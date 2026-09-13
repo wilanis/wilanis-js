@@ -19,8 +19,10 @@ export { coerceWire, Embedder, type FireOptions, fillTemplates, prune } from './
 export { cli as cliTriggers } from './plugins/cli-trigger.js';
 export { BUILTIN_PLUGINS } from './plugins/index.js';
 export { std } from './plugins/std.js';
+export { postLoad } from './post-load.js';
 export { loadProject, type PluginResolution, resolveIncludes, resolvePlugins } from './project.js';
-export { contentTypeOf, postLoad, runStartup, runTrigger, Served, start } from './serve.js';
+export { contentTypeOf, runStartup, runTrigger, start } from './serve.js';
+export { Served } from './served.js';
 export {
   describe,
   embedderFor,

@@ -3,8 +3,8 @@
  * plugin.json, ports, trigger kinds, connection kinds, codecs, shapes -- JSON files a reader can open, the way
  * a library ships headers), the handlers behind its native
  * operations, the runtimes behind its trigger kinds, the codecs behind its content types, and two hooks:
- * `check` for its own rules, `postLoad` for work that happens once the tree is loaded and judged -- and, for the one
- * plugin that identifies callers, a `guard`.
+ * `check` for its own rules, `postLoad` for work that happens every time the tree is loaded and judged -- and, for
+ * the one plugin that identifies callers, a `guard`.
  *
  * A plugin package exports its PluginModule as the default export; project.json names the package in
  * `plugins[].from` and the runtime imports it. @std and @cli are built into the runtime and need no `from`.
@@ -66,6 +66,8 @@ export interface Serving {
    * Load and judge the tree again, and serve it if it is clean. The runtime does the loading and the judging
    * -- a plugin never imports the compiler -- so a watcher only decides *when*. A tree that refuses is not
    * served: the refusals come back and whatever is already listening keeps answering from the last good one.
+   * The plugins are the ones the tree was started with, not whatever `plugins[].from` now resolves to: a
+   * reload serves the same plugins against a new tree, and a plugin added to project.json needs a restart.
    */
   reload(): Promise<{ ok: true; documents: number } | { ok: false; refusals: string }>;
   /** The directory of the tree being served, for a watcher that has to know what to watch. */
@@ -218,8 +220,11 @@ export interface PluginModule {
   /** Plugin-specific rules (X codes), run by `checkTree` after the generic ones. */
   check?(ctx: PluginCheckContext): void;
   /**
-   * Runs once after the tree is loaded and checked, before any trigger starts: open connections, warm
-   * caches, register parsers. May hand back a teardown, run when the runtime stops.
+   * Runs once per load of the tree, after it is checked and before any trigger starts: open connections, warm
+   * caches, register parsers. A reload is that happening again, so this runs once more, against the new
+   * tree's environment, and what it sets up belongs to that tree alone -- never to the process. May hand back
+   * a teardown, run when the tree it set up stops being served: on a reload, once the new tree is serving.
+   * Whatever it holds must be released there, or a tree that reloads holds a little more each time.
    */
   postLoad?(ctx: PostLoadContext): Promise<void | (() => Promise<void>)>;
 }
