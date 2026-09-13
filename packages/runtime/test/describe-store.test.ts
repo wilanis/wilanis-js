@@ -1,15 +1,18 @@
 /**
- * What `wilanis describe` says about a store, and about a shape a store keeps. A store is where a feature
- * writes down what it persists and what it holds those records to; a reader who cannot see the marks has to
- * open the JSON, which is the one thing the viewer and `describe` exist to avoid.
+ * What `wilanis ls`, `wilanis describe` and `wilanis map` say about a store, the port it is reached through,
+ * and a shape a store keeps. A store is where a feature writes down what it persists and what it holds those
+ * records to; none of what makes it reachable -- which engine keeps the records, what type a key is, which
+ * graphs run against it -- is in the document, so a reader who cannot see it has to walk the tree by hand,
+ * which is the one thing the viewer and `describe` exist to avoid.
  *
- * The example keeps nothing yet (RFC 0002 step 8), so the store is planted.
+ * The marks are exercised against a planted store, which declares more of them than the example needs; the
+ * engine, the key's type, the calls and the map line are exercised against the example's own.
  */
 import { rmSync } from 'node:fs';
-import { schemaUrl } from '@wilanis/core';
+import { loadTree, schemaUrl } from '@wilanis/core';
 import { afterAll, describe, expect, it } from 'vitest';
-import { describe as describeDoc } from '../src/index.js';
-import { loadedWith } from './example-harness.js';
+import { describe as describeDoc, ls, map } from '../src/index.js';
+import { EXAMPLE, INCLUDES, loadedWith, PLUGINS } from './example-harness.js';
 
 const shape = (label: string, fields: Record<string, unknown>) => ({
   $schema: schemaUrl('shape'),
@@ -83,5 +86,85 @@ describe('describe: a shape a store keeps', () => {
 
   it('says nothing of the sort about a shape no store keeps', () => {
     expect(describeDoc(load, '@monitor/domain/Digest.shape.json')).not.toContain('held by');
+  });
+});
+
+// ---- the example's own store, the one a reader meets -------------------------------------------------
+
+const example = loadTree(EXAMPLE, PLUGINS, INCLUDES);
+const KEPT = '@features/monitor/data/entries.store.json';
+
+describe('ls: the stores of a tree', () => {
+  it('lists a store under its kind, as every other kind is listed', () => {
+    expect(ls(example, 'store')).toEqual([`store            ${KEPT}`]);
+  });
+
+  it('lists it among everything else too, so a reader who asks for no kind still finds it', () => {
+    expect(ls(example).some(line => line.includes(KEPT))).toBe(true);
+  });
+});
+
+describe('describe: the engine behind a store', () => {
+  const said = () => describeDoc(example, KEPT);
+
+  it('says which connection kind keeps the records, and the plugin and package that grant it', () => {
+    expect(said()).toContain('connection  @connections/entries.connection.json');
+    expect(said()).toContain(
+      'engine      @storage-memory/memory.connection-kind.json  granted by @storage-memory (@wilanis/plugin-storage-memory)',
+    );
+  });
+
+  it("says the type of a collection's key, read from the shape rather than repeated by the store", () => {
+    expect(said()).toContain('    key         id: string');
+  });
+
+  it('names every graph that runs an operation against it, with the operation and the collection', () => {
+    expect(said()).toContain('run against by (the operation each runs):');
+    expect(said()).toContain('    @features/monitor/data/kept-get.graph.json#asked  get (entries)');
+    expect(said()).toContain('    @features/monitor/data/kept-record.graph.json#key  newKey (entries)');
+    expect(said()).toContain('    @features/monitor/data/kept-record.graph.json#saved  put (entries)');
+  });
+});
+
+describe('describe: the port a store is reached through', () => {
+  const said = () => describeDoc(example, '@storage/store.port.json');
+
+  it('says which plugin grants it, as every native port does', () => {
+    expect(said()).toContain('granted by  @storage  (@wilanis/plugin-storage)');
+  });
+
+  it('lays out every operation with what it accepts and answers', () => {
+    for (const op of ['#get', '#find', '#count', '#put', '#patch', '#remove', '#newKey']) expect(said()).toContain(op);
+    expect(said()).toContain('    returns {record?: $T}');
+  });
+
+  it('says where the record type and the key type come from, rather than asking a caller to repeat them', () => {
+    expect(said()).toContain('binds $T from collections[collection].of');
+    expect(said()).toContain('binds $K from collections[collection].of{key}.type');
+  });
+
+  it('lays the where grammar out where find and count accept it, so a reader never guesses a filter', () => {
+    const where = said()
+      .split('\n')
+      .filter(line => line.trimStart().startsWith('in  where?:'));
+    expect(where).toHaveLength(2);
+    for (const line of where) {
+      expect(line).toContain('one or more of eq, ne, lt, lte, gt, gte');
+      expect(line).toContain('all, any');
+      expect(line).toContain('not');
+    }
+  });
+});
+
+describe('map: where a node lands', () => {
+  const lines = () => map(example);
+
+  it('ends a store call at the records, naming the store, the collection and the operation', () => {
+    expect(lines()).toContain(`      asked @storage/store.port.json#get  (effect) → store ${KEPT} entries (get)`);
+    expect(lines()).toContain(`      asked @storage/store.port.json#remove  (effect) → store ${KEPT} entries (remove)`);
+  });
+
+  it('leaves a call that is not a store call as it was', () => {
+    expect(lines().some(line => line.includes('@std/object.port.json#make') && line.includes('store'))).toBe(false);
   });
 });

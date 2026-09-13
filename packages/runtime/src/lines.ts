@@ -1,10 +1,19 @@
 /**
  * How one document's contract reads: a type as a reader sees it, one field of a shape or a settings block, and
- * one operation of a port with the inputs it accepts -- and, for a store, the marks each collection holds its
- * records to. `wilanis describe` prints these; where a type variable comes from is among them, since a
- * contract that resolves a type says so and no caller repeats it.
+ * one operation of a port with the inputs it accepts -- and, for a store, the engine behind it, the marks each
+ * collection holds its records to, and the graphs that run against it. `wilanis describe` prints these; where a
+ * type variable comes from is among them, since a contract that resolves a type says so and no caller repeats it.
  */
-import { type Collection, type Loaded, type PortDoc, type Scope, type StoreDoc, show } from '@wilanis/core';
+import {
+  type Collection,
+  type Loaded,
+  type LoadResult,
+  type PortDoc,
+  type Scope,
+  type StoreDoc,
+  show,
+} from '@wilanis/core';
+import { callsAgainst, engineOf, keyTypeOf } from './stores.js';
 
 /** A spec as one reader sees it, or the spec itself when it does not resolve. */
 export function shower(scope: Scope) {
@@ -108,11 +117,17 @@ function defaultsMark(collection: Collection): string[] {
   return [markLine('default', defaults.map(([field, value]) => `${field} = ${JSON.stringify(value)}`).join(', '))];
 }
 
+/** The key of a collection, with its type where the shape it names declares the field. */
+function keyMark(collection: Collection, scope: Scope): string {
+  const type = keyTypeOf(collection.of, collection.key, scope);
+  return markLine('key', type ? `${collection.key}: ${type}` : collection.key);
+}
+
 /** One collection: the shape it holds, what identifies a record, and every mark it declares. */
-function collectionLines(name: string, collection: Collection, store: StoreDoc): string[] {
+function collectionLines(name: string, collection: Collection, store: StoreDoc, scope: Scope): string[] {
   return [
     `  collection ${name}: ${collection.of}`,
-    markLine('key', collection.key),
+    keyMark(collection, scope),
     ...uniqueMark(collection),
     ...refsMark(collection, store),
     ...defaultsMark(collection),
@@ -121,13 +136,39 @@ function collectionLines(name: string, collection: Collection, store: StoreDoc):
 }
 
 /**
- * A store: the connection its records live behind, and every collection with what it holds its records to.
- * A mark family with nothing to say prints no line, so a collection that declares nothing reads as one.
+ * Which engine keeps these records: the connection, and the plugin whose connection kind it is. Who implements
+ * a thing is never a code detail, so a store says the package as a native port does.
  */
-export function storeLines(doc: Loaded): string[] {
+function engineLines(store: StoreDoc, scope: Scope): string[] {
+  const engine = engineOf(store, scope);
+  const lines = [`connection  ${engine.connection}`];
+  if (!engine.kind) return lines;
+  const granted = engine.plugin ? `  granted by ${engine.plugin}${engine.from ? ` (${engine.from})` : ''}` : '';
+  return [...lines, `engine      ${engine.kind}${granted}`];
+}
+
+/** Every call site that runs an operation of the store port against this store, and which collection each names. */
+function runLines(path: string, load: LoadResult, scope: Scope): string[] {
+  const calls = callsAgainst(path, load, scope);
+  if (!calls.length) return ['run against by  nothing yet -- no graph names this store'];
+  return [
+    'run against by (the operation each runs):',
+    ...calls.map(call => `    ${call.file}#${call.where}  ${call.op}${call.collection ? ` (${call.collection})` : ''}`),
+  ];
+}
+
+/**
+ * A store: the engine its records live behind, every collection with what it holds its records to, and the
+ * graphs that run an operation against it. A mark family with nothing to say prints no line, so a collection
+ * that declares nothing reads as one.
+ */
+export function storeLines(doc: Loaded, load: LoadResult, scope: Scope): string[] {
   const store = doc.doc as StoreDoc;
   return [
-    `connection  ${store.connection}`,
-    ...Object.entries(store.collections).flatMap(([name, collection]) => collectionLines(name, collection, store)),
+    ...engineLines(store, scope),
+    ...Object.entries(store.collections).flatMap(([name, collection]) =>
+      collectionLines(name, collection, store, scope),
+    ),
+    ...runLines(doc.path, load, scope),
   ];
 }

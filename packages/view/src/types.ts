@@ -77,6 +77,25 @@ export interface VNode {
   bind?: Record<string, string>;
   /** On a node that refuses on purpose: every trigger that can reach it, and how each answers its reason. */
   answeredBy?: VAnsweredBy[];
+  /** On a node that runs an operation of the store port: the records it reaches, so a click opens them. */
+  keeps?: VKeeps;
+}
+
+/**
+ * Where one node's records are: the store document, the collection of it the node names, the shape that
+ * collection holds and the operation run against it. A graph names a store and a collection and nothing else,
+ * so this is the one hop from a node to what it reads or writes.
+ */
+export interface VKeeps {
+  /** The store document, canonical. */
+  store: string;
+  label: string;
+  /** The collection by the name it declares; absent where the node writes none. */
+  collection?: string;
+  /** The shape that collection holds, when the store declares it. */
+  of?: string;
+  /** The operation of the store port, by its short name. */
+  op: string;
 }
 
 /**
@@ -175,6 +194,39 @@ export interface DocView {
   proves?: string[];
   /** On a policy: every trigger that names it. */
   gates?: { path: string; label: string }[];
+  /** On a store: the engine behind it, its collections with their key types, and the calls run against it. */
+  store?: VStore;
+}
+
+/**
+ * What a store page needs beyond its own JSON: which engine keeps the records and which plugin grants that
+ * engine, each collection's key with the type the shape gives it, and every call site that runs an operation
+ * against it. None of it is in the document, so a reader who has only the JSON cannot see any of it.
+ */
+export interface VStore {
+  /** The connection its records live behind, canonical. */
+  connection: string;
+  connectionLabel: string;
+  /** The connection kind that connection is of, canonical; empty where the connection names none. */
+  kind: string;
+  kindLabel: string;
+  /** The plugin alias that grants the kind (@storage-memory), when the kind is a plugin's. */
+  plugin?: string;
+  /** The npm package that ships that plugin, when the project names one. */
+  from?: string;
+  /** The type of each collection's key, by collection name, where the shape declares the field. */
+  keyTypes: Record<string, string>;
+  /** Every call that runs an operation against this store. */
+  calls: VStoreCall[];
+}
+
+/** One call against a store: the document it sits in, where in it, the operation and the collection. */
+export interface VStoreCall {
+  file: string;
+  label: string;
+  where: string;
+  op: string;
+  collection?: string;
 }
 
 /** One refusal reason at a trigger: how the trigger answers it (absent: not mapped), and where it comes from (empty: nothing reaches it). */
