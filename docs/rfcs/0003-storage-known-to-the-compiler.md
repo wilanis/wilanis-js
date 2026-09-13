@@ -92,13 +92,12 @@ Misspell the field and `wilanis check` answers, instead of the handler at run ti
 ```
 X208  @features/monitor/data/list-rows.graph.json#nodes/asked/in/where/methd
     'methd' is not a field of @monitor/domain/Entry.shape.json (fields: id, url, method, ua)
-    → wilanis describe @monitor/domain/Entry.shape.json
+    → wilanis describe @monitor/data/entries.store.json
 ```
 
-Write `{ "method": 7 }` and the answer is that `method` is a string, not a number. Write `{ "ua":
-{ "lt": "x" } }` and the answer is that an ordering does not apply where the field is optional and only `has`
-may test it, as RFC 0002's `where` grammar says. Patch `{ "id": "other" }` and the answer is that a key is
-never patched.
+Write `{ "method": 7 }` and the answer is that `method` is a string, not a number. Write `{ "method":
+{ "like": "G%" } }` and the answer is that `like` is not an operator the grammar names, as RFC 0002's
+`where` grammar says. Patch `{ "id": "other" }` and the answer is that a key is never patched.
 
 The declaration reaches PostgreSQL at start, the way RFC 0002 arranges it: a startup step names a domain
 operation, and the profile's binding delegates it to `@storage/storage.port.json#ensure`:
@@ -235,9 +234,9 @@ settled which shape the collection holds, so every rule below reads that shape.
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
-| X208 | `rules.ts` | a key of `where` (at any nesting under `all`, `any`, `not`), or an `order` entry's `by`, is neither a field of the shape nor a combinator | `wilanis describe <shape>` |
-| X209 | `rules.ts` | a `where` value -- a literal, or a read typed where it comes from -- is not assignable to the field's type (`eq`, `ne`, `lt`, `lte`, `gt`, `gte`), or is not a list of it (`in`, `notIn`), or is not a boolean (`has`), or is not a string (`contains`, `startsWith`) | `<field> is <type>` |
-| X210 | `rules.ts` | a `where` operator is one the field's type does not admit under RFC 0002's **The `where` grammar**: `contains` or `startsWith` on a non-string, an ordering on a boolean, anything but `has` on a field that is a shape or a list, or an operator the grammar does not name | `see The where grammar in @storage/store.port.json` |
+| X208 | `rules.ts` | a key of `where` (at any nesting under `all`, `any`, `not`), or an `order` entry's `by`, is neither a field of the shape nor a combinator | `wilanis describe <the store>` |
+| X209 | `rules.ts` | a `where` value -- a literal, or a read typed where it comes from -- is not assignable to the field's type (`eq`, `ne`, `lt`, `lte`, `gt`, `gte`), or is a list of the wrong thing (`in`, `notIn`), or is not a boolean (`has`), or is not a string (`contains`, `startsWith`) | `<field> is <type>` |
+| X210 | `rules.ts` | a `where` operator is one the field's type does not admit under RFC 0002's **The `where` grammar**: `contains` or `startsWith` on a non-string, an ordering on a boolean, anything but `has` on a field that is a shape or a list, or an operator the grammar does not name; and a literal `in` or `notIn` that is not a list, which the grammar refuses as the shape of a test while it parses, before any value is judged | `see The where grammar in @storage/store.port.json` |
 | X211 | `rules.ts` | a `patch` whose `changes` is a literal object names the key, a field the shape lacks, or gives a value not assignable to the field's type; a `changes` that is one read is judged as an object against the shape with every field optional | `a key identifies; it is never patched` / `wilanis describe <shape>` |
 | X212 | `rules.ts` | `ensure` is run by a graph node, or delegated to by a binding operation that no startup step reaches under any profile | `name the domain operation in project.json → startup; ensure runs once, before the port opens` |
 | X213 | `rules.ts` | a graph or binding of one feature names a store of another | `reach another feature's records through its domain port` |
@@ -346,9 +345,10 @@ In `packages/plugin-storage/test/rules.test.ts`, extending RFC 0002's small tree
 
 - X208: `where: { methd: "GET" }`; `where: { any: [{ nope: 1 }] }`; `order: [{ by: "nope" }]`.
 - X209: `where: { method: 7 }`; `where: { method: "{{in.count}}" }` with `count: number`;
-  `where: { method: { in: "GET" } }`; `where: { ua: { has: "yes" } }`.
-- X210: `where: { url: { lt: "a" } }` on an optional field; `where: { method: { contains: 1 } }` on a number
-  field; `where: { method: { like: "G%" } }`.
+  `where: { hits: { in: ["a"] } }`, a list of the wrong thing; `where: { ua: { has: "yes" } }`.
+- X210: `where: { ok: { gt: false } }` on a boolean field; `where: { hits: { contains: "2" } }` on a number
+  field; `where: { tags: { eq: [...] } }` on a list; `where: { url: { like: "x" } }`; and a literal
+  `where: { url: { in: "GET" } }`, which is not a list.
 - X211: `changes: { id: "other" }`; `changes: { nope: 1 }`; `changes: { url: 7 }`; `changes: "{{in.changes}}"`
   where `changes` is an edge shape with a field the record shape lacks.
 - X212: `ensure` in a graph node; a binding delegating to `ensure` that no startup step reaches.
