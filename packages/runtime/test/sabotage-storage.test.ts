@@ -9,7 +9,7 @@
  */
 import { schemaUrl } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
-import { plantedAll, plantedPointing } from './example-harness.js';
+import { planted, plantedAll, plantedPointing, sabotage } from './example-harness.js';
 
 const KEPT = '@connections/entries.connection.json';
 const shape = (label: string, fields: Record<string, unknown>) => ({
@@ -146,5 +146,59 @@ describe('sabotage: what a store holds its records to', () => {
       notes: notes({ refs: { entryId: { collection: 'rows' } } }),
     };
     expect(pointingAt(referring)).toEqual(at('R001', 'rows/of'));
+  });
+});
+
+/**
+ * What a call means once the store is understood: which fields a patch may change, where `ensure` is reached
+ * from, and whose records a feature keeps. These break the example's own documents, since RFC 0002 step 8
+ * gave it a store that graphs really call.
+ */
+describe('what a call may do to the records', () => {
+  it('X211 a patch that changes the key: a key identifies, so it is never patched', () => {
+    const found = sabotage('features/monitor/data/kept-update.graph.json', doc => {
+      doc.nodes[0].in.changes.id = 'other';
+    });
+    expect(found).toContain('X211');
+  });
+
+  it('X211 a patch that changes a field the shape does not have', () => {
+    const found = sabotage('features/monitor/data/kept-update.graph.json', doc => {
+      doc.nodes[0].in.changes.nope = 'x';
+    });
+    expect(found).toContain('X211');
+  });
+
+  it('X211 a patch whose value the field would not accept', () => {
+    const found = sabotage('features/monitor/data/kept-update.graph.json', doc => {
+      doc.nodes[0].in.changes.url = 7;
+    });
+    expect(found).toContain('X211');
+  });
+
+  it('X212 ensure run by a graph node: it prepares the engine once, before the port opens', () => {
+    const found = sabotage('features/monitor/data/kept-get.graph.json', doc => {
+      doc.nodes[0].run = '@storage/storage.port.json#ensure';
+    });
+    expect(found).toContain('X212');
+  });
+
+  it("X213 a graph of one feature naming another feature's store", () => {
+    // hello keeps nothing; monitor's records are monitor's, and hello asks monitor's domain port for them
+    const found = planted('features/hello/data/peek.graph.json', {
+      $schema: schemaUrl('graph'),
+      label: 'Peek at what monitor keeps',
+      description: "A data graph of one feature reaching into another feature's collection.",
+      nodes: [
+        {
+          type: '@wilanis/node/run.schema.json',
+          id: 'asked',
+          label: 'Read a record',
+          run: '@storage/store.port.json#get',
+          in: { store: '@monitor/data/entries.store.json', collection: 'entries', key: 'x' },
+        },
+      ],
+    });
+    expect(found).toContain('X213');
   });
 });
