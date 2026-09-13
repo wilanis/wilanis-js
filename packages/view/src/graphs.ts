@@ -4,7 +4,7 @@
  * or map node where its operation leads. A deep read opens the field it reads as an attribute port under its parent,
  * so the edge leaves the attribute.
  */
-import type { GraphDoc, Loaded, Scope, Type } from '@wilanis/core';
+import type { GraphDoc, Loaded, Scope, Type, Values } from '@wilanis/core';
 import { isMap, isRun, isSwitch, show, splitPath, typeAt } from '@wilanis/core';
 import {
   attributePorts,
@@ -20,6 +20,7 @@ import {
 } from './ports.js';
 import { answeredBy } from './refusals.js';
 import { said } from './said.js';
+import { keepsOf } from './stores.js';
 import type { DocView, VEdge, VNode } from './types.js';
 import { labelOf, readable } from './types.js';
 
@@ -124,6 +125,12 @@ class GraphBuilder {
     });
   }
 
+  /** What a node adds when it reaches a store, as a spread: nothing at all when it reaches none. */
+  private keeps(run: string, given: Values | undefined) {
+    const keeps = keepsOf(this.scope, run, given);
+    return keeps ? { keeps } : {};
+  }
+
   /** One node of the graph: a switch becomes a rule node per rule, a run or a map becomes one node. */
   private addNode(node: GraphDoc['nodes'][number]) {
     if (isSwitch(node)) {
@@ -202,6 +209,7 @@ class GraphBuilder {
       outputs: outputPorts(result, target.op),
       target: target.target,
       ...(target.target.refuses ? { answeredBy: answeredBy(this.scope, this.graph.path, node.id) } : {}),
+      ...this.keeps(node.run, node.in),
     });
     wire(this.edges, node.id, node.in, this.resolvers);
   }
@@ -227,6 +235,7 @@ class GraphBuilder {
       target: target.target,
       bind: node.bind,
       onItemFailure: node.onItemFailure,
+      ...this.keeps(node.run, node.in),
     });
     wire(this.edges, node.id, { over: node.over, ...(node.in ?? {}) }, this.resolvers);
   }

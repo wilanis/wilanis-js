@@ -17,6 +17,7 @@ import { graphView } from './graphs.js';
 import { stemOf, targetOf } from './ports.js';
 import { callersOf, type IndexedRef, referenceIndex } from './references.js';
 import { answersOf } from './refusals.js';
+import { storeView } from './stores.js';
 import type { DocView } from './types.js';
 import { labelOf, readable } from './types.js';
 
@@ -161,5 +162,6 @@ export function viewOf(load: LoadResult, ref: string): DocView | undefined {
   if (doc.kind === 'port') view.implementations = implementationsOf(scope, doc.path);
   if (doc.kind === 'trigger') triggerView(scope, doc, view);
   if (doc.kind === 'policy') policyView(scope, doc, view);
+  if (doc.kind === 'store') view.store = storeView(scope, load, doc);
   return view;
 }

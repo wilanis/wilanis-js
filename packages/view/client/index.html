@@ -495,21 +495,37 @@
         break;
       }
       case 'store': {
-        const chain = el('div', 'chain'); chain.appendChild(step('kept behind', link(d.connection))); page.appendChild(chain);
+        const s = v.store || { keyTypes: {}, calls: [] };
+        const chain = el('div', 'chain'); chain.appendChild(step('kept behind', link(d.connection)));
+        if (s.kind) { chain.appendChild(arrow()); chain.appendChild(step('by the engine', link(s.kind, s.kindLabel))); }
+        page.appendChild(chain);
+        if (s.plugin) { const p = el('p'); p.appendChild(frag('Granted by ')); p.appendChild(link(s.plugin + '/plugin.json', s.plugin)); p.appendChild(frag(s.from ? ' (' + s.from + '), which carries the code that keeps these records. Swapping engines is swapping the connection\u2019s kind; no graph below changes.' : ', which carries the code that keeps these records.')); page.appendChild(p); }
         page.appendChild(el('h2', null, 'Collections'));
         page.appendChild(el('p', null, 'What this feature keeps, by name. The collection is where the record type is written down, so a graph names the store and the collection and never repeats the shape.'));
         const uniqueOf = c => (c.unique || []).map(fields => '[' + fields.join(', ') + ']').join(', ');
         const refsOf = c => Object.entries(c.refs || {}).map(([f, r]) => f + ' \u2192 ' + r.collection + '.' + ((d.collections[r.collection] || {}).key || '?') + (r.onRemove ? ' (' + r.onRemove + ' on remove)' : '')).join(', ');
         const defaultsOf = c => Object.entries(c.defaults || {}).map(([f, v]) => f + ' = ' + JSON.stringify(v)).join(', ');
+        const keyOf = (name, c) => s.keyTypes[name] ? c.key + ': ' + s.keyTypes[name] : c.key;
         const t = el('table'); const hd = el('tr'); for (const h of ['collection', 'records of', 'keyed by', 'unique', 'refs', 'default', 'holds']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
         for (const [name, c] of Object.entries(d.collections)) {
           const tr = el('tr'); tr.appendChild(el('td', 'name', name));
-          tr.appendChild(el('td')).appendChild(typeEl(c.of)); tr.appendChild(el('td', 'mono', c.key));
+          tr.appendChild(el('td')).appendChild(typeEl(c.of)); tr.appendChild(el('td', 'mono', keyOf(name, c)));
           tr.appendChild(el('td', 'mono', uniqueOf(c))); tr.appendChild(el('td', 'mono', refsOf(c))); tr.appendChild(el('td', 'mono', defaultsOf(c)));
           tr.appendChild(el('td', 'desc', c.description || ''));
           t.appendChild(tr);
         }
         page.appendChild(t);
+        page.appendChild(el('h2', null, 'Run against by (' + s.calls.length + ')'));
+        if (!s.calls.length) page.appendChild(el('p', null, 'No graph names this store yet.'));
+        else {
+          const ct = el('table'); const ch = el('tr'); for (const h of ['where', 'node', 'runs', 'collection']) ch.appendChild(el('th', null, h)); ct.appendChild(ch);
+          for (const c of s.calls) {
+            const tr = el('tr'); tr.appendChild(el('td')).appendChild(link(c.file, c.label));
+            tr.appendChild(el('td', 'name', c.where)); tr.appendChild(el('td', 'mono', c.op)); tr.appendChild(el('td', 'mono', c.collection || ''));
+            ct.appendChild(tr);
+          }
+          page.appendChild(ct);
+        }
         break;
       }
       case 'connection': {
@@ -623,6 +639,14 @@
       const t = n.target;
       box.appendChild(el('h4', null, 'runs'));
       const p = el('p'); p.appendChild(link(t.port, t.portLabel + SEP + t.opName)); p.appendChild(document.createTextNode(t.refuses ? ' (ends the graph on purpose; the reason is what the trigger maps)' : t.native ? (t.effect ? ' (a native effect)' : ' (pure, native)') : ' (a domain port)')); box.appendChild(p);
+      if (n.keeps) {
+        const k = n.keeps;
+        box.appendChild(el('h4', null, 'records'));
+        const r = el('div', 'ref'); r.appendChild(link(k.store, k.label, 'primary'));
+        r.appendChild(el('span', 'sub', k.collection ? 'collection ' + k.collection + ', ' + k.op : k.op));
+        box.appendChild(r);
+        if (k.of) { const q = el('div', 'row'); q.appendChild(el('span', 'name req', 'records of')); q.appendChild(typeLink(k.of)); box.appendChild(q); }
+      }
       if (n.answeredBy) {
         box.appendChild(el('h4', null, `answered by (${n.answeredBy.length})`));
         if (!n.answeredBy.length) box.appendChild(el('p', null, 'no trigger reaches this node'));

@@ -14,6 +14,7 @@ import {
   type TriggerKindDoc,
 } from '@wilanis/core';
 import { fieldLine, portLines, shower, storeLines } from './lines.js';
+import { storeTail } from './stores.js';
 
 // ---- discovery --------------------------------------------------------------------------------------
 
@@ -191,7 +192,7 @@ function kindBody(doc: Loaded, load: LoadResult, scope: Scope, showType: (spec: 
   if (doc.kind === 'trigger-kind' || doc.kind === 'connection-kind' || doc.kind === 'plugin')
     return kindLines(doc, showType);
   if (doc.kind === 'shape') return shapeLines(doc, scope, load);
-  if (doc.kind === 'store') return storeLines(doc);
+  if (doc.kind === 'store') return storeLines(doc, load, scope);
   if (doc.kind === 'policy') return policyLines(doc, load);
   if (doc.kind === 'trigger') return triggerLines(doc);
   return [JSON.stringify(doc.doc, null, 2)];
@@ -235,7 +236,10 @@ function nodeLines(node: Record<string, unknown>, indent: string, scope: Scope):
   const run = String(node.run);
   const found = scope.op(run);
   if (typeof found === 'string') return { lines: [`${indent}  ${id} ?? ${run}`] };
-  if (found.port.native) return { lines: [`${indent}  ${id} ${run}${found.op.pure ? '' : '  (effect)'}`] };
+  if (found.port.native) {
+    const effect = found.op.pure ? '' : '  (effect)';
+    return { lines: [`${indent}  ${id} ${run}${effect}${storeTail(run, node.in as Record<string, unknown>, scope)}`] };
+  }
   const binding = scope.bindingFor(found.path);
   const lines = [`${indent}  ${id} ${run}`];
   if (typeof binding === 'string') return { lines: [...lines, `${indent}    ?? ${binding}`] };
