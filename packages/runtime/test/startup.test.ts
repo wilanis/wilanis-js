@@ -13,7 +13,7 @@ describe("the project's startup steps", () => {
    * `holds` operation standing in for a listener. `calls` records the order of the plugin's postLoad, each
    * startup step, and the moment the listener opened -- so the tests can say what started, and whether.
    */
-  const tree = (startup: unknown[], onBoot: () => unknown) => {
+  const tree = (startup: unknown[], onBoot: () => unknown, onDown?: () => void) => {
     const calls: string[] = [];
     /** What the fake listener was given as `env.serving`: the way a test asks the tree to load itself again. */
     let serving: { reload: () => Promise<{ ok: boolean }> } | undefined;
@@ -59,6 +59,7 @@ describe("the project's startup steps", () => {
         calls.push('postLoad');
         return async () => {
           calls.push('postLoadDown');
+          onDown?.();
         };
       },
     };
@@ -119,6 +120,27 @@ describe("the project's startup steps", () => {
     await stop();
     // one listener was ever held, and the tree serving now is the one whose teardown runs last
     expect(calls).toEqual(['postLoad', 'listening', 'postLoad', 'postLoadDown', 'stopped', 'postLoadDown']);
+  });
+
+  it('a reload whose old tree will not stop cleanly still serves the new one', async () => {
+    // the swap has happened by the time the old teardown runs: what it failed to release is worth saying,
+    // but reporting it as a reload that did not happen would leave a caller retrying a tree already serving
+    const lines: string[] = [];
+    const { dir, calls, plugins, serving } = tree(
+      [listen],
+      () => 'ok',
+      () => {
+        throw new Error('the connection would not close');
+      },
+    );
+    const { stop } = await start(loadTree(dir, plugins), { log: line => lines.push(line) });
+
+    const again = await serving()?.reload();
+    expect(again?.ok).toBe(true);
+    expect(calls).toEqual(['postLoad', 'listening', 'postLoad', 'postLoadDown']);
+    expect(lines.some(line => line.includes('the old tree did not stop cleanly'))).toBe(true);
+
+    await expect(stop()).rejects.toThrow('the connection would not close');
   });
 
   it('every step runs in order, after postLoad, and the listener is one of them', async () => {
