@@ -71,6 +71,7 @@ describe('the example tree', () => {
       '@std',
       '@storage',
       '@storage-memory',
+      '@storage-postgres',
     ]);
   });
 });

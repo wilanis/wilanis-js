@@ -34,6 +34,9 @@ const rows: Record<string, unknown>[] = [];
 
 beforeAll(async () => {
   process.env.MONITOR_JWT_SECRET = SECRET;
+  // every connection's secrets are substituted whatever the profile, and the example now has one over a
+  // database; nothing here dials it, so any well-formed URL will do
+  process.env.MONITOR_DATABASE_URL = 'postgres://monitor:monitor@localhost:5432/monitor';
   const upstream: Server = fakeUpstream(rows);
   stopUpstream = await listening(upstream, UPSTREAM);
   key = await issuerKey();

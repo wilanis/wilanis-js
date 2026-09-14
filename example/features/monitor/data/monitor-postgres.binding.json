@@ -1,0 +1,63 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/binding.schema.json",
+  "label": "PostgreSQL storage",
+  "description": "What monitor.port.json means under the production profile: the same business graphs, over the same declaration, kept in PostgreSQL. Only the store each data graph names differs from @monitor/data/monitor-store.binding.json, which is the one thing a profile cannot swap for itself yet.",
+  "port": "@monitor/domain/monitor.port.json",
+  "operations": {
+    "listAll": {
+      "graph": "@monitor/data/kept-list-postgres.graph.json"
+    },
+    "listByMethod": {
+      "graph": "@monitor/data/kept-list-by-method-postgres.graph.json"
+    },
+    "get": {
+      "graph": "@monitor/data/kept-get-postgres.graph.json"
+    },
+    "record": {
+      "graph": "@monitor/data/kept-record-postgres.graph.json"
+    },
+    "update": {
+      "graph": "@monitor/data/kept-update-postgres.graph.json"
+    },
+    "remove": {
+      "graph": "@monitor/data/kept-remove-postgres.graph.json"
+    },
+    "removeMany": {
+      "description": "The business graph that fans one removal out per id and waits for all of them.",
+      "graph": "@monitor/domain/remove-entries.graph.json"
+    },
+    "submit": {
+      "description": "The business graph that attributes and records.",
+      "graph": "@monitor/domain/record-entry.graph.json"
+    },
+    "list": {
+      "description": "The business graph that routes on the filter.",
+      "graph": "@monitor/domain/list-entries.graph.json"
+    },
+    "digest": {
+      "description": "The business graph that composes the digest.",
+      "graph": "@monitor/domain/digest.graph.json"
+    },
+    "parseDrafts": {
+      "graph": "@monitor/data/parse-drafts.graph.json"
+    },
+    "toCsv": {
+      "graph": "@monitor/data/write-csv.graph.json"
+    },
+    "import": {
+      "description": "The business graph that reads the file and submits each row.",
+      "graph": "@monitor/domain/import-entries.graph.json"
+    },
+    "export": {
+      "description": "The business graph that lists and writes the file.",
+      "graph": "@monitor/domain/export-entries.graph.json"
+    },
+    "prepare": {
+      "description": "Create the collections the store declares, and leave alone any that are there. The startup step names this operation, so what a tree prepares is what its project.json says it prepares.",
+      "run": "@storage/storage.port.json#ensure",
+      "in": {
+        "store": "@monitor/data/entries-postgres.store.json"
+      }
+    }
+  }
+}

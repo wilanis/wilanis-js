@@ -46,12 +46,13 @@
     "@wilanis/engine": "0.1.0"
   },
   "devDependencies": {
-    "@wilanis/plugin-http": "0.1.0",
-    "@wilanis/plugin-blob": "0.1.0",
-    "@wilanis/plugin-reload": "0.1.0",
     "@wilanis/plugin-auth": "0.1.0",
+    "@wilanis/plugin-blob": "0.1.0",
+    "@wilanis/plugin-http": "0.1.0",
+    "@wilanis/plugin-reload": "0.1.0",
     "@wilanis/plugin-storage": "0.1.0",
-    "@wilanis/plugin-storage-memory": "0.1.0"
+    "@wilanis/plugin-storage-memory": "0.1.0",
+    "@wilanis/plugin-storage-postgres": "0.1.0"
   },
   "publishConfig": {
     "access": "public"

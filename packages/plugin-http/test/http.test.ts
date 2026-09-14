@@ -8,6 +8,7 @@ import blobs from '@wilanis/plugin-blob';
 import reload from '@wilanis/plugin-reload';
 import storage from '@wilanis/plugin-storage';
 import memory from '@wilanis/plugin-storage-memory';
+import postgres from '@wilanis/plugin-storage-postgres';
 import { BUILTIN_PLUGINS, start } from '@wilanis/runtime';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import http, { encode } from '../src/index.js';
@@ -39,6 +40,9 @@ const call = caller(() => token);
 beforeAll(async () => {
   stopUpstream = await listening(fakeUpstream({ rows, inFlight }), UPSTREAM);
   process.env.MONITOR_JWT_SECRET = SECRET;
+  // every connection's secrets are substituted whatever the profile, and the example now has one over a
+  // database; nothing here dials it, so any well-formed URL will do
+  process.env.MONITOR_DATABASE_URL = 'postgres://monitor:monitor@localhost:5432/monitor';
   dir = localCopy();
   // a copy outside the workspace cannot resolve plugins[].from through node_modules, so the plugins are handed in
   const load = loadTree(
@@ -51,6 +55,7 @@ beforeAll(async () => {
       '@auth': auth,
       '@storage': storage,
       '@storage-memory': memory,
+      '@storage-postgres': postgres,
     },
     INCLUDES,
   );

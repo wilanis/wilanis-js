@@ -68,6 +68,10 @@
     {
       "use": "@storage-memory",
       "from": "@wilanis/plugin-storage-memory"
+    },
+    {
+      "use": "@storage-postgres",
+      "from": "@wilanis/plugin-storage-postgres"
     }
   ],
   "includes": [
@@ -80,7 +84,8 @@
     }
   ],
   "secrets": {
-    "jwt": "MONITOR_JWT_SECRET"
+    "jwt": "MONITOR_JWT_SECRET",
+    "entriesDatabase": "MONITOR_DATABASE_URL"
   },
   "startup": [
     {
@@ -118,6 +123,13 @@
       "description": "Everything in this process: the entries kept in memory, and the directories written in the connections. Nothing reaches the network, so `wilanis start example --profile local` serves the same routes with no upstream at all.",
       "bindings": {
         "@monitor/domain/monitor.port.json": "@monitor/data/monitor-store.binding.json",
+        "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json"
+      }
+    },
+    "production": {
+      "description": "The entries in PostgreSQL, and the directories written in the connections. The same routes, policies, shapes and business graphs as every other profile: what changes is which binding meets monitor.port.json, and through it which connection the records live behind. The startup step prepares the database before the port opens, so a tree whose database is unreachable refuses to serve rather than answering every route with a fault.",
+      "bindings": {
+        "@monitor/domain/monitor.port.json": "@monitor/data/monitor-postgres.binding.json",
         "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json"
       }
     }
