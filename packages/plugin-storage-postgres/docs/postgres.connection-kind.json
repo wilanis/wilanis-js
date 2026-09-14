@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/connection-kind.schema.json",
+  "label": "Records in PostgreSQL",
+  "description": "A store kept in a PostgreSQL database. The URL is a secret, since it carries the credentials; the schema and the pool are facts about this one database, so they sit here rather than in the plugin's settings.",
+  "settings": {
+    "fields": {
+      "url": {
+        "type": "string",
+        "secret": true,
+        "description": "the connection URL, read as {{secrets.*}} -- postgres://user:password@host:port/database"
+      },
+      "schema": {
+        "type": "string",
+        "required": false,
+        "description": "the schema the tables live in. Absent: public"
+      },
+      "pool": {
+        "type": "@storage-postgres/Pool.shape.json",
+        "required": false,
+        "description": "how many connections this tree may hold open at once. Absent: ten"
+      }
+    }
+  },
+  "storage": true
+}

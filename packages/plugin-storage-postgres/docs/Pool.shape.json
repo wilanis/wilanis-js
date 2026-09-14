@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Pool",
+  "layer": "core",
+  "description": "How many connections to one database a tree holds open at once.",
+  "fields": {
+    "max": {
+      "type": "number",
+      "description": "the most connections held open at once"
+    }
+  }
+}

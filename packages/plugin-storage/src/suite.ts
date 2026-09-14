@@ -60,11 +60,21 @@ const ids = (records: Record_[]) => records.map(record => String(record.id)).sor
 const where = (filter: unknown) => parseWhere(filter, SHAPE);
 
 /** What a case declares beyond the shape: the constraints the engine is to answer for. */
-type Declared = Partial<Pick<At, 'unique' | 'refs' | 'referenced'>>;
+type Declared = Partial<Pick<At, 'unique' | 'refs' | 'referenced' | 'defaults'>>;
 
 /** A collection of the subject's connection, named for the case that keeps its records there. */
 function at(subject: Subject, name: string, declared: Declared = {}): At {
-  return { ...subject.connection, name, shape: SHAPE, key: 'id', unique: [], refs: [], referenced: [], ...declared };
+  return {
+    ...subject.connection,
+    name,
+    shape: SHAPE,
+    key: 'id',
+    unique: [],
+    refs: [],
+    referenced: [],
+    defaults: {},
+    ...declared,
+  };
 }
 
 /** A collection made, emptied of anything a previous run left, and filled with the seeds. */

@@ -9,7 +9,7 @@ import type { PluginModule } from '@wilanis/core';
 import { handlers } from './handlers.js';
 import { check } from './rules.js';
 
-export type { At, Engine, Engines, Order, PutAnswer, Query, Record_, Ref, RemoveAnswer } from './engine.js';
+export type { At, Engine, Engines, Made, Order, PutAnswer, Query, Record_, Ref, RemoveAnswer } from './engine.js';
 export { engines } from './engine.js';
 export type { Operator, Test, Where } from './where.js';
 export { OPERATORS, parseWhere, whereOf } from './where.js';

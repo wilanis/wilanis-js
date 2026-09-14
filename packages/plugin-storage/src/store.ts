@@ -22,6 +22,7 @@ interface Declared {
   key: string;
   unique?: string[][];
   refs?: Record<string, { collection: string }>;
+  defaults?: Record<string, unknown>;
 }
 interface StoreDocument {
   connection: string;
@@ -80,6 +81,7 @@ export function collectionAt(env: Record<string, unknown>, named: unknown, name:
     shape: resolving.type(declared.of),
     key: declared.key,
     unique: declared.unique ?? [],
+    defaults: declared.defaults ?? {},
     refs: refs.filter(ref => ref.from === String(name)),
     referenced: refs.filter(ref => ref.to === String(name)),
   };

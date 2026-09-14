@@ -1,0 +1,58 @@
+{
+  "name": "@wilanis/plugin-storage-postgres",
+  "version": "0.1.0",
+  "description": "The @storage-postgres engine for wilanis: an @storage store kept in PostgreSQL, through Kysely.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Rafael Fontes <rfontes1987@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wilanis/wilanis-js.git",
+    "directory": "packages/plugin-storage-postgres"
+  },
+  "homepage": "https://github.com/wilanis/wilanis-js/tree/main/packages/plugin-storage-postgres#readme",
+  "bugs": "https://github.com/wilanis/wilanis-js/issues",
+  "keywords": [
+    "wilanis",
+    "dataflow",
+    "json-schema",
+    "declarative",
+    "storage",
+    "postgres",
+    "postgresql",
+    "plugin"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@wilanis/core": "0.1.0",
+    "@wilanis/engine": "0.1.0",
+    "@wilanis/plugin-storage": "0.1.0",
+    "kysely": "^0.27.4",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "@wilanis/compiler": "0.1.0",
+    "@wilanis/runtime": "0.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

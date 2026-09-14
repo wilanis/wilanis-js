@@ -29,6 +29,9 @@
       "path": "packages/plugin-storage-memory"
     },
     {
+      "path": "packages/plugin-storage-postgres"
+    },
+    {
       "path": "packages/plugin-auth"
     },
     {
