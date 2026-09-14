@@ -100,6 +100,7 @@ describe('sabotage: access, as the example attaches the included policies', () =
     ).toEqual([
       '@connections/customers.connection.json',
       '@connections/employees.connection.json',
+      '@connections/entries-postgres.connection.json',
       '@connections/entries.connection.json',
       '@connections/monitor-api.connection.json',
     ]);

@@ -31,14 +31,19 @@ RFC 0022 all depend on it.
 
 ## M02 Same tree, real database
 
-Start the example under a production profile against PostgreSQL; the startup log shows the store ensured
-and its collections created. Not one document changes between profiles. Draws on the PostgreSQL engine of
-RFC 0002 and `ensure` of RFC 0003.
+Start the example under a production profile against PostgreSQL; the startup log shows the store prepared
+before the port opens. Not one route, policy, shape, port or business graph changes between profiles: what a
+profile swaps is which binding meets `monitor.port.json`, and through it which connection the records live
+behind. Draws on the PostgreSQL engine of RFC 0002 and `ensure` of RFC 0003.
 
 ```
+export MONITOR_DATABASE_URL=postgres://user:password@localhost:5432/monitor
 npx wilanis start example --profile production
-startup 1/3 Ensure the entries store: ok, 2 collections
+startup 1/4 Prepare the entry store: ok
 ```
+
+The step is the one `local` runs; what differs is the connection behind the store it prepares, so the first
+start creates the table and the next creates nothing.
 
 ## M03 See a request run
 

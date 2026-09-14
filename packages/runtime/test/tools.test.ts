@@ -11,6 +11,7 @@ import http from '@wilanis/plugin-http';
 import reload from '@wilanis/plugin-reload';
 import storage from '@wilanis/plugin-storage';
 import memory from '@wilanis/plugin-storage-memory';
+import postgres from '@wilanis/plugin-storage-postgres';
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_PLUGINS, fuzz, init, regress, runTrigger, scaffold } from '../src/index.js';
 
@@ -31,6 +32,7 @@ const PLUGINS = {
   '@auth': auth,
   '@storage': storage,
   '@storage-memory': memory,
+  '@storage-postgres': postgres,
 };
 const tmp = () => mkdtempSync(join(tmpdir(), 'wilanis-tools-'));
 const read = (path: string) => JSON.parse(readFileSync(path, 'utf8'));

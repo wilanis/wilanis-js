@@ -46,13 +46,14 @@
     "node": ">=22"
   },
   "devDependencies": {
-    "@wilanis/runtime": "0.1.0",
-    "@wilanis/plugin-blob": "0.1.0",
-    "@wilanis/plugin-reload": "0.1.0",
     "@wilanis/compiler": "0.1.0",
     "@wilanis/plugin-auth": "0.1.0",
-    "jose": "^6.0.0",
+    "@wilanis/plugin-blob": "0.1.0",
+    "@wilanis/plugin-reload": "0.1.0",
     "@wilanis/plugin-storage": "0.1.0",
-    "@wilanis/plugin-storage-memory": "0.1.0"
+    "@wilanis/plugin-storage-memory": "0.1.0",
+    "@wilanis/plugin-storage-postgres": "0.1.0",
+    "@wilanis/runtime": "0.1.0",
+    "jose": "^6.0.0"
   }
 }

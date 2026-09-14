@@ -21,8 +21,18 @@ either and `wilanis check` names it, rather than PostgreSQL finding out on the f
 write would repeat is answered, not thrown -- `put` hands back `violated` and the graph routes on it with a
 `switch`, the same way it routes on `conflict`.
 
-Because the port now has two bindings, **a command that runs the tree names a profile**: `--profile local` or
-`--profile live`. `wilanis check` needs none -- it judges every profile.
+**A third profile keeps the same entries in PostgreSQL.** `production` binds the monitor port to
+`monitor-postgres.binding.json`, whose data graphs name a store over a connection of the postgres engine's
+kind, its URL read from `MONITOR_DATABASE_URL`. Not one route, policy, shape, port or business graph differs
+from `local`: only which binding meets the port, and through it where the records live. The startup step
+prepares the database before the port opens, so a tree whose database is unreachable refuses to serve rather
+than answering every route with a fault.
+
+That there are two store documents rather than one connection swapped under a profile is the seam RFC 0002
+settled and RFC 0005 will close: a profile swaps bindings, and a store names its connection in the document.
+
+Because the port now has three bindings, **a command that runs the tree names a profile**: `--profile local`,
+`--profile live` or `--profile production`. `wilanis check` needs none -- it judges every profile.
 
 ```
 npm install

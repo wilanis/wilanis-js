@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/store.schema.json",
+  "label": "Entries in PostgreSQL",
+  "description": "The same entries as @monitor/data/entries.store.json, kept in a database rather than in memory. Every word of the declaration is the same -- the collection, the shape, the key, what no two records may repeat, what an added column gives the rows already there -- and only the connection differs. Two stores exist because a profile swaps bindings and not connections (RFC 0002 settled that; RFC 0005 is where it changes), so this is the seam until it does.",
+  "connection": "@connections/entries-postgres.connection.json",
+  "collections": {
+    "entries": {
+      "description": "the observed calls, one row each: no two record the same call, and a row that predates the user agent column reads as unknown",
+      "of": "@monitor/domain/Entry.shape.json",
+      "key": "id",
+      "unique": [
+        [
+          "url",
+          "method"
+        ]
+      ],
+      "defaults": {
+        "ua": "unknown"
+      }
+    }
+  }
+}

@@ -96,7 +96,12 @@ const KEPT = '@features/monitor/data/entries.store.json';
 
 describe('ls: the stores of a tree', () => {
   it('lists a store under its kind, as every other kind is listed', () => {
-    expect(ls(example, 'store')).toEqual([`store            ${KEPT}`]);
+    // two, since the example keeps its entries in memory under one profile and in PostgreSQL under another,
+    // and a profile swaps bindings rather than connections
+    expect(ls(example, 'store')).toEqual([
+      'store            @features/monitor/data/entries-postgres.store.json',
+      `store            ${KEPT}`,
+    ]);
   });
 
   it('lists it among everything else too, so a reader who asks for no kind still finds it', () => {

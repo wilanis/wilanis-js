@@ -170,8 +170,14 @@ describe('the view model of a graph', () => {
       port: '@features/monitor/domain/monitor.port.json',
       portLabel: 'Entry storage',
       native: false,
-      // the port has two bindings now, and the viewer names both: which one answers is the profile's
+      // the port has three bindings now, and the viewer names both: which one answers is the profile's
       bindings: [
+        {
+          path: '@features/monitor/data/monitor-postgres.binding.json',
+          label: 'PostgreSQL storage',
+          graph: '@features/monitor/data/kept-list-by-method-postgres.graph.json',
+          graphLabel: 'List what is kept, by method',
+        },
         {
           path: '@features/monitor/data/monitor-rest.binding.json',
           label: 'REST storage',
@@ -185,7 +191,8 @@ describe('the view model of a graph', () => {
           graphLabel: 'List what is kept, by method',
         },
       ],
-      implementation: ByMethod,
+      // the first binding by path, which is what the page offers before a reader picks a profile
+      implementation: '@features/monitor/data/kept-list-by-method-postgres.graph.json',
     });
     const asked = (await view(GET_ROW)).graph!.nodes.find(node => node.id === 'asked')!;
     expect(asked.target).toMatchObject({

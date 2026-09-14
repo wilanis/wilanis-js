@@ -64,9 +64,10 @@ describe('the view model of the example', () => {
       opName: 'get',
       portLabel: 'Entry storage',
       native: false,
-      implementation: GET_ROW,
+      // the first binding by path; the REST one is still there, one along
+      implementation: '@features/monitor/data/kept-get-postgres.graph.json',
     });
-    expect(seen.fires!.bindings![0]).toMatchObject({ label: 'REST storage', graphLabel: 'Get a row' });
+    expect(seen.fires!.bindings![1]).toMatchObject({ label: 'REST storage', graphLabel: 'Get a row' });
     // the graph behind the binding knows the trigger reaches it
     const graph = await view(GET_ROW);
     expect(graph.callers).toContainEqual({
@@ -81,7 +82,7 @@ describe('the view model of the example', () => {
   it('says how a trigger answers each refusal it can reach, and which node refuses with it', async () => {
     const seen = await view('@features/monitor/edge/get-entry.trigger.json');
     expect(seen.answers).toEqual([
-      // one reason, refused in both bindings' graphs: the viewer names each, since which one runs is the
+      // one reason, refused in every binding's graphs: the viewer names each, since which one runs is the
       // profile's choice and a reader of the route wants to see every place the answer can come from
       {
         reason: 'missing',
@@ -90,6 +91,12 @@ describe('the view model of the example', () => {
           { graph: GET_ROW, graphLabel: 'Get a row', node: 'missing', nodeLabel: 'No such entry' },
           {
             graph: '@features/monitor/data/kept-get.graph.json',
+            graphLabel: 'Get what is kept',
+            node: 'missing',
+            nodeLabel: 'No such entry',
+          },
+          {
+            graph: '@features/monitor/data/kept-get-postgres.graph.json',
             graphLabel: 'Get what is kept',
             node: 'missing',
             nodeLabel: 'No such entry',
@@ -109,6 +116,7 @@ describe('the view model of the example', () => {
       from: [
         { graph: '@features/monitor/data/delete-row.graph.json', node: 'missing' },
         { graph: '@features/monitor/data/kept-remove.graph.json', node: 'missing' },
+        { graph: '@features/monitor/data/kept-remove-postgres.graph.json', node: 'missing' },
       ],
     });
     // a kind that maps no refusals has nothing to say here
@@ -247,8 +255,15 @@ describe('the view model of the example', () => {
     expect(port.callers.map(caller => caller.path)).toContain('@features/monitor/data/monitor-rest.binding.json');
     expect(port.callers.map(caller => caller.path)).toContain('@features/monitor/domain/list-entries.graph.json');
     expect(port.refs.map(refusal => refusal.path)).toContain('@features/monitor/domain/Entry.shape.json');
-    // both bindings of the port, so the page says what meets it under either profile
+    // every binding of the port, so the page says what meets it under any profile
     expect(port.implementations).toEqual([
+      {
+        path: '@features/monitor/data/monitor-postgres.binding.json',
+        label: 'PostgreSQL storage',
+        operations: expect.objectContaining({
+          get: { graph: '@features/monitor/data/kept-get-postgres.graph.json', graphLabel: 'Get what is kept' },
+        }),
+      },
       {
         path: '@features/monitor/data/monitor-rest.binding.json',
         label: 'REST storage',
