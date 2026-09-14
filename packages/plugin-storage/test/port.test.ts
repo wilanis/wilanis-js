@@ -60,8 +60,14 @@ describe('what an operation reads off the tree', () => {
     expect(await run('@storage/store.port.json#count', { store: STORE, collection: 'notes' })).toBe(0);
   });
 
-  it('ensure prepares every collection the store declares, and says how many', async () => {
-    expect(await run('@storage/storage.port.json#ensure', { store: STORE })).toEqual({ collections: 2 });
+  it('ensure prepares every collection the store declares, and says what it made', async () => {
+    // the memory engine creates nothing -- a collection exists as soon as it is asked for -- so it answers
+    // zeros, which is the same answer any engine gives on a second run
+    expect(await run('@storage/storage.port.json#ensure', { store: STORE })).toEqual({
+      collections: 0,
+      columns: 0,
+      constraints: 0,
+    });
   });
 
   it('newKey answers a key the collection does not hold', async () => {
