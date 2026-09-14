@@ -22,6 +22,10 @@
       "type": "string",
       "minLength": 1
     },
+    "atomic": {
+      "description": "Every effect this graph reaches runs in one transaction on one connection: its answer commits, a refusal or a fault rolls back. Absent: false, and each effect commits on its own.",
+      "type": "boolean"
+    },
     "resolvers": {
       "description": "The resolvers document (edge/) whose reads this graph may use as {{name}}: values taken straight from the request. Data graphs only: a domain graph never reads the request.",
       "$ref": "common.schema.json#/$defs/path"

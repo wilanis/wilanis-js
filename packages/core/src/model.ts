@@ -190,6 +190,8 @@ export interface PluginDoc extends Envelope {
  * `refuses`: running it ends the graph on purpose; its static `reason` input names the outcome, and a trigger
  * kind maps that word to how it answers. `holds`: running it starts something that outlives the run -- a
  * listener, a watcher -- which a project's startup list names and the runtime stops when the process ends.
+ * `transactional`: running it can take part in the transaction of an atomic graph, which it finds through the
+ * static `connection` or `store` field it accepts.
  */
 export interface Operation {
   description: string;
@@ -198,6 +200,7 @@ export interface Operation {
   pure?: boolean;
   refuses?: boolean;
   holds?: boolean;
+  transactional?: boolean;
 }
 export interface PortDoc extends Envelope {
   operations: Record<string, Operation>;
@@ -252,6 +255,8 @@ export const isSwitch = (node: Node): node is SwitchNode => node.type === NODE_S
 export const isMap = (node: Node): node is MapNode => node.type === NODE_MAP;
 
 export interface GraphDoc extends Envelope {
+  /** Every effect this graph reaches runs in one transaction on one connection; its answer commits it. */
+  atomic?: boolean;
   /** The resolvers document whose reads this graph may use as {{name}}; data graphs only. */
   resolvers?: string;
   constants?: Record<string, { type: TypeSpec; value: unknown; description?: string }>;
