@@ -65,6 +65,21 @@ export interface At {
   refs: Ref[];
   /** the references made to it, by whichever collections of the store hold its key */
   referenced: Ref[];
+  /**
+   * field -> what a row already there receives when `ensure` adds that field's column. It is about existing
+   * rows and nothing else: a `put` always gives the whole record, so no engine ever reads this on a write.
+   */
+  defaults: Record<string, unknown>;
+}
+
+/** What an `ensure` made: what it created, never what was already there. */
+export interface Made {
+  /** collections created */
+  collections: number;
+  /** columns created, in tables new and old */
+  columns: number;
+  /** constraints created */
+  constraints: number;
 }
 
 /** What a put answers: the record as stored, or the constraint that stopped it. */
@@ -104,8 +119,13 @@ export interface Engine {
   remove(at: At, key: unknown): Promise<RemoveAnswer>;
   /** A key no record of the collection has, of the type the collection's key field declares. */
   newKey(at: At): Promise<unknown>;
-  /** Create every collection that is not there yet and leave alone every one that is. */
-  ensure(collections: At[]): Promise<void>;
+  /**
+   * Create every collection that is not there yet and leave alone every one that is, and say how much was
+   * made. The counts are the engine's own account of what it did -- zero on a second run, and zero everywhere
+   * for an engine with nothing to create. What `@storage/storage.port.json#ensure` answers a graph is still
+   * `collections`, the number the store declares; widening that is RFC 0003 step 6's.
+   */
+  ensure(collections: At[]): Promise<Made | undefined>;
 }
 
 /** The engines registered under one environment, by the connection kind each was registered for. */

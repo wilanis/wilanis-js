@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/plugin.schema.json",
+  "label": "Storage in PostgreSQL",
+  "description": "An @storage engine that keeps records in PostgreSQL tables, through Kysely. It grants one connection kind and no port: what may be asked of a store is @storage's business, and this plugin only answers it in SQL. A collection is a table in the connection's schema, a field is a column, and what the store declares -- the key, what is unique, what refers to what -- is what the database is asked to hold. Engine-wide knobs live in these settings; per-database facts live on the connection.",
+  "grants": {
+    "connectionKinds": [
+      "@storage-postgres/postgres.connection-kind.json"
+    ]
+  },
+  "settings": {
+    "fields": {
+      "statementTimeout": {
+        "type": "number",
+        "required": false,
+        "description": "how many seconds a statement may run before the database cancels it. Absent: the server's own setting stands."
+      },
+      "keyType": {
+        "type": "string",
+        "required": false,
+        "enum": [
+          "uuidv7",
+          "identity"
+        ],
+        "description": "what newKey answers: uuidv7 for a string key, identity (one past the highest) for a number key. Absent: uuidv7. A collection whose key type the choice cannot answer is refused by X222."
+      }
+    }
+  }
+}

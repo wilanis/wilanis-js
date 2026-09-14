@@ -16,6 +16,7 @@ packages/plugin-reload/ @wilanis/plugin-reload  index.ts, docs/                 
 packages/plugin-auth/  @wilanis/plugin-auth  index.ts store.ts, docs/               → core, engine   (the guard: tokens, sessions, challenges, directories)
 packages/plugin-storage/ @wilanis/plugin-storage  index.ts engine.ts store.ts where.ts handlers.ts suite.ts, docs/   → core, engine   (records behind one port; an engine plugin keeps them)
 packages/plugin-storage-memory/ @wilanis/plugin-storage-memory  index.ts engine.ts match.ts, docs/   → core, engine, plugin-storage   (an engine: records in a Map, for as long as the process)
+packages/plugin-storage-postgres/ @wilanis/plugin-storage-postgres  index.ts engine.ts ensure.ts filter.ts columns.ts names.ts pool.ts rules.ts, docs/   → core, engine, plugin-storage   (an engine: records in PostgreSQL, through Kysely)
 packages/view/         @wilanis/view       model.ts serve.ts cli.ts, client/index.html, bin/   → core, compiler, runtime
 libraries/access/      @wilanis/access     a tree to include: features/access (sign-in, sessions, policies, otp), features/access-dev (its own binding), connections/, project.json, test/
 example/               a consumer project: JSON documents + package.json; includes @wilanis/access and binds its identity port in features/directories

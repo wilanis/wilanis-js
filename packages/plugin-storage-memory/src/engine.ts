@@ -169,5 +169,6 @@ export class MemoryEngine implements Engine {
   /** Every collection exists as soon as it is asked for, so there is nothing to create and nothing to alter. */
   async ensure(collections: At[]) {
     for (const at of collections) this.records(at);
+    return undefined;
   }
 }
