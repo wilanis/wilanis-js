@@ -40,6 +40,21 @@ jobs:
     strategy:
       matrix:
         node: [22, 24]
+    # the storage suite runs against a real database rather than a mock, so CI gives it one; without it the
+    # postgres engine's tests skip, and a suite that silently skips is one nobody notices the loss of
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: wilanis
+          POSTGRES_DB: monitor
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -48,14 +63,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+        env:
+          WILANIS_TEST_POSTGRES_URL: postgres://postgres:wilanis@127.0.0.1:5432/monitor
       - name: the example checks and rehearses, under each of its profiles
         run: |
           npx wilanis check example
           npx wilanis check libraries/access
           npx wilanis rehearse example --profile local
           npx wilanis rehearse example --profile live
+          npx wilanis rehearse example --profile production
         env:
           MONITOR_JWT_SECRET: ci-only-not-a-secret
+          MONITOR_DATABASE_URL: postgres://postgres:wilanis@127.0.0.1:5432/monitor
 
   fitness:
     name: fitness
