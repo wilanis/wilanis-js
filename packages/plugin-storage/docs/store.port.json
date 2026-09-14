@@ -96,7 +96,7 @@
       "returns": "number"
     },
     "put": {
-      "description": "Write one whole record under its own key. The one verb that writes: with replace (the default) it is the upsert the name suggests, and with \"replace\": false it writes nothing where a record of that key exists and answers conflict, so a graph routes on that rather than on a failure. Nothing is filled in silently -- a new record's key comes from newKey.",
+      "description": "Write one whole record under its own key. The one verb that writes: with replace (the default) it is the upsert the name suggests, and with \"replace\": false it writes nothing where a record of that key exists and answers conflict, so a graph routes on that rather than on a failure. A constraint the store declares is answered the same way: a unique another record already holds, or a refs pointing at a record that is not there, answers violated and writes nothing. Nothing is filled in silently -- a new record's key comes from newKey.",
       "accepts": {
         "store": {
           "type": "string",
@@ -126,11 +126,16 @@
           "record": {
             "type": "$T",
             "required": false,
-            "description": "the record as stored; absent where a conflict stopped the write"
+            "description": "the record as stored; absent where a conflict or a violated constraint stopped the write"
           },
           "conflict": {
             "type": "boolean",
             "description": "a record of that key existed and replace was false, so nothing was written"
+          },
+          "violated": {
+            "type": "string",
+            "required": false,
+            "description": "the constraint that stopped the write, named as the store declares it -- \"unique [url, method]\" or \"refs notes.entryId -> entries\". Absent where none did, so a graph routes on has(violated)"
           }
         }
       }
@@ -172,7 +177,7 @@
       }
     },
     "remove": {
-      "description": "Remove one record by its key, and answer the record that was removed -- absent where the collection held none under it.",
+      "description": "Remove one record by its key, and answer the record that was removed -- absent where the collection held none under it. A record another collection still references by a declared refs is kept rather than orphaned: removed is false and referencedBy names the reference, so a graph routes on that rather than on a failure.",
       "accepts": {
         "store": {
           "type": "string",
@@ -198,7 +203,16 @@
           "record": {
             "type": "$T",
             "required": false,
-            "description": "absent where there is none"
+            "description": "the record as it was; absent where there was none, and still there where a reference kept it"
+          },
+          "removed": {
+            "type": "boolean",
+            "description": "the record was there and is gone. False where the collection held none under that key, and where a reference kept it"
+          },
+          "referencedBy": {
+            "type": "string",
+            "required": false,
+            "description": "the reference that kept the record, named as the store declares it -- \"refs notes.entryId -> entries\". Absent where none did, so a graph routes on has(referencedBy)"
           }
         }
       }

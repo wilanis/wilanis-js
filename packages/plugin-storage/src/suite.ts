@@ -59,14 +59,22 @@ const SEEDS: Record_[] = [
 const ids = (records: Record_[]) => records.map(record => String(record.id)).sort();
 const where = (filter: unknown) => parseWhere(filter, SHAPE);
 
+/** What a case declares beyond the shape: the constraints the engine is to answer for. */
+type Declared = Partial<Pick<At, 'unique' | 'refs' | 'referenced'>>;
+
 /** A collection of the subject's connection, named for the case that keeps its records there. */
-function at(subject: Subject, name: string): At {
-  return { ...subject.connection, name, shape: SHAPE, key: 'id' };
+function at(subject: Subject, name: string, declared: Declared = {}): At {
+  return { ...subject.connection, name, shape: SHAPE, key: 'id', unique: [], refs: [], referenced: [], ...declared };
 }
 
 /** A collection made, emptied of anything a previous run left, and filled with the seeds. */
-async function seeded(subject: Subject, name: string, records: Record_[] = SEEDS): Promise<At> {
-  const where_ = at(subject, name);
+async function seeded(
+  subject: Subject,
+  name: string,
+  records: Record_[] = SEEDS,
+  declared: Declared = {},
+): Promise<At> {
+  const where_ = at(subject, name, declared);
   await subject.engine.ensure([where_]);
   for (const record of await subject.engine.find(where_, {})) await subject.engine.remove(where_, record.id);
   for (const record of records) await subject.engine.put(where_, record, true);
@@ -191,10 +199,92 @@ export const cases: Case[] = [
     },
   },
   {
-    name: 'a remove of a key nothing is kept under answers record absent',
+    name: 'a remove of a key nothing is kept under answers record absent, and removed false',
     async run(subject) {
       const where_ = await seeded(subject, 'remove_missing');
-      assert.equal((await subject.engine.remove(where_, 'nobody')).record, undefined);
+      const answer = await subject.engine.remove(where_, 'nobody');
+      assert.equal(answer.record, undefined);
+      assert.equal(answer.removed, false);
+    },
+  },
+  {
+    name: 'a remove of a record that is there answers it, and removed true',
+    async run(subject) {
+      const where_ = await seeded(subject, 'remove_removed');
+      const answer = await subject.engine.remove(where_, 'a');
+      assert.deepEqual(answer.record, SEEDS[0]);
+      assert.equal(answer.removed, true);
+    },
+  },
+  {
+    name: 'a put repeating a declared unique answers violated and writes nothing',
+    async run(subject) {
+      const declared: Declared = { unique: [['url', 'method']] };
+      const where_ = await seeded(subject, 'unique_put', SEEDS, declared);
+      const repeat = entry('z', 'https://one.example/a', 'GET');
+      const answer = await subject.engine.put(where_, repeat, true);
+      assert.equal(answer.violated, 'unique [url, method]');
+      assert.equal(answer.record, undefined);
+      assert.equal((await subject.engine.get(where_, 'z')).record, undefined);
+    },
+  },
+  {
+    name: 'a put over a record repeats nothing of its own, and answers no violation',
+    async run(subject) {
+      const declared: Declared = { unique: [['url']] };
+      const where_ = await seeded(subject, 'unique_self', SEEDS, declared);
+      const over = entry('a', 'https://one.example/a', 'PUT', { hits: 9 });
+      const answer = await subject.engine.put(where_, over, true);
+      assert.equal(answer.violated, undefined);
+      assert.deepEqual(answer.record, over);
+    },
+  },
+  {
+    name: 'a put whose reference names no record answers violated and writes nothing',
+    async run(subject) {
+      const to = await seeded(subject, 'refs_to');
+      const from = at(subject, 'refs_from', { refs: [{ from: 'refs_from', field: 'ua', to: 'refs_to' }] });
+      await subject.engine.ensure([from]);
+      const answer = await subject.engine.put(from, entry('n', 'https://note', 'GET', { ua: 'nobody' }), true);
+      assert.equal(answer.violated, 'refs refs_from.ua -> refs_to');
+      assert.equal((await subject.engine.get(from, 'n')).record, undefined);
+      assert.equal(await subject.engine.count(to, undefined), 3);
+    },
+  },
+  {
+    name: 'a put whose reference names a record that is there is written',
+    async run(subject) {
+      await seeded(subject, 'refs_ok_to');
+      const from = at(subject, 'refs_ok_from', { refs: [{ from: 'refs_ok_from', field: 'ua', to: 'refs_ok_to' }] });
+      await subject.engine.ensure([from]);
+      const note = entry('n', 'https://note', 'GET', { ua: 'a' });
+      assert.deepEqual((await subject.engine.put(from, note, true)).record, note);
+    },
+  },
+  {
+    name: 'a remove of a record another still references keeps it, and answers referencedBy',
+    async run(subject) {
+      const ref = { from: 'held_from', field: 'ua', to: 'held_to' };
+      const to = await seeded(subject, 'held_to', SEEDS, { referenced: [ref] });
+      const from = at(subject, 'held_from', { refs: [ref] });
+      await subject.engine.ensure([from]);
+      await subject.engine.put(from, entry('n', 'https://note', 'GET', { ua: 'a' }), true);
+      const answer = await subject.engine.remove(to, 'a');
+      assert.equal(answer.referencedBy, 'refs held_from.ua -> held_to');
+      assert.equal(answer.removed, false);
+      assert.deepEqual((await subject.engine.get(to, 'a')).record, SEEDS[0]);
+    },
+  },
+  {
+    name: 'a remove of a record nothing references any more goes through',
+    async run(subject) {
+      const ref = { from: 'freed_from', field: 'ua', to: 'freed_to' };
+      const to = await seeded(subject, 'freed_to', SEEDS, { referenced: [ref] });
+      const from = at(subject, 'freed_from', { refs: [ref] });
+      await subject.engine.ensure([from]);
+      await subject.engine.put(from, entry('n', 'https://note', 'GET', { ua: 'a' }), true);
+      await subject.engine.remove(from, 'n');
+      assert.equal((await subject.engine.remove(to, 'a')).removed, true);
     },
   },
   {

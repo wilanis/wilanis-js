@@ -8,7 +8,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { Type } from '@wilanis/core';
-import type { At, Engine, Query, Record_, Where } from '@wilanis/plugin-storage';
+import type { At, Engine, Query, Record_, Ref, Where } from '@wilanis/plugin-storage';
 import { matches, ordered, paged } from './match.js';
 
 /** The type of the field that identifies a record, so a new key can be one the collection would accept. */
@@ -65,11 +65,53 @@ export class MemoryEngine implements Engine {
     return [...this.records(at).values()].filter(record => matches(where, record)).length;
   }
 
-  /** Write the whole record under its own key; with `replace` false, answer a conflict and write nothing. */
+  /** The records of a collection of the same store, by its name: what a reference is judged against. */
+  private beside(at: At, name: string): Map<string, Record_> {
+    return this.records({ ...at, name });
+  }
+
+  /**
+   * The first `unique` this record would repeat, spelled as the constraint it broke. A record is compared
+   * with every other under its own key excepted, since writing a record over itself repeats nothing.
+   */
+  private repeats(at: At, record: Record_): string | undefined {
+    const key = String(record[at.key]);
+    const others = [...this.records(at)].filter(([under]) => under !== key).map(([, kept]) => kept);
+    const constraint = at.unique.find(fields =>
+      others.some(other => fields.every(field => Object.is(other[field], record[field]))),
+    );
+    return constraint && `unique [${constraint.join(', ')}]`;
+  }
+
+  /**
+   * The first reference this record makes to a record that is not there, spelled as the reference it broke.
+   * A reference whose field is absent points at nothing and is nothing to judge -- that is the shape's
+   * `required: false`, said once.
+   */
+  private dangles(at: At, record: Record_): string | undefined {
+    const broken = at.refs.find(ref => {
+      const held = record[ref.field];
+      return held !== undefined && held !== null && !this.beside(at, ref.to).has(String(held));
+    });
+    return broken && MemoryEngine.spell(broken);
+  }
+
+  /** A reference as a message names it: the field of the collection that holds it, and what it points at. */
+  private static spell(ref: Ref): string {
+    return `refs ${ref.from}.${ref.field} -> ${ref.to}`;
+  }
+
+  /**
+   * Write the whole record under its own key; with `replace` false, answer a conflict and write nothing. A
+   * `unique` another record already holds, or a `refs` pointing at a record that is not there, is answered as
+   * `violated` and nothing is written: the store declared it, so it is no surprise to the graph that wrote it.
+   */
   async put(at: At, record: Record_, replace: boolean) {
     const kept = this.records(at);
     const key = String(record[at.key]);
     if (!replace && kept.has(key)) return { conflict: true };
+    const violated = this.repeats(at, record) ?? this.dangles(at, record);
+    if (violated) return { conflict: false, violated };
     kept.set(key, MemoryEngine.kept(record));
     return { record: MemoryEngine.kept(record), conflict: false };
   }
@@ -84,12 +126,26 @@ export class MemoryEngine implements Engine {
     return { record: MemoryEngine.kept(after) };
   }
 
-  /** The record that was removed, or `record` absent where there was none. */
+  /** The first collection still holding this key by a declared reference, spelled as that reference. */
+  private held(at: At, key: unknown): string | undefined {
+    const by = at.referenced.find(ref =>
+      [...this.beside(at, ref.from).values()].some(record => String(record[ref.field]) === String(key)),
+    );
+    return by && MemoryEngine.spell(by);
+  }
+
+  /**
+   * The record that was removed, or `record` absent where there was none. A record another collection still
+   * references is kept and the reference answered, since nothing is ever deleted on a tree's behalf.
+   */
   async remove(at: At, key: unknown) {
     const kept = this.records(at);
     const before = MemoryEngine.copy(kept.get(String(key)));
+    if (!before) return { removed: false };
+    const referencedBy = this.held(at, key);
+    if (referencedBy) return { record: before, removed: false, referencedBy };
     kept.delete(String(key));
-    return { record: before };
+    return { record: before, removed: true };
   }
 
   /**

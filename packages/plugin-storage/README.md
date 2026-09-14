@@ -28,7 +28,11 @@ store whose connection is of the kind it grants is kept by it.
 - `#newKey` a key no record has, so what identifies a record is written by a node a reader can see.
 
 An absent record is answered as `record` absent rather than as a failure, so a graph routes on `has(record)`.
-`@storage/storage.port.json#ensure` prepares what a store declares, from a startup step.
+A constraint the store declares is answered the same way: `#put` answers `violated` where a `unique` is
+repeated or a `refs` points at nothing, `#remove` answers `removed` and `referencedBy` where another
+collection still holds the key, and the node stays `done` either way -- failure is for the unforeseen, and a
+constraint the store itself declares is the opposite of that. `@storage/storage.port.json#ensure` prepares
+what a store declares, from a startup step.
 
 `$T`, the record's type, and `$K`, its key's, are read from the store document by the port's `resolves` --
 `collections[collection].of` and `collections[collection].of{key}.type` -- so the checker types every call site
@@ -51,9 +55,12 @@ from this package, and registers itself from `postLoad`:
 engines(ctx.env).register('@your-engine/your.connection-kind.json', makeEngine(ctx));
 ```
 
-The table is created by whichever side reaches it first, so nothing has to be said about plugin order. What
-"being an engine" means is executable: `@wilanis/plugin-storage/suite` exports the cases every engine must
-answer alike, as plain `{ name, run }` pairs your own `it` can run.
+The table is created by whichever side reaches it first, so nothing has to be said about plugin order. The
+`At` an operation is given carries the constraints the store declared -- `unique`, the `refs` this collection
+makes and the ones made to it -- so an engine answers `violated` and `referencedBy` from the declaration
+rather than from a driver's error text. What "being an engine" means is executable:
+`@wilanis/plugin-storage/suite` exports the cases every engine must answer alike, as plain `{ name, run }`
+pairs your own `it` can run -- the constraint cases among them.
 
 Every operation is an effect, so each lives in a data graph and is listed in the feature's `effects`. A
 rehearsal stubs them and reaches no engine at all.
