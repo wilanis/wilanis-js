@@ -41,6 +41,12 @@ The maps hang off the engine instance and never off the module, and an instance 
 so loading a tree a second time starts empty. A record is deep-copied on the way in and on the way out, so
 what a graph does with a record it was given never reaches what is kept.
 
+What the store declares, this engine holds: a `#put` repeating a `unique` answers `violated` and writes
+nothing, and a `#remove` of a record another collection still references answers `removed: false` and
+`referencedBy` rather than orphaning it. A database holds those with constraints and this one checks them in
+the maps, but a graph cannot tell the two apart -- which is the point, since the same `switch` routes on the
+same flag either way.
+
 `#newKey` answers a uuid where the collection's key field is a string and one past the highest where it is a
 number; a key of any other type is the tree's own to write, and the engine says so rather than answering
 something that is not that type. Every collection exists as soon as it is asked for, so `#ensure` prepares

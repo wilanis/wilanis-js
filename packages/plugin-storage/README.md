@@ -55,6 +55,24 @@ from this package, and registers itself from `postLoad`:
 engines(ctx.env).register('@your-engine/your.connection-kind.json', makeEngine(ctx));
 ```
 
+Eight methods, each taking the collection as an `At` -- where its records live, what it is called there, the
+shape they have, the field that identifies one, and what the store declared about them:
+
+| Method | Answers |
+|---|---|
+| `get(at, key)` | `{ record? }` -- absent where the collection holds none under that key |
+| `find(at, query)` | the records the filter matches, in the order asked for, cut to the page |
+| `count(at, where)` | how many match, carrying none of them back |
+| `put(at, record, replace)` | `{ record?, conflict, violated? }` -- the whole record written, or what stopped it |
+| `patch(at, key, changes)` | `{ record? }` -- the record after the change, never touching the key |
+| `remove(at, key)` | `{ record?, removed, referencedBy? }` -- what was removed, or what still references it |
+| `newKey(at)` | a key no record of the collection has, of the key field's type |
+| `ensure(collections)` | every collection prepared; what that means is the engine's, and may be nothing |
+
+**A condition the author could expect is answered, never thrown.** An absent record, a taken key, a violated
+`unique`, a record another still references: each comes back as a field a graph routes on with a `switch`.
+Failure is for the unforeseen.
+
 The table is created by whichever side reaches it first, so nothing has to be said about plugin order. The
 `At` an operation is given carries the constraints the store declared -- `unique`, the `refs` this collection
 makes and the ones made to it -- so an engine answers `violated` and `referencedBy` from the declaration
