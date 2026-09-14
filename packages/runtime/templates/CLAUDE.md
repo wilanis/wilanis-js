@@ -84,7 +84,7 @@ triggers) are built in. Any other plugin is an npm package named by `from`, inst
 `package.json`:
 
 ```json
-{ "use": "@http", "from": "@wilanis/plugin-http", "settings": { "port": 8080, "codecs": { "application/json": "@http/codecs/json.codec.json" } } }
+{ "use": "@http", "from": "@wilanis/plugin-http", "settings": { "port": 8099, "codecs": { "application/json": "@http/codecs/json.codec.json" } } }
 ```
 
 `from` is a package name, never a path. `wilanis ls port`, `ls trigger-kind`, `ls connection-kind` and
