@@ -22,7 +22,7 @@ upstream API. Draws on RFC 0002 and the call-site rules of RFC 0003.
 
 ```
 npx wilanis start example
-curl -X POST :8080/monitor -d '{...}'   # then GET /monitor/{id} answers what you posted
+curl -X POST :8099/monitor -d '{...}'   # then GET /monitor/{id} answers what you posted
 npx wilanis describe @monitor/data/entries.store.json
 ```
 
@@ -97,7 +97,7 @@ Draws on RFC 0013, RFC 0016, RFC 0024 and RFC 0026.
 
 ```
 npx wilanis-deploy example --profile production
-scripts/cluster.sh up     # → http://localhost:8080/monitor
+scripts/cluster.sh up     # → http://localhost:8099/monitor
 ```
 
 RFC 0013 depends on RFC 0005, so this follows M07 and M08; RFC 0024 depends on RFC 0006, so it follows M03.
