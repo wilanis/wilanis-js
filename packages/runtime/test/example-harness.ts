@@ -66,14 +66,29 @@ function codesAfter(change: (dir: string) => void): string[] {
   return out;
 }
 
+/** Apply an edit to one document of a copied tree, in place. */
+const editing = (file: string, edit: (doc: any) => void) => (dir: string) => {
+  const path = join(dir, file);
+  const doc = JSON.parse(readFileSync(path, 'utf8'));
+  edit(doc);
+  writeFileSync(path, JSON.stringify(doc));
+};
+
 /** Copy the example, apply an edit to one file, answer the refusal codes. */
 export function sabotage(file: string, edit: (doc: any) => void): string[] {
-  return codesAfter(dir => {
-    const path = join(dir, file);
-    const doc = JSON.parse(readFileSync(path, 'utf8'));
-    edit(doc);
-    writeFileSync(path, JSON.stringify(doc));
-  });
+  return codesAfter(editing(file, edit));
+}
+
+/**
+ * The same sabotage, answered as code and the place each refusal points at -- what a case needs when the
+ * constraint it broke is one of several in the document, and which one was named is the claim.
+ */
+export function sabotagePointing(file: string, edit: (doc: any) => void): string[] {
+  const dir = copyOfExample();
+  editing(file, edit)(dir);
+  const out = refusalsAt(dir);
+  rmSync(dir, { recursive: true, force: true });
+  return out;
 }
 
 /** Copy the example, move one document to another path, and answer the refusal codes. */

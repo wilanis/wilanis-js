@@ -13,6 +13,14 @@ collection of `Entry` keyed by `id`, over a connection of the memory engine's ki
 process. The routes, the policies, the domain graphs and the shapes are the same either way: only the data
 graphs behind the port differ, which is what a port is for.
 
+**The store declares more than the shape and the key.** `unique: [["url", "method"]]` says no two entries
+record the same call, and `defaults: { "ua": "unknown" }` says what an entry written before the user agent
+column existed reads as once `ensure` adds it -- about rows already there, never about what a graph writes,
+since `put` always gives the whole record. The compiler judges both against `Entry`: misspell a field in
+either and `wilanis check` names it, rather than PostgreSQL finding out on the first write. A `unique` a
+write would repeat is answered, not thrown -- `put` hands back `violated` and the graph routes on it with a
+`switch`, the same way it routes on `conflict`.
+
 Because the port now has two bindings, **a command that runs the tree names a profile**: `--profile local` or
 `--profile live`. `wilanis check` needs none -- it judges every profile.
 
