@@ -70,6 +70,18 @@ describe('the envelope', () => {
   });
 });
 
+describe('the flags an operation carries', () => {
+  const op = (extra: Record<string, unknown>) => doc('port', { operations: { get: { description: 'one', ...extra } } });
+
+  it('transactional is an optional boolean, beside pure, refuses and holds', () => {
+    expect(refused(op({ transactional: true }))).toEqual([]);
+    expect(refused(op({ transactional: false }))).toEqual([]);
+    expect(refused(op({ pure: true, refuses: false, holds: false, transactional: true }))).toEqual([]);
+    expect(refused(op({}))).toEqual([]);
+    expect(refused(op({ transactional: 'yes' }))).toEqual([at('operations/get/transactional', 'must be boolean')]);
+  });
+});
+
 describe('a contract that says where a type comes from', () => {
   const port = (resolves: unknown) =>
     doc('port', {
@@ -172,6 +184,12 @@ describe('graph', () => {
     expect(refused(doc('graph', { constants: { n: { type: 'number' } } }))).toEqual([
       at('constants/n', "missing 'value'"),
     ]);
+  });
+  it('atomic is an optional boolean: a graph that declares it validates, and a graph that is not one is unchanged', () => {
+    expect(refused(doc('graph', { atomic: true }))).toEqual([]);
+    expect(refused(doc('graph', { atomic: false }))).toEqual([]);
+    expect(refused(doc('graph', {}))).toEqual([]);
+    expect(refused(doc('graph', { atomic: 'yes' }))).toEqual([at('atomic', 'must be boolean')]);
   });
   it('a value in in is any JSON: the schema does not judge it, the checker does', () => {
     expect(

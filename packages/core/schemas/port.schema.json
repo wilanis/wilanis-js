@@ -54,6 +54,10 @@
           "holds": {
             "description": "True when running it starts something that keeps running after the run has answered: a listener, a watcher, a subscription. Such an operation is named by a project's startup list, never by a graph; it answers what it started, and the runtime holds its teardown until the process stops.",
             "type": "boolean"
+          },
+          "transactional": {
+            "description": "True when running it can take part in the transaction of an atomic graph. Such an operation accepts a static field the checker resolves a connection from: `connection`, the path of a connection document, or `store`, the path of a store document that names one. A plugin grants it.",
+            "type": "boolean"
           }
         },
         "required": [

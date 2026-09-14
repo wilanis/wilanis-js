@@ -35,9 +35,9 @@ property is described.
 | `project` | aliases, plugins (`use`, `from`, `settings` incl. the codecs table), includes (trees whose features load here), secrets, startup, profiles | `project.json` |
 | `feature` | dependsOn, exports, effects allowlist | `features/<name>/feature.json` |
 | `shape` | a named object type; `layer: edge` (the world's) or `core` (ours) | `edge/` or `domain/` |
-| `port` | a contract: operations with accepts / returns; a field may be `static` | `domain/` |
+| `port` | a contract: operations with accepts / returns, each maybe `pure`, `refuses`, `holds` or `transactional`; a field may be `static` | `domain/` |
 | `binding` | how a port is met: per operation a graph or a delegation (`run` + `in`) | `data/` |
-| `graph` | dataflow: nodes of type run / switch / map, `in`, `out.from`, constants; a data graph may name `resolvers` | `domain/` or `data/` |
+| `graph` | dataflow: nodes of type run / switch / map, `in`, `out.from`, constants; `atomic` when its effects commit or roll back together; a data graph may name `resolvers` | `domain/` or `data/` |
 | `trigger` | a way in: `kind`, `settings`, `in`, `out`, `policies` (what gates it, in order, each given the credentials it needs), and `fire` -- the run node it invokes | `edge/` |
 | `policy` | a gate: `decide` fires a domain operation over what the guard hands (`{{request.principal}}`), `outcomes` maps each reason its graph refuses with to `deny` or `challenge`, `proves` says what is present once it allows | `edge/` |
 | `resolvers` | named reads of the request (`request.params.id`, `request.headers['user-agent']`, `request.session.id`), for data graphs and bindings to read as `{{name}}`; `required` when a policy guarantees the read | `edge/` |
