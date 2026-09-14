@@ -13,6 +13,20 @@ import type { Where } from './where.js';
 /** One record, as it is kept and as it comes back: an object of the collection's shape. */
 export type Record_ = Record<string, unknown>;
 
+/**
+ * One reference between two collections of a store: a field of `from` holds the key of `to`. Every collection
+ * carries both the references it makes and the ones made to it, so `put` can judge what it writes and
+ * `remove` what would be orphaned without either one reading the store document again.
+ */
+export interface Ref {
+  /** the collection the field belongs to */
+  from: string;
+  /** the field of it that holds the other collection's key */
+  field: string;
+  /** the collection whose key that field holds */
+  to: string;
+}
+
 /** One ordering of a find: the field, and the direction. */
 export interface Order {
   by: string;
@@ -45,6 +59,26 @@ export interface At {
   shape: Type;
   /** the field of the shape that identifies a record */
   key: string;
+  /** the combinations no two records may repeat, each one constraint over those fields together */
+  unique: string[][];
+  /** the references this collection makes: a field of it holding another collection's key */
+  refs: Ref[];
+  /** the references made to it, by whichever collections of the store hold its key */
+  referenced: Ref[];
+}
+
+/** What a put answers: the record as stored, or the constraint that stopped it. */
+export interface PutAnswer {
+  record?: Record_;
+  conflict: boolean;
+  violated?: string;
+}
+
+/** What a remove answers: the record that was removed, or the collection still referencing it. */
+export interface RemoveAnswer {
+  record?: Record_;
+  removed: boolean;
+  referencedBy?: string;
 }
 
 /** What @storage asks of whoever keeps the records. No SQL, no dialect, no driver: values in, values out. */
@@ -55,12 +89,19 @@ export interface Engine {
   find(at: At, query: Query): Promise<Record_[]>;
   /** How many records the filter matches. */
   count(at: At, where: Where | undefined): Promise<number>;
-  /** Write the whole record under its own key; with `replace` false, write nothing where one is already there. */
-  put(at: At, record: Record_, replace: boolean): Promise<{ record?: Record_; conflict: boolean }>;
+  /**
+   * Write the whole record under its own key; with `replace` false, write nothing where one is already there.
+   * A declared `unique` another record already holds, or a `refs` naming a record that is not there, is
+   * answered as `violated` rather than thrown: a constraint the store declares is the opposite of unforeseen.
+   */
+  put(at: At, record: Record_, replace: boolean): Promise<PutAnswer>;
   /** Change some fields of the record under that key, or answer `record` absent where there is none. */
   patch(at: At, key: unknown, changes: Record_): Promise<{ record?: Record_ }>;
-  /** Remove the record under that key and answer it, or `record` absent where there was none. */
-  remove(at: At, key: unknown): Promise<{ record?: Record_ }>;
+  /**
+   * Remove the record under that key and answer it, or `record` absent where there was none. A record another
+   * still references by a declared `refs` is kept, and the collection that references it is answered.
+   */
+  remove(at: At, key: unknown): Promise<RemoveAnswer>;
   /** A key no record of the collection has, of the type the collection's key field declares. */
   newKey(at: At): Promise<unknown>;
   /** Create every collection that is not there yet and leave alone every one that is. */

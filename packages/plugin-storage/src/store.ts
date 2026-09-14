@@ -4,7 +4,7 @@
  * identifies one -- is read from documents the tree already holds, the way @http reads a connection.
  */
 import type { Resolves } from '@wilanis/core';
-import type { At, Engine } from './engine.js';
+import type { At, Engine, Ref } from './engine.js';
 import { engines } from './engine.js';
 
 type Connection = { kind: string; settings: Record<string, unknown> };
@@ -20,6 +20,8 @@ interface Env {
 interface Declared {
   of: string;
   key: string;
+  unique?: string[][];
+  refs?: Record<string, { collection: string }>;
 }
 interface StoreDocument {
   connection: string;
@@ -47,6 +49,17 @@ function connectionOf(env: Record<string, unknown>, store: StoreDocument): { pat
   return { path, conn };
 }
 
+/**
+ * Every reference the store declares, in one list: a field of one collection holding another's key. Both
+ * directions are read off the same declaration, so no collection has to be visited twice to learn who points
+ * at it.
+ */
+function refsOf(store: StoreDocument): Ref[] {
+  return Object.entries(store.collections).flatMap(([from, declared]) =>
+    Object.entries(declared.refs ?? {}).map(([field, ref]) => ({ from, field, to: ref.collection })),
+  );
+}
+
 /** One collection of a store, as the engine sees it: where it lives, what it is called, its shape and its key. */
 export function collectionAt(env: Record<string, unknown>, named: unknown, name: unknown): At {
   const store = documentOf(env, named);
@@ -58,6 +71,7 @@ export function collectionAt(env: Record<string, unknown>, named: unknown, name:
   const { path, conn } = connectionOf(env, store);
   const resolving = (env as Env).resolving;
   if (!resolving) throw new Error('no tree in this environment to read a shape from');
+  const refs = refsOf(store);
   return {
     connection: path,
     kind: conn.kind,
@@ -65,6 +79,9 @@ export function collectionAt(env: Record<string, unknown>, named: unknown, name:
     name: String(name),
     shape: resolving.type(declared.of),
     key: declared.key,
+    unique: declared.unique ?? [],
+    refs: refs.filter(ref => ref.from === String(name)),
+    referenced: refs.filter(ref => ref.to === String(name)),
   };
 }
 

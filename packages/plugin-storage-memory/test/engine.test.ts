@@ -29,7 +29,15 @@ describe('what every engine answers alike', () => {
 
 const types = new TypeResolver(() => undefined);
 const numbered: Type = types.inline({ fields: { id: { type: 'number' }, url: { type: 'string' } } });
-const at = (shape: Type, key: string): At => ({ ...subjectOf().connection, name: 'entries', shape, key });
+const at = (shape: Type, key: string): At => ({
+  ...subjectOf().connection,
+  name: 'entries',
+  shape,
+  key,
+  unique: [],
+  refs: [],
+  referenced: [],
+});
 
 describe('the keys it makes', () => {
   it('a number key is one past the highest the collection holds', async () => {
