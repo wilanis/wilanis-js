@@ -31,20 +31,20 @@ npm run check                       # wilanis check .  -- every profile at once
 npm run rehearse -- --profile local # every trigger, every policy, every branch of every switch, effects stubbed
 npm run digest -- --profile local   # the count and one line per entry, for real
 npm run start -- --profile local    # GET /monitor[?method=], POST /monitor, GET|PUT|DELETE /monitor/{id}, DELETE /monitor, GET|POST /monitor.csv,
-                                    # POST /api/v1/auth-customers | auth-employees | token/refresh | sign-out, GET|PUT /api/v1/me/preferences on :8080
+                                    # POST /api/v1/auth-customers | auth-employees | token/refresh | sign-out, GET|PUT /api/v1/me/preferences on :8099
 npm run hello -- --profile local    # challenged until a one-time code is answered
 ```
 
 Kept in memory, it answers for itself:
 
 ```
-curl -s localhost:8080/monitor                                    # []
-TOKEN=$(curl -s -X POST localhost:8080/api/v1/auth-employees \
+curl -s localhost:8099/monitor                                    # []
+TOKEN=$(curl -s -X POST localhost:8099/api/v1/auth-employees \
   -H 'content-type: application/json' \
   -d '{"username":"bo","password":"bo-pass"}' | jq -r .accessToken)
-curl -s -X POST localhost:8080/monitor -H "authorization: Bearer $TOKEN" \
+curl -s -X POST localhost:8099/monitor -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' -d '{"url":"https://example.com/a","method":"GET"}'
-curl -s localhost:8080/monitor                                    # the entry, read back from the store
+curl -s localhost:8099/monitor                                    # the entry, read back from the store
 ```
 
 The store lives exactly as long as the process: stop it and the entries are gone. That is what the memory
@@ -77,8 +77,8 @@ that is the domain's decision, not the caller's. Present it as `Authorization: B
 it as the `session` cookie, so a browser needs no header.
 
 ```
-curl -s localhost:8080/api/v1/auth-employees -d '{"username":"bo","password":"bo-pass"}' -H 'content-type: application/json'
-curl -s localhost:8080/monitor -d '{"url":"https://x.example/","method":"GET"}' -H 'content-type: application/json' -H "authorization: Bearer $TOKEN"
+curl -s localhost:8099/api/v1/auth-employees -d '{"username":"bo","password":"bo-pass"}' -H 'content-type: application/json'
+curl -s localhost:8099/monitor -d '{"url":"https://x.example/","method":"GET"}' -H 'content-type: application/json' -H "authorization: Bearer $TOKEN"
 ```
 
 On a write, the `@auth` guard verifies the token and hands `request.principal`; then `employees-only` decides on the
@@ -120,7 +120,7 @@ The three processes share the challenge through the plugin's store under `.wilan
 `project.json → startup` says what this tree starts, in order, and nothing else runs. `monitor.port.json#listAll`
 reads the entries once: if the API is unreachable, `start` says so and exits rather than answering every route
 with a fault. `@reload/watch.port.json#watch` serves the tree again whenever a document changes, without
-closing the port. `@http/server.port.json#listen` opens :8080 -- **delete that step and nothing listens**, since
+closing the port. `@http/server.port.json#listen` opens :8099 -- **delete that step and nothing listens**, since
 no runtime opens a port merely because http triggers exist. The first is a domain port operation, so whichever
 binding the profile chose is what gets checked; the last two are `holds` operations, which a plugin grants and
 the runtime stops when the process ends. `wilanis describe @http/server.port.json` says which plugin grants it.

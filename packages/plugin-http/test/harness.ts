@@ -184,7 +184,7 @@ export const listening = async (server: Server, port: number) => {
 
 /** Sign in as bo, an employee holding the recorder role, and answer the token. */
 export async function signInAsRecorder(): Promise<string> {
-  const answer = await fetch('http://localhost:8080/api/v1/auth-employees', {
+  const answer = await fetch('http://localhost:8099/api/v1/auth-employees', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ username: 'bo', password: 'bo-pass' }),
@@ -197,7 +197,7 @@ export async function signInAsRecorder(): Promise<string> {
 export const caller =
   (token: () => string) =>
   async (method: string, path: string, body?: unknown, authorized = false) => {
-    const answer = await fetch(`http://localhost:8080${path}`, {
+    const answer = await fetch(`http://localhost:8099${path}`, {
       method,
       headers: {
         'content-type': 'application/json',

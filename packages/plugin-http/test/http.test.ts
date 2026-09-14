@@ -161,7 +161,7 @@ describe('http trigger kind against a mockapi-shaped upstream', () => {
 describe('files through the blob registry', () => {
   it('uploads a CSV as a blob: the body streams into the registry, the graph gets a handle, every row is recorded', async () => {
     const csv = 'url,method\nhttps://csv-1.example/,GET\n"https://csv-2.example/?a=1,2",POST\n';
-    const answer = await fetch('http://localhost:8080/monitor.csv', {
+    const answer = await fetch('http://localhost:8099/monitor.csv', {
       method: 'POST',
       headers: { 'content-type': 'text/csv', authorization: `Bearer ${token}` },
       body: csv,
@@ -174,7 +174,7 @@ describe('files through the blob registry', () => {
     expect(rows.filter(row => String(row.url).startsWith('https://csv-'))).toHaveLength(2);
   });
   it('downloads every entry as a CSV: streamed from the registry with its content type, length and filename', async () => {
-    const answer = await fetch('http://localhost:8080/monitor.csv');
+    const answer = await fetch('http://localhost:8099/monitor.csv');
     expect(answer.status).toBe(200);
     expect(answer.headers.get('content-type')).toBe('text/csv; charset=utf-8');
     expect(answer.headers.get('content-disposition')).toBe('attachment; filename="monitor.csv"');
@@ -191,14 +191,14 @@ describe('files through the blob registry', () => {
     form.append('note', 'from a form');
     form.append('file', new Blob([big], { type: 'text/csv' }), 'bulk.csv');
     const before = rows.length;
-    const answer = await fetch('http://localhost:8080/monitor/upload', { method: 'POST', body: form });
+    const answer = await fetch('http://localhost:8099/monitor/upload', { method: 'POST', body: form });
     expect(answer.status).toBe(201);
     expect(await answer.json()).toHaveLength(2000);
     expect(rows.length).toBe(before + 2000);
   });
   it('a CSV row that is not an entry is a fault of the import, and nothing is recorded', async () => {
     const before = rows.length;
-    const answer = await fetch('http://localhost:8080/monitor.csv', {
+    const answer = await fetch('http://localhost:8099/monitor.csv', {
       method: 'POST',
       headers: { 'content-type': 'text/csv', authorization: `Bearer ${token}` },
       body: 'url,method\nhttps://x.example/,TRACE\n',
@@ -208,7 +208,7 @@ describe('files through the blob registry', () => {
     expect(rows.length).toBe(before);
   });
   it('a body of another content type than the route consumes is a 415, and an upload with no body is a 400', async () => {
-    const answer = await fetch('http://localhost:8080/monitor.csv', {
+    const answer = await fetch('http://localhost:8099/monitor.csv', {
       method: 'POST',
       headers: { 'content-type': 'application/pdf' },
       body: '%PDF',
@@ -216,7 +216,7 @@ describe('files through the blob registry', () => {
     expect(answer.status).toBe(415);
     expect((await answer.json()).error).toBe('this route consumes text/csv, not application/pdf');
     expect(
-      (await fetch('http://localhost:8080/monitor.csv', { method: 'POST', headers: { 'content-type': 'text/csv' } }))
+      (await fetch('http://localhost:8099/monitor.csv', { method: 'POST', headers: { 'content-type': 'text/csv' } }))
         .status,
     ).toBe(400);
   });

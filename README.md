@@ -153,7 +153,7 @@ npx wilanis rehearse example --profile local   # run every branch of every route
 npx wilanis map example            # how does a request flow, and what gates it?
 npx wilanis-view example           # draw it, on http://127.0.0.1:4400/
 export MONITOR_JWT_SECRET=$(openssl rand -base64 32)
-npx wilanis start example --profile local      # serve it on :8080, entries kept in memory
+npx wilanis start example --profile local      # serve it on :8099, entries kept in memory
 ```
 
 [`example/README.md`](example/README.md) walks through what it serves and who may do what.
