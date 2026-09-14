@@ -45,17 +45,20 @@ startup 1/4 Prepare the entry store: ok
 The step is the one `local` runs; what differs is the connection behind the store it prepares, so the first
 start creates the table and the next creates nothing.
 
-## M03 See a request run
+## M03 All or nothing
+
+The CSV import records every row and updates the digest in one atomic graph. A bad row in the middle
+leaves nothing written; rehearsal prints the rolled-back branch. Draws on RFC 0004.
+
+Here because RFC 0004 depends on RFC 0002 alone, which M02 finished, so this is free to start; the
+milestone that follows depends on nothing and is free to start at any time, so the smaller comes first.
+
+## M04 See a request run
 
 Start with `--trace` and every request prints its tree: gate, policies, graphs, effects, timings. The same
 trace reaches a local Jaeger through the OpenTelemetry plugin. Draws on RFC 0006.
 
 Here because RFC 0006 depends on nothing, and RFC 0024 under M11 depends on it.
-
-## M04 All or nothing
-
-The CSV import records every row and updates the digest in one atomic graph. A bad row in the middle
-leaves nothing written; rehearsal prints the rolled-back branch. Draws on RFC 0004.
 
 ## M05 Change the schema, get the plan
 
@@ -105,7 +108,7 @@ npx wilanis-deploy example --profile production
 scripts/cluster.sh up     # → http://localhost:8099/monitor
 ```
 
-RFC 0013 depends on RFC 0005, so this follows M07 and M08; RFC 0024 depends on RFC 0006, so it follows M03.
+RFC 0013 depends on RFC 0005, so this follows M07 and M08; RFC 0024 depends on RFC 0006, so it follows M04.
 
 ## M12 Tenants by construction
 
