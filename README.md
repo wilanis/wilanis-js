@@ -169,6 +169,7 @@ npx wilanis start example --profile local      # serve it on :8099, entries kept
 | **Trigger** | An entry point: an HTTP route, a command, whatever a plugin offers. It names the operation to fire and the policies that gate it. |
 | **Policy** | A gate on a trigger. It allows by answering, or refuses with a reason. A trigger with no policies is public. |
 | **Connection** | Where an effect goes and how it is paced: an address, credentials read from secrets, a throttle. A graph names the connection, never the address. |
+| **Store** | What a feature keeps: collections of a shape, each keyed by one of its fields, behind a connection. It says what no two records may repeat and what refers to what; the compiler judges a filter or a write against that, and swapping the connection swaps memory for a database with no other change. |
 | **Profile** | Which binding meets which port, chosen per environment, so the same documents run against a fake or the real thing. |
 | **Feature** | A directory with `edge/`, `domain/` and `data/` inside. The directory is the layer, and the checker reads it off the path. |
 | **Plugin** | An npm package that ships JSON documents and one handler per operation. It is the only place code lives. |
@@ -190,6 +191,7 @@ what a tree starts.
 | [`@wilanis/plugin-auth`](packages/plugin-auth) | The guard: tokens, sessions with typed attributes, one-time challenges |
 | [`@wilanis/plugin-storage`](packages/plugin-storage) | Records of a shape behind one port; an engine plugin says how they are kept |
 | [`@wilanis/plugin-storage-memory`](packages/plugin-storage-memory) | An engine for that port: records in a Map, for as long as the process runs |
+| [`@wilanis/plugin-storage-postgres`](packages/plugin-storage-postgres) | An engine for that port: records in PostgreSQL tables, through Kysely |
 | [`@wilanis/view`](packages/view) | The viewer. Read-only: it grants nothing and runs nothing |
 | [`@wilanis/access`](libraries/access) | Not code but a tree to include: sign-in, sessions and policies, in pure JSON |
 
