@@ -4,12 +4,16 @@
  * would not accept or a reference that leaves the store is refused before anything runs (C003 to C008).
  *
  * What a store *means* at a call site -- a filter over it, a patch of it -- is @storage's to judge (X208 to
- * X213, renumbered after RFC 0002's X207). The example keeps nothing yet (RFC 0002 step 8), so every case
- * plants the store it breaks, and the connection is simply one the example already has.
+ * X213, renumbered after RFC 0002's X207).
+ *
+ * The example's own store declares a `unique` and a `defaults`, and the last cases break those where they are
+ * written, so the declaration a reader learns the DSL from is the one the rules are proved against. The rest
+ * plant the store they break: a `refs` needs a second collection and a numeric key a second shape, and
+ * neither is something the example has a use for.
  */
 import { schemaUrl } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
-import { planted, plantedAll, plantedPointing, sabotage } from './example-harness.js';
+import { planted, plantedAll, plantedPointing, sabotage, sabotagePointing } from './example-harness.js';
 
 const KEPT = '@connections/entries.connection.json';
 const shape = (label: string, fields: Record<string, unknown>) => ({
@@ -92,6 +96,16 @@ describe('sabotage: what a store holds its records to', () => {
     expect(pointingAt({ rows: entry({ defaults: { ua: 7 } }) })).toEqual(at('C004', 'rows/defaults/ua'));
     expect(pointingAt({ rows: entry({ defaults: { id: 'x' } }) })).toEqual(at('C004', 'rows/defaults/id'));
     expect(codesOf({ rows: entry({ defaults: { ua: 'unknown' } }) })).toEqual([]);
+  });
+
+  it("the example's own unique and defaults are judged where they are written", () => {
+    const kept = '@features/monitor/data/entries.store.json#collections/entries';
+    const breaking = (edit: (collection: any) => void) =>
+      sabotagePointing('features/monitor/data/entries.store.json', doc => edit(doc.collections.entries));
+
+    expect(breaking(entries => entries.unique.push(['urrl']))).toEqual([`C003 ${kept}/unique/1`]);
+    expect(breaking(entries => (entries.defaults.ua = 7))).toEqual([`C004 ${kept}/defaults/ua`]);
+    expect(breaking(entries => (entries.defaults.id = entries.defaults.ua))).toEqual([`C004 ${kept}/defaults/id`]);
   });
 
   it('C005 a reference to a collection this store does not declare', () => {
