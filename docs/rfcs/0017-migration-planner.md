@@ -319,20 +319,22 @@ additive step per collection, and plans from there; it is the operator saying th
 behind, and it is recorded as such.
 
 **The engine.** The `Engine` interface RFC 0002 exports from `packages/plugin-storage/src/engine.ts` gains five
-members, each taking the connection's canonical path first as the storage operations do, and no SQL in any
-signature:
+members, each taking the connection first as the storage operations do, and no SQL in any signature. What it takes
+is an `On` rather than the canonical path alone: a plan may be a connection's first contact, so an engine that has
+opened nothing yet needs the settings to reach the database, and `On` is `At`'s connection half exactly -- the path
+still first, and every caller already holds one.
 
 ```ts
 /** The record's current entry for a collection, or nothing when it was never recorded on this connection. */
-recorded(connection: string, collection: string): Promise<Declared | undefined>;
+recorded(on: On, collection: string): Promise<Declared | undefined>;
 /** What the catalog holds for a collection, lowered to Declared, or nothing when there is no table. */
-inspect(connection: string, collection: string): Promise<Declared | undefined>;
+inspect(on: On, collection: string): Promise<Declared | undefined>;
 /** How many rows stand in a step's way: rows of a collection, rows holding a value, rows violating a constraint, rows that would not cast. */
-rows(connection: string, step: Step): Promise<number>;
+rows(on: On, step: Step): Promise<number>;
 /** Apply the steps of one connection and write the record, in one transaction where the engine can; throws having applied nothing otherwise. */
-apply(connection: string, steps: Step[], record: Record<string, Declared | null>, applied: Applied): Promise<void>;
+apply(on: On, steps: Step[], record: Record<string, Declared | null>, applied: Applied): Promise<void>;
 /** Every applied plan on this connection, latest first. */
-history(connection: string): Promise<Applied[]>;
+history(on: On): Promise<Applied[]>;
 ```
 
 `@wilanis/plugin-storage-postgres` implements them with Kysely: `inspect` over `information_schema.columns`,

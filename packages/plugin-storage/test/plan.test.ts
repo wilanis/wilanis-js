@@ -72,14 +72,25 @@ describe('how a collection comes to exist', () => {
   it('nothing recorded and nothing in the catalog: a create per collection, then the guarantees it declares', () => {
     const { steps } = plan({}, { entries: ENTRIES, notes: NOTES }, noMarks);
     // the create makes every column and the primary key in the one statement, so no field step follows it;
-    // a `unique` and a `refs` are guarantees over those columns, and each is its own step with its own count
-    expect(does(steps)).toEqual(['create', 'unique', 'create', 'ref']);
-    expect(steps.map(step => step.target)).toEqual(['entries', 'entries', 'notes', 'notes']);
+    // a `unique` and a `refs` are guarantees over those columns, and each is its own step with its own count.
+    // Every collection is opened before any guarantee is given, whatever the order they are declared in
+    expect(does(steps)).toEqual(['create', 'create', 'unique', 'ref']);
+    expect(steps.map(step => step.target)).toEqual(['entries', 'notes', 'entries', 'notes']);
     expect(steps[0].says).toBe('create collection entries');
-    expect(steps[1]).toMatchObject({ do: 'unique', over: ['url', 'method'] });
+    expect(steps[2]).toMatchObject({ do: 'unique', over: ['url', 'method'] });
     // the ref follows both creates, so the table it points at exists by the time the constraint is written
     expect(steps[3]).toMatchObject({ do: 'ref', at: 'entryId', to: 'entries' });
     expect(steps.filter(step => step.do === 'add')).toHaveLength(0);
+  });
+
+  it('the referencing collection declared first: every create still comes before any ref', () => {
+    // declaration order is the store's, and a `ref` names a table that has to exist by the time it is written.
+    // With `notes` first, a plan that pushed each collection's constraints straight after its own create would
+    // read `create notes, ref notes → entries, create entries` and ALTER against a table two steps away.
+    const { steps } = plan({}, { notes: NOTES, entries: ENTRIES }, noMarks);
+    expect(does(steps)).toEqual(['create', 'create', 'ref', 'unique']);
+    expect(steps.map(step => step.target)).toEqual(['notes', 'entries', 'notes', 'entries']);
+    expect(steps[2]).toMatchObject({ do: 'ref', target: 'notes', at: 'entryId', to: 'entries' });
   });
 
   it('the RFC 0003 example against its own record: no step', () => {
