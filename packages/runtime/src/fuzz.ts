@@ -11,15 +11,28 @@ import { embedderFor, generatedFire } from './stubbing.js';
 
 // ---- fuzz / regress ----------------------------------------------------------------------------------
 
+/**
+ * What one node did: how it ended, the operation it ran, where a switch routed, and what it answered. The
+ * handler is kept beside the rest because a node whose binding was changed under it answers differently for
+ * a reason no diff of the answer alone can name.
+ *
+ * Durations are deliberately absent: they are not reproducible, so a scenario would diff against itself.
+ */
+function did(node: Report['nodes'][string]): ScenarioDoc['expect']['nodes'][string] {
+  return {
+    status: node.status,
+    ...(node.handler ? { handler: node.handler } : {}),
+    ...(node.selected ? { selected: node.selected } : {}),
+    ...(node.status === 'done' && node.out !== undefined ? { out: node.out } : {}),
+  };
+}
+
+/** What every node of a run did, by its dotted path, a nested graph's nodes under the node that called it. */
 function pick(report: Report, prefix = ''): ScenarioDoc['expect']['nodes'] {
   const out: ScenarioDoc['expect']['nodes'] = {};
   for (const [id, node] of Object.entries(report.nodes)) {
     const key = prefix ? `${prefix}.${id}` : id;
-    out[key] = {
-      status: node.status,
-      ...(node.selected ? { selected: node.selected } : {}),
-      ...(node.status === 'done' && node.out !== undefined ? { out: node.out } : {}),
-    };
+    out[key] = did(node);
     if (node.sub) Object.assign(out, pick(node.sub, key));
   }
   return out;
@@ -72,6 +85,7 @@ function nodeDiffs(
   if (!now) return [`${id}: gone`];
   const out: string[] = [];
   if (now.status !== was.status) out.push(`${id}: ${was.status} → ${now.status}`);
+  if (was.handler && now.handler !== was.handler) out.push(`${id}: ran ${was.handler} → ${now.handler}`);
   if (was.selected && now.selected !== was.selected) out.push(`${id}: routed ${was.selected} → ${now.selected}`);
   if ('out' in was && !same(now.out, was.out)) out.push(`${id}: out changed`);
   return out;

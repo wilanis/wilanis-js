@@ -32,6 +32,14 @@ const marked = (atomic?: boolean) => (atomic ? '  (atomic)' : '');
 /** What a branch that did not answer adds, in an atomic graph: the transaction it opened is undone. */
 const undone = (atomic?: boolean) => (atomic ? ', rolled back' : '');
 
+/**
+ * How long the branch took, under `--verbose` and nowhere else. A rehearsal stubs every effect, so this
+ * times the tree's own work; it is read, never asserted on, which is why it stays out of the ordinary
+ * report a diff is taken of.
+ */
+const took = (branch: Decision['branches'][number], verbose?: boolean) =>
+  verbose && branch.settled?.ms !== undefined ? `  (${branch.settled.ms}ms)` : '';
+
 /** Merge a switch's result into the decisions already gathered, so a shared graph is reported once. */
 export function gather(decisions: Decision[], decision: Decision) {
   const hit = decisions.find(one => one.graph === decision.graph && one.node === decision.node);
@@ -80,7 +88,7 @@ const short = (path: string) => path.replace(/^@/, '').replace(/\.graph\.json$/,
 /** How one branch settled: the line the report shows, and the problem it names when something is wrong. */
 function branchLine(
   branch: Decision['branches'][number],
-  at: { graph: string; node: string; atomic?: boolean },
+  at: { graph: string; node: string; atomic?: boolean; verbose?: boolean },
   width: number,
 ): { line: string; problem?: string } {
   const when = phrase(branch.when).padEnd(width);
@@ -92,8 +100,8 @@ function branchLine(
     };
   const settled = branch.settled;
   const answered = { line: `  ok  ${when}  answered from '${branch.to}'` };
-  if (!settled) return answered;
-  return settledLine(settled, branch, { when, where, atomic: at.atomic }) ?? answered;
+  const said = settled ? (settledLine(settled, branch, { when, where, atomic: at.atomic }) ?? answered) : answered;
+  return { ...said, line: `${said.line}${took(branch, at.verbose)}` };
 }
 
 /** How a settled branch reads: wrong, or one of the ways it may rightly end. */
@@ -189,7 +197,7 @@ function decisionLines(decision: Decision, lines: string[], verbose?: boolean): 
   // one width for the whole decision, so the outcomes line up and the odd one out is visible
   const width = Math.max(...decision.branches.map(branch => phrase(branch.when).length));
   const problems: string[] = [];
-  const at = { graph: short(decision.graph), node: decision.node, atomic: decision.atomic };
+  const at = { graph: short(decision.graph), node: decision.node, atomic: decision.atomic, verbose };
   for (const branch of decision.branches) {
     const said = branchLine(branch, at, width);
     lines.push(said.line);

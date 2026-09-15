@@ -153,6 +153,38 @@ describe('wilanis fuzz and regress', () => {
     expect(existsSync(join(dir, 'scenarios'))).toBe(true);
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it('records the handler each node ran, so a diff says a node was rebound and not only that it answered differently', async () => {
+    const dir = tmp();
+    cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
+    await fuzz(loadTree(dir, PLUGINS, INCLUDES), { runs: 1, profile: 'live' });
+    const sc = read(join(dir, 'scenarios', 'get-entry.1.scenario.json'));
+    // the fire runs whatever the profile's binding met the port with -- the graph is the thing a rebind changes
+    expect(sc.expect.nodes.op.handler).toBe('graph:@features/monitor/data/get-row.graph.json');
+    // and under it, the operation each node ran, native or declared
+    expect(sc.expect.nodes['op.asked'].handler).toBe('@http/http.port.json#request');
+    expect(sc.expect.nodes['op.failed'].handler).toBe('@std/outcome.port.json#refuse');
+    // a switch has no handler to record, and nothing invented one
+    expect(sc.expect.nodes['op.route'].selected).toBe('failed');
+    expect(sc.expect.nodes['op.route'].handler).toBeUndefined();
+
+    // the scenarios still load and pass check with the field on them
+    const again = loadTree(dir, PLUGINS, INCLUDES);
+    expect(checkTree(again).items).toEqual([]);
+    expect((await regress(again, { profile: 'live' })).ok).toBe(true);
+
+    // a node met by another graph is a change the recorded answer alone cannot name, and the diff names it
+    const scenario = join(dir, 'scenarios', 'get-entry.1.scenario.json');
+    const doc = read(scenario);
+    doc.expect.nodes.op.handler = 'graph:@features/monitor/data/kept-get.graph.json';
+    writeFileSync(scenario, JSON.stringify(doc));
+    const changed = await regress(loadTree(dir, PLUGINS, INCLUDES), { profile: 'live' });
+    expect(changed.ok).toBe(false);
+    expect(changed.lines.join('\n')).toContain(
+      'op: ran graph:@features/monitor/data/kept-get.graph.json → graph:@features/monitor/data/get-row.graph.json',
+    );
+    rmSync(dir, { recursive: true, force: true });
+  });
 });
 
 describe('wilanis run with files', () => {

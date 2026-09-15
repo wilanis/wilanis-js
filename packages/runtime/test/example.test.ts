@@ -51,6 +51,23 @@ describe('the example tree', () => {
     expect(text).toMatch(/anything else/);
     expect(text).toMatch(/when status == 404/);
   });
+  it('prints how long each branch took under --verbose, and never without it', async () => {
+    const quiet = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'live' });
+    const loud = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, verbose: true, profile: 'live' });
+    expect(quiet.ok && loud.ok, quiet.lines.join('\n')).toBe(true);
+    // a duration is an aside for a reader, so it is absent from the ordinary report
+    expect(quiet.lines.join('\n')).not.toMatch(/\(\d+ms\)/);
+    // and present on every branch that ran under --verbose -- an uncovered one never ran, so it has none
+    const ran = loud.lines.filter(line => /^ {2}(ok|!!) /.test(line));
+    expect(ran.length).toBeGreaterThan(0);
+    expect(
+      ran.every(line => /\(\d+ms\)$/.test(line)),
+      ran.join('\n'),
+    ).toBe(true);
+    // the duration follows the outcome rather than replacing it: the line still says what settled
+    expect(loud.lines.join('\n')).toMatch(/answered from '[^']+' {2}\(\d+ms\)/);
+    expect(loud.lines.join('\n')).toMatch(/refused on purpose at '[^']+' as upstream: "[^"]*" {2}\(\d+ms\)/);
+  });
   it('rehearses a switch inside a mapped operation through the first element, whatever the seed', async () => {
     for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
       const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed, verbose: true, profile: 'live' });
