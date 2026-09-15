@@ -125,6 +125,8 @@ export interface RunContext {
   /** The trigger context (`request`) of this run, forwarded to nested graphs. */
   request?: unknown;
   signal?: AbortSignal;
+  /** The clock this run stamps its reports with, forwarded so a nested run stamps by the same one. */
+  clock: () => number;
   /** Anything the embedder wants handlers to see (connections, secrets, ...). Opaque to the kernel. */
   env: Record<string, unknown>;
 }
@@ -144,6 +146,11 @@ export interface RunOptions {
   initial?: Record<string, unknown>;
   stubs?: Record<string, unknown>;
   signal?: AbortSignal;
+  /**
+   * What every `startedAt` and `endedAt` of this run is read from; `Date.now` unless given. It only reads
+   * the time: the kernel never waits on it and never decides from it whether to run again.
+   */
+  clock?: () => number;
   env?: Record<string, unknown>;
   nodePath?: string[];
 }

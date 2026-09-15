@@ -164,7 +164,7 @@ export class Compiler {
   }
 
   /**
-   * A handler that runs a nested spec with the caller's `in` and forwards request, stubs and env. A graph that
+   * A handler that runs a nested spec with the caller's `in` and forwards request, stubs, clock and env. A graph that
    * takes its input whole (an `in` that is not a shape) is handed it under the one key `in`, and unwraps it.
    */
   private nestedRunner(spec: KernelSpec, whole = false, atomic = false): Handler {
@@ -175,6 +175,7 @@ export class Compiler {
           initial,
           stubs: ctx.stubs,
           signal: ctx.signal,
+          clock: ctx.clock,
           env,
           nodePath: ctx.nodePath,
         });

@@ -76,7 +76,9 @@ export class Run {
   private readonly reports: Record<string, NodeReport> = {};
   private readonly plan: Plan;
   private readonly root: string[];
-  private readonly startedAt = Date.now();
+  /** What every stamp of this run is read from: the clock given, or `Date.now`. */
+  private readonly clock: () => number;
+  private readonly startedAt: number;
   private failed = false;
   private running = 0;
   private wake: (() => void) | undefined;
@@ -88,6 +90,8 @@ export class Run {
   ) {
     this.plan = planOf(spec);
     this.root = opts.nodePath ?? [];
+    this.clock = opts.clock ?? Date.now;
+    this.startedAt = this.clock();
     for (const [key, value] of Object.entries(opts.initial ?? {})) this.values.set(key, value);
     for (const id of Object.keys(spec.nodes)) this.reports[id] = this.initialReport(id);
   }
@@ -156,13 +160,13 @@ export class Run {
     const node = this.spec.nodes[id];
     const report = this.reports[id];
     report.status = 'running';
-    report.startedAt = Date.now();
+    report.startedAt = this.clock();
     if (node.kind !== 'switch') report.handler = node.handler;
     this.running++;
     this.runNode(id, node, report)
       .catch(error => this.fail(report, error))
       .finally(() => {
-        report.endedAt = Date.now();
+        report.endedAt = this.clock();
         this.running--;
         this.wake?.();
       });
@@ -235,7 +239,7 @@ export class Run {
     if (element.status === 'seeded') return { ok: true, value: element.out };
     const inputs = elementInputs(site.node, site.broadcast, item);
     element.status = 'running';
-    element.startedAt = Date.now();
+    element.startedAt = this.clock();
     element.handler = site.node.handler;
     element.in = redactValue(inputs, site.node.redact?.in) as Record<string, unknown>;
     const ctx = this.contextFor([...this.root, site.id, String(index)], element);
@@ -250,7 +254,7 @@ export class Run {
       noteRefusal(element, error);
       return { ok: false, error: element.error, reason: element.reason, detail: element.detail };
     } finally {
-      element.endedAt = Date.now();
+      element.endedAt = this.clock();
     }
   }
 
@@ -264,6 +268,7 @@ export class Run {
       stubs: this.opts.stubs,
       request: this.values.get('request'),
       signal: this.opts.signal,
+      clock: this.clock,
       env: this.opts.env ?? {},
     };
   }
@@ -281,7 +286,7 @@ export class Run {
 
   /** At quiescence: failed; or done with the first settled output candidate; or blocked on what was never supplied. */
   private report(): Report {
-    const base = { graph: this.spec.name, nodes: this.reports, startedAt: this.startedAt, endedAt: Date.now() };
+    const base = { graph: this.spec.name, nodes: this.reports, startedAt: this.startedAt, endedAt: this.clock() };
     if (this.failed) return { ...base, status: 'failed' };
     if (!this.spec.output) return { ...base, status: 'done' };
     const answer = this.spec.output.find(id => this.settled(id));
