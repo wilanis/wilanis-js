@@ -69,13 +69,17 @@ const noMarks: Marks = { entries: {}, notes: {} };
 const does = (steps: { do: string }[]) => steps.map(step => step.do);
 
 describe('how a collection comes to exist', () => {
-  it('nothing recorded and nothing in the catalog: one create per declared collection', () => {
+  it('nothing recorded and nothing in the catalog: a create per collection, then the guarantees it declares', () => {
     const { steps } = plan({}, { entries: ENTRIES, notes: NOTES }, noMarks);
-    expect(does(steps)).toEqual(['create', 'create']);
-    expect(steps.map(step => step.target)).toEqual(['entries', 'notes']);
+    // the create makes every column and the primary key in the one statement, so no field step follows it;
+    // a `unique` and a `refs` are guarantees over those columns, and each is its own step with its own count
+    expect(does(steps)).toEqual(['create', 'unique', 'create', 'ref']);
+    expect(steps.map(step => step.target)).toEqual(['entries', 'entries', 'notes', 'notes']);
     expect(steps[0].says).toBe('create collection entries');
-    // a collection that is not there yet has no field step: creating it is the whole of it
-    expect(steps.every(step => step.at === undefined)).toBe(true);
+    expect(steps[1]).toMatchObject({ do: 'unique', over: ['url', 'method'] });
+    // the ref follows both creates, so the table it points at exists by the time the constraint is written
+    expect(steps[3]).toMatchObject({ do: 'ref', at: 'entryId', to: 'entries' });
+    expect(steps.filter(step => step.do === 'add')).toHaveLength(0);
   });
 
   it('the RFC 0003 example against its own record: no step', () => {

@@ -12,17 +12,31 @@ import { constraintSteps } from './plan-constraints.js';
 /** How a collection comes to exist, and the record the rest of its steps are read against. */
 export interface Opening extends Planned {
   against?: Declared;
+  /**
+   * Whether the opening step already made the collection's columns, so only its constraints are still to
+   * emit. A `create` writes every column and the primary key in the one statement that makes the table, and
+   * a guarantee over those columns is its own step with its own count and its own class.
+   */
+  columnsMade?: boolean;
 }
 
 /** The names a hint may offer, so a reader sees what the record actually holds. */
 const listed = (names: string[]) => (names.length ? names.join(', ') : 'none');
 
 /**
+ * What a fresh `create` leaves still to do: the table is made with every column and the primary key, so what
+ * it is compared against is a collection of exactly those columns and no guarantee at all. The `unique` lists
+ * and the `refs` the tree declares are then the constraint steps of point 5, each with its own count and its
+ * own class, which is the one place a guarantee is ever added.
+ */
+const asCreated = (to: Declared): Declared => ({ key: to.key, fields: to.fields, unique: [], refs: {} });
+
+/**
  * Point 1: a declared collection with no record. It is `create` where the catalog has no table either,
  * `renameCollection` where `was` names a record no longer declared, and `adopt` where the engine found a table
  * the record has never seen -- the record is written from the catalog and the field steps run against that.
  */
-export function collectionSteps(name: string, standing: Standing): Opening {
+export function collectionSteps(name: string, standing: Standing, to: Declared): Opening {
   const { recorded, found, was } = standing;
   if (recorded && was)
     return {
@@ -37,7 +51,12 @@ export function collectionSteps(name: string, standing: Standing): Opening {
       stale: [],
       against: found,
     };
-  return { steps: [{ do: 'create', target: name, says: `create collection ${name}` }], stale: [], against: undefined };
+  return {
+    steps: [{ do: 'create', target: name, says: `create collection ${name}` }],
+    stale: [],
+    against: asCreated(to),
+    columnsMade: true,
+  };
 }
 
 /**
@@ -230,6 +249,11 @@ function fieldSteps(name: string, from: Declared, to: Declared, marks: Collectio
   }
   steps.push(...removeSteps(name, from, to, marks));
   return { steps, stale: renames.stale };
+}
+
+/** Point 5 alone: the guarantees a collection whose columns were just made still has to be given. */
+export function constraintStepsOnly(name: string, from: Declared, to: Declared, marks: CollectionMarks): Planned {
+  return { steps: constraintSteps(name, from, to, marks), stale: [] };
 }
 
 /** Points 3, 4 and 5 together: what changed inside a collection both the record and the tree hold. */

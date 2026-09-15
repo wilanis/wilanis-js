@@ -39,6 +39,12 @@ async function create(db: Kysely<never>, schema: string, step: Step, to: Declare
 /**
  * Add a column, with the default the store declared for the rows already there and dropped again at once: the
  * default was for the rows that existed, and what a graph writes always gives the whole record.
+ *
+ * A required field is `NOT NULL` whether or not a default was declared, exactly as `ensure` adds one: the
+ * record says the column is required, and a column the record calls required and the catalog calls optional is
+ * a drift the next plan cannot see. Whether the rows already there can answer for it is the plan's judgement
+ * and not this statement's -- a required `add` with no default over a table with rows is destructive, and
+ * either the operator allowed it or the step never reached here.
  */
 async function add(db: Kysely<never>, schema: string, step: Step, to: Declared): Promise<void> {
   const field = to.fields[step.at ?? ''];
@@ -47,7 +53,7 @@ async function add(db: Kysely<never>, schema: string, step: Step, to: Declared):
   const type = columnFor(field.type);
   const has = step.default !== undefined;
   const fill = has ? sql` default ${sql.raw(literal(step.default, type))}` : sql``;
-  const notNull = field.required && has ? sql` not null` : sql``;
+  const notNull = field.required ? sql` not null` : sql``;
   const table = tableOf(schema, step.target);
   await sql`alter table ${table} add column ${column} ${sql.raw(type)}${fill}${notNull}`.execute(db);
   if (has) await sql`alter table ${table} alter column ${column} drop default`.execute(db);
@@ -116,8 +122,11 @@ async function unconstrain(db: Kysely<never>, schema: string, name: string, targ
  * as the tree declares it now (and null for the ones the plan drops). A `create` reads its columns from it, an
  * `add` the type of the column, and a `ref` the key of the collection it points at, so nothing here has to be
  * handed the tree as well as the plan.
+ *
+ * Named for what it holds rather than for the act, since `Applying` is the contract's word for who is running
+ * a plan (`{ by, tree }`) and one word must not mean two things in one package.
  */
-export interface Applying {
+export interface Against {
   declared: Record<string, Declared | null>;
 }
 
@@ -160,7 +169,7 @@ async function declaring(db: Kysely<never>, schema: string, step: Step, to: Decl
  * One step applied, on whatever session the caller is on. An `adopt` runs no statement at all: the table is
  * already what the record will say it is, and adopting it is writing that record and nothing more.
  */
-export async function applyStep(db: Kysely<never>, schema: string, step: Step, ctx: Applying): Promise<void> {
+export async function applyStep(db: Kysely<never>, schema: string, step: Step, ctx: Against): Promise<void> {
   if (step.do === 'adopt') return;
   if (await simple(db, schema, step)) return;
   if (await constrain(db, schema, step)) return;

@@ -15,6 +15,7 @@ import type {
   At,
   Declared,
   Engine,
+  FieldType,
   On,
   Query,
   Record_,
@@ -25,6 +26,7 @@ import type {
 } from '@wilanis/plugin-storage';
 import type { Kysely } from 'kysely';
 import { applyPlan } from './apply.js';
+import { attempts } from './casts.js';
 import { fieldsOf, folded, isJson } from './columns.js';
 import { countFor } from './counting.js';
 import { ensureTables } from './ensure.js';
@@ -265,6 +267,15 @@ export class PostgresEngine implements Engine {
   async apply(on: On, steps: Step[], record: Recording, applying: Applying): Promise<Applied | undefined> {
     const { db, schema } = this.at(on);
     return applyPlan(db, { schema, connection: on.connection }, { steps, record }, applying);
+  }
+
+  /**
+   * Whether this engine writes a cast between these two types at all, which is `casts.ts`'s one table. A pair
+   * it answers `false` for is refused before it is counted: a cast that cannot be written is no more possible
+   * on an empty table than on a full one, and the operator reads `refused` rather than a fault.
+   */
+  attempts(was: FieldType, becomes: FieldType): boolean {
+    return attempts(was, becomes);
   }
 
   /** Every plan that applied on this connection, latest first, as the record kept it. */

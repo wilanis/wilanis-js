@@ -124,9 +124,14 @@ describe('what a count makes of a step: the Guide table', () => {
   it('a create and an adopt cost nothing on any database, so neither is ever counted', async () => {
     const { engine, asked } = fake({ rows: 4000 });
     const created = plan({}, { entries: ENTRIES }, {}).steps;
-    expect(await planned(engine, created)).toEqual([
-      { says: 'create collection entries', class: 'additive', rows: 0, refused: undefined },
-    ]);
+    // the create is followed by the guarantees the collection declares, each its own step; the create itself
+    // is additive whatever the database holds, and is never the step a count is taken for
+    expect((await planned(engine, created))[0]).toEqual({
+      says: 'create collection entries',
+      class: 'additive',
+      rows: 0,
+      refused: undefined,
+    });
     const adopted = plan({}, { entries: ENTRIES }, {}, { entries: ENTRIES }).steps;
     expect(await planned(engine, adopted)).toEqual([
       {
@@ -136,8 +141,9 @@ describe('what a count makes of a step: the Guide table', () => {
         refused: undefined,
       },
     ]);
-    // neither asked the engine for a count: a table this plan makes, or takes as it stands, costs nothing
-    expect(asked.rows).toEqual([]);
+    // no count was ever asked for a create or an adopt: a table this plan makes, or takes as it stands, costs nothing
+    expect(asked.rows.map(step => step.do)).not.toContain('create');
+    expect(asked.rows.map(step => step.do)).not.toContain('adopt');
   });
 
   it('a dropped collection is transformative at zero rows and destructive above', async () => {

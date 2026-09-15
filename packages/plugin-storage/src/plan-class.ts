@@ -7,10 +7,22 @@
  * data; destructive costs rows or values; refused is what no flag can make safe, and it carries the edit or
  * the graph that makes the step possible instead.
  */
-import type { Step } from './plan.js';
+import type { FieldType, Step } from './plan.js';
 
 /** What a step is at stake for, which decides what applies it: additive always, destructive only when allowed. */
 export type Class = 'additive' | 'transformative' | 'destructive' | 'refused';
+
+/**
+ * What the engine answers about a step beyond the count, where the count cannot answer it. Only one question
+ * is asked: whether this engine writes a cast between a pair of types at all, which is the engine's table and
+ * never the planner's -- and which is why a refused pair is refused here rather than thrown by the statement.
+ *
+ * An absent `attempts` means the caller is asking the *Guide* table alone, and a retype is classed by its
+ * count as it always was.
+ */
+export interface Judging {
+  attempts?: (was: FieldType, becomes: FieldType) => boolean;
+}
 
 /** A step with the count the engine answered and the class that count puts it in. */
 export interface Classed {
@@ -70,11 +82,32 @@ function byCount(step: Step, rows: number): Classed {
 }
 
 /**
+ * A pair no engine will attempt is refused whatever the table holds: an empty table makes a cast that cannot
+ * be written no more possible than a full one, and a count of zero is the honest count of rows in its way.
+ * Said as its own refusal so the operator reads what the *Guide* table promises -- refused -- rather than a
+ * destructive step that faults inside the transaction.
+ */
+function unattemptedClass(step: Step, rows: number): Classed {
+  return {
+    step,
+    rows,
+    class: 'refused',
+    refused: `this engine attempts no cast from ${step.was} to ${step.becomes} for ${step.at}: change the values with a one-off graph fired by a command-line trigger, or declare the type they already are`,
+  };
+}
+
+/**
  * A field kept in another type: destructive by the *Guide* table whatever the count, since a cast is a value
  * rewritten and no flag makes that free. What the count answers is the rows no cast can carry at all, and
- * those refuse the step -- an engine that will not attempt the pair answers every row.
+ * those refuse the step.
+ *
+ * Whether the engine attempts the pair at all is not a question about data, so no count answers it: an engine
+ * that says it will not is refused here, at zero rows as at any other number, rather than classed destructive
+ * and left to throw when the statement is written.
  */
-function retypeClass(step: Step, rows: number): Classed {
+function retypeClass(step: Step, rows: number, judge: Judging): Classed {
+  if (step.was && step.becomes && judge.attempts && !judge.attempts(step.was, step.becomes))
+    return unattemptedClass(step, rows);
   if (!rows) return { step, rows, class: 'destructive' };
   return {
     step,
@@ -85,24 +118,25 @@ function retypeClass(step: Step, rows: number): Classed {
 }
 
 /** Which of the four the count puts a step in, step by step, exactly as RFC 0017's *Guide* table says. */
-function classOf(step: Step, rows: number): Classed {
+function classOf(step: Step, rows: number, judge: Judging): Classed {
   if (ALWAYS_ADDITIVE.has(step.do)) return { step, rows, class: 'additive' };
   if (ALWAYS_TRANSFORMATIVE.has(step.do)) return { step, rows, class: 'transformative' };
   if (step.do === 'unique' || step.do === 'ref') return constraintClass(step, rows);
   if (step.do === 'add') return addClass(step, rows);
   if (step.do === 'require') return requireClass(step, rows);
-  if (step.do === 'retype') return retypeClass(step, rows);
+  if (step.do === 'retype') return retypeClass(step, rows, judge);
   return byCount(step, rows);
 }
 
 /**
  * One step classed. A step the planner already refused stays refused whatever the count says: a changed key,
- * a `renamed` naming a field the record has not got, a cast the engine will not attempt -- none of them is a
- * question about data, so no number answers it.
+ * a `renamed` naming a field the record has not got -- none of them is a question about data, so no number
+ * answers it. A cast the engine will not attempt is the same kind of answer, and `judge` is where the engine
+ * says so, since which pairs it writes is the engine's table and not the planner's.
  */
-export function classed(step: Step, rows: number): Classed {
+export function classed(step: Step, rows: number, judge: Judging = {}): Classed {
   if (step.refused) return { step, rows, class: 'refused', refused: step.refused };
-  return classOf(step, rows);
+  return classOf(step, rows, judge);
 }
 
 /**

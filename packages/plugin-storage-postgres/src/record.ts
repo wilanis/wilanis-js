@@ -7,7 +7,7 @@
  * what the tree declares, and the record is this engine's own furniture. Nothing drops it.
  */
 
-import type { Declared } from '@wilanis/plugin-storage';
+import type { Applied, Declared } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';
 
 /** One row of the record, as the database reports it. */
@@ -88,25 +88,20 @@ function stepsOf(value: unknown): string[] {
   return Array.isArray(held) ? held.map(String) : [];
 }
 
-/** One migration as `history` answers it: every row that shares an id's plan, gathered by that plan. */
-export interface Migration {
-  id: number;
-  appliedAt: string;
-  by: string;
-  tree: string;
-  connection: string;
-  targets: string[];
-  steps: Record<string, string[]>;
-}
+/**
+ * One plan as this engine reads it back: the contract's `Applied`, with the `steps` it leaves optional always
+ * filled, since a row of this record always says what it did.
+ */
+type Gathered = Applied & { steps: Record<string, string[]> };
 
 /**
  * Every plan that applied on this connection, latest first. One plan writes one row per collection it touched,
  * all at the same instant and by the same runner, so the rows of a plan are gathered by that instant: the
  * identity column numbers rows and a plan is the rows it wrote together.
  */
-export async function historyOf(db: Kysely<never>, schema: string, connection: string): Promise<Migration[]> {
+export async function historyOf(db: Kysely<never>, schema: string, connection: string): Promise<Applied[]> {
   const rows = await rowsOf(db, schema);
-  const byPlan = new Map<string, Migration>();
+  const byPlan = new Map<string, Gathered>();
   for (const row of [...rows].reverse()) {
     const at = instant(row.applied_at);
     const key = `${at}|${row.by}|${row.tree}`;
