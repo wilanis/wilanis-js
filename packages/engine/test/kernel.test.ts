@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { KernelSpec } from '../src/index.js';
-import { Kernel } from '../src/index.js';
+import { isRefusal, Kernel, outcomeOf, Refusal, refusalOf } from '../src/index.js';
 import { handlers } from './handlers.js';
+
+/** A one-node spec over a shared handler, so each outcome is named by the handler it ends in. */
+function oneNode(handler: string, input: Record<string, { value: unknown }> = {}): KernelSpec {
+  return { name: 't', output: ['a'], nodes: { a: { kind: 'call', handler, in: input } } };
+}
 
 describe('the scheduler', () => {
   it('runs ready nodes, routes, cancels the other branch, answers the first settled candidate', async () => {
@@ -114,5 +119,97 @@ describe('the scheduler', () => {
     expect(report.nodes.slow.endedAt! - report.nodes.bad.endedAt!).toBeGreaterThan(400);
     // `after` was still pending when the failure landed, so it never ran.
     expect(report.nodes.after.status).toBe('cancelled');
+  });
+});
+
+describe('outcomeOf', () => {
+  it('names a run that answered, with its output', async () => {
+    const report = await new Kernel(handlers).run(oneNode('double', { x: { value: 21 } }), {});
+    expect(outcomeOf(report)).toEqual({ kind: 'answered', output: 42 });
+  });
+  it('names a refusal: the reason, the message, the detail and the node that gave them', async () => {
+    const detail = { value: { challenge: { id: 'K7Q2' } } };
+    const spec = oneNode('refuse', { reason: { value: 'missing' }, what: { value: 'entry 7' }, detail });
+    const report = await new Kernel(handlers).run(spec, {});
+    expect(outcomeOf(report)).toEqual({
+      kind: 'refused',
+      reason: 'missing',
+      message: 'no entry 7',
+      detail: { challenge: { id: 'K7Q2' } },
+      at: 'a',
+    });
+    // refusalOf is the refused case of outcomeOf, and says what it always said.
+    expect(refusalOf(report)).toEqual({
+      reason: 'missing',
+      message: 'no entry 7',
+      detail: { challenge: { id: 'K7Q2' } },
+    });
+  });
+  it('names a fault: the node that broke and what it threw, and refusalOf finds nothing', async () => {
+    const report = await new Kernel(handlers).run(oneNode('boom'), {});
+    expect(outcomeOf(report)).toEqual({ kind: 'faulted', at: 'a', error: 'boom' });
+    expect(refusalOf(report)).toBeUndefined();
+  });
+  it('names a blocked run by the roots nothing supplied', async () => {
+    const spec: KernelSpec = {
+      name: 't',
+      output: ['a'],
+      nodes: { a: { kind: 'call', handler: 'double', in: { x: { ref: 'in', path: ['x'] } } } },
+    };
+    const report = await new Kernel(handlers).run(spec, {});
+    expect(outcomeOf(report)).toEqual({ kind: 'blocked', needs: ['in.x'] });
+  });
+  it('answers the refusal, not the fault, when a run holds both, and names the node that refused', async () => {
+    // `bad` breaks and `no` refuses; the graph decided, so the run refused.
+    const spec: KernelSpec = {
+      name: 't',
+      output: ['ok'],
+      nodes: {
+        bad: { kind: 'call', handler: 'boom', in: {} },
+        no: { kind: 'call', handler: 'refuse', in: { reason: { value: 'conflict' }, what: { value: 'room' } } },
+        ok: { kind: 'call', handler: 'echo', in: {} },
+      },
+    };
+    const report = await new Kernel(handlers).run(spec, {});
+    expect(outcomeOf(report)).toMatchObject({ kind: 'refused', reason: 'conflict', at: 'no' });
+  });
+  it('skips a node whose fault a switch caught: the fault that ended the run is the one that was not', async () => {
+    const report = await new Kernel(handlers).run(oneNode('boom'), {});
+    // `caught` is written by the switch that routes a fault; a node carrying it did not end the run.
+    report.nodes.caught = { status: 'failed', error: 'routed', caught: 'route' };
+    expect(outcomeOf(report)).toEqual({ kind: 'faulted', at: 'a', error: 'boom' });
+  });
+  it("a nested run's refusal reaching the caller node is the run's refusal, at the caller", async () => {
+    // What the compiler does: a nested run that refused rethrows its Refusal at the node that ran it.
+    const nested = {
+      ...handlers,
+      call: async () => {
+        throw new Refusal('missing', 'no entry 7');
+      },
+    };
+    const report = await new Kernel(nested).run(oneNode('call'), {});
+    expect(outcomeOf(report)).toEqual({ kind: 'refused', reason: 'missing', message: 'no entry 7', at: 'a' });
+  });
+});
+
+describe('isRefusal', () => {
+  it("reads a foreign copy of the engine: an Error named Refusal with a string reason is the graph's decision", async () => {
+    const own = new Refusal('missing', 'no entry 7');
+    expect(isRefusal(own)).toBe(true);
+    const spec = oneNode('refuseForeign', { reason: { value: 'missing' }, what: { value: 'entry 7' } });
+    const report = await new Kernel(handlers).run(spec, {});
+    expect(report.nodes.a).toMatchObject({ status: 'failed', reason: 'missing', error: 'no entry 7' });
+    expect(outcomeOf(report)).toEqual({ kind: 'refused', reason: 'missing', message: 'no entry 7', at: 'a' });
+  });
+  it('an Error named Refusal without a string reason is a fault, and so is anything else thrown', async () => {
+    const named = new Error('no entry 7');
+    named.name = 'Refusal';
+    expect(isRefusal(named)).toBe(false);
+    expect(isRefusal(new Error('boom'))).toBe(false);
+    expect(isRefusal({ name: 'Refusal', reason: 'missing' })).toBe(false);
+    expect(isRefusal(undefined)).toBe(false);
+    const report = await new Kernel(handlers).run(oneNode('refuseForeign', { what: { value: 'entry 7' } }), {});
+    expect(report.nodes.a.reason).toBeUndefined();
+    expect(outcomeOf(report)).toEqual({ kind: 'faulted', at: 'a', error: 'no entry 7' });
   });
 });

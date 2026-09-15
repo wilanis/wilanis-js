@@ -19,7 +19,7 @@ import type {
   RunContext,
   RunOptions,
 } from './spec.js';
-import { Refusal } from './spec.js';
+import { isRefusal, Refusal } from './spec.js';
 
 /** What one element of a map came to: its value, or the error (and the reason, when it refused). */
 type ElementResult =
@@ -36,7 +36,7 @@ interface MapSite {
 
 /** A handler that refused on purpose leaves its reason (and detail) on the report; a fault leaves neither. */
 function noteRefusal(report: NodeReport, error: unknown): void {
-  if (!(error instanceof Refusal)) return;
+  if (!isRefusal(error)) return;
   report.reason = error.reason;
   if (error.detail) report.detail = error.detail;
 }
