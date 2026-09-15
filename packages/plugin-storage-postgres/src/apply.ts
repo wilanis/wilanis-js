@@ -9,16 +9,26 @@
  */
 import type { Applied, Applying, Recording, Step } from '@wilanis/plugin-storage';
 import type { Kysely } from 'kysely';
+import { folded } from './columns.js';
 import { ensureRecord, type Written, write } from './record.js';
 import { applyStep } from './steps.js';
+
+/**
+ * Every row of the record is keyed by the folded name, which is the name the table actually has: Postgres
+ * folds an unquoted identifier, so `auditLog` and `auditlog` are one table and X223 refuses a store that means
+ * two by them. `recorded` and `inspect` both ask the catalog by the folded name, so the record answers by it
+ * too -- a collection written under the tree's spelling would be looked up under the table's and never found,
+ * and every plan after it would create a table that is already there.
+ */
+const key = (collection: string) => folded(collection);
 
 /** What each collection a step touched is said to have done, by the collection it is about. */
 function saidBy(steps: Step[]): Map<string, string[]> {
   const said = new Map<string, string[]>();
   for (const step of steps) {
-    const lines = said.get(step.target) ?? [];
+    const lines = said.get(key(step.target)) ?? [];
     lines.push(step.says);
-    said.set(step.target, lines);
+    said.set(key(step.target), lines);
   }
   return said;
 }
@@ -28,7 +38,7 @@ function saidBy(steps: Step[]): Map<string, string[]> {
  * would answer for both names and the next plan would see a collection that is not there any more.
  */
 function vacated(steps: Step[]): string[] {
-  return steps.filter(step => step.do === 'renameCollection' && step.from).map(step => step.from as string);
+  return steps.filter(step => step.do === 'renameCollection' && step.from).map(step => key(step.from as string));
 }
 
 /** What each collection the plan touched has to say about itself afterwards, as the record keeps it. */
@@ -36,7 +46,7 @@ function written(steps: Step[], record: Recording): Written[] {
   const said = saidBy(steps);
   const rows: Written[] = [];
   for (const [collection, declared] of Object.entries(record))
-    rows.push({ collection, declared, steps: said.get(collection) ?? [] });
+    rows.push({ collection: key(collection), declared, steps: said.get(key(collection)) ?? [] });
   const named = new Set(rows.map(one => one.collection));
   for (const collection of [...said.keys(), ...vacated(steps)])
     if (!named.has(collection)) {

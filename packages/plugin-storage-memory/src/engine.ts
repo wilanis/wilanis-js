@@ -209,6 +209,15 @@ export class MemoryEngine implements Engine {
     return [];
   }
 
+  /**
+   * This engine writes no cast, because it applies no step: a record kept in a Map is whatever was put there,
+   * and nothing here ever rewrites one type as another. Answering `false` is of no consequence -- no plan of
+   * this engine's is ever classed -- and it is the honest answer rather than a claim it would attempt one.
+   */
+  attempts(): boolean {
+    return false;
+  }
+
   /** A copy deep enough that writing through one map cannot reach the other: the records too, not just the maps. */
   private static forked(collections: Map<string, Map<string, Record_>>): Map<string, Map<string, Record_>> {
     return new Map([...collections].map(([where, kept]) => [where, new Map(kept)]));

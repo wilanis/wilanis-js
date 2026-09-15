@@ -7,7 +7,7 @@
  * house limit splits along the families it holds. Nothing here mentions SQL, a table or a column: an engine
  * answers a `Declared` and takes a `Step`, and what either is on that engine is that engine's alone.
  */
-import type { Declared, Step } from './plan.js';
+import type { Declared, FieldType, Step } from './plan.js';
 
 /**
  * The connection an engine is asked about: its canonical path, and the settings that reach it. The path comes
@@ -66,8 +66,9 @@ export type Recording = Record<string, Declared | null>;
  * What an engine keeping a record answers about it. Every member takes the connection first and mentions no
  * SQL: the questions are about collections, fields and rows, which is what a plan is made of.
  *
- * An engine that keeps nothing between processes answers nothing, zero, and does nothing -- there is no
- * record to read and no plan to apply -- so the contract is optional on `Engine` and complete here.
+ * `Engine` extends this, so every engine answers all of it. An engine that keeps nothing between processes
+ * answers nothing, zero, and does nothing -- there is no record to read and no plan to apply -- which is an
+ * answer to every member and not an excuse from any of them.
  */
 export interface Recorder {
   /** The record's current entry for a collection, or nothing when it was never recorded on this connection. */
@@ -80,6 +81,13 @@ export interface Recorder {
   apply(on: On, steps: Step[], record: Recording, applying: Applying): Promise<Applied | undefined>;
   /** Every applied plan on this connection, latest first. */
   history(on: On): Promise<Applied[]>;
+  /**
+   * Whether this engine writes a cast between these two types at all. It is asked before a `retype` is classed
+   * and never counted: which pairs an engine attempts is its own table, and a pair it will not write is refused
+   * on an empty table exactly as on a full one, rather than classed by a count and left to fault when the
+   * statement is written. An engine that applies nothing attempts nothing.
+   */
+  attempts(was: FieldType, becomes: FieldType): boolean;
 }
 
 /** The connection half of anything that names one, so a caller holding an `At` has an `On` already. */

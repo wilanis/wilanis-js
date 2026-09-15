@@ -9,7 +9,7 @@
  * emits the step, says what it does and names what it would lose.
  */
 import type { Collection, Type } from '@wilanis/core';
-import { collectionSteps, fieldAndConstraintSteps } from './plan-steps.js';
+import { collectionSteps, constraintStepsOnly, fieldAndConstraintSteps } from './plan-steps.js';
 
 /**
  * A collection as a store document declares it, with the two marks RFC 0017 adds to the schema. It is written
@@ -199,11 +199,17 @@ interface Standing {
   applied?: string;
 }
 
-/** The steps for one declared collection: how it comes to exist, then the field and constraint steps over it. */
+/**
+ * The steps for one declared collection: how it comes to exist, then what is still to do inside it. A `create`
+ * makes the columns and the primary key in the one statement, so only the guarantees follow it; everything
+ * else is compared field by field against the record or the catalog the opening answered.
+ */
 function stepsFor(name: string, standing: Standing, to: Declared, marks: CollectionMarks): Planned {
-  const opening = collectionSteps(name, standing);
+  const opening = collectionSteps(name, standing, to);
   if (!opening.against) return { steps: opening.steps, stale: opening.stale };
-  const rest = fieldAndConstraintSteps(name, opening.against, to, marks);
+  const rest = opening.columnsMade
+    ? constraintStepsOnly(name, opening.against, to, marks)
+    : fieldAndConstraintSteps(name, opening.against, to, marks);
   return { steps: [...opening.steps, ...rest.steps], stale: [...opening.stale, ...rest.stale] };
 }
 
