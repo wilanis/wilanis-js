@@ -6,95 +6,20 @@
  *   import { cases } from '@wilanis/plugin-storage/suite';
  *   for (const one of cases) it(one.name, () => one.run(subject));
  *
- * Each case keeps its records in a collection of its own, so an engine that really persists them can run the
- * whole suite against one database without the cases reaching each other.
+ * The cases of this file are what a store does with records; `suite-transactions.ts` holds what it does
+ * with a transaction, and `cases` below is the two together -- an engine answers all of it or is not one.
+ * Each case keeps its records in a collection of its own, so an engine that really persists them can run
+ * the whole suite against one database without the cases reaching each other.
  */
 import { strict as assert } from 'node:assert';
-import type { Type } from '@wilanis/core';
-import type { At, Engine, Record_ } from './engine.js';
-import { parseWhere } from './where.js';
+import { at, type Case, type Declared, entry, found, ids, SEEDS, seeded, where } from './suite-fixture.js';
+import { transactionCases } from './suite-transactions.js';
 
-/** The shape the suite keeps: one required field of each kind the grammar tests, and one optional. */
-export const SHAPE: Type = {
-  kind: 'object',
-  name: 'Entry',
-  open: false,
-  fields: {
-    id: { type: { kind: 'string' }, required: true },
-    url: { type: { kind: 'string' }, required: true },
-    method: { type: { kind: 'string' }, required: true },
-    hits: { type: { kind: 'number' }, required: true },
-    ok: { type: { kind: 'boolean' }, required: true },
-    ua: { type: { kind: 'string' }, required: false },
-  },
-};
+export type { Case, Subject } from './suite-fixture.js';
+export { SHAPE } from './suite-fixture.js';
 
-/** What an engine's own tests hand the suite: the engine, and the connection it was registered for. */
-export interface Subject {
-  engine: Engine;
-  connection: { connection: string; kind: string; settings: Record<string, unknown> };
-}
-
-/** One thing every engine must do, by the name it is done under. */
-export interface Case {
-  name: string;
-  run(subject: Subject): Promise<void>;
-}
-
-const entry = (id: string, url: string, method: string, rest: Partial<Record_> = {}): Record_ => ({
-  id,
-  url,
-  method,
-  hits: 1,
-  ok: true,
-  ...rest,
-});
-
-const SEEDS: Record_[] = [
-  entry('a', 'https://one.example/a', 'GET', { hits: 3, ua: 'curl' }),
-  entry('b', 'https://two.example/b', 'POST', { hits: 7, ok: false }),
-  entry('c', 'http://localhost/c', 'GET', { hits: 5, ua: 'wget' }),
-];
-
-const ids = (records: Record_[]) => records.map(record => String(record.id)).sort();
-const where = (filter: unknown) => parseWhere(filter, SHAPE);
-
-/** What a case declares beyond the shape: the constraints the engine is to answer for. */
-type Declared = Partial<Pick<At, 'unique' | 'refs' | 'referenced' | 'defaults'>>;
-
-/** A collection of the subject's connection, named for the case that keeps its records there. */
-function at(subject: Subject, name: string, declared: Declared = {}): At {
-  return {
-    ...subject.connection,
-    name,
-    shape: SHAPE,
-    key: 'id',
-    unique: [],
-    refs: [],
-    referenced: [],
-    defaults: {},
-    ...declared,
-  };
-}
-
-/** A collection made, emptied of anything a previous run left, and filled with the seeds. */
-async function seeded(
-  subject: Subject,
-  name: string,
-  records: Record_[] = SEEDS,
-  declared: Declared = {},
-): Promise<At> {
-  const where_ = at(subject, name, declared);
-  await subject.engine.ensure([where_]);
-  for (const record of await subject.engine.find(where_, {})) await subject.engine.remove(where_, record.id);
-  for (const record of records) await subject.engine.put(where_, record, true);
-  return where_;
-}
-
-const found = async (subject: Subject, where_: At, filter: unknown) =>
-  ids(await subject.engine.find(where_, { where: where(filter) }));
-
-export const cases: Case[] = [
+/** What a store does with records: written, read back, filtered, ordered, paged and constrained. */
+const recordCases: Case[] = [
   {
     name: 'a record put is the record got, field for field',
     async run(subject) {
@@ -315,3 +240,6 @@ export const cases: Case[] = [
     },
   },
 ];
+
+/** Everything an engine must answer: what it does with records, and what it does with a transaction. */
+export const cases: Case[] = [...recordCases, ...transactionCases];

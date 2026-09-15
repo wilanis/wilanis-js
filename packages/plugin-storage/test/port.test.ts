@@ -3,6 +3,7 @@
  * collection found in it, and the engine registered for its connection's kind asked. What is tested here is
  * the three steps every handler takes -- not how records are kept, which is the engine's and the suite's.
  */
+import type { Atomic, Participant } from '@wilanis/core';
 import { type Type, TypeResolver } from '@wilanis/core';
 import { MemoryEngine } from '@wilanis/plugin-storage-memory';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -110,5 +111,72 @@ describe('what an operation refuses before it reaches an engine', () => {
     await expect(run('@storage/store.port.json#count', on({}))).rejects.toThrow(
       /no storage engine for connection kind '@other\/other.connection-kind.json': add the package that grants it/,
     );
+  });
+});
+
+/**
+ * What a handler does with `env.atomic`, which is the whole of this plugin's part in RFC 0004: it joins the
+ * scope once per connection and runs on the engine the transaction handed back. The scope here is the one
+ * the runtime puts on `env`, written out rather than imported, so what is tested is the handler's use of the
+ * contract and not the runtime's implementation of it.
+ */
+describe('an operation inside an atomic graph', () => {
+  const opened: Participant[] = [];
+
+  /** The scope the runtime hands down: one participant per connection, memoised on the promise. */
+  const scope = (): Atomic => {
+    const joined = new Map<string, Promise<Participant>>();
+    return {
+      join<T extends Participant>(connection: string, open: () => Promise<T>): Promise<T> {
+        let pending = joined.get(connection);
+        if (!pending) {
+          pending = open().then(participant => {
+            opened.push(participant);
+            return participant;
+          });
+          joined.set(connection, pending);
+        }
+        return pending as Promise<T>;
+      },
+    };
+  };
+
+  beforeEach(() => {
+    opened.length = 0;
+  });
+
+  it('runs on the transaction, so what it writes is not kept until the scope commits', async () => {
+    env.atomic = scope();
+    const record = { id: '1', url: 'https://x', hits: 2 };
+    await run('@storage/store.port.json#put', on({ record }));
+    expect(await run('@storage/store.port.json#count', on({}))).toBe(1);
+
+    const outside = { ...env, atomic: undefined };
+    const counted = plugin.handlers['@storage/store.port.json#count'];
+    expect(await counted({ in: on({}), ctx: { env: outside, nodePath: [], attach: () => {} } } as never)).toBe(0);
+
+    await opened[0].commit();
+    expect(await counted({ in: on({}), ctx: { env: outside, nodePath: [], attach: () => {} } } as never)).toBe(1);
+  });
+
+  it('joins once, so two operations of one connection are one transaction', async () => {
+    env.atomic = scope();
+    await run('@storage/store.port.json#put', on({ record: { id: '1', url: 'https://x', hits: 2 } }));
+    await run('@storage/store.port.json#put', on({ record: { id: '2', url: 'https://y', hits: 3 } }));
+    expect(opened).toHaveLength(1);
+    expect(await run('@storage/store.port.json#count', on({}))).toBe(2);
+  });
+
+  it('refuses rather than writing outside the transaction the graph declared', async () => {
+    engines(env).register(
+      KIND,
+      new (class extends MemoryEngine {
+        begin = undefined;
+      })(),
+    );
+    env.atomic = scope();
+    await expect(
+      run('@storage/store.port.json#put', on({ record: { id: '1', url: 'https://x', hits: 2 } })),
+    ).rejects.toThrow(/cannot take part in a transaction, so an atomic graph cannot write through it/);
   });
 });
