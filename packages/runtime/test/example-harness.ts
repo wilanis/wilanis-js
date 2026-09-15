@@ -154,6 +154,21 @@ export function loadedWith(docs: Record<string, unknown>): { load: LoadResult; d
 }
 
 /**
+ * Copy the example, add documents at paths it does not have and edit several it has, and answer each refusal
+ * as `code message`: what a case needs when the claim is about which profiles a rule was judged under, since
+ * which profiles reach a graph is written across the bindings rather than in any one of them.
+ */
+export function plantedEditingAllSaying(
+  docs: Record<string, unknown>,
+  edits: Record<string, (doc: any) => void>,
+): string[] {
+  return after(dir => {
+    write(dir, docs);
+    for (const [file, edit] of Object.entries(edits)) editing(file, edit)(dir);
+  }, refusalsSaying);
+}
+
+/**
  * Copy the example, edit one document it has, and answer the tree as loaded together with the directory it
  * sits in: what a case needs when it reads what `describe`, `map` or the view model says about a document
  * the example does not yet write that way. The caller removes the directory.
