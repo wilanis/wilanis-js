@@ -1,0 +1,32 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/port.schema.json",
+  "label": "Scheduler",
+  "description": "What keeps this tree's schedule. A project's startup list names `run` to start it: nothing fires on a clock of its own, so a tree that does not ask to be scheduled is not. The schedule is the scheduled triggers themselves -- this operation names none of them.",
+  "operations": {
+    "run": {
+      "description": "Keep this tree's schedule until the process stops: at every instant a scheduled trigger's cron expression or interval names, fire its operation and log what it answered. Answers what it found, so a startup report says how many triggers are scheduled and when the earliest next tick falls.",
+      "holds": true,
+      "accepts": {
+        "lease": {
+          "type": "string",
+          "static": true,
+          "required": false,
+          "description": "the path of a connection document whose kind declares `leases`, on which a tick is held so that one instance of several fires it; absent: this process assumes it is alone and fires every tick itself"
+        }
+      },
+      "returns": {
+        "fields": {
+          "triggers": {
+            "type": "number",
+            "description": "how many scheduled triggers the tree has"
+          },
+          "next": {
+            "type": "string",
+            "required": false,
+            "description": "the earliest next tick of any of them, ISO 8601 in UTC; absent where the tree has no scheduled trigger"
+          }
+        }
+      }
+    }
+  }
+}

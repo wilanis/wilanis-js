@@ -1,0 +1,55 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger-kind.schema.json",
+  "label": "Schedule",
+  "description": "Fired by the clock while a startup step names @schedule/scheduler.port.json#run: at every instant a five-field cron expression names in its timezone, or at every multiple of everyMs milliseconds since the Unix epoch. The context hands the tick's instant, when the run actually began, and how many ticks since the last run were not fired; the trigger's input mapping picks what the graph gets. Nobody is calling: the trigger gives the guard nothing, so a policy reading the caller is refused (A005), and the answer is judged against out and logged, never delivered. A refusal is logged with its reason. A tick that finds the previous run still going is skipped, waits, or runs beside it, as overlap says. A tick that fell while no process ran is not fired unless catchUp says so, which needs a lease to remember the last tick by.",
+  "settings": {
+    "fields": {
+      "cron": {
+        "type": "string",
+        "required": false,
+        "description": "five fields: minute hour day-of-month month day-of-week; *, lists, ranges, steps, and month and weekday names. One of cron and everyMs"
+      },
+      "everyMs": {
+        "type": "number",
+        "required": false,
+        "description": "an interval in milliseconds, 1000 or more; a tick is every multiple of it since the Unix epoch, the same instants on every process; never with a timezone. One of cron and everyMs"
+      },
+      "timezone": {
+        "type": "string",
+        "required": false,
+        "description": "the IANA zone the cron expression is read in; absent: the plugin's settings.timezone, and UTC when that is absent too"
+      },
+      "overlap": {
+        "type": "string",
+        "enum": [
+          "skip",
+          "wait",
+          "concurrent"
+        ],
+        "required": false,
+        "description": "what a tick does when the previous tick's run is still going: skip (default) drops it and counts it in missed; wait fires it once that run ends, one tick waiting at most; concurrent fires it beside the running one"
+      },
+      "catchUp": {
+        "type": "boolean",
+        "required": false,
+        "description": "whether a tick that fell while no process ran is fired once at start, as the most recent such tick, with the earlier ones counted in missed; default false. Needs the run step's lease: without a store there is nothing to remember the last tick by (X253)"
+      }
+    }
+  },
+  "context": {
+    "fields": {
+      "scheduled": {
+        "type": "string",
+        "description": "the tick's instant, ISO 8601 in UTC (2026-09-11T03:00:00.000Z), whatever the timezone the expression was read in"
+      },
+      "fired": {
+        "type": "string",
+        "description": "when this run began, ISO 8601 in UTC; later than scheduled when the process was busy or catching up"
+      },
+      "missed": {
+        "type": "number",
+        "description": "ticks between the last fired one and this one that were not fired: skipped by overlap, or fallen while no process ran (known only with a lease); 0 on the first tick after a start without one"
+      }
+    }
+  }
+}
