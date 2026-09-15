@@ -126,8 +126,9 @@ describe('describe: the engine behind a store', () => {
   it('names every graph that runs an operation against it, with the operation and the collection', () => {
     expect(said()).toContain('run against by (the operation each runs):');
     expect(said()).toContain('    @features/monitor/data/kept-get.graph.json#asked  get (entries)');
-    expect(said()).toContain('    @features/monitor/data/kept-record.graph.json#key  newKey (entries)');
-    expect(said()).toContain('    @features/monitor/data/kept-record.graph.json#saved  put (entries)');
+    expect(said()).toContain('    @features/monitor/data/store-and-latest.graph.json#key  newKey (entries)');
+    expect(said()).toContain('    @features/monitor/data/store-and-latest.graph.json#stored  put (entries)');
+    expect(said()).toContain('    @features/monitor/data/store-and-latest.graph.json#latest  put (latest)');
   });
 });
 

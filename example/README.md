@@ -161,7 +161,7 @@ binding the profile chose is what gets checked; the last three are `holds` opera
 the runtime stops when the process ends. `wilanis describe @http/server.port.json` says which plugin grants it.
 
 `monitor.port.json` is what the domain needs: `listAll`, `listByMethod`, `get`, `record`, `update`,
-`remove`, `parseDrafts`, `toCsv`, `removeMany`, `submit`, `list`, `digest`, `import`, `export`. `monitor-rest.binding.json` meets the first eight with a data
+`remove`, `parseDrafts`, `toCsv`, `removeMany`, `submit`, `recordAll`, `list`, `digest`, `import`, `export`. `monitor-rest.binding.json` meets the first eight with a data
 graph each, which issues one declared request and decides with a `switch` on `status` what the answer means:
 the rows, the declared refusal `no entry {id}` with reason `missing` when the API answers 404, or the refusal
 `upstream` for anything else. The http triggers map those two words to statuses (`"refusals": { "missing": 404, "upstream": 502 }`),
@@ -174,7 +174,8 @@ the edge shape `EntryRow` and never reaches the domain.
 `POST /monitor.csv` takes a CSV file (`url,method` per line) and `GET /monitor.csv` answers one. The file never
 enters a graph: `text/csv` is mapped to the blob codec in `project.json`, so the upload streams into the blob
 registry and the route hands the domain a handle; `import-entries` has the data layer read it as drafts
-(`@blob/csv.port.json#parse`, typed by `EntryDraft`) and submits each one the way a single POST is;
+(`@blob/csv.port.json#parse`, typed by `EntryDraft`) and then records them all at once through `recordAll`,
+which is where the atomicity below lives;
 `export-entries` lists everything and has the data layer write `monitor.csv` (`#write`), which the route streams
 back as a download. Both operations are effects, listed in `feature.json`.
 
@@ -184,6 +185,36 @@ deleted entries, in the order asked -- leaves only after the last one settled. O
 refuses the whole batch as `missing`, a 404. The connection paces this: `monitor-api.connection.json` declares
 `"throttle": { "concurrency": 4 }`, so however many ids arrive, at most four requests are in flight
 against the API at a time.
+
+## All of it or none of it
+
+Two graphs say `"atomic": true`, and that one word is the whole declaration: every effect the graph reaches
+runs inside one transaction on one connection, the answer commits it, and a refusal on purpose or a fault
+rolls it back. Nothing is added to the language -- there is no transaction node, no begin and no commit --
+and no graph undoes by hand what it wrote.
+
+`record-all.graph.json` is behind `recordAll`, which is what `POST /monitor.csv` records the file through.
+It maps `submit` over the drafts, so the rows are still recorded at once rather than one after another; what
+the flag adds is that a draft refusing halfway undoes the rows recorded before it. Import a file whose fifth
+row is not an entry and the store holds nothing, rather than the first four. The file is read *outside* it,
+in `import-entries`, because a transaction undoes rows and not the world: a read that cannot roll back sits
+in the caller, and only the writes are inside. That is why the import is two nodes.
+
+`store-and-latest.graph.json` is behind `record`. It stores the entry and records it as the latest call of
+its method, in a second collection of the same store, and answers only when both are in. A reader asking
+which call was the latest `POST` can never be told an entry that was not stored.
+
+The compiler refuses an atomic graph that could not be one transaction, so the promise is checked rather
+than trusted: an effect that cannot take part (`L009` -- an HTTP request, a file), effects on two connections
+(`L010`), nothing that could roll back at all (`L011`), and a `map` that collects the failures a transaction
+has already ended (`G014`). This is why `recordAll` is bound to `record-all` only where the entries are kept
+in a store: under `live` they live behind an upstream API, so that profile binds `record-each` instead --
+the same fan-out with no promise, since an HTTP call is not something a transaction can roll back. The
+caller's graph does not change either way.
+
+`wilanis describe @monitor/data/store-and-latest.graph.json` says what commits, on which connection, which
+nodes take part, and which refusals roll it back; the viewer badges the graph and rims those nodes; and
+`wilanis rehearse` marks the graph `(atomic)` and says `rolled back` after the branches that undo it.
 
 Inside the wilanis workspace this directory is a workspace member and resolves the packages locally.
 Copied elsewhere, the same `package.json` installs them from npm.

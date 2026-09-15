@@ -168,6 +168,17 @@ export function plantedEditingAllSaying(
   }, refusalsSaying);
 }
 
+/** The same, answered as `code file#at`: for a case whose claim is which document a refusal points at. */
+export function plantedEditingAllAt(
+  docs: Record<string, unknown>,
+  edits: Record<string, (doc: any) => void>,
+): string[] {
+  return after(dir => {
+    write(dir, docs);
+    for (const [file, edit] of Object.entries(edits)) editing(file, edit)(dir);
+  }, refusalsAt);
+}
+
 /**
  * Copy the example, edit one document it has, and answer the tree as loaded together with the directory it
  * sits in: what a case needs when it reads what `describe`, `map` or the view model says about a document

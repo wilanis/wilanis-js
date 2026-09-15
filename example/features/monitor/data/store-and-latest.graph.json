@@ -1,7 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
-  "label": "Keep a record",
-  "description": "Data graph behind monitor.record under the local profile: ask for a key, then write the whole record under it. Nothing is filled in silently -- the key comes from a node a reader can see.",
+  "label": "Store an entry and its method's latest",
+  "atomic": true,
+  "description": "Data graph behind monitor.record: the entry is stored and the latest call of its method is recorded beside it, and the graph answers only when both are in. The two writes move together -- a reader asking which call was the latest POST can never be told an entry that was not stored, and no entry can be stored without its method's latest catching up. That is what atomic buys here, and it is one word rather than a graph that undoes what it wrote.",
   "in": "@monitor/domain/EntryRecord.shape.json",
   "out": {
     "type": "@monitor/domain/Entry.shape.json",
@@ -23,8 +24,8 @@
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "saved",
-      "label": "Write the record under that key",
+      "id": "stored",
+      "label": "Write the entry under that key",
       "run": "@storage/store.port.json#put",
       "in": {
         "store": "@monitor/data/entries.store.json",
@@ -38,15 +39,32 @@
       }
     },
     {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "latest",
+      "label": "Record it as the method's latest",
+      "description": "One row per method, so a put under the method replaces whatever was there.",
+      "run": "@storage/store.port.json#put",
+      "in": {
+        "store": "@monitor/data/entries.store.json",
+        "collection": "latest",
+        "record": {
+          "method": "{{in.method}}",
+          "url": "{{in.url}}",
+          "entry": "{{key}}"
+        }
+      }
+    },
+    {
       "type": "@wilanis/node/switch.schema.json",
       "id": "route",
-      "label": "Was it written?",
+      "label": "Were both written?",
       "in": {
-        "record": "{{saved.record}}"
+        "record": "{{stored.record}}",
+        "mark": "{{latest.record}}"
       },
       "rules": [
         {
-          "when": "has(record)",
+          "when": "has(record) && has(mark)",
           "to": "row"
         }
       ],
@@ -55,10 +73,10 @@
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "row",
-      "label": "The record",
+      "label": "The entry",
       "run": "@std/object.port.json#make",
       "in": {
-        "value": "{{saved.record}}",
+        "value": "{{stored.record}}",
         "type": "@monitor/domain/Entry.shape.json"
       }
     },
@@ -66,6 +84,7 @@
       "type": "@wilanis/node/run.schema.json",
       "id": "failed",
       "label": "Nothing was written",
+      "description": "The transaction rolls back, so neither write survives this refusal.",
       "run": "@std/outcome.port.json#refuse",
       "in": {
         "reason": "upstream",
