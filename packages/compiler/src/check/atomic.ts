@@ -9,8 +9,29 @@
  * the profile being judged, followed through nested domain operations. It is made per profile, since which
  * binding meets an operation is what a profile chooses.
  */
-import { type GraphDoc, isMap, isSwitch, type Loaded, type Scope, type Values } from '@wilanis/core';
+import { type GraphDoc, isMap, isSwitch, type Loaded, type Operation, type Scope, type Values } from '@wilanis/core';
 import { type Judge, underProfiles } from './judge.js';
+
+/**
+ * The canonical connection a transactional call goes to, or nothing where the call does not say. It is read
+ * from one of the two static fields such an operation accepts (C009): `connection`, a connection document's
+ * path, or `store`, the path of a store document that names one.
+ *
+ * It stays quiet throughout. A field that is absent, or names a document that is not there, is the business
+ * of the rules that judge the call site and the store itself (R001 from `checkStore`), so a tree with one
+ * fault answers one refusal rather than the same fault told twice.
+ */
+export function connectionOf(scope: Scope, op: Operation, given: Values | undefined): string | undefined {
+  const named = (field: string): string | undefined => {
+    const value = given?.[field];
+    return op.accepts?.[field]?.static && typeof value === 'string' ? value : undefined;
+  };
+  const direct = named('connection');
+  if (direct) return scope.get('connection', direct) ? scope.canon(direct) : undefined;
+  const store = named('store');
+  const doc = store ? scope.get('store', store) : undefined;
+  return doc ? scope.canon(doc.doc.connection) : undefined;
+}
 
 /** One effect an atomic graph reaches: what it runs, where that call is written, and whether it may take part. */
 export interface Reached {
@@ -23,6 +44,12 @@ export interface Reached {
   /** The document the call is written in, and the node of it that makes the call. */
   file: string;
   node: string;
+  /**
+   * The node of the atomic graph itself that this effect descended from: the node a reader can point at.
+   * For a data graph's own effect it is `node` again; for a domain graph it is the run or map node whose
+   * operation the profile's binding met with the graph the effect is written in.
+   */
+  from: string;
 }
 
 /** A map an atomic graph reaches, and what it does with an element that fails: what G014 judges. */
@@ -44,6 +71,8 @@ interface Call {
   given: Values | undefined;
   file: string;
   node: string;
+  /** The node of the atomic graph this call descended from; a node of the graph itself is its own. */
+  from: string;
 }
 
 /**
@@ -51,9 +80,9 @@ interface Call {
  * judge, the profile it is made under, the graphs already walked and what has been found -- so that no step
  * has to be handed them one by one.
  */
-export function reachOf(judge: Judge, graph: Loaded<GraphDoc>, profile: string | undefined): Reach {
-  const walk = new Walk(judge, profile);
-  walk.graph(graph);
+export function reachOf(scope: Scope, graph: Loaded<GraphDoc>, profile: string | undefined): Reach {
+  const walk = new Walk(scope, profile);
+  walk.graph(graph, undefined);
   return walk.found;
 }
 
@@ -66,18 +95,21 @@ class Walk {
   private readonly seen = new Set<string>();
 
   constructor(
-    private readonly judge: Judge,
+    private readonly scope: Scope,
     private readonly profile: string | undefined,
   ) {}
 
-  /** Every node of a graph, each call followed on through whatever meets it. */
-  graph(graph: Loaded<GraphDoc>): void {
+  /**
+   * Every node of a graph, each call followed on through whatever meets it. `from` is the node of the atomic
+   * graph the walk descended from, and is nothing at the top: there each node stands for itself.
+   */
+  graph(graph: Loaded<GraphDoc>, from: string | undefined): void {
     if (this.seen.has(graph.path)) return;
     this.seen.add(graph.path);
     for (const node of graph.doc.nodes) {
       if (isSwitch(node)) continue;
       if (isMap(node)) this.found.maps.push({ onItemFailure: node.onItemFailure, file: graph.path, node: node.id });
-      this.call({ run: node.run, given: node.in, file: graph.path, node: node.id });
+      this.call({ run: node.run, given: node.in, file: graph.path, node: node.id, from: from ?? node.id });
     }
   }
 
@@ -86,36 +118,37 @@ class Walk {
    * domain operation is followed into whatever the profile's binding meets it with.
    */
   private call(call: Call): void {
-    const hit = this.judge.scope.op(call.run);
+    const hit = this.scope.op(call.run);
     if (typeof hit === 'string') return;
     if (!hit.port.native) {
-      this.bound(call.run);
+      this.bound(call.run, call.from);
       return;
     }
     if (hit.op.pure === true) return;
     this.found.effects.push({
       key: `${hit.path}#${hit.opName}`,
       transactional: hit.op.transactional === true,
-      connection: this.judge.connectionOf(hit.op, call.given),
+      connection: connectionOf(this.scope, hit.op, call.given),
       file: call.file,
       node: call.node,
+      from: call.from,
     });
   }
 
   /** What a domain operation is met by under this profile: a graph to walk, or another operation to follow. */
-  private bound(opRef: string): void {
-    const hit = this.judge.scope.op(opRef);
+  private bound(opRef: string, from: string): void {
+    const hit = this.scope.op(opRef);
     if (typeof hit === 'string') return;
-    const binding = this.judge.scope.bindingFor(hit.path, this.profile);
+    const binding = this.scope.bindingFor(hit.path, this.profile);
     if (typeof binding === 'string') return;
     const bound = binding.doc.operations[hit.opName];
     if (!bound) return;
     if (bound.graph) {
-      const graph = this.judge.scope.registry.get('graph', this.judge.scope.canon(bound.graph));
-      if (graph) this.graph(graph);
+      const graph = this.scope.registry.get('graph', this.scope.canon(bound.graph));
+      if (graph) this.graph(graph, from);
       return;
     }
-    if (bound.run) this.call({ run: bound.run, given: bound.in, file: binding.path, node: hit.opName });
+    if (bound.run) this.call({ run: bound.run, given: bound.in, file: binding.path, node: hit.opName, from });
   }
 }
 
@@ -172,7 +205,7 @@ class Faults {
  */
 export function checkAtomic(judge: Judge): void {
   for (const graph of atomicGraphs(judge.scope)) {
-    const walks = judge.profiles().map(profile => ({ profile, reach: reachOf(judge, graph, profile) }));
+    const walks = judge.profiles().map(profile => ({ profile, reach: reachOf(judge.scope, graph, profile) }));
     const participants = new Faults();
     const connections = new Faults();
     for (const { profile, reach } of walks) {

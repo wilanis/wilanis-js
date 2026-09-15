@@ -56,12 +56,19 @@ function acceptsLine(
   return `    in  ${name}${optional}: ${type}${isStatic}${bindsOf(field)}${allowed}${says}`;
 }
 
-/** What an operation says about itself: whether it is pure, may refuse, or holds something until stopped. */
-function operationLine(name: string, op: { pure?: boolean; refuses?: unknown; holds?: boolean; description?: string }) {
+/**
+ * What an operation says about itself: whether it is pure, may refuse, may take part in a transaction, or
+ * holds something until stopped.
+ */
+function operationLine(
+  name: string,
+  op: { pure?: boolean; refuses?: unknown; transactional?: boolean; holds?: boolean; description?: string },
+) {
   const pure = op.pure ? '  (pure)' : '';
   const refuses = op.refuses ? '  (refuses on purpose)' : '';
+  const transactional = op.transactional ? '  (transactional)' : '';
   const holds = op.holds ? '  (holds until stopped)' : '';
-  return `#${name}${pure}${refuses}${holds}: ${op.description}`;
+  return `#${name}${pure}${refuses}${transactional}${holds}: ${op.description}`;
 }
 
 /** A port: every operation, what it accepts and what it answers. */

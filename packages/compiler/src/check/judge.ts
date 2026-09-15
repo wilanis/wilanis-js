@@ -20,7 +20,6 @@ import {
   type Type,
   TypeError_,
   type TypeSpec,
-  type Values,
 } from '@wilanis/core';
 import type { ReachableRefusal } from '../refusals.js';
 
@@ -191,27 +190,6 @@ export class Judge {
   canonOp(opRef: string): string {
     const { path, op } = splitOp(opRef);
     return `${this.scope.canon(path)}#${op}`;
-  }
-
-  /**
-   * The canonical connection a transactional call goes to, or nothing where the call does not say. It is read
-   * from one of the two static fields such an operation accepts (C009): `connection`, a connection document's
-   * path, or `store`, the path of a store document that names one.
-   *
-   * It stays quiet throughout. A field that is absent, or names a document that is not there, is the business
-   * of the rules that judge the call site and the store itself (R001 from `checkStore`), so a tree with one
-   * fault answers one refusal rather than the same fault told twice.
-   */
-  connectionOf(op: Operation, given: Values | undefined): string | undefined {
-    const named = (field: string): string | undefined => {
-      const value = given?.[field];
-      return op.accepts?.[field]?.static && typeof value === 'string' ? value : undefined;
-    };
-    const direct = named('connection');
-    if (direct) return this.scope.get('connection', direct) ? this.scope.canon(direct) : undefined;
-    const store = named('store');
-    const doc = store ? this.scope.get('store', store) : undefined;
-    return doc ? this.scope.canon(doc.doc.connection) : undefined;
   }
 
   /** The effectful operations a feature allows. */
