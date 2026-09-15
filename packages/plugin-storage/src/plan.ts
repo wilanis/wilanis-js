@@ -200,24 +200,40 @@ interface Standing {
 }
 
 /**
- * The steps for one declared collection: how it comes to exist, then what is still to do inside it. A `create`
- * makes the columns and the primary key in the one statement, so only the guarantees follow it; everything
- * else is compared field by field against the record or the catalog the opening answered.
+ * The steps for one declared collection, in the two rounds the plan is ordered by: how it comes to exist, and
+ * what is still to do inside it. A `create` makes the columns and the primary key in the one statement, so
+ * only the guarantees follow it; everything else is compared field by field against the record or the catalog
+ * the opening answered.
  */
-function stepsFor(name: string, standing: Standing, to: Declared, marks: CollectionMarks): Planned {
+function stepsFor(name: string, standing: Standing, to: Declared, marks: CollectionMarks): Rounds {
   const opening = collectionSteps(name, standing, to);
-  if (!opening.against) return { steps: opening.steps, stale: opening.stale };
+  if (!opening.against) return { opens: opening.steps, within: [], stale: opening.stale };
   const rest = opening.columnsMade
     ? constraintStepsOnly(name, opening.against, to, marks)
     : fieldAndConstraintSteps(name, opening.against, to, marks);
-  return { steps: [...opening.steps, ...rest.steps], stale: [...opening.stale, ...rest.stale] };
+  return { opens: opening.steps, within: rest.steps, stale: [...opening.stale, ...rest.stale] };
+}
+
+/**
+ * One collection's steps kept in the two rounds a plan is ordered by: `opens` is how the collection comes to
+ * exist -- a `create`, an `adopt`, a `renameCollection` -- and `within` is everything that follows against it.
+ */
+interface Rounds {
+  opens: Step[];
+  within: Step[];
+  stale: Stale[];
 }
 
 /**
  * The steps from `recorded` to `declared` for the collections of one connection, before any row is counted,
  * with the marks that have done their work. `found` is what the engine's catalog holds for a collection the
  * record has never seen, so a database that predates the record joins it as an `adopt` rather than a `create`.
- * Collections are walked in declaration order and the drops follow, so a plan reads the way the store does.
+ *
+ * Collections are walked in declaration order and the drops follow, so a plan reads the way the store does --
+ * but in two rounds, and this is the one place that ordering lives. Every collection is opened before anything
+ * is done inside any of them, since a `ref` names a table that has to exist when the constraint is written and
+ * declaration order says nothing about which collection references which: `notes` declared before `entries`
+ * would otherwise reference a table its own plan makes two steps later, and the transaction would roll back.
  */
 export function plan(
   recorded: Record<string, Declared>,
@@ -226,7 +242,8 @@ export function plan(
   found: Record<string, Declared> = {},
 ): Planned {
   const taken = claimed(recorded, declared, marks);
-  const steps: Step[] = [];
+  const opens: Step[] = [];
+  const within: Step[] = [];
   const stale: Stale[] = [];
   for (const [name, to] of Object.entries(declared)) {
     const was = continues(name, recorded, marks, declared);
@@ -237,9 +254,11 @@ export function plan(
       applied: applied(name, recorded, marks),
     };
     const one = stepsFor(name, standing, to, marks[name] ?? {});
-    steps.push(...one.steps);
+    opens.push(...one.opens);
+    within.push(...one.within);
     stale.push(...one.stale);
   }
+  const steps: Step[] = [...opens, ...within];
   for (const name of Object.keys(recorded))
     if (!(name in declared) && !taken.has(name))
       steps.push({ do: 'drop', target: name, says: `drop collection ${name}`, loses: `every row of ${name}` });
