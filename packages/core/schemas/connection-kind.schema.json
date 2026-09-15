@@ -28,6 +28,10 @@
     "storage": {
       "description": "true: a connection of this kind reaches a storage engine, so an @storage store may name it. The plugin that grants the kind registers the engine behind it.",
       "type": "boolean"
+    },
+    "leases": {
+      "description": "true: a connection of this kind can keep a lease -- a named hold one process of several takes for a while, and the record of what was last done under it. The plugin that grants the kind registers a lease keeper for it; the scheduler's `run` step names such a connection as its `lease` (X254). Absent: a connection of this kind keeps no lease (an HTTP upstream, a directory).",
+      "type": "boolean"
     }
   },
   "required": [

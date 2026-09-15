@@ -309,6 +309,8 @@ export interface TriggerKindDoc extends Envelope {
 export interface ConnectionKindDoc extends Envelope {
   settings: InlineObject;
   storage?: boolean;
+  /** `leases`: a connection of this kind can keep a named hold and the record of what was last done under it; the granting plugin registers the keeper. */
+  leases?: boolean;
 }
 export interface ConnectionDoc extends Envelope {
   kind: string;

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/plugin.schema.json",
+  "label": "Schedule",
+  "description": "A trigger fired by the clock: a five-field cron expression in a timezone, or an interval whose ticks are the multiples of it since the Unix epoch. The schedule runs only while a project's startup list names `@schedule/scheduler.port.json#run`, so a tree that names none schedules nothing, as a tree that names no listener serves nothing. The tick's instant reaches the graph as an input, so nothing in the tree calls a clock and a rehearsal replays a tick like any request. On several instances the `run` step names a `lease`: a connection whose kind declares `leases`, on which one instance takes the tick.",
+  "settings": {
+    "fields": {
+      "timezone": {
+        "type": "string",
+        "required": false,
+        "description": "the IANA zone a cron trigger is read in when it names none; absent: UTC"
+      },
+      "leaseTtlMs": {
+        "type": "number",
+        "required": false,
+        "description": "how long a hold taken for a tick lasts without renewal, so a process that dies mid-run lets go of the tick; a whole number of 1000 or more, default 30000"
+      }
+    }
+  },
+  "grants": {
+    "ports": [
+      "@schedule/scheduler.port.json"
+    ],
+    "triggerKinds": [
+      "@schedule/schedule.trigger-kind.json"
+    ]
+  }
+}
