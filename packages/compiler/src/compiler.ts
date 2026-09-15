@@ -37,6 +37,7 @@ import {
   type Report,
   refusalOf,
 } from '@wilanis/engine';
+import { inScope } from './atomic.js';
 import { bindings, outputCandidates, passedInputs } from './documents.js';
 import { bindPaths, inputsByName, lowerValue, lowerValues, type Roots, secretPaths } from './lower.js';
 
@@ -166,15 +167,18 @@ export class Compiler {
    * A handler that runs a nested spec with the caller's `in` and forwards request, stubs and env. A graph that
    * takes its input whole (an `in` that is not a shape) is handed it under the one key `in`, and unwraps it.
    */
-  private nestedRunner(spec: KernelSpec, whole = false): Handler {
+  private nestedRunner(spec: KernelSpec, whole = false, atomic = false): Handler {
     return async ({ in: input, ctx }) => {
-      const report = await new Kernel(this.handlers).run(spec, {
-        initial: { in: whole ? input.in : input, ...(ctx.request !== undefined ? { request: ctx.request } : {}) },
-        stubs: ctx.stubs,
-        signal: ctx.signal,
-        env: ctx.env,
-        nodePath: ctx.nodePath,
-      });
+      const initial = { in: whole ? input.in : input, ...(ctx.request !== undefined ? { request: ctx.request } : {}) };
+      const once = (env: Record<string, unknown>) =>
+        new Kernel(this.handlers).run(spec, {
+          initial,
+          stubs: ctx.stubs,
+          signal: ctx.signal,
+          env,
+          nodePath: ctx.nodePath,
+        });
+      const report = atomic ? await inScope(ctx.env, once) : await once(ctx.env);
       ctx.attach(report);
       if (report.status !== 'done') throw nestedFailure(spec, report);
       return report.output;
@@ -236,7 +240,7 @@ export class Compiler {
     if (!graph) throw new Error(`unknown graph '${graphRef}'`);
     const handler = `graph:${graph.path}`;
     const whole = this.takesWhole(graph);
-    this.handlers[handler] ??= this.nestedRunner(this.lowerGraph(graph), whole);
+    this.handlers[handler] ??= this.nestedRunner(this.lowerGraph(graph), whole, graph.doc.atomic === true);
     const names = Object.keys(op.accepts ?? {});
     const passIn = whole ? { in: { ref: 'in', path: [names[0]] } } : inputsByName(names);
     return { kind: 'call', handler, in: passIn };
