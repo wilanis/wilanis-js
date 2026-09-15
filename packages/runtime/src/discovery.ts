@@ -49,6 +49,10 @@ function kindLines(doc: Loaded, showType: (spec: unknown) => string): string[] {
     lines.push(
       `refusals: settings.${declared.refusals} maps each reason one trigger can reach to how it is answered (T005, T006)`,
     );
+  if (declared.correlation)
+    lines.push(
+      `correlation: request.${declared.correlation} correlates a run with the caller's trace, copied opaquely (T007)`,
+    );
   if ('grants' in (declared as unknown as { grants?: unknown }))
     lines.push(`grants: ${JSON.stringify((declared as unknown as { grants: unknown }).grants)}`);
   lines.push(...guardLines(declared, showType));
