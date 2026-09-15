@@ -506,6 +506,10 @@ atomic graph holds a connection for its whole run, and a connection pool sized f
 - The rehearsal line does not list the reasons that roll back; `describe` says them.
 - The viewer marks the participating nodes individually, not only the graph. The set is derived from the
   per-profile walk L0n2 already makes, never written by an author.
+- A non-atomic graph reached from an atomic root joins the outer scope, but its switch line reads its own
+  document's flag and so says nothing. This is a known limit rather than an omission: a shared graph is
+  merged across the triggers that reach it, so a mark that depended on the run would say different things
+  about one line and be ambiguous. The graph that declares `atomic` is the one the report marks.
 - A read-only atomic graph is accepted, so the L0n3 case above is no longer a refusal. `get`, `find` and
   `count` are `transactional` in `store.port.json` because a store read takes part in the transaction like
   any other operation, and a graph whose reads all take part is asking for the consistent snapshot a

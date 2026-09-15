@@ -9,10 +9,28 @@ export interface Decision {
   graph: string;
   /** The switch's node id within that graph. */
   node: string;
+  /** True when that graph says `atomic`, so every branch that does not answer undoes what it wrote. */
+  atomic?: boolean;
   /** The triggers whose runs reach this switch. */
   triggers: string[];
   branches: { when: string; to: string; settled?: Settled; uncovered?: string }[];
 }
+
+/** A graph with no branches at all: what it ran, how it ended, and whether it was atomic. */
+export interface Plain {
+  trigger: string;
+  graph: string;
+  atomic?: boolean;
+  status: string;
+  declared?: string;
+  error?: string;
+}
+
+/** What the report adds to a graph's name when it says `atomic`, and nothing when it does not. */
+const marked = (atomic?: boolean) => (atomic ? '  (atomic)' : '');
+
+/** What a branch that did not answer adds, in an atomic graph: the transaction it opened is undone. */
+const undone = (atomic?: boolean) => (atomic ? ', rolled back' : '');
 
 /** Merge a switch's result into the decisions already gathered, so a shared graph is reported once. */
 export function gather(decisions: Decision[], decision: Decision) {
@@ -62,7 +80,7 @@ const short = (path: string) => path.replace(/^@/, '').replace(/\.graph\.json$/,
 /** How one branch settled: the line the report shows, and the problem it names when something is wrong. */
 function branchLine(
   branch: Decision['branches'][number],
-  at: { graph: string; node: string },
+  at: { graph: string; node: string; atomic?: boolean },
   width: number,
 ): { line: string; problem?: string } {
   const when = phrase(branch.when).padEnd(width);
@@ -75,16 +93,16 @@ function branchLine(
   const settled = branch.settled;
   const answered = { line: `  ok  ${when}  answered from '${branch.to}'` };
   if (!settled) return answered;
-  return settledLine(settled, branch, { when, where }) ?? answered;
+  return settledLine(settled, branch, { when, where, atomic: at.atomic }) ?? answered;
 }
 
 /** How a settled branch reads: wrong, or one of the ways it may rightly end. */
 function settledLine(
   settled: NonNullable<Decision['branches'][number]['settled']>,
   branch: Decision['branches'][number],
-  said: { when: string; where: string },
+  said: { when: string; where: string; atomic?: boolean },
 ): { line: string; problem?: string } | undefined {
-  return wrongly(settled, branch, said) ?? rightly(settled, branch, said.when);
+  return wrongly(settled, branch, said) ?? rightly(settled, branch, said);
 }
 
 /** A branch that ended wrongly: routed elsewhere, blocked, or broken where no failure is declared. */
@@ -112,19 +130,23 @@ function wrongly(
   return undefined;
 }
 
-/** A branch that ended rightly: it refused on purpose, or the node it went to did. */
+/**
+ * A branch that ended rightly: it refused on purpose, or the node it went to did. In an atomic graph a
+ * refusal is also what undoes the store, so the outcome says so -- the reasons themselves are `describe`'s.
+ */
 function rightly(
   settled: NonNullable<Decision['branches'][number]['settled']>,
   branch: Decision['branches'][number],
-  when: string,
+  said: { when: string; atomic?: boolean },
 ): { line: string } | undefined {
+  const { when, atomic } = said;
   if (settled.declared)
     return {
-      line: `  ok  ${when}  refused on purpose at '${branch.to}' as ${settled.declared.reason}: "${settled.declared.message}"`,
+      line: `  ok  ${when}  refused on purpose at '${branch.to}' as ${settled.declared.reason}: "${settled.declared.message}"${undone(atomic)}`,
     };
   if (settled.propagated)
     return {
-      line: `  ok  ${when}  went to '${branch.to}', which refused it as ${settled.propagated.reason}: "${settled.propagated.error}"`,
+      line: `  ok  ${when}  went to '${branch.to}', which refused it as ${settled.propagated.reason}: "${settled.propagated.error}"${undone(atomic)}`,
     };
   return undefined;
 }
@@ -141,12 +163,7 @@ function aside(run: { declared?: string; error?: string }): string {
  *
  * Answers whether the rehearsal passed: every branch settled, and none was left unreachable.
  */
-export function format(
-  decisions: Decision[],
-  plain: { trigger: string; graph: string; status: string; declared?: string; error?: string }[],
-  lines: string[],
-  verbose?: boolean,
-): boolean {
+export function format(decisions: Decision[], plain: Plain[], lines: string[], verbose?: boolean): boolean {
   const problems: string[] = [];
   for (const run of plain) problems.push(...plainLines(run, lines));
   for (const decision of decisions) problems.push(...decisionLines(decision, lines, verbose));
@@ -155,12 +172,10 @@ export function format(
 }
 
 /** A graph with no branches: what it answered, and the problem it names when it did not. */
-function plainLines(
-  run: { graph: string; status: string; declared?: string; error?: string },
-  lines: string[],
-): string[] {
-  lines.push(`${short(run.graph)}  (no branches)`);
-  lines.push(`  ${verdict(run.status)}${aside(run)}`);
+function plainLines(run: Plain, lines: string[]): string[] {
+  lines.push(`${short(run.graph)}${marked(run.atomic)}  (no branches)`);
+  const rolled = run.declared ? undone(run.atomic) : '';
+  lines.push(`  ${verdict(run.status)}${aside(run)}${rolled}`);
   if (!run.error && run.status !== 'BLOCKED') return [];
   return [`${short(run.graph)}: ${run.error ?? 'blocked -- an input it needs is never supplied'}`];
 }
@@ -169,14 +184,14 @@ function plainLines(
 function decisionLines(decision: Decision, lines: string[], verbose?: boolean): string[] {
   const covered = decision.branches.filter(branch => !branch.uncovered).length;
   const via = verbose ? `  [via ${decision.triggers.join(', ')}]` : '';
-  lines.push(
-    `${short(decision.graph)}  switch '${decision.node}'  ${covered}/${decision.branches.length} branches${via}`,
-  );
+  const named = `${short(decision.graph)}${marked(decision.atomic)}`;
+  lines.push(`${named}  switch '${decision.node}'  ${covered}/${decision.branches.length} branches${via}`);
   // one width for the whole decision, so the outcomes line up and the odd one out is visible
   const width = Math.max(...decision.branches.map(branch => phrase(branch.when).length));
   const problems: string[] = [];
+  const at = { graph: short(decision.graph), node: decision.node, atomic: decision.atomic };
   for (const branch of decision.branches) {
-    const said = branchLine(branch, { graph: short(decision.graph), node: decision.node }, width);
+    const said = branchLine(branch, at, width);
     lines.push(said.line);
     if (said.problem) problems.push(said.problem);
   }

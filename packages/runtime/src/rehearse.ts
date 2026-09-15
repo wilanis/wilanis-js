@@ -7,7 +7,7 @@ import type { Report } from '@wilanis/engine';
 import { refusalOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, nonEmpty, type Stubbing, setPath, switchesOf } from './branches.js';
 import type { Embedder } from './embed.js';
-import { type Decision, format, gather } from './rehearsal-report.js';
+import { type Decision, format, gather, type Plain } from './rehearsal-report.js';
 import { embedderFor, failedBelow, generatedFire, policyRoots } from './stubbing.js';
 
 // ---- rehearse ----------------------------------------------------------------------------------------
@@ -98,7 +98,7 @@ export async function rehearse(
   const seed = opts.seed ?? 1;
   const lines: string[] = [];
   const decisions: Decision[] = [];
-  const settledGraphs: { trigger: string; graph: string; status: string; declared?: string; error?: string }[] = [];
+  const settledGraphs: Plain[] = [];
   // every trigger, and every policy as a trigger of each kind that attaches it: a decision is walked like any other graph
   for (const trigger of [...load.registry.all('trigger'), ...policyRoots(load)]) {
     const found = await rehearseTrigger(load, trigger, { seed, profile: opts.profile }, decisions);
@@ -122,6 +122,7 @@ async function wholeOf(load: LoadResult, trigger: Loaded<TriggerDoc>, seed: numb
   return {
     trigger: trigger.name,
     graph: trigger.doc.fire.run,
+    atomic: atomicAt(emb, rootGraph(emb, trigger)),
     status: report.status === 'blocked' ? 'BLOCKED' : report.status,
     declared: refused ? `${refused.reason}: "${refused.message}"` : undefined,
     error: broke ? whatBroke(failed) : undefined,
@@ -271,9 +272,11 @@ function downstreamOf(walk: Walk, sw: FoundSwitch): Record<string, unknown> {
 async function decisionFor(walk: Walk, sw: FoundSwitch): Promise<Decision> {
   const pre = reach(walk, sw);
   const downstream = downstreamOf(walk, sw);
+  const graph = graphOf(walk.probe, walk.trigger, sw);
   const decision: Decision = {
-    graph: graphOf(walk.probe, walk.trigger, sw),
+    graph,
     node: sw.at.split('.').pop() ?? '',
+    atomic: atomicAt(walk.probe, graph),
     triggers: [walk.trigger.name],
     branches: [],
   };
@@ -317,13 +320,26 @@ function graphAt(emb: Embedder, spec: { nodes: Record<string, unknown> }, segmen
   return handler.startsWith('graph:') ? handler.slice('graph:'.length) : bindingGraph(emb, handler);
 }
 
+/**
+ * The graph a trigger's fire runs: the one the profile's binding meets the operation with, or the operation
+ * itself where nothing does. The binding is read off the compiled wrapper spec -- a binding operation lowers
+ * to a single node `op` -- rather than from the port reference, which names no binding and would resolve to
+ * nothing.
+ */
+function rootGraph(emb: Embedder, trigger: Loaded<TriggerDoc>): string {
+  const spec = emb.operation(trigger.doc.fire.run).spec as { nodes: Record<string, unknown> };
+  return emb.scope.canon(graphAt(emb, spec, 'op') ?? trigger.doc.fire.run);
+}
+
+/** True when the graph at this path says `atomic`: every branch that does not answer undoes what it wrote. */
+function atomicAt(emb: Embedder, graph: string): boolean {
+  return emb.scope.get('graph', graph)?.doc.atomic === true;
+}
+
 /** The graph document a switch belongs to: the trigger's own graph, or the one its enclosing call runs. */
 function graphOf(emb: Embedder, trigger: Loaded<TriggerDoc>, sw: FoundSwitch): string {
   let spec = emb.operation(trigger.doc.fire.run).spec as { nodes: Record<string, unknown> };
-  let graph =
-    bindingGraph(emb, `${emb.scope.canon(trigger.doc.fire.run.split('#')[0])}#${trigger.doc.fire.run.split('#')[1]}`) ??
-    trigger.doc.fire.run;
-  graph = emb.scope.canon(graph);
+  let graph = rootGraph(emb, trigger);
   for (const segment of sw.prefix) {
     const ref = graphAt(emb, spec, segment);
     if (!ref) continue;
