@@ -3,6 +3,7 @@
  * to a kernel spec whose handlers are plugin functions or nested specs; `buildEnv` and `runGraph` run it;
  * `refusalsReachable` and `refusalsOfTrigger` say what a run can refuse with.
  */
+export * from './atomic.js';
 export * from './checker.js';
 export * from './compiler.js';
 export * from './documents.js';
