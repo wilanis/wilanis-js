@@ -9,6 +9,7 @@ import auth from '@wilanis/plugin-auth';
 import blobs from '@wilanis/plugin-blob';
 import http from '@wilanis/plugin-http';
 import reload from '@wilanis/plugin-reload';
+import schedule from '@wilanis/plugin-schedule';
 import storage from '@wilanis/plugin-storage';
 import memory from '@wilanis/plugin-storage-memory';
 import postgres from '@wilanis/plugin-storage-postgres';
@@ -30,6 +31,7 @@ const PLUGINS = {
   '@blob': blobs,
   '@reload': reload,
   '@auth': auth,
+  '@schedule': schedule,
   '@storage': storage,
   '@storage-memory': memory,
   '@storage-postgres': postgres,
@@ -124,19 +126,19 @@ describe('wilanis fuzz and regress', () => {
     const dir = tmp();
     cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
     const written = await fuzz(loadTree(dir, PLUGINS, INCLUDES), { runs: 2, profile: 'live' });
-    // seventeen triggers -- the example's and the included access tree's -- two seeds each
-    expect(written).toHaveLength(34);
+    // eighteen triggers -- the example's, the nightly digest among them, and the included access tree's -- two seeds each
+    expect(written).toHaveLength(36);
     expect(readdirSync(join(dir, 'scenarios')).sort()).toEqual(written.map(one => one.split('/').pop()!).sort());
     const sc = read(join(dir, 'scenarios', 'get-entry.1.scenario.json'));
     expect(sc.trigger).toBe('@features/monitor/edge/get-entry.trigger.json');
     expect(['done', 'failed']).toContain(sc.expect.status);
     // the scenarios are documents of the tree: they load, and they pass check
     const again = loadTree(dir, PLUGINS, INCLUDES);
-    expect(again.registry.all('scenario')).toHaveLength(34);
+    expect(again.registry.all('scenario')).toHaveLength(36);
     expect(checkTree(again).items).toEqual([]);
     const replayed = await regress(again, { profile: 'live' });
     expect(replayed.ok, replayed.lines.join('\n')).toBe(true);
-    expect(replayed.lines).toHaveLength(34);
+    expect(replayed.lines).toHaveLength(36);
     expect(replayed.lines.every(line => line.endsWith(': same'))).toBe(true);
     // a graph that changes is caught: the answering node under a new name is a node the scenario never saw
     const file = join(dir, 'features/monitor/data/get-row.graph.json');
