@@ -68,6 +68,15 @@ export class Refusal extends Error {
   }
 }
 
+/**
+ * Whether a thrown thing is a refusal: this engine's `Refusal`, or an `Error` named `Refusal` carrying a
+ * string `reason`, so a plugin that bundles its own copy of the engine is still understood.
+ */
+export function isRefusal(error: unknown): error is Refusal {
+  if (error instanceof Refusal) return true;
+  return error instanceof Error && error.name === 'Refusal' && typeof (error as Refusal).reason === 'string';
+}
+
 export interface NodeReport {
   status: NodeStatus;
   /** call/map: the handler that ran (path#operation, or a binding operation). */
@@ -81,6 +90,8 @@ export interface NodeReport {
   detail?: Record<string, unknown>;
   /** switch: the node it routed to. */
   selected?: string;
+  /** call or map: the switch that routed this node's fault; the run went on, so this is not how it ended. */
+  caught?: string;
   /** call bound to a graph: the nested run. */
   sub?: Report;
   /**
