@@ -7,10 +7,15 @@
  * A `drift` is thrown, not answered. RFC 0003 is explicit about the difference: a constraint a graph could
  * route on is answered as a flag, but drift is not a graph's outcome at all -- it is a startup failure, and it
  * stops the tree the way an unreachable database does.
+ *
+ * What the catalog holds is `inspect.ts`'s to ask (RFC 0017, step 4): this reads its columns rather than
+ * making a second query of its own. The judgement below stays here until step 5 (#238) puts `ensure` over the
+ * planner, where the whole comparison becomes `inspect` against the record and this file's `judgeDrift` goes.
  */
 import type { At } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';
 import { columnOf, fieldsOf, folded, isJson as isJsonType } from './columns.js';
+import { type Column, columnsOf } from './inspect.js';
 import { refName, uniqueName } from './names.js';
 import type { Settings } from './pool.js';
 
@@ -21,22 +26,14 @@ export interface Made {
   constraints: number;
 }
 
-/** One column as the database reports it. */
-interface Found {
-  column_name: string;
-  data_type: string;
-  is_nullable: string;
-}
+/** One column as the database reports it, which `inspect.ts` is the one place to ask about (RFC 0017). */
+type Found = Column;
 
 /** The columns a table already has, by name, or nothing at all where there is no such table. */
 async function existing(db: Kysely<never>, schema: string, table: string): Promise<Map<string, Found> | undefined> {
-  const rows = (await sql<Found>`
-    select column_name, data_type, is_nullable
-    from information_schema.columns
-    where table_schema = ${schema} and table_name = ${table}
-  `.execute(db)) as { rows: Found[] };
-  if (!rows.rows.length) return undefined;
-  return new Map(rows.rows.map(one => [one.column_name, one]));
+  const columns = await columnsOf(db, schema, table);
+  if (!columns) return undefined;
+  return new Map(columns.map(one => [one.column_name, one]));
 }
 
 /** The type the database reports for a column this engine would have created as `declared`. */

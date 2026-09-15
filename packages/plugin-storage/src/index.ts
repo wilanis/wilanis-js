@@ -37,6 +37,10 @@ export type {
   Step,
 } from './plan.js';
 export { declaredOf, declaredOfStore, fieldTypeOf, marksOf, marksOfStore, plan } from './plan.js';
+export type { Class, Classed } from './plan-class.js';
+export { classed, counts } from './plan-class.js';
+export type { Applied, Applying, On, Recorder, Recording } from './record.js';
+export { onOf } from './record.js';
 export type { Operator, Test, Where } from './where.js';
 export { OPERATORS, parseWhere, whereOf } from './where.js';
 

@@ -9,13 +9,30 @@
  */
 import { randomUUID } from 'node:crypto';
 import { conforms } from '@wilanis/core';
-import type { At, Engine, Query, Record_, Transaction, Where } from '@wilanis/plugin-storage';
+import type {
+  Applied,
+  Applying,
+  At,
+  Declared,
+  Engine,
+  On,
+  Query,
+  Record_,
+  Recording,
+  Step,
+  Transaction,
+  Where,
+} from '@wilanis/plugin-storage';
 import type { Kysely } from 'kysely';
+import { applyPlan } from './apply.js';
 import { fieldsOf, folded, isJson } from './columns.js';
+import { countFor } from './counting.js';
 import { ensureTables } from './ensure.js';
 import { conditionOf, orderingsOf } from './filter.js';
+import { inspectTable } from './inspect.js';
 import { refName, uniqueName } from './names.js';
 import { poolFor, type Settings } from './pool.js';
+import { currentOf, ensureRecord, historyOf } from './record.js';
 
 /** What a row becomes on its way back out: the record the shape describes, or the reason it is not one. */
 function record(row: Record<string, unknown> | undefined, at: At): Record_ | undefined {
@@ -209,6 +226,52 @@ export class PostgresEngine implements Engine {
     if (!collections.length) return { collections: 0, columns: 0, constraints: 0 };
     const { db } = this.db(collections[0]);
     return ensureTables(db, collections, this.settings);
+  }
+
+  /** The connection's pool and the schema its tables sit in, for the five members that name no collection. */
+  private at(on: On): { db: Kysely<never>; schema: string } {
+    const { db, schema } = poolFor(on, this.settings);
+    return { db: this.on ?? db, schema };
+  }
+
+  /**
+   * The record's current entry for a collection, or nothing where this connection never recorded it. The
+   * record's own table is made on first contact, so a database that has never seen it answers nothing rather
+   * than failing on a table that is not there.
+   */
+  async recorded(on: On, collection: string): Promise<Declared | undefined> {
+    const { db, schema } = this.at(on);
+    await ensureRecord(db, schema);
+    return currentOf(db, schema, folded(collection));
+  }
+
+  /** What the catalog holds for a collection, lowered to `Declared`, or nothing where there is no table. */
+  async inspect(on: On, collection: string): Promise<Declared | undefined> {
+    const { db, schema } = this.at(on);
+    return inspectTable(db, schema, folded(collection));
+  }
+
+  /** How many rows stand in this step's way, as the one count its shape asks for. */
+  async rows(on: On, step: Step): Promise<number> {
+    const { db, schema } = this.at(on);
+    const key = step.do === 'ref' && step.to ? (await inspectTable(db, schema, folded(step.to)))?.key : undefined;
+    return countFor(db, schema, step, key);
+  }
+
+  /**
+   * Apply the steps of one connection and write the record, in one transaction: a step that fails half way
+   * rolls the whole connection back, and the record is untouched.
+   */
+  async apply(on: On, steps: Step[], record: Recording, applying: Applying): Promise<Applied | undefined> {
+    const { db, schema } = this.at(on);
+    return applyPlan(db, { schema, connection: on.connection }, { steps, record }, applying);
+  }
+
+  /** Every plan that applied on this connection, latest first, as the record kept it. */
+  async history(on: On): Promise<Applied[]> {
+    const { db, schema } = this.at(on);
+    await ensureRecord(db, schema);
+    return historyOf(db, schema, on.connection);
   }
 
   /**

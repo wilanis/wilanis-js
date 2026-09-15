@@ -6,7 +6,7 @@
  * The pools are kept per settings object rather than in module state, so loading a tree twice in one process
  * (a reload does exactly that) gets its own pools and the old ones are destroyed with the old tree.
  */
-import type { At } from '@wilanis/plugin-storage';
+import type { On } from '@wilanis/plugin-storage';
 import { Kysely, PostgresDialect } from 'kysely';
 import pg from 'pg';
 
@@ -27,13 +27,15 @@ interface Connection {
 const pools = new Map<string, { db: Kysely<never>; schema: string }>();
 
 /** The key a pool is kept under: the connection it was made for, in this load of this tree. */
-const keyOf = (at: At) => `${at.connection}`;
+const keyOf = (at: On) => `${at.connection}`;
 
 /**
- * The database this collection lives in, and the schema its tables sit in. Made on first use: the first
- * operation against a connection opens the pool, and every later one finds it.
+ * The database this connection reaches, and the schema its tables sit in. Made on first use: the first
+ * operation against a connection opens the pool, and every later one finds it. It takes the connection alone
+ * -- an `At` is one, and so is the `On` a migration names -- since a pool is per connection and knows nothing
+ * of collections.
  */
-export function poolFor(at: At, settings: Settings): { db: Kysely<never>; schema: string } {
+export function poolFor(at: On, settings: Settings): { db: Kysely<never>; schema: string } {
   const key = keyOf(at);
   const made = pools.get(key);
   if (made) return made;
