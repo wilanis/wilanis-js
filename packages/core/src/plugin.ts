@@ -59,6 +59,28 @@ export interface Atomic {
   join<T extends Participant>(connection: string, open: () => Promise<T>): Promise<T>;
 }
 
+/** What one span carries: a value an exporter can put on a span without knowing anything of this tree. */
+export type TraceAttributes = Record<string, string | number | boolean>;
+
+/**
+ * One run said as spans: what ran, when it started and ended, how it ended, what it was, and what ran under
+ * it. A trace is its root span, so the type is the span and the nesting is the trace. Plain data, in the
+ * tree's own words: it is what an exporter reads, so it holds the smallest thing one needs and no more.
+ */
+export interface Trace {
+  /** What ran, in the tree's words: `fire <trigger>`, `<port>#<operation>`, `<node id> <handler>`. */
+  name: string;
+  /** When it started and ended, from the run's clock, in milliseconds. */
+  startedAt: number;
+  endedAt: number;
+  /** How it ended: `ok`, `refused: <reason>`, `denied`, `challenged`, `failed`, `cancelled`, `seeded`. */
+  status: string;
+  /** What it was, by the `wilanis.*` names the RFC's table gives; a level of `summary` carries no value. */
+  attributes: TraceAttributes;
+  /** What ran under it: a graph's nodes, a binding's graph, a map's elements. */
+  children: Trace[];
+}
+
 /**
  * What a `holds` operation that answers requests is given, as `env.serving`: the triggers of one kind and
  * the way to fire them. It is read afresh on every request, so a reload can replace the tree underneath a
@@ -84,6 +106,12 @@ export interface Serving {
   /** The tree's blob registry; a listener opens a scope per request and releases it once it has answered. */
   blobs: BlobStore;
   log(line: string): void;
+  /**
+   * Be told of every fire while this tree is served; answers the way to stop listening, as `env.hold` does.
+   * Survives a reload: the listeners are the server's, not the tree's, so an exporter holds what it
+   * subscribed to and never goes quiet when the tree underneath it is replaced.
+   */
+  observe(listener: (trace: Trace) => void): () => void;
   /**
    * Load and judge the tree again, and serve it if it is clean. The runtime does the loading and the judging
    * -- a plugin never imports the compiler -- so a watcher only decides *when*. A tree that refuses is not
