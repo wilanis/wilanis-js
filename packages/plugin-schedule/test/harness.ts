@@ -161,6 +161,7 @@ export function serving(triggers: TriggerDoc[], answering: () => Answering = () 
     codecs: () => ({}),
     blobs: store,
     log: line => logs.push(line),
+    observe: () => () => {},
     reload: async () => ({ ok: true, documents: 0 }),
     root: '/nowhere',
   };

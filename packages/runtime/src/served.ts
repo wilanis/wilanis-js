@@ -1,6 +1,6 @@
 /** The tree behind a listener: what every request is answered from, and what a reload puts there instead. */
 import { checkTree } from '@wilanis/compiler';
-import type { LoadResult, Serving } from '@wilanis/core';
+import type { LoadResult, Serving, Trace } from '@wilanis/core';
 import type { Embedder } from './embed.js';
 import { postLoad } from './post-load.js';
 import { loadProject } from './project.js';
@@ -25,6 +25,12 @@ export class Served {
    */
   private down: () => Promise<void> = async () => {};
 
+  /**
+   * Who is being told of every fire. They live here and not on the embedder because a reload builds a fresh
+   * one: an exporter holds the server, never the tree it came from, exactly as a listener does.
+   */
+  private readonly listeners = new Set<(trace: Trace) => void>();
+
   constructor(
     private current: { load: LoadResult; emb: Embedder },
     readonly log: (line: string) => void,
@@ -47,6 +53,27 @@ export class Served {
   /** The tree being served now, so a swap is seen by whoever asks next. */
   get load() {
     return this.current.load;
+  }
+
+  /** Be told of every fire while this tree is served; answers the way to stop listening. Survives a reload. */
+  observe(listener: (trace: Trace) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  /**
+   * Tell everyone listening what one run did. An observer that throws is said and stepped over: an exporter
+   * that cannot reach its collector must not take down the run whose trace it was handed.
+   */
+  observed(trace: Trace): void {
+    for (const listener of this.listeners)
+      try {
+        listener(trace);
+      } catch (error) {
+        this.log(`observer: ${(error as Error).message}`);
+      }
   }
 
   /**
@@ -119,6 +146,7 @@ export class Served {
         return held.emb.blobs;
       },
       log: held.log,
+      observe: listener => held.observe(listener),
       reload: () => held.reload(),
       get root() {
         return held.load.root;
