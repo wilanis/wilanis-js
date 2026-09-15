@@ -3,8 +3,9 @@
  * expression is one (X251) and which instant it names next -- so a case here is a case for both.
  *
  * The daylight-saving rows are the reason `nextTick` steps the real timeline and reads the wall clock rather
- * than doing arithmetic on it: an hour the clock skips is never read, and an hour it repeats is read twice
- * and taken the first time. Both are pinned here so a reader is not left to guess.
+ * than doing arithmetic on it: an hour the clock skips is never read, so a tick inside it fires at the first
+ * instant after the gap, once; an hour it repeats is read twice and taken the first time. Both are pinned
+ * here so a reader is not left to guess.
  */
 import { describe, expect, it } from 'vitest';
 import { nextInterval, nextTick, parseCron } from '../src/cron.js';
@@ -101,9 +102,13 @@ describe('across a daylight-saving change, in Europe/Lisbon', () => {
   });
 
   it('01:30, which does not exist that day, fires at the first instant after the gap, once', () => {
-    const first = next('30 1 * * *', '2026-03-28T12:00:00.000Z', 'Europe/Lisbon');
-    // 01:30 local is never read on the 29th, so the next 01:30 is the 30th, 01:30 WEST = 00:30 UTC
-    expect(first).toBe('2026-03-30T00:30:00.000Z');
+    // the clock goes 00:59 WET → 02:00 WEST, so 01:30 local is never read on the 29th. The tick is not lost:
+    // it fires at the first instant after the gap, 02:00 WEST = 01:00 UTC, as Vixie cron does.
+    // from midday on the 28th, the 28th's own 01:30 WET is already past, so the next tick is the gap's
+    const swallowed = next('30 1 * * *', '2026-03-28T12:00:00.000Z', 'Europe/Lisbon');
+    expect(swallowed).toBe('2026-03-29T01:00:00.000Z');
+    // and once only: the next is the 30th's ordinary 01:30 WEST = 00:30 UTC, not a second pass at the gap
+    expect(next('30 1 * * *', swallowed as string, 'Europe/Lisbon')).toBe('2026-03-30T00:30:00.000Z');
   });
 
   // 2026-10-25: the clock goes 01:59 → 01:00, so 01:00-01:59 local happens twice

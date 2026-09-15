@@ -21,7 +21,11 @@ export interface Settings {
 /** One trigger's schedule: the trigger itself, how it is named, and when it fires. */
 export interface Schedule {
   trigger: TriggerDoc;
-  /** What a lease holds and a log line names: stable across processes and restarts. */
+  /**
+   * What a lease holds and a log line names: the trigger's canonical path. It is the one thing that tells
+   * two triggers apart -- two may fire one operation on one schedule and differ only in their inputs -- and
+   * it is as stable across processes and restarts as the document is.
+   */
   name: string;
   settings: Settings;
   overlap: Overlap;
@@ -35,32 +39,23 @@ export interface Schedule {
   says: string;
 }
 
-/**
- * What a lease holds a tick of, and what a log line names. `Serving.triggers` hands a plugin the trigger
- * documents and not the paths they are written at, and this RFC changes no runtime contract to add one -- so
- * a schedule is named by the operation it fires and the schedule it declares, which is as stable across
- * processes and restarts as the path is, and which the checker has already held to be a schedule.
- */
-export function nameOf(trigger: TriggerDoc, says: string): string {
-  return `${trigger.fire.run} @ ${says}`;
-}
-
 /** How a schedule reads, for the line `start` logs and the name a lease holds. */
 function saysOf(settings: Settings, timezone: string): string {
   return settings.cron ? `${settings.cron} ${timezone}` : `every ${settings.everyMs} ms`;
 }
 
 /**
- * One trigger's schedule, or nothing where its settings are not one. The checker has already refused a
- * schedule that is neither (X251), so nothing here reports: a tree that reaches the scheduler is a judged one.
+ * One trigger's schedule, named by the canonical path it is written at, or nothing where its settings are
+ * not one. The checker has already refused a schedule that is neither (X251), so nothing here reports: a
+ * tree that reaches the scheduler is a judged one.
  */
-export function scheduleOf(trigger: TriggerDoc, fallbackZone: string): Schedule | undefined {
+export function scheduleOf(trigger: TriggerDoc, path: string, fallbackZone: string): Schedule | undefined {
   const settings = (trigger.settings ?? {}) as Settings;
   const timezone = settings.timezone ?? fallbackZone;
   const says = saysOf(settings, timezone);
   const common = {
     trigger,
-    name: nameOf(trigger, says),
+    name: path,
     settings,
     overlap: settings.overlap ?? 'skip',
     catchUp: settings.catchUp === true,
@@ -87,19 +82,24 @@ export function betweenOf(schedule: Schedule, from: number, to: number): number 
   return ticksBetween(schedule.cron, { from: new Date(from), to: new Date(to), timezone: schedule.timezone });
 }
 
-/** The most recent instant this schedule names at or before `at`, for the one tick a catchUp fires. */
-export function lastBefore(schedule: Schedule, at: number): number | undefined {
+/**
+ * The most recent instant this schedule names at or before `at`, for the one tick a catchUp fires. The search
+ * walks forward from `since` -- the tick last recorded as fired -- so a weekly or a monthly schedule is caught
+ * up as surely as an hourly one: looking a fixed window back would never find the tick of a schedule whose
+ * ticks are further apart than the window, which is what the kind's description promises it does.
+ */
+export function lastBefore(schedule: Schedule, at: number, since: number): number | undefined {
   if (schedule.everyMs) return Math.floor(at / schedule.everyMs) * schedule.everyMs;
   if (!schedule.cron) return undefined;
-  // a day back covers every five-field expression that fires at all within one; a rarer one simply catches up
-  // at its next ordinary tick, which is what a schedule that fires monthly means by "the most recent tick"
-  const day = 24 * 60 * 60_000;
   let found: number | undefined;
-  let walk = at - day;
-  for (;;) {
-    const next = nextOf({ ...schedule }, walk);
+  let walk = since;
+  // a ceiling on the walk: `missed` is a number for a log line, not a list, and a schedule left unrun for
+  // years should still start rather than spin. The most recent tick found stands.
+  for (let step = 0; step < 10_000; step++) {
+    const next = nextOf(schedule, walk);
     if (next === undefined || next > at) return found;
     found = next;
     walk = next;
   }
+  return found;
 }

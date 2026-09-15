@@ -10,16 +10,9 @@ import type { Serving } from '@wilanis/core';
 import type { Clock } from './clock.js';
 import { systemClock } from './clock.js';
 import { type Fired, fireTick, lineOf, type Tick } from './fire.js';
-import type { Leases } from './leases.js';
+import { Holds, type Lease } from './holds.js';
 import { KIND } from './paths.js';
 import { betweenOf, lastBefore, nextOf, type Schedule, scheduleOf } from './schedule.js';
-
-/** How the scheduler takes a hold, where the run step named a lease. */
-export interface Lease {
-  keeper: Leases;
-  connection: string;
-  ttlMs: number;
-}
 
 /** What a scheduler is built with: where the tree is, what time it is, and who decides who fires. */
 export interface SchedulerOptions {
@@ -38,8 +31,6 @@ interface State {
   lastFired?: number;
   /** the one tick `overlap: wait` keeps back, fired when the run in flight ends */
   waiting?: Tick;
-  /** the tick the hold is held for, so a renewal asks for the same one */
-  holding?: string;
 }
 
 /** A minute: cron's own resolution, and how long the loop sleeps when the next tick is further off than that. */
@@ -47,6 +38,9 @@ const MINUTE = 60_000;
 
 /** The instant, as a graph reads it: ISO 8601 in UTC, whatever zone the expression was read in. */
 const iso = (at: number) => new Date(at).toISOString();
+
+/** What went wrong, in one line a log can carry, whatever was thrown. */
+const reasonOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /**
  * Let whatever a tick just started run as far as it can without waiting on anything outside. A run that
@@ -59,7 +53,7 @@ const drain = () => new Promise<void>(done => setImmediate(done));
 export class Scheduler {
   private readonly serving: Serving;
   private readonly clock: Clock;
-  private readonly lease?: Lease;
+  private readonly holds: Holds;
   private readonly timezone: string;
   private readonly states = new Map<string, State>();
   private readonly stopping = new AbortController();
@@ -71,15 +65,26 @@ export class Scheduler {
   constructor(opts: SchedulerOptions) {
     this.serving = opts.serving;
     this.clock = opts.clock ?? systemClock;
-    this.lease = opts.lease;
     this.timezone = opts.timezone ?? 'UTC';
+    this.holds = new Holds({
+      lease: opts.lease,
+      clock: this.clock,
+      log: line => this.serving.log(line),
+      stopping: this.stopping.signal,
+    });
   }
 
-  /** Every scheduled trigger of the tree as it now stands, so a reload is seen at the next wake-up. */
+  /**
+   * Every scheduled trigger of the tree as it now stands, so a reload is seen at the next wake-up. Each is
+   * named by the canonical path it is written at: a trigger the tree cannot place is not scheduled, since
+   * there would be nothing stable to hold its lease or count its ticks by.
+   */
   schedules(): Schedule[] {
     const out: Schedule[] = [];
     for (const trigger of this.serving.triggers(KIND)) {
-      const one = scheduleOf(trigger, this.timezone);
+      const path = this.serving.pathOf(trigger);
+      if (!path) continue;
+      const one = scheduleOf(trigger, path, this.timezone);
       if (one) out.push(one);
     }
     return out;
@@ -125,13 +130,25 @@ export class Scheduler {
 
   /** Read the tree afresh, fire what has come due, and sleep until the next one or a minute, whichever is first. */
   private async loop(): Promise<void> {
-    await this.catchUp();
+    // a catch-up that cannot be done is not a reason to schedule nothing: the ordinary ticks still run
+    try {
+      await this.catchUp();
+    } catch (error) {
+      this.serving.log(`schedule → nothing was caught up (${reasonOf(error)})`);
+    }
     while (!this.stopping.signal.aborted) {
       const now = this.clock.now();
       const schedules = this.schedules();
       this.forget(schedules);
       this.seed(now);
-      for (const schedule of schedules) await this.advance(schedule, now);
+      for (const schedule of schedules) {
+        // one schedule's bad wake-up is not every schedule's: whatever it was, it is logged and the loop lives
+        try {
+          await this.advance(schedule, now);
+        } catch (error) {
+          this.serving.log(`schedule ${schedule.name} → the tick was not taken (${reasonOf(error)})`);
+        }
+      }
       if (this.stopping.signal.aborted) break;
       await this.clock.wait(this.sleepFor(this.clock.now()), this.stopping.signal);
     }
@@ -175,7 +192,8 @@ export class Scheduler {
 
   /** A tick has come: take the hold where there is one, then let `overlap` say whether it fires. */
   private async reached(schedule: Schedule, at: number): Promise<void> {
-    if (!(await this.hold(schedule, at))) return; // another process holds this tick, or it is already fired
+    // another process holds this tick, or it is already fired
+    if (!(await this.holds.take(schedule.name, iso(at)))) return;
     const state = this.stateOf(schedule.name);
     const tick: Tick = {
       scheduled: iso(at),
@@ -183,16 +201,6 @@ export class Scheduler {
       missed: state.lastFired === undefined ? 0 : betweenOf(schedule, state.lastFired, at),
     };
     this.dispatch(schedule, tick);
-  }
-
-  /** Whether this process may fire this tick: always, alone; the keeper's answer where the run step named a lease. */
-  private async hold(schedule: Schedule, at: number): Promise<boolean> {
-    if (!this.lease) return true;
-    const { keeper, connection, ttlMs } = this.lease;
-    const scheduled = iso(at);
-    const held = await keeper.acquire(connection, schedule.name, scheduled, ttlMs);
-    if (held) this.stateOf(schedule.name).holding = scheduled;
-    return held;
   }
 
   /** What `overlap` says when a tick comes while a run of the same schedule is still going. */
@@ -214,11 +222,18 @@ export class Scheduler {
   private run(schedule: Schedule, tick: Tick): void {
     const state = this.stateOf(schedule.name);
     state.inFlight++;
+    // a tick counts as fired when it is fired, not when it answers: under `concurrent` a run may still be
+    // going when the next tick comes, and counting from the answer would call the ticks between it missed.
+    // A tick `wait` kept back fires late and must not drag the count backwards, so this only ever moves on.
+    const at = Date.parse(tick.scheduled);
+    if (state.lastFired === undefined || at > state.lastFired) state.lastFired = at;
     const promise = this.fireAndSettle(schedule, tick).finally(() => {
       state.inFlight--;
       this.runs.delete(promise);
       const waiting = state.waiting;
-      if (waiting && state.inFlight === 0) {
+      // a stop has already been decided on: the tick kept back is let go rather than started behind the
+      // stop's back, where nothing would be waiting for it
+      if (waiting && state.inFlight === 0 && !this.stopping.signal.aborted) {
         state.waiting = undefined;
         this.run(schedule, { ...waiting, fired: iso(this.clock.now()) });
       }
@@ -228,39 +243,19 @@ export class Scheduler {
 
   /** One run, from the fire to the log line, the mark and the release: a refusal is an answer and is marked too. */
   private async fireAndSettle(schedule: Schedule, tick: Tick): Promise<void> {
-    const renewing = this.renew(schedule, tick);
+    const running = new AbortController();
+    const renewing = this.holds.renew(schedule.name, tick.scheduled, running.signal);
     let fired: Fired;
     try {
       fired = await fireTick(this.serving, schedule.trigger, tick);
     } catch (error) {
-      fired = { error: (error as Error).message, ms: 0 };
+      fired = { error: reasonOf(error), ms: 0 };
     } finally {
-      clearInterval(renewing);
+      running.abort(); // the run has answered: stop renewing, and let the renewal loop end before settling
+      await renewing;
     }
     this.serving.log(lineOf(schedule.name, tick, fired));
-    this.stateOf(schedule.name).lastFired = Date.parse(tick.scheduled);
-    await this.settle(schedule, tick);
-  }
-
-  /** Renew the hold while the run is in flight, so a run longer than the ttl does not lose its own tick. */
-  private renew(schedule: Schedule, tick: Tick): ReturnType<typeof setInterval> | undefined {
-    const lease = this.lease;
-    if (!lease) return undefined;
-    const every = Math.max(1, Math.floor(lease.ttlMs / 2));
-    const timer = setInterval(() => {
-      void lease.keeper.acquire(lease.connection, schedule.name, tick.scheduled, lease.ttlMs).catch(() => {});
-    }, every);
-    timer.unref?.();
-    return timer;
-  }
-
-  /** Record the tick as fired and let the hold go, so the next process to ask finds it done rather than free. */
-  private async settle(schedule: Schedule, tick: Tick): Promise<void> {
-    const lease = this.lease;
-    if (!lease) return;
-    await lease.keeper.markFired(lease.connection, schedule.name, tick.scheduled);
-    await lease.keeper.release(lease.connection, schedule.name);
-    this.stateOf(schedule.name).holding = undefined;
+    await this.holds.settle(schedule.name, tick.scheduled);
   }
 
   /**
@@ -269,14 +264,14 @@ export class Scheduler {
    * the last tick by, which X253 has already refused.
    */
   private async catchUp(): Promise<void> {
-    const lease = this.lease;
-    if (!lease) return;
+    if (!this.holds.leased) return;
     const now = this.clock.now();
     for (const schedule of this.schedules()) {
       if (!schedule.catchUp) continue;
-      const last = await lease.keeper.lastFired(lease.connection, schedule.name);
-      const recent = lastBefore(schedule, now);
-      if (recent === undefined || last === undefined || Date.parse(last) >= recent) continue;
+      const last = await this.holds.lastFired(schedule.name);
+      if (last === undefined) continue;
+      const recent = lastBefore(schedule, now, Date.parse(last));
+      if (recent === undefined || Date.parse(last) >= recent) continue;
       // the ticks between the last one fired and this one were missed while no process ran: say how many
       this.stateOf(schedule.name).lastFired = Date.parse(last);
       await this.reached(schedule, recent);
@@ -287,6 +282,8 @@ export class Scheduler {
   async stop(): Promise<void> {
     this.stopping.abort();
     await this.looping;
-    await Promise.allSettled([...this.runs]);
+    // one snapshot is not enough: a run answering can start the tick `wait` kept back, so drain until the
+    // set stays empty. The abort above stops any new tick being taken, so this ends.
+    while (this.runs.size) await Promise.allSettled([...this.runs]);
   }
 }

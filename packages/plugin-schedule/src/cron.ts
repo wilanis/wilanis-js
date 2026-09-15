@@ -196,19 +196,51 @@ function repeated(at: number, wall: Wall, timezone: string): boolean {
   return false;
 }
 
+/** How far apart two wall clock readings are in minutes, as the clock itself counts them. */
+const wallMinutes = (wall: Wall) => Date.UTC(wall.year, wall.month - 1, wall.day, wall.hour, wall.minute) / MINUTE;
+
+/**
+ * Whether the expression names a wall clock minute the clock never read, between the reading before a
+ * forward jump and the reading after it. The spring change skips an hour, and a schedule naming a time
+ * inside it still has to fire: Vixie cron fires such a tick at the first instant after the gap, once.
+ */
+function namedInGap(cron: Cron, before: Wall, after: Wall): boolean {
+  const from = wallMinutes(before);
+  const to = wallMinutes(after);
+  // a gap of at most two hours, as any zone shifts by; the minute before the jump was read and is not in it
+  for (let minute = from + 1; minute < to && minute - from <= 2 * 60; minute++) {
+    const at = new Date(minute * MINUTE);
+    const wall: Wall = {
+      year: at.getUTCFullYear(),
+      month: at.getUTCMonth() + 1,
+      day: at.getUTCDate(),
+      hour: at.getUTCHours(),
+      minute: at.getUTCMinutes(),
+      weekday: at.getUTCDay(),
+    };
+    if (matches(cron, wall)) return true;
+  }
+  return false;
+}
+
 /**
  * The first instant strictly after `after` that the expression names in its zone, or nothing where it names
  * none within four years (`0 0 30 2 *`, a 30th of February). The search steps the real timeline a minute at a
- * time and reads the wall clock in the zone, so a daylight-saving change needs no arithmetic of its own: an
- * hour the clock skips is simply never read, so a tick inside it falls away and the day's later ticks stand;
- * an hour it repeats is read twice and taken the first time, since a schedule names a wall clock time and that
- * time came once as far as its author is concerned.
+ * time and reads the wall clock in the zone, so a daylight-saving change needs no arithmetic of its own for
+ * the ordinary case. The two changes are named, because a schedule names a wall clock time: an hour the clock
+ * skips is never read, so a tick inside it fires at the first instant after the gap, once, as Vixie cron
+ * does; an hour it repeats is read twice and taken the first time, since that time came once as far as the
+ * expression's author is concerned.
  */
 export function nextTick(cron: Cron, after: Date, timezone: string): Date | undefined {
   let at = Math.floor(after.getTime() / MINUTE) * MINUTE + MINUTE;
+  let previous = wallOf(new Date(at - MINUTE), timezone);
   for (let step = 0; step < HORIZON; step++, at += MINUTE) {
     const wall = wallOf(new Date(at), timezone);
+    // the clock jumped forward over this minute: a tick the gap swallowed fires here, at the first instant after it
+    if (wallMinutes(wall) > wallMinutes(previous) + 1 && namedInGap(cron, previous, wall)) return new Date(at);
     if (matches(cron, wall) && !repeated(at, wall, timezone)) return new Date(at);
+    previous = wall;
   }
   return undefined;
 }

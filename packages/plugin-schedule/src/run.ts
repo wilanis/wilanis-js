@@ -6,9 +6,10 @@
  */
 import type { Hold, Serving } from '@wilanis/core';
 import type { Handler } from '@wilanis/engine';
+import type { Lease } from './holds.js';
 import { leases } from './leases.js';
 import { ROOT, RUN } from './paths.js';
-import { type Lease, Scheduler } from './scheduler.js';
+import { Scheduler } from './scheduler.js';
 
 /** What a tree hands a held operation, and what this one reads of it. */
 type ScheduleEnv = {
