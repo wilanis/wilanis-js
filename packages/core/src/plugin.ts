@@ -67,6 +67,12 @@ export interface Atomic {
 export interface Serving {
   /** Every trigger of one kind in the tree as it now stands. */
   triggers(kind: string): TriggerDoc[];
+  /**
+   * The canonical path a trigger is written at, or nothing where it is not one of the tree's. It is what
+   * names a trigger across processes and restarts -- two triggers may fire one operation on one schedule and
+   * differ only in their inputs, and the document is the only thing that tells them apart.
+   */
+  pathOf(trigger: TriggerDoc): string | undefined;
   /** Run a trigger's operation and answer its report. */
   fire(args: FireArgs): Promise<Report>;
   /** The trigger's in/out types, resolved. */

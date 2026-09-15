@@ -18,11 +18,12 @@ export { systemClock } from './clock.js';
 export type { Cron } from './cron.js';
 export { knownZone, nextInterval, nextTick, parseCron } from './cron.js';
 export type { Tick } from './fire.js';
+export type { Lease } from './holds.js';
 export type { Leases } from './leases.js';
 export { Keepers, leases } from './leases.js';
 export type { Schedule, Settings } from './schedule.js';
 export { scheduleOf } from './schedule.js';
-export type { Lease, SchedulerOptions } from './scheduler.js';
+export type { SchedulerOptions } from './scheduler.js';
 export { Scheduler } from './scheduler.js';
 
 const DOCS = fileURLToPath(new URL('../docs', import.meta.url));

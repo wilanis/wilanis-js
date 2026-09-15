@@ -135,6 +135,42 @@ describe('a run that outlasts its interval, as overlap says', () => {
     await settle();
     await one.scheduler.stop();
   });
+
+  it('concurrent: a tick counts as fired when it fires, so a later tick calls none of them missed', async () => {
+    // the first run is held over the next two ticks and then answers; the ticks after it must not be told
+    // that the ones which ran beside it were missed. Counting a tick as fired only when it *answers* would
+    // leave state.lastFired back at the first tick and call everything since then dropped.
+    let held = true;
+    const one = started(
+      [trigger({ everyMs: 1000, overlap: 'concurrent' })],
+      () => ({ hold: held }),
+      '2026-09-11T10:00:00.000Z',
+    );
+    await one.clock.advance(1000); // tick 1 fires, and is held
+    held = false; // every later tick answers at once
+    await one.clock.advance(1000); // tick 2 fires beside it and answers
+    await one.clock.advance(1000); // tick 3 likewise
+    one.release(); // now the long first run finally answers
+    await settle();
+    await one.clock.advance(1000); // tick 4: the three before it all ran, so none of them was missed
+    expect(one.fired).toHaveLength(4);
+    expect(one.fired.map(each => each.missed)).toEqual([0, 0, 0, 0]);
+    await one.scheduler.stop();
+  });
+
+  it('wait: a tick kept back is let go rather than fired behind a stop that has begun', async () => {
+    const one = running('wait');
+    await one.clock.advance(1000); // tick 1 fires and holds
+    await one.clock.advance(1000); // tick 2 is kept back, waiting on it
+    expect(one.fired).toHaveLength(1);
+    const stopping = one.scheduler.stop();
+    await settle();
+    one.release(); // the run answers; the waiting tick must not start now, with the stop already decided
+    await stopping;
+    expect(one.fired).toHaveLength(1);
+    await one.clock.advance(5000);
+    expect(one.fired).toHaveLength(1);
+  });
 });
 
 describe('missed, and what a start knows', () => {
@@ -225,8 +261,26 @@ describe('what a tick is logged as', () => {
   it('a fault is logged as failed and the loop goes on to the next tick', async () => {
     const one = started([trigger({ everyMs: 60_000 })], () => ({ error: 'the upstream fell over' }));
     await one.clock.advance(120_000);
-    expect(one.logs.some(line => line.includes('the upstream fell over'))).toBe(true);
+    // a run that threw is a failure, not a refusal: nothing refused it, the run itself fell over
+    const line = one.logs.find(each => each.includes('the upstream fell over')) as string;
+    expect(line).toContain('→ failed (the upstream fell over)');
+    expect(line).not.toContain('refused at the edge');
     expect(one.fired).toHaveLength(2); // the second tick still fired
+    await one.scheduler.stop();
+  });
+});
+
+describe('a schedule is named by its trigger, not by what it fires', () => {
+  it('two triggers firing one operation on one schedule both fire: neither collapses into the other', async () => {
+    // the same operation, the same schedule, different inputs: only the path tells the two apart
+    const run = '@monitor/domain/monitor.port.json#digest';
+    const one = started([
+      trigger({ everyMs: 60_000 }, run, 'features/monitor/edge/nightly.trigger.json'),
+      trigger({ everyMs: 60_000 }, run, 'features/monitor/edge/weekly.trigger.json'),
+    ]);
+    expect(one.answer.triggers).toBe(2); // both were seeded, not one over the other
+    await one.clock.advance(60_000);
+    expect(one.fired).toHaveLength(2); // and both fired: neither was silently never scheduled
     await one.scheduler.stop();
   });
 });

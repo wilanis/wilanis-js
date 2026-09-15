@@ -20,14 +20,17 @@ export interface Tick {
 /** What one tick's run answered, for the line it is logged as and for whoever waits on it. */
 export interface Fired {
   report?: Report;
-  /** why the input could not be built, where the tick never reached a graph */
+  /** why the tick did not answer: the input could not be built, or the run itself threw */
   error?: string;
+  /** true where the input could not be built, so the tick never reached a graph at all */
+  atEdge?: boolean;
   ms: number;
 }
 
 /** How a tick's run ended, in the words the log line uses. */
 function outcome(fired: Fired): string {
-  if (fired.error) return `→ refused at the edge (${fired.error})`;
+  // the input never built: the tick was refused before any graph ran. A run that threw is a failure, not a refusal
+  if (fired.error) return fired.atEdge ? `→ refused at the edge (${fired.error})` : `→ failed (${fired.error})`;
   const report = fired.report;
   if (!report) return '→ failed';
   const refused = refusalOf(report);
@@ -51,7 +54,7 @@ export async function fireTick(serving: Serving, trigger: TriggerDoc, tick: Tick
   const started = Date.now();
   const request = { ...tick } as Record<string, unknown>;
   const built = serving.inputFor(trigger, request);
-  if ('error' in built) return { error: built.error, ms: Date.now() - started };
+  if ('error' in built) return { error: built.error, atEdge: true, ms: Date.now() - started };
   const scope = serving.blobs.scope();
   try {
     const report = await serving.fire({ trigger, input: built.input, request, blobs: scope });

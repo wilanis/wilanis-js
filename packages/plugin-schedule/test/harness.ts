@@ -121,10 +121,20 @@ export function serving(triggers: TriggerDoc[], answering: () => Answering = () 
   const logs: string[] = [];
   const open: (() => void)[] = [];
   let set = triggers;
+  // the path each trigger is written at, as the registry knows it: what names a schedule
+  const paths = new WeakMap<TriggerDoc, string>();
+  let placed = 0;
+  const place = (docs: TriggerDoc[]) => {
+    for (const doc of docs)
+      if (!paths.has(doc))
+        paths.set(doc, (doc as { at?: string }).at ?? `features/test/edge/tick-${placed++}.trigger.json`);
+  };
+  place(triggers);
   const counts: Counted = { scopes: 0, released: 0 };
   const store = blobs(counts);
   const serving: Serving = {
     triggers: kind => (kind === KIND ? set : []),
+    pathOf: doc => paths.get(doc),
     fire: async ({ trigger, request }: FireArgs) => {
       const context = request as unknown as Fired;
       fired.push({
@@ -163,15 +173,21 @@ export function serving(triggers: TriggerDoc[], answering: () => Answering = () 
     release: () => open.shift()?.(),
     /** Put a new set of triggers behind the same serving, as a reload does. */
     reloadWith: (next: TriggerDoc[]) => {
+      place(next);
       set = next;
     },
   };
 }
 
-/** A scheduled trigger, as a document: the settings a test varies, and an operation to fire. */
+/**
+ * A scheduled trigger, as a document: the settings a test varies, an operation to fire, and the path it is
+ * written at. `at` is what `Serving.pathOf` answers for it, and what names its schedule -- a case that needs
+ * two triggers told apart gives each its own.
+ */
 export function trigger(
   settings: Record<string, unknown>,
   run = '@monitor/domain/monitor.port.json#digest',
+  at?: string,
 ): TriggerDoc {
   return {
     $schema: '@wilanis/trigger.schema.json',
@@ -179,6 +195,7 @@ export function trigger(
     kind: KIND,
     settings,
     fire: { run },
+    ...(at ? { at } : {}),
   } as TriggerDoc;
 }
 
@@ -244,5 +261,48 @@ export class FakeLeases implements Leases {
   async markFired(_connection: string, name: string, scheduled: string): Promise<void> {
     const record = this.at(name);
     if (record.lastFired === undefined || record.lastFired < scheduled) record.lastFired = scheduled;
+  }
+}
+
+/**
+ * A keeper that throws the first `times` calls to one of its methods and behaves after that: a store that is
+ * briefly unreachable. What the scheduler does with it is log the tick and go on, never end the schedule.
+ */
+export class FlakyLeases implements Leases {
+  private left: number;
+
+  constructor(
+    private readonly real: Leases,
+    private readonly method: 'acquire' | 'markFired' | 'release' | 'lastFired',
+    times = 1,
+  ) {
+    this.left = times;
+  }
+
+  /** Whether this call is one of the ones that throws, counting it down as it answers. */
+  private throws(method: string): boolean {
+    if (method !== this.method || this.left <= 0) return false;
+    this.left--;
+    return true;
+  }
+
+  async acquire(connection: string, name: string, scheduled: string, ttlMs: number): Promise<boolean> {
+    if (this.throws('acquire')) throw new Error('the lease store is unreachable');
+    return this.real.acquire(connection, name, scheduled, ttlMs);
+  }
+
+  async release(connection: string, name: string): Promise<void> {
+    if (this.throws('release')) throw new Error('the lease store is unreachable');
+    return this.real.release(connection, name);
+  }
+
+  async lastFired(connection: string, name: string): Promise<string | undefined> {
+    if (this.throws('lastFired')) throw new Error('the lease store is unreachable');
+    return this.real.lastFired(connection, name);
+  }
+
+  async markFired(connection: string, name: string, scheduled: string): Promise<void> {
+    if (this.throws('markFired')) throw new Error('the lease store is unreachable');
+    return this.real.markFired(connection, name, scheduled);
   }
 }
