@@ -31,6 +31,11 @@ export interface Settled {
   blocked: boolean;
   /** The node the switch actually routed to, when it is not the one the branch aimed at. */
   misrouted?: string;
+  /**
+   * How long the graph that owns the decision took, in milliseconds. Effects are stubbed, so this is the
+   * cost of the tree's own work and nothing else; it is shown under `--verbose` and never recorded.
+   */
+  ms?: number;
 }
 
 /** The report of the graph at a dotted node path, or the whole report at the top. A map node is followed by the index of the element to read. */
@@ -60,6 +65,7 @@ function settle(report: Report, sw: FoundSwitch, aim: string): Settled {
     status: local.status === 'blocked' ? 'BLOCKED' : local.status,
     blocked: local.status === 'blocked',
     misrouted: took !== undefined && took !== aim ? took : undefined,
+    ms: local.endedAt - local.startedAt,
   };
   const failed = Object.entries(local.nodes).find(([, node]) => node.status === 'failed');
   if (local.status !== 'failed' || !failed) return out;

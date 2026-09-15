@@ -369,7 +369,7 @@ export interface ScenarioDoc extends Envelope {
   expect: {
     status: 'done' | 'failed' | 'blocked';
     output?: unknown;
-    nodes: Record<string, { status: string; out?: unknown; selected?: string }>;
+    nodes: Record<string, { status: string; handler?: string; out?: unknown; selected?: string }>;
   };
 }
 

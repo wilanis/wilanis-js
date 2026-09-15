@@ -67,6 +67,10 @@
                 "description": "How this node ended.",
                 "type": "string"
               },
+              "handler": {
+                "description": "For a call or a map, the operation that ran, so a replay says when a node was rebound rather than only that its answer changed.",
+                "type": "string"
+              },
               "out": {
                 "description": "What this node answered, recorded as it was."
               },
