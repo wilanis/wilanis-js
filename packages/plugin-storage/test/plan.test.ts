@@ -29,6 +29,19 @@ const NOTES: Declared = declaredOf(
   types.inline({ fields: { id: { type: 'string' }, entryId: { type: 'string' }, body: { type: 'string' } } }),
 );
 
+/** `notes` under its name now, with a `title` the record has never held: what `"was": "notes"` declares. */
+const DRAFTS: Declared = declaredOf(
+  { of: '@x/Note.shape.json', key: 'id', refs: { entryId: { collection: 'entries' } }, was: 'notes' },
+  types.inline({
+    fields: {
+      id: { type: 'string' },
+      entryId: { type: 'string' },
+      body: { type: 'string' },
+      title: { type: 'string', required: false },
+    },
+  }),
+);
+
 /** The same `entries`, with `ua` renamed `agent` in the shape and nothing else changed. */
 const RENAMED: Declared = declaredOf(
   { of: '@x/Entry.shape.json', key: 'id', unique: [['url', 'method']] },
@@ -91,24 +104,22 @@ describe('a collection that is gone, and one that took its place', () => {
   });
 
   it('notes gone and drafts declared with was: one renameCollection, then field steps against notes’s record', () => {
-    const drafts = declaredOf(
-      { of: '@x/Note.shape.json', key: 'id', refs: { entryId: { collection: 'entries' } }, was: 'notes' },
-      types.inline({
-        fields: {
-          id: { type: 'string' },
-          entryId: { type: 'string' },
-          body: { type: 'string' },
-          title: { type: 'string', required: false },
-        },
-      }),
-    );
     const marks: Marks = { entries: {}, drafts: marksOf({ of: '@x/Note.shape.json', key: 'id', was: 'notes' }) };
-    const { steps, stale } = plan({ entries: ENTRIES, notes: NOTES }, { entries: ENTRIES, drafts }, marks);
+    const { steps, stale } = plan({ entries: ENTRIES, notes: NOTES }, { entries: ENTRIES, drafts: DRAFTS }, marks);
     expect(does(steps)).toEqual(['renameCollection', 'add']);
     expect(steps[0]).toMatchObject({ target: 'drafts', from: 'notes', says: 'rename collection notes → drafts' });
     expect(steps[1]).toMatchObject({ target: 'drafts', at: 'title' });
-    // the mark has done its work the moment it is planned, so the store is asked to drop it
-    expect(stale[0].says).toBe('was.drafts has been applied');
+    // nothing has applied on the run that plans the rename, so the mark is not stale yet
+    expect(stale).toEqual([]);
+  });
+
+  it('the run after: drafts recorded under its own name and notes gone, so the was mark is stale', () => {
+    const marks: Marks = { entries: {}, drafts: marksOf({ of: '@x/Note.shape.json', key: 'id', was: 'notes' }) };
+    const { steps, stale } = plan({ entries: ENTRIES, drafts: DRAFTS }, { entries: ENTRIES, drafts: DRAFTS }, marks);
+    expect(steps).toEqual([]);
+    expect(stale).toHaveLength(1);
+    expect(stale[0]).toMatchObject({ target: 'drafts', says: 'was.drafts has been applied' });
+    expect(stale[0].hint).toContain('"was": "notes"');
   });
 });
 
@@ -132,6 +143,28 @@ describe('a field that changed its name', () => {
     expect(second.steps).toEqual([]);
     expect(second.stale[0]).toMatchObject({ target: 'entries', at: 'agent', says: 'renamed.agent has been applied' });
     expect(second.stale[0].hint).toContain('"renamed": { "agent": "ua" }');
+  });
+
+  it('renamed agent ← ua with both recorded: the mark is done, and agent reads as itself', () => {
+    // RFC 0017 point 4 wants the old name in the record *and the new one not*: renaming ua onto an agent that
+    // already exists is not a rename, so the mark is stale and the record's own ua is what is dropped
+    const both = declaredOf(
+      { of: '@x/Entry.shape.json', key: 'id', unique: [['url', 'method']] },
+      types.inline({
+        fields: {
+          id: { type: 'string' },
+          url: { type: 'string' },
+          method: { type: 'string' },
+          ua: { type: 'string', required: false },
+          agent: { type: 'string', required: false },
+        },
+      }),
+    );
+    const marks: Marks = { entries: { renamed: { agent: 'ua' } } };
+    const { steps, stale } = plan({ entries: both }, { entries: RENAMED }, marks);
+    expect(does(steps)).toEqual(['remove']);
+    expect(steps[0]).toMatchObject({ at: 'ua' });
+    expect(stale[0]).toMatchObject({ target: 'entries', at: 'agent', says: 'renamed.agent has been applied' });
   });
 
   it('renamed agent ← nope, with nope not in the record: refused, and the hint names the record’s fields', () => {
@@ -160,6 +193,24 @@ describe('a field added, removed or changed', () => {
       default: 'unknown',
       says: 'add agent  string, optional, default "unknown"',
     });
+  });
+
+  it('note added required with no default: add, and it says what the empty rows would cost', () => {
+    // every row already there has nothing to put in the column, so the step costs what `require` costs and
+    // step 4 classes it from the count: refused unless allowed as destructive
+    const declared = entriesWith({ ua: { type: 'string', required: false }, note: { type: 'string' } });
+    const bare = plan({ entries: ENTRIES }, { entries: declared }, { entries: {} });
+    expect(does(bare.steps)).toEqual(['add']);
+    expect(bare.steps[0]).toMatchObject({ at: 'note', says: 'add note  string, required', loses: 'rows with no note' });
+
+    // a default says what every empty row receives, so nothing is at stake and the step is additive
+    const given = plan({ entries: ENTRIES }, { entries: declared }, { entries: { defaults: { note: 'none' } } });
+    expect(given.steps[0]).toMatchObject({
+      at: 'note',
+      default: 'none',
+      says: 'add note  string, required, default "none"',
+    });
+    expect(given.steps[0].loses).toBeUndefined();
   });
 
   it('method from string to number: retype, and what it loses is what no cast carries', () => {
@@ -218,6 +269,19 @@ describe('a constraint added or dropped', () => {
     expect(does(dropped.steps)).toEqual(['unref']);
     expect(dropped.steps[0]).toMatchObject({ at: 'entryId', to: 'entries', says: 'unref    entryId → entries' });
   });
+
+  it('entryId refs moved from entries to users: unref the old and ref the new, never silence', () => {
+    // a reference is the pair (field, collection): comparing on the field alone would leave the record
+    // disagreeing with the database, since the field is in both and neither step would fire
+    const toUsers = declaredOf(
+      { of: '@x/Note.shape.json', key: 'id', refs: { entryId: { collection: 'users' } } },
+      types.inline({ fields: { id: { type: 'string' }, entryId: { type: 'string' }, body: { type: 'string' } } }),
+    );
+    const { steps } = plan({ notes: NOTES }, { notes: toUsers }, { notes: {} });
+    expect(does(steps)).toEqual(['ref', 'unref']);
+    expect(steps[0]).toMatchObject({ at: 'entryId', to: 'users', says: 'ref      entryId → users' });
+    expect(steps[1]).toMatchObject({ at: 'entryId', to: 'entries', says: 'unref    entryId → entries' });
+  });
 });
 
 describe('what no count can make possible', () => {
@@ -238,5 +302,7 @@ describe('what no count can make possible', () => {
     expect(refused[0]).toMatchObject({ target: 'entries', at: 'slug', says: 'key id → slug' });
     expect(refused[0].refused).toContain('declare it');
     expect(refused[0].refused).toContain('one-off graph');
+    // its own verb, so an engine that dispatches on `do` never reads a refused key change as a cast
+    expect(refused[0].do).toBe('rekey');
   });
 });

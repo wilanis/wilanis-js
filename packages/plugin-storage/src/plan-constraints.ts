@@ -51,11 +51,23 @@ function ununiqueSteps(name: string, from: Declared, to: Declared, now: Map<stri
     }));
 }
 
-/** A `refs` the tree declares and the record does not: rows pointing at nothing decide whether it applies. */
+/** One `refs` entry as a key a set can hold: a reference is the pair of the field and what it points at. */
+const refOf = (field: string, collection: string) => `${field}→${collection}`;
+
+/** The record's references under the names their fields carry now, as the pairs the declared are compared against. */
+function wasRefs(from: Declared, now: Map<string, string>): Set<string> {
+  return new Set(Object.entries(from.refs).map(([field, ref]) => refOf(now.get(field) ?? field, ref.collection)));
+}
+
+/**
+ * A `refs` the tree declares and the record does not: rows pointing at nothing decide whether it applies. The
+ * comparison is on the pair (field, collection), so a reference whose target moved is the old one dropped and
+ * the new one added, and never a field the record silently disagrees with the database about.
+ */
 function refSteps(name: string, from: Declared, to: Declared, now: Map<string, string>): Step[] {
-  const was = new Map(Object.entries(from.refs).map(([field, ref]) => [now.get(field) ?? field, ref]));
+  const was = wasRefs(from, now);
   return Object.entries(to.refs)
-    .filter(([field]) => !was.has(field))
+    .filter(([field, ref]) => !was.has(refOf(field, ref.collection)))
     .map(([field, ref]) => ({
       do: 'ref' as const,
       target: name,
@@ -66,11 +78,15 @@ function refSteps(name: string, from: Declared, to: Declared, now: Map<string, s
     }));
 }
 
-/** A `refs` the record holds and the tree no longer declares: the guarantee goes, and an orphan may be written. */
+/**
+ * A `refs` the record holds and the tree no longer declares, on the same pair: the guarantee goes, and an orphan
+ * may be written. A field still referenced but at another collection is dropped here and added by `refSteps`.
+ */
 function unrefSteps(name: string, from: Declared, to: Declared, now: Map<string, string>): Step[] {
+  const declared = new Set(Object.entries(to.refs).map(([field, ref]) => refOf(field, ref.collection)));
   return Object.entries(from.refs)
     .map(([field, ref]) => [now.get(field) ?? field, ref] as const)
-    .filter(([field]) => !(field in to.refs))
+    .filter(([field, ref]) => !declared.has(refOf(field, ref.collection)))
     .map(([field, ref]) => ({
       do: 'unref' as const,
       target: name,
