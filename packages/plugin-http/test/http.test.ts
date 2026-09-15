@@ -6,6 +6,7 @@ import { loadTree } from '@wilanis/core';
 import auth from '@wilanis/plugin-auth';
 import blobs from '@wilanis/plugin-blob';
 import reload from '@wilanis/plugin-reload';
+import schedule from '@wilanis/plugin-schedule';
 import storage from '@wilanis/plugin-storage';
 import memory from '@wilanis/plugin-storage-memory';
 import postgres from '@wilanis/plugin-storage-postgres';
@@ -53,6 +54,7 @@ beforeAll(async () => {
       '@blob': blobs,
       '@reload': reload,
       '@auth': auth,
+      '@schedule': schedule,
       '@storage': storage,
       '@storage-memory': memory,
       '@storage-postgres': postgres,

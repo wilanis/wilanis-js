@@ -34,6 +34,10 @@
       "from": "@wilanis/plugin-reload"
     },
     {
+      "use": "@schedule",
+      "from": "@wilanis/plugin-schedule"
+    },
+    {
       "use": "@auth",
       "from": "@wilanis/plugin-auth",
       "settings": {
@@ -104,6 +108,11 @@
       "label": "Watch for changes",
       "description": "Serve the tree again whenever a document changes, without closing the port. A change that does not pass wilanis check is reported and the last good tree keeps answering.",
       "run": "@reload/watch.port.json#watch"
+    },
+    {
+      "label": "Keep the schedule",
+      "description": "Fire the scheduled triggers of this tree, each at the instants its cron expression names. Delete this step and nothing is scheduled: the nightly digest is a document either way, and it fires because project.json asks for a scheduler, never because the trigger exists. One process runs it here; several instances would give it a lease.",
+      "run": "@schedule/scheduler.port.json#run"
     },
     {
       "label": "Listen",
