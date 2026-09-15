@@ -14,7 +14,8 @@
       "graph": "@monitor/data/kept-get-postgres.graph.json"
     },
     "record": {
-      "graph": "@monitor/data/kept-record-postgres.graph.json"
+      "description": "The data graph that stores the entry and its method\u2019s latest as one transaction.",
+      "graph": "@monitor/data/store-and-latest-postgres.graph.json"
     },
     "update": {
       "graph": "@monitor/data/kept-update-postgres.graph.json"
@@ -29,6 +30,10 @@
     "submit": {
       "description": "The business graph that attributes and records.",
       "graph": "@monitor/domain/record-entry.graph.json"
+    },
+    "recordAll": {
+      "description": "The business graph that records the batch as one transaction: every draft or none.",
+      "graph": "@monitor/domain/record-all.graph.json"
     },
     "list": {
       "description": "The business graph that routes on the filter.",

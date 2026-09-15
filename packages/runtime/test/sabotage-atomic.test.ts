@@ -6,10 +6,10 @@
  * transaction (G014). A transactional operation must also say where it goes, statically (C009), since the
  * connection is resolved before anything runs.
  *
- * The cases mark the example's own graphs atomic rather than planting new ones, so what is proved is the
- * rule against the tree a reader learns from: `kept-record` writes twice to one store and is the graph an
- * atomic declaration suits, `kept-list` only reads and is the consistent snapshot the RFC decided to allow,
- * and `import-entries` reads a file before it writes, which is the shape the RFC says to split. The two that
+ * The cases work over the example's own graphs rather than planting new ones, so what is proved is the
+ * rule against the tree a reader learns from: `store-and-latest` already says it is atomic and writes twice
+ * to one store, `kept-list` only reads and is the consistent snapshot the RFC decided to allow,
+ * and `import-entries` reads a file before it records, which is the shape the RFC says to split. The two that
  * need a document the example has no use for -- a second connection to fall on, and a port declaring itself
  * transactional while saying nowhere it goes -- plant it.
  *
@@ -24,9 +24,16 @@ import { checkTree } from '@wilanis/compiler';
 import { loadTree, type PluginModule, schemaRef, schemaUrl } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_PLUGINS } from '../src/index.js';
-import { docsDir, plantedEditingAllSaying, plantedEditingSaying, sabotage, sabotageSaying } from './example-harness.js';
+import {
+  docsDir,
+  plantedEditingAllAt,
+  plantedEditingAllSaying,
+  plantedEditingSaying,
+  sabotage,
+  sabotageSaying,
+} from './example-harness.js';
 
-const KEPT = 'features/monitor/data/kept-record.graph.json';
+const KEPT = 'features/monitor/data/store-and-latest.graph.json';
 const IMPORT = 'features/monitor/domain/import-entries.graph.json';
 const RECORD = 'features/monitor/domain/record-entry.graph.json';
 
@@ -39,8 +46,8 @@ const atomic = (file: string, also: (doc: any) => void = () => {}) =>
 
 describe('a graph that says it is atomic', () => {
   it('is accepted where every effect it reaches is one transaction on one connection', () => {
-    // kept-record asks for a key and writes the record, both through @storage on the entries connection:
-    // the case that must pass, so the three that follow are refusing something real
+    // store-and-latest asks for a key and writes two records, all through @storage on the entries
+    // connection: the case that must pass, so the three that follow are refusing something real
     expect(atomic(KEPT)).toEqual([]);
   });
 
@@ -92,7 +99,7 @@ describe('a graph that says it is atomic', () => {
         run: '@storage/store.port.json#put',
         over: '{{in.tags}}',
         onItemFailure: 'collect',
-        in: { store: '@monitor/data/entries.store.json', collection: 'entries', record: '{{saved.record}}' },
+        in: { store: '@monitor/data/entries.store.json', collection: 'entries', record: '{{stored.record}}' },
       });
     });
     expect(broken).toContain('G014');
@@ -130,11 +137,18 @@ const NOTED = {
 
 describe('an atomic graph over more than one connection', () => {
   it('is refused, since one transaction is one connection -- L010', () => {
-    const broken = plantedEditingSaying(ELSEWHERE, KEPT, doc => {
-      doc.atomic = true;
-      doc.nodes.push({ ...NOTED, in: { ...NOTED.in, record: '{{saved.record}}' } });
+    // store-and-latest already writes the entries connection; the note writes another. record-all maps
+    // submit down into it and says atomic too, so two graphs reach the same fault and each answers for
+    // itself: a refusal names the graph whose promise cannot be kept, not the node they share.
+    const broken = plantedEditingAllAt(ELSEWHERE, {
+      [KEPT]: doc => {
+        doc.nodes.push({ ...NOTED, in: { ...NOTED.in, record: '{{stored.record}}' } });
+      },
     });
-    expect(broken.filter(one => one.startsWith('L010'))).toHaveLength(1);
+    expect(broken.filter(one => one.startsWith('L010'))).toEqual([
+      'L010 @features/monitor/data/store-and-latest.graph.json#atomic',
+      'L010 @features/monitor/domain/record-all.graph.json#atomic',
+    ]);
   });
 
   it('names the profiles whose bindings put the effects on two connections -- L010', () => {
@@ -145,7 +159,11 @@ describe('an atomic graph over more than one connection', () => {
       doc.atomic = true;
       doc.nodes.push(NOTED);
     });
+    // record-all reaches record-entry through submit and is atomic itself, so it answers for the same
+    // fault under the same two profiles: two graphs, two promises, two refusals
     expect(broken.filter(one => one.startsWith('L010'))).toEqual([
+      "L010 atomic graph reaches effects on 2 connections (@connections/entries.connection.json, @connections/notes.connection.json) (profile 'local')",
+      "L010 atomic graph reaches effects on 2 connections (@connections/entries-postgres.connection.json, @connections/notes.connection.json) (profile 'production')",
       "L010 atomic graph reaches effects on 2 connections (@connections/entries.connection.json, @connections/notes.connection.json) (profile 'local')",
       "L010 atomic graph reaches effects on 2 connections (@connections/entries-postgres.connection.json, @connections/notes.connection.json) (profile 'production')",
     ]);

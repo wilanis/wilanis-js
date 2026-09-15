@@ -47,8 +47,9 @@ start creates the table and the next creates nothing.
 
 ## M03 All or nothing
 
-The CSV import records every row and updates the digest in one atomic graph. A bad row in the middle
-leaves nothing written; rehearsal prints the rolled-back branch. Draws on RFC 0004.
+The CSV import records every row in one atomic graph, and an entry and the latest call of its method move
+together in another. A bad row in the middle leaves nothing written; rehearsal prints the rolled-back
+branch. Draws on RFC 0004.
 
 Here because RFC 0004 depends on RFC 0002 alone, which M02 finished, so this is free to start; the
 milestone that follows depends on nothing and is free to start at any time, so the smaller comes first.

@@ -109,6 +109,16 @@
       },
       "returns": "@monitor/domain/Entry.shape.json"
     },
+    "recordAll": {
+      "description": "Record every draft of a batch, each attributed the way a single submission is, and answer them in the order given. Where the entries are kept in a store, all of them are recorded or none: a draft that refuses undoes the rows recorded before it.",
+      "accepts": {
+        "drafts": {
+          "type": "@monitor/domain/EntryDraft.shape.json[]",
+          "description": "the calls to record, in the order they are to be answered"
+        }
+      },
+      "returns": "@monitor/domain/Entry.shape.json[]"
+    },
     "list": {
       "description": "Every entry, narrowed to one method when a method is given.",
       "accepts": {

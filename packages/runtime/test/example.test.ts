@@ -210,21 +210,21 @@ describe('branch rehearsal', () => {
   });
 
   it('marks an atomic graph and says which of its branches roll back', async () => {
-    // kept-record writes the store under the local profile, so it is the graph a transaction could hold
-    const lines = await withEdit('features/monitor/data/kept-record.graph.json', doc => (doc.atomic = true), 'local');
+    // store-and-latest is the example's own: it writes the entry and its method's latest, and says so
+    const lines = await withEdit('features/monitor/data/store-and-latest.graph.json', () => {}, 'local');
     const text = lines.join('\n');
-    expect(text).toMatch(/features\/monitor\/data\/kept-record {2}\(atomic\) {2}switch 'route'/);
-    // the branch that answers commits, so nothing is said of it; the refusal is what undoes the writes
-    expect(text).toMatch(/when has\(record\) {2}answered from 'row'$/m);
+    expect(text).toMatch(/features\/monitor\/data\/store-and-latest {2}\(atomic\) {2}switch 'route'/);
+    // the branch that answers commits, so nothing is said of it; the refusal is what undoes both writes
+    expect(text).toMatch(/when has\(record\) && has\(mark\) {2}answered from 'row'$/m);
     expect(text).toMatch(/refused on purpose at 'failed' as upstream: "[^"]*", rolled back$/m);
     // and the line names no reasons: describe says those
     expect(text).not.toMatch(/\(atomic\)[^\n]*rolls back/);
   });
 
-  it('changes nothing but those two words: the same branches, and only the one graph marked', async () => {
-    const graph = 'features/monitor/data/kept-record.graph.json';
-    const before = (await withEdit(graph, () => {}, 'local')).join('\n');
-    const after = (await withEdit(graph, doc => (doc.atomic = true), 'local')).join('\n');
+  it('changes nothing but those two words: the same branches, and only the graph that says so', async () => {
+    const graph = 'features/monitor/data/store-and-latest.graph.json';
+    const before = (await withEdit(graph, doc => delete doc.atomic, 'local')).join('\n');
+    const after = (await withEdit(graph, () => {}, 'local')).join('\n');
     // atomicity is a property of the run, not of the routing: the solver walks the same branches either way
     expect(before).not.toContain('(atomic)');
     expect(before).not.toContain('rolled back');

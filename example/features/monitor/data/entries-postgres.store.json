@@ -17,6 +17,11 @@
       "defaults": {
         "ua": "unknown"
       }
+    },
+    "latest": {
+      "description": "the most recent call recorded for each method, one row per method: written in the same transaction as the entry itself, so the two cannot disagree",
+      "of": "@monitor/domain/MethodLatest.shape.json",
+      "key": "method"
     }
   }
 }

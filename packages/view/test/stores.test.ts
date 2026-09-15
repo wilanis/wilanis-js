@@ -34,7 +34,8 @@ describe('the view of a store', () => {
   });
 
   it("gives each collection's key its type, read from the shape the collection names", async () => {
-    expect((await view(STORE)).store?.keyTypes).toEqual({ entries: 'string' });
+    // latest is keyed by the method it records, which is the one field identifying one of its rows
+    expect((await view(STORE)).store?.keyTypes).toEqual({ entries: 'string', latest: 'string' });
   });
 
   it('lists every call run against it: the document, the node, the operation and the collection', async () => {
@@ -43,10 +44,12 @@ describe('the view of a store', () => {
       '@features/monitor/data/kept-get.graph.json#asked get entries',
       '@features/monitor/data/kept-list-by-method.graph.json#rows find entries',
       '@features/monitor/data/kept-list.graph.json#rows find entries',
-      '@features/monitor/data/kept-record.graph.json#key newKey entries',
-      '@features/monitor/data/kept-record.graph.json#saved put entries',
       '@features/monitor/data/kept-remove.graph.json#asked remove entries',
       '@features/monitor/data/kept-update.graph.json#asked patch entries',
+      // the atomic graph writes twice, to two collections, and both writes are listed against the store
+      '@features/monitor/data/store-and-latest.graph.json#key newKey entries',
+      '@features/monitor/data/store-and-latest.graph.json#stored put entries',
+      '@features/monitor/data/store-and-latest.graph.json#latest put latest',
     ]);
     expect(calls[0].label).toBe('Get what is kept');
   });
@@ -70,9 +73,9 @@ describe('the view of a node that reaches a store', () => {
   });
 
   it('says which collection each node of a graph that writes reaches', async () => {
-    const graph = await view('@features/monitor/data/kept-record.graph.json');
+    const graph = await view('@features/monitor/data/store-and-latest.graph.json');
     const reached = (graph.graph?.nodes ?? []).flatMap(node => (node.keeps ? [`${node.id} ${node.keeps.op}`] : []));
-    expect(reached).toEqual(['key newKey', 'saved put']);
+    expect(reached).toEqual(['key newKey', 'stored put', 'latest put']);
   });
 
   it('leaves a node that reaches no store without one', async () => {

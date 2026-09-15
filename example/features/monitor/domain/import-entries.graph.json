@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Import entries",
-  "description": "Domain graph behind POST /monitor.csv: the file's drafts, each submitted the way a single POST is (so each is attributed by the domain), all at once; the answer is every recorded entry in file order.",
+  "description": "Domain graph behind POST /monitor.csv: the file's drafts read first, then recorded as one batch. The reading is outside whatever transaction the recording opens, because a file is not something a database can roll back; the recording is inside it, because rows are. That split is why this graph is two nodes rather than one, and it is the shape RFC 0004 asks for whenever an irreversible read sits beside writes that must move together.",
   "in": "blob",
   "out": {
     "type": "@monitor/domain/Entry.shape.json[]",
@@ -18,15 +18,13 @@
       }
     },
     {
-      "type": "@wilanis/node/map.schema.json",
+      "type": "@wilanis/node/run.schema.json",
       "id": "recorded",
-      "label": "Submit each draft",
-      "description": "monitor.submit once per row; the row's url and method are the submission",
-      "run": "@monitor/domain/monitor.port.json#submit",
-      "over": "{{drafts}}",
-      "bind": {
-        "url": "url",
-        "method": "method"
+      "label": "Record them all",
+      "description": "Where the profile keeps the entries in a store, this is the one transaction: every draft or none.",
+      "run": "@monitor/domain/monitor.port.json#recordAll",
+      "in": {
+        "drafts": "{{drafts}}"
       }
     }
   ]

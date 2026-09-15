@@ -216,7 +216,8 @@ describe('the view model of the example', () => {
   });
 
   it('a map with bind shows each bound input as read from the element, never as missing; an input typed by a bound variable shows the bound type', async () => {
-    const recorded = (await view('@features/monitor/domain/import-entries.graph.json')).graph!.nodes.find(
+    // the map that binds url and method moved into record-all when the import was split around its transaction
+    const recorded = (await view('@features/monitor/domain/record-all.graph.json')).graph!.nodes.find(
       node => node.id === 'recorded',
     )!;
     expect(recorded.inputs.map(port => [port.name, port.bound, port.missing])).toEqual([
