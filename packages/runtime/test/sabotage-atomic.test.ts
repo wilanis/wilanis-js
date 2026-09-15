@@ -159,13 +159,25 @@ describe('an atomic graph over more than one connection', () => {
       doc.atomic = true;
       doc.nodes.push(NOTED);
     });
-    // record-all reaches record-entry through submit and is atomic itself, so it answers for the same
-    // fault under the same two profiles: two graphs, two promises, two refusals
-    expect(broken.filter(one => one.startsWith('L010'))).toEqual([
+    // each profile's fault is said once, naming that profile and the connections it put the effects on
+    expect([...new Set(broken.filter(one => one.startsWith('L010')))]).toEqual([
       "L010 atomic graph reaches effects on 2 connections (@connections/entries.connection.json, @connections/notes.connection.json) (profile 'local')",
       "L010 atomic graph reaches effects on 2 connections (@connections/entries-postgres.connection.json, @connections/notes.connection.json) (profile 'production')",
-      "L010 atomic graph reaches effects on 2 connections (@connections/entries.connection.json, @connections/notes.connection.json) (profile 'local')",
-      "L010 atomic graph reaches effects on 2 connections (@connections/entries-postgres.connection.json, @connections/notes.connection.json) (profile 'production')",
+    ]);
+    // and it is said by each graph that promised a transaction over it: record-all reaches record-entry
+    // through submit and is atomic itself, so two promises answer for the one fault, each naming itself
+    expect(
+      plantedEditingAllAt(ELSEWHERE, {
+        [RECORD]: doc => {
+          doc.atomic = true;
+          doc.nodes.push(NOTED);
+        },
+      }).filter(one => one.startsWith('L010')),
+    ).toEqual([
+      'L010 @features/monitor/domain/record-all.graph.json#atomic',
+      'L010 @features/monitor/domain/record-all.graph.json#atomic',
+      'L010 @features/monitor/domain/record-entry.graph.json#atomic',
+      'L010 @features/monitor/domain/record-entry.graph.json#atomic',
     ]);
     // the live profile meets the port over HTTP, which is no second connection but an effect that cannot
     // take part at all
