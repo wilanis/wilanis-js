@@ -43,6 +43,22 @@ export interface BlobScope extends BlobStore {
  */
 export type Hold = (what: { label: string; stop: () => Promise<void> }) => void;
 
+/** What one transaction's participant can do once it is open. */
+export interface Participant {
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+}
+
+/**
+ * What an atomic graph's run hands every handler below it, as `env.atomic`. The first transactional operation
+ * to run opens the transaction on its connection through `join`; every later one on the same connection gets
+ * the same participant. The runtime settles it when the graph's run ends: commit when it answered, rollback
+ * otherwise. A handler that is not transactional never reads it.
+ */
+export interface Atomic {
+  join<T extends Participant>(connection: string, open: () => Promise<T>): Promise<T>;
+}
+
 /**
  * What a `holds` operation that answers requests is given, as `env.serving`: the triggers of one kind and
  * the way to fire them. It is read afresh on every request, so a reload can replace the tree underneath a
