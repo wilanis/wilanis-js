@@ -24,6 +24,13 @@ export interface Loaded<T extends AnyDoc = AnyDoc> {
   file?: string;
 }
 
+/** One edit that removes a refusal: a value set, added to a list or removed at a path of a document, or a file moved. */
+export type Fix =
+  | { file: string; at: string; set: unknown }
+  | { file: string; at: string; add: unknown }
+  | { file: string; at: string; remove: true }
+  | { file: string; move: string };
+
 /** One reason the tree is refused: the file, the rule, and the direction of the fix. */
 export interface Refusal {
   code: string;
@@ -31,6 +38,8 @@ export interface Refusal {
   file: string;
   at?: string;
   hint: string;
+  /** The edits that remove it, each sufficient alone, the first preferred; offered only where the rule can prove one. */
+  fixes?: Fix[];
 }
 
 /** One refusal as `wilanis check` prints it: the code and file, then the message, then the fix. */

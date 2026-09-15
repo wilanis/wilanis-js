@@ -1,6 +1,7 @@
 /** Documents the validation tests judge: the smallest of each kind, and how a refusal is expected. */
 import { expect } from 'vitest';
-import { type Kind, NODE_RUN, schemaRef, schemaUrl } from '../src/model.js';
+import { type Kind, NODE_RUN } from '../src/model.js';
+import { schemaRef, schemaUrl } from '../src/published.js';
 import { validateDocument } from '../src/validate.js';
 
 /**

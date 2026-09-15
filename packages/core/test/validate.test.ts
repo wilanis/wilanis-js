@@ -2,7 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import { describe, expect, it } from 'vitest';
-import { KINDS, type Kind, NODE_MAP, NODE_RUN, NODE_SWITCH, schemaRef, schemaUrl } from '../src/model.js';
+import { KINDS, type Kind, NODE_MAP, NODE_RUN, NODE_SWITCH } from '../src/model.js';
+import { pageUrl, schemaRef, schemaUrl } from '../src/published.js';
 import { SCHEMAS_DIR, validateDocument } from '../src/validate.js';
 import { at, doc, refused, run } from './documents.js';
 
@@ -128,36 +129,50 @@ describe('a contract that says where a type comes from', () => {
 
 describe('graph', () => {
   it('a node is judged against the one node schema its type names', () => {
-    expect(refused(doc('graph', { nodes: [{ type: NODE_RUN, id: 'a' }] }))).toEqual([at('nodes/0', "missing 'run'")]);
+    expect(refused(doc('graph', { nodes: [{ type: NODE_RUN, id: 'a' }] }))).toEqual([at('nodes/a', "missing 'run'")]);
     expect(refused(doc('graph', { nodes: [{ type: NODE_SWITCH, id: 's', in: {}, rules: [{ when: 'x' }] }] }))).toEqual([
-      at('nodes/0', "missing 'else'"),
-      at('nodes/0/rules/0', "missing 'to'"),
+      at('nodes/s', "missing 'else'"),
+      at('nodes/s/rules/0', "missing 'to'"),
     ]);
     expect(refused(doc('graph', { nodes: [{ type: NODE_MAP, id: 'm', run: '@x/p.json#op' }] }))).toEqual([
-      at('nodes/0', "missing 'over'"),
+      at('nodes/m', "missing 'over'"),
     ]);
   });
-  it('an unknown node type names the three that exist', () => {
+  it('an unknown node type names the three that exist, and offers no fix: the author meant one of them', () => {
     expect(refused(doc('graph', { nodes: [{ type: '@wilanis/node/loop.schema.json', id: 'a' }] }))).toEqual([
-      at('nodes/0/type', NODE_RUN, NODE_SWITCH, NODE_MAP),
+      at('nodes/a/type', NODE_RUN, NODE_SWITCH, NODE_MAP),
     ]);
+    const { refusals } = validateDocument(
+      doc('graph', { nodes: [{ type: '@wilanis/node/loop.schema.json', id: 'a' }] }),
+      'f.json',
+    );
+    for (const refusal of refusals) expect(refusal.fixes).toBeUndefined();
   });
   it('several deviations in one node are all reported, each at its own path', () => {
     expect(refused(doc('graph', { nodes: [{ type: NODE_RUN, id: 'Bad-Id', params: {} }] }))).toEqual([
-      at('nodes/0', "missing 'run'"),
-      at('nodes/0', "unknown property 'params'"),
-      at('nodes/0/id', '^[a-z][A-Za-z0-9_]*$', 'node identifier'),
+      at('nodes/Bad-Id', "missing 'run'"),
+      at('nodes/Bad-Id', "unknown property 'params'"),
+      at('nodes/Bad-Id/id', '^[a-z][A-Za-z0-9_]*$', 'node identifier'),
+    ]);
+  });
+  it('a node is named by its id, so a reorder moves no path; a node without one keeps its index', () => {
+    expect(
+      refused(doc('graph', { nodes: [run('first'), { type: NODE_RUN, id: 'second', run: '@x/p.json#op', in: 3 }] })),
+    ).toEqual([at('nodes/second/in', 'must be object')]);
+    expect(refused(doc('graph', { nodes: [{ type: NODE_RUN, run: '@x/p.json#op', in: 3 }] }))).toEqual([
+      at('nodes/0', "missing 'id'"),
+      at('nodes/0/in', 'must be object'),
     ]);
   });
   it('identifiers, operation references and paths follow the shared grammar, quoted in the refusal', () => {
     expect(refused(doc('graph', { nodes: [run('a', { run: 'object.port.json#make' })] }))).toEqual([
-      at('nodes/0/run', 'path#operation'),
+      at('nodes/a/run', 'path#operation'),
     ]);
     expect(refused(doc('graph', { nodes: [run('a', { run: '@std/object.port.json' })] }))).toEqual([
-      at('nodes/0/run', 'path#operation'),
+      at('nodes/a/run', 'path#operation'),
     ]);
     expect(refused(doc('graph', { nodes: [run('a', { in: { 'bad key': 1 } })] }))).toEqual([
-      at('nodes/0/in', "property name 'bad key'", 'identifier'),
+      at('nodes/a/in', "property name 'bad key'", 'identifier'),
     ]);
     expect(
       refused(
@@ -168,7 +183,7 @@ describe('graph', () => {
           ],
         }),
       ),
-    ).toEqual([at('nodes/1/rules/0/to', 'identifier')]);
+    ).toEqual([at('nodes/s/rules/0/to', 'identifier')]);
   });
   it('in, out.type and constants: in is a type reference; out.from is a node or a list of nodes; a constant has type and value', () => {
     expect(refused(doc('graph', { in: { fields: {} } }))).toEqual([at('in', 'must be string')]);
@@ -207,7 +222,17 @@ describe('graph', () => {
       doc('graph', { nodes: [{ type: NODE_MAP, id: 'm', run: '@x/p.json#op', over: '{{in.list}}', ...extra }] });
     expect(refused(map({ bind: { item: '' } }))).toEqual([]);
     expect(refused(map({ bind: { item: 'a.b' } }))).toEqual([]);
-    expect(refused(map({ bind: { item: '.a' } }))).toEqual([at('nodes/0/bind/item', 'dotted path within the element')]);
-    expect(refused(map({ onItemFailure: 'ignore' }))).toEqual([at('nodes/0/onItemFailure', '"fail", "collect"')]);
+    expect(refused(map({ bind: { item: '.a' } }))).toEqual([at('nodes/m/bind/item', 'dotted path within the element')]);
+    expect(refused(map({ onItemFailure: 'ignore' }))).toEqual([at('nodes/m/onItemFailure', '"fail", "collect"')]);
+  });
+});
+
+describe('the page of a refusal code', () => {
+  it('a code of a checker family, or of a plugin this workspace ships, has one; anything else has none', () => {
+    expect(pageUrl('L003')).toBe('https://github.com/wilanis/wilanis-js/blob/main/docs/refusals/L003.md');
+    expect(pageUrl('X103')).toBe('https://github.com/wilanis/wilanis-js/blob/main/docs/refusals/X103.md');
+    expect(pageUrl('Z001')).toBeUndefined();
+    expect(pageUrl('L03')).toBeUndefined();
+    expect(pageUrl('')).toBeUndefined();
   });
 });
