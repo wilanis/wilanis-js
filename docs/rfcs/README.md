@@ -9,7 +9,7 @@ accepted. Statuses: draft, accepted, implemented, withdrawn.
 | [0001](0001-the-rfc-process.md) | The RFC process | accepted |
 | [0002](0002-storage-plugin.md) | The `@storage` plugin: records of a shape behind a generic port | implemented |
 | [0003](0003-storage-known-to-the-compiler.md) | Storage declarations the compiler judges | implemented |
-| [0004](0004-atomic-graphs.md) | Atomic graphs: transactions as a property of a data graph | accepted |
+| [0004](0004-atomic-graphs.md) | Atomic graphs: transactions as a property of a data graph | implemented |
 | [0005](0005-externalized-state.md) | Externalized state: every store behind a port the project binds | accepted |
 | [0006](0006-run-reports-as-traces.md) | Observability: the run report as a trace | accepted |
 | [0007](0007-invariants.md) | Invariants: what must hold, declared once and judged by the checker | accepted |
