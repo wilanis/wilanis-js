@@ -8,6 +8,7 @@
  * operation on the same connection, and settles it once.
  */
 import type { Atomic, Participant } from '@wilanis/core';
+import type { Report } from '@wilanis/engine';
 
 /** The transaction one atomic graph's run opens, at most one, on the one connection its effects fall on. */
 export class AtomicScope implements Atomic {
@@ -47,4 +48,24 @@ export class AtomicScope implements Atomic {
     const participant = await this.opening;
     await (commit ? participant.commit() : participant.rollback());
   }
+}
+
+/**
+ * Run one atomic graph's nested run inside a scope, and settle it. An atomic graph reached from inside an
+ * atomic scope joins the outer one rather than opening its own: a nested refusal is the calling node's
+ * failure, so the outer run ends anyway and a separate transaction would have nothing to preserve.
+ *
+ * `Kernel.run` resolves at quiescence, so no handler is in flight when the scope commits or rolls back. A
+ * commit that throws fails the calling node, the way a nested run's failure is reported today.
+ */
+export async function inScope(
+  env: Record<string, unknown>,
+  run: (env: Record<string, unknown>) => Promise<Report>,
+): Promise<Report> {
+  const outer = env.atomic as Atomic | undefined;
+  if (outer) return run(env);
+  const scope = new AtomicScope();
+  const report = await run({ ...env, atomic: scope });
+  await scope.settle(report.status === 'done');
+  return report;
 }
