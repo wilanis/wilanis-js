@@ -32,10 +32,10 @@ import {
   Kernel,
   type KernelSpec,
   type KNode,
+  outcomeOf,
   type Redact,
   Refusal,
   type Report,
-  refusalOf,
 } from '@wilanis/engine';
 import { inScope } from './atomic.js';
 import { bindings, outputCandidates, passedInputs } from './documents.js';
@@ -65,11 +65,11 @@ export interface Compiled {
  * blocked run names what it needed.
  */
 function nestedFailure(spec: KernelSpec, report: Report): Error {
-  if (report.status === 'blocked') return new Error(`${spec.name}: blocked, needs ${report.needs?.join(', ')}`);
-  const refused = refusalOf(report);
-  if (refused) return new Refusal(refused.reason, refused.message, refused.detail);
-  const failed = Object.entries(report.nodes).find(([, node]) => node.status === 'failed');
-  return new Error(`${spec.name}: ${failed ? `${failed[0]}: ${failed[1].error}` : 'failed'}`);
+  const outcome = outcomeOf(report);
+  if (outcome.kind === 'blocked') return new Error(`${spec.name}: blocked, needs ${outcome.needs.join(', ')}`);
+  if (outcome.kind === 'refused') return new Refusal(outcome.reason, outcome.message, outcome.detail);
+  if (outcome.kind === 'faulted' && outcome.at) return new Error(`${spec.name}: ${outcome.at}: ${outcome.error}`);
+  return new Error(`${spec.name}: failed`);
 }
 
 /**
