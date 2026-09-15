@@ -162,17 +162,31 @@ describe('plugin packages and hooks', () => {
 });
 
 describe('branch rehearsal', () => {
-  /** Copy the example, edit one document, and rehearse every branch of it. */
-  async function withEdit(file: string, edit: (doc: any) => void): Promise<string[]> {
+  /**
+   * Copy the example, edit one document per entry, and answer the rehearsal's lines together with the copy's
+   * refusal codes -- a fixture the checker refuses proves nothing, so a case that edits the tree says both.
+   */
+  async function withEdits(
+    edits: Record<string, (doc: any) => void>,
+    profile: string,
+  ): Promise<{ lines: string[]; codes: string[] }> {
     const dir = mkdtempSync(join(tmpdir(), 'wilanis-'));
     cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
-    const at = join(dir, file);
-    const doc = JSON.parse(readFileSync(at, 'utf8'));
-    edit(doc);
-    writeFileSync(at, JSON.stringify(doc));
-    const run = await rehearse(loadTree(dir, PLUGINS), { seed: 1, profile: 'live' });
+    for (const [file, edit] of Object.entries(edits)) {
+      const at = join(dir, file);
+      const doc = JSON.parse(readFileSync(at, 'utf8'));
+      edit(doc);
+      writeFileSync(at, JSON.stringify(doc));
+    }
+    const refused = checkTree(loadTree(dir, PLUGINS, INCLUDES)).items.map(one => one.code);
+    const run = await rehearse(loadTree(dir, PLUGINS), { seed: 1, profile });
     rmSync(dir, { recursive: true, force: true });
-    return run.lines;
+    return { lines: run.lines, codes: refused };
+  }
+
+  /** Copy the example, edit one document, and rehearse every branch of it under one profile. */
+  async function withEdit(file: string, edit: (doc: any) => void, profile = 'live'): Promise<string[]> {
+    return (await withEdits({ [file]: edit }, profile)).lines;
   }
 
   it('reports a rule an earlier rule already covers', async () => {
@@ -192,5 +206,53 @@ describe('branch rehearsal', () => {
       route.rules = [{ when: 'status > 500 && status < 200', to: 'rows' }];
     });
     expect(lines.join('\n')).toMatch(/NEVER RUN/);
+  });
+
+  it('marks an atomic graph and says which of its branches roll back', async () => {
+    // kept-record writes the store under the local profile, so it is the graph a transaction could hold
+    const lines = await withEdit('features/monitor/data/kept-record.graph.json', doc => (doc.atomic = true), 'local');
+    const text = lines.join('\n');
+    expect(text).toMatch(/features\/monitor\/data\/kept-record {2}\(atomic\) {2}switch 'route'/);
+    // the branch that answers commits, so nothing is said of it; the refusal is what undoes the writes
+    expect(text).toMatch(/when has\(record\) {2}answered from 'row'$/m);
+    expect(text).toMatch(/refused on purpose at 'failed' as upstream: "[^"]*", rolled back$/m);
+    // and the line names no reasons: describe says those
+    expect(text).not.toMatch(/\(atomic\)[^\n]*rolls back/);
+  });
+
+  it('changes nothing but those two words: the same branches, and only the one graph marked', async () => {
+    const graph = 'features/monitor/data/kept-record.graph.json';
+    const before = (await withEdit(graph, () => {}, 'local')).join('\n');
+    const after = (await withEdit(graph, doc => (doc.atomic = true), 'local')).join('\n');
+    // atomicity is a property of the run, not of the routing: the solver walks the same branches either way
+    expect(before).not.toContain('(atomic)');
+    expect(before).not.toContain('rolled back');
+    expect(after.match(/\(atomic\)/g)).toHaveLength(1);
+    expect(after.replace('  (atomic)', '').replace(/, rolled back/g, '')).toBe(before);
+  });
+
+  it('marks a graph with no branches at all, reached as a trigger fires its port', async () => {
+    // digest is the one graph a trigger's fire reaches through a binding and that holds no switch, so it is
+    // the run the report calls plain -- and the only one that exercises the root a plain run is marked from.
+    // Under live its listAll fetches over HTTP, which L009 refuses inside a transaction, so the copy binds
+    // that operation to the kept graph as local already does and drops the 'upstream' the export trigger
+    // then no longer reaches (T006). What is left is a tree that checks clean and writes under a transaction.
+    const { lines, codes: refused } = await withEdits(
+      {
+        'features/monitor/domain/digest.graph.json': doc => {
+          doc.atomic = true;
+        },
+        'features/monitor/data/monitor-rest.binding.json': doc => {
+          doc.operations.listAll = { graph: '@monitor/data/kept-list.graph.json' };
+        },
+        'features/monitor/edge/export-entries.trigger.json': doc => {
+          delete doc.settings.response.refusals.upstream;
+        },
+      },
+      'local',
+    );
+    expect(refused).toEqual([]);
+    // the line names the operation the trigger fires, and says the graph behind it moves as one
+    expect(lines.join('\n')).toMatch(/monitor\/domain\/monitor\.port\.json#digest {2}\(atomic\) {2}\(no branches\)/);
   });
 });
