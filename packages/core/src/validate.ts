@@ -7,7 +7,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Ajv2020, type ErrorObject } from 'ajv/dist/2020.js';
-import { KINDS, type Kind, kindOfSchema, schemaRef, schemaUrl } from './model.js';
+import { KINDS, type Kind } from './model.js';
+import { kindOfSchema, schemaRef, schemaUrl } from './published.js';
 import type { Refusal } from './registry.js';
 
 export const SCHEMAS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
@@ -96,12 +97,36 @@ function messagesFor(group: ErrorObject[]): Set<string> {
   return messages;
 }
 
+/** The ids of a graph's nodes by index, so a path into `nodes` can name the node a reorder would move. */
+function nodeIds(doc: unknown, kind: Kind): string[] {
+  if (kind !== 'graph') return [];
+  const nodes = (doc as { nodes?: unknown }).nodes;
+  if (!Array.isArray(nodes)) return [];
+  return nodes.map(node => {
+    const id = (node as { id?: unknown } | null)?.id;
+    return typeof id === 'string' ? id : '';
+  });
+}
+
+/**
+ * One `at` in the grammar the checker's own refusals use: a graph's node is named by its `id`, the one keyed
+ * array, so that reordering nodes moves no path. A node without an id keeps its index.
+ */
+function byNodeId(at: string, ids: string[]): string {
+  const match = /^nodes\/([0-9]+)(\/.*)?$/.exec(at);
+  if (!match) return at;
+  const id = ids[Number(match[1])];
+  return id ? `nodes/${id}${match[2] ?? ''}` : at;
+}
+
 /** Turn Ajv's errors into refusals, one per deviation. */
-function refusalsOf(errors: ErrorObject[], file: string, kind: Kind): Refusal[] {
+function refusalsOf(errors: ErrorObject[], file: string, kind: Kind, doc: unknown): Refusal[] {
+  const ids = nodeIds(doc, kind);
   const out: Refusal[] = [];
   for (const [at, group] of groupByPath(errors)) {
     for (const message of messagesFor(group)) {
-      out.push({ code: 'D001', file, at: at || undefined, message, hint: `see ${schemaUrl(kind)}` });
+      const where = at ? byNodeId(at, ids) : undefined;
+      out.push({ code: 'D001', file, at: where, message, hint: `see ${schemaUrl(kind)}` });
     }
   }
   return out;
@@ -124,5 +149,5 @@ export function validateDocument(doc: unknown, file: string): { kind?: Kind; ref
   const validate = engine().getSchema(schemaUrl(kind));
   if (!validate) throw new Error(`no schema loaded for kind '${kind}'`);
   if (validate(doc)) return { kind, refusals: [] };
-  return { kind, refusals: refusalsOf(validate.errors ?? [], file, kind) };
+  return { kind, refusals: refusalsOf(validate.errors ?? [], file, kind, doc) };
 }

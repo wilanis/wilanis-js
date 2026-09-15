@@ -1,6 +1,7 @@
 /**
  * The document model: one TypeScript type per document kind, mirroring schemas/*.schema.json.
  * A document's kind is its $schema (the published URL, or the alias @wilanis/<kind>.schema.json); its identity is its path (@...).
+ * Where those URLs point, and how a $schema is read back to a kind, is `published.ts`.
  */
 
 export type Kind =
@@ -39,27 +40,6 @@ export const KINDS: Kind[] = [
   'resolvers',
   'store',
 ];
-
-/** The short alias a document may use as its $schema: @wilanis/<kind>.schema.json. */
-export const WILANIS = '@wilanis';
-/**
- * Where the schemas are published, so editors and agents can fetch them. The branch name carries the
- * schema version: main until 1.0 is published; from then on a tag (schemas-v1, later schemas-v2) that a
- * document written against it keeps validating under for as long as that version is read.
- */
-export const SCHEMA_BASE = 'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas';
-/** The short `$schema` a kind's documents carry, the form a reader writes: `@wilanis/graph.schema.json`. */
-export const schemaRef = (kind: Kind) => `${WILANIS}/${kind}.schema.json`;
-/** Where a kind's schema is fetched from, so an editor or an agent can resolve what the short form names. */
-export const schemaUrl = (kind: Kind) => `${SCHEMA_BASE}/${kind}.schema.json`;
-const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
-const KIND_OF_SCHEMA = new RegExp(`^(?:${escapeRe(WILANIS)}|${escapeRe(SCHEMA_BASE)})/([a-z-]+)\\.schema\\.json$`);
-/** The kind a $schema names, in either form; undefined when it is not a wilanis schema. */
-export function kindOfSchema(schema: unknown): Kind | undefined {
-  if (typeof schema !== 'string') return undefined;
-  const match = KIND_OF_SCHEMA.exec(schema);
-  return match && (KINDS as string[]).includes(match[1]) ? (match[1] as Kind) : undefined;
-}
 
 /**
  * The three layers of a feature, named by the directory a document sits in. A document's layer is where it
