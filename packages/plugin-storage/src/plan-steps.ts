@@ -27,10 +27,10 @@ export function collectionSteps(name: string, standing: Standing): Opening {
   if (recorded && was)
     return {
       steps: [{ do: 'renameCollection', target: name, from: was, says: `rename collection ${was} → ${name}` }],
-      stale: [staleCollection(name, was)],
+      stale: [],
       against: recorded,
     };
-  if (recorded) return { steps: [], stale: [], against: recorded };
+  if (recorded) return { steps: [], stale: staleWas(name, standing), against: recorded };
   if (found)
     return {
       steps: [{ do: 'adopt', target: name, says: `adopt collection ${name} (from the database as it stands)` }],
@@ -40,21 +40,32 @@ export function collectionSteps(name: string, standing: Standing): Opening {
   return { steps: [{ do: 'create', target: name, says: `create collection ${name}` }], stale: [], against: undefined };
 }
 
-/** A `was` that has done its work: the collection is renamed and the mark is a lie to the next fresh database. */
-function staleCollection(name: string, was: string): Stale {
-  return {
-    target: name,
-    says: `was.${name} has been applied`,
-    hint: `remove "was": "${was}" from the ${name} collection once every database has applied it`,
-  };
+/**
+ * A `was` that has done its work: the collection is recorded under its own name and the record no longer holds
+ * the one the mark names, so the rename has applied and the mark is a lie to the next fresh database. Said on
+ * the run *after* the `renameCollection`, as `renamed` says `done` on the run after its `rename`.
+ */
+function staleWas(name: string, standing: Standing): Stale[] {
+  const was = standing.applied;
+  if (!was) return [];
+  return [
+    {
+      target: name,
+      says: `was.${name} has been applied`,
+      hint: `remove "was": "${was}" from the ${name} collection once every database has applied it`,
+    },
+  ];
 }
 
-/** Point 3: a key identifies, so re-keying is a new collection and no count can make the step safe. */
+/**
+ * Point 3: a key identifies, so re-keying is a new collection and no count can make the step safe. Its own verb
+ * rather than a `retype`: nothing is cast here, and an engine that dispatches on `do` must not read this as one.
+ */
 function keySteps(name: string, from: Declared, to: Declared): Step[] {
   if (from.key === to.key) return [];
   return [
     {
-      do: 'retype',
+      do: 'rekey',
       target: name,
       at: to.key,
       says: `key ${from.key} → ${to.key}`,
@@ -63,10 +74,14 @@ function keySteps(name: string, from: Declared, to: Declared): Step[] {
   ];
 }
 
-/** Which recorded field a declared one continues, where `renamed` says so and the record can answer it. */
+/**
+ * Which recorded field a declared one continues, where `renamed` says so and the record can answer it: RFC
+ * 0017's point 4, "the old name in the record and the new one not". Where the record holds both the mark has
+ * done its work already -- renaming onto a column that exists is not a rename -- so the field reads as itself.
+ */
 function renameOf(field: string, from: Declared, to: Declared, marks: CollectionMarks): string | undefined {
   const old = marks.renamed?.[field];
-  if (!old || !(old in from.fields) || old in to.fields) return undefined;
+  if (!old || !(old in from.fields) || old in to.fields || field in from.fields) return undefined;
   return old;
 }
 
@@ -133,11 +148,18 @@ function withDefault(step: Step, value: unknown): Step {
   return { ...step, default: value, says: `${step.says}, default ${JSON.stringify(value)}` };
 }
 
-/** Point 4, an added field: what a row already there receives is the store's `defaults`, and nothing else. */
+/**
+ * Point 4, an added field: what a row already there receives is the store's `defaults`, and nothing else. A
+ * required column with no default has every existing row to answer for and none of them holds a value, so it
+ * says what it would cost exactly as `require` does; the step is refused at a count unless allowed as
+ * destructive, and step 4 classes it from the count and this line.
+ */
 function addStep(name: string, field: string, declared: DeclaredField, marks: CollectionMarks): Step {
   const said = declared.required ? 'required' : 'optional';
+  const value = marks.defaults?.[field];
   const step: Step = { do: 'add', target: name, at: field, says: `add ${field}  ${declared.type}, ${said}` };
-  return withDefault(step, marks.defaults?.[field]);
+  const costs = declared.required && value === undefined ? { ...step, loses: `rows with no ${field}` } : step;
+  return withDefault(costs, value);
 }
 
 /** One field the record and the tree both hold, under the name it carries now: what it was, and what it is. */

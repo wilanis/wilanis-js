@@ -66,6 +66,8 @@ export type Does =
   | 'add'
   | 'remove'
   | 'retype'
+  /** a changed key: its own verb and not a `retype`, since an engine keyed on `do` would read that as a cast */
+  | 'rekey'
   | 'require'
   | 'relax'
   | 'unique'
@@ -112,7 +114,14 @@ export interface Planned {
   stale: Stale[];
 }
 
-/** The column type a field of this type is kept in: scalars as themselves, everything else as json. */
+/**
+ * The column type a field of this type is kept in: scalars as themselves, everything else as json.
+ *
+ * This mapping is `columnOf` in `packages/plugin-storage-postgres/src/columns.ts` said engine-neutrally, and the
+ * two must agree on which types are scalar and which are kept as JSON -- a field this calls `json` is the one
+ * that engine calls `jsonb`. Step 5 of RFC 0017 (#237, #238) moves the catalog comparison out of `ensure` into
+ * `inspect`, and the two meet there; until then a change to either belongs in both.
+ */
 export function fieldTypeOf(type: Type): FieldType {
   if (type.kind === 'string' || type.kind === 'number' || type.kind === 'boolean') return type.kind;
   return 'json';
@@ -157,6 +166,17 @@ function continues(name: string, recorded: Record<string, Declared>, marks: Mark
   return was;
 }
 
+/**
+ * A `was` that has done its work: the collection is recorded under its own name and the record no longer holds
+ * the one the mark names, so the rename applied on an earlier run. Answered on the run after the
+ * `renameCollection`, never on the run that plans it, as `renamed` is.
+ */
+function applied(name: string, recorded: Record<string, Declared>, marks: Marks): string | undefined {
+  const was = marks[name]?.was;
+  if (!was || !(name in recorded) || was in recorded) return undefined;
+  return was;
+}
+
 /** Every recorded collection some declared one continues through `was`, so it is renamed and never dropped. */
 function claimed(recorded: Record<string, Declared>, declared: Record<string, Declared>, marks: Marks): Set<string> {
   const taken = new Set<string>();
@@ -171,7 +191,10 @@ function claimed(recorded: Record<string, Declared>, declared: Record<string, De
 interface Standing {
   recorded?: Declared;
   found?: Declared;
+  /** the recorded collection this one continues, where `was` names one the record holds and the tree no longer declares */
   was?: string;
+  /** a `was` the record no longer holds, so the rename has applied and the mark may go */
+  applied?: string;
 }
 
 /** The steps for one declared collection: how it comes to exist, then the field and constraint steps over it. */
@@ -199,7 +222,12 @@ export function plan(
   const stale: Stale[] = [];
   for (const [name, to] of Object.entries(declared)) {
     const was = continues(name, recorded, marks, declared);
-    const standing: Standing = { recorded: recorded[was ?? name], found: found[name], was };
+    const standing: Standing = {
+      recorded: recorded[was ?? name],
+      found: found[name],
+      was,
+      applied: applied(name, recorded, marks),
+    };
     const one = stepsFor(name, standing, to, marks[name] ?? {});
     steps.push(...one.steps);
     stale.push(...one.stale);
