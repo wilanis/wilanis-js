@@ -45,6 +45,10 @@ export const codes = (root: string) => checkTree(loadTree(root, PLUGINS, INCLUDE
 export const refusalsAt = (root: string) =>
   checkTree(loadTree(root, PLUGINS, INCLUDES)).items.map(one => `${one.code} ${one.file}${one.at ? `#${one.at}` : ''}`);
 
+/** The refusals a tree answers with, as `code message`: what a case needs when what it says is the claim. */
+export const refusalsSaying = (root: string) =>
+  checkTree(loadTree(root, PLUGINS, INCLUDES)).items.map(one => `${one.code} ${one.message}`);
+
 /** A plugin's docs directory, written from name -> document. */
 export function docsDir(docs: Record<string, unknown>): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-docs-'));
@@ -59,14 +63,20 @@ function copyOfExample(): string {
   return dir;
 }
 
-/** The refusal codes a copy answers with, once it has been broken; the copy does not outlive the answer. */
-function codesAfter(change: (dir: string) => void): string[] {
+/**
+ * What a broken copy of the example answers, read however the case needs it; the copy does not outlive the
+ * answer. `codesAfter` and its siblings are this with the reading fixed.
+ */
+function after(change: (dir: string) => void, read: (dir: string) => string[]): string[] {
   const dir = copyOfExample();
   change(dir);
-  const out = codes(dir);
+  const out = read(dir);
   rmSync(dir, { recursive: true, force: true });
   return out;
 }
+
+/** The refusal codes a copy answers with, once it has been broken. */
+const codesAfter = (change: (dir: string) => void): string[] => after(change, codes);
 
 /** Apply an edit to one document of a copied tree, in place. */
 const editing = (file: string, edit: (doc: any) => void) => (dir: string) => {
@@ -86,11 +96,15 @@ export function sabotage(file: string, edit: (doc: any) => void): string[] {
  * constraint it broke is one of several in the document, and which one was named is the claim.
  */
 export function sabotagePointing(file: string, edit: (doc: any) => void): string[] {
-  const dir = copyOfExample();
-  editing(file, edit)(dir);
-  const out = refusalsAt(dir);
-  rmSync(dir, { recursive: true, force: true });
-  return out;
+  return after(editing(file, edit), refusalsAt);
+}
+
+/**
+ * The same sabotage, answered as code and what each refusal says -- what a case needs when the message
+ * itself is the claim, as it is where a refusal has to name the profiles that found the fault.
+ */
+export function sabotageSaying(file: string, edit: (doc: any) => void): string[] {
+  return after(editing(file, edit), refusalsSaying);
 }
 
 /** Copy the example, move one document to another path, and answer the refusal codes. */
@@ -123,11 +137,7 @@ export function plantedAll(docs: Record<string, unknown>): string[] {
 
 /** Copy the example, add several documents, and answer each refusal as `code file#at`. */
 export function plantedPointing(docs: Record<string, unknown>): string[] {
-  const dir = copyOfExample();
-  write(dir, docs);
-  const out = refusalsAt(dir);
-  rmSync(dir, { recursive: true, force: true });
-  return out;
+  return after(dir => write(dir, docs), refusalsAt);
 }
 
 /**
@@ -146,14 +156,19 @@ export function loadedWith(docs: Record<string, unknown>): { load: LoadResult; d
  * codes: what a case needs when the document it plants is only refused once another says it may be named.
  */
 export function plantedEditing(docs: Record<string, unknown>, file: string, edit: (doc: any) => void): string[] {
-  return codesAfter(dir => {
-    write(dir, docs);
-    const path = join(dir, file);
-    const doc = JSON.parse(readFileSync(path, 'utf8'));
-    edit(doc);
-    writeFileSync(path, JSON.stringify(doc));
-  });
+  return codesAfter(plantingAndEditing(docs, file, edit));
 }
+
+/** The same, answered as code and what each refusal says: for a case whose claim is the message. */
+export function plantedEditingSaying(docs: Record<string, unknown>, file: string, edit: (doc: any) => void): string[] {
+  return after(plantingAndEditing(docs, file, edit), refusalsSaying);
+}
+
+/** Write the planted documents into a copy, then edit one it already has. */
+const plantingAndEditing = (docs: Record<string, unknown>, file: string, edit: (doc: any) => void) => (dir: string) => {
+  write(dir, docs);
+  editing(file, edit)(dir);
+};
 
 /** Write each document into the copy, making the directories it needs. */
 function write(dir: string, docs: Record<string, unknown>): void {

@@ -117,7 +117,9 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
 - **A new rule.** Add it to its family's module under `packages/compiler/src/check/` -- `project.ts` (C, B at
   the project, startup), `contracts.ts` (shapes, ports, connections), `resolvers.ts` (P), `inputs.ts` (a call
   site's inputs), `bindings.ts` (B), `graph.ts` with `graph-nodes.ts`, `graph-reads.ts`, `graph-whole.ts` and
-  `narrowing.ts` (G), `triggers.ts` (T, S), `access.ts` (A) -- give it the next code, write the hint, and add a
+  `narrowing.ts` (G), `triggers.ts` (T, S), `access.ts` (A), `atomic.ts` (the L and G rules about what an
+  atomic graph reaches: L009, L010, L011 and G014, gathered there because each is a judgement over the one
+  per-profile walk and not over a document) -- give it the next code, write the hint, and add a
   sabotage test in `packages/runtime/test/example.test.ts` that breaks the example and expects the code. What
   every family shares (typing a spec, visibility, the layer a type may name, settings that read secrets only)
   is a method of `Judge` in `check/judge.ts`; a refusal is made through `judge.refuser(file)`. The order the

@@ -409,7 +409,9 @@ a storage-backed profile (names as RFC 0002 settles them):
   reaches `@http/http.port.json#request`; the refusal names the profile.
 - L0n2: an atomic data graph with two `@storage` nodes on two store documents whose `connection` fields
   name different connections.
-- L0n3: `"atomic": true` on `list-entries.graph.json`, which reaches no write.
+- L0n3: `"atomic": true` on `list-entries.graph.json`, which reaches no write. (Decided otherwise during
+  implementation: a graph reaching only store reads is accepted -- see "Decided during implementation".
+  What is tested instead is that a graph reaching nothing transactional at all, `parse-drafts`, refuses.)
 - G0n1: `"onItemFailure": "collect"` on the map in `record-all.graph.json`.
 
 End to end, in `packages/plugin-storage/test` against `@wilanis/plugin-storage-memory`, and in `packages/runtime/test`
@@ -504,3 +506,13 @@ atomic graph holds a connection for its whole run, and a connection pool sized f
 - The rehearsal line does not list the reasons that roll back; `describe` says them.
 - The viewer marks the participating nodes individually, not only the graph. The set is derived from the
   per-profile walk L0n2 already makes, never written by an author.
+- A read-only atomic graph is accepted, so the L0n3 case above is no longer a refusal. `get`, `find` and
+  `count` are `transactional` in `store.port.json` because a store read takes part in the transaction like
+  any other operation, and a graph whose reads all take part is asking for the consistent snapshot a
+  transaction gives -- two `find`s that cannot see a write that landed between them. L011 keeps the rule it
+  was written for, that `atomic` on a graph reaching nothing transactional says nothing, and the port needs
+  no write/read field to carry a distinction the transaction itself does not make.
+- L009 and L010 are judged over the per-profile walk but answer once per fault, naming every profile that
+  reached it: `(profiles 'live', 'local', 'production')` where a data graph's node is the same under each,
+  `(profile 'live')` where only one profile's binding reaches it. One fault answers one refusal, as every
+  other family does.

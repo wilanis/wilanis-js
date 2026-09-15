@@ -8,9 +8,14 @@
  *
  * The cases mark the example's own graphs atomic rather than planting new ones, so what is proved is the
  * rule against the tree a reader learns from: `kept-record` writes twice to one store and is the graph an
- * atomic declaration suits, and `import-entries` reads a file before it writes, which is the shape the RFC
- * says to split. The two that need a document the example has no use for -- a second connection to fall on,
- * and a port declaring itself transactional while saying nowhere it goes -- plant it.
+ * atomic declaration suits, `kept-list` only reads and is the consistent snapshot the RFC decided to allow,
+ * and `import-entries` reads a file before it writes, which is the shape the RFC says to split. The two that
+ * need a document the example has no use for -- a second connection to fall on, and a port declaring itself
+ * transactional while saying nowhere it goes -- plant it.
+ *
+ * Two cases are about the refusals themselves rather than about a graph: that one fault answers one refusal
+ * naming every profile that reached it, and that a fault only one profile's binding reaches names only that
+ * profile. The walk is per profile, since a profile chooses the binding; the refusal is per fault.
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -19,10 +24,11 @@ import { checkTree } from '@wilanis/compiler';
 import { loadTree, type PluginModule, schemaRef, schemaUrl } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_PLUGINS } from '../src/index.js';
-import { docsDir, plantedEditing, sabotage } from './example-harness.js';
+import { docsDir, plantedEditingSaying, sabotage, sabotageSaying } from './example-harness.js';
 
 const KEPT = 'features/monitor/data/kept-record.graph.json';
 const IMPORT = 'features/monitor/domain/import-entries.graph.json';
+const RECORD = 'features/monitor/domain/record-entry.graph.json';
 
 /** Mark one graph of the example atomic, and answer what the tree then refuses with. */
 const atomic = (file: string, also: (doc: any) => void = () => {}) =>
@@ -38,9 +44,37 @@ describe('a graph that says it is atomic', () => {
     expect(atomic(KEPT)).toEqual([]);
   });
 
+  it('is accepted where everything it reaches is a store read -- L011', () => {
+    // kept-list only finds records, and a find takes part in the transaction: an atomic read-only graph
+    // is the consistent snapshot RFC 0004 decided to allow, not a graph with nothing to roll back
+    expect(atomic('features/monitor/data/kept-list.graph.json')).toEqual([]);
+  });
+
   it('is refused where it reaches an effect that cannot take part -- L009', () => {
     // import-entries reads the CSV through @blob before it records a row, and a file is not rolled back
     expect(atomic(IMPORT)).toContain('L009');
+  });
+
+  it('answers one refusal for one fault, naming every profile that reached it -- L009', () => {
+    // parse-drafts is a data graph, so every profile's walk reaches the same @blob node: one fault, one
+    // refusal, and the message says the three profiles rather than the refusal being repeated three times
+    const said = sabotageSaying(IMPORT, doc => {
+      doc.atomic = true;
+    }).filter(one => one.startsWith('L009') && one.includes('@blob/csv.port.json#parse'));
+    expect(said).toEqual([
+      "L009 atomic graph '@features/monitor/domain/import-entries.graph.json' reaches '@blob/csv.port.json#parse', which cannot take part in a transaction (profiles 'live', 'local', 'production')",
+    ]);
+  });
+
+  it('names only the profile whose binding reaches an effect that cannot take part -- L009', () => {
+    // create-row is reached through monitor-rest.binding.json, which only the live profile chooses: the
+    // refusal for its @http node says 'live' and no other, where the @blob one says all three
+    const said = sabotageSaying(IMPORT, doc => {
+      doc.atomic = true;
+    }).filter(one => one.startsWith('L009') && one.includes('@http/http.port.json#request'));
+    expect(said).toEqual([
+      "L009 atomic graph '@features/monitor/domain/import-entries.graph.json' reaches '@http/http.port.json#request', which cannot take part in a transaction (profile 'live')",
+    ]);
   });
 
   it('is refused where nothing it reaches could roll back -- L011', () => {
@@ -85,22 +119,39 @@ const ELSEWHERE = {
   },
 };
 
+/** Write the note beside whatever the graph already wrote, so its effects fall on two connections. */
+const NOTED = {
+  type: '@wilanis/node/run.schema.json',
+  id: 'noted',
+  label: 'Note it elsewhere',
+  run: '@storage/store.port.json#put',
+  in: { store: '@monitor/data/notes.store.json', collection: 'notes', record: '{{recorded}}' },
+};
+
 describe('an atomic graph over more than one connection', () => {
   it('is refused, since one transaction is one connection -- L010', () => {
-    const broken = plantedEditing(ELSEWHERE, KEPT, doc => {
+    const broken = plantedEditingSaying(ELSEWHERE, KEPT, doc => {
       doc.atomic = true;
-      doc.nodes.push({
-        type: '@wilanis/node/run.schema.json',
-        id: 'noted',
-        label: 'Note it elsewhere',
-        run: '@storage/store.port.json#put',
-        in: { store: '@monitor/data/notes.store.json', collection: 'notes', record: '{{saved.record}}' },
-      });
+      doc.nodes.push({ ...NOTED, in: { ...NOTED.in, record: '{{saved.record}}' } });
     });
-    // once per profile: which binding meets an operation is the profile's choice, so the walk is made per
-    // profile and the refusal says which one found it
-    expect(broken).toContain('L010');
-    expect(broken.filter(code => code === 'L010').length).toBeGreaterThan(1);
+    expect(broken.filter(one => one.startsWith('L010'))).toHaveLength(1);
+  });
+
+  it('names the profiles whose bindings put the effects on two connections -- L010', () => {
+    // record-entry fires monitor.record, which the local profile meets in memory and the production
+    // profile in PostgreSQL: two connections, each different from the notes one, so both profiles refuse.
+    // The live profile meets it over HTTP, which is L009 and not a second connection at all.
+    const broken = plantedEditingSaying(ELSEWHERE, RECORD, doc => {
+      doc.atomic = true;
+      doc.nodes.push(NOTED);
+    });
+    expect(broken.filter(one => one.startsWith('L010'))).toEqual([
+      "L010 atomic graph reaches effects on 2 connections (@connections/entries.connection.json, @connections/notes.connection.json) (profile 'local')",
+      "L010 atomic graph reaches effects on 2 connections (@connections/entries-postgres.connection.json, @connections/notes.connection.json) (profile 'production')",
+    ]);
+    // the live profile meets the port over HTTP, which is no second connection but an effect that cannot
+    // take part at all
+    expect(broken.filter(one => one.startsWith('L009'))).toHaveLength(1);
   });
 });
 
