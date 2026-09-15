@@ -1,7 +1,8 @@
 /**
- * The kernel. Stateless, clockless: it takes a spec, handlers and initial values, runs every node the
- * instant its sources have settled (all of them concurrently), routes, cancels, and answers a report at
- * quiescence. It never decides whether to run again -- the embedder reads the report and decides.
+ * The kernel. Stateless: it takes a spec, handlers and initial values, runs every node the instant its
+ * sources have settled (all of them concurrently), routes, cancels, and answers a report at quiescence.
+ * It never decides whether to run again -- the embedder reads the report and decides. It reads a clock only
+ * to stamp what it reports (`RunOptions.clock`, `Date.now` unless given); it never waits on one.
  *
  * A graph whose inputs are not supplied is valid: the report says `blocked` and names what it needs.
  * Any node's value may be pre-supplied (`initial[nodeId]`): the node is `seeded`, not executed. That is replay.

@@ -213,3 +213,37 @@ describe('isRefusal', () => {
     expect(outcomeOf(report)).toEqual({ kind: 'faulted', at: 'a', error: 'no entry 7' });
   });
 });
+
+describe('the clock', () => {
+  /** A clock that answers 1, 2, 3, ... one number per reading, so every stamp says which reading it was. */
+  function counting(): () => number {
+    let tick = 0;
+    return () => ++tick;
+  }
+
+  it('stamps the run and its node from the clock it was given, in the order it read them', async () => {
+    const report = await new Kernel(handlers).run(oneNode('double', { x: { value: 21 } }), { clock: counting() });
+    expect(report.output).toBe(42);
+    // 1: the run begins; 2: the node starts; 3: the node ends; 4: the run answers
+    expect(report.startedAt).toBe(1);
+    expect(report.nodes.a.startedAt).toBe(2);
+    expect(report.nodes.a.endedAt).toBe(3);
+    expect(report.endedAt).toBe(4);
+  });
+  it('stamps a map element from the same clock: no node is timed by another', async () => {
+    const spec: KernelSpec = {
+      name: 't',
+      output: ['m'],
+      nodes: { m: { kind: 'map', handler: 'echo', over: { value: [{ n: 1 }] }, in: {}, onItemFailure: 'fail' } },
+    };
+    const report = await new Kernel(handlers).run(spec, { clock: counting() });
+    expect(report.nodes.m.startedAt).toBe(2);
+    expect(report.nodes.m.items?.[0]).toMatchObject({ startedAt: 3, endedAt: 4 });
+  });
+  it('reads Date.now when no clock is given', async () => {
+    const began = Date.now();
+    const report = await new Kernel(handlers).run(oneNode('double', { x: { value: 1 } }), {});
+    expect(report.startedAt).toBeGreaterThanOrEqual(began);
+    expect(report.endedAt).toBeGreaterThanOrEqual(report.startedAt);
+  });
+});
