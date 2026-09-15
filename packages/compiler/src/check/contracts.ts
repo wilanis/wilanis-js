@@ -36,8 +36,26 @@ export function checkPort(judge: Judge, port: Loaded<PortDoc>): void {
   for (const [name, op] of Object.entries(port.doc.operations)) {
     judge.fieldsType(op.accepts, port.path, `operations/${name}/accepts`);
     judge.type(op.returns, port.path, `operations/${name}/returns`);
+    if (op.transactional) checkTransactional(judge, port, name, op);
     if (!port.native) checkDomainOperation(judge, port, name, op);
   }
+}
+
+/**
+ * C009: a transactional operation says where it goes, statically. One of the two fields the compiler knows
+ * how to follow -- `connection`, a connection document, or `store`, a store document that names one -- must
+ * be accepted and marked static, since an atomic graph's one transaction is judged before anything runs and
+ * a value only known at run time could not be judged at all.
+ */
+function checkTransactional(judge: Judge, port: Loaded<PortDoc>, name: string, op: Operation): void {
+  const says = (field: string) => op.accepts?.[field]?.static === true;
+  if (says('connection') || says('store')) return;
+  judge.refuser(port.path)(
+    'C009',
+    `operation '${name}' is transactional but accepts no static 'connection' or 'store' to resolve one from`,
+    `operations/${name}/accepts`,
+    'accept "connection" (a connection document) or "store" (a store document that names one), marked "static": true',
+  );
 }
 
 /** A domain operation speaks core shapes (L001) and marks nothing static (L006): a binding fixes values. */

@@ -63,8 +63,12 @@ function keeper(log: Log, opened: { count: number }): PluginModule {
             returns: 'string',
           },
           fail: {
-            description: 'Break, so a run ends without an answer.',
-            accepts: { after: { type: 'string' } },
+            description: 'Break on the connection, so a run inside a transaction ends without an answer.',
+            transactional: true,
+            accepts: {
+              connection: { type: 'string', static: true },
+              after: { type: 'string' },
+            },
             returns: 'string',
           },
         },
@@ -219,15 +223,9 @@ describe('a graph that says atomic', () => {
         writes('first', 'one'),
         {
           type: schemaRef('node/run'),
-          id: 'broke',
-          run: '@keeper/keeper.port.json#send',
-          in: { what: '{{first}}' },
-        },
-        {
-          type: schemaRef('node/run'),
           id: 'failed',
           run: '@keeper/keeper.port.json#fail',
-          in: { after: '{{broke}}' },
+          in: { connection: CONNECTION, after: '{{first}}' },
         },
       ],
     });
