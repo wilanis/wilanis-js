@@ -85,5 +85,7 @@ Decision: retires fitness/the-engine-imports-nothing.fitness.ts because RFC 00NN
 
 `npm install` switches on `.githooks/commit-msg`, which refuses the commit without it; `--no-verify` skips
 the hook, and the `decision` job in CI does not. That job checks every such commit and then waits in the
-`decisions` environment for the maintainer to approve the run, so a decision is never changed silently. A
+`decisions` environment for the maintainer to approve the run, so a decision is never changed silently. The
+same approval waits on a change to a schema under `packages/core/schemas/`, since `main` serves the schemas
+to every tree; a pull request that changes neither skips the job. A
 fitness function that bites is a design signal: the edit usually goes to the code, not to `fitness/`.

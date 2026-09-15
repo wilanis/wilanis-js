@@ -136,5 +136,7 @@ The line is the maintainer's to write, in their own words; no tool adds it, and 
 --no-verify` skips the hook, as it skips any hook; the `decision` job in CI is what binds: it checks every
 commit of the pull request that touches `fitness/`, then waits in an Actions environment named `decisions`
 for the maintainer to approve the run. The job is always present and skips itself when the pull request
-changes no decision, because GitHub counts a skipped required check as satisfied and a job filtered out by
-path never reports at all.
+changes no decision and no schema (a `changes` job reads the pull request's files and says), because
+GitHub counts a skipped required check as satisfied and a job filtered out by path never reports at all. A
+schema under `packages/core/schemas/` waits at the same gate because `main` serves it to every tree; that
+is the one thing the job approves that is not a decision under `fitness/`.
