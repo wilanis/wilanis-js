@@ -3,18 +3,38 @@
  * registered for its connection's kind, and ask it. Nothing here knows how records are kept, and nothing here
  * decides what a filter may say -- the grammar is parsed in `where.ts` so every engine judges one alike.
  */
+import type { Atomic } from '@wilanis/core';
 import type { Handler } from '@wilanis/engine';
-import type { At, Engine, Order, Query } from './engine.js';
+import type { At, Engine, Order, Query, Transaction } from './engine.js';
 import { collectionAt, collectionsOf, engineFor } from './store.js';
 import { whereOf } from './where.js';
 
 type Input = Record<string, unknown>;
 type Ctx = { env: Record<string, unknown> };
 
-/** What every operation starts from: the collection it names, and whoever keeps it. */
-function at(input: Input, ctx: Ctx): { at: At; engine: Engine } {
+/**
+ * What every operation starts from: the collection it names, and whoever keeps it.
+ *
+ * Inside an atomic graph the engine is the transaction's own. The scope opens one on the first call and
+ * hands back the same one to every later call on that connection, so the whole graph's records move
+ * together; outside one, `env.atomic` is absent and nothing changes.
+ */
+async function at(input: Input, ctx: Ctx): Promise<{ at: At; engine: Engine }> {
   const collection = collectionAt(ctx.env, input.store, input.collection);
-  return { at: collection, engine: engineFor(ctx.env, collection) };
+  const engine = engineFor(ctx.env, collection);
+  const scope = ctx.env.atomic as Atomic | undefined;
+  if (!scope) return { at: collection, engine };
+  if (!engine.begin)
+    throw new Error(
+      `the engine keeping '${collection.connection}' cannot take part in a transaction, so an atomic graph cannot write through it`,
+    );
+  const joined = await scope.join<Transaction>(collection.connection, async () => {
+    const opened = await engine.begin?.(collection);
+    if (!opened)
+      throw new Error(`the engine keeping '${collection.connection}' opened no transaction for an atomic graph`);
+    return opened;
+  });
+  return { at: collection, engine: joined.engine };
 }
 
 /** The orderings a find asks for, held to the one shape they may have. */
@@ -43,12 +63,12 @@ function objectOf(given: unknown, name: string): Record<string, unknown> {
 }
 
 const get: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine } = at(input, ctx);
+  const { at: where, engine } = await at(input, ctx);
   return engine.get(where, input.key);
 };
 
 const find: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine } = at(input, ctx);
+  const { at: where, engine } = await at(input, ctx);
   const query: Query = {
     where: whereOf(input.where, where.shape),
     order: orderOf(input.order),
@@ -59,17 +79,17 @@ const find: Handler = async ({ in: input, ctx }) => {
 };
 
 const count: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine } = at(input, ctx);
+  const { at: where, engine } = await at(input, ctx);
   return engine.count(where, whereOf(input.where, where.shape));
 };
 
 const put: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine } = at(input, ctx);
+  const { at: where, engine } = await at(input, ctx);
   return engine.put(where, objectOf(input.record, 'record'), input.replace !== false);
 };
 
 const patch: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine } = at(input, ctx);
+  const { at: where, engine } = await at(input, ctx);
   const changes = objectOf(input.changes, 'changes');
   if (where.key in changes)
     throw new Error(`patch: '${where.key}' is the key of this collection, and a key is never patched`);
@@ -77,12 +97,12 @@ const patch: Handler = async ({ in: input, ctx }) => {
 };
 
 const remove: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine } = at(input, ctx);
+  const { at: where, engine } = await at(input, ctx);
   return engine.remove(where, input.key);
 };
 
 const newKey: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine } = at(input, ctx);
+  const { at: where, engine } = await at(input, ctx);
   return engine.newKey(where);
 };
 

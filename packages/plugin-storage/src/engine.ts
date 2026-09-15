@@ -7,7 +7,7 @@
  * kind it grants, in a table the environment carries. The table is created on first use by whichever side
  * reaches it first, so nothing has to be said in `project.json` about the order the plugins are named in.
  */
-import type { Type } from '@wilanis/core';
+import type { Participant, Type } from '@wilanis/core';
 import type { Where } from './where.js';
 
 /** One record, as it is kept and as it comes back: an object of the collection's shape. */
@@ -126,6 +126,21 @@ export interface Engine {
    * `collections`, the number the store declares; widening that is RFC 0003 step 6's.
    */
   ensure(collections: At[]): Promise<Made | undefined>;
+  /**
+   * Begin a transaction on one connection and answer what runs inside it: an engine of the same shape whose
+   * every call is part of the transaction, and the way to end it. An engine that cannot do this answers
+   * nothing, and @storage refuses the run rather than writing outside the transaction a graph declared.
+   *
+   * @storage calls this at most once per atomic run, through `env.atomic`: the scope memoises it, so an
+   * engine is never asked to nest one transaction inside another.
+   */
+  begin?(at: At): Promise<Transaction | undefined>;
+}
+
+/** A transaction an engine opened: the engine that runs inside it, and the two ways it can end. */
+export interface Transaction extends Participant {
+  /** The same engine, every call of it inside the transaction. */
+  engine: Engine;
 }
 
 /** The engines registered under one environment, by the connection kind each was registered for. */

@@ -8,7 +8,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { Type } from '@wilanis/core';
-import type { At, Engine, Query, Record_, Ref, Where } from '@wilanis/plugin-storage';
+import type { At, Engine, Query, Record_, Ref, Transaction, Where } from '@wilanis/plugin-storage';
 import { matches, ordered, paged } from './match.js';
 
 /** The type of the field that identifies a record, so a new key can be one the collection would accept. */
@@ -18,10 +18,15 @@ function keyType(at: At): Type | undefined {
 
 /** An @storage engine keeping records in maps that live as long as the process, and no longer. */
 export class MemoryEngine implements Engine {
-  /** connection/name -> the records kept under it, by the text of their key. */
-  private readonly collections = new Map<string, Map<string, Record_>>();
   /** How many keys this engine has made, so a number key can be one no record has. */
   private made = 0;
+
+  /**
+   * `collections` is connection/name -> the records kept under it, by the text of their key. It is taken
+   * rather than made so that a transaction can be this same engine over a copy of it: `begin` hands the copy
+   * to a second instance, and committing swaps that copy back into this one.
+   */
+  constructor(private collections = new Map<string, Map<string, Record_>>()) {}
 
   /** The records of one collection, made on first use: `ensure` is therefore nothing to do here. */
   private records(at: At): Map<string, Record_> {
@@ -170,5 +175,34 @@ export class MemoryEngine implements Engine {
   async ensure(collections: At[]) {
     for (const at of collections) this.records(at);
     return undefined;
+  }
+
+  /** A copy deep enough that writing through one map cannot reach the other: the records too, not just the maps. */
+  private static forked(collections: Map<string, Map<string, Record_>>): Map<string, Map<string, Record_>> {
+    return new Map([...collections].map(([where, kept]) => [where, new Map(kept)]));
+  }
+
+  /** Take the records of another engine as this one's own, which is what committing a transaction means here. */
+  private adopt(collections: Map<string, Map<string, Record_>>): void {
+    this.collections = collections;
+  }
+
+  /**
+   * Begin by copying every collection and answering an engine over the copy: the transaction writes there and
+   * this one is untouched, so a rollback is keeping what was already kept and costs nothing to do. Committing
+   * swaps the copy in. A record is copied on the way in and out of a collection already, so forking the maps
+   * is the whole of the isolation -- what the two sides share is records neither of them mutates.
+   *
+   * It is copy-on-begin rather than copy-on-write because a Map of the records a process holds is small by
+   * construction: this engine keeps nothing past the process, and a store too big to copy wants the other one.
+   */
+  async begin(_at: At): Promise<Transaction> {
+    const forked = MemoryEngine.forked(this.collections);
+    const engine = new MemoryEngine(forked);
+    return {
+      engine,
+      commit: async () => this.adopt(forked),
+      rollback: async () => undefined,
+    };
   }
 }

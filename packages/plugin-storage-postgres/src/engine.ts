@@ -9,7 +9,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { conforms } from '@wilanis/core';
-import type { At, Engine, Query, Record_, Where } from '@wilanis/plugin-storage';
+import type { At, Engine, Query, Record_, Transaction, Where } from '@wilanis/plugin-storage';
 import type { Kysely } from 'kysely';
 import { fieldsOf, folded, isJson } from './columns.js';
 import { ensureTables } from './ensure.js';
@@ -68,12 +68,20 @@ const columns = (at: At) => fieldsOf(at.shape).map(field => folded(field.name));
 
 /** An @storage engine keeping records in PostgreSQL tables. */
 export class PostgresEngine implements Engine {
-  constructor(private readonly settings: Settings) {}
+  /**
+   * `on` is the one session a transaction runs on, absent everywhere else. An engine made with one is the
+   * same engine in every respect but where its statements go: to that session rather than to the pool, so
+   * every call of it is inside the transaction that session began.
+   */
+  constructor(
+    private readonly settings: Settings,
+    private readonly on?: Kysely<never>,
+  ) {}
 
   /** The database this collection lives in, and the table it is, qualified by the connection's schema. */
   private db(at: At): { db: Kysely<never>; table: string } {
     const { db, schema } = poolFor(at, this.settings);
-    return { db, table: `${schema}.${folded(at.name)}` };
+    return { db: this.on ?? db, table: `${schema}.${folded(at.name)}` };
   }
 
   /** A select of every column of the collection, filtered as the caller asked. */
@@ -201,6 +209,21 @@ export class PostgresEngine implements Engine {
     if (!collections.length) return { collections: 0, columns: 0, constraints: 0 };
     const { db } = this.db(collections[0]);
     return ensureTables(db, collections, this.settings);
+  }
+
+  /**
+   * BEGIN on one session of the connection's pool, and answer the engine that runs on it. The session is the
+   * pool's until the transaction ends, which is what keeps a concurrent run from seeing what this one has
+   * written: exclusivity is the pool's, and ordinary isolation does the rest.
+   */
+  async begin(at: At): Promise<Transaction> {
+    const { db } = poolFor(at, this.settings);
+    const trx = await db.startTransaction().execute();
+    return {
+      engine: new PostgresEngine(this.settings, trx as unknown as Kysely<never>),
+      commit: () => trx.commit().execute(),
+      rollback: () => trx.rollback().execute(),
+    };
   }
 }
 
