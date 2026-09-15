@@ -3,9 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkTree } from '@wilanis/compiler';
 import { loadTree, type PluginModule, schemaRef, schemaUrl } from '@wilanis/core';
+import http from '@wilanis/plugin-http';
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_PLUGINS, describe as describeDoc, loadProject, rehearse, start } from '../src/index.js';
-import { codes, docsDir, EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
+import { codes, docsDir, EXAMPLE, INCLUDES, PLUGINS, withBrokenPluginDoc } from './example-harness.js';
 
 describe('the example tree', () => {
   it('passes check', () => {
@@ -129,6 +130,18 @@ describe('plugin packages and hooks', () => {
     expect(loaded.registry.get('graph', '@features/monitor/data/get-row.graph.json')?.file).toBe(
       join(EXAMPLE, 'features/monitor/data/get-row.graph.json'),
     );
+  });
+  it('T007 a trigger kind whose correlation names no field of its own context', () => {
+    // the route kind says headers.traceparent correlates a run with its caller's trace; the example's routes
+    // are of that kind, so what the kind declares is judged here and the tree that names it is the proof
+    const broken = (path: string) =>
+      withBrokenPluginDoc(http, 'http.trigger-kind.json', kind => {
+        kind.correlation = path;
+      });
+    expect(broken('headers.traceparent').codes).toEqual([]);
+    expect(broken('traceparent').at).toEqual(['T007 @http/http.trigger-kind.json#correlation']);
+    expect(broken('headers.traceparent.version').codes).toEqual(['T007']);
+    expect(broken('method.traceparent').codes).toEqual(['T007']);
   });
   it('D006 when a plugin ships no plugin.json', () => {
     const fake: PluginModule = {

@@ -303,6 +303,8 @@ export interface PolicyDoc extends Envelope {
 export interface TriggerKindDoc extends Envelope {
   settings: InlineObject;
   context: InlineObject;
+  /** The dotted context path of the value correlating a run with the caller's own trace, copied opaquely; it must be a path this kind's context hands (T007). */
+  correlation?: string;
   refusals?: string;
 }
 /** `storage`: a connection of this kind reaches a storage engine, so a store may name it; the granting plugin registers the engine. */

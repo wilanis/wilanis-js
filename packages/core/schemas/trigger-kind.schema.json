@@ -28,6 +28,11 @@
     "context": {
       "$ref": "common.schema.json#/$defs/inlineObject"
     },
+    "correlation": {
+      "description": "The dotted path, within this kind's context, of the value that correlates a run with the caller's own trace (e.g. headers.traceparent). It must name a field this kind's context hands (T007). The runtime copies it into the trace as an opaque string; parsing it is the exporter's business. Absent: runs of this kind carry no correlation.",
+      "type": "string",
+      "minLength": 1
+    },
     "refusals": {
       "description": "The dotted path, within a trigger's settings, of the map from a refusal's reason to how this kind answers it (e.g. response.refusals). Declared: every reason a trigger of this kind can reach must be a key of that map (T005), and every key must be a reason it can reach (T006). Absent: the kind answers every refusal one way.",
       "type": "string",
