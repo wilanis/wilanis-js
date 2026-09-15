@@ -16,7 +16,7 @@ import { checkGraph } from './check/graph.js';
 import { Judge } from './check/judge.js';
 import { checkProject, checkStartup } from './check/project.js';
 import { checkResolversDoc } from './check/resolvers.js';
-import { checkScenario, checkTrigger } from './check/triggers.js';
+import { checkScenario, checkTrigger, checkTriggerKind } from './check/triggers.js';
 
 /** Every refusal of a loaded tree: the loader's, then every rule family's, then each plugin's own. */
 export function checkTree(load: LoadResult): RefusalList {
@@ -31,24 +31,37 @@ export function checkTree(load: LoadResult): RefusalList {
 }
 
 /**
- * The order of judgement: documents before what names them, atomic graphs once every binding is judged --
- * the walk goes through them -- and startup last, once every resolvers document is read.
+ * The order of judgement: the project, then what a contract declares, then what names it, atomic graphs once
+ * every binding is judged -- the walk goes through them -- and startup last, once every resolvers document
+ * is read.
  */
 function judgeTree(judge: Judge): void {
-  const { registry } = judge.scope;
   checkProject(judge);
+  judgeContracts(judge);
+  judgeUses(judge);
+  checkAtomic(judge);
+  checkStartup(judge);
+}
+
+/** What a contract says for itself: the shapes, ports, connections, stores and plugin-shipped kinds. */
+function judgeContracts(judge: Judge): void {
+  const { registry } = judge.scope;
   for (const shape of registry.all('shape')) checkShape(judge, shape);
   for (const port of registry.all('port')) checkPort(judge, port);
   for (const connection of registry.all('connection')) checkConnection(judge, connection);
   for (const store of registry.all('store')) checkStore(judge, store);
+  for (const kind of registry.all('trigger-kind')) checkTriggerKind(judge, kind);
+}
+
+/** What names a contract: the resolvers, graphs, bindings, policies, triggers and scenarios. */
+function judgeUses(judge: Judge): void {
+  const { registry } = judge.scope;
   for (const resolvers of registry.all('resolvers')) checkResolversDoc(judge, resolvers);
   for (const graph of registry.all('graph')) checkGraph(judge, graph, judge.scope.roleOf(graph.path));
   for (const binding of registry.all('binding')) checkBinding(judge, binding);
   for (const policy of registry.all('policy')) checkPolicy(judge, policy);
   for (const trigger of registry.all('trigger')) checkTrigger(judge, trigger);
   for (const scenario of registry.all('scenario')) checkScenario(judge, scenario);
-  checkAtomic(judge);
-  checkStartup(judge);
 }
 
 /** X rules: what only the plugin can judge, given its settings and a way to refuse. */

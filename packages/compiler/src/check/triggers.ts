@@ -2,7 +2,8 @@
  * T triggers. A trigger names a kind and settings that fit it (R001, T001), fires a domain port whose contract
  * its edge shapes meet (L006, T002), reads the request into its input (T003), reaches only request.* paths its
  * kind hands (T004) and guarantees the ones a resolver requires (A006), and maps every refusal reason it can
- * reach, and no other (T005, T006). What gates it is judged in access.ts. S scenarios name a trigger (S001).
+ * reach, and no other (T005, T006). A kind itself is judged once: what it says correlates a run must be a path
+ * into its own context (T007). What gates it is judged in access.ts. S scenarios name a trigger (S001).
  */
 import {
   type Field,
@@ -43,6 +44,23 @@ export function checkScenario(judge: Judge, scenario: Loaded<ScenarioDoc>): void
  */
 export function checkTrigger(judge: Judge, trigger: Loaded<TriggerDoc>): void {
   new TriggerCheck(judge, trigger).run();
+}
+
+/**
+ * T007: a kind's `correlation` names a value its own context hands. The runtime copies that value into a run's
+ * trace opaquely, so a path the context has no field for would correlate nothing and say so nowhere.
+ */
+export function checkTriggerKind(judge: Judge, kind: Loaded<TriggerKindDoc>): void {
+  const path = kind.doc.correlation;
+  if (path === undefined) return;
+  const read = typeAt(judge.scope.contextType(kind.doc), splitPath(path));
+  if (typeof read !== 'string') return;
+  judge.refuser(kind.path)(
+    'T007',
+    `correlation reads request.${path}, which this kind's context does not hand: ${read}`,
+    'correlation',
+    'name a field of context, as in headers.traceparent, or remove correlation',
+  );
 }
 
 /** The refusal table a kind keeps in a trigger's settings, when it is an object there. */

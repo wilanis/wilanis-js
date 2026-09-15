@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkTree } from '@wilanis/compiler';
-import { type LoadResult, loadTree, type ResolvedInclude } from '@wilanis/core';
+import { type LoadResult, loadTree, type PluginModule, type ResolvedInclude } from '@wilanis/core';
 import auth from '@wilanis/plugin-auth';
 import blobs from '@wilanis/plugin-blob';
 import http from '@wilanis/plugin-http';
@@ -87,6 +87,29 @@ const editing = (file: string, edit: (doc: any) => void) => (dir: string) => {
   edit(doc);
   writeFileSync(path, JSON.stringify(doc));
 };
+
+/**
+ * The example checked against a plugin one of whose shipped documents has been broken: the plugin's docs are
+ * copied, one document edited, and a module handed in with the copy as its `docs`. What a plugin declares --
+ * a trigger kind's context, what correlates a run with its caller's trace -- is judged nowhere else, and the
+ * example is the tree that names it.
+ */
+export function withBrokenPluginDoc(
+  plugin: PluginModule,
+  doc: string,
+  edit: (doc: any) => void,
+): { codes: string[]; at: string[] } {
+  const dir = mkdtempSync(join(tmpdir(), 'wilanis-docs-'));
+  cpSync(plugin.docs, dir, { recursive: true });
+  editing(doc, edit)(dir);
+  const plugins = { ...PLUGINS, [plugin.root]: { ...plugin, docs: dir } };
+  const refusals = checkTree(loadTree(EXAMPLE, plugins, INCLUDES)).items;
+  rmSync(dir, { recursive: true, force: true });
+  return {
+    codes: refusals.map(one => one.code),
+    at: refusals.map(one => `${one.code} ${one.file}${one.at ? `#${one.at}` : ''}`),
+  };
+}
 
 /** Copy the example, apply an edit to one file, answer the refusal codes. */
 export function sabotage(file: string, edit: (doc: any) => void): string[] {

@@ -125,5 +125,6 @@
       }
     }
   },
+  "correlation": "headers.traceparent",
   "refusals": "response.refusals"
 }
