@@ -79,6 +79,20 @@ export interface VNode {
   answeredBy?: VAnsweredBy[];
   /** On a node that runs an operation of the store port: the records it reaches, so a click opens them. */
   keeps?: VKeeps;
+  /** True on a node of an atomic graph whose operation takes part in the transaction. */
+  participates?: boolean;
+}
+
+/**
+ * What one atomic graph's declaration means, for the page that draws it: where the one transaction falls, and
+ * what rolls it back. Which nodes take part is marked on the nodes themselves, since a reader points at a node
+ * and not at a list. Nothing here is written by an author: it is read from the walk the checker judges by.
+ */
+export interface VAtomic {
+  /** The connections the transaction may fall on, canonical: one where every profile agrees. */
+  connections: string[];
+  /** The reasons a declared refusal below the graph rolls it back on, sorted. */
+  rollsBackOn: string[];
 }
 
 /**
@@ -173,7 +187,7 @@ export interface DocView {
   /** Documents that name this one, with where. */
   callers: VRef[];
   refusals: Refusal[];
-  graph?: { nodes: VNode[]; edges: VEdge[]; role: 'domain' | 'data' };
+  graph?: { nodes: VNode[]; edges: VEdge[]; role: 'domain' | 'data'; atomic?: VAtomic };
   /** On a port: every binding that meets it, and what each does per operation. */
   implementations?: {
     path: string;

@@ -13,6 +13,7 @@ import {
   type TriggerDoc,
   type TriggerKindDoc,
 } from '@wilanis/core';
+import { graphLines } from './graph-said.js';
 import { fieldLine, portLines, shower, storeLines } from './lines.js';
 import { storeTail } from './stores.js';
 
@@ -195,6 +196,7 @@ function kindBody(doc: Loaded, load: LoadResult, scope: Scope, showType: (spec: 
   if (doc.kind === 'store') return storeLines(doc, load, scope);
   if (doc.kind === 'policy') return policyLines(doc, load);
   if (doc.kind === 'trigger') return triggerLines(doc);
+  if (doc.kind === 'graph') return graphLines(doc, scope);
   return [JSON.stringify(doc.doc, null, 2)];
 }
 
@@ -248,17 +250,31 @@ function nodeLines(node: Record<string, unknown>, indent: string, scope: Scope):
   return { lines, into: op?.graph };
 }
 
-/** One graph and everything it reaches, indented; one graph already seen is named but not walked again. */
-function graphLines(ref: string, indent: string, seen: Set<string>, scope: Scope): string[] {
-  const graph = scope.get('graph', ref);
+/** What one walk of the map carries: the scope it reads, the graphs it has written, and every graph it reached. */
+interface Walk {
+  scope: Scope;
+  /** Written once per trigger, so a graph two triggers reach is drawn under each. */
+  seen: Set<string>;
+  /** Shared across the whole map: what is left over is the orphans. */
+  reached: Set<string>;
+}
+
+/**
+ * One graph and everything it reaches, indented; one graph already seen is named but not walked again. A graph
+ * whose effects move together is marked where the map names it, so a reader of the tree sees the transaction
+ * without opening the document.
+ */
+function mappedGraph(ref: string, indent: string, walk: Walk): string[] {
+  const graph = walk.scope.get('graph', ref);
   if (!graph) return [`${indent}?? ${ref}`];
-  const lines = [`${indent}${graph.path}`];
-  if (seen.has(graph.path)) return lines;
-  seen.add(graph.path);
+  walk.reached.add(graph.path);
+  const lines = [`${indent}${graph.path}${graph.doc.atomic ? '  [atomic]' : ''}`];
+  if (walk.seen.has(graph.path)) return lines;
+  walk.seen.add(graph.path);
   for (const node of graph.doc.nodes) {
-    const said = nodeLines(node as unknown as Record<string, unknown>, indent, scope);
+    const said = nodeLines(node as unknown as Record<string, unknown>, indent, walk.scope);
     lines.push(...said.lines);
-    if (said.into) lines.push(...graphLines(said.into, `${indent}      `, seen, scope));
+    if (said.into) lines.push(...mappedGraph(said.into, `${indent}      `, walk));
   }
   return lines;
 }
@@ -277,29 +293,33 @@ function gateLines(trigger: Loaded<TriggerDoc>, scope: Scope): string[] {
 }
 
 /** What each binding of the port one trigger fires meets it with, and the graph behind it. */
-function firesLines(trigger: Loaded<TriggerDoc>, load: LoadResult, scope: Scope): string[] {
+function firesLines(trigger: Loaded<TriggerDoc>, load: LoadResult, reached: Set<string>, scope: Scope): string[] {
   const port = load.registry.get('port', load.resolve(trigger.doc.fire.run.split('#')[0]));
   const opName = trigger.doc.fire.run.split('#')[1];
   const lines = [`  ${trigger.doc.fire.run}`];
   if (!port) return lines;
   for (const binding of load.registry.all('binding').filter(one => load.resolve(one.doc.port) === port.path)) {
     const op = binding.doc.operations[opName];
-    if (op?.graph) lines.push(...graphLines(op.graph, '    ', new Set(), scope));
+    if (op?.graph) lines.push(...mappedGraph(op.graph, '    ', { scope, seen: new Set(), reached }));
     else if (op?.run) lines.push(`    ${binding.path}#${opName} → ${op.run}`);
   }
   return lines;
 }
 
-/** Every trigger of the tree, everything each one reaches, and the graphs nothing reaches. */
+/**
+ * Every trigger of the tree, everything each one reaches, and the graphs nothing reaches. The graphs reached
+ * are gathered as the walk goes rather than read back off its lines: a line carries marks beside the path
+ * (`[atomic]`), and a graph must not become an orphan because of how it is written down.
+ */
 export function map(load: LoadResult): string[] {
   const scope = new Scope(load.registry, load.resolve);
   const lines: string[] = [];
+  const reached = new Set<string>();
   for (const trigger of load.registry.all('trigger')) {
     lines.push(`${trigger.path}  (${trigger.doc.kind})`);
     lines.push(...gateLines(trigger, scope));
-    lines.push(...firesLines(trigger, load, scope));
+    lines.push(...firesLines(trigger, load, reached, scope));
   }
-  const reached = new Set(lines.filter(line => line.trim().endsWith('.graph.json')).map(line => line.trim()));
   for (const graph of load.registry.all('graph')) if (!reached.has(graph.path)) lines.push(`orphan  ${graph.path}`);
   return lines;
 }

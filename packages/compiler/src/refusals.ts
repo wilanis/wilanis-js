@@ -37,7 +37,7 @@ export function refusalsReachable(
   if (typeof binding === 'string') return [];
   const bound = binding.doc.operations[hit.opName];
   if (!bound) return [];
-  if (bound.graph) return graphRefusals(scope, scope.canon(bound.graph), profile, seen);
+  if (bound.graph) return refusalsOfGraph(scope, scope.canon(bound.graph), profile, seen);
   if (!bound.run) return [];
   return callRefusals(scope, { run: bound.run, given: bound.in, file: binding.path, node: hit.opName }, profile, seen);
 }
@@ -73,11 +73,16 @@ function callRefusals(scope: Scope, call: Call, profile: string | undefined, see
   return hit.port.native ? [] : refusalsReachable(scope, call.run, profile, seen);
 }
 
-function graphRefusals(
+/**
+ * Every reason a run of one graph can refuse with: its own refusing nodes' literal reasons, and whatever the
+ * domain operations it calls reach under the profile. `describe` says them of an atomic graph, since they are
+ * exactly what rolls its transaction back.
+ */
+export function refusalsOfGraph(
   scope: Scope,
   graphPath: string,
-  profile: string | undefined,
-  seen: Set<string>,
+  profile?: string,
+  seen = new Set<string>(),
 ): ReachableRefusal[] {
   if (seen.has(graphPath)) return [];
   seen.add(graphPath);

@@ -152,6 +152,17 @@ export function loadedWith(docs: Record<string, unknown>): { load: LoadResult; d
 }
 
 /**
+ * Copy the example, edit one document it has, and answer the tree as loaded together with the directory it
+ * sits in: what a case needs when it reads what `describe`, `map` or the view model says about a document
+ * the example does not yet write that way. The caller removes the directory.
+ */
+export function loadedEditing(file: string, edit: (doc: any) => void): { load: LoadResult; dir: string } {
+  const dir = copyOfExample();
+  editing(file, edit)(dir);
+  return { load: loadTree(dir, PLUGINS, INCLUDES), dir };
+}
+
+/**
  * Copy the example, add documents at paths it does not have and edit one it has, and answer the refusal
  * codes: what a case needs when the document it plants is only refused once another says it may be named.
  */

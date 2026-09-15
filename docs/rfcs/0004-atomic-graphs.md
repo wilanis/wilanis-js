@@ -520,3 +520,11 @@ atomic graph holds a connection for its whole run, and a connection pool sized f
   reached it: `(profiles 'live', 'local', 'production')` where a data graph's node is the same under each,
   `(profile 'live')` where only one profile's binding reaches it. One fault answers one refusal, as every
   other family does.
+- What `describe`, `map` and the viewer say about an atomic graph is one function, `atomicOf` in
+  `packages/compiler/src/atomic-said.ts`, over the same walk the checker judges by: what a reader is told and
+  what the tree was held to cannot drift apart. A participant is a node of the graph being read, never the
+  node the effect is written at -- a domain graph's effects live in the data graph its operations are bound
+  to, and a reader points at what is in front of them -- so the walk carries the node it descended from.
+- The connection is a list, not one value. Every checked tree agrees on one under each profile (L010), but
+  profiles may disagree with each other: a port bound to one store under `local` and another under
+  `production` falls on two, and a reader choosing a profile is told both.

@@ -4,6 +4,7 @@
  * or map node where its operation leads. A deep read opens the field it reads as an attribute port under its parent,
  * so the edge leaves the attribute.
  */
+import { atomicOf } from '@wilanis/compiler';
 import type { GraphDoc, Loaded, Scope, Type, Values } from '@wilanis/core';
 import { isMap, isRun, isSwitch, show, splitPath, typeAt } from '@wilanis/core';
 import {
@@ -47,7 +48,7 @@ class GraphBuilder {
     this.resolversDoc = this.doc.resolvers ? scope.get('resolvers', this.doc.resolvers) : undefined;
   }
 
-  /** The view: every node of the graph, the edges between them, and the role the tree gives it. */
+  /** The view: every node of the graph, the edges between them, the role the tree gives it, and its transaction. */
   build(): NonNullable<DocView['graph']> {
     this.readResolvers();
     this.addInput();
@@ -57,7 +58,25 @@ class GraphBuilder {
     this.addRequest();
     this.openAttributes();
     this.labelRequestPorts();
-    return { nodes: this.nodes, edges: this.edges, role: this.scope.roleOf(this.graph.path) };
+    const view: NonNullable<DocView['graph']> = {
+      nodes: this.nodes,
+      edges: this.edges,
+      role: this.scope.roleOf(this.graph.path),
+    };
+    this.markAtomic(view);
+    return view;
+  }
+
+  /**
+   * What the graph's `atomic` means, and which of its nodes take part. The set comes from the walk the checker
+   * judges by, never from the document: an author writes one flag and the tree works out the rest.
+   */
+  private markAtomic(view: NonNullable<DocView['graph']>) {
+    const atomic = atomicOf(this.scope, this.graph);
+    if (!atomic) return;
+    view.atomic = { connections: atomic.connections, rollsBackOn: atomic.rollsBackOn };
+    const taking = new Set(atomic.participants);
+    for (const node of view.nodes) if (taking.has(node.id)) node.participates = true;
   }
 
   /** A spec as a reader sees it, or the spec itself when it does not resolve. */

@@ -42,6 +42,7 @@
   main .legend { position: absolute; left: 12px; bottom: 10px; display: flex; gap: 14px; color: var(--dim); font-size: 11px; align-items: center; }
   main .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--muted); margin-right: 4px; vertical-align: -1px; } main .legend i.full { background: var(--muted); }
   main .legend s { display: inline-block; width: 18px; border-top: 2px dashed var(--muted); vertical-align: 3px; margin-right: 4px; }
+  main .legend u { display: inline-block; width: 11px; height: 8px; border: 1.5px dashed var(--ok); border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
   main .empty { padding: 40px; color: var(--muted); }
   main .page { padding: 22px 28px 40px; overflow: auto; height: 100%; max-width: 1100px; }
   .page h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; } .page h1 .badge { margin-left: 10px; }
@@ -86,6 +87,9 @@
   .node .go { font: 14px var(--sans); fill: var(--accent); cursor: pointer; } .node .go:hover { fill: #fff; }
   .node .link { cursor: pointer; } .node .link:hover { fill: var(--accent); text-decoration: underline; }
   .node .fx { font: 10px var(--sans); fill: var(--warn); }
+  /* a node whose effect is inside the graph's one transaction: a dashed rim and a word, so the set is seen at a glance */
+  .node.joins > .box { stroke: var(--ok); stroke-dasharray: 4 3; }
+  .node .txn { font: 10px var(--sans); fill: var(--ok); }
   .node .said { font: 12px var(--sans); fill: var(--text); } .node .said .lead { fill: var(--dim); } .node .said .val { font: 11.5px var(--mono); fill: var(--lit); }
   .node .said .in { font: 600 11.5px var(--mono); fill: var(--text); cursor: default; } .node .said .in:hover, .node .said .in.lit-up { fill: var(--accent); }
   .node .port.lit-up { fill: var(--accent); } .node .pin.lit-up { stroke: var(--accent); fill: var(--accent); }
@@ -103,7 +107,7 @@
     <span class="brand">wilanis</span>
     <button id="back" title="back">&larr;</button>
     <button id="fwd" title="forward">&rarr;</button>
-    <div class="crumb"><span id="kind" class="badge"></span><span id="title" class="title"></span><span id="role" class="badge" hidden></span><span id="refusals" class="badge bad" hidden></span><span id="path" class="path"></span></div>
+    <div class="crumb"><span id="kind" class="badge"></span><span id="title" class="title"></span><span id="role" class="badge" hidden></span><span id="atomic" class="badge ok" hidden></span><span id="refusals" class="badge bad" hidden></span><span id="path" class="path"></span></div>
     <button id="source" title="show the JSON document">{ } source</button>
     <span id="status" class="status"></span>
   </header>
@@ -238,6 +242,9 @@
     $('kind').className = 'badge' + (v && v.kind ? ' kind-' + v.kind : '');
     const layer = v && v.layer ? { edge: 'edge: speaks the world', domain: 'domain: the rules', data: 'data: translates and reaches out' }[v.layer] : null;
     $('role').hidden = !layer; if (layer) $('role').textContent = layer;
+    const at = v && v.graph ? v.graph.atomic : null;
+    $('atomic').hidden = !at;
+    if (at) { $('atomic').textContent = 'atomic'; $('atomic').title = 'every effect below this graph is one transaction: it commits when the graph answers, and rolls back on a refusal or a fault' + (at.connections.length ? '\non ' + at.connections.join(' or ') : ''); }
     const n = v && v.refusals ? v.refusals.length : 0; $('refusals').hidden = !n; $('refusals').textContent = `${n} refusal${n === 1 ? '' : 's'}`;
     $('source').hidden = !(v && !v.error && v.kind !== 'schema');
   }
@@ -468,7 +475,7 @@
         else if (v.native) { const p = el('p'); p.appendChild(document.createTextNode('Granted by ')); p.appendChild(link(v.native + '/plugin.json')); p.appendChild(document.createTextNode(v.from ? ` (${v.from}), which carries the code behind every operation below.` : ', built into the runtime, which carries the code behind every operation below.')); page.appendChild(p); }
         page.appendChild(el('h2', null, 'Operations'));
         for (const [name, op] of Object.entries(d.operations)) {
-          const h = el('h3', null, readable(name)); h.appendChild(el('code', null, '#' + name)); if (op.pure) h.appendChild(el('span', 'badge ok', 'pure')); else if (v.native) h.appendChild(el('span', 'badge warn', 'effect')); if (op.refuses) h.appendChild(el('span', 'badge warn', 'refuses on purpose')); if (op.holds) h.appendChild(el('span', 'badge warn', 'holds until stopped')); page.appendChild(h);
+          const h = el('h3', null, readable(name)); h.appendChild(el('code', null, '#' + name)); if (op.pure) h.appendChild(el('span', 'badge ok', 'pure')); else if (v.native) h.appendChild(el('span', 'badge warn', 'effect')); if (op.refuses) h.appendChild(el('span', 'badge warn', 'refuses on purpose')); if (op.transactional) h.appendChild(el('span', 'badge ok', 'transactional')); if (op.holds) h.appendChild(el('span', 'badge warn', 'holds until stopped')); page.appendChild(h);
           page.appendChild(el('p', null, op.description));
           if (op.accepts && Object.keys(op.accepts).length) page.appendChild(fieldsTable(op.accepts)); else page.appendChild(el('p', null, 'Takes nothing.'));
           const r = el('p'); r.appendChild(frag('Answers ')); r.appendChild(op.returns ? typeEl(op.returns) : frag('nothing')); page.appendChild(r);
@@ -585,6 +592,7 @@
       for (const d of judged) { const r = el('div', 'ref'); r.appendChild(badge(d.kind)); r.appendChild(document.createTextNode(' ')); r.appendChild(link(d.path, d.label)); box.appendChild(r); }
       return;
     }
+    if (v.graph && v.graph.atomic) box.appendChild(atomicEl(v.graph.atomic));
     if (v.refusals.length) { box.appendChild(el('h4', null, 'refusals')); for (const r of v.refusals) box.appendChild(refusalEl(r)); }
     const callers = v.callers.filter(c => c.kind !== 'project' || v.kind !== 'feature');
     if (v.kind === 'trigger') { box.appendChild(el('h4', null, 'a way in')); box.appendChild(el('p', null, 'A trigger is where a run starts: nothing in the tree calls it.')); }
@@ -627,6 +635,20 @@
     return d;
   }
 
+  /** What one graph's `atomic` means: where the one transaction falls, and every reason that rolls it back. */
+  function atomicEl(at) {
+    const box = el('div');
+    box.appendChild(el('h4', null, 'atomic'));
+    box.appendChild(el('p', null, 'Every effect below this graph is one transaction. It commits when the graph answers; a refusal on purpose or a fault rolls it back, and nothing the graph did is kept. The nodes that take part are rimmed in the drawing.'));
+    if (at.connections.length) {
+      const p = el('p'); p.appendChild(frag(at.connections.length > 1 ? 'On, per profile: ' : 'On '));
+      at.connections.forEach((c, i) => { if (i) p.appendChild(frag(', ')); p.appendChild(link(c)); });
+      box.appendChild(p);
+    }
+    if (at.rollsBackOn.length) { const p = el('p'); p.appendChild(frag('Rolls back on ')); at.rollsBackOn.forEach((r, i) => { if (i) p.appendChild(frag(', ')); p.appendChild(el('code', null, r)); }); p.appendChild(frag(', or a fault.')); box.appendChild(p); }
+    return box;
+  }
+
   function renderNodeDetails(box, n, v) {
     const color = nodeColors(v.graph).get(n.id);
     const h = el('h3'); const sw = el('span', 'swatch'); sw.style.background = color; h.appendChild(sw); h.appendChild(document.createTextNode(n.label + ' ')); const kindText = { run: 'operation', map: 'for each', rule: 'rule', in: 'input', out: 'output', const: 'constants', request: 'request' }[n.kind]; h.appendChild(NODE_SCHEMA[n.kind] ? schemaBadge(n.kind, kindText, NODE_SCHEMA[n.kind]) : badge(n.kind, kindText)); box.appendChild(h);
@@ -635,6 +657,7 @@
     if (n.type) { const p = el('p'); p.appendChild(frag(n.kind === 'in' ? 'The graph takes ' : 'The graph answers ')); p.appendChild(typeLink(n.type)); box.appendChild(p); }
     if (n.description) box.appendChild(el('p', null, n.description));
     if (n.decision) { const d = n.decision, p = el('p'); p.appendChild(frag(`Rule ${d.rule} of ${d.of} in `)); p.appendChild(el('b', null, d.label)); p.appendChild(frag('. The first rule that holds wins.' + (d.description ? ' ' + d.description : ''))); box.appendChild(p); }
+    if (n.participates) { box.appendChild(el('h4', null, 'in the transaction')); box.appendChild(el('p', null, 'What this node does is inside the one transaction the graph declares. It is kept only if the graph answers; a refusal or a fault anywhere below undoes it with the rest.')); }
     if (n.target) {
       const t = n.target;
       box.appendChild(el('h4', null, 'runs'));
@@ -865,15 +888,19 @@
     }
     for (const n of g.nodes) {
       const b = boxes.get(n.id), color = colors.get(n.id);
-      const gn = svg('g', { transform: `translate(${b.x},${b.y})` }, 'node kind-' + n.kind + (state.selected === n.id ? ' selected' : '')); gn.dataset.id = n.id;
+      const gn = svg('g', { transform: `translate(${b.x},${b.y})` }, 'node kind-' + n.kind + (n.participates ? ' joins' : '') + (state.selected === n.id ? ' selected' : '')); gn.dataset.id = n.id;
       gn.appendChild(svg('rect', { width: b.w, height: b.h }, 'box'));
       gn.appendChild(svg('rect', { width: b.w, height: headOf(n) }, 'head'));
       gn.appendChild(svg('rect', { x: 0, y: 8, width: 4, height: b.h - 16, rx: 2, fill: color }));
       if (n.kind === 'rule') n.says.forEach((line, i) => gn.appendChild(saidLine(gn, n, line, 14, 16 + i * 15)));
       else gn.appendChild(withTitle(txt(14, 17, trunc(n.label, 30), 'title'), n.label + (n.description ? '\n' + n.description : '')));
       const sub = subOf(n);
-      if (sub) gn.appendChild(opens(withTitle(txt(14, 32, trunc(sub, 36), 'sub'), n.op || n.type || sub), n.type ? shapeOf(n.type) : null));
+      // the marks share the sub's row from the right: the sub gives up the room each one takes
+      const marks = (n.target && n.target.effect ? 7 : 0) + (n.participates ? 5 : 0);
+      if (sub) gn.appendChild(opens(withTitle(txt(14, 32, trunc(sub, 36 - marks), 'sub'), n.op || n.type || sub), n.type ? shapeOf(n.type) : null));
       if (n.target && n.target.effect) gn.appendChild(withTitle(txt(b.w - (n.target ? 32 : 14), 32, 'effect', 'fx', { 'text-anchor': 'end' }), 'reaches outside the process'));
+      // a participant is rimmed, and marked beside the effect: what it does is inside the graph's one transaction
+      if (n.participates) gn.appendChild(withTitle(txt(b.w - (n.target && n.target.effect ? 72 : 32), 32, 'txn', 'txn', { 'text-anchor': 'end' }), 'this node\u2019s effect is inside the graph\u2019s one transaction: it is undone with the rest unless the graph answers'));
       const goto = n.target ? n.target.implementation : n.opens;
       if (goto) {
         const go_ = withTitle(txt(b.w - 20, 19, ARROW, 'go'), 'open ' + labelFor(goto));
@@ -966,6 +993,8 @@
     const b2 = el('span'); b2.appendChild(el('i')); b2.appendChild(frag('optional')); legend.appendChild(b2);
     const c = el('span'); c.appendChild(el('s')); c.appendChild(frag('a decision routes')); legend.appendChild(c);
     legend.appendChild(el('span', null, 'an edge has the colour of the node it feeds'));
+    // the rim is only worth explaining where something wears it
+    if (g.atomic) { const t = el('span'); t.appendChild(el('u')); t.appendChild(frag('a rimmed node is in the transaction')); legend.appendChild(t); }
     legend.appendChild(el('span', null, ARROW + ' or double-click opens the implementation'));
     main.appendChild(legend);
   }
