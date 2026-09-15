@@ -144,7 +144,8 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   in the guard's `plugin.json` (`guard.credentials`, `guard.context`, `guard.refuses`), never in a trigger kind.
   What the `@auth` plugin alone can judge (a challenge method, a session write against the session shape) is its
   `check` (X101-X103).
-- **A schema change.** Until 1.0: edit in place; the schemas are served from `main`. After 1.0: compatible,
+- **A schema change.** The pull request waits for the maintainer's approval in CI, as a change of decision
+  does, because `main` serves the schemas to every tree. Until 1.0: edit in place. After 1.0: compatible,
   edit in place; breaking, the base URL in `model.ts` and every `$id` move to the tag `schemas-v2`, and the
   `schemas-v1` tag stays (RFC 0008).
 - **A new plugin.** A new package under `packages/`, depending on core and engine only -- and, where it implements one, the contract plugin it answers -- exporting its
@@ -186,4 +187,6 @@ Messages are plain: what changed and why, in the imperative. No generated traile
 references. The one exception is a commit that touches `fitness/`, which carries a `Decision: (adds |
 reconfigures | retires) fitness/<file> because ...` line saying what was decided and why. That line is the
 maintainer's own words; no tool adds it, `.githooks/commit-msg` refuses the commit without it, and the
-`decision` job in CI checks every such commit and then waits for the maintainer to approve the run.
+`decision` job in CI checks every such commit and then waits for the maintainer to approve the run. That job
+waits only when there is something to approve: a change of decision, or of a schema under
+`packages/core/schemas/`, which `main` serves to every tree; any other pull request skips it.

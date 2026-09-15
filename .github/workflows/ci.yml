@@ -89,11 +89,39 @@ jobs:
       # No build: a fitness function reads this repository's source as text, so it answers in seconds.
       - run: npm run fitness
 
-  # Always present, and skipped by its own `if:` when the pull request touches no fitness function -- GitHub
-  # counts a skipped required check as satisfied, while a job filtered out by `paths:` never reports at all.
+  # What the pull request touches, so `decision` can tell whether anything waits for the maintainer. A job
+  # cannot read a diff in its own `if:`, so this one reads it and hands the answer on.
+  changes:
+    name: what the pull request touches
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      gated: ${{ steps.files.outputs.gated }}
+    steps:
+      - id: files
+        name: a decision or a schema, if the pull request changes one
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename')
+          gated=$(echo "$files" | grep -E '^(fitness/[^/]+\.fitness\.ts|packages/core/schemas/[^/]+\.json)$' || true)
+          if [ -n "$gated" ]; then
+            echo "waits for the maintainer:"; echo "$gated" | sed 's/^/  /'
+            echo "gated=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changes no decision and no schema; nothing to approve"
+            echo "gated=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Waits in the `decisions` environment for the maintainer's approval, and runs only when there is something
+  # to approve: a change of decision (RFC 0027) or of a schema, which `main` serves to every tree (RFC 0008).
+  # GitHub counts a skipped required check as satisfied, while a job filtered out by `paths:` never reports at
+  # all, so the job is always present and skips itself. When `changes` could not say, it runs: a gate that
+  # cannot tell asks rather than waves through.
   decision:
     name: decision
-    if: github.event_name == 'pull_request'
+    needs: changes
+    if: ${{ github.event_name == 'pull_request' && !cancelled() && needs.changes.outputs.gated != 'false' }}
     runs-on: ubuntu-latest
     environment: decisions
     steps:
@@ -105,7 +133,7 @@ jobs:
           base="${{ github.event.pull_request.base.sha }}"
           head="${{ github.event.pull_request.head.sha }}"
           if [ -z "$(git diff --name-only "$base" "$head" -- 'fitness/*.fitness.ts')" ]; then
-            echo "this pull request changes no decision; nothing to approve"
+            echo "this pull request changes no decision; the approval was for its schemas"
             exit 0
           fi
           missing=""
