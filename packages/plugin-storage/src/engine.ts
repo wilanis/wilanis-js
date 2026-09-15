@@ -8,6 +8,7 @@
  * reaches it first, so nothing has to be said in `project.json` about the order the plugins are named in.
  */
 import type { Participant, Type } from '@wilanis/core';
+import type { Recorder } from './record.js';
 import type { Where } from './where.js';
 
 /** One record, as it is kept and as it comes back: an object of the collection's shape. */
@@ -96,8 +97,15 @@ export interface RemoveAnswer {
   referencedBy?: string;
 }
 
-/** What @storage asks of whoever keeps the records. No SQL, no dialect, no driver: values in, values out. */
-export interface Engine {
+/**
+ * What @storage asks of whoever keeps the records. No SQL, no dialect, no driver: values in, values out.
+ *
+ * The five members of `Recorder` are the migration half (RFC 0017): what this connection has recorded, what
+ * its catalog holds, how many rows stand in a step's way, the application of a plan, and the history of the
+ * ones that applied. They are here rather than on an engine of their own because a plan is asked of the same
+ * engine that keeps the records it is a plan for, and `record.ts` says what each answers.
+ */
+export interface Engine extends Recorder {
   /** The record under that key, or `record` absent where there is none. */
   get(at: At, key: unknown): Promise<{ record?: Record_ }>;
   /** Every record the query matches, in the order it asks for. */

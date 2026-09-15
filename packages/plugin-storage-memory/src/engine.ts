@@ -177,6 +177,38 @@ export class MemoryEngine implements Engine {
     return undefined;
   }
 
+  /**
+   * This engine keeps nothing between processes, so there is nothing to record and nothing to migrate: the
+   * record is empty, the catalog is empty, no row stands in any step's way, applying a plan is applying it to
+   * a database that will not be here tomorrow, and there is no history. `wilanis migrate` reads the five
+   * answers below and says so for this connection rather than planning against a record that cannot exist.
+   *
+   * `ensure` already answers nothing for the same reason: a collection exists as soon as it is asked for.
+   */
+  async recorded(): Promise<undefined> {
+    return undefined;
+  }
+
+  /** There is no catalog: a collection is a Map made on first use, which is not a thing to inspect. */
+  async inspect(): Promise<undefined> {
+    return undefined;
+  }
+
+  /** No row stands in any step's way, because no step ever runs here. */
+  async rows(): Promise<number> {
+    return 0;
+  }
+
+  /** Nothing to apply and nothing to record: a plan against records that end with the process is no plan. */
+  async apply(): Promise<undefined> {
+    return undefined;
+  }
+
+  /** No plan ever applied here, so there is nothing to have a history of. */
+  async history(): Promise<never[]> {
+    return [];
+  }
+
   /** A copy deep enough that writing through one map cannot reach the other: the records too, not just the maps. */
   private static forked(collections: Map<string, Map<string, Record_>>): Map<string, Map<string, Record_>> {
     return new Map([...collections].map(([where, kept]) => [where, new Map(kept)]));

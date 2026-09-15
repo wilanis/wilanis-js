@@ -91,8 +91,10 @@ export interface Step {
   default?: unknown;
   /** what a `rename` or a `renameCollection` renames from, so an engine needs no second look at the marks */
   from?: string;
-  /** the type a `retype` moves from and to, so an engine knows which cast to attempt */
+  /** the type a `retype` moves from, so an engine knows which cast to attempt */
   was?: FieldType;
+  /** the type a `retype` moves to: the other half of the pair, so `rows` needs no second look at the tree */
+  becomes?: FieldType;
   /** the fields a `unique` or `ununique` is over */
   over?: string[];
   /** the collection a `ref` or `unref` points at */

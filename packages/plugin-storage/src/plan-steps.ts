@@ -189,6 +189,7 @@ function retypeStep(name: string, both: Both): Step {
     target: name,
     at: field,
     was: was.type,
+    becomes: now.type,
     says: `retype ${field}  ${was.type} → ${now.type}`,
     loses: `values of ${field} no cast can carry from ${was.type} to ${now.type}`,
   };
