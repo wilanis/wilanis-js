@@ -10,7 +10,7 @@
  * binding meets an operation is what a profile chooses.
  */
 import { type GraphDoc, isMap, isSwitch, type Loaded, type Scope, type Values } from '@wilanis/core';
-import { type Judge, underProfile } from './judge.js';
+import { type Judge, underProfiles } from './judge.js';
 
 /** One effect an atomic graph reaches: what it runs, where that call is written, and whether it may take part. */
 export interface Reached {
@@ -123,22 +123,64 @@ class Walk {
 const atomicGraphs = (scope: Scope): Loaded<GraphDoc>[] =>
   scope.registry.all('graph').filter(graph => graph.doc.atomic === true);
 
+/** One fault found by the per-profile walk: where it is, what it says, and the profiles that reached it. */
+interface Fault {
+  file: string;
+  at: string;
+  message: (profiles: string) => string;
+  hint: string;
+  profiles: (string | undefined)[];
+}
+
 /**
- * The refusals over every atomic graph of a tree, judged under each profile: an effect that cannot take part
- * (L009), effects on more than one connection (L010), no transactional effect at all (L011), and a map that
- * collects what a failed element has already ended (G014).
+ * The faults one rule found across the profiles, each answered once. The walk is made per profile because
+ * which binding meets an operation is a profile's choice, but a fault the walk finds is a fault of one
+ * document at one node: keying it by where it is collapses the profiles that agree into the one refusal
+ * `connectionOf` promises, and keeps the profiles that found it so the message can name them.
+ */
+class Faults {
+  private readonly byPlace = new Map<string, Fault>();
+
+  /** Remember a fault at one place, adding the profile to the one already there. */
+  found(key: string, fault: Omit<Fault, 'profiles'>, profile: string | undefined): void {
+    const already = this.byPlace.get(key);
+    if (already) {
+      already.profiles.push(profile);
+      return;
+    }
+    this.byPlace.set(key, { ...fault, profiles: [profile] });
+  }
+
+  /** Refuse once per place, the message naming every profile that found it. */
+  refuse(judge: Judge, code: string): void {
+    for (const fault of this.byPlace.values()) {
+      judge.refuser(fault.file)(code, fault.message(underProfiles(fault.profiles)), fault.at, fault.hint);
+    }
+  }
+}
+
+/**
+ * The refusals over every atomic graph of a tree: an effect that cannot take part (L009), effects on more
+ * than one connection (L010), no transactional effect at all (L011), and a map that collects what a failed
+ * element has already ended (G014).
  *
- * L009 and L010 are judged per profile because which binding meets an operation is what a profile chooses,
- * and a refusal says which one found it. L011 and G014 are judged over the union of the profiles' walks: a
- * graph that reaches a write under one profile and none under another is not one with nothing to roll back.
+ * Every rule reads the same per-profile walks, since which binding meets an operation is what a profile
+ * chooses. One fault still answers one refusal: L009 and L010 gather what the profiles found by where it is
+ * and name the profiles that reached it, so a fault under one profile alone names that profile and a fault
+ * every profile shares is said once. L011 and G014 are judged over the union of the walks: a graph that
+ * reaches a write under one profile and none under another is not one with nothing to roll back.
  */
 export function checkAtomic(judge: Judge): void {
   for (const graph of atomicGraphs(judge.scope)) {
     const walks = judge.profiles().map(profile => ({ profile, reach: reachOf(judge, graph, profile) }));
+    const participants = new Faults();
+    const connections = new Faults();
     for (const { profile, reach } of walks) {
-      checkParticipants(judge, graph, reach, profile);
-      checkOneConnection(judge, graph, reach, profile);
+      checkParticipants(participants, graph, reach, profile);
+      checkOneConnection(connections, graph, reach, profile);
     }
+    participants.refuse(judge, 'L009');
+    connections.refuse(judge, 'L010');
     const reaches = walks.map(walk => walk.reach);
     checkSomethingToRollBack(judge, graph, reaches);
     checkCollectingMaps(judge, graph, reaches);
@@ -146,28 +188,38 @@ export function checkAtomic(judge: Judge): void {
 }
 
 /** L009: every effect an atomic graph reaches can take part in a transaction. */
-function checkParticipants(judge: Judge, graph: Loaded<GraphDoc>, reach: Reach, profile: string | undefined): void {
+function checkParticipants(found: Faults, graph: Loaded<GraphDoc>, reach: Reach, profile: string | undefined): void {
   for (const effect of reach.effects) {
     if (effect.transactional) continue;
-    judge.refuser(effect.file)(
-      'L009',
-      `atomic graph '${graph.path}' reaches '${effect.key}', which cannot take part in a transaction${underProfile(profile)}`,
-      `nodes/${effect.node}`,
-      'read or send that outside the transaction: in the caller for a domain graph, in a graph of its own for a data graph',
+    found.found(
+      `${effect.file}#${effect.node}`,
+      {
+        file: effect.file,
+        at: `nodes/${effect.node}`,
+        message: profiles =>
+          `atomic graph '${graph.path}' reaches '${effect.key}', which cannot take part in a transaction${profiles}`,
+        hint: 'read or send that outside the transaction: in the caller for a domain graph, in a graph of its own for a data graph',
+      },
+      profile,
     );
   }
 }
 
 /** L010: one transaction is one connection, so every transactional effect reached falls on the same one. */
-function checkOneConnection(judge: Judge, graph: Loaded<GraphDoc>, reach: Reach, profile: string | undefined): void {
+function checkOneConnection(found: Faults, graph: Loaded<GraphDoc>, reach: Reach, profile: string | undefined): void {
   const connections = [...new Set(reach.effects.filter(effect => effect.transactional).map(one => one.connection))];
   const named = connections.filter((one): one is string => one !== undefined);
   if (named.length < 2) return;
-  judge.refuser(graph.path)(
-    'L010',
-    `atomic graph reaches effects on ${named.length} connections (${named.join(', ')})${underProfile(profile)}`,
-    undefined,
-    'one transaction is one connection; split the graph, or move both stores to one connection',
+  found.found(
+    `${graph.path}#${named.join(', ')}`,
+    {
+      file: graph.path,
+      at: 'atomic',
+      message: profiles =>
+        `atomic graph reaches effects on ${named.length} connections (${named.join(', ')})${profiles}`,
+      hint: 'one transaction is one connection; split the graph, or move both stores to one connection',
+    },
+    profile,
   );
 }
 

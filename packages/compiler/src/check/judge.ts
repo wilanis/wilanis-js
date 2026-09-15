@@ -80,6 +80,17 @@ export function underProfile(profile: string | undefined): string {
   return profile ? ` (profile '${profile}')` : '';
 }
 
+/**
+ * How a message says which profiles a judgement was made under, where one fault was found under several.
+ * One fault answers one refusal, so a rule made per profile names every profile that found it rather than
+ * repeating itself: nothing where no profile is declared, `(profile 'live')` where one found it.
+ */
+export function underProfiles(profiles: (string | undefined)[]): string {
+  const named = profiles.filter((one): one is string => one !== undefined);
+  if (named.length === 0) return '';
+  return ` (profile${named.length > 1 ? 's' : ''} ${named.map(one => `'${one}'`).join(', ')})`;
+}
+
 /** Every type reference in a spec, with where it sits. */
 function* typeRefs(spec: TypeSpec, at: string): Generator<[string, string]> {
   if (typeof spec === 'string') {
