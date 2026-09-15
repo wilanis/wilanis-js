@@ -7,9 +7,18 @@
  * (L009, L010, L011, G014); this reads the same per-profile walk to say what the surviving graph does. Where
  * the profiles disagree about the connection -- a port bound to one store under `local` and another under
  * `production` -- every one they reach is named, since a reader chooses a profile before running.
+ *
+ * It reads the same profiles L009 and L010 are judged under -- those whose bindings name the graph -- so what
+ * a reader is told is what the tree was held to. A profile that never runs the graph would otherwise add a
+ * connection no run of it can fall on.
+ *
+ * Where no profile reaches the graph it falls back to all of them, which is the one place it parts from the
+ * checker and on purpose: the checker is deciding what to refuse and says nothing of an unreached graph,
+ * while a reader has opened the document and is owed what it says. L011 has already refused such a graph
+ * where it reaches nothing transactional, so what is described here is a graph waiting to be bound.
  */
 import type { GraphDoc, Loaded, Scope } from '@wilanis/core';
-import { reachOf } from './check/atomic.js';
+import { profilesReaching, reachOf } from './check/atomic.js';
 import { refusalsOfGraph } from './refusals.js';
 
 /** What one atomic graph commits, where, and what undoes it. */
@@ -56,7 +65,10 @@ function reasonsOf(scope: Scope, graph: Loaded<GraphDoc>, profiles: (string | un
 export function atomicOf(scope: Scope, graph: Loaded<GraphDoc>): AtomicSaid | undefined {
   if (graph.doc.atomic !== true) return undefined;
   const declared = scope.profiles();
-  const profiles = declared.length ? declared : [undefined];
+  const all: (string | undefined)[] = declared.length ? declared : [undefined];
+  // a graph no profile reaches is still described by its own contents, rather than by nothing at all
+  const reaching = profilesReaching(scope, graph, all);
+  const profiles = reaching.length ? reaching : all;
   const { connections, participants } = transactionOf(scope, graph, profiles);
   return {
     connections: [...connections].sort(),

@@ -156,6 +156,30 @@ class Walk {
 const atomicGraphs = (scope: Scope): Loaded<GraphDoc>[] =>
   scope.registry.all('graph').filter(graph => graph.doc.atomic === true);
 
+/**
+ * The profiles that reach one graph: those whose chosen binding lists it behind an operation. A profile
+ * chooses a binding by naming it, and a port met by exactly one binding is chosen by every profile, so
+ * `bindingFor` answers the choice either way.
+ *
+ * This is the set L009 and L010 are judged under. A profile that never runs a graph has nothing to be
+ * refused for: the graph's effects are only reached through a binding, and a binding a profile does not
+ * choose is a binding whose graph it never runs. The test is over the bindings rather than over `reachOf`,
+ * which walks the document's own nodes and so answers the same under every profile.
+ */
+export function profilesReaching(
+  scope: Scope,
+  graph: Loaded<GraphDoc>,
+  profiles: (string | undefined)[],
+): (string | undefined)[] {
+  return profiles.filter(profile =>
+    scope.registry.all('binding').some(binding => {
+      const port = scope.canon(binding.doc.port);
+      if (scope.bindingFor(port, profile) !== binding) return false;
+      return Object.values(binding.doc.operations).some(op => op.graph && scope.canon(op.graph) === graph.path);
+    }),
+  );
+}
+
 /** One fault found by the per-profile walk: where it is, what it says, and the profiles that reached it. */
 interface Fault {
   file: string;
@@ -200,21 +224,26 @@ class Faults {
  * Every rule reads the same per-profile walks, since which binding meets an operation is what a profile
  * chooses. One fault still answers one refusal: L009 and L010 gather what the profiles found by where it is
  * and name the profiles that reached it, so a fault under one profile alone names that profile and a fault
- * every profile shares is said once. L011 and G014 are judged over the union of the walks: a graph that
- * reaches a write under one profile and none under another is not one with nothing to roll back.
+ * every profile shares is said once.
+ *
+ * L009 and L010 are judged only under the profiles that reach the graph, since they ask what one run of it
+ * would do and a profile that never runs it has no such run. L011 and G014 are judged over every profile:
+ * they ask whether anything below the graph ever rolls back, and a graph no profile reaches would otherwise
+ * get an empty union and a misleading L011 rather than the refusal its own contents earn.
  */
 export function checkAtomic(judge: Judge): void {
+  const profiles = judge.profiles();
   for (const graph of atomicGraphs(judge.scope)) {
-    const walks = judge.profiles().map(profile => ({ profile, reach: reachOf(judge.scope, graph, profile) }));
+    const walk = (profile: string | undefined) => ({ profile, reach: reachOf(judge.scope, graph, profile) });
     const participants = new Faults();
     const connections = new Faults();
-    for (const { profile, reach } of walks) {
+    for (const { profile, reach } of profilesReaching(judge.scope, graph, profiles).map(walk)) {
       checkParticipants(participants, graph, reach, profile);
       checkOneConnection(connections, graph, reach, profile);
     }
     participants.refuse(judge, 'L009');
     connections.refuse(judge, 'L010');
-    const reaches = walks.map(walk => walk.reach);
+    const reaches = profiles.map(profile => walk(profile).reach);
     checkSomethingToRollBack(judge, graph, reaches);
     checkCollectingMaps(judge, graph, reaches);
   }

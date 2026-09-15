@@ -199,8 +199,12 @@ plugin's X rules judge what a call means to the store; the compiler judges only 
 | L0n3 | `check/graph-whole.ts` | an atomic graph reaches no transactional effect at all | `nothing here can roll back; delete "atomic"` |
 | G0n1 | `check/graph-nodes.ts` | a `map` inside an atomic graph, or inside a graph an atomic graph reaches, declares `onItemFailure: collect` | `a failed element aborts the transaction, so its failure cannot be collected; use "fail", or take the map out of the atomic graph` |
 
-L0n1 and L0n2 are judged for every profile in `project.json → profiles`, since the effects a domain graph
-reaches depend on which binding meets each operation; a refusal names the profile. A graph that is not
+L0n1 and L0n2 are judged for every profile in `project.json → profiles` **that reaches the graph** -- one
+whose chosen binding lists it behind an operation -- since the effects a domain graph reaches depend on which
+binding meets each operation, and a profile that never runs the graph has no run of it to judge; a refusal
+names the profile. L0n3 and G0n1 are judged over every profile, reaching or not: they ask whether anything
+below the graph ever rolls back, and a graph nothing reaches must earn the refusal its own contents earn
+rather than an empty union and silence. A graph that is not
 atomic but is reached from one is judged as part of the atomic graph: the rules apply to the whole scope,
 not to the document that carries the flag.
 
@@ -528,3 +532,11 @@ atomic graph holds a connection for its whole run, and a connection pool sized f
 - The connection is a list, not one value. Every checked tree agrees on one under each profile (L010), but
   profiles may disagree with each other: a port bound to one store under `local` and another under
   `production` falls on two, and a reader choosing a profile is told both.
+- L009 and L010 are judged only under the profiles that reach the graph. The Reference sentence above said
+  every profile, and that contradicted this RFC's own step 8: the example's `submit` reaches a store under
+  `local` and an HTTP call under `live` by design, so an atomic graph over it was refused however it was
+  bound, and the graph the Motivation opens with could not be written at all. A profile that never runs a
+  graph has nothing to be refused for. A profile reaches a graph when the binding it chooses lists that graph
+  behind an operation -- a test over the bindings, since `reachOf` walks the document's own nodes and answers
+  the same under every profile. L011 and G014 stay over every profile for the reason given above.
+  `atomicOf` reads the same filter, so what a reader is told is what the tree was held to.

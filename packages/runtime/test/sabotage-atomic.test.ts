@@ -24,7 +24,7 @@ import { checkTree } from '@wilanis/compiler';
 import { loadTree, type PluginModule, schemaRef, schemaUrl } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_PLUGINS } from '../src/index.js';
-import { docsDir, plantedEditingSaying, sabotage, sabotageSaying } from './example-harness.js';
+import { docsDir, plantedEditingAllSaying, plantedEditingSaying, sabotage, sabotageSaying } from './example-harness.js';
 
 const KEPT = 'features/monitor/data/kept-record.graph.json';
 const IMPORT = 'features/monitor/domain/import-entries.graph.json';
@@ -209,5 +209,95 @@ describe('an operation that says it is transactional', () => {
       },
     };
     expect(shipping(saying)).not.toContain('C009');
+  });
+});
+
+/**
+ * The batch graph the example's `import` wants: one map over `monitor.submit`, declaring that the rows it
+ * records move together. What it reaches depends entirely on which binding meets `submit`, so it is the graph
+ * the profile filter is about.
+ */
+const BATCH = {
+  'features/monitor/domain/record-batch.graph.json': {
+    $schema: schemaUrl('graph'),
+    label: 'Record a batch',
+    atomic: true,
+    description: 'Every draft of a batch recorded, or none.',
+    in: '@monitor/domain/EntryDraft.shape.json[]',
+    out: { type: '@monitor/domain/Entry.shape.json[]', from: 'recorded' },
+    nodes: [
+      {
+        type: schemaRef('node/map'),
+        id: 'recorded',
+        label: 'Record each draft',
+        run: '@monitor/domain/monitor.port.json#submit',
+        over: '{{in}}',
+        bind: { url: 'url', method: 'method' },
+      },
+    ],
+  },
+};
+
+/** Meet `removeMany` with the batch graph in one binding, so the profiles choosing it reach the graph. */
+const meetsBatch = (doc: any) => {
+  doc.operations.removeMany = { graph: '@monitor/domain/record-batch.graph.json' };
+};
+
+const STORE_BINDING = 'features/monitor/data/monitor-store.binding.json';
+const REST_BINDING = 'features/monitor/data/monitor-rest.binding.json';
+
+/**
+ * Which profiles an atomic graph is judged under. L009 and L010 ask what one run of the graph would do, and a
+ * profile that never runs it has no such run: the example's `submit` reaches a store under `local` and an
+ * HTTP call under `live`, so the same graph is a transaction under one profile and impossible under the
+ * other, and which refusals it earns has to follow the bindings that name it.
+ *
+ * The case is written over `removeMany` because every profile of the example binds every operation of
+ * `monitor.port.json`: pointing one profile's binding at the graph and not another's is what makes one
+ * profile reach it. The type it answers is the same either way, so nothing else in the tree moves.
+ */
+describe('an atomic graph the profiles do not all reach', () => {
+  it('is judged under the profile that names it, and not under one that does not', () => {
+    // only the store binding meets removeMany with the batch graph, so only local and production reach it:
+    // both keep the entries in a store, and neither has anything to refuse
+    const said = plantedEditingAllSaying(BATCH, { [STORE_BINDING]: meetsBatch });
+    expect(said.filter(one => one.includes('record-batch'))).toEqual([]);
+  });
+
+  it('is refused again as soon as a profile that cannot run it names it -- L009', () => {
+    // the live binding meets removeMany with the same graph, and live meets submit over HTTP: one profile
+    // now reaches a transaction it cannot hold, and the refusal names that profile and no other
+    const said = plantedEditingAllSaying(BATCH, { [STORE_BINDING]: meetsBatch, [REST_BINDING]: meetsBatch });
+    expect(said.filter(one => one.startsWith('L009') && one.includes('record-batch'))).toEqual([
+      "L009 atomic graph '@features/monitor/domain/record-batch.graph.json' reaches '@http/http.port.json#request', which cannot take part in a transaction (profile 'live')",
+    ]);
+  });
+
+  it('is refused for what it reaches nowhere, whatever the profiles name -- L011', () => {
+    // a graph no profile reaches still earns the refusal its own contents earn: L011 is judged over every
+    // profile, so an unreached graph answers what it is rather than an empty union and silence
+    const said = plantedEditingAllSaying(
+      {
+        'features/monitor/domain/record-batch.graph.json': {
+          ...BATCH['features/monitor/domain/record-batch.graph.json'],
+          in: 'blob',
+          out: { type: '@monitor/domain/EntryDraft.shape.json[]', from: 'recorded' },
+          nodes: [
+            {
+              type: schemaRef('node/run'),
+              id: 'recorded',
+              label: 'Read the file',
+              run: '@blob/csv.port.json#parse',
+              in: { file: '{{in}}', type: '@monitor/domain/EntryDraft.shape.json' },
+            },
+          ],
+        },
+      },
+      {},
+    );
+    // the message names the rule, not the file: what matters is that a graph nothing reaches is still judged
+    expect(said.filter(one => one.startsWith('L011'))).toEqual([
+      'L011 atomic graph reaches no effect that can take part in a transaction',
+    ]);
   });
 });
