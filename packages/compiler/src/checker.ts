@@ -4,10 +4,12 @@
  *   D documents (the loader)   R references   L layers/effects/visibility   G graphs (graph.ts, inputs.ts)
  *   P static fields/resolvers (resolvers.ts)   B bindings/profiles (bindings.ts, project.ts)
  *   T triggers (triggers.ts)   A access (access.ts)   C connections, settings and stores (project.ts, contracts.ts)
+ *   atomic graphs, which are L and G rules over what one reaches (atomic.ts)
  *   S scenarios (triggers.ts)   X plugin-specific (each plugin's own `check`)
  */
 import { type LoadResult, type PluginModule, RefusalList, Scope } from '@wilanis/core';
 import { checkPolicy } from './check/access.js';
+import { checkAtomic } from './check/atomic.js';
 import { checkBinding } from './check/bindings.js';
 import { checkConnection, checkPort, checkShape, checkStore } from './check/contracts.js';
 import { checkGraph } from './check/graph.js';
@@ -28,7 +30,10 @@ export function checkTree(load: LoadResult): RefusalList {
   return out;
 }
 
-/** The order of judgement: documents before what names them, and startup last, once every resolvers document is read. */
+/**
+ * The order of judgement: documents before what names them, atomic graphs once every binding is judged --
+ * the walk goes through them -- and startup last, once every resolvers document is read.
+ */
 function judgeTree(judge: Judge): void {
   const { registry } = judge.scope;
   checkProject(judge);
@@ -42,6 +47,7 @@ function judgeTree(judge: Judge): void {
   for (const policy of registry.all('policy')) checkPolicy(judge, policy);
   for (const trigger of registry.all('trigger')) checkTrigger(judge, trigger);
   for (const scenario of registry.all('scenario')) checkScenario(judge, scenario);
+  checkAtomic(judge);
   checkStartup(judge);
 }
 
