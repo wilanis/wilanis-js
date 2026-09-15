@@ -23,6 +23,20 @@ export type {
   Transaction,
 } from './engine.js';
 export { engines } from './engine.js';
+export type {
+  CollectionMarks,
+  Declared,
+  DeclaredField,
+  Declares,
+  Declaring,
+  Does,
+  FieldType,
+  Marks,
+  Planned,
+  Stale,
+  Step,
+} from './plan.js';
+export { declaredOf, declaredOfStore, fieldTypeOf, marksOf, marksOfStore, plan } from './plan.js';
 export type { Operator, Test, Where } from './where.js';
 export { OPERATORS, parseWhere, whereOf } from './where.js';
 
