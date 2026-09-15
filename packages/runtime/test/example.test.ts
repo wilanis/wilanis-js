@@ -68,6 +68,7 @@ describe('the example tree', () => {
       '@cli',
       '@http',
       '@reload',
+      '@schedule',
       '@std',
       '@storage',
       '@storage-memory',

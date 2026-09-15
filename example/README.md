@@ -127,12 +127,37 @@ guard opens one and tells the caller how to answer it in the kind's own words; `
 the caller presents and hands `request.challenge`, the policy allows, and the challenge is spent by the run.
 The three processes share the challenge through the plugin's store under `.wilanis/auth/`.
 
+## The digest, nightly
+
+`digest.trigger.json` is a command: `npm run digest` prints the count and one line per entry.
+`nightly-digest.trigger.json` fires the *same* domain operation at three in the morning, UTC:
+
+```json
+"kind": "@schedule/schedule.trigger-kind.json",
+"settings": { "cron": "0 3 * * *", "timezone": "UTC" },
+"out": "@monitor/edge/DigestView.shape.json",
+"fire": { "run": "@monitor/domain/monitor.port.json#digest" }
+```
+
+One operation, two ways in, and neither document names a graph -- which is what a port is for. Nobody is
+calling a tick, so the trigger attaches no policy (one that read the caller would be refused, `A005`) and
+answers nobody: the digest is judged against `out` and written to the log. The tick's instant reaches a graph
+as `request.scheduled` where one takes it, so nothing in this tree calls a clock and `wilanis rehearse` replays
+a tick like any request.
+
+It fires because the startup list asks for a scheduler, never because the document exists -- **delete the
+`Keep the schedule` step and nothing is scheduled**, exactly as deleting `Listen` closes the port. This tree
+runs one process and needs no lease; several instances would give the step a `lease` naming a connection whose
+kind declares `leases`, and one of them would take each tick. `wilanis describe @monitor/edge/nightly-digest.trigger.json`
+prints the schedule as written.
+
 `project.json → startup` says what this tree starts, in order, and nothing else runs. `monitor.port.json#listAll`
 reads the entries once: if the API is unreachable, `start` says so and exits rather than answering every route
 with a fault. `@reload/watch.port.json#watch` serves the tree again whenever a document changes, without
-closing the port. `@http/server.port.json#listen` opens :8099 -- **delete that step and nothing listens**, since
+closing the port. `@schedule/scheduler.port.json#run` keeps the schedule above. `@http/server.port.json#listen`
+opens :8099 -- **delete that step and nothing listens**, since
 no runtime opens a port merely because http triggers exist. The first is a domain port operation, so whichever
-binding the profile chose is what gets checked; the last two are `holds` operations, which a plugin grants and
+binding the profile chose is what gets checked; the last three are `holds` operations, which a plugin grants and
 the runtime stops when the process ends. `wilanis describe @http/server.port.json` says which plugin grants it.
 
 `monitor.port.json` is what the domain needs: `listAll`, `listByMethod`, `get`, `record`, `update`,

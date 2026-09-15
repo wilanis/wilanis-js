@@ -12,6 +12,7 @@ import { loadTree, type PluginModule, type ResolvedInclude } from '@wilanis/core
 import blobs from '@wilanis/plugin-blob';
 import http from '@wilanis/plugin-http';
 import reload from '@wilanis/plugin-reload';
+import schedule from '@wilanis/plugin-schedule';
 import storage from '@wilanis/plugin-storage';
 import memory from '@wilanis/plugin-storage-memory';
 import postgres from '@wilanis/plugin-storage-postgres';
@@ -26,6 +27,7 @@ export const PLUGINS: Record<string, PluginModule> = {
   '@blob': blobs,
   '@reload': reload,
   '@auth': auth,
+  '@schedule': schedule,
   '@storage': storage,
   '@storage-memory': memory,
   '@storage-postgres': postgres,
