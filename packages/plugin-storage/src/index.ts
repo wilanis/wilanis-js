@@ -7,8 +7,10 @@
 import { fileURLToPath } from 'node:url';
 import type { PluginModule } from '@wilanis/core';
 import { handlers } from './handlers.js';
+import { applyStores, historyOfStores, planStores } from './migrate.js';
 import { check } from './rules.js';
 
+export { driftOf } from './drift.js';
 export type {
   At,
   Engine,
@@ -24,6 +26,7 @@ export type {
 } from './engine.js';
 export { engines } from './engine.js';
 export { ensureStore } from './ensure.js';
+export { applyStores, historyOfStores, planStores } from './migrate.js';
 export type {
   CollectionMarks,
   Declared,
@@ -42,6 +45,8 @@ export type { Class, Classed, Judging } from './plan-class.js';
 export { classed, counts } from './plan-class.js';
 export type { Applied, Applying, On, Recorder, Recording } from './record.js';
 export { onOf } from './record.js';
+export type { Standing } from './standing.js';
+export { classedSteps, standing } from './standing.js';
 export type { Operator, Test, Where } from './where.js';
 export { OPERATORS, parseWhere, whereOf } from './where.js';
 
@@ -50,5 +55,8 @@ const plugin: PluginModule = {
   docs: fileURLToPath(new URL('../docs', import.meta.url)),
   handlers,
   check,
+  // the one planner's second caller: `ensure` prepares a store at startup, and this plans every store of the
+  // tree for an operator to read before anything is applied (RFC 0017)
+  migrate: { plan: planStores, apply: applyStores, history: historyOfStores },
 };
 export default plugin;
