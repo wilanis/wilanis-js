@@ -61,6 +61,14 @@ Every dispatch carries, in the prompt:
   step 3 (`--force-with-lease=refs/heads/N-short-title:`, empty lease) — **unless the branch already exists
   on the remote**, in which case say so and tell the agent the claim is already its own, or it will read its
   own claim as someone else's and stop.
+
+  The branch name is CI's, not a convention: `.github/workflows/ci.yml` refuses a head branch that is not
+  `<issue>-<short-title>`, and then refuses it again unless issue N exists, is assigned to the pull
+  request's author, and no other open pull request serves it. **So the issue comes before the branch.**
+  Work that has no issue — a skill, a note, a fix nobody filed — needs one opened and assigned first, or
+  the pull request cannot pass however good the change is. A branch already pushed under the wrong name is
+  renamed (`git branch -m`), pushed under the new name, and its pull request opened again: the check reads
+  the head branch, so editing the old pull request does not move it.
 - **`npm install` in the worktree before running tests.** A fresh worktree has no `node_modules` symlinks
   and `packages/view/test/static.test.ts` then fails spuriously, resolving the `@wilanis/access` include to
   an absolute path. It is not a real failure and it is not the agent's change.
