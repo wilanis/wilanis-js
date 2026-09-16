@@ -1,0 +1,35 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/plugin.schema.json",
+  "label": "OpenTelemetry",
+  "description": "Ship every run of this tree to an OpenTelemetry collector as spans. Nothing is instrumented by an author: the report a run already leaves is the trace, and a project's startup list names `export` to send it. A tree that names no step exports nothing, so a reader of project.json sees at the root whether traces leave the process, to where, and under which service name.",
+  "settings": {
+    "fields": {
+      "endpoint": {
+        "type": "string",
+        "description": "the OTLP/HTTP collector to POST spans to, e.g. http://localhost:4318/v1/traces; a {{secrets.<key>}} read where the collector is not public"
+      },
+      "service": {
+        "type": "string",
+        "description": "what this tree is called on a span: the service.name every exported span carries"
+      },
+      "headers": {
+        "type": {
+          "fields": {},
+          "open": "string"
+        },
+        "required": false,
+        "description": "headers to send with every export, for a collector that authenticates, e.g. \"x-api-key\": \"{{secrets.OTLP_KEY}}\""
+      },
+      "level": {
+        "type": "string",
+        "required": false,
+        "description": "how much a span carries: \"summary\" (the default) is status, timing and the wilanis.* attributes and never a value; \"full\" adds the report's redacted in/out and a node's message"
+      }
+    }
+  },
+  "grants": {
+    "ports": [
+      "@otel/exporter.port.json"
+    ]
+  }
+}
