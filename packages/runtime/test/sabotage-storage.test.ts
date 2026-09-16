@@ -1,7 +1,9 @@
 /**
  * What a store holds its records to, and what the compiler will not let it say. `unique`, `refs` and
  * `defaults` name fields of the shape a collection declares, and a name the shape lacks, a default the field
- * would not accept or a reference that leaves the store is refused before anything runs (C003 to C008).
+ * would not accept or a reference that leaves the store is refused before anything runs (C003 to C008). The
+ * marks a rename is written as -- `renamed` on a field, `was` on the collection -- name something that could
+ * have been renamed, and a name still taken on the connection is refused (C010, C011).
  *
  * What a store *means* at a call site -- a filter over it, a patch of it -- is @storage's to judge (X208 to
  * X213, renumbered after RFC 0002's X207).
@@ -41,6 +43,11 @@ const SHAPES = {
     id: { type: 'string' },
     file: { type: 'blob' },
     tags: { type: 'string[]' },
+  }),
+  'features/monitor/domain/Renamed.shape.json': shape('Renamed', {
+    id: { type: 'string' },
+    url: { type: 'string' },
+    agent: { type: 'string' },
   }),
 };
 
@@ -150,6 +157,42 @@ describe('sabotage: what a store holds its records to', () => {
   it('a reference on a list field is C008 alone: a field an engine holds no value of refers to nothing', () => {
     const broken = { rows: entry(), notes: notes({ refs: { tags: { collection: 'rows' } } }) };
     expect(pointingAt(broken)).toEqual(at('C008', 'notes/refs/tags'));
+  });
+
+  it('C010 a renamed keyed by a field the shape does not have: there is nothing to rename to', () => {
+    expect(pointingAt({ rows: entry({ renamed: { nope: 'ua' } }) })).toEqual(at('C010', 'rows/renamed/nope'));
+  });
+
+  it('C010 a renamed whose value is a field of the shape still, so nothing was renamed', () => {
+    const both = { of: '@monitor/domain/Renamed.shape.json', key: 'id', renamed: { agent: 'url' } };
+    expect(pointingAt({ rows: both })).toEqual(at('C010', 'rows/renamed/agent'));
+  });
+
+  it('C010 one name under two keys: one column cannot become two', () => {
+    const twice = { of: '@monitor/domain/Renamed.shape.json', key: 'id', renamed: { url: 'ua', agent: 'ua' } };
+    expect(pointingAt({ rows: twice })).toEqual(at('C010', 'rows/renamed/agent'));
+  });
+
+  it('a renamed naming the key passes: a key is a column like any other, and renaming it loses nothing', () => {
+    expect(codesOf({ rows: entry({ renamed: { id: 'rowId' }, defaults: { ua: 'unknown' } }) })).toEqual([]);
+  });
+
+  it("C011 a was equal to the collection's own name, which was never renamed", () => {
+    expect(pointingAt({ rows: entry({ was: 'rows' }) })).toEqual(at('C011', 'rows/was'));
+  });
+
+  it('C011 a was naming another collection of the same store', () => {
+    const broken = { rows: entry({ was: 'notes' }), notes: notes() };
+    expect(pointingAt(broken)).toEqual(at('C011', 'rows/was'));
+  });
+
+  it('C011 a was naming a collection of another store on the same connection: (connection, name) is a table', () => {
+    // the example's own store keeps `entries` on this connection, so no collection here was ever called that
+    expect(pointingAt({ rows: entry({ was: 'entries' }) })).toEqual(at('C011', 'rows/was'));
+  });
+
+  it('a was naming nothing this connection keeps passes: that is what a rename says', () => {
+    expect(codesOf({ rows: entry({ was: 'observed' }) })).toEqual([]);
   });
 
   it('an unknown shape is R001 once, wherever else the collection is looked at', () => {
