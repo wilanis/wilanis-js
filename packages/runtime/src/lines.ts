@@ -3,6 +3,8 @@
  * one operation of a port with the inputs it accepts -- and, for a store, the engine behind it, the marks each
  * collection holds its records to, and the graphs that run against it. `wilanis describe` prints these; where a
  * type variable comes from is among them, since a contract that resolves a type says so and no caller repeats it.
+ * A mark saying a name changed (`renamed`, `was`) is the tree's word and not a database's: nothing here opens a
+ * connection, so each says only that `wilanis migrate` has yet to carry it everywhere.
  */
 import {
   type Collection,
@@ -124,6 +126,25 @@ function defaultsMark(collection: Collection): string[] {
   return [markLine('default', defaults.map(([field, value]) => `${field} = ${JSON.stringify(value)}`).join(', '))];
 }
 
+/**
+ * What a mark the database has not caught up with says under itself. `describe` reads the tree and opens no
+ * connection, so it says which database still holds the old name for none of them: that is `--history`'s.
+ */
+const UNTIL_APPLIED = markLine('', 'until wilanis migrate has applied it everywhere');
+
+/** Every renamed field, as the name now and the name before, since the database may still hold the old one. */
+function renamedMark(collection: Collection): string[] {
+  const renamed = Object.entries(collection.renamed ?? {});
+  if (!renamed.length) return [];
+  return [markLine('renamed', renamed.map(([now, before]) => `${now} ← ${before}`).join(', ')), UNTIL_APPLIED];
+}
+
+/** The name the collection had before this one, since the database may still keep its records under it. */
+function wasMark(collection: Collection): string[] {
+  if (!collection.was) return [];
+  return [markLine('was', collection.was), UNTIL_APPLIED];
+}
+
 /** The key of a collection, with its type where the shape it names declares the field. */
 function keyMark(collection: Collection, scope: Scope): string {
   const type = keyTypeOf(collection.of, collection.key, scope);
@@ -138,6 +159,8 @@ function collectionLines(name: string, collection: Collection, store: StoreDoc, 
     ...uniqueMark(collection),
     ...refsMark(collection, store),
     ...defaultsMark(collection),
+    ...renamedMark(collection),
+    ...wasMark(collection),
     ...(collection.description ? [markLine('holds', collection.description)] : []),
   ];
 }

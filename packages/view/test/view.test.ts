@@ -1,9 +1,11 @@
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { loadProject } from '@wilanis/runtime';
 import { describe, expect, it } from 'vitest';
 import { type DocView, indexOf, viewOf } from '../src/index.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
+const PAGE = fileURLToPath(new URL('../client/index.html', import.meta.url));
 const GET_ROW = '@features/monitor/data/get-row.graph.json';
 
 const view = async (path: string): Promise<DocView> => {
@@ -285,5 +287,41 @@ describe('the view model of the example', () => {
       implementations: [],
     });
     expect(await view('@std/list.port.json')).toMatchObject({ native: '@std', from: undefined });
+  });
+});
+
+// the page is one static file with no build step, so what it draws is read from its own source
+describe("the store page's marks the database has not caught up with", () => {
+  it('strikes through the name a renamed field had before, beside the name it has now', async () => {
+    const page = await readFile(PAGE, 'utf8');
+    // `was` is the struck class, and the stylesheet is the one place that strikes it
+    expect(page).toMatch(/\.was\s*\{[^}]*line-through/);
+    // the renamed column draws the name now, then the name before in that class
+    expect(page).toMatch(/renamedCell = c => \{[\s\S]*?'was', before\)/);
+    expect(page).toContain("'renamed'");
+  });
+
+  it("puts a collection's was under its name, struck the same way, and says what has yet to happen", async () => {
+    const page = await readFile(PAGE, 'utf8');
+    expect(page).toMatch(/c\.was[\s\S]*?'was', c\.was\)/);
+    // under, not beside: the struck name is a block inside the name cell
+    expect(page).toMatch(/td\.name \.was \{ display: block/);
+    expect(page).toContain('until wilanis migrate has applied it everywhere');
+  });
+
+  it('draws them from the store document alone, so the page opens no connection', async () => {
+    const store = (await view('@features/monitor/data/entries.store.json')).store;
+    // the view model says what the tree says: the engine behind the store, its key types and its call sites,
+    // and nothing about what any database has recorded
+    expect(Object.keys(store ?? {}).sort()).toEqual([
+      'calls',
+      'connection',
+      'connectionLabel',
+      'from',
+      'keyTypes',
+      'kind',
+      'kindLabel',
+      'plugin',
+    ]);
   });
 });
