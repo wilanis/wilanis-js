@@ -126,11 +126,41 @@ async function requestOf(
   return request;
 }
 
+/** What one command-line run is fired through: the trigger, the embedder set up for it, and its teardown. */
+interface OneRun {
+  found: Loaded<TriggerDoc>;
+  emb: Embedder;
+  down: () => Promise<void>;
+}
+
+/**
+ * Everything a one-shot run needs before it fires: the trigger the reference names, an embedder for the
+ * profile and seed, the observer registered through a `Served` of its own -- the server an observer registers
+ * with here exactly as it is under `start`, so `--trace` reads what an exporter would be handed -- and the
+ * plugins' postLoad, which a seeded run skips because nothing of it ever leaves the process.
+ */
+async function readied(
+  load: LoadResult,
+  ref: string,
+  opts: { profile?: string; seed?: number; log: (line: string) => void; observe?: (trace: Trace) => void },
+): Promise<OneRun> {
+  const found = load.registry.get('trigger', load.resolve(ref));
+  if (!found) throw new Error(`no trigger at '${ref}'`);
+  const emb = embedderFor(load, { profile: opts.profile, seed: opts.seed });
+  if (opts.observe) {
+    const served = new Served({ load, emb }, opts.log, opts.profile);
+    served.observe(opts.observe);
+    emb.serve(served);
+  }
+  return { found, emb, down: opts.seed === undefined ? await postLoad(load, emb, opts.log) : async () => {} };
+}
+
 /**
  * Fire a trigger from the command line with a context built from flags and args. A real run (no seed)
  * runs postLoad first and its teardown after; a seeded run stubs every effect and skips the hooks. `--file`
  * streams a file into the blob registry and hands its handle as request.file; a blob answer is streamed to
- * `--out`, or to stdout, by `deliver`. The run's blobs are released once delivered.
+ * `--out`, or to stdout, by `deliver`. The run's blobs are released once delivered. An `observe` given here is
+ * handed the trace of the fire, the same one a tree being served would hand an exporter.
  */
 export async function runTrigger(
   load: LoadResult,
@@ -141,20 +171,14 @@ export async function runTrigger(
     seed?: number;
     log?: (line: string) => void;
     deliver?: (body: Readable, handle: BlobHandle) => Promise<void>;
+    observe?: (trace: Trace) => void;
   } = {},
 ) {
-  const flags = given.flags ?? {};
-  const args = given.args ?? [];
-  const found = load.registry.get('trigger', load.resolve(ref));
-  if (!found) throw new Error(`no trigger at '${ref}'`);
-  const emb = embedderFor(load, { profile: opts.profile, seed: opts.seed });
-  const down =
-    opts.seed === undefined
-      ? await postLoad(load, emb, opts.log ?? ((line: string) => console.error(line)))
-      : async () => {};
+  const log = opts.log ?? ((line: string) => console.error(line));
+  const { found, emb, down } = await readied(load, ref, { ...opts, log });
   const blobs = emb.blobs.scope();
   try {
-    const request = await requestOf(flags, args, blobs);
+    const request = await requestOf(given.flags ?? {}, given.args ?? [], blobs);
     const built = emb.inputFor(found.doc, request);
     if ('error' in built) throw new Error(`input: ${built.error}`);
     const report = await emb.fire(found.doc, built.input, request, { blobs });

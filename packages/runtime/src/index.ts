@@ -25,7 +25,6 @@ export {
   type Identified,
   isStarted,
   type Ran,
-  rootOf,
   type Started,
   statusOf,
 } from './fired.js';
@@ -64,5 +63,5 @@ export {
   rehearse,
   scaffold,
   stubEffects,
-  summarize,
 } from './tools.js';
+export { atLevel, type Level, traceJson, traceOf, traceText } from './trace.js';

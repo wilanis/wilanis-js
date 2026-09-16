@@ -163,8 +163,10 @@ export class Embedder {
    * literals and {{secrets.*}}. Nothing has been received, so the run is given no request -- the checker
    * has already refused any step that reaches a read of one. What it did is told to whoever is listening as a
    * `Started` and never as a `Fired`: a step is not a trigger, it has no kind, no correlation and no gate.
+   * `at` is required and never defaulted: a step's index is a real position in `project.json → startup`, which
+   * the record exports as `wilanis.startup.at`, so a caller that does not know it must not be given a false one.
    */
-  async startup(step: StartupStep, opts: FireOptions & { at?: number } = {}): Promise<Report> {
+  async startup(step: StartupStep, opts: FireOptions & { at: number }): Promise<Report> {
     const compiled = this.operation(step.run);
     const input = fillTemplates(step.in ?? {}, { secrets: this.secrets }) as Record<string, unknown>;
     const startedAt = this.clock();
@@ -176,7 +178,7 @@ export class Embedder {
     });
     this.observed({
       id: runId(startedAt),
-      at: opts.at ?? 0,
+      at: opts.at,
       label: step.label ?? step.run,
       run: this.opPath(step.run),
       answer,

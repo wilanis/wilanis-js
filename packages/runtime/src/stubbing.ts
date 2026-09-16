@@ -181,22 +181,3 @@ export function failedBelow(id: string, node: Report['nodes'][string]): FailedNo
   if (!failed) return undefined;
   return (failed.sub && failedLeaf(failed.sub)) || { ...failed, id: `${id}.${at}` };
 }
-
-/**
- * One run said in lines: how the graph ended, then every node's status, the route it took and what broke, with
- * nested runs and a map's elements indented under the node that ran them.
- */
-export function summarize(report: Report, indent = ''): string {
-  const lines = [
-    `${indent}${report.graph}: ${report.status}${report.needs?.length ? ` needs ${report.needs.join(', ')}` : ''}`,
-  ];
-  const line = (id: string, shown: Report['nodes'][string], depth: string) => {
-    const routed = shown.selected ? ` → ${shown.selected}` : '';
-    const broke = shown.error ? ` -- ${shown.error}` : '';
-    lines.push(`${depth}${id}: ${shown.status}${routed}${broke}`);
-    if (shown.sub) lines.push(summarize(shown.sub, `${depth}  `));
-    for (const [at, item] of (shown.items ?? []).entries()) line(`${id}.${at}`, item, `${depth}  `);
-  };
-  for (const [id, shown] of Object.entries(report.nodes)) line(id, shown, `${indent}  `);
-  return lines.join('\n');
-}

@@ -2,10 +2,11 @@
 import { checkTree } from '@wilanis/compiler';
 import type { LoadResult, Serving, Trace } from '@wilanis/core';
 import type { Embedder } from './embed.js';
-import { type Ran, rootOf } from './fired.js';
+import type { Ran } from './fired.js';
 import { postLoad } from './post-load.js';
 import { loadProject } from './project.js';
 import { embedderFor } from './tools.js';
+import { traceOf } from './trace.js';
 
 /** A tree loaded, judged and set up, ready to be put behind the listener. */
 interface Prepared {
@@ -68,9 +69,14 @@ export class Served {
    * What the embedder of the tree being served hands over after every run -- a fire of a trigger, or one of
    * the project's startup steps -- said as a trace and told to everyone listening. It is the server that is
    * told and not the embedder that tells, because a reload replaces the embedder and never the listeners.
+   *
+   * The trace is built at `full`, because one is built once and handed to every observer: a printer asked for
+   * `summary` and an exporter asked for `full` cannot both be served by a trace that already dropped what one
+   * of them wanted. Each narrows what it was handed with `atLevel`, and the level a run leaves the process at
+   * is the one the thing that sends was configured with, never the one the server happened to build.
    */
   ran(what: Ran): void {
-    this.observed(rootOf(what));
+    this.observed(traceOf(what, this.emb.scope, { level: 'full' }));
   }
 
   /**

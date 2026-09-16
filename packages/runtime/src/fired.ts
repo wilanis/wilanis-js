@@ -6,7 +6,6 @@
  * a span carries.
  */
 import { randomUUID } from 'node:crypto';
-import type { Trace } from '@wilanis/core';
 import { outcomeOf, type Report } from '@wilanis/engine';
 
 /** What the guard's `identify` did, timed: what it added to the context, or the reason it refused. */
@@ -105,31 +104,4 @@ export function statusOf(report: Report): string {
   if (outcome.kind === 'answered') return 'ok';
   if (outcome.kind === 'refused') return `refused: ${outcome.reason}`;
   return outcome.kind === 'blocked' ? 'blocked' : 'failed';
-}
-
-/**
- * The root span of what ran: `fire <trigger>` for a trigger, `startup <label>` for one of the project's steps.
- * It is the root alone -- what ran beneath it is `traceOf`'s to walk -- so that a tree being served says what
- * it did from the moment there is anyone to tell, and gains its depth without an exporter changing.
- */
-export function rootOf(ran: Ran): Trace {
-  const shared = { startedAt: ran.startedAt, endedAt: ran.endedAt, children: [] as Trace[] };
-  if (isStarted(ran))
-    return {
-      ...shared,
-      name: `startup ${ran.label}`,
-      status: statusOf(ran.answer),
-      attributes: { 'wilanis.run.id': ran.id, 'wilanis.startup.at': ran.at, 'wilanis.operation': ran.run },
-    };
-  return {
-    ...shared,
-    name: `fire ${ran.trigger}`,
-    status: statusOf(ran.answer),
-    attributes: {
-      'wilanis.run.id': ran.id,
-      'wilanis.trigger': ran.trigger,
-      'wilanis.kind': ran.kind,
-      ...(ran.correlation ? { 'wilanis.correlation': ran.correlation } : {}),
-    },
-  };
 }
