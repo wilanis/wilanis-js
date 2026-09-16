@@ -1,8 +1,8 @@
 /**
  * @wilanis/compiler: `checkTree` judges a loaded tree against every rule; `Compiler` lowers a judged graph
  * to a kernel spec whose handlers are plugin functions or nested specs; `buildEnv` and `runGraph` run it;
- * `refusalsReachable` and `refusalsOfTrigger` say what a run can refuse with, `reachOf` what an atomic
- * graph reaches, and `atomicOf` what a reader is told about one.
+ * `refusalsReachable` and `refusalsOfTrigger` say what a run can refuse with and `operationsReachable` what
+ * it calls, `reachOf` what an atomic graph reaches, and `atomicOf` what a reader is told about one.
  */
 export * from './atomic.js';
 export * from './atomic-said.js';
