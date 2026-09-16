@@ -35,12 +35,19 @@ describe('a startup step that prepares a store', () => {
     recorded?: Record<string, Declared>;
     rows?: number;
     applied: Step[][];
+    /** every collection `rows` was asked to count in, so a case can say what was never asked about */
+    counted?: string[];
   }
 
   /**
    * An engine whose record is whatever the case says it is, whose catalog is empty, and which applies a plan
    * by noting it. It keeps nothing: what is under test is what `ensure` makes of the five answers, not how any
    * one engine keeps records.
+   *
+   * `rows` throws for a collection the record has never seen, the way a real database does: there is no table
+   * to count in, and asking is an error rather than an answer of zero. A fake that answers zero regardless
+   * hides the one fault a fresh database has -- `ensure` counting rows for the guarantees that follow its own
+   * `create` -- so this one refuses to be that fake.
    */
   const engineThat = (keeps: Keeps): Engine =>
     ({
@@ -50,7 +57,9 @@ describe('a startup step that prepares a store', () => {
       async inspect() {
         return undefined;
       },
-      async rows() {
+      async rows(_on: On, step: Step) {
+        keeps.counted?.push(step.target);
+        if (!keeps.recorded?.[step.target]) throw new Error(`relation "${step.target}" does not exist`);
         return keeps.rows ?? 0;
       },
       async apply(_on: On, steps: Step[]): Promise<Applied> {
@@ -245,7 +254,10 @@ describe('a startup step that prepares a store', () => {
     // required with no default, and 4 rows already there with nothing to put in it: the rows are what it costs
     expect(failed).toMatch(/add url {2}string, required {2}\(destructive\)/);
     expect(failed).toMatch(/remove href {2}\(destructive\)/);
-    expect(failed).toMatch(/hint: run wilanis migrate .* to see the whole plan and apply it/);
+    // the hint names the tree's own directory, read off `env.serving`: a handler has no `env.root` to read,
+    // so a hint that named one would print `wilanis migrate .` wherever the operator happened to be standing
+    expect(failed).toContain(`hint: run wilanis migrate ${dir} --profile `);
+    expect(failed).toMatch(/to see the whole plan and apply it/);
     expect(keeps.applied).toEqual([]);
     expect(calls).not.toContain('listening');
     rmSync(dir, { recursive: true, force: true });
@@ -268,6 +280,27 @@ describe('a startup step that prepares a store', () => {
     const loaded = loadTree(dir, plugins);
     const { stop } = await start(loaded, { log: () => {} });
     expect(keeps.applied.map(steps => steps.map(step => step.says))).toEqual([['create collection entries']]);
+    expect(calls).toContain('listening');
+    await stop();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('a fresh database is never asked to count rows in a table the same plan is about to create', async () => {
+    // the fault this pins: a collection the record has never seen plans a `create`, and the guarantees the
+    // store declares follow it as steps of their own. A `unique` is a step the Guide table classes by a count,
+    // so asking the engine for one here asks a database to count rows in a table that does not exist yet --
+    // which is not zero, it is `relation "entries" does not exist`, and the whole start fails on a database
+    // that had nothing wrong with it. The engine above throws exactly as PostgreSQL does, so this case fails
+    // loudly if `ensure` ever asks again.
+    const keeps: Keeps = { applied: [], counted: [] };
+    const { dir, calls, plugins } = tree(keeps, { unique: [['url']] });
+    const loaded = loadTree(dir, plugins);
+    expect(checkTree(loaded).format()).toBe('');
+    const { stop } = await start(loaded, { log: () => {} });
+    expect(keeps.counted).toEqual([]);
+    expect(keeps.applied.map(steps => steps.map(step => step.says))).toEqual([
+      ['create collection entries', 'unique   [url]'],
+    ]);
     expect(calls).toContain('listening');
     await stop();
     rmSync(dir, { recursive: true, force: true });
