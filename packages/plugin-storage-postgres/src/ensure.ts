@@ -9,8 +9,12 @@
  * stops the tree the way an unreachable database does.
  *
  * What the catalog holds is `inspect.ts`'s to ask (RFC 0017, step 4): this reads its columns rather than
- * making a second query of its own. The judgement below stays here until step 5 (#238) puts `ensure` over the
- * planner, where the whole comparison becomes `inspect` against the record and this file's `judgeDrift` goes.
+ * making a second query of its own.
+ *
+ * Since step 5 (#238) this is no longer what `@storage/storage.port.json#ensure` reaches. That operation goes
+ * over the planner -- `recorded` and `inspect` against what the tree declares, classed by the *Guide* table --
+ * so the comparison a port's `ensure` makes is the planner's now, and `judgeDrift` below judges only for the
+ * callers of `Engine.ensure` that remain: the shared suite, which makes the tables its cases write into.
  */
 import type { At } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';

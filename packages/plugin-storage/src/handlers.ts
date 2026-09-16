@@ -6,7 +6,8 @@
 import type { Atomic } from '@wilanis/core';
 import type { Handler } from '@wilanis/engine';
 import type { At, Engine, Order, Query, Transaction } from './engine.js';
-import { collectionAt, collectionsOf, engineFor } from './store.js';
+import { ensureStore } from './ensure.js';
+import { collectionAt, engineFor, storeFor } from './store.js';
 import { whereOf } from './where.js';
 
 type Input = Record<string, unknown>;
@@ -106,19 +107,17 @@ const newKey: Handler = async ({ in: input, ctx }) => {
   return engine.newKey(where);
 };
 
-const NOTHING_MADE = { collections: 0, columns: 0, constraints: 0 };
-
 /**
- * What the engine made ready, or zeros. The counts are what was *created*, never what the store declares, so a
- * second run answers zeros and so does an engine with nothing to create -- that is what makes them worth
- * printing at startup: a line that says three collections were made says something a line saying three are
- * declared does not.
+ * What preparing the store created, or zeros. The work is `ensure.ts`'s, over the one planner: this reads the
+ * store off the tree and finds whoever keeps it, which is what every operation of this plugin does, and asks.
+ *
+ * The counts are what was *created*, never what the store declares, so a second run answers zeros and so does
+ * an engine with nothing to create -- that is what makes them worth printing at startup: a line that says
+ * three collections were made says something a line saying three are declared does not.
  */
 const ensure: Handler = async ({ in: input, ctx }) => {
-  const collections = collectionsOf(ctx.env, input.store);
-  if (!collections.length) return { ...NOTHING_MADE };
-  const made = await engineFor(ctx.env, collections[0]).ensure(collections);
-  return { ...NOTHING_MADE, ...made };
+  const store = storeFor(ctx.env, input.store);
+  return ensureStore(engineFor(ctx.env, store.on), store, ctx.env);
 };
 
 /** Every operation this plugin grants, by the path#operation a graph names. */

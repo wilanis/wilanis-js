@@ -4,7 +4,7 @@
   "description": "What is asked of the engine itself rather than of the records. A startup step reaches ensure through a domain port bound to a data graph, so what a tree prepares is what its project.json says it prepares.",
   "operations": {
     "ensure": {
-      "description": "Make every collection the store declares ready to answer. It adds what is missing -- a collection that is not there, a column a shape has gained, a constraint the store declares -- and leaves alone everything that is. What that means is the engine's: nothing at all for one that keeps records in memory, where a collection exists as soon as it is asked for. It is additive everywhere and destructive nowhere: anything it would have to destroy or change is refused as drift, which is not a graph's outcome but a startup failure, so the step stops the tree the way an unreachable database does. Answers what it created, each zero on a second run and on an engine with nothing to create.",
+      "description": "Plans the store's collections against what this connection has recorded (RFC 0017) and applies the plan when every step is additive; refuses drift, naming the steps and wilanis migrate, when one is not. Counts what it created.",
       "accepts": {
         "store": {
           "type": "string",
