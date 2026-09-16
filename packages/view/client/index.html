@@ -544,6 +544,28 @@
         }
         break;
       }
+      case 'invariant': {
+        if (d.access) {
+          const chain = el('div', 'chain');
+          chain.appendChild(step('gates', frag(d.access.over.length + (d.access.over.length === 1 ? ' operation' : ' operations'))));
+          chain.appendChild(arrow());
+          const req = d.access.requires || {};
+          if (req.policy) chain.appendChild(step('with the policy', link(req.policy)));
+          if (req.proves && req.proves.length) chain.appendChild(step('proving', frag(req.proves.join(', '))));
+          page.appendChild(chain);
+          page.appendChild(el('p', null, 'Every trigger that reaches one of these operations, directly or through another domain operation, must satisfy this. The checker refuses one that does not.'));
+          page.appendChild(el('h2', null, 'Operations it gates'));
+          page.appendChild(chips(d.access.over, showOp));
+        } else if (d.holds) {
+          const chain = el('div', 'chain');
+          chain.appendChild(step('holds over', link(d.holds.on)));
+          page.appendChild(chain);
+          page.appendChild(el('h2', null, 'The rule'));
+          page.appendChild(el('pre', 'mono', d.holds.when));
+          page.appendChild(el('p', null, 'The roots are the shape’s fields. Where a value of it is made or taken, the checker proves the rule or the compiler guards the site.'));
+        }
+        break;
+      }
       case 'connection': {
         const chain = el('div', 'chain'); chain.appendChild(step('a channel of kind', link(d.kind))); page.appendChild(chain);
         page.appendChild(el('h2', null, 'Settings')); page.appendChild(valuesTable(d.settings));
