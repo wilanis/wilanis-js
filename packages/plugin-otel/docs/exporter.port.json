@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/port.schema.json",
+  "label": "Trace exporter",
+  "description": "Sending this tree's runs to an OpenTelemetry collector. A project's startup list names `export` to open it: nothing phones home on its own, so a tree that does not ask to export does not. It names no trigger -- every run of every trigger is exported, because every run already leaves a report.",
+  "operations": {
+    "export": {
+      "description": "Subscribe to every run this tree serves and send it to the collector as spans, until the process stops. Export is batched and asynchronous, so a slow collector never delays an answer, and a collector that cannot be reached is said out loud and never fails the run whose trace it was handed. Answers where it sends and under what name, so a startup report says so.",
+      "holds": true,
+      "accepts": {
+        "level": {
+          "type": "string",
+          "required": false,
+          "description": "how much a span carries: \"summary\" or \"full\"; absent: the @otel plugin's settings.level, and \"summary\" when that is absent too"
+        }
+      },
+      "returns": {
+        "fields": {
+          "endpoint": {
+            "type": "string",
+            "description": "the collector being exported to"
+          },
+          "service": {
+            "type": "string",
+            "description": "the service.name every exported span carries"
+          }
+        }
+      }
+    }
+  }
+}
