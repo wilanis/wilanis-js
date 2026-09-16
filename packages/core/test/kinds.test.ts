@@ -223,12 +223,14 @@ describe('store', () => {
       at('collections', "property name 'Bad Name'", 'identifier'),
     ]);
   });
-  it('a collection may declare what no two records repeat, which field holds another collection key, and what existing rows receive', () => {
+  it('a collection may declare what no two records repeat, which field holds another collection key, what existing rows receive, and what it was called before', () => {
     const entries = {
       of: '@features/f/domain/Entry.shape.json',
       key: 'id',
       unique: [['url', 'method']],
       defaults: { ua: 'unknown' },
+      renamed: { agent: 'ua' },
+      was: 'calls',
       description: 'observed calls',
     };
     const notes = {
@@ -237,6 +239,20 @@ describe('store', () => {
       refs: { entryId: { collection: 'entries', onRemove: 'refuse', description: 'the entry observed' } },
     };
     expect(refused(doc('store', { collections: { entries, notes } }))).toEqual([]);
+  });
+  it('a rename names both names by an identifier, and a previous collection name is one identifier', () => {
+    const collections = (one: Record<string, unknown>) =>
+      doc('store', { collections: { entries: { of: '@features/f/domain/Entry.shape.json', key: 'id', ...one } } });
+    expect(refused(collections({ renamed: { agent: 7 } }))).toEqual([
+      at('collections/entries/renamed/agent', 'must be string'),
+    ]);
+    expect(refused(collections({ renamed: { 'the agent': 'ua' } }))).toEqual([
+      at('collections/entries/renamed', "property name 'the agent'", 'identifier'),
+    ]);
+    expect(refused(collections({ renamed: { agent: 'the ua' } }))).toEqual([
+      at('collections/entries/renamed/agent', 'identifier'),
+    ]);
+    expect(refused(collections({ was: 'two words' }))).toEqual([at('collections/entries/was', 'identifier')]);
   });
   it('a constraint names each field by its identifier, and names at least one', () => {
     const collections = (one: Record<string, unknown>) =>

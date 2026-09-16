@@ -94,6 +94,20 @@
               "$ref": "common.schema.json#/$defs/ident"
             }
           },
+          "renamed": {
+            "description": "Fields of the shape that changed name, each keyed by its name now and holding its name before, so `wilanis migrate` renames the column instead of dropping one and adding another. Remove the entry once every database has applied it; the planner says when. A name may appear once as a value.",
+            "type": "object",
+            "propertyNames": {
+              "$ref": "common.schema.json#/$defs/ident"
+            },
+            "additionalProperties": {
+              "$ref": "common.schema.json#/$defs/ident"
+            }
+          },
+          "was": {
+            "description": "The collection's name before this one on the same connection, so `wilanis migrate` renames the table instead of dropping it and creating another. Remove it once every database has applied it.",
+            "$ref": "common.schema.json#/$defs/ident"
+          },
           "description": {
             "description": "What this collection holds, for a reader of a graph that reads or writes it.",
             "type": "string"

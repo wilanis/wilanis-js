@@ -342,7 +342,9 @@ export interface StoreRef {
  * One collection of a store: the shape its records have, the field that identifies one, the constraints the
  * records are held to, and what it holds. `unique` lists combinations no two records may repeat, each inner
  * list one constraint over those fields together; `refs` says which fields hold another collection's key;
- * `defaults` is what existing rows receive when `ensure` adds a column, never what a graph writes.
+ * `defaults` is what existing rows receive when `ensure` adds a column, never what a graph writes; `renamed`
+ * and `was` say what a field or the collection was called before, so `wilanis migrate` renames rather than
+ * drops and creates.
  */
 export interface Collection {
   of: TypeRef;
@@ -350,6 +352,10 @@ export interface Collection {
   unique?: string[][];
   refs?: Record<string, StoreRef>;
   defaults?: Record<string, unknown>;
+  /** field name now -> its name before, so a column is renamed instead of dropped and added. */
+  renamed?: Record<string, string>;
+  /** the collection's name before this one on the same connection, so the table is renamed instead of recreated. */
+  was?: string;
   description?: string;
 }
 /**
