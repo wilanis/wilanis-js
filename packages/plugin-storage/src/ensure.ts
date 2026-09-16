@@ -63,14 +63,34 @@ async function standing(engine: Engine, on: On, names: string[]) {
 }
 
 /**
+ * The collections this plan brings into existence itself. A `create` is the first step of its collection and
+ * every later step of the same plan is against a table that does not exist yet, so asking a database to count
+ * rows in one is asking about a relation it has never heard of -- which is not zero rows, it is an error.
+ */
+function beingCreated(steps: Step[]): Set<string> {
+  return new Set(steps.filter(step => step.do === 'create').map(step => step.target));
+}
+
+/**
+ * How many rows stand in this step's way. A step of a collection the same plan opens with `create` has none
+ * by construction: the table is not there to hold a row, and the guarantees that follow the `create` are over
+ * columns made empty a moment earlier. The engine is not asked, because there is nothing yet to ask it about.
+ */
+async function rowsFor(engine: Engine, on: On, step: Step, fresh: Set<string>): Promise<number> {
+  if (!counts(step) || fresh.has(step.target)) return 0;
+  return engine.rows(on, step);
+}
+
+/**
  * Every step classed, with the row count the engine answered where the count changes the answer. `attempts`
  * is handed to the classing because which casts an engine writes is that engine's table and no count answers
  * it: a pair it refuses is refused on an empty table exactly as on a full one.
  */
 async function classedSteps(engine: Engine, on: On, steps: Step[]): Promise<Classed[]> {
+  const fresh = beingCreated(steps);
   const out: Classed[] = [];
   for (const step of steps) {
-    const rows = counts(step) ? await engine.rows(on, step) : 0;
+    const rows = await rowsFor(engine, on, step, fresh);
     out.push(classed(step, rows, { attempts: (was, becomes) => engine.attempts(was, becomes) }));
   }
   return out;
@@ -96,38 +116,44 @@ function madeBy(steps: Step[]): Made {
 /**
  * Who a migration this `ensure` applied is recorded as having been run by, and from which tree. A startup
  * step is nobody's hand on a keyboard, so it says so: the operator reading the history sees that the tree
- * prepared itself rather than that a person ran `wilanis migrate`.
+ * prepared itself rather than that a person ran `wilanis migrate`. The tree is named by the directory it is
+ * rooted at, which is what `env.serving` knows about it; a run outside a served tree names none.
  */
-function applying(root: string): Applying {
-  return { by: `${userInfo().username}@${hostname()} (startup)`, tree: basename(root) };
+function applying(root: string | undefined): Applying {
+  return { by: `${userInfo().username}@${hostname()} (startup)`, tree: root ? basename(root) : 'unknown' };
 }
 
 /**
  * The drift a step that is not additive refuses with: the steps one per line, each with its class and, where
  * the classing said why, the reason. The hint names the command that prints the whole plan and applies it
  * under the operator's eye, which is the one thing a startup step will never do on its own.
+ *
+ * The profile is not in the hint because a handler cannot know it: it is a compile option the `Embedder`
+ * holds and never puts on the environment, so naming one would mean naming a guess. The hint says which
+ * flag to add instead of printing a command that would run under the wrong bindings.
  */
-function drift(steps: Classed[], root: string, profile: string | undefined): Error {
+function drift(steps: Classed[], root: string | undefined): Error {
   const lines = steps.map(one => `  ${one.step.says}  (${one.class})${one.refused ? ` -- ${one.refused}` : ''}`);
-  const flag = profile ? ` --profile ${profile}` : '';
+  const where = root ?? 'the tree';
   return new Error(
     `drift: the store declares changes this startup step will not make:\n${lines.join('\n')}\n` +
-      `hint: run wilanis migrate ${root}${flag} to see the whole plan and apply it`,
+      `hint: run wilanis migrate ${where} --profile <the profile this tree starts under> ` +
+      'to see the whole plan and apply it',
   );
 }
 
-/** What the tree is rooted at and which profile it is running under, as the hint names them back to a reader. */
-function where(env: Record<string, unknown>): { root: string; profile: string | undefined } {
-  const root = typeof env.root === 'string' ? env.root : '.';
-  const profile = typeof env.profile === 'string' ? env.profile : undefined;
-  return { root, profile };
-}
-
-/** The way a startup step says what it did, where the tree is being served; a run outside one says nothing. */
-function logger(env: Record<string, unknown>): (line: string) => void {
-  const serving = env.serving as { log?: (line: string) => void } | undefined;
-  const log = serving?.log;
-  return typeof log === 'function' ? line => log(line) : () => undefined;
+/**
+ * What a handler can learn about the tree being served: where it is rooted, and how to say something to
+ * whoever started it. Both come from `env.serving`, which the runtime sets before it runs a startup step --
+ * a run outside one (a graph under test, a rehearsal) has neither, and says so by answering nothing.
+ */
+function serving(env: Record<string, unknown>): { root?: string; log: (line: string) => void } {
+  const held = env.serving as { root?: unknown; log?: (line: string) => void } | undefined;
+  const log = held?.log;
+  return {
+    root: typeof held?.root === 'string' ? held.root : undefined,
+    log: typeof log === 'function' ? line => log(line) : () => undefined,
+  };
 }
 
 /**
@@ -160,12 +186,12 @@ export async function ensureStore(engine: Engine, store: Lowering, env: Record<s
   const { recorded, found } = await standing(engine, store.on, names);
   const planned = plan(recorded, declared, marksOfStore(store.declaring), found);
   const judged = await classedSteps(engine, store.on, planned.steps);
-  const { root, profile } = where(env);
-  if (judged.some(one => one.class !== 'additive')) throw drift(judged, root, profile);
+  const { root, log } = serving(env);
+  if (judged.some(one => one.class !== 'additive')) throw drift(judged, root);
   const steps = judged.map(one => one.step);
   if (!steps.length) return { ...NOTHING_MADE };
   const applied = await engine.apply(store.on, steps, recording(declared, steps), applying(root));
   if (!applied) return { ...NOTHING_MADE };
-  logAdoptions(steps, store.on.connection, logger(env));
+  logAdoptions(steps, store.on.connection, log);
   return madeBy(steps);
 }
