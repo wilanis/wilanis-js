@@ -8,14 +8,18 @@
  * node's message, because a message is prose an author interpolated values into and only they can say it is
  * safe to export. A refusal's `detail` never enters a trace at either level.
  */
-import type { Scope, Trace, TraceAttributes } from '@wilanis/core';
+import type { Scope, Trace, TraceAttributes, TraceLevel } from '@wilanis/core';
 import type { NodeReport, Report } from '@wilanis/engine';
 import { type Decided, type Fired, type Identified, isStarted, type Ran, statusOf } from './fired.js';
 
+/**
+ * How much a span carries, and the narrowing of an already-built trace to it. Both are core's, beside the
+ * `Trace` they describe, so the runtime that builds a trace and an exporter that sends one read one list of
+ * what counts as a value; they are re-exported here because this is the module a reader of traces opens.
+ */
+export { atLevel } from '@wilanis/core';
 export { traceJson, traceText } from './trace-print.js';
-
-/** How much a span carries: `summary` never a value, `full` the report's redacted in/out and the message. */
-export type Level = 'summary' | 'full';
+export type Level = TraceLevel;
 
 /** What a walk of one run carries down: the tree it reads contracts from, and how much a span may say. */
 interface Walk {
@@ -283,26 +287,6 @@ function firedSpan(fired: Fired, walk: Walk): Trace {
     },
     children: firedChildren(fired, walk),
   });
-}
-
-/** The attributes that carry what a run said rather than what it did; `summary` carries none of them. */
-const VALUED = ['wilanis.in', 'wilanis.out', 'wilanis.error'];
-
-/**
- * A trace already built, narrowed to what a level allows: the same spans and the same nesting, carrying only
- * what the level lets them. One trace is built per run and handed to every observer, so the narrowing is each
- * observer's and not the server's -- a printer asked for `summary` and an exporter asked for `full` are served
- * by the one walk. A cancelled node is kept at `full` and dropped at `summary`.
- */
-export function atLevel(trace: Trace, level: Level): Trace {
-  if (level === 'full') return trace;
-  const attributes: TraceAttributes = {};
-  for (const [name, value] of Object.entries(trace.attributes)) if (!VALUED.includes(name)) attributes[name] = value;
-  return {
-    ...trace,
-    attributes,
-    children: trace.children.filter(child => child.status !== 'cancelled').map(child => atLevel(child, level)),
-  };
 }
 
 /**

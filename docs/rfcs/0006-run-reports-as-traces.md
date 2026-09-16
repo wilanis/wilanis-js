@@ -226,9 +226,10 @@ sees the branches not taken; the `full` level keeps them, the `summary` level dr
 carries the request: only the correlation string. At level `summary` a span carries status, timing and the
 attributes above, and never a value. At level `full` a span also carries `wilanis.in` and `wilanis.out` as JSON
 of the report's redacted `in`/`out`, and `wilanis.error` as the node's message. A refusal's `message` and a
-fault's `error` can interpolate values (`"no entry {{in.id}}"`), so `trace.ts` passes every message through
-`redactValue` with the union of the node's redact paths applied to the *values* the message may contain: the
-rule is that `summary` carries the reason alone and never the message; the message appears at `full` only.
+fault's `error` can interpolate values (`"no entry {{in.id}}"`), and the rule is that `summary` carries the
+reason alone and never the message; the message appears at `full` only. This RFC first said `trace.ts` would
+pass every message through `redactValue` with the union of the node's redact paths; it does not, because a
+message is a string and `redactValue` walks paths into a value -- see "Decided during implementation" 3.
 A reason is a word the author declared in `refuses`, a closed set that cannot leak; a message is prose that
 interpolates whatever the author wrote into it, and `redactValue` blanks only the paths a document *marked*
 secret. The value nobody thought to mark is exactly the one that ends up in a message, so the level that is
@@ -353,3 +354,18 @@ gains a member, which only plugins that hold something ever see. `@wilanis/plugi
    is the way to avoid a dependency for it.
 2. Whether `wilanis run --trace` prints before or after the answer on stdout when the answer is a blob
    streamed to stdout (`deliver`): the trace goes to stderr regardless, so ordering only affects a terminal.
+3. **A message cannot be redacted by path, so `full` carries it whole.** The Redaction paragraph above said
+   `trace.ts` passes every message through `redactValue` with the union of the node's redact paths. Writing it
+   showed the mechanism does not fit what a message is. `redactValue` (`packages/engine/src/redact.ts`) takes
+   `(value, paths)`, JSON round-trips the value and walks each path into the copy; `redactAt` only assigns
+   where the parent it reaches is an object. A `NodeReport.error` is a flat `string` -- prose the handler
+   already interpolated its values into -- so every non-empty path walks into nothing and returns the message
+   unchanged, and the only path that bites is the empty one, which blanks the whole message and leaves `full`
+   with no message at all. There is no third behaviour to reach for: by the time a message is on a report the
+   values are characters in it, and nothing short of re-running the interpolation against the redacted inputs
+   could tell which characters came from a marked path.
+   So `trace.ts` does not call `redactValue` on a message, and `valued` exports `node.error` as the report
+   holds it. The rule the paragraph was defending is unchanged and is the one that matters: `summary` carries
+   the reason alone and never the message, and the message appears at `full` only, which is the author saying
+   they have read what their messages say. Redacting a message by path would have been a guarantee the
+   mechanism could not keep, which is worse than the level being the whole of the promise.
