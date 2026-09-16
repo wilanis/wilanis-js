@@ -78,10 +78,9 @@ export MONITOR_JWT_SECRET=$(openssl rand -base64 32)
 export MONITOR_DATABASE_URL=postgres://user:password@127.0.0.1:5432/monitor
 ```
 
-`Entry` has just changed in three ways: it gained an optional `note`, its `ua` became `agent`, and notes now
-live on the entry rather than in a collection of their own. Two of those a diff can see. The rename it
-cannot -- from outside, `ua` gone and `agent` new is a dropped column and a new one, and every user agent
-lost -- so `entries.store.json` says it, keyed by the field's name now:
+`Entry` has just changed in two ways: it gained an optional `note`, and its `ua` became `agent`. The added
+field a diff can see. The rename it cannot -- from outside, `ua` gone and `agent` new is a dropped column
+and a new one, and every user agent lost -- so `entries.store.json` says it, keyed by the field's name now:
 
 ```json
 "defaults": { "agent": "unknown" },
@@ -107,7 +106,10 @@ and the added column is `additive`, since an optional field costs no row anythin
 
 **Dropping a collection is the operator's to allow.** A collection the record has seen and the tree no
 longer declares is a table with rows in it, so the plan refuses it and says what would unlock it, naming
-the pair of connection and collection, because two connections of one tree may each hold a `notes`:
+the pair of connection and collection, because two connections of one tree may each hold a `notes`. This
+example declares no `notes` -- grep it and you will find none -- so the two blocks below are what you would
+see had it declared one and then stopped; they were produced by declaring it, applying, and taking it away
+again:
 
 ```
   notes

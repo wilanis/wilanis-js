@@ -87,7 +87,7 @@ describe('sabotage: the project, its plugins and its startup', () => {
     expect(
       sabotage('project.json', project => {
         project.startup[0].run = '@monitor/domain/monitor.port.json#record';
-        project.startup[0].in = { url: 'http://x', method: 'GET', ua: 'startup' };
+        project.startup[0].in = { url: 'http://x', method: 'GET', agent: 'startup' };
       }),
     ).toContain('B008');
   });
