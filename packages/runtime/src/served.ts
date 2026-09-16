@@ -2,6 +2,7 @@
 import { checkTree } from '@wilanis/compiler';
 import type { LoadResult, Serving, Trace } from '@wilanis/core';
 import type { Embedder } from './embed.js';
+import { type Ran, rootOf } from './fired.js';
 import { postLoad } from './post-load.js';
 import { loadProject } from './project.js';
 import { embedderFor } from './tools.js';
@@ -61,6 +62,15 @@ export class Served {
     return () => {
       this.listeners.delete(listener);
     };
+  }
+
+  /**
+   * What the embedder of the tree being served hands over after every run -- a fire of a trigger, or one of
+   * the project's startup steps -- said as a trace and told to everyone listening. It is the server that is
+   * told and not the embedder that tells, because a reload replaces the embedder and never the listeners.
+   */
+  ran(what: Ran): void {
+    this.observed(rootOf(what));
   }
 
   /**

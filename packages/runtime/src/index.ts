@@ -17,7 +17,18 @@ export {
   satisfy,
   switchesOf,
 } from './branches.js';
-export { coerceWire, Embedder, type FireOptions, fillTemplates, prune } from './embed.js';
+export { coerceWire, Embedder, type FireOptions, fillTemplates, type Observers, prune } from './embed.js';
+export {
+  correlationOf,
+  type Decided,
+  type Fired,
+  type Identified,
+  isStarted,
+  type Ran,
+  rootOf,
+  type Started,
+  statusOf,
+} from './fired.js';
 export { cli as cliTriggers } from './plugins/cli-trigger.js';
 export { BUILTIN_PLUGINS } from './plugins/index.js';
 export { std } from './plugins/std.js';

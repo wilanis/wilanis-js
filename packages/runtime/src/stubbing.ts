@@ -83,6 +83,8 @@ export function embedderFor(
     types?: Record<string, Type>;
     profile?: string;
     env?: NodeJS.ProcessEnv;
+    /** What every stamp of every run is read from; `Date.now` unless given, so a test can freeze time. */
+    clock?: () => number;
   } = {},
 ): Embedder {
   const scope = new Scope(load.registry, load.resolve);
@@ -92,6 +94,7 @@ export function embedderFor(
     stubEffects: opts.seed !== undefined ? stubEffects(opts.seed, opts.record, opts.types) : undefined,
     env,
     root: load.root,
+    clock: opts.clock,
   });
 }
 

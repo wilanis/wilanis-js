@@ -5,19 +5,12 @@
  */
 import { buildEnv, type Compiled, type CompileOptions, Compiler, runGraph } from '@wilanis/compiler';
 import type { Codecs, Hold, PluginModule, Scope, Serving } from '@wilanis/core';
-import {
-  type BlobStore,
-  conforms,
-  type GuardArgs,
-  policyPath,
-  type StartupStep,
-  type TriggerDoc,
-  type Type,
-} from '@wilanis/core';
+import { type BlobStore, conforms, type GuardArgs, type StartupStep, type TriggerDoc, type Type } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
-import { refusalOf } from '@wilanis/engine';
 import { FileBlobStore } from './blobs.js';
-import { coerceWire, fillTemplates, prune, refused } from './values.js';
+import { correlationOf, type Fired, type Ran, runId, type Started } from './fired.js';
+import { gate } from './gate.js';
+import { coerceWire, fillTemplates, prune } from './values.js';
 
 export { coerceWire, fillTemplates, prune } from './values.js';
 
@@ -25,6 +18,11 @@ export interface FireOptions {
   stubs?: Record<string, unknown>;
   signal?: AbortSignal /** The blob scope of this run; handlers see it as env.blobs. Absent: the tree's store itself. */;
   blobs?: BlobStore;
+}
+
+/** What is told of every run this embedder makes; `Served` is the one that holds them, so a reload keeps them. */
+export interface Observers {
+  ran(what: Ran): void;
 }
 
 /** Whether a value is a credential at all: a value with nothing in it is none. */
@@ -80,13 +78,21 @@ export class Embedder {
   /** A run whose effects are stubbed (rehearse, fuzz, regress): nothing leaves the process, and nothing gates it. */
   readonly stubbed: boolean;
   /** The one plugin that identifies callers, when the project names one. */
-  private readonly guard: PluginModule | undefined;
+  readonly guard: PluginModule | undefined;
+  /** What every stamp of every run this embedder makes is read from, so a test can freeze time. */
+  readonly clock: () => number;
+  /**
+   * Who is told of every run. It is the server's, never this embedder's own, because a reload builds a fresh
+   * embedder and an observer left on the old one would go quiet without saying so.
+   */
+  private observers: Observers | undefined;
 
   constructor(
     readonly scope: Scope,
     readonly plugins: PluginModule[],
-    opts: CompileOptions & { env?: NodeJS.ProcessEnv; blobs?: BlobStore; root?: string } = {},
+    opts: CompileOptions & { env?: NodeJS.ProcessEnv; blobs?: BlobStore; root?: string; clock?: () => number } = {},
   ) {
+    this.clock = opts.clock ?? Date.now;
     this.compiler = new Compiler(scope, plugins, opts);
     const processEnv = opts.env ?? process.env;
     const built = buildEnv(scope, processEnv);
@@ -104,9 +110,30 @@ export class Embedder {
     this.guard = plugins.find(plugin => plugin.guard);
   }
 
-  /** Give `holds` operations the tree being served, as env.serving. Only `start` calls this: a stubbed run holds nothing. */
-  serve(served: { serving(): Serving }) {
+  /**
+   * Give `holds` operations the tree being served, as env.serving, and take the server's observers so every run
+   * this embedder makes is told to them. Only `start` and a reload call this: a stubbed run holds nothing and
+   * records nothing, since nobody registered with it.
+   */
+  serve(served: { serving(): Serving } & Observers) {
     (this.env as Record<string, unknown>).serving = served.serving();
+    this.observers = served;
+  }
+
+  /** Tell whoever is listening what one run did; a run nobody is serving is told to nobody. */
+  private observed(what: Ran): void {
+    this.observers?.ran(what);
+  }
+
+  /** The environment one run sees: the tree's, with this run's blob scope where it has one of its own. */
+  envFor(blobs: unknown): Record<string, unknown> {
+    return blobs ? { ...this.env, blobs } : this.env;
+  }
+
+  /** A port operation as `path#operation`, canonical, for a record that names what ran across restarts. */
+  private opPath(opRef: string): string {
+    const found = this.scope.op(opRef);
+    return typeof found === 'string' ? opRef : `${found.path}#${found.opName}`;
   }
 
   /** The compiled form of one graph, compiled the first time it is asked for and kept for every run after. */
@@ -134,16 +161,29 @@ export class Embedder {
   /**
    * Run one of the project's startup steps: the domain port operation it names, with its `in` written as
    * literals and {{secrets.*}}. Nothing has been received, so the run is given no request -- the checker
-   * has already refused any step that reaches a read of one.
+   * has already refused any step that reaches a read of one. What it did is told to whoever is listening as a
+   * `Started` and never as a `Fired`: a step is not a trigger, it has no kind, no correlation and no gate.
    */
-  async startup(step: StartupStep, opts: FireOptions = {}): Promise<Report> {
+  async startup(step: StartupStep, opts: FireOptions & { at?: number } = {}): Promise<Report> {
     const compiled = this.operation(step.run);
     const input = fillTemplates(step.in ?? {}, { secrets: this.secrets }) as Record<string, unknown>;
-    return runGraph(compiled, {
+    const startedAt = this.clock();
+    const answer = await runGraph(compiled, {
       initial: { in: input },
       signal: opts.signal,
-      env: opts.blobs ? { ...this.env, blobs: opts.blobs } : this.env,
+      clock: this.clock,
+      env: this.envFor(opts.blobs),
     });
+    this.observed({
+      id: runId(startedAt),
+      at: opts.at ?? 0,
+      label: step.label ?? step.run,
+      run: this.opPath(step.run),
+      answer,
+      startedAt,
+      endedAt: this.clock(),
+    } satisfies Started);
+    return answer;
   }
 
   /**
@@ -165,83 +205,11 @@ export class Embedder {
   }
 
   /**
-   * The gate before a run. The guard verifies the credentials the trigger's policy attachments give, and what it
-   * establishes joins the request; then every policy decides, in order. Answers the report that ends the run
-   * -- the guard's refusal, a policy's denial, a challenge carrying its detail -- or nothing when the trigger
-   * may fire. A stubbed run is never gated: its generated context already carries a principal, and the
-   * policies are rehearsed as roots of their own.
-   */
-  private async gate(
-    trigger: TriggerDoc,
-    request: Record<string, unknown>,
-    opts: FireOptions,
-  ): Promise<Report | undefined> {
-    if (this.stubbed || !trigger.policies?.length) return undefined;
-    const args = this.guardArgs(trigger, request);
-    const identify = this.guard?.guard?.identify;
-    if (this.guard && identify) {
-      const id = await identify(args);
-      if ('refuse' in id) return refused(`${this.guard.root} guard`, 'identify', id.refuse);
-      Object.assign(request, id.context);
-    }
-    for (const use of trigger.policies) {
-      const decided = await this.decide(policyPath(use), request, opts, args);
-      if (decided) return decided;
-    }
-    return undefined;
-  }
-
-  /** One policy's decision: nothing when it allows, else the report that ends the run. */
-  private async decide(
-    ref: string,
-    request: Record<string, unknown>,
-    opts: FireOptions,
-    args: GuardArgs,
-  ): Promise<Report | undefined> {
-    const policy = this.scope.get('policy', ref);
-    if (!policy) throw new Error(`unknown policy '${ref}'`);
-    const report = await runGraph(this.operation(policy.doc.decide.run), {
-      initial: { in: fillTemplates(policy.doc.decide.in ?? {}, { request }), request },
-      signal: opts.signal,
-      env: opts.blobs ? { ...this.env, blobs: opts.blobs } : this.env,
-    });
-    if (report.status === 'done') return undefined;
-    const decided: Report = { ...report, graph: policy.path };
-    const outcome = refusalOf(report);
-    if (!outcome) return decided; // the decision broke: a fault, answered as one
-    const effect = policy.doc.outcomes[outcome.reason];
-    if (effect?.effect !== 'challenge' || !this.guard) return decided;
-    return this.challenged(decided, args, { policy: policy.path, outcome, method: effect.method });
-  }
-
-  /** A denial the guard turns into a challenge: the same report, carrying how to answer it. */
-  private async challenged(
-    decided: Report,
-    args: GuardArgs,
-    what: { policy: string; outcome: { reason: string; message: string }; method?: string },
-  ): Promise<Report> {
-    const challenge = await this.guard?.guard?.challenge({
-      ...args,
-      policy: what.policy,
-      reason: what.outcome.reason,
-      message: what.outcome.message,
-      method: what.method,
-    });
-    const failed = Object.entries(decided.nodes).find(([, node]) => node.status === 'failed');
-    if (!challenge || !failed) return decided;
-    const [id, node] = failed;
-    return {
-      ...decided,
-      nodes: { ...decided.nodes, [id]: { ...node, error: challenge.message, detail: challenge.detail } },
-    };
-  }
-
-  /**
    * What the guard is handed: the credentials the trigger's policy attachments give, read from the context -- a list is
    * the places one may sit, the first present wins; a value with nothing in it is no credential -- and the reads as
    * written, so the guard can say where an answer goes.
    */
-  private guardArgs(trigger: TriggerDoc, request: Record<string, unknown>): GuardArgs {
+  guardArgs(trigger: TriggerDoc, request: Record<string, unknown>): GuardArgs {
     const settings = this.guard
       ? ((this.env.plugins as Record<string, Record<string, unknown>>)[this.guard.root] ?? {})
       : {};
@@ -287,7 +255,9 @@ export class Embedder {
   /**
    * The report of one trigger's run: the gate's answer where it ends the run, else the port operation's, with the
    * output pruned to what a closed out shape declares and judged against it. This is where the domain's value
-   * becomes the edge's.
+   * becomes the edge's. What the whole fire did -- the gate's decisions, allowed or not, the guard's timing, the
+   * run -- is assembled as a `Fired` and told to whoever is listening; a stubbed run tells nobody, since nothing
+   * is serving it.
    */
   async fire(
     trigger: TriggerDoc,
@@ -295,36 +265,73 @@ export class Embedder {
     request: Record<string, unknown>,
     opts: FireOptions = {},
   ): Promise<Report> {
-    const gated = await this.gate(trigger, request, opts);
-    if (gated) return gated;
-    const compiled = this.operation(trigger.fire.run);
+    const startedAt = this.clock();
+    const gated = await gate(this, trigger, request, { stubbed: this.stubbed, ...opts });
+    const run = gated.ended ? undefined : await this.ran(trigger, input, request, opts);
+    const answer = gated.ended ?? (run as Report);
+    const correlation = this.correlation(trigger, request);
+    this.observed({
+      id: runId(startedAt),
+      trigger: this.pathOf(trigger),
+      kind: this.scope.canon(trigger.kind),
+      ...(correlation ? { correlation } : {}),
+      ...(gated.identify ? { identify: gated.identify } : {}),
+      decisions: gated.decisions,
+      ...(run ? { run } : {}),
+      answer,
+      startedAt,
+      endedAt: this.clock(),
+    } satisfies Fired);
+    return answer;
+  }
+
+  /** The trigger's operation, run, settled with the guard, and judged against the trigger's out type. */
+  private async ran(
+    trigger: TriggerDoc,
+    input: unknown,
+    request: Record<string, unknown>,
+    opts: FireOptions,
+  ): Promise<Report> {
     const initial: Record<string, unknown> = { request };
     if (input !== undefined) initial.in = input;
-    const report = await runGraph(compiled, {
+    const report = await runGraph(this.operation(trigger.fire.run), {
       initial,
       stubs: opts.stubs,
       signal: opts.signal,
-      env: opts.blobs ? { ...this.env, blobs: opts.blobs } : this.env,
+      clock: this.clock,
+      env: this.envFor(opts.blobs),
     });
     const guard = this.guard?.guard;
     if (guard?.settle && !this.stubbed && trigger.policies?.length)
       await guard.settle({ ...this.guardArgs(trigger, request), report });
     const declared = trigger.out ? this.types(trigger).out : undefined;
-    if (report.status === 'done' && declared) {
-      const type = declared;
-      const output = prune(report.output, type); // a closed out shape keeps only what it declares
-      const bad = conforms(output, type);
-      if (bad)
-        return {
-          ...report,
-          status: 'failed',
-          nodes: {
-            ...report.nodes,
-            out: { status: 'failed', error: `the answer does not conform to ${trigger.out}: ${bad}` },
-          },
-        };
-      return { ...report, output };
-    }
-    return report;
+    return report.status === 'done' && declared ? judged(report, declared, trigger.out ?? '') : report;
   }
+
+  /** The canonical path the trigger is written at, or its kind and operation where it is not one of the tree's. */
+  private pathOf(trigger: TriggerDoc): string {
+    const found = this.scope.registry.all('trigger').find(one => one.doc === trigger);
+    return found?.path ?? this.opPath(trigger.fire.run);
+  }
+
+  /** What correlates this run with its caller's own trace: the value at the path the trigger's kind declares. */
+  private correlation(trigger: TriggerDoc, request: Record<string, unknown>): string | undefined {
+    const kind = this.scope.get('trigger-kind', trigger.kind);
+    return correlationOf(request, kind?.doc.correlation);
+  }
+}
+
+/** A done report judged against the trigger's out type: pruned to what a closed shape declares, or refused. */
+function judged(report: Report, type: Type, out: string): Report {
+  const output = prune(report.output, type); // a closed out shape keeps only what it declares
+  const bad = conforms(output, type);
+  if (!bad) return { ...report, output };
+  return {
+    ...report,
+    status: 'failed',
+    nodes: {
+      ...report.nodes,
+      out: { status: 'failed', error: `the answer does not conform to ${out}: ${bad}` },
+    },
+  };
 }
