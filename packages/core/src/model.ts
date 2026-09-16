@@ -2,10 +2,34 @@
  * The document model: one TypeScript type per document kind, mirroring schemas/*.schema.json.
  * A document's kind is its $schema (the published URL, or the alias @wilanis/<kind>.schema.json); its identity is its path (@...).
  * Where those URLs point, and how a $schema is read back to a kind, is `published.ts`.
+ * The vocabulary every kind is written in -- the envelope, types, fields and values -- is `vocabulary.ts`,
+ * re-exported here so model.js stays the one import for the document model.
  */
 
-/** Every document kind, named once: the `Kind` union is read off this list, so a new kind is added here alone. */
-const EVERY_KIND = [
+import type { Envelope, Fields, InlineObject, TypeRef, TypeSpec, Value, Values } from './vocabulary.js';
+
+export * from './vocabulary.js';
+
+export type Kind =
+  | 'project'
+  | 'plugin'
+  | 'port'
+  | 'binding'
+  | 'graph'
+  | 'trigger'
+  | 'policy'
+  | 'trigger-kind'
+  | 'connection-kind'
+  | 'connection'
+  | 'codec'
+  | 'feature'
+  | 'shape'
+  | 'scenario'
+  | 'resolvers'
+  | 'store'
+  | 'invariant';
+
+export const KINDS: Kind[] = [
   'project',
   'plugin',
   'port',
@@ -23,9 +47,7 @@ const EVERY_KIND = [
   'resolvers',
   'store',
   'invariant',
-] as const;
-export type Kind = (typeof EVERY_KIND)[number];
-export const KINDS: Kind[] = [...EVERY_KIND];
+];
 
 /**
  * The three layers of a feature, named by the directory a document sits in. A document's layer is where it
@@ -45,45 +67,6 @@ export function layerOf(path: string): Layer | undefined {
 export const NODE_RUN = '@wilanis/node/run.schema.json';
 export const NODE_SWITCH = '@wilanis/node/switch.schema.json';
 export const NODE_MAP = '@wilanis/node/map.schema.json';
-
-/** Every document: its kind, what it is for, and optionally a short human name a reader sees instead of its path. */
-export interface Envelope {
-  $schema: string;
-  description: string;
-  label?: string;
-}
-
-export type TypeRef = string;
-export interface InlineObject {
-  fields: Record<string, Field>;
-  open?: boolean | TypeRef;
-  description?: string;
-}
-export type TypeSpec = TypeRef | InlineObject;
-/**
- * One field of a shape or a contract. `static`: where the operation is called the value must be a literal,
- * never a read; a field of type `type` always is. `resolves`: variable -> the path within the document this
- * field's literal names whose value is the type to bind it to (`resolves.ts` holds the grammar).
- */
-export interface Field {
-  type: TypeSpec;
-  required?: boolean;
-  description?: string;
-  secret?: boolean;
-  enum?: string[];
-  binds?: string;
-  static?: boolean;
-  resolves?: Record<string, string>;
-}
-export type Fields = Record<string, Field>;
-
-/**
- * A value where an operation is called: a literal as written, or a string carrying {{root.path}} templates.
- * Alone, a template takes that value and its type; embedded in text it is interpolated. Lists and objects
- * hold values. This is the one grammar for a node's in, a resolver's in, a delegation's in and a trigger's input.
- */
-export type Value = unknown;
-export type Values = Record<string, Value>;
 
 /** One resolver: a named read of the trigger kind's context, request.params.id or request.headers['user-agent']. Nothing runs. */
 export interface ResolverRead {

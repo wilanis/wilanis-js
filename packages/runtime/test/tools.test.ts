@@ -71,6 +71,16 @@ describe('wilanis new', () => {
     expect(
       scaffold(dir, 'trigger', 'features/tasks/list', { run: '@features/tasks/domain/tasks.port.json#example' }),
     ).toEqual(['features/tasks/edge/list.trigger.json']);
+    // an invariant is a rule of the business, so both its forms land in domain/: --over writes the access form,
+    // and without it the field form over a core shape
+    expect(
+      scaffold(dir, 'invariant', 'features/tasks/writes-are-gated', {
+        over: '@features/tasks/domain/tasks.port.json#example',
+      }),
+    ).toEqual(['features/tasks/domain/writes-are-gated.invariant.json']);
+    expect(
+      scaffold(dir, 'invariant', 'features/tasks/task-is-named', { on: '@features/tasks/domain/Task.shape.json' }),
+    ).toEqual(['features/tasks/domain/task-is-named.invariant.json']);
     // a path with the layer already in it is taken as written, and the shape's layer follows the directory
     expect(scaffold(dir, 'shape', 'features/tasks/edge/ListRequest', {})).toEqual([
       'features/tasks/edge/ListRequest.shape.json',
