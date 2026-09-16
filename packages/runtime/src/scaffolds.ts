@@ -200,6 +200,14 @@ const SCAFFOLDS: Record<string, (target: string, opts: Record<string, string | u
       ],
     ];
   },
+  invariant: (target, opts) => {
+    // a rule of the business, in exactly one of its two forms: --over names the operations an access invariant
+    // gates, and without it the rule is over a core shape's fields, written as the one that always holds.
+    const body = opts.over
+      ? { access: { over: [opts.over], requires: { proves: ['request.principal'] } } }
+      : { holds: { on: opts.on ?? '@features/TODO/domain/TODO.shape.json', when: 'true' } };
+    return [[into(target, 'domain', 'invariant'), { $schema: schemaOf('invariant'), description: 'TODO', ...body }]];
+  },
 };
 
 /** The documents `wilanis new <kind> <target>` writes, in the places placement says they live. */
@@ -212,7 +220,7 @@ export function scaffold(
   const build = SCAFFOLDS[kind];
   if (!build)
     throw new Error(
-      `unknown kind '${kind}'; one of project, feature, shape, port, graph, binding, store, trigger, policy, resolvers`,
+      `unknown kind '${kind}'; one of project, feature, shape, port, graph, binding, store, trigger, policy, resolvers, invariant`,
     );
   const files = build(target, opts);
   const written: string[] = [];

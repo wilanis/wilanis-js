@@ -21,6 +21,7 @@ export const HOME: Partial<Record<Kind, Home>> = {
   binding: { layers: ['data'], why: "a binding says how a domain port is met, which is the data layer's job" },
   store: { layers: ['data'], why: "a store says how records are kept, which is the data layer's job" },
   port: { layers: ['domain'], why: 'a domain port is the contract the business offers' },
+  invariant: { layers: ['domain'], why: 'an invariant is a rule of the business, over its ports and shapes' },
   shape: { layers: ['edge', 'domain'], why: "a shape is the world's (edge/) or ours (domain/)" },
   resolvers: {
     layers: ['edge'],

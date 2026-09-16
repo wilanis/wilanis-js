@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/invariant.schema.json",
+  "title": "invariant",
+  "description": "A rule that must hold everywhere, stated once, and the checker holds every document to it. An invariant is a rule of the business, so it lives in a feature's domain/. It comes in exactly one of two forms. `access`: domain port operations, and what must gate every way in that reaches them -- the invariant says the gate stands, the policy behind it says what it decides. `holds`: a core shape, and a rule over its fields in the grammar a switch rule uses -- the checker proves it where it can and the compiler guards the rest.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "description": "The kind of this document: its published schema URL, or the alias @wilanis/invariant.schema.json.",
+      "enum": [
+        "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/invariant.schema.json",
+        "@wilanis/invariant.schema.json"
+      ]
+    },
+    "description": {
+      "description": "What this invariant asserts, and why it is a rule rather than a habit, in one or two sentences.",
+      "type": "string",
+      "minLength": 1
+    },
+    "label": {
+      "description": "A short human name for this document, shown wherever a reader sees it instead of its path. Absent: the file name stands in.",
+      "type": "string",
+      "minLength": 1
+    },
+    "access": {
+      "description": "The access form: domain port operations, and what must gate every trigger that reaches them. Reaching is transitive, so a domain graph cannot route around the invariant by calling the operation itself. It never names a role: a role is what a policy's graph decides.",
+      "type": "object",
+      "properties": {
+        "over": {
+          "description": "The domain port operations this invariant gates, as path#operation. A native port or an operation of one is refused (I002).",
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/opRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "requires": {
+          "description": "What every trigger reaching those operations must attach: a named policy, what some attached policy must prove, or both.",
+          "type": "object",
+          "properties": {
+            "policy": {
+              "description": "The policy every reaching trigger attaches, by path. Attached bare or with credentials, either satisfies it.",
+              "$ref": "common.schema.json#/$defs/path"
+            },
+            "proves": {
+              "description": "request.* paths some policy the trigger attaches must prove, by its own `proves` (the path itself or one above it). Names what must be established rather than which policy establishes it, so signed-in, employees-only and can-record all qualify and a public trigger does not.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^request(?:\\.[A-Za-z0-9_]+|\\[(?:'[^'\\]]*'|\"[^\"\\]]*\")\\])+$"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "minProperties": 1,
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "over",
+        "requires"
+      ],
+      "additionalProperties": false
+    },
+    "holds": {
+      "description": "The field form: a core shape, and a rule its values always satisfy. Where a value of the shape comes into being, the rule is proved from the documents or guarded by a switch the compiler lowers.",
+      "type": "object",
+      "properties": {
+        "on": {
+          "description": "The core shape this rule is about, by path. An edge shape or a document that is not a shape is refused (I002): the edge is judged by the trigger.",
+          "$ref": "common.schema.json#/$defs/path"
+        },
+        "when": {
+          "description": "The rule, in the grammar a switch rule uses -- has(), len(), comparisons, in, &&, ||, ! -- whose roots are the shape's fields: \"len(url) > 0 && (method != 'DELETE' || has(ua))\".",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "on",
+        "when"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "$schema",
+    "description"
+  ],
+  "oneOf": [
+    {
+      "description": "The access form: `access`, and no `holds` beside it.",
+      "required": [
+        "access"
+      ],
+      "properties": {
+        "holds": false
+      }
+    },
+    {
+      "description": "The field form: `holds`, and no `access` beside it.",
+      "required": [
+        "holds"
+      ],
+      "properties": {
+        "access": false
+      }
+    }
+  ],
+  "additionalProperties": false
+}
