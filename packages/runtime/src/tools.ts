@@ -4,6 +4,7 @@
  */
 export { describe, ls, map } from './discovery.js';
 export { fuzz, regress } from './fuzz.js';
+export { type MigrateOptions, type MigrateResult, migrate } from './migrate.js';
 export { type Rehearsal, rehearse } from './rehearse.js';
 export { init, scaffold } from './scaffolds.js';
 export {

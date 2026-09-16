@@ -9,7 +9,10 @@ import type { BlobHandle } from '@wilanis/core';
 import { KINDS, type Kind, type LoadResult } from '@wilanis/core';
 import { loadProject } from './project.js';
 import { runTrigger, start } from './serve.js';
-import { describe, fuzz, init, ls, map, regress, rehearse, scaffold, summarize } from './tools.js';
+import { describe, fuzz, init, ls, map, migrate, regress, rehearse, scaffold, summarize } from './tools.js';
+
+/** Every flag `wilanis migrate` knows; anything else is exit 2, since a misspelt flag must never silently plan. */
+const MIGRATE_FLAGS = ['profile', 'apply', 'allow-destructive', 'adopt', 'history', 'json'];
 
 const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a stateless engine
 
@@ -21,6 +24,8 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
                    listens is what those steps say
   wilanis run      <trigger> [root] [--in json] [--file path] [--out path] [--flag=v ...]
                    fire one cli trigger; --file hands a file as request.file, --out receives a blob answer
+  wilanis migrate  [root] [--profile word] [--apply] [--allow-destructive a,b] [--adopt] [--history] [--json]   plan the stores against the database; apply when told
+                   --allow-destructive names each as <connection>/<target>, the pair that names a table
   wilanis ls       [root] [kind]                   every document, or those of one kind
   wilanis describe <path> [root]                   a document, with its contract laid out
   wilanis map      [root]                          trigger → graph → port → binding → graph
@@ -155,6 +160,29 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     if (flags.verbose) console.error(summarize(report));
     if (!delivered) console.log(typeof answer === 'string' ? answer : JSON.stringify(answer ?? report, null, 2));
     if (report.status !== 'done') process.exit(1);
+  },
+  migrate: async ({ flags, rootArg }) => {
+    const unknown = Object.keys(flags).filter(name => !MIGRATE_FLAGS.includes(name));
+    if (unknown.length) {
+      console.error(`wilanis migrate: unknown flag(s) ${unknown.map(name => `--${name}`).join(', ')}\n\n${USAGE}`);
+      process.exit(2);
+    }
+    if (flags.json) {
+      // RFC 0019's envelope, and its field names, are settled by issue #228, which is still open.
+      console.error('wilanis migrate --json waits on the envelope of RFC 0019 (issue #228); run without --json');
+      process.exit(2);
+    }
+    // migrate judges the tree itself, so that a caller without the command line gets the same guarantee
+    const loaded = await load(rootArg(0));
+    const answer = await migrate(loaded, {
+      profile: flags.profile,
+      apply: Boolean(flags.apply),
+      allowDestructive: flags['allow-destructive'] ? flags['allow-destructive'].split(',') : [],
+      adopt: Boolean(flags.adopt),
+      history: Boolean(flags.history),
+    });
+    console.log(answer.lines.join('\n'));
+    if (answer.code) process.exit(answer.code);
   },
   ls: async ({ positional }) => {
     const kind = positional.find(word => (KINDS as string[]).includes(word)) as Kind | undefined;
