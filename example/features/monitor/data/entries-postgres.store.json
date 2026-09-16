@@ -5,7 +5,7 @@
   "connection": "@connections/entries-postgres.connection.json",
   "collections": {
     "entries": {
-      "description": "the observed calls, one row each: no two record the same call, and a row that predates the user agent column reads as unknown",
+      "description": "the observed calls, one row each: no two record the same call, a note is a field of the entry, and a row that predates the user agent column reads as unknown",
       "of": "@monitor/domain/Entry.shape.json",
       "key": "id",
       "unique": [
@@ -15,7 +15,10 @@
         ]
       ],
       "defaults": {
-        "ua": "unknown"
+        "agent": "unknown"
+      },
+      "renamed": {
+        "agent": "ua"
       }
     },
     "latest": {

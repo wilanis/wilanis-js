@@ -127,7 +127,8 @@ describe('the view model of a graph', () => {
       ['id', 'string', true],
       ['url', 'string', true],
       ['method', 'string', true],
-      ['ua', 'string', false],
+      ['agent', 'string', false],
+      ['note', 'string', false],
     ]);
     expect(edge(seen, { from: 'row', fromPort: '', to: 'out', toPort: '' })).toMatchObject({
       kind: 'out',

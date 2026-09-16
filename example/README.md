@@ -14,7 +14,7 @@ process. The routes, the policies, the domain graphs and the shapes are the same
 graphs behind the port differ, which is what a port is for.
 
 **The store declares more than the shape and the key.** `unique: [["url", "method"]]` says no two entries
-record the same call, and `defaults: { "ua": "unknown" }` says what an entry written before the user agent
+record the same call, and `defaults: { "agent": "unknown" }` says what an entry written before the user agent
 column existed reads as once `ensure` adds it -- about rows already there, never about what a graph writes,
 since `put` always gives the whole record. The compiler judges both against `Entry`: misspell a field in
 either and `wilanis check` names it, rather than PostgreSQL finding out on the first write. A `unique` a
@@ -60,6 +60,94 @@ curl -s localhost:8099/monitor                                    # the entry, r
 The store lives exactly as long as the process: stop it and the entries are gone. That is what the memory
 engine is for -- development, tests, and a demo that needs nothing installed. Point `entries.connection.json`
 at another engine's kind and the same documents keep the same records in a database.
+
+## Changing the shape, and the plan that follows
+
+A migration here is derived, not written: there is no migration file to keep in step with the shapes. The
+postgres engine records, in the database itself, every collection as it was last applied there, and
+`wilanis migrate` diffs that record against the store documents and prints what the database would have to
+do. Nothing runs until `--apply`, and a step that loses data runs only when the operator names it.
+
+**This walk-through needs a PostgreSQL to talk to.** The record lives in the database, so a plan is a
+conversation with one; the memory engine keeps nothing between processes and is skipped with a line saying
+so. Every command below also needs both of the tree's secrets in the environment, since `migrate` loads and
+judges the whole tree before it plans anything:
+
+```
+export MONITOR_JWT_SECRET=$(openssl rand -base64 32)
+export MONITOR_DATABASE_URL=postgres://user:password@127.0.0.1:5432/monitor
+```
+
+`Entry` has just changed in three ways: it gained an optional `note`, its `ua` became `agent`, and notes now
+live on the entry rather than in a collection of their own. Two of those a diff can see. The rename it
+cannot -- from outside, `ua` gone and `agent` new is a dropped column and a new one, and every user agent
+lost -- so `entries.store.json` says it, keyed by the field's name now:
+
+```json
+"defaults": { "agent": "unknown" },
+"renamed": { "agent": "ua" }
+```
+
+**The plan.** Nothing has happened yet; this is what would:
+
+```
+$ npx wilanis migrate . --profile production
+plan for @connections/entries-postgres.connection.json  (@storage-postgres/postgres.connection-kind.json, granted by @storage-postgres)
+  entries
+    rename   rename ua → agent                           transformative
+    add      add note  string, optional                  additive
+plan for @connections/entries.connection.json  (@storage-memory/memory.connection-kind.json, granted by @storage-memory)
+  skipped: nothing is kept between processes, so there is nothing to migrate
+
+2 steps would apply; 0 refused. Nothing was applied: run again with --apply.
+```
+
+The rename is `transformative` -- no row is lost, but a name a graph elsewhere might read has changed --
+and the added column is `additive`, since an optional field costs no row anything.
+
+**Dropping a collection is the operator's to allow.** A collection the record has seen and the tree no
+longer declares is a table with rows in it, so the plan refuses it and says what would unlock it, naming
+the pair of connection and collection, because two connections of one tree may each hold a `notes`:
+
+```
+  notes
+    drop     drop collection notes                       destructive     ✗ needs --allow-destructive @connections/entries-postgres.connection.json/notes
+      loses every row of notes
+```
+
+```
+$ npx wilanis migrate . --profile production --apply --allow-destructive '@connections/entries-postgres.connection.json/notes'
+  notes
+    drop     drop collection notes                       destructive     applied
+      loses every row of notes
+
+1 steps applied in one transaction; recorded as migration 5 (2026-09-16T16:45:54.879Z).
+```
+
+One plan is one transaction, so a step that fails midway leaves the database and the record as they were.
+Every applied plan is a row of the record: `--history` prints what changed and when, and who ran it.
+
+**The run that asks for the mark's removal.** Once the rename has been applied the mark has done its work,
+and the next plan says so rather than doing anything:
+
+```
+$ npx wilanis migrate . --profile production
+plan for @connections/entries-postgres.connection.json  (@storage-postgres/postgres.connection-kind.json, granted by @storage-postgres)
+  up to date
+  note: renamed.agent has been applied -- remove "renamed": { "agent": "ua" } from the entries collection once every database has applied it
+plan for @connections/entries.connection.json  (@storage-memory/memory.connection-kind.json, granted by @storage-memory)
+  skipped: nothing is kept between processes, so there is nothing to migrate
+
+nothing to apply
+```
+
+It asks and does not refuse: a tree is deployed to more than one database, and the mark has to survive until
+the last of them has moved. A fresh database has no `ua` to rename, so it reads the shape as it stands and
+every collection is simply created.
+
+`wilanis start` never migrates destructively. The startup step that prepares the store applies additive
+steps only; anything more and it refuses as `drift`, printing the plan and naming this command. So
+production changes shape because an operator ran it and read the plan, never because a process started.
 
 ## Who may do what
 

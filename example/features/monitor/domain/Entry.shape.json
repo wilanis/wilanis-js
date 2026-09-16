@@ -13,10 +13,15 @@
     "method": {
       "type": "string"
     },
-    "ua": {
+    "agent": {
       "type": "string",
       "required": false,
       "description": "the user agent that made the call"
+    },
+    "note": {
+      "type": "string",
+      "required": false,
+      "description": "what a reader wrote about this call; a note lives on the entry itself"
     }
   }
 }

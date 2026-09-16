@@ -17,7 +17,7 @@
         "DELETE"
       ]
     },
-    "ua": {
+    "agent": {
       "type": "string"
     }
   }

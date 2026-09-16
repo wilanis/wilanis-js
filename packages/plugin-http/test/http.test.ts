@@ -78,7 +78,7 @@ describe('http trigger kind against a mockapi-shaped upstream', () => {
   it('lists everything, pruned to the edge shape', async () => {
     const answer = await call('GET', '/monitor');
     expect(answer.status).toBe(200);
-    expect(answer.body).toEqual([{ id: '1', url: 'https://a.example/', method: 'GET', ua: 'curl/8' }]);
+    expect(answer.body).toEqual([{ id: '1', url: 'https://a.example/', method: 'GET', agent: 'curl/8' }]);
   });
   it('narrows by method through the declared statement', async () => {
     const answer = await call('GET', '/monitor?method=POST');
@@ -96,7 +96,7 @@ describe('http trigger kind against a mockapi-shaped upstream', () => {
   it('records with the recorder the domain chose, answers 201', async () => {
     const answer = await call('POST', '/monitor', { url: 'https://b.example/', method: 'PUT' }, true);
     expect(answer.status).toBe(201);
-    expect(answer.body).toEqual({ id: '2', url: 'https://b.example/', method: 'PUT', ua: 'wilanis-example/0.1.0' });
+    expect(answer.body).toEqual({ id: '2', url: 'https://b.example/', method: 'PUT', agent: 'wilanis-example/0.1.0' });
   });
   it('400 on an undeclared body field (closed edge shape)', async () => {
     expect((await call('POST', '/monitor', { url: 'https://c.example/', method: 'GET', sneaky: 1 }, true)).status).toBe(
@@ -108,13 +108,13 @@ describe('http trigger kind against a mockapi-shaped upstream', () => {
   });
   it('deletes a batch of ids: one DELETE each, paced by the connection throttle, answered once all are gone', async () => {
     for (const id of [3, 4, 5, 6, 7])
-      rows.push({ id: String(id), url: `https://${id}.example/`, method: 'GET', ua: 'curl/8' });
+      rows.push({ id: String(id), url: `https://${id}.example/`, method: 'GET', agent: 'curl/8' });
     inFlight.peak = 0;
     const answer = await call('DELETE', '/monitor', { ids: ['3', '4', '5', '6', '7'] }, true);
     expect(answer.status).toBe(200);
     // the answer is every deleted entry, in the order asked, pruned to the edge shape
     expect(answer.body).toEqual(
-      [3, 4, 5, 6, 7].map(id => ({ id: String(id), url: `https://${id}.example/`, method: 'GET', ua: 'curl/8' })),
+      [3, 4, 5, 6, 7].map(id => ({ id: String(id), url: `https://${id}.example/`, method: 'GET', agent: 'curl/8' })),
     );
     // and by the time it arrived, the upstream had none of them left
     expect(rows.map(row => row.id)).toEqual(['1', '2']);
@@ -177,8 +177,8 @@ describe('files through the blob registry', () => {
     });
     expect(answer.status).toBe(201);
     expect(await answer.json()).toEqual([
-      { id: expect.any(String), url: 'https://csv-1.example/', method: 'GET', ua: 'wilanis-example/0.1.0' },
-      { id: expect.any(String), url: 'https://csv-2.example/?a=1,2', method: 'POST', ua: 'wilanis-example/0.1.0' },
+      { id: expect.any(String), url: 'https://csv-1.example/', method: 'GET', agent: 'wilanis-example/0.1.0' },
+      { id: expect.any(String), url: 'https://csv-2.example/?a=1,2', method: 'POST', agent: 'wilanis-example/0.1.0' },
     ]);
     expect(rows.filter(row => String(row.url).startsWith('https://csv-'))).toHaveLength(2);
   });
@@ -190,7 +190,7 @@ describe('files through the blob registry', () => {
     const body = await answer.text();
     expect(Number(answer.headers.get('content-length'))).toBe(Buffer.byteLength(body));
     const lines = body.split('\r\n').filter(Boolean);
-    expect(lines[0]).toBe('id,url,method,ua');
+    expect(lines[0]).toBe('id,url,method,agent,note');
     expect(lines).toHaveLength(rows.length + 1);
     expect(lines.some(line => line.includes('"https://csv-2.example/?a=1,2"'))).toBe(true);
   });
