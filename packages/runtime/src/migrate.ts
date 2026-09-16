@@ -149,8 +149,17 @@ function report(
     targets.map(one => one.target),
     allowed,
   );
-  lines.push('', summaryLine(count, applied[0]));
-  const drifted = targets.some(one => one.target.drifted?.length || one.target.skipped);
+  lines.push(
+    '',
+    summaryLine(
+      count,
+      applied,
+      targets.map(one => one.target),
+    ),
+  );
+  // a skipped connection is not a failure: an engine that keeps nothing between processes is skipped on
+  // every run, and a tree holding one would never exit 0 if it counted here
+  const drifted = targets.some(one => one.target.drifted?.length);
   return { lines, code: count.refused || drifted ? 1 : 0 };
 }
 
