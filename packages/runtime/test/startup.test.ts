@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkTree } from '@wilanis/compiler';
-import { loadTree, type PluginModule, schemaRef, schemaUrl } from '@wilanis/core';
+import { loadTree, type PluginModule, schemaRef, schemaUrl, type Trace } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_PLUGINS, start } from '../src/index.js';
 import { docsDir, sabotage } from './example-harness.js';
@@ -155,6 +155,43 @@ describe("the project's startup steps", () => {
     expect(held).toBe(1);
     await stop();
     expect(calls).toEqual(['postLoad', 'open:db', 'open:queue', 'listening', 'stopped', 'postLoadDown']);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('every step is traced, rooted at its label and never as a trigger that does not exist', async () => {
+    const { dir, plugins } = tree([step({ label: 'Warm the database', in: { name: 'db' } }), listen], () => 'ok');
+    const loaded = loadTree(dir, plugins);
+    const traces: Trace[] = [];
+    // registered before the first step runs, so the steps' own traces reach it: an exporter a step starts
+    // can only ever hear what ran after it
+    const { stop } = await start(loaded, { log: () => {}, observe: trace => traces.push(trace) });
+
+    expect(traces.map(one => one.name)).toEqual(['startup Warm the database', 'startup @fake/server.port.json#listen']);
+    expect(traces[0].status).toBe('ok');
+    // a step is not a trigger: it says where it sits in the list and what it ran, and names no trigger at all
+    expect(traces[0].attributes['wilanis.startup.at']).toBe(0);
+    expect(traces[0].attributes['wilanis.operation']).toBe('@features/boot/domain/ready.port.json#warm');
+    expect(traces[0].attributes['wilanis.trigger']).toBeUndefined();
+    expect(traces[0].attributes['wilanis.run.id']).toMatch(/^[0-9a-f-]{36}$/);
+
+    await stop();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('a step that refuses is traced as refused, so a failed start still says what it did', async () => {
+    const { dir, plugins } = tree([step({ label: 'Warm the cache', required: false }), listen], () => {
+      throw new Error('the cache is cold');
+    });
+    const loaded = loadTree(dir, plugins);
+    const traces: Trace[] = [];
+    const { stop } = await start(loaded, { log: () => {}, observe: trace => traces.push(trace) });
+
+    expect(traces.map(one => [one.name, one.status])).toEqual([
+      ['startup Warm the cache', 'failed'],
+      ['startup @fake/server.port.json#listen', 'ok'],
+    ]);
+
+    await stop();
     rmSync(dir, { recursive: true, force: true });
   });
 

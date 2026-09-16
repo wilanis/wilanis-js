@@ -2,7 +2,14 @@
 import { createReadStream } from 'node:fs';
 import { basename, extname } from 'node:path';
 import type { Readable } from 'node:stream';
-import { type BlobHandle, isBlobHandle, type Loaded, type LoadResult, type TriggerDoc } from '@wilanis/core';
+import {
+  type BlobHandle,
+  isBlobHandle,
+  type Loaded,
+  type LoadResult,
+  type Trace,
+  type TriggerDoc,
+} from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
 import { FileBlobStore } from './blobs.js';
 import type { Embedder } from './embed.js';
@@ -19,7 +26,7 @@ export async function runStartup(load: LoadResult, emb: Embedder, log: (line: st
   const steps = load.registry.project?.doc.startup ?? [];
   for (const [at, step] of steps.entries()) {
     const name = step.label ?? step.run;
-    const report = await emb.startup(step);
+    const report = await emb.startup(step, { at });
     if (report.status === 'done') {
       log(`startup ${at + 1}/${steps.length} ${name}: ok`);
       continue;
@@ -49,15 +56,18 @@ function failureOf(report: Report): string {
  * Load a tree, run every plugin's postLoad, then run the project's startup steps -- and nothing else. What
  * listens, and whether anything listens at all, is what those steps say: a tree whose startup names no
  * `holds` operation serves nothing and this answers at once. Answers the way to stop what was held.
+ * An `observe` given here is registered before the first step runs, so the steps' own traces reach it too --
+ * an exporter that a step starts can only ever hear what ran after it.
  */
 export async function start(
   load: LoadResult,
-  opts: { profile?: string; log?: (line: string) => void } = {},
+  opts: { profile?: string; log?: (line: string) => void; observe?: (trace: Trace) => void } = {},
 ): Promise<{ stop: () => Promise<void>; held: number }> {
   const log = opts.log ?? ((line: string) => console.log(line));
   const emb = embedderFor(load, { profile: opts.profile });
   if (emb.missingSecrets.length) throw new Error(`missing secrets: ${emb.missingSecrets.join(', ')}`);
   const served = new Served({ load, emb }, log, opts.profile);
+  if (opts.observe) served.observe(opts.observe);
   emb.serve(served);
   served.setDown(await postLoad(load, emb, log));
   const bye = async () => {
