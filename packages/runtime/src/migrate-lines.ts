@@ -52,10 +52,41 @@ export function targetLines(
   return lines;
 }
 
-/** The one line that closes a run: what would apply, what did, or that there was nothing to do. */
-export function summaryLine(count: { would: number; refused: number }, applied?: Applied): string {
-  if (applied)
-    return `${count.would} steps applied in one transaction; recorded as migration ${applied.id} (${applied.appliedAt}).`;
+/**
+ * Which migration each connection recorded: one applied plan is one transaction and one id, so several
+ * connections name several, and naming only the first would hide the rest.
+ */
+function recorded(applied: Applied[]): string {
+  if (applied.length === 1) return `recorded as migration ${applied[0].id} (${applied[0].appliedAt})`;
+  return `recorded as ${applied.map(one => `migration ${one.id} on ${one.connection} (${one.appliedAt})`).join(', ')}`;
+}
+
+/**
+ * How the connections fared, where more than one was in play and they did not all fare alike: the operator
+ * has to know that the record of the one that applied is already written, whatever a later one did.
+ */
+function connectionsLine(targets: PlanTarget[], applied: Applied[]): string {
+  const took = new Set(applied.map(one => one.connection));
+  // a connection nobody skipped and nothing applied to is one that refused: a step of its plan was not allowed
+  const refused = targets.filter(target => !target.skipped && !took.has(target.connection)).length;
+  if (targets.length < 2 || !applied.length || !refused) return '';
+  return `${targets.length} connections: ${applied.length} applied, ${refused} refused. `;
+}
+
+/**
+ * The one line that closes a run: what would apply, what did and where it was recorded, or that there was
+ * nothing to do. Each connection applies in its own transaction, so each names its own migration.
+ */
+export function summaryLine(
+  count: { would: number; refused: number },
+  applied: Applied[],
+  targets: PlanTarget[] = [],
+): string {
+  if (applied.length) {
+    const transaction =
+      applied.length === 1 ? 'in one transaction' : `in ${applied.length} transactions, one per connection`;
+    return `${connectionsLine(targets, applied)}${count.would} steps applied ${transaction}; ${recorded(applied)}.`;
+  }
   if (!count.would && !count.refused) return 'nothing to apply';
   return `${count.would} steps would apply; ${count.refused} refused. Nothing was applied: run again with --apply.`;
 }
