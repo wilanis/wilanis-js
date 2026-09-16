@@ -85,6 +85,7 @@ describe('the example tree', () => {
       '@blob',
       '@cli',
       '@http',
+      '@otel',
       '@reload',
       '@schedule',
       '@std',

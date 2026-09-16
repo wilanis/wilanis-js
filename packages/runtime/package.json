@@ -49,6 +49,7 @@
     "@wilanis/plugin-auth": "0.1.0",
     "@wilanis/plugin-blob": "0.1.0",
     "@wilanis/plugin-http": "0.1.0",
+    "@wilanis/plugin-otel": "0.1.0",
     "@wilanis/plugin-reload": "0.1.0",
     "@wilanis/plugin-schedule": "0.1.0",
     "@wilanis/plugin-storage": "0.1.0",

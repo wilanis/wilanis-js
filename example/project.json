@@ -76,6 +76,14 @@
     {
       "use": "@storage-postgres",
       "from": "@wilanis/plugin-storage-postgres"
+    },
+    {
+      "use": "@otel",
+      "from": "@wilanis/plugin-otel",
+      "settings": {
+        "endpoint": "http://localhost:4318/v1/traces",
+        "service": "monitor"
+      }
     }
   ],
   "includes": [
@@ -113,6 +121,12 @@
       "label": "Keep the schedule",
       "description": "Fire the scheduled triggers of this tree, each at the instants its cron expression names. Delete this step and nothing is scheduled: the nightly digest is a document either way, and it fires because project.json asks for a scheduler, never because the trigger exists. One process runs it here; several instances would give it a lease.",
       "run": "@schedule/scheduler.port.json#run"
+    },
+    {
+      "label": "Export traces",
+      "description": "Send every run this tree serves to an OpenTelemetry collector at localhost:4318, as spans. Delete this step and nothing is exported: traces leave the process because project.json says so, never because the runtime decided a tree should phone home. It is not required, because no collector is running when you clone this example: the step only subscribes, so it succeeds with nothing listening, and every batch it then cannot send is said once in the log and dropped rather than delaying or failing the run whose trace it was. Run `wilanis run <trigger> example --trace` to read the same spans on your terminal with no collector at all.",
+      "run": "@otel/exporter.port.json#export",
+      "required": false
     },
     {
       "label": "Listen",

@@ -11,6 +11,7 @@ import { checkTree } from '@wilanis/compiler';
 import { loadTree, type PluginModule, type ResolvedInclude } from '@wilanis/core';
 import blobs from '@wilanis/plugin-blob';
 import http from '@wilanis/plugin-http';
+import otel from '@wilanis/plugin-otel';
 import reload from '@wilanis/plugin-reload';
 import schedule from '@wilanis/plugin-schedule';
 import storage from '@wilanis/plugin-storage';
@@ -31,6 +32,7 @@ export const PLUGINS: Record<string, PluginModule> = {
   '@storage': storage,
   '@storage-memory': memory,
   '@storage-postgres': postgres,
+  '@otel': otel,
 };
 
 /** The tree the example includes, as the runtime would resolve it from the example's node_modules. */
