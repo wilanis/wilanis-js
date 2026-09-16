@@ -32,7 +32,7 @@ export const firstRow = (): Record<string, unknown> => ({
   reponseStatus: 204,
   ipv4: '10.0.0.1',
   mac: '00:00:00:00:00:01',
-  ua: 'curl/8',
+  agent: 'curl/8',
   createdAt: '2026-09-07',
 });
 

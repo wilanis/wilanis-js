@@ -25,7 +25,11 @@
       "type": "string",
       "required": false
     },
-    "ua": {
+    "agent": {
+      "type": "string",
+      "required": false
+    },
+    "note": {
       "type": "string",
       "required": false
     },

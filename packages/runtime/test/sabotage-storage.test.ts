@@ -85,7 +85,7 @@ describe('sabotage: what a store holds its records to', () => {
   it('passes check when every constraint names a field the shape has, and means what it can mean', () => {
     expect(
       codesOf({
-        rows: entry({ unique: [['url', 'method']], defaults: { ua: 'unknown' } }),
+        rows: entry({ unique: [['url', 'method']], defaults: { agent: 'unknown' } }),
         notes: notes({ refs: { entryId: { collection: 'rows', onRemove: 'refuse' } } }),
       }),
     ).toEqual([]);
@@ -100,9 +100,9 @@ describe('sabotage: what a store holds its records to', () => {
   });
 
   it('C004 a default the field would not accept, or one given for the key', () => {
-    expect(pointingAt({ rows: entry({ defaults: { ua: 7 } }) })).toEqual(at('C004', 'rows/defaults/ua'));
+    expect(pointingAt({ rows: entry({ defaults: { agent: 7 } }) })).toEqual(at('C004', 'rows/defaults/agent'));
     expect(pointingAt({ rows: entry({ defaults: { id: 'x' } }) })).toEqual(at('C004', 'rows/defaults/id'));
-    expect(codesOf({ rows: entry({ defaults: { ua: 'unknown' } }) })).toEqual([]);
+    expect(codesOf({ rows: entry({ defaults: { agent: 'unknown' } }) })).toEqual([]);
   });
 
   it("the example's own unique and defaults are judged where they are written", () => {
@@ -111,8 +111,8 @@ describe('sabotage: what a store holds its records to', () => {
       sabotagePointing('features/monitor/data/entries.store.json', doc => edit(doc.collections.entries));
 
     expect(breaking(entries => entries.unique.push(['urrl']))).toEqual([`C003 ${kept}/unique/1`]);
-    expect(breaking(entries => (entries.defaults.ua = 7))).toEqual([`C004 ${kept}/defaults/ua`]);
-    expect(breaking(entries => (entries.defaults.id = entries.defaults.ua))).toEqual([`C004 ${kept}/defaults/id`]);
+    expect(breaking(entries => (entries.defaults.agent = 7))).toEqual([`C004 ${kept}/defaults/agent`]);
+    expect(breaking(entries => (entries.defaults.id = entries.defaults.agent))).toEqual([`C004 ${kept}/defaults/id`]);
   });
 
   it('C005 a reference to a collection this store does not declare', () => {
@@ -174,7 +174,7 @@ describe('sabotage: what a store holds its records to', () => {
   });
 
   it('a renamed naming the key passes: a key is a column like any other, and renaming it loses nothing', () => {
-    expect(codesOf({ rows: entry({ renamed: { id: 'rowId' }, defaults: { ua: 'unknown' } }) })).toEqual([]);
+    expect(codesOf({ rows: entry({ renamed: { id: 'rowId' }, defaults: { agent: 'unknown' } }) })).toEqual([]);
   });
 
   it("C011 a was equal to the collection's own name, which was never renamed", () => {

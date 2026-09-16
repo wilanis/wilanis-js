@@ -23,7 +23,7 @@
       "in": {
         "url": "{{in.url}}",
         "method": "{{in.method}}",
-        "ua": "{{const.recorder}}"
+        "agent": "{{const.recorder}}"
       }
     }
   ]

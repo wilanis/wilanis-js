@@ -1,6 +1,6 @@
 # RFC 0017: Migrations derived from store declarations
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:plugin-storage` (the planner, the record, the engine contract), `area:core` (two optional marks on the
   `store` schema; one optional hook on `PluginModule`), `area:compiler` (two C rules over the marks), `area:runtime`
   (the `wilanis migrate` command, the template), `area:view`

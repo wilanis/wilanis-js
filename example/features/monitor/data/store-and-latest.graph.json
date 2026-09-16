@@ -34,7 +34,7 @@
           "id": "{{key}}",
           "url": "{{in.url}}",
           "method": "{{in.method}}",
-          "ua": "{{in.ua}}"
+          "agent": "{{in.agent}}"
         }
       }
     },
