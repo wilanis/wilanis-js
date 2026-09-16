@@ -105,6 +105,32 @@ without writing a test. `wilanis fuzz` writes runs out as scenarios, files of th
 replays them and compares node by node, so an edit that changes what the service does says so before it
 ships.
 
+## See what a request did
+
+Every run already leaves a complete record, so nothing is instrumented by an author and no document mentions
+tracing. `--trace` says that record out loud, one span per thing that happened:
+
+```
+$ wilanis run @hello/edge/hello-gated.trigger.json example --trace
+trace 01a0aab5-fdc3-7bb7-86b8-a41015399289  fire @features/hello/edge/hello-gated.trigger.json → refused: otp  2ms
+  identify (@auth)                                            0ms  ok  principal=no session=no
+  policy @features/access/edge/otp-verified.policy.json       1ms  challenged: otp  policy.outcome=challenged
+    @features/access/domain/require-otp.graph.json            0ms  refused: otp
+      decide switch → otp                                     0ms  ok  selected=otp
+      otp @std/outcome.port.json#refuse                       0ms  refused: otp  effect=false
+```
+
+Who was identified, which policy stopped the call, which switch rule it took and how long each took, in the
+tree's own words: the paths in a span are the paths in the documents. `--trace=json` prints the same tree as
+one object per run for a log shipper, and a span never carries a value unless you ask for `--level full`.
+
+To send the same spans to an OpenTelemetry collector, a project adds the exporter to what it starts, exactly
+as it adds the listener: a step in `project.json` naming `@otel/exporter.port.json#export`, which the example
+carries beside the one that opens the HTTP port. Delete that step and nothing is exported: no runtime decides
+on its own that a tree should phone home. The example marks it `"required": false`, so it still starts with
+no collector listening — the step subscribes and says where it would send, and what it then cannot send is
+said once in the log rather than delaying the run whose trace it was.
+
 ## There is no code in a document
 
 A document names operations and routes between them. The only place it states a condition is a switch

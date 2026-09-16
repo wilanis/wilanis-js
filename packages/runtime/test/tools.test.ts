@@ -7,6 +7,7 @@ import { loadTree, type ResolvedInclude } from '@wilanis/core';
 import auth from '@wilanis/plugin-auth';
 import blobs from '@wilanis/plugin-blob';
 import http from '@wilanis/plugin-http';
+import otel from '@wilanis/plugin-otel';
 import reload from '@wilanis/plugin-reload';
 import schedule from '@wilanis/plugin-schedule';
 import storage from '@wilanis/plugin-storage';
@@ -34,6 +35,7 @@ const PLUGINS = {
   '@storage': storage,
   '@storage-memory': memory,
   '@storage-postgres': postgres,
+  '@otel': otel,
 };
 const tmp = () => mkdtempSync(join(tmpdir(), 'wilanis-tools-'));
 const read = (path: string) => JSON.parse(readFileSync(path, 'utf8'));

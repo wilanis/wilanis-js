@@ -1,6 +1,6 @@
 # RFC 0006: Observability: the run report as a trace
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:engine`, `area:runtime`, `area:plugin-http`, `area:core` (one field on a trigger kind, one member on `Serving`)
 - **Tracking issue:** #8
 - **Depends on:** none

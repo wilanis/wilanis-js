@@ -5,6 +5,7 @@ import type { BlobStore } from '@wilanis/core';
 import { loadTree } from '@wilanis/core';
 import auth from '@wilanis/plugin-auth';
 import blobs from '@wilanis/plugin-blob';
+import otel from '@wilanis/plugin-otel';
 import reload from '@wilanis/plugin-reload';
 import schedule from '@wilanis/plugin-schedule';
 import storage from '@wilanis/plugin-storage';
@@ -58,6 +59,7 @@ beforeAll(async () => {
       '@storage': storage,
       '@storage-memory': memory,
       '@storage-postgres': postgres,
+      '@otel': otel,
     },
     INCLUDES,
   );
