@@ -38,6 +38,7 @@ export const minimal: Record<Kind, Record<string, unknown>> = {
     connection: '@connections/records.connection.json',
     collections: { entries: { of: '@features/f/domain/Entry.shape.json', key: 'id' } },
   },
+  invariant: { holds: { on: '@features/f/domain/Entry.shape.json', when: 'true' } },
 };
 export const doc = (kind: Kind, body: Record<string, unknown> = {}, schema = schemaRef(kind)) => ({
   $schema: schema,

@@ -227,6 +227,67 @@ describe('graph', () => {
   });
 });
 
+describe('invariant', () => {
+  const access = (requires: unknown) => ({
+    over: ['@features/monitor/domain/monitor.port.json#record'],
+    requires,
+  });
+  const holds = { on: '@features/monitor/domain/Entry.shape.json', when: 'len(url) > 0' };
+  const form = (body: Record<string, unknown>) => {
+    const { holds: _baseline, ...envelope } = doc('invariant');
+    return { ...envelope, ...body };
+  };
+
+  it('the access form: operations, and the policy or the proofs every reaching trigger must carry', () => {
+    expect(refused(form({ access: access({ policy: '@access/edge/can-record.policy.json' }) }))).toEqual([]);
+    expect(refused(form({ access: access({ proves: ['request.principal'] }) }))).toEqual([]);
+    expect(
+      refused(
+        form({ access: access({ policy: '@access/edge/can-record.policy.json', proves: ['request.session.id'] }) }),
+      ),
+    ).toEqual([]);
+  });
+
+  it('the field form: a shape, and a rule over its fields', () => {
+    expect(refused(form({ holds }))).toEqual([]);
+    expect(refused(form({ label: 'An entry names a call', holds }))).toEqual([]);
+  });
+
+  it('a document is exactly one of the two forms: both is refused, and neither', () => {
+    expect(refused(form({ access: access({ proves: ['request.principal'] }), holds }))).toEqual([
+      at('holds', "'holds' is not allowed here"),
+      at('access', "'access' is not allowed here"),
+    ]);
+    expect(refused(form({}))).toEqual([at(undefined, "missing 'access'"), at(undefined, "missing 'holds'")]);
+  });
+
+  it('over names at least one operation without repeating one, and requires says at least one thing', () => {
+    expect(refused(form({ access: { over: [], requires: { proves: ['request.principal'] } } }))).toEqual([
+      at('access/over', 'fewer than 1 items'),
+    ]);
+    const twice = ['@features/f/domain/f.port.json#write', '@features/f/domain/f.port.json#write'];
+    expect(refused(form({ access: { over: twice, requires: { proves: ['request.principal'] } } }))).toEqual([
+      at('access/over', 'duplicate items'),
+    ]);
+    expect(refused(form({ access: access({}) }))).toEqual([at('access/requires', 'fewer than 1 properties')]);
+    expect(refused(form({ access: access({ proves: ['principal'] }) }))).toEqual([
+      at('access/requires/proves/0', '^request'),
+    ]);
+    expect(
+      refused(
+        form({ access: { over: ['@features/f/domain/f.port.json'], requires: { proves: ['request.principal'] } } }),
+      ),
+    ).toEqual([at('access/over/0', 'path#operation')]);
+  });
+
+  it('holds names a shape and a rule, and nothing else', () => {
+    expect(refused(form({ holds: { on: holds.on } }))).toEqual([at('holds', "missing 'when'")]);
+    expect(refused(form({ holds: { when: 'true' } }))).toEqual([at('holds', "missing 'on'")]);
+    expect(refused(form({ holds: { ...holds, when: '' } }))).toEqual([at('holds/when', 'fewer than 1 characters')]);
+    expect(refused(form({ holds: { ...holds, over: [] } }))).toEqual([at('holds', "unknown property 'over'")]);
+  });
+});
+
 describe('the page of a refusal code', () => {
   it('a code of a checker family, or of a plugin this workspace ships, has one; anything else has none', () => {
     expect(pageUrl('L003')).toBe('https://github.com/wilanis/wilanis-js/blob/main/docs/refusals/L003.md');

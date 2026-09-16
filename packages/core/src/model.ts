@@ -4,25 +4,8 @@
  * Where those URLs point, and how a $schema is read back to a kind, is `published.ts`.
  */
 
-export type Kind =
-  | 'project'
-  | 'plugin'
-  | 'port'
-  | 'binding'
-  | 'graph'
-  | 'trigger'
-  | 'policy'
-  | 'trigger-kind'
-  | 'connection-kind'
-  | 'connection'
-  | 'codec'
-  | 'feature'
-  | 'shape'
-  | 'scenario'
-  | 'resolvers'
-  | 'store';
-
-export const KINDS: Kind[] = [
+/** Every document kind, named once: the `Kind` union is read off this list, so a new kind is added here alone. */
+const EVERY_KIND = [
   'project',
   'plugin',
   'port',
@@ -39,7 +22,10 @@ export const KINDS: Kind[] = [
   'scenario',
   'resolvers',
   'store',
-];
+  'invariant',
+] as const;
+export type Kind = (typeof EVERY_KIND)[number];
+export const KINDS: Kind[] = [...EVERY_KIND];
 
 /**
  * The three layers of a feature, named by the directory a document sits in. A document's layer is where it
@@ -368,6 +354,22 @@ export interface StoreDoc extends Envelope {
   collections: Record<string, Collection>;
 }
 
+/** The access form: the domain operations gated, and the policy or proofs every trigger reaching one -- transitively -- attaches. */
+export interface AccessInvariant {
+  over: string[];
+  requires: { policy?: string; proves?: string[] };
+}
+/** The field form: a core shape, and a rule over its fields in the switch grammar. */
+export interface HoldsInvariant {
+  on: string;
+  when: string;
+}
+/** A rule the checker holds the tree to, in exactly one of two forms: what gates a domain operation, or what is always true of a core shape. */
+export interface InvariantDoc extends Envelope {
+  access?: AccessInvariant;
+  holds?: HoldsInvariant;
+}
+
 export interface ScenarioDoc extends Envelope {
   trigger: string;
   seed: number;
@@ -398,5 +400,6 @@ export interface DocByKind {
   scenario: ScenarioDoc;
   resolvers: ResolversDoc;
   store: StoreDoc;
+  invariant: InvariantDoc;
 }
 export type AnyDoc = DocByKind[Kind];
