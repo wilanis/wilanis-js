@@ -3,7 +3,8 @@
  * its module under check/:
  *   D documents (the loader)   R references   L layers/effects/visibility   G graphs (graph.ts, inputs.ts)
  *   P static fields/resolvers (resolvers.ts)   B bindings/profiles (bindings.ts, project.ts)
- *   T triggers (triggers.ts)   A access (access.ts)   C connections, settings and stores (project.ts, contracts.ts)
+ *   T triggers (triggers.ts)   A access (access.ts)   C connections and settings (project.ts, contracts.ts)
+ *   C stores: what they keep and what they once called it (stores.ts)
  *   atomic graphs, which are L and G rules over what one reaches (atomic.ts)
  *   S scenarios (triggers.ts)   X plugin-specific (each plugin's own `check`)
  */
@@ -11,11 +12,12 @@ import { type LoadResult, type PluginModule, RefusalList, Scope } from '@wilanis
 import { checkPolicy } from './check/access.js';
 import { checkAtomic } from './check/atomic.js';
 import { checkBinding } from './check/bindings.js';
-import { checkConnection, checkPort, checkShape, checkStore } from './check/contracts.js';
+import { checkConnection, checkPort, checkShape } from './check/contracts.js';
 import { checkGraph } from './check/graph.js';
 import { Judge } from './check/judge.js';
 import { checkProject, checkStartup } from './check/project.js';
 import { checkResolversDoc } from './check/resolvers.js';
+import { checkStore } from './check/stores.js';
 import { checkScenario, checkTrigger, checkTriggerKind } from './check/triggers.js';
 
 /** Every refusal of a loaded tree: the loader's, then every rule family's, then each plugin's own. */
