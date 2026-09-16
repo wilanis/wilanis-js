@@ -310,12 +310,16 @@ describe('a run that calls another port operation', () => {
     emb.serve(Object.assign(served, { ran: (what: Ran) => heard.push(what) }));
 
     await emb.startup({ run: '@reload/watch.port.json#watch', label: 'Watch' }, { at: 2 });
-    const under = traceOf(heard[0], emb.scope).children[0];
+    try {
+      const under = traceOf(heard[0], emb.scope).children[0];
 
-    // a startup step may name one native `holds` operation, and there is no binding document to call it
-    expect(under.name).toBe('@reload/watch.port.json#watch');
-    expect(under.attributes['wilanis.port']).toBe('@reload/watch.port.json');
-    expect(under.attributes['wilanis.binding']).toBeUndefined();
-    for (const holding of [...emb.held].reverse()) await holding.stop();
+      // a startup step may name one native `holds` operation, and there is no binding document to call it
+      expect(under.name).toBe('@reload/watch.port.json#watch');
+      expect(under.attributes['wilanis.port']).toBe('@reload/watch.port.json');
+      expect(under.attributes['wilanis.binding']).toBeUndefined();
+    } finally {
+      // the watch is held whatever the assertions did: a failing expect must not leave it watching
+      for (const holding of [...emb.held].reverse()) await holding.stop();
+    }
   });
 });

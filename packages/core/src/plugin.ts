@@ -81,6 +81,44 @@ export interface Trace {
   children: Trace[];
 }
 
+/** How much a span carries: `summary` never a value, `full` the report's redacted in/out and the message. */
+export type TraceLevel = 'summary' | 'full';
+
+/**
+ * The attributes that carry what a run said rather than what it did: the report's redacted in and out, and a
+ * node's message. `summary` carries none of them -- a reason is a word the author declared in `refuses` and
+ * cannot leak, a message is prose that interpolates whatever the author wrote into it. The list lives here,
+ * beside the `Trace` it describes, because the runtime that builds a trace and an exporter that sends one
+ * must agree on it: two copies drift the day a fourth attribute is added, and the copy that did not learn
+ * about it is the one that exports a value an operator asked never to leave.
+ */
+export const VALUED_ATTRIBUTES = ['wilanis.in', 'wilanis.out', 'wilanis.error'];
+
+/** One span's attributes at this level: all of them at `full`, and none of the valued ones at `summary`. */
+function attributesAtLevel(attributes: TraceAttributes, level: TraceLevel): TraceAttributes {
+  if (level === 'full') return attributes;
+  const out: TraceAttributes = {};
+  for (const [name, value] of Object.entries(attributes)) if (!VALUED_ATTRIBUTES.includes(name)) out[name] = value;
+  return out;
+}
+
+/**
+ * A trace already built, narrowed to what a level allows: the same spans and the same nesting, carrying only
+ * what the level lets them. A cancelled node is kept at `full` and dropped at `summary`, so a reader at
+ * `summary` sees what ran and a reader at `full` also sees the branches not taken.
+ *
+ * One trace is built per run, at `full`, and handed to every observer, so the narrowing is each observer's
+ * and not the server's -- a printer asked for `summary` and an exporter asked for `full` are served by the
+ * one walk. An exporter calls this again at its own edge, where the bytes leave the process: the level that
+ * is safe by default is only safe if the thing that sends enforces it, whatever it was handed.
+ */
+export function atLevel(trace: Trace, level: TraceLevel): Trace {
+  const children = trace.children
+    .filter(child => level === 'full' || child.status !== 'cancelled')
+    .map(child => atLevel(child, level));
+  return { ...trace, attributes: attributesAtLevel(trace.attributes, level), children };
+}
+
 /**
  * What a `holds` operation that answers requests is given, as `env.serving`: the triggers of one kind and
  * the way to fire them. It is read afresh on every request, so a reload can replace the tree underneath a
@@ -110,6 +148,11 @@ export interface Serving {
    * Be told of every fire while this tree is served; answers the way to stop listening, as `env.hold` does.
    * Survives a reload: the listeners are the server's, not the tree's, so an exporter holds what it
    * subscribed to and never goes quiet when the tree underneath it is replaced.
+   *
+   * The trace handed over is built at `full`, so it carries the report's redacted `in`/`out` and each node's
+   * message: one trace is built per run and every observer sees it, and a listener that narrows would
+   * otherwise have dropped what another wanted. Narrowing is therefore the observer's own -- an observer that
+   * does not narrow receives values, and one that exports must apply its level before any byte leaves.
    */
   observe(listener: (trace: Trace) => void): () => void;
   /**
