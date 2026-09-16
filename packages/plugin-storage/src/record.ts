@@ -82,6 +82,14 @@ export interface Recorder {
   /** Every applied plan on this connection, latest first. */
   history(on: On): Promise<Applied[]>;
   /**
+   * Whether what a plan applies outlives the process. It is asked before a connection is planned at all and
+   * never counted: an engine keeping records in memory has no record to plan against and nothing an `apply`
+   * would leave behind, which is not an empty database -- a fresh one is planned a `create` per collection and
+   * keeps it. `wilanis migrate` skips such a connection and says so rather than printing a plan nobody could
+   * apply, and it is the engine's own answer because only the engine knows where its records go.
+   */
+  keeps(): boolean;
+  /**
    * Whether this engine writes a cast between these two types at all. It is asked before a `retype` is classed
    * and never counted: which pairs an engine attempts is its own table, and a pair it will not write is refused
    * on an empty table exactly as on a full one, rather than classed by a count and left to fault when the

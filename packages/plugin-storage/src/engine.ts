@@ -180,7 +180,7 @@ const tables = new WeakMap<object, Engines>();
  * an engine registered on. `connections` is built once for the tree by `buildEnv` and carried by every copy,
  * so it names the environment where the copy does not. An environment without one is keyed by itself.
  */
-function keyOf(env: object): object {
+export function keyOf(env: object): object {
   const connections = (env as { connections?: unknown }).connections;
   return connections && typeof connections === 'object' ? connections : env;
 }

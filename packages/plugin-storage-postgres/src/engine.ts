@@ -278,6 +278,11 @@ export class PostgresEngine implements Engine {
     return attempts(was, becomes);
   }
 
+  /** A database keeps what a plan applies for as long as the database is there, so every connection is planned. */
+  keeps(): boolean {
+    return true;
+  }
+
   /** Every plan that applied on this connection, latest first, as the record kept it. */
   async history(on: On): Promise<Applied[]> {
     const { db, schema } = this.at(on);

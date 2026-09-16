@@ -16,8 +16,9 @@ import { basename } from 'node:path';
 import type { Type } from '@wilanis/core';
 import type { Engine, Made } from './engine.js';
 import { type Declared, type Declaring, declaredOfStore, marksOfStore, plan, type Step } from './plan.js';
-import { type Classed, classed, counts } from './plan-class.js';
+import type { Classed } from './plan-class.js';
 import type { Applying, On, Recording } from './record.js';
+import { classedSteps, standing } from './standing.js';
 
 /**
  * A store lowered far enough to plan against: the connection it sits on, the collections it declares with
@@ -40,61 +41,6 @@ const MADE_BY: Record<string, keyof Made> = {
   unique: 'constraints',
   ref: 'constraints',
 };
-
-/**
- * What every collection of the store already is, as the connection knows it: the record first, and the
- * catalog for the ones the record has never seen. A table the record does not hold is what the planner turns
- * into an `adopt`, which is additive -- so a database that predates the record, or that an older `ensure`
- * built, joins the record on first contact rather than being refused as drift.
- */
-async function standing(engine: Engine, on: On, names: string[]) {
-  const recorded: Record<string, Declared> = {};
-  const found: Record<string, Declared> = {};
-  for (const name of names) {
-    const kept = await engine.recorded(on, name);
-    if (kept) {
-      recorded[name] = kept;
-      continue;
-    }
-    const table = await engine.inspect(on, name);
-    if (table) found[name] = table;
-  }
-  return { recorded, found };
-}
-
-/**
- * The collections this plan brings into existence itself. A `create` is the first step of its collection and
- * every later step of the same plan is against a table that does not exist yet, so asking a database to count
- * rows in one is asking about a relation it has never heard of -- which is not zero rows, it is an error.
- */
-function beingCreated(steps: Step[]): Set<string> {
-  return new Set(steps.filter(step => step.do === 'create').map(step => step.target));
-}
-
-/**
- * How many rows stand in this step's way. A step of a collection the same plan opens with `create` has none
- * by construction: the table is not there to hold a row, and the guarantees that follow the `create` are over
- * columns made empty a moment earlier. The engine is not asked, because there is nothing yet to ask it about.
- */
-async function rowsFor(engine: Engine, on: On, step: Step, fresh: Set<string>): Promise<number> {
-  if (!counts(step) || fresh.has(step.target)) return 0;
-  return engine.rows(on, step);
-}
-
-/**
- * Every step classed, with the row count the engine answered where the count changes the answer. `attempts`
- * is handed to the classing because which casts an engine writes is that engine's table and no count answers
- * it: a pair it refuses is refused on an empty table exactly as on a full one.
- */
-async function classedSteps(engine: Engine, on: On, steps: Step[]): Promise<Classed[]> {
-  const fresh = beingCreated(steps);
-  const out: Classed[] = [];
-  for (const step of steps) {
-    const rows = await rowsFor(engine, on, step, fresh);
-    out.push(classed(step, rows, { attempts: (was, becomes) => engine.attempts(was, becomes) }));
-  }
-  return out;
-}
 
 /** The record as the plan leaves it: every collection the store declares, under the declaration it now has. */
 function recording(declared: Record<string, Declared>, steps: Step[]): Recording {

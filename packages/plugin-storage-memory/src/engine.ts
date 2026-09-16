@@ -210,6 +210,15 @@ export class MemoryEngine implements Engine {
   }
 
   /**
+   * Nothing this engine holds outlives the process, so a plan against it would be a plan nobody could apply.
+   * `wilanis migrate` reads this and skips the connection with a line saying why, rather than printing a
+   * `create` per collection that the next process would print again.
+   */
+  keeps(): boolean {
+    return false;
+  }
+
+  /**
    * This engine writes no cast, because it applies no step: a record kept in a Map is whatever was put there,
    * and nothing here ever rewrites one type as another. Answering `false` is of no consequence -- no plan of
    * this engine's is ever classed -- and it is the honest answer rather than a claim it would attempt one.
