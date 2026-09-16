@@ -278,6 +278,16 @@ export class PostgresEngine implements Engine {
     return attempts(was, becomes);
   }
 
+  /**
+   * The name a collection is kept under here, which is the folded one: PostgreSQL folds an unquoted
+   * identifier, so `auditLog` and `auditlog` are one table, the record keys its rows by the folded name
+   * (`apply.ts`) and `history` answers it. Saying so is what keeps a plan from reading the record's spelling
+   * beside the tree's and dropping the table one of them names.
+   */
+  named(collection: string): string {
+    return folded(collection);
+  }
+
   /** A database keeps what a plan applies for as long as the database is there, so every connection is planned. */
   keeps(): boolean {
     return true;

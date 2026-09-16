@@ -28,9 +28,6 @@ import { engineFor } from './store.js';
 /** What an engine that keeps nothing between processes is said to be, rather than planned a `create` nobody keeps. */
 const NOTHING_KEPT = 'nothing is kept between processes, so there is nothing to migrate';
 
-/** The verb a stale mark is printed under: it is a line about the tree, and never a step an engine is given. */
-const STALE = 'stale';
-
 /** One connection's plan as this plugin holds it, so `apply` runs what was printed and never a second judgement. */
 interface Held {
   on: Gathered['on'];
@@ -75,13 +72,14 @@ function lowerStep(one: Classed): PlanStep {
 }
 
 /**
- * A mark that has done its work, as a line the runtime prints and no engine is ever given. A `renamed` the
- * record has already answered is not a change to make -- the column is renamed and the tree is right -- and
- * what is left is a line in the store document saying so. It is carried as an additive step with the edit in
- * `refused`, so the operator reads what to remove and the connection still applies everything else.
+ * A mark that has done its work, as a note the runtime prints and judges by nothing. A `renamed` the record
+ * has already answered is not a change to make -- the column is renamed and the tree is right -- so it is not
+ * a step at all, and it must not refuse: a tree is deployed to more than one database and the mark has to
+ * survive until the last of them has moved (RFC 0017). Carried in a step's `refused` it would stop every
+ * other step of that connection applying, on every run, for as long as the mark is correctly still there.
  */
-function lowerStale(one: Stale): PlanStep {
-  return { do: STALE, target: one.target, at: one.at, class: 'additive', says: one.says, refused: one.hint };
+function noteOfStale(one: Stale): string {
+  return `${one.says} -- ${one.hint}`;
 }
 
 /** A connection nothing was planned for: an engine that keeps nothing, or a record the database moved away from. */
@@ -134,7 +132,8 @@ async function targetOf(one: Gathered, engine: Engine, ctx: MigrateContext): Pro
   return {
     connection: one.on.connection,
     engine: one.engine,
-    steps: [...judgedSteps.map(lowerStep), ...plan.stale.map(lowerStale)],
+    steps: judgedSteps.map(lowerStep),
+    ...(plan.stale.length ? { notes: plan.stale.map(noteOfStale) } : {}),
   };
 }
 
@@ -167,10 +166,33 @@ function applying(ctx: MigrateContext): Applying {
 }
 
 /**
+ * What a connection that failed says, with the account of the ones that did not. One plan is one transaction,
+ * but a *run* over several connections is several: the ones before this connection have committed and their
+ * records are written, and an error that said only what went wrong would leave the operator to guess which.
+ * So the message names what landed before naming what did not, and the original is kept as its cause.
+ */
+function halfway(on: string, applied: Applied[], cause: unknown): Error {
+  const landed = applied.length
+    ? `applied and recorded on ${applied.map(one => `${one.connection} (migration ${one.id})`).join(', ')}`
+    : 'nothing had applied yet';
+  const why = cause instanceof Error ? cause.message : String(cause);
+  return new Error(
+    `${on} failed to apply: ${why}\n` +
+      `each connection applies in its own transaction, so this one rolled back whole and ${landed}. ` +
+      'Run wilanis migrate again to see what is left to do.',
+    { cause },
+  );
+}
+
+/**
  * Apply the plan the runtime handed back: the targets whose every step it allows, each on its own connection
  * and in its own transaction, in the canonical-path order they were planned in. What comes back is one
  * `Applied` per connection that recorded something, which is what makes `2 connections: 1 applied, 1 refused`
  * printable -- and an engine that recorded nothing answers nothing rather than an empty row.
+ *
+ * A run over several connections is not one transaction and cannot be: a transaction belongs to a connection.
+ * So a connection that fails rolls back whole and the ones before it stay applied, and what this throws says
+ * which those were -- the record on each connection is the account, and the next plan reads it.
  */
 export async function applyStores(ctx: MigrateContext, plan: Plan): Promise<Applied[]> {
   const table = holding(ctx.env);
@@ -179,8 +201,12 @@ export async function applyStores(ctx: MigrateContext, plan: Plan): Promise<Appl
     const held = table.get(target.connection);
     if (!held?.steps.length) continue;
     const engine = engineFor(ctx.env, held.on);
-    const answer = await engine.apply(held.on, held.steps, held.record, applying(ctx));
-    if (answer) applied.push(answer);
+    try {
+      const answer = await engine.apply(held.on, held.steps, held.record, applying(ctx));
+      if (answer) applied.push(answer);
+    } catch (error) {
+      throw halfway(target.connection, applied, error);
+    }
   }
   return applied;
 }

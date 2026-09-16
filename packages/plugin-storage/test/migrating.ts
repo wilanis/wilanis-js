@@ -48,18 +48,36 @@ interface Ran {
   applying: Applying;
 }
 
-/** One applied plan as the fake engine records it, so the answer reads as a real one and not as a placeholder. */
+/**
+ * The name this fake keeps a collection under: the folded one, as PostgreSQL's is, because that is the harder
+ * of the two contracts and the one a mistake hides behind. An engine that folds answers its record and its
+ * history under a name that is not always the tree's spelling, so a planner reading both would see two
+ * collections where there is one -- and plan a `drop` of the live table. Folding here is what makes a case
+ * over `auditLog` able to catch that; a fake that kept names as given never could.
+ */
+const folded = (collection: string) => collection.toLowerCase();
+
+/** A table of a case's own, read under the name the engine keeps, so a case may write the tree's spelling. */
+const under = <T>(table: Record<string, T> | undefined, collection: string): T | undefined =>
+  table && Object.entries(table).find(([name]) => folded(name) === folded(collection))?.[1];
+
+/**
+ * One applied plan as the fake engine records it, so the answer reads as a real one and not as a placeholder.
+ * Every collection is named the way the engine keeps it -- folded -- since that is what a record keyed by the
+ * table's own name answers back, and it is exactly the spelling a plan must not mistake for a second table.
+ */
 function recordOf(ran: Ran, id: number): Applied {
   const { steps, record } = ran;
+  const targets = Object.keys(record).map(folded);
   return {
     id,
     appliedAt: '2026-09-11T09:14:02.000Z',
     by: ran.applying.by,
     tree: ran.applying.tree,
     connection: ran.on,
-    targets: Object.keys(record),
+    targets,
     steps: Object.fromEntries(
-      Object.keys(record).map(name => [name, steps.filter(step => step.target === name).map(step => step.says)]),
+      targets.map(name => [name, steps.filter(step => folded(step.target) === name).map(step => step.says)]),
     ),
   };
 }
@@ -67,25 +85,26 @@ function recordOf(ran: Ran, id: number): Applied {
 /**
  * An engine over the tables a case fills, which refuses what a database would refuse. A count against a
  * collection it has never heard of is not zero rows: it is the error PostgreSQL answers, and a plan that asks
- * for one has a bug the count would otherwise hide.
+ * for one has a bug the count would otherwise hide. Every name it answers is folded, as that engine's are.
  */
 export function fake(holding: Record<string, Holding>, opts: { keeps?: boolean } = {}) {
   const asked: Asked = { applied: [], counted: [] };
   const held = (on: On) => holding[on.connection] ?? {};
   const engine = {
     async recorded(on: On, collection: string) {
-      return held(on).recorded?.[collection];
+      return under(held(on).recorded, collection);
     },
     async inspect(on: On, collection: string) {
       const one = held(on);
-      return one.catalog?.[collection] ?? one.found?.[collection];
+      return under(one.catalog, collection) ?? under(one.found, collection);
     },
     async rows(on: On, step: Step) {
       asked.counted.push(step);
       const one = held(on);
-      const exists = one.recorded?.[step.target] ?? one.catalog?.[step.target] ?? one.found?.[step.target];
-      if (!exists) throw new Error(`relation "${step.target}" does not exist`);
-      return one.rows?.[step.target] ?? 0;
+      const exists =
+        under(one.recorded, step.target) ?? under(one.catalog, step.target) ?? under(one.found, step.target);
+      if (!exists) throw new Error(`relation "${folded(step.target)}" does not exist`);
+      return under(one.rows, step.target) ?? 0;
     },
     async apply(on: On, steps: Step[], record: Recording, applying: Applying) {
       const ran: Ran = { on: on.connection, steps, record, applying };
@@ -94,7 +113,7 @@ export function fake(holding: Record<string, Holding>, opts: { keeps?: boolean }
     },
     // a record holding a collection got there by a plan that applied, so the history names it: a real database
     // reads both out of one table, and a fake whose history forgot what its own record holds would let a plan
-    // that never looks past the tree's own collections pass green
+    // that never looks past the tree's own collections pass green. The names are folded, as the record's are
     async history(on: On) {
       const seeded = Object.keys(held(on).recorded ?? {});
       const earlier: Ran[] = seeded.length
@@ -110,6 +129,7 @@ export function fake(holding: Record<string, Holding>, opts: { keeps?: boolean }
       const since = asked.applied.filter(one => one.on === on.connection);
       return [...since.map((one, at) => recordOf(one, at + 1)).reverse(), ...earlier.map(one => recordOf(one, 0))];
     },
+    named: folded,
     attempts: () => true,
     keeps: () => opts.keeps !== false,
   } as unknown as Engine;
