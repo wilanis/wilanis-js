@@ -23,6 +23,7 @@ export type {
   Transaction,
 } from './engine.js';
 export { engines } from './engine.js';
+export { ensureStore } from './ensure.js';
 export type {
   CollectionMarks,
   Declared,

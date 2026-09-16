@@ -121,8 +121,8 @@ export interface Planned {
  *
  * This mapping is `columnOf` in `packages/plugin-storage-postgres/src/columns.ts` said engine-neutrally, and the
  * two must agree on which types are scalar and which are kept as JSON -- a field this calls `json` is the one
- * that engine calls `jsonb`. Step 5 of RFC 0017 (#237, #238) moves the catalog comparison out of `ensure` into
- * `inspect`, and the two meet there; until then a change to either belongs in both.
+ * that engine calls `jsonb`. They meet in `inspect`, which is where the catalog comparison lives since step 4:
+ * a table read back is lowered by that engine's mapping and compared with what this one lowered.
  */
 export function fieldTypeOf(type: Type): FieldType {
   if (type.kind === 'string' || type.kind === 'number' || type.kind === 'boolean') return type.kind;

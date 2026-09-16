@@ -6,6 +6,8 @@
 import type { Resolves } from '@wilanis/core';
 import type { At, Engine, Ref } from './engine.js';
 import { engines } from './engine.js';
+import type { Lowering } from './ensure.js';
+import type { Declaring } from './plan.js';
 
 type Connection = { kind: string; settings: Record<string, unknown> };
 
@@ -87,10 +89,22 @@ export function collectionAt(env: Record<string, unknown>, named: unknown, name:
   };
 }
 
-/** Every collection of a store, in the order it declares them: what `ensure` is given. */
-export function collectionsOf(env: Record<string, unknown>, named: unknown): At[] {
+/**
+ * A store as the planner reads it: the connection it sits on, its collections with the marks RFC 0017 adds,
+ * and the way to resolve the shape each names. It is the whole store rather than a collection at a time,
+ * because a plan is a plan for one connection -- a `ref` names a table that has to exist, and a collection
+ * planned alone could not know whether it does.
+ */
+export function storeFor(env: Record<string, unknown>, named: unknown): Lowering {
   const store = documentOf(env, named);
-  return Object.keys(store.collections).map(name => collectionAt(env, named, name));
+  const { path, conn } = connectionOf(env, store);
+  const resolving = (env as Env).resolving;
+  if (!resolving) throw new Error('no tree in this environment to read a shape from');
+  return {
+    on: { connection: path, kind: conn.kind, settings: conn.settings },
+    declaring: { connection: path, collections: store.collections as Declaring['collections'] },
+    shapeOf: (of: string) => resolving.type(of),
+  };
 }
 
 /**
@@ -98,7 +112,7 @@ export function collectionsOf(env: Record<string, unknown>, named: unknown): At[
  * names no plugin that grants that kind an engine -- which X203 refuses before anything runs, so this message
  * is for a plugin that failed to load rather than for a tree that is wrong.
  */
-export function engineFor(env: Record<string, unknown>, at: At): Engine {
+export function engineFor(env: Record<string, unknown>, at: { kind: string }): Engine {
   const engine = engines(env).for(at.kind);
   if (engine) return engine;
   const registered = engines(env).kinds.join(', ') || 'none';
