@@ -46,6 +46,24 @@ and `not` sit beside the field names. A field that is a shape or a list may only
 grammar is parsed here, once, so every engine judges one filter the same way -- and a misspelled field or
 operator is named rather than quietly compared.
 
+## The record
+
+`renamed` and `was` on a collection say what a field or the collection was called before, so a rename is a
+rename and not a drop and a create. Knowing which of them has already happened needs a memory of the database
+as it was last left, and that memory is **the record**: every collection as it was last applied to that
+database, one entry per collection per applied plan.
+
+The record is the engine's, kept **in the database it describes** -- a database carries its own history, and a
+fresh one carries none -- and it is not a document: nothing under `features/` names it, no graph reads it, and
+`wilanis check` never sees it. `wilanis migrate` writes it and `wilanis migrate --history` prints it. The
+table it lives in is the engine's too: `@wilanis/plugin-storage-postgres` keeps it as `wilanis_migrations` in
+the connection's schema and creates it on first contact, and `@wilanis/plugin-storage-memory` keeps nothing
+between processes, so it records nothing and has nothing to migrate.
+
+`wilanis describe <store>` and the viewer read the tree and open no connection, so they say what the store
+declares -- `renamed` and `was` among it -- and never what the database holds. What the database holds is
+`wilanis migrate --history`'s alone to say.
+
 ## Writing an engine
 
 An engine is a plugin of its own. It grants a connection kind marked `"storage": true`, implements `Engine`

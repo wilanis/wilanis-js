@@ -53,6 +53,9 @@
   .page table { border-collapse: collapse; width: 100%; margin: 4px 0 8px; } .page th { text-align: left; font-size: 11px; color: var(--dim); font-weight: 600; padding: 4px 10px 4px 0; border-bottom: 1px solid var(--line); }
   .page td { padding: 5px 10px 5px 0; border-bottom: 1px solid #1d242d; vertical-align: top; } .page td.name { font-family: var(--mono); font-size: 12px; white-space: nowrap; } .page td.desc { color: var(--muted); }
   .page td.type { font-family: var(--mono); font-size: 12px; color: var(--type); white-space: nowrap; } .page td.val { font-family: var(--mono); font-size: 12px; color: var(--lit); overflow-wrap: anywhere; }
+  .was { text-decoration: line-through; color: var(--dim); }
+  .page td.name .was { display: block; }
+  .page td .until { display: block; font-family: var(--sans); font-size: 10px; color: var(--dim); white-space: normal; }
   .req::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); margin-right: 7px; vertical-align: 1px; }
   .opt::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--dim); box-sizing: border-box; margin-right: 7px; vertical-align: 1px; }
   .opt { color: var(--muted); } .opt::after { content: ' optional'; font-family: var(--sans); font-size: 10px; color: var(--dim); }
@@ -513,11 +516,17 @@
         const refsOf = c => Object.entries(c.refs || {}).map(([f, r]) => f + ' \u2192 ' + r.collection + '.' + ((d.collections[r.collection] || {}).key || '?') + (r.onRemove ? ' (' + r.onRemove + ' on remove)' : '')).join(', ');
         const defaultsOf = c => Object.entries(c.defaults || {}).map(([f, v]) => f + ' = ' + JSON.stringify(v)).join(', ');
         const keyOf = (name, c) => s.keyTypes[name] ? c.key + ': ' + s.keyTypes[name] : c.key;
-        const t = el('table'); const hd = el('tr'); for (const h of ['collection', 'records of', 'keyed by', 'unique', 'refs', 'default', 'holds']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
+        const UNTIL = 'until wilanis migrate has applied it everywhere';
+        // a renamed field reads as the name now with the name before struck through beside it: the tree is ahead of the database until migrate has caught it up
+        const renamedCell = c => { const td = el('td', 'mono'); const pairs = Object.entries(c.renamed || {}); if (!pairs.length) return td; pairs.forEach(([now, before], i) => { if (i) td.appendChild(frag(', ')); td.appendChild(frag(now + ' ')); td.appendChild(el('span', 'was', before)); }); td.appendChild(el('span', 'until', UNTIL)); return td; };
+        const t = el('table'); const hd = el('tr'); for (const h of ['collection', 'records of', 'keyed by', 'unique', 'refs', 'default', 'renamed', 'holds']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
         for (const [name, c] of Object.entries(d.collections)) {
-          const tr = el('tr'); tr.appendChild(el('td', 'name', name));
+          const tr = el('tr'); const nm = el('td', 'name', name);
+          if (c.was) { nm.appendChild(el('span', 'was', c.was)); nm.appendChild(el('span', 'until', UNTIL)); }
+          tr.appendChild(nm);
           tr.appendChild(el('td')).appendChild(typeEl(c.of)); tr.appendChild(el('td', 'mono', keyOf(name, c)));
           tr.appendChild(el('td', 'mono', uniqueOf(c))); tr.appendChild(el('td', 'mono', refsOf(c))); tr.appendChild(el('td', 'mono', defaultsOf(c)));
+          tr.appendChild(renamedCell(c));
           tr.appendChild(el('td', 'desc', c.description || ''));
           t.appendChild(tr);
         }

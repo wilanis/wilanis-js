@@ -40,6 +40,8 @@ const { load, dir } = loadedWith({
         key: 'id',
         unique: [['url', 'method'], ['ua']],
         defaults: { ua: 'unknown' },
+        renamed: { agent: 'ua', note: 'comment' },
+        was: 'entry',
         description: 'one row per observed call',
       },
       notes: {
@@ -74,7 +76,28 @@ describe('describe: a store', () => {
     expect(notes).toContain('    refs');
     expect(notes).not.toContain('    unique');
     expect(notes).not.toContain('    default');
+    expect(notes).not.toContain('    renamed');
+    expect(notes).not.toContain('    was ');
     expect(notes).not.toContain('    holds');
+  });
+
+  it('gives the renames their own lines, and says under each that the database is not there yet', () => {
+    expect(said()).toContain('    renamed     agent ← ua, note ← comment');
+    expect(said()).toContain('    was         entry');
+    // one note under each, so a reader of either knows the tree is ahead of every database
+    const under = said()
+      .split('\n')
+      .filter(line => line.includes('until wilanis migrate has applied it everywhere'));
+    expect(under).toHaveLength(2);
+    // the note sits where a mark's own words sit, under the family it belongs to
+    for (const line of under) expect(line).toBe(`${' '.repeat(16)}until wilanis migrate has applied it everywhere`);
+  });
+
+  it('opens no connection to say them: what the database holds is migrate --history to say', () => {
+    // every line is the tree's own words -- no engine is reached, so the page says nothing about a database
+    expect(said()).not.toContain('in the database');
+    expect(said()).not.toContain('migration ');
+    expect(said()).not.toContain('applied at');
   });
 });
 
