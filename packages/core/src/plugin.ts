@@ -250,6 +250,76 @@ export interface PostLoadContext {
   log: (line: string) => void;
 }
 
+/**
+ * What `wilanis migrate` gives a plugin's `migrate` member: what `postLoad` saw, the profile the command ran
+ * under, the targets the operator allowed a destructive step on, and whether a target the world holds but the
+ * record does not may be adopted.
+ */
+export interface MigrateContext extends PostLoadContext {
+  /** The profile the command ran under, as `start`'s is: it decides which connection settings are read. */
+  profile: string;
+  /** The targets the operator named with `--allow-destructive`, each `<connection>/<target>`; a destructive step on any other is refused. */
+  allowDestructive: string[];
+  /** Whether a target the world holds and the record does not may be taken into the record rather than refused. */
+  adopt: boolean;
+}
+
+/**
+ * One thing a plugin would do to the world to make it match the tree. `target` is what the step is about in
+ * the plugin's own words and `at` the part of it; the runtime reads only `class` and `refused`, so it never
+ * learns what either names.
+ */
+export interface PlanStep {
+  /** The verb, in the plugin's words: what would be done. */
+  do: string;
+  /** What it would be done to, in the plugin's words. */
+  target: string;
+  /** The part of the target it is about, where it is about one. */
+  at?: string;
+  /** Additive always applies; transformative applies under `--apply`; destructive needs the operator to allow it. */
+  class: 'additive' | 'transformative' | 'destructive';
+  /** The one line an operator reads to know what this step does. */
+  says: string;
+  /** What the step would destroy, said plainly, where it would destroy anything. */
+  loses?: string;
+  /** How many rows the step touches, where the plugin counted them. */
+  rows?: number;
+  /** Why the step cannot apply at all; a refused step refuses its whole target, since a plan is one transaction. */
+  refused?: string;
+}
+
+/** One connection's plan: what it is, what would be done to it, and why nothing would be, where nothing would. */
+export interface PlanTarget {
+  /** The canonical path of the connection this plan is against; the runtime orders targets by it. */
+  connection: string;
+  /** What is behind the connection, for the operator to read. */
+  engine: string;
+  /** Why this connection was not planned at all, where it was not. */
+  skipped?: string;
+  /** What the world holds that the record does not agree with; a drifted connection plans nothing. */
+  drifted?: string[];
+  /** The steps, in the order the plugin declared them. */
+  steps: PlanStep[];
+}
+
+/** Every connection one plugin would reconcile, and the steps for each. */
+export interface Plan {
+  targets: PlanTarget[];
+}
+
+/** One plan that was applied, as the world now records it. */
+export interface Applied {
+  id: number;
+  appliedAt: string;
+  /** Who ran it, as the plugin recorded them. */
+  by: string;
+  /** The tree the plan came from: `project.json → name`. */
+  tree: string;
+  connection: string;
+  /** The targets this application touched, in the plugin's words. */
+  targets: string[];
+}
+
 export interface PluginModule {
   /** The alias root, e.g. '@http'. */
   root: string;
@@ -277,4 +347,19 @@ export interface PluginModule {
    * Whatever it holds must be released there, or a tree that reloads holds a little more each time.
    */
   postLoad?(ctx: PostLoadContext): Promise<void | (() => Promise<void>)>;
+  /**
+   * What a plugin that keeps declared state in the world does for `wilanis migrate`: the plan from the tree as it
+   * stands against what the world has recorded, and its application. Run after postLoad under the chosen profile,
+   * never by a graph and never by start. Plugins without one have nothing in the world to reconcile.
+   */
+  migrate?: {
+    plan(ctx: MigrateContext): Promise<Plan>;
+    apply(ctx: MigrateContext, plan: Plan): Promise<Applied[]>;
+    /**
+     * Every plan this plugin has already applied to the world, latest first, for `wilanis migrate --history`.
+     * The record is the world's and not the tree's, so only the plugin that wrote it can read it back; a
+     * plugin that keeps none has no history to print.
+     */
+    history?(ctx: MigrateContext): Promise<Applied[]>;
+  };
 }
