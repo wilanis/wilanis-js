@@ -41,9 +41,14 @@ async function serving(profile = 'local') {
   const blobs = emb.blobs.scope();
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-atomic-e2e-'));
 
-  /** Fire one operation of the monitor port, with what it accepts, and answer the whole report. */
+  /**
+   * Fire one operation of the monitor port, with what it accepts, and answer the whole report. `at` is the
+   * place this call takes in the order they were made here -- these are not the project's steps, so the index
+   * is this harness's own, and it is counted rather than defaulted so no record claims a position it has not.
+   */
+  let at = 0;
   const run = (op: string, input: Record<string, unknown> = {}) =>
-    emb.startup({ run: `@monitor/domain/monitor.port.json#${op}`, in: input }, { blobs });
+    emb.startup({ run: `@monitor/domain/monitor.port.json#${op}`, in: input }, { blobs, at: at++ });
 
   /** The CSV as the route would hand it: bytes in the registry, a handle in the graph. */
   const upload = (text: string): Promise<BlobHandle> =>

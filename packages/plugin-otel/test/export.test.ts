@@ -3,11 +3,9 @@
  * it, given a `Serving` that keeps its observers the way the server does, and the spans are read back off the
  * socket as OTLP/JSON.
  *
- * What is deliberately not here is a fire of a real trigger. The trace of a run is assembled by the runtime's
- * embedder (RFC 0006, step 3) and said as spans by `traceOf` (step 4); neither has landed. A trace handed to
- * an observer is the contract between them and this plugin, so these cases hand one over directly -- which is
- * exactly what the runtime will do -- and the end-to-end case that starts the example and fires a route waits
- * for that wiring.
+ * Every case here hands a trace over directly, because a trace handed to an observer is the whole contract
+ * between the runtime and this plugin, and a case that builds one says exactly what this plugin is given.
+ * `served.test.ts` closes the loop the other way, with a real tree and a real fire.
  */
 import type { Serving, Trace } from '@wilanis/core';
 import { afterEach, describe, expect, it } from 'vitest';

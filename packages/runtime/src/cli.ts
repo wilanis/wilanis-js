@@ -5,11 +5,12 @@ import { join, resolve } from 'node:path';
 import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { checkTree } from '@wilanis/compiler';
-import type { BlobHandle } from '@wilanis/core';
+import type { BlobHandle, Trace } from '@wilanis/core';
 import { KINDS, type Kind, type LoadResult } from '@wilanis/core';
 import { loadProject } from './project.js';
 import { runTrigger, start } from './serve.js';
-import { describe, fuzz, init, ls, map, migrate, regress, rehearse, scaffold, summarize } from './tools.js';
+import { describe, fuzz, init, ls, map, migrate, regress, rehearse, scaffold } from './tools.js';
+import { atLevel, type Level, traceJson, traceText } from './trace.js';
 
 /** Every flag `wilanis migrate` knows; anything else is exit 2, since a misspelt flag must never silently plan. */
 const MIGRATE_FLAGS = ['profile', 'apply', 'allow-destructive', 'adopt', 'history', 'json'];
@@ -20,10 +21,11 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
   wilanis rehearse [root] [--seed n] [-v]          run every trigger, and every branch of every switch
   wilanis fuzz     [root] [--runs n]               write one scenario per trigger per seed to scenarios/
   wilanis regress  [root]                          replay every scenario and diff node by node
-  wilanis start    [root] [--profile word]            run postLoad and the project's startup steps; what
-                   listens is what those steps say
-  wilanis run      <trigger> [root] [--in json] [--file path] [--out path] [--flag=v ...]
-                   fire one cli trigger; --file hands a file as request.file, --out receives a blob answer
+  wilanis start    [root] [--profile word] [--trace[=text|json]] [--level summary|full]
+                   run postLoad and the project's startup steps; what listens is what those steps say
+  wilanis run      <trigger> [root] [--in json] [--file path] [--out path] [--trace[=text|json]] [--flag=v ...]
+                   fire one cli trigger; --file hands a file as request.file, --out receives a blob answer;
+                   --trace prints what the run did, span by span, on stderr
   wilanis migrate  [root] [--profile word] [--apply] [--allow-destructive a,b] [--adopt] [--history] [--json]   plan the stores against the database; apply when told
                    --allow-destructive names each as <connection>/<target>, the pair that names a table
   wilanis ls       [root] [kind]                   every document, or those of one kind
@@ -64,6 +66,19 @@ function parse(argv: string[]) {
     at = next;
   }
   return { flags, positional };
+}
+
+/**
+ * What `--trace` and `--verbose` print, and nothing where neither was given: a printing observer, on stderr,
+ * where a trace belongs whatever stdout is carrying. `--trace=json` writes one object per run for a shipper;
+ * anything else writes the text form. `--level` says how much a span may carry, `summary` by default.
+ */
+function tracing(flags: Record<string, string>): ((trace: Trace) => void) | undefined {
+  const asked = flags.trace ?? (flags.verbose ? 'text' : undefined);
+  if (asked === undefined) return undefined;
+  const level: Level = flags.level === 'full' ? 'full' : 'summary';
+  const write = asked === 'json' ? traceJson : traceText;
+  return trace => console.error(write(atLevel(trace, level)));
 }
 
 async function load(root: string): Promise<LoadResult> {
@@ -124,7 +139,7 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
   },
   start: async ({ flags, rootArg }) => {
     const loaded = await check(rootArg(0));
-    const { stop, held } = await start(loaded, { profile: flags.profile });
+    const { stop, held } = await start(loaded, { profile: flags.profile, observe: tracing(flags) });
     if (!held) {
       console.log('nothing is held: project.json declares no startup step that listens, so there is nothing to serve');
       await stop();
@@ -155,9 +170,9 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
         profile: flags.profile,
         seed: flags.seed ? Number(flags.seed) : undefined,
         deliver,
+        observe: tracing(flags),
       },
     );
-    if (flags.verbose) console.error(summarize(report));
     if (!delivered) console.log(typeof answer === 'string' ? answer : JSON.stringify(answer ?? report, null, 2));
     if (report.status !== 'done') process.exit(1);
   },

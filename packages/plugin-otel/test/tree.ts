@@ -26,6 +26,7 @@ export function tree(): Docs {
       name: 'traced',
       plugins: [
         { use: '@std' },
+        { use: '@cli' },
         {
           use: ROOT,
           from: '@wilanis/plugin-otel',
@@ -70,11 +71,26 @@ export function tree(): Docs {
         },
       ],
     },
+    'features/monitor/edge/DigestView.shape.json': {
+      $schema: schemaRef('shape'),
+      description: 'the digest as a caller sees it',
+      layer: 'edge',
+      fields: { count: { type: 'number' } },
+    },
+    'features/monitor/edge/digest.trigger.json': {
+      $schema: schemaRef('trigger'),
+      label: 'digest',
+      description: 'what a command line asks for, so a case can fire this tree for real',
+      settings: { command: 'digest' },
+      out: '@features/monitor/edge/DigestView.shape.json',
+      kind: '@cli/cli.trigger-kind.json',
+      fire: { run: '@features/monitor/domain/monitor.port.json#digest' },
+    },
   };
 }
 
 /** Write a tree into a directory of its own; the caller removes it. */
-function write(docs: Docs): string {
+export function write(docs: Docs): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-otel-'));
   for (const [relative, doc] of Object.entries(docs)) {
     const path = join(dir, relative);
@@ -95,7 +111,7 @@ export function refusals(docs: Docs): { code: string; at: string; file: string; 
 /** The tree with its @otel settings replaced by what a case wants to try. */
 export function withSettings(settings: Record<string, unknown>): Docs {
   const docs = tree();
-  (docs['project.json'] as { plugins: { settings?: unknown }[] }).plugins[1].settings = settings;
+  (docs['project.json'] as { plugins: { settings?: unknown }[] }).plugins[2].settings = settings;
   return docs;
 }
 

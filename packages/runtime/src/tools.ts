@@ -14,5 +14,4 @@ export {
   generatedFire,
   policyRoots,
   stubEffects,
-  summarize,
 } from './stubbing.js';
