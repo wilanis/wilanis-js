@@ -90,6 +90,16 @@ export interface Recorder {
    */
   keeps(): boolean;
   /**
+   * The name this engine would keep a collection under, which is how two names that mean one collection are
+   * told from two that mean two. An engine folding an unquoted identifier keeps `auditLog` and `auditlog` as
+   * one table, so its record answers the folded name and a plan reading that name beside the tree's spelling
+   * would see a collection the tree no longer declares -- and plan a `drop` of the live table.
+   *
+   * It is the engine's own answer because the fold is the engine's: an engine that keeps names as given
+   * answers the name it was given, and the planner assumes nothing either way.
+   */
+  named(collection: string): string;
+  /**
    * Whether this engine writes a cast between these two types at all. It is asked before a `retype` is classed
    * and never counted: which pairs an engine attempts is its own table, and a pair it will not write is refused
    * on an empty table exactly as on a full one, rather than classed by a count and left to fault when the

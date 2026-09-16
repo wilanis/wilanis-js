@@ -210,6 +210,14 @@ export class MemoryEngine implements Engine {
   }
 
   /**
+   * A collection is kept under exactly the name it was given: a Map key folds nothing, so two names that
+   * differ only in case are two collections here, as `records` has always treated them.
+   */
+  named(collection: string): string {
+    return collection;
+  }
+
+  /**
    * Nothing this engine holds outlives the process, so a plan against it would be a plan nobody could apply.
    * `wilanis migrate` reads this and skips the connection with a line saying why, rather than printing a
    * `create` per collection that the next process would print again.

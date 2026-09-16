@@ -57,13 +57,22 @@ async function stand(engine: Engine, on: On, name: string, into: { held: Standin
  * Every collection this connection has ever recorded, beside the ones the tree declares now. A `drop` is
  * planned for a collection the record holds and the tree no longer does, so the record has to be asked about
  * more than the store mentions -- and what it was ever asked to apply anything to is what its own history
- * names. No member is added to the contract for it: `history` already answers which collections each applied
- * plan touched, and a collection nothing ever applied to was never recorded either.
+ * names.
+ *
+ * A name the history answers is the name the *engine* keeps, which is not always the name the tree wrote: an
+ * engine that folds an unquoted identifier records `auditLog` as `auditlog`, and taking both would leave one
+ * of them undeclared and plan a `drop` of the table the other one is. So the two are compared through
+ * `named`, and the tree's spelling wins where they are one collection -- the plan reads as the store does,
+ * and only a name the tree really has stopped declaring is left over to be dropped.
  */
 export async function everKnown(engine: Engine, on: On, declared: string[]): Promise<string[]> {
-  const names = new Set(declared);
-  for (const record of await engine.history(on)) for (const target of record.targets) names.add(target);
-  return [...names];
+  const names = new Map(declared.map(name => [engine.named(name), name]));
+  for (const record of await engine.history(on))
+    for (const target of record.targets) {
+      const under = engine.named(target);
+      if (!names.has(under)) names.set(under, target);
+    }
+  return [...names.values()];
 }
 
 /**

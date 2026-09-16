@@ -191,30 +191,66 @@ describe('a record the database has moved out from under', () => {
   });
 });
 
+/** The record once a `renamed` has applied: the record calls the field `agent`, as the tree now does. */
+const RENAMED: Declared = {
+  ...RECORDED,
+  fields: {
+    id: { type: 'string', required: true },
+    url: { type: 'string', required: true },
+    agent: { type: 'string', required: false },
+  },
+};
+
 describe('a mark that has done its work', () => {
-  it('a renamed the record has already answered is a line, not a step, and names the edit that clears it', async () => {
-    // the record already calls the field `agent`, so the rename applied on an earlier run and the mark is stale
-    const renamed: Declared = {
-      ...RECORDED,
-      fields: {
-        id: { type: 'string', required: true },
-        url: { type: 'string', required: true },
-        agent: { type: 'string', required: false },
-      },
-    };
+  it('a renamed the record has already answered is a note, never a step and never a refusal', async () => {
     const { ctx, register } = context({
       entries: { entries: { of: RENAMED_SHAPE, key: 'id', renamed: { agent: 'ua' } } },
     });
-    register(fake({ [ENTRIES]: { recorded: { entries: renamed }, catalog: { entries: renamed } } }).engine);
+    register(fake({ [ENTRIES]: { recorded: { entries: RENAMED }, catalog: { entries: RENAMED } } }).engine);
     const plan = await planStores(ctx);
-    const stale = plan.targets[0].steps.find(step => step.do === 'stale');
-    expect(stale?.says).toContain('renamed.agent has been applied');
-    expect(stale?.refused).toContain('remove');
-    // nothing is applied for it: the change is to the store document, and an engine is never given one
-    const { engine, asked } = fake({ [ENTRIES]: { recorded: { entries: renamed }, catalog: { entries: renamed } } });
+    // a tree is deployed to more than one database and the mark has to survive until the last has moved, so
+    // it must not refuse: carried in a step it would stop the connection on every run while it is still right
+    expect(plan.targets[0].steps).toEqual([]);
+    expect(plan.targets[0].notes?.join('\n')).toContain('renamed.agent has been applied');
+    expect(plan.targets[0].notes?.join('\n')).toContain('remove "renamed"');
+  });
+
+  it('a connection carrying a stale mark still applies every step beside it', async () => {
+    // the rename has applied -- the record calls the field `agent` -- and the store has since declared a
+    // unique the record has not got. The mark is a note and the unique is the connection's one step
+    const { ctx, register } = context({
+      entries: { entries: { of: RENAMED_SHAPE, key: 'id', unique: [['url']], renamed: { agent: 'ua' } } },
+    });
+    const { engine, asked } = fake({
+      [ENTRIES]: { recorded: { entries: RENAMED }, catalog: { entries: RENAMED } },
+    });
     register(engine);
-    await applyStores(ctx, await planStores(ctx));
-    expect(asked.applied.map(one => one.on)).not.toContain(ENTRIES);
+    const plan = await planStores(ctx);
+    const entries = plan.targets[0];
+    expect(entries.steps.map(step => step.do)).toEqual(['unique']);
+    expect(entries.steps.every(step => !step.refused)).toBe(true);
+    expect(entries.notes?.join('\n')).toContain('renamed.agent has been applied');
+    await applyStores(ctx, { targets: [entries] });
+    expect(asked.applied.map(one => one.on)).toEqual([ENTRIES]);
+    expect(asked.applied[0].steps.map(step => step.do)).toEqual(['unique']);
+  });
+});
+
+describe('a collection an engine keeps under a name of its own', () => {
+  it('a mixed-case collection is one collection, whatever spelling the record answers', async () => {
+    // this fake folds as PostgreSQL does, so its history answers `auditlog` for a tree declaring `auditLog`.
+    // Reading both as collections would leave one undeclared -- and plan a drop of the live table
+    const { ctx, register } = context({ entries: { auditLog: declares() } });
+    const { engine, asked } = fake({
+      [ENTRIES]: { recorded: { auditLog: RECORDED }, catalog: { auditLog: RECORDED } },
+    });
+    register(engine);
+    const plan = await planStores(ctx);
+    const entries = plan.targets[0];
+    // no step at all: not a create of `auditLog`, and above all not a drop of `auditlog`
+    expect(entries.steps).toEqual([]);
+    await applyStores(ctx, { targets: [entries] });
+    expect(asked.applied).toEqual([]);
   });
 });
 

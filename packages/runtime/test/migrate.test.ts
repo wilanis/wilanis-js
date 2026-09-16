@@ -82,6 +82,26 @@ describe('wilanis migrate: what it plans and prints', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("a target's notes are printed and judged by nothing: they neither refuse nor stop a step applying", async () => {
+    // a plugin with something to say about the tree -- a mark that has done its work -- has no step to say it
+    // with, and a line that judged would refuse a connection nothing is wrong with
+    const said = 'renamed.agent has been applied -- remove "renamed" from the entries collection';
+    const { dir, calls, plugins } = tree({ targets: [target([step()], { notes: [said] })] });
+    const answer = await run(dir, plugins, { apply: true });
+    expect(answer.lines.join('\n')).toContain(`note: ${said}`);
+    expect(calls).toContain('apply:@connections/entries.connection.json');
+    expect(answer.code).toBe(0);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('a note on a connection with nothing else to do still prints, under `up to date`', async () => {
+    const { dir, plugins } = tree({ targets: [target([], { notes: ['was.entry has been applied'] })] });
+    const answer = await run(dir, plugins);
+    expect(answer.lines.join('\n')).toMatch(/up to date\n {2}note: was\.entry has been applied/);
+    expect(answer.code).toBe(0);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it('targets are ordered by connection path, whatever order the plugin gave them', async () => {
     const { dir, plugins } = tree({
       targets: [

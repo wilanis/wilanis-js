@@ -32,6 +32,15 @@ function stepLines(step: PlanStep, note: string, applied: boolean): string[] {
   return lines;
 }
 
+/**
+ * What a plugin has to say about this connection that is not a change to make. It prints under whatever the
+ * plan came to -- a connection with nothing to do still has a mark to report -- and it judges nothing: the
+ * exit code and what applies are read off the steps alone.
+ */
+function noteLines(target: PlanTarget): string[] {
+  return (target.notes ?? []).map(said => `  note: ${said}`);
+}
+
 /** What one connection's plan says: its heading, the steps grouped by the target each is about, or why nothing ran. */
 export function targetLines(
   target: PlanTarget,
@@ -41,7 +50,7 @@ export function targetLines(
   if (target.skipped) return [...lines, `  skipped: ${target.skipped}`];
   if (target.drifted?.length)
     return [...lines, '  drifted, so nothing is planned here:', ...target.drifted.map(said => `    ${said}`)];
-  if (!target.steps.length) return [...lines, '  up to date'];
+  if (!target.steps.length) return [...lines, '  up to date', ...noteLines(target)];
   let heading = '';
   for (const step of target.steps) {
     if (step.target !== heading) lines.push(`  ${step.target}`);
@@ -49,7 +58,7 @@ export function targetLines(
     const note = noteOf(step, target.connection, opts.allowed);
     lines.push(...stepLines(step, note, opts.applied && !note));
   }
-  return lines;
+  return [...lines, ...noteLines(target)];
 }
 
 /**

@@ -341,6 +341,14 @@ export interface PlanTarget {
   skipped?: string;
   /** What the world holds that the record does not agree with; a drifted connection plans nothing. */
   drifted?: string[];
+  /**
+   * What the operator should know about this connection that is not a change to make: a mark in the tree that
+   * has done its work, say, and the edit that removes it. It is printed and never judged -- it does not stop a
+   * step applying, does not count towards what refused, and does not reach the exit code -- because the plugin
+   * that has something to say about a tree has no step to say it with, and a line that judged would refuse a
+   * connection nothing is wrong with.
+   */
+  notes?: string[];
   /** The steps, in the order the plugin declared them. */
   steps: PlanStep[];
 }

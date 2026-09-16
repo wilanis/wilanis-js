@@ -45,7 +45,12 @@ type Declares = { of: string; key: string; unique?: string[][]; renamed?: Record
 interface Tree {
   fields: Record<string, { type: string; required?: boolean }>;
   collection?: Partial<Declares>;
+  /** the collection's name, where a case is about the name itself; absent: `c_entries` */
+  name?: string;
 }
+
+/** The collection a case declares, which is `c_entries` unless the case is about what a name is spelled like. */
+const named = (tree: Tree) => tree.name ?? 'c_entries';
 
 /** A tree of one store over one PostgreSQL connection, written where the command can load it. */
 function write(tree: Tree): string {
@@ -76,7 +81,7 @@ function write(tree: Tree): string {
       description: 'the entries kept so far',
       connection: CONNECTION,
       collections: {
-        c_entries: { of: '@features/monitor/domain/Entry.shape.json', key: 'id', ...tree.collection },
+        [named(tree)]: { of: '@features/monitor/domain/Entry.shape.json', key: 'id', ...tree.collection },
       },
     },
   };
@@ -218,8 +223,52 @@ describe.skipIf(!url)('wilanis migrate, from a store document to a table and bac
 
     // the record now calls it `agent`, so the mark has done its work and the plan says which edit clears it
     const after = await run(renamed);
-    expect(after.plan.targets[0].steps.map(step => step.do)).toEqual(['stale']);
-    expect(after.lines.join('\n')).toContain('renamed.agent has been applied');
+    expect(after.plan.targets[0].steps).toEqual([]);
+    expect(after.plan.targets[0].notes?.join('\n')).toContain('renamed.agent has been applied');
     expect(after.lines.join('\n')).toContain('remove "renamed"');
+    // and it judges nothing: the mark has to survive until the last database has moved, so a run that finds
+    // one is a run with nothing to do and not a run that refused
+    expect(after.code).toBe(0);
+    expect(after.lines.join('\n')).toContain('nothing to apply');
+  });
+
+  it('a stale mark leaves every step beside it applying, and the command still exits 0', async () => {
+    await run({ fields: FIELDS }, { apply: true });
+    const renamed: Tree = {
+      fields: { id: FIELDS.id, url: FIELDS.url, agent: { type: 'string', required: false } },
+      collection: { renamed: { agent: 'ua' } },
+    };
+    await run(renamed, { apply: true });
+
+    // the mark has applied and the shape has since gained a field: the note rides beside the add, and the
+    // add applies. Carried in a step's `refused` the note would refuse the connection and nothing would
+    const gained: Tree = {
+      fields: { ...renamed.fields, note: { type: 'string', required: false } },
+      collection: renamed.collection,
+    };
+    const applied = await run(gained, { apply: true });
+    expect(applied.code).toBe(0);
+    expect(applied.plan.targets[0].steps.map(step => `${step.do} ${step.at}`)).toEqual(['add note']);
+    expect(applied.plan.targets[0].notes?.join('\n')).toContain('renamed.agent has been applied');
+    expect(applied.applied).toHaveLength(1);
+    expect((await columns()).note).toBeDefined();
+  });
+
+  it('a collection PostgreSQL folds is one collection: a second plan drops nothing', async () => {
+    // Postgres keeps `c_auditLog` as `c_auditlog` and its record answers that name, so a plan reading the
+    // record's spelling beside the tree's would call one of them undeclared -- and drop the live table
+    const mixed: Tree = { fields: FIELDS, name: 'c_auditLog' };
+    const first = await run(mixed, { apply: true });
+    expect(first.code).toBe(0);
+    expect(first.plan.targets[0].steps.map(step => step.do)).toEqual(['create']);
+
+    const again = await run(mixed);
+    expect(again.code).toBe(0);
+    expect(again.plan.targets[0].steps).toEqual([]);
+    const held = (await sql<{ n: string }>`
+      select count(*) as n from information_schema.tables
+      where table_schema = ${schema} and table_name = 'c_auditlog'
+    `.execute(db())) as { rows: { n: string }[] };
+    expect(Number(held.rows[0]?.n)).toBe(1);
   });
 });
