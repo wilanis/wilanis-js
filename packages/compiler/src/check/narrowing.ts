@@ -1,46 +1,85 @@
 /**
- * What a routing switch proves. `has(x)` on a read input, in a rule, proves that path present for the node the
- * rule routes to; a node downstream of a routed one runs only after it did, so it may take the same for
- * granted. Wherever such a node reads a proved path, the read loses its optionality.
+ * What a routing switch proves. A rule routes to a node only when it held, so that node -- and anything
+ * downstream of it -- may take every conjunct of the rule for granted. A `has(x)` conjunct is what the read
+ * rules lean on: it makes an optional path present. The rest are what an invariant leans on (RFC 0007): a
+ * site the routing already established the rule for is proved, and needs no guard.
+ *
+ * A conjunct is kept renamed -- the switch's input names rewritten to the read paths its `in` gives them --
+ * so it says the same thing wherever it is asked about, in the one spelling every reader of the graph uses.
  */
-import { expr, isSwitch, type Node, type Scope, type SwitchNode, WHOLE_TEMPLATE } from '@wilanis/core';
+import { expr, isSwitch, type Node, type Scope, type SwitchNode, splitPath, WHOLE_TEMPLATE } from '@wilanis/core';
 import { readValuesOf } from './judge.js';
 import { atOrBelow } from './typing.js';
 
-/** The paths a rule's `has(...)` conjuncts prove, spelled the way the switch's inputs read them. */
-function provedBy(node: SwitchNode, when: string): Set<string> {
-  const proved = new Set<string>();
+/** Rewrite every root of an expression through `rename`; nothing when a root has no reading of its own. */
+function renamed(term: expr.Expr, rename: (root: string) => string[] | undefined): expr.Expr | undefined {
+  switch (term.kind) {
+    case 'lit':
+      return term;
+    case 'path':
+    case 'has': {
+      const head = rename(term.path[0]);
+      return head ? { kind: term.kind, path: [...head, ...term.path.slice(1)] } : undefined;
+    }
+    case 'len':
+    case 'not': {
+      const arg = renamed(term.arg, rename);
+      return arg ? { kind: term.kind, arg } : undefined;
+    }
+    case 'bin': {
+      const left = renamed(term.left, rename);
+      const right = renamed(term.right, rename);
+      return left && right ? { kind: 'bin', op: term.op, left, right } : undefined;
+    }
+  }
+}
+
+/** One conjunct a switch established before routing: the switch's id, and the conjunct in this graph's reads. */
+export type Established = [string, expr.Expr];
+
+/** The conjuncts of a rule: what `&&` at the top splits it into, each judged on its own. */
+export function conjunctsOf(term: expr.Expr, out: expr.Expr[] = []): expr.Expr[] {
+  if (term.kind === 'bin' && term.op === '&&') {
+    conjunctsOf(term.left, out);
+    conjunctsOf(term.right, out);
+    return out;
+  }
+  out.push(term);
+  return out;
+}
+
+/** A rule's conjuncts, spelled the way the switch's inputs read them; a conjunct over an input written in place is dropped. */
+function provedBy(node: SwitchNode, when: string): expr.Expr[] {
   let parsed: expr.Expr;
   try {
     parsed = expr.parse(when);
   } catch {
-    return proved; // refused where the rule is judged (G011)
+    return []; // refused where the rule is judged (G011)
   }
-  const walk = (term: expr.Expr): void => {
-    if (term.kind === 'bin' && term.op === '&&') {
-      walk(term.left);
-      walk(term.right);
-      return;
-    }
-    if (term.kind !== 'has') return;
-    const value = node.in[term.path[0]];
+  const rename = (root: string): string[] | undefined => {
+    const value = node.in[root];
     const whole = typeof value === 'string' ? WHOLE_TEMPLATE.exec(value) : null;
-    if (whole) proved.add([whole[1], ...term.path.slice(1)].join('.'));
+    return whole ? splitPath(whole[1]) : undefined;
   };
-  walk(parsed);
-  return proved;
+  const out: expr.Expr[] = [];
+  for (const conjunct of conjunctsOf(parsed)) {
+    const one = renamed(conjunct, rename);
+    if (one) out.push(one);
+  }
+  return out;
 }
 
 /**
- * What a graph's routing proves: for each node, the request paths a switch's `has(...)` rule established
- * before routing to it -- or to anything it reads -- so a read of such a path is no longer optional. It also
- * answers which nodes read which, the dependency table G007 and G010 are judged over.
+ * What a graph's routing proves: for each node, the conjuncts a switch's rule established before routing to
+ * it -- or to anything it reads -- each spelled as a read path of this graph. `establishedFor` answers them;
+ * `presentFor` answers the `has(...)` ones as paths, which is what a read losing its optionality needs. It
+ * also answers which nodes read which, the dependency table G007 and G010 are judged over.
  */
 export class Narrowing {
   /** node id -> the nodes it reads */
   readonly dependencies = new Map<string, Set<string>>();
-  /** node id -> the paths the switch routing to it proved present */
-  private readonly present = new Map<string, Set<string>>();
+  /** node id -> the conjuncts the switch routing to it established, each with the switch that did */
+  private readonly proved = new Map<string, Established[]>();
 
   constructor(scope: Scope, nodes: Map<string, Node>) {
     for (const node of nodes.values()) {
@@ -52,28 +91,34 @@ export class Narrowing {
 
   private collectProofs(node: SwitchNode): void {
     for (const rule of node.rules) {
-      const proved = provedBy(node, rule.when);
-      if (!proved.size) continue;
-      const known = this.present.get(rule.to) ?? new Set<string>();
-      for (const path of proved) known.add(path);
-      this.present.set(rule.to, known);
+      const proved = provedBy(node, rule.when).map((term): Established => [node.id, term]);
+      if (!proved.length) continue;
+      this.proved.set(rule.to, [...(this.proved.get(rule.to) ?? []), ...proved]);
     }
   }
 
-  /** What a node may take as present: what routed it, and what routed anything it reads. */
-  provedFor(id: string, seen = new Set<string>()): Set<string> {
-    if (seen.has(id)) return new Set();
+  /**
+   * What a node may take as established: what routed it, and what routed anything it reads, each with the
+   * switch that established it, so a reader can be told which decision proved an invariant.
+   */
+  establishedFor(id: string, seen = new Set<string>()): Established[] {
+    if (seen.has(id)) return [];
     seen.add(id);
-    const out = new Set(this.present.get(id) ?? []);
-    for (const dependency of this.dependencies.get(id) ?? []) {
-      for (const path of this.provedFor(dependency, seen)) out.add(path);
-    }
+    const out = [...(this.proved.get(id) ?? [])];
+    for (const dependency of this.dependencies.get(id) ?? []) out.push(...this.establishedFor(dependency, seen));
+    return out;
+  }
+
+  /** The paths a node may take as present: the `has(...)` conjuncts of what established it. */
+  presentFor(id: string): Set<string> {
+    const out = new Set<string>();
+    for (const [, term] of this.establishedFor(id)) if (term.kind === 'has') out.add(term.path.join('.'));
     return out;
   }
 
   /** Is a dotted read proved present where `reading` runs? */
   narrowed(reading: string | undefined, source: string): boolean {
     if (!reading) return false;
-    return [...this.provedFor(reading)].some(path => atOrBelow(source, path));
+    return [...this.presentFor(reading)].some(path => atOrBelow(source, path));
   }
 }
