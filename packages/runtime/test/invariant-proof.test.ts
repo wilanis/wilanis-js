@@ -54,6 +54,16 @@ const routes = (id: string, when: string, to: string, otherwise: string) => ({
   else: otherwise,
 });
 
+/** A switch of several rules over what `reads` answers, each routing where the case says. */
+const routesAll = (id: string, rules: { when: string; to: string }[], otherwise: string) => ({
+  type: '@wilanis/node/switch.schema.json',
+  id,
+  label: id,
+  in: { row: '{{asked.record}}' },
+  rules,
+  else: otherwise,
+});
+
 /** A refusal for a switch's else branch to land on, so every node is reachable. */
 const refuses = (id: string) => ({
   type: '@wilanis/node/run.schema.json',
@@ -137,6 +147,55 @@ describe('the proof rules of a field invariant', () => {
     expect(provenAt(narrowing('len(row.url) > 0'), ANSWERS, 'row', 'has(url)')).toEqual(['guarded']);
     // a rule about another field than the one routed on is established by nothing
     expect(provenAt(narrowing('len(row.url) > 0'), ANSWERS, 'row', "method != 'DELETE'")).toEqual(['guarded']);
+  });
+
+  it('guards a node the same switch reaches by a rule and by else: it runs whether the rule held or not', () => {
+    // the rule proves len(url) > 0 of the runs it routed, and `else` sends the rest of them to the very same
+    // node. Arriving at `row` says nothing about which way brought the run there, so nothing is established.
+    const bothWays = [
+      reads('asked'),
+      routes('route', 'len(row.url) > 0', 'row', 'row'),
+      makes('row', '{{asked.record}}'),
+    ];
+    expect(provenAt(bothWays, { out: { type: ENTRY, from: 'row' } }, 'row', 'len(url) > 0')).toEqual(['guarded']);
+  });
+
+  it('guards a node two rules of one switch both route to: only one of the two was true of the run', () => {
+    // two cases answered the same way is a fair thing for a graph to say, and it establishes neither rule:
+    // unioning them would prove len(url) > 0 of a run that arrived because the method was GET
+    const twice = [
+      reads('asked'),
+      routesAll(
+        'route',
+        [
+          { when: 'len(row.url) > 0', to: 'row' },
+          { when: "row.method == 'GET'", to: 'row' },
+        ],
+        'gone',
+      ),
+      makes('row', '{{asked.record}}'),
+      refuses('gone'),
+    ];
+    expect(provenAt(twice, ANSWERS, 'row', 'len(url) > 0')).toEqual(['guarded']);
+    expect(provenAt(twice, ANSWERS, 'row', "method == 'GET'")).toEqual(['guarded']);
+    // and the switch's other targets are unaffected: only the one reached twice loses what it established
+    const one = [
+      reads('asked'),
+      routesAll(
+        'route',
+        [
+          { when: 'len(row.url) > 0', to: 'row' },
+          { when: "row.method == 'GET'", to: 'other' },
+        ],
+        'gone',
+      ),
+      makes('row', '{{asked.record}}'),
+      makes('other', '{{asked.record}}'),
+      refuses('gone'),
+    ];
+    expect(provenAt(one, { out: { type: ENTRY, from: ['row', 'other', 'gone'] } }, 'row', 'len(url) > 0')).toEqual([
+      'narrowed by route',
+    ]);
   });
 
   it('proves a site that reads a sibling site of the same shape whole, and guards one that reads anything else', () => {
