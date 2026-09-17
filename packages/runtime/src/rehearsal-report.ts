@@ -1,7 +1,15 @@
 /**
  * A rehearsal said in words: one line per decision, the branches it took, and what it took to reach each -- so a
  * reader sees which way a tree can go without reading the report's JSON.
+ *
+ * A guard (RFC 0007) is one of those decisions. The compiler lowers it where a field invariant could not be
+ * proved, so the branch solver inverts its rule like any other and the walk tries both branches: nothing new is
+ * solved here. What changes is only what a reader is told -- the decision is headed by the invariant it stands
+ * for rather than by a switch the author never wrote, its branches read `holds` and `violated` rather than as a
+ * rule and an `else`, and the summary says, invariant by invariant, where the tree met each one.
  */
+import { heldWhollyAt, invariantSaidOf, sitesOf } from '@wilanis/compiler';
+import type { InvariantDoc, Loaded, Scope } from '@wilanis/core';
 import type { Settled } from './rehearse.js';
 
 export interface Decision {
@@ -11,9 +19,26 @@ export interface Decision {
   node: string;
   /** True when that graph says `atomic`, so every branch that does not answer undoes what it wrote. */
   atomic?: boolean;
+  /**
+   * The invariants this decision guards, where it is a guard the compiler lowered and not a switch the author
+   * wrote: their labels, joined. A switch has none, and reads as one.
+   */
+  guard?: string;
   /** The triggers whose runs reach this switch. */
   triggers: string[];
   branches: { when: string; to: string; settled?: Settled; uncovered?: string }[];
+}
+
+/**
+ * How one invariant of the tree stands, as the summary says it after the branches: the access form holds at
+ * every trigger that reaches what it gates, and the field form is proved at some of its sites and guarded at
+ * the rest. Both are counted by the compiler, which judged them; the report only says the count.
+ */
+export interface Stated {
+  /** The invariant's label where it has one, else its path: what a reader opens. */
+  name: string;
+  /** `holds at N trigger(s)` for the access form, `proved at N site(s), guarded at M` for the field form. */
+  met: string;
 }
 
 /** A graph with no branches at all: what it ran, how it ended, and whether it was atomic. */
@@ -76,6 +101,16 @@ function phrase(when: string): string {
   return `when ${when}`;
 }
 
+/**
+ * A branch as it reads under a guard: the two words the rule can come out as. The rule itself is the header's,
+ * said once beside the invariant that states it, so repeating it on the branch that tests it would say nothing
+ * -- and `anything else` is not what the other branch means when the else is a refusal the compiler wrote.
+ */
+const guarded = (when: string): string => (when === 'else' ? 'violated' : 'holds');
+
+/** How one branch is named: by the rule it routes on, or, under a guard, by what the rule decided. */
+const branchName = (when: string, guard: boolean): string => (guard ? guarded(when) : phrase(when));
+
 /** How a run with no branches ended. */
 function verdict(status: string): string {
   if (status === 'done') return 'answers';
@@ -88,10 +123,10 @@ const short = (path: string) => path.replace(/^@/, '').replace(/\.graph\.json$/,
 /** How one branch settled: the line the report shows, and the problem it names when something is wrong. */
 function branchLine(
   branch: Decision['branches'][number],
-  at: { graph: string; node: string; atomic?: boolean; verbose?: boolean },
+  at: { graph: string; node: string; atomic?: boolean; guard?: boolean; verbose?: boolean },
   width: number,
 ): { line: string; problem?: string } {
-  const when = phrase(branch.when).padEnd(width);
+  const when = branchName(branch.when, at.guard === true).padEnd(width);
   const where = `${at.graph} '${at.node}'`;
   if (branch.uncovered)
     return {
@@ -169,14 +204,21 @@ function aside(run: { declared?: string; error?: string }): string {
  * The report. Grouped by the graph that makes each decision, because that is the document to open when
  * a branch is wrong -- a switch reached from two triggers is one decision, reported once.
  *
- * Answers whether the rehearsal passed: every branch settled, and none was left unreachable.
+ * Answers whether the rehearsal passed: every branch settled, and none was left unreachable. An invariant that
+ * is guarded everywhere is not a failure: a guard settling both ways is the rehearsal doing its job, and where
+ * each one stands is said in the summary rather than counted against the run.
  */
-export function format(decisions: Decision[], plain: Plain[], lines: string[], verbose?: boolean): boolean {
+export function format(
+  decisions: Decision[],
+  plain: Plain[],
+  lines: string[],
+  said: { verbose?: boolean; stated?: Stated[] } = {},
+): boolean {
   const problems: string[] = [];
   for (const run of plain) problems.push(...plainLines(run, lines));
-  for (const decision of decisions) problems.push(...decisionLines(decision, lines, verbose));
+  for (const decision of decisions) problems.push(...decisionLines(decision, lines, said.verbose));
   lines.push('');
-  return summary(decisions, problems, lines);
+  return summary(decisions, problems, lines, said.stated ?? []);
 }
 
 /** A graph with no branches: what it answered, and the problem it names when it did not. */
@@ -188,16 +230,24 @@ function plainLines(run: Plain, lines: string[]): string[] {
   return [`${short(run.graph)}: ${run.error ?? 'blocked -- an input it needs is never supplied'}`];
 }
 
+/**
+ * What a decision is called: a guard says the invariant it stands for, since the switch is the compiler's and
+ * its id is not a node a reader can open. A switch the author wrote says so and names itself.
+ */
+const headed = (decision: Decision): string =>
+  decision.guard ? `guard '${decision.node}' ${decision.guard}` : `switch '${decision.node}'`;
+
 /** One decision: how many branches were covered, and how each settled. */
 function decisionLines(decision: Decision, lines: string[], verbose?: boolean): string[] {
+  const guard = decision.guard !== undefined;
   const covered = decision.branches.filter(branch => !branch.uncovered).length;
   const via = verbose ? `  [via ${decision.triggers.join(', ')}]` : '';
   const named = `${short(decision.graph)}${marked(decision.atomic)}`;
-  lines.push(`${named}  switch '${decision.node}'  ${covered}/${decision.branches.length} branches${via}`);
+  lines.push(`${named}  ${headed(decision)}  ${covered}/${decision.branches.length} branches${via}`);
   // one width for the whole decision, so the outcomes line up and the odd one out is visible
-  const width = Math.max(...decision.branches.map(branch => phrase(branch.when).length));
+  const width = Math.max(...decision.branches.map(branch => branchName(branch.when, guard).length));
   const problems: string[] = [];
-  const at = { graph: short(decision.graph), node: decision.node, atomic: decision.atomic, verbose };
+  const at = { graph: short(decision.graph), node: decision.node, atomic: decision.atomic, guard, verbose };
   for (const branch of decision.branches) {
     const said = branchLine(branch, at, width);
     lines.push(said.line);
@@ -206,20 +256,82 @@ function decisionLines(decision: Decision, lines: string[], verbose?: boolean): 
   return problems;
 }
 
-/** The last word: every branch settled, or the problems that are left. */
-function summary(decisions: Decision[], problems: string[], lines: string[]): boolean {
+/**
+ * What the tree states and where it met it, one invariant to a line, after the branch summary -- because a
+ * rehearsal that walked every branch has answered the routing question and this is the other one: of the rules
+ * the tree states once, which were settled before it ran and which are still being watched while it runs.
+ * A tree that states none says nothing, rather than a count of zero a reader has to read past.
+ */
+function statedLines(stated: Stated[], lines: string[]) {
+  if (!stated.length) return;
+  lines.push(`${stated.length} invariant(s) declared:`);
+  for (const one of stated) lines.push(`  ${one.name}  ${one.met}`);
+}
+
+/** The last word: every branch settled, or the problems that are left, and where each invariant stands. */
+function summary(decisions: Decision[], problems: string[], lines: string[], stated: Stated[]): boolean {
   if (problems.length) {
     lines.push(`${problems.length} problem(s):`);
     for (const problem of problems) lines.push(`  - ${problem}`);
+    statedLines(stated, lines);
     return false;
   }
   const branches = decisions.reduce((count, decision) => count + decision.branches.length, 0);
   const graphs = new Set(decisions.map(decision => decision.graph)).size;
   lines.push(`every branch settled -- ${branches} branch(es), ${decisions.length} decision(s), ${graphs} graph(s).`);
+  statedLines(stated, lines);
   lines.push(
     '"refused on purpose" is a refuse node the graph declares: a designed outcome with a reason the trigger maps, not a fault. Effects are stubbed, so no request left this process.',
   );
   return true;
+}
+
+// ---- what the tree states --------------------------------------------------------------------------
+
+/**
+ * How a reader is told which invariant is meant: its label where it has one, else its path. Both the header a
+ * guard carries and the summary line say it this way, so the two cannot come to name one document differently.
+ */
+export const stateName = (invariant: Loaded<InvariantDoc>): string => invariant.doc.label ?? invariant.path;
+
+/**
+ * Where an access invariant holds: the triggers that reach an operation it gates and meet what it requires.
+ * A trigger the checker left unjudged is not counted as holding, since nothing proved it does -- the count
+ * here can never claim more than `wilanis check` did.
+ */
+function accessMet(scope: Scope, invariant: Loaded<InvariantDoc>): string {
+  const said = invariantSaidOf(scope, invariant);
+  const held = new Set((said?.reached ?? []).filter(one => one.met.length).map(one => one.trigger));
+  return `holds at ${held.size} trigger(s)`;
+}
+
+/**
+ * Where a field invariant stands: how many of its shape's sites the checker proved it at, and how many carry
+ * a guard instead. The question is `heldWhollyAt`, the same one the compiler asked before it lowered a guard,
+ * so the two counts add up to the sites and the guarded one is exactly what the branches above walked.
+ */
+function holdsMet(scope: Scope, holds: { on: string; when: string }): string {
+  const sites = sitesOf(scope, holds.on);
+  const proved = sites.filter(site => heldWhollyAt(scope, sites, site, holds.when)).length;
+  return `proved at ${proved} site(s), guarded at ${sites.length - proved}`;
+}
+
+/**
+ * Every invariant the tree states, and where each is met: one line's worth per document, in registry order.
+ *
+ * This is the other half of what a rehearsal answers. The branches say the routing is wired up; these say
+ * which of the rules the tree states once were settled before it ran, and which are being watched while it
+ * runs. Both counts come from the functions that judged them -- `invariantSaidOf` for the access form,
+ * `heldWhollyAt` for the field form -- so the summary cannot claim a proof the checker did not make.
+ */
+export function statedOf(scope: Scope): Stated[] {
+  const out: Stated[] = [];
+  for (const invariant of scope.registry.all('invariant')) {
+    const holds = invariant.doc.holds;
+    if (holds?.when !== undefined) out.push({ name: stateName(invariant), met: holdsMet(scope, holds) });
+    else if (invariant.doc.access) out.push({ name: stateName(invariant), met: accessMet(scope, invariant) });
+  }
+  return out;
 }
 
 /**

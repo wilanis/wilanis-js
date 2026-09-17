@@ -2,12 +2,13 @@
  * `wilanis rehearse`: every branch of every decision a trigger can reach, walked until each is answered, and what it
  * took to get there said in words. It runs against stubbed effects, so nothing leaves the process.
  */
+import { guardsOf, idsOf } from '@wilanis/compiler';
 import type { BindingDoc, Loaded, LoadResult, TriggerDoc, Type } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
 import { refusalOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, nonEmpty, type Stubbing, setPath, switchesOf } from './branches.js';
 import type { Embedder } from './embed.js';
-import { type Decision, format, gather, type Plain } from './rehearsal-report.js';
+import { type Decision, format, gather, type Plain, statedOf, stateName } from './rehearsal-report.js';
 import { embedderFor, failedBelow, generatedFire, policyRoots } from './stubbing.js';
 
 // ---- rehearse ----------------------------------------------------------------------------------------
@@ -110,7 +111,10 @@ export async function rehearse(
     const found = await rehearseTrigger(load, trigger, { seed, profile: opts.profile }, decisions);
     if (!found) settledGraphs.push(await wholeOf(load, trigger, seed, opts.profile));
   }
-  return { ok: format(decisions, settledGraphs, lines, opts.verbose), lines };
+  // the invariants the tree states, counted over the whole tree rather than per trigger: a rule is stated once
+  const scope = embedderFor(load, { seed, profile: opts.profile }).scope;
+  const said = { verbose: opts.verbose, stated: statedOf(scope) };
+  return { ok: format(decisions, settledGraphs, lines, said), lines };
 }
 
 /** What broke, when a run failed without declaring a refusal. */
@@ -274,15 +278,30 @@ function downstreamOf(walk: Walk, sw: FoundSwitch): Record<string, unknown> {
   return downstream;
 }
 
+/**
+ * The invariants a decision guards, where the switch is one the compiler lowered rather than one the author
+ * wrote (RFC 0007); nothing where it is an ordinary switch. Which sites carry a guard is never re-derived
+ * here: `guardsOf` is the compiler's own answer, and the ids it occupies are the contract the report, the
+ * describe and the viewer all read a guard by, so a node id that is one of them is one.
+ */
+function guardAt(emb: Embedder, graph: string, node: string): string | undefined {
+  const doc = emb.scope.get('graph', graph);
+  if (!doc) return undefined;
+  const guard = guardsOf(emb.scope, doc).find(one => idsOf(one).check === node);
+  return guard?.unproved.map(one => stateName(one.invariant)).join('; ');
+}
+
 /** One switch as a decision: every branch, and what each settled to. */
 async function decisionFor(walk: Walk, sw: FoundSwitch): Promise<Decision> {
   const pre = reach(walk, sw);
   const downstream = downstreamOf(walk, sw);
   const graph = graphOf(walk.probe, walk.trigger, sw);
+  const node = sw.at.split('.').pop() ?? '';
   const decision: Decision = {
     graph,
-    node: sw.at.split('.').pop() ?? '',
+    node,
     atomic: atomicAt(walk.probe, graph),
+    guard: guardAt(walk.probe, graph, node),
     triggers: [walk.trigger.name],
     branches: [],
   };
