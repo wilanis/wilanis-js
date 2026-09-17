@@ -7,7 +7,9 @@
  *
  * The example's two access invariants are both exercised, since they take the two forms `requires` allows:
  * `writes-are-for-recorders` names the policy, `the-session-is-the-callers` names what must be proved. The
- * `holds` form is planted, because the example has none today.
+ * example carries one `holds` invariant beside them, `an-entry-names-a-call`, so the listing sees all three;
+ * what `describe` says of the field form is still read off a planted one, since a case that plants its rule
+ * says in the test what it expects to be told.
  */
 import { rmSync } from 'node:fs';
 import { loadTree, schemaUrl } from '@wilanis/core';
@@ -19,12 +21,17 @@ const example = loadTree(EXAMPLE, PLUGINS, INCLUDES);
 
 const WRITES = '@features/monitor/domain/writes-are-for-recorders.invariant.json';
 const SESSION = '@features/directories/domain/the-session-is-the-callers.invariant.json';
+const CALLS = '@features/monitor/domain/an-entry-names-a-call.invariant.json';
 const CAN_RECORD = '@features/access/edge/can-record.policy.json';
 const SIGNED_IN = '@features/access/edge/signed-in.policy.json';
 
 describe('ls: the invariants of a tree', () => {
   it('lists an invariant under its kind, as every other kind is listed', () => {
-    expect(ls(example, 'invariant')).toEqual([`invariant        ${SESSION}`, `invariant        ${WRITES}`]);
+    expect(ls(example, 'invariant')).toEqual([
+      `invariant        ${SESSION}`,
+      `invariant        ${CALLS}`,
+      `invariant        ${WRITES}`,
+    ]);
   });
 
   it('lists them among everything else too, so a reader who asks for no kind still finds them', () => {
