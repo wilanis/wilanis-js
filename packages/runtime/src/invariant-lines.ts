@@ -31,7 +31,7 @@ const metSaid = (reached: ReachedWay): string =>
  */
 function howSaid(reached: ReachedWay): string {
   if (reached.met.length) return metSaid(reached);
-  return reached.unjudged ? 'not judged -- the invariant itself is refused' : 'nothing -- I001 refuses this';
+  return reached.unjudged ? 'not judged (the invariant itself is refused)' : 'nothing, which I001 refuses';
 }
 
 /** What one access invariant asks of every way in, as one line a reader of the invariant sees. */
@@ -59,15 +59,53 @@ export function overShape(shape: string, scope: Scope): string[] {
   return lines;
 }
 
-/** Every way in an access invariant constrains, one trigger to a pair of lines: what it reaches, and how it meets it. */
+/** One operation as it reads where the `over` block above has already named the port: the bare `#operation`. */
+const opSaid = (op: string, ports: Set<string>): string => {
+  const [port, name] = [op.slice(0, op.indexOf('#')), op.slice(op.indexOf('#') + 1)];
+  return ports.size === 1 && ports.has(port) ? `#${name}` : op;
+};
+
+/** One way in, as it reads beside its trigger: what it reaches, and the operation it was reached through. */
+const waySaid = (one: ReachedWay, ports: Set<string>): string =>
+  `${opSaid(one.operation, ports)}${one.through ? ` (through ${opSaid(one.through, ports)})` : ''}`;
+
+/** The ways in one trigger has, gathered in the order the walk found them, which is the order `over` writes. */
+function byTrigger(reached: ReachedWay[]): Map<string, ReachedWay[]> {
+  const out = new Map<string, ReachedWay[]>();
+  for (const one of reached) out.set(one.trigger, [...(out.get(one.trigger) ?? []), one]);
+  return out;
+}
+
+/**
+ * One trigger, on one line: what it reaches, and how it meets the rule where that is not what every way in
+ * does. A trigger reaching three operations is one trigger, and the `over` block above has named the port,
+ * so the operations read as `#record, #submit, #import` rather than three canonical paths.
+ */
+function triggerLine(trigger: string, ways: ReachedWay[], ports: Set<string>, hoisted: boolean): string {
+  const reaches = ways.map(one => waySaid(one, ports)).join(', ');
+  const how = hoisted ? '' : `  -- met by ${howSaid(ways[0])}`;
+  return `    ${trigger}  ${reaches}${how}`;
+}
+
+/**
+ * Whether every way in is met the same way, so the answer can be said once above the list instead of on every
+ * line. `requires` is one rule and most trees meet it with one policy, which the line above has already named;
+ * repeating it per trigger says nothing a reader does not have. Where the ways differ -- one unjudged, one
+ * meeting nothing, one meeting something else -- each says its own, since that difference is the whole point.
+ */
+const sameThroughout = (reached: ReachedWay[]): boolean =>
+  new Set(reached.map(one => howSaid(one))).size === 1 && reached.every(one => one.met.length);
+
+/** Every way in an access invariant constrains, a trigger to a line, with what they share said once. */
 function reachedLines(said: InvariantSaid): string[] {
   if (!said.reached.length) return ['reached by  nothing yet -- no trigger reaches any operation of over'];
-  const lines = ['reached by (the policy that meets it, and how the operation was reached):'];
-  for (const one of said.reached) {
-    const by = one.through ? `  reached through ${one.through}` : '';
-    lines.push(`    ${one.trigger}  ${one.operation}${by}`, `        met by ${howSaid(one)}`);
-  }
-  return lines;
+  const ports = new Set(said.covers.map(one => one.port));
+  const hoisted = sameThroughout(said.reached);
+  const head = hoisted
+    ? `reached by (every one met by ${howSaid(said.reached[0])}):`
+    : 'reached by (the operations each reaches, and how it meets the rule):';
+  const grouped = byTrigger(said.reached);
+  return [head, ...[...grouped].map(([trigger, ways]) => triggerLine(trigger, ways, ports, hoisted))];
 }
 
 /** The access form, said: what it gates, what it asks, and every trigger that reaches it with how each meets it. */

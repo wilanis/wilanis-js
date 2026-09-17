@@ -45,41 +45,59 @@ describe('describe: an access invariant that names the policy', () => {
     expect(said()).toContain('requires: attaches @access/edge/can-record.policy.json');
   });
 
-  it('names every trigger that reaches it and the policy that meets it there', () => {
-    // the five write triggers of the monitor feature; the reads are not reached and say nothing
-    expect(said()).toContain(
-      '    @features/monitor/edge/delete-entry.trigger.json  @features/monitor/domain/monitor.port.json#remove',
-    );
-    expect(said()).toContain(`        met by ${CAN_RECORD}`);
+  it('names each trigger once, however many of the gated operations it reaches', () => {
+    // one trigger reaching three operations is one trigger. The five write triggers of the monitor feature,
+    // one line each; the reads are not reached and say nothing at all
+    const rows = said()
+      .split('\n')
+      .filter(line => line.includes('.trigger.json  #'));
+    expect(rows).toHaveLength(5);
     expect(said()).not.toContain('@features/monitor/edge/list-entries.trigger.json');
     expect(said()).not.toContain('@features/monitor/edge/get-entry.trigger.json');
   });
 
+  it('says once, above the list, what every way in is met by, rather than on all nine rows', () => {
+    // requires names one policy and every way meets it: the reader already has that fact from the line above,
+    // so the policy is named in the header and on no row at all
+    expect(said()).toContain(`reached by (every one met by ${CAN_RECORD}):`);
+    expect(said().split(CAN_RECORD)).toHaveLength(2);
+    expect(said()).not.toContain('met by @features/access/edge/can-record.policy.json\n    @features');
+  });
+
   it('gives every way in, not only the one a refusal would name first', () => {
     // the checker stops at the first covered operation a trigger reaches, since one is enough to refuse; a
-    // reader has opened the invariant and is owed all of them. Nine ways in, from five triggers.
-    const lines = said()
+    // reader has opened the invariant and is owed all of them. Nine ways in, across five trigger lines.
+    const ways = said()
       .split('\n')
-      .filter(line => line.includes('.trigger.json  @features/'));
-    expect(lines).toHaveLength(9);
-    for (const line of lines) expect(line).not.toContain('reached through undefined');
+      .filter(line => line.includes('.trigger.json  #'))
+      .flatMap(line => line.slice(line.indexOf('  #') + 2).split(', '));
+    expect(ways).toHaveLength(9);
   });
 
   it("names an operation reached through another, which is the RFC's own reason for the rule", () => {
     // POST /monitor/import fires #import, whose graph calls #record for every row: the trigger reaches
     // #record transitively and the invariant holds it to the same gate, so a domain graph cannot route around it
     expect(said()).toContain(
-      '    @features/monitor/edge/import-entries.trigger.json  @features/monitor/domain/monitor.port.json#record  reached through @features/monitor/domain/monitor.port.json#submit',
+      '    @features/monitor/edge/import-entries.trigger.json  #record (through #submit), #submit (through #recordAll), #import',
     );
   });
 
+  it('spells an operation bare where the over block above has already named the one port', () => {
+    // #remove, not @features/monitor/domain/monitor.port.json#remove, as a port's own describe spells its own
+    expect(said()).toContain('    @features/monitor/edge/delete-entry.trigger.json  #remove');
+    expect(said()).not.toContain('.trigger.json  @features/monitor/domain');
+  });
+
   it("orders one trigger's ways by the operations the document writes, not by how they were found", () => {
-    const rows = said()
+    const row = said()
       .split('\n')
-      .filter(line => line.includes('import-entries.trigger.json  @features/'))
-      .map(line => line.split('#')[1].split(' ')[0]);
+      .filter(line => line.includes('import-entries.trigger.json'))[0];
     // over writes record, update, remove, removeMany, submit, import; import-entries reaches three of them
-    expect(rows).toEqual(['record', 'submit', 'import']);
+    expect(row.slice(row.indexOf('  #') + 2).split(', ')).toEqual([
+      '#record (through #submit)',
+      '#submit (through #recordAll)',
+      '#import',
+    ]);
   });
 });
 
@@ -90,11 +108,9 @@ describe('describe: an access invariant that names what must be proved', () => {
     expect(said()).toContain('requires: attaches a policy proving request.principal');
   });
 
-  it('names the policy that proves it at each trigger, and the path it proves', () => {
-    expect(said()).toContain(`        met by ${SIGNED_IN} (proves request.principal)`);
-    expect(said()).toContain(
-      '    @features/access/edge/sign-out.trigger.json  @features/access/domain/access.port.json#signOut',
-    );
+  it('names the policy that proves it, and the path it proves, once above the three triggers', () => {
+    expect(said()).toContain(`reached by (every one met by ${SIGNED_IN} (proves request.principal)):`);
+    expect(said()).toContain('    @features/access/edge/sign-out.trigger.json  #signOut');
   });
 });
 
@@ -167,14 +183,51 @@ describe('describe: an invariant asking for what no trigger could give', () => {
 
   it('says the checker did not judge it, rather than pointing at an I001 that was never emitted', () => {
     const said = describeDoc(unjudged, UNMEETABLE);
-    expect(said).toContain('        met by not judged -- the invariant itself is refused');
+    expect(said).toContain('met by not judged (the invariant itself is refused)');
     expect(said).not.toContain('I001');
+  });
+
+  it('says it per trigger rather than once above them, since nothing here is a shared answer to hoist', () => {
+    // hoisting is for the ordinary case, where every way in is met the same way; a row the checker declines
+    // to judge is not "met by" anything, so it keeps its own line and cannot be read as agreement
+    const said = describeDoc(unjudged, UNMEETABLE);
+    expect(said).toContain('reached by (the operations each reaches, and how it meets the rule):');
+    expect(said).not.toContain('reached by (every one met by');
   });
 
   it('says the same beside the trigger, so neither reading blames the trigger for the document', () => {
     const said = describeDoc(unjudged, '@monitor/edge/delete-entry.trigger.json');
-    expect(said).toContain(`  holds  ${UNMEETABLE}  through not judged -- the invariant itself is refused`);
+    expect(said).toContain(`  holds  ${UNMEETABLE}  through not judged (the invariant itself is refused)`);
     expect(said).not.toContain('I001');
+  });
+});
+
+// ---- a trigger that genuinely meets nothing, which I001 refuses and the lines must not soften ----------
+
+/**
+ * The case the hoisting must never swallow: one trigger among several attaches no policy the invariant asks
+ * for. The others are met and it is not, so nothing can be said once for all of them, and the row I001
+ * refuses has to be the loud one on the page.
+ */
+const DELETE_ENTRY = 'features/monitor/edge/delete-entry.trigger.json';
+const ungated = JSON.parse(JSON.stringify(example.registry.get('trigger', `@${DELETE_ENTRY}`)?.doc));
+ungated.policies = [ungated.policies[0]]; // keep employees-only, drop can-record: the invariant asks for the latter
+const { load: partly, dir: partlyDir } = loadedWith({ [DELETE_ENTRY]: ungated });
+afterAll(() => rmSync(partlyDir, { recursive: true, force: true }));
+
+describe('describe: one trigger meeting nothing among others that do', () => {
+  const said = () => describeDoc(partly, WRITES);
+
+  it('stops hoisting, since the ways in no longer share an answer', () => {
+    expect(said()).toContain('reached by (the operations each reaches, and how it meets the rule):');
+    expect(said()).not.toContain('reached by (every one met by');
+  });
+
+  it('names what I001 refuses on the row it refuses, and leaves the others saying what met them', () => {
+    expect(said()).toContain(
+      '    @features/monitor/edge/delete-entry.trigger.json  #remove  -- met by nothing, which I001 refuses',
+    );
+    expect(said()).toContain(`    @features/monitor/edge/update-entry.trigger.json  #update  -- met by ${CAN_RECORD}`);
   });
 });
 
