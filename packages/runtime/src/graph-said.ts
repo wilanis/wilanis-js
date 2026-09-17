@@ -1,7 +1,8 @@
 /**
- * What `wilanis describe` says about a graph beyond its JSON: whether its effects move together. A graph that
- * declares `atomic` commits when it answers and rolls back on every reason a refusal below it can give, so the
- * lines name the connection the transaction falls on, the nodes of the graph that take part, and those reasons.
+ * What `wilanis describe` says about a graph: what it takes and answers, the nodes it runs, and whether its
+ * effects move together. A graph that declares `atomic` commits when it answers and rolls back on every reason
+ * a refusal below it can give, so the lines name the connection the transaction falls on, the nodes of the
+ * graph that take part, and those reasons.
  *
  * Nothing is computed here: `atomicOf` reads the same per-profile walk the checker judges by, so what a reader
  * is told and what the tree was held to are one answer.

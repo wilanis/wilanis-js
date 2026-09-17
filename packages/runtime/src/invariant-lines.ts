@@ -127,6 +127,7 @@ export function invariantLines(doc: Loaded, scope: Scope): string[] {
   const declared = doc.doc as InvariantDoc;
   if (declared.access) return accessLines(doc as Loaded<InvariantDoc>, declared.access, scope);
   const holds = declared.holds;
-  if (!holds) return [JSON.stringify(doc.doc, null, 2)];
+  // the schema's oneOf refuses a document with neither form, so a reader only meets this line mid-edit
+  if (!holds) return ['states nothing: an invariant takes exactly one of access or holds'];
   return [`holds: every value of ${holds.on} satisfies the rule`, `    when  ${holds.when}`];
 }

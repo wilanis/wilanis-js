@@ -83,13 +83,17 @@ function operationLine(
  */
 function shapeOfPort(port: PortDoc, showType: (spec: unknown) => string): string | undefined {
   const counted = new Map<string, number>();
+  let answering = 0;
   for (const op of Object.values(port.operations)) {
     if (!op.returns) continue;
+    answering += 1;
     const bare = showType(op.returns).replace(/\[\]$/, '');
     if (bare.startsWith('@')) counted.set(bare, (counted.get(bare) ?? 0) + 1);
   }
   const [best, most] = [...counted].sort(([, one], [, other]) => other - one)[0] ?? [];
-  return most > 1 ? best : undefined;
+  // a strict majority, not merely the commonest: a port answering A, A, B, C, D, E does not work in A, and
+  // hoisting it there would leave five operations naming their own beneath a line claiming to cover them
+  return most * 2 > answering ? best : undefined;
 }
 
 /** What one operation answers, said against the shape the port works in where every operation shares it. */

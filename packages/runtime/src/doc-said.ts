@@ -117,7 +117,39 @@ function includeLines(declared: ProjectDoc): string[] {
   ];
 }
 
-/** The project: what it is called, what it loads, what it includes and the aliases it gives every reference. */
+/**
+ * What the tree starts, in the order it starts them: everything a tree starts is declared here and nowhere
+ * else, so a reader of the project document is told what `wilanis start` will run before it runs anything.
+ * A step that is not required lets serving proceed when it refuses, which is the difference worth saying.
+ */
+function startupLines(declared: ProjectDoc): string[] {
+  if (!declared.startup?.length) return ['starts  nothing -- a tree that names no startup step serves nothing'];
+  return [
+    'starts, in order:',
+    ...declared.startup.map(step => {
+      const must = step.required ? '  (required: serving stops if it refuses)' : '  (serving proceeds if it refuses)';
+      return `    ${step.run}${must}${step.label ? `  -- ${step.label}` : ''}`;
+    }),
+  ];
+}
+
+/** Each profile and the bindings it chooses, since which binding meets a port is a profile's choice. */
+function profileLines(declared: ProjectDoc): string[] {
+  const profiles = Object.entries(declared.profiles ?? {});
+  if (!profiles.length) return [];
+  const lines = ['profiles (each names the binding it meets a port with):'];
+  for (const [name, profile] of profiles) {
+    lines.push(`    ${name}${profile.description ? `  -- ${profile.description}` : ''}`);
+    for (const [port, binding] of Object.entries(profile.bindings ?? {})) lines.push(`        ${port} → ${binding}`);
+  }
+  return lines;
+}
+
+/**
+ * The project: what it is called, what it loads, what it includes, the aliases it gives every reference, what
+ * it starts and how each profile binds its ports. The last two are what the document is chiefly for -- nothing
+ * a tree starts is decided by the runtime -- so neither may be left for a reader to open the file to find.
+ */
 export function projectLines(doc: Loaded): string[] {
   const declared = doc.doc as ProjectDoc;
   const aliases = Object.entries(declared.aliases ?? {}).map(([name, target]) => `${name} → ${target}`);
@@ -127,5 +159,7 @@ export function projectLines(doc: Loaded): string[] {
     ...includeLines(declared),
     ...listLine('aliases  ', aliases),
     ...listLine('secrets  ', Object.keys(declared.secrets ?? {})),
+    ...startupLines(declared),
+    ...profileLines(declared),
   ];
 }

@@ -7,12 +7,34 @@
  * them -- the idiom a policy's `gates:` line already uses. Both are easy to lose by accident, since nothing
  * fails when a body grows a repetition, so they are asserted here rather than left to a reader to notice.
  */
-import { loadTree } from '@wilanis/core';
-import { describe, expect, it } from 'vitest';
+import { rmSync } from 'node:fs';
+import { loadTree, Scope, schemaUrl } from '@wilanis/core';
+import { afterAll, describe, expect, it } from 'vitest';
 import { describe as describeDoc, ls } from '../src/index.js';
-import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
+import { invariantLines } from '../src/invariant-lines.js';
+import { EXAMPLE, INCLUDES, loadedWith, PLUGINS } from './example-harness.js';
 
 const example = loadTree(EXAMPLE, PLUGINS, INCLUDES);
+
+/** A port answering in six things, two of them the same: the commonest shape, but not a majority of them. */
+const operation = (returns: string) => ({ description: `Answers in ${returns}.`, returns });
+const { load: minority, dir: minorityDir } = loadedWith({
+  'features/hello/domain/many.port.json': {
+    $schema: schemaUrl('port'),
+    label: 'Many',
+    description: 'Answers in six different things, so no one of them speaks for the rest.',
+    operations: {
+      one: operation('@monitor/domain/Entry.shape.json'),
+      two: operation('@monitor/domain/Entry.shape.json'),
+      three: operation('@monitor/domain/Digest.shape.json'),
+      four: operation('@monitor/domain/EntryDraft.shape.json'),
+      five: operation('string'),
+      six: operation('number'),
+    },
+  },
+});
+
+afterAll(() => rmSync(minorityDir, { recursive: true, force: true }));
 
 describe('describe: no kind answers with the document as JSON', () => {
   it('prints no JSON object body for any kind the example holds', () => {
@@ -69,6 +91,24 @@ describe('describe: no kind answers with the document as JSON', () => {
     expect(describeDoc(example, '@project.json')).toContain('    @http  (@wilanis/plugin-http)  configured');
   });
 
+  it('says what the tree starts, which is the thing the project document is chiefly for', () => {
+    // everything a tree starts is declared in project.json and nowhere else, so a body that drops startup
+    // loses more than it saves: the raw JSON this replaced did show it
+    const said = describeDoc(example, '@project.json');
+    expect(said).toContain('starts, in order:');
+    expect(said).toContain('    @http/server.port.json#listen  (serving proceeds if it refuses)  -- Listen');
+    expect(said).toContain(
+      '    @monitor/domain/monitor.port.json#prepare  (required: serving stops if it refuses)  -- Prepare the entry store',
+    );
+  });
+
+  it('says how each profile binds its ports, since which binding meets a port is a profile s choice', () => {
+    const said = describeDoc(example, '@project.json');
+    expect(said).toContain('profiles (each names the binding it meets a port with):');
+    expect(said).toContain('        @monitor/domain/monitor.port.json → @monitor/data/monitor-store.binding.json');
+    expect(said).toContain('        @monitor/domain/monitor.port.json → @monitor/data/monitor-postgres.binding.json');
+  });
+
   it('says a shape as its fields rather than its JSON, keeping what each field means', () => {
     const said = describeDoc(example, '@monitor/domain/Entry.shape.json');
     expect(said).toContain('layer  core');
@@ -107,5 +147,29 @@ describe('describe: a port names the shape it works in once', () => {
   it('hoists nothing for a port whose operations do not mostly agree', () => {
     const outcome = describeDoc(example, '@std/outcome.port.json');
     expect(outcome).not.toContain('works in');
+  });
+
+  it('asks a strict majority, not merely the commonest, so two of six does not speak for the other four', () => {
+    // a port answering A, A, B, C, D, E does not work in A: hoisting it would leave four operations naming
+    // their own beneath a line claiming to cover them, which is worse than naming all six
+    const said = describeDoc(minority, '@features/hello/domain/many.port.json');
+    expect(said).not.toContain('works in');
+    expect(said).toContain('    returns @features/monitor/domain/Entry.shape.json');
+    expect(said).toContain('    returns @features/monitor/domain/Digest.shape.json');
+  });
+});
+
+describe('describe: an invariant stating neither form', () => {
+  it('says so in words rather than printing the document, as every other body does', () => {
+    // The schema's oneOf refuses a document with neither form, so it never loads and neither the sweep above
+    // nor a planted tree can reach this branch -- `loadTree` rejects the document first. It is exercised
+    // against the function itself, because the branch exists for an author mid-edit, which is exactly when
+    // printing the file they are editing back at them helps least.
+    const doc = { kind: 'invariant', path: '@features/hello/domain/states-nothing.invariant.json', doc: {} };
+    const said = invariantLines(
+      doc as unknown as Parameters<typeof invariantLines>[0],
+      new Scope(example.registry, example.resolve),
+    );
+    expect(said).toEqual(['states nothing: an invariant takes exactly one of access or holds']);
   });
 });
