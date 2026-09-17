@@ -1,9 +1,23 @@
 /**
  * The node kinds with rules of their own. A switch's rules are boolean over its inputs (G011) and route to
  * nodes of the graph, each routed once (G009). A map iterates a list that is there (G012, G004) and hands its
- * element to the operation as `item` or through bind, never also in `in` (G006).
+ * element to the operation as `item` or through bind, never also in `in` (G006). A node that refuses names
+ * its outcome in a word of its own, and not the one the compiler's guards are refused with (I006).
  */
-import { expr, type MapNode, type Node, type Read, type SwitchNode, show, type Type, typeAt } from '@wilanis/core';
+import {
+  expr,
+  type MapNode,
+  type Node,
+  type OpHit,
+  type Read,
+  type RunNode,
+  type Scope,
+  type SwitchNode,
+  show,
+  type Type,
+  typeAt,
+} from '@wilanis/core';
+import { INVARIANT } from '../guard.js';
 import type { Reader, Refuser } from './judge.js';
 
 /** The graph the node sits in: where to refuse, the node table, and who routes whom (a switch adds itself). */
@@ -72,6 +86,24 @@ function checkRoute(site: NodeSite, node: SwitchNode, target: string): void {
     );
   }
   site.routedBy.set(target, node.id);
+}
+
+/**
+ * I006: a node that refuses does not name its outcome `invariant`. That word is the compiler's: it is what a
+ * guard lowered at an unproved site refuses with, so a trigger that maps it is told the value the tree made or
+ * took did not satisfy a rule someone declared. A graph writing it would say the same word about something
+ * else, and the trigger could no longer tell the two apart.
+ */
+export function checkReason(site: NodeSite, node: RunNode | MapNode, hit: OpHit, scope: Scope): void {
+  if (!hit.op.refuses) return;
+  const reason = node.in?.reason;
+  if (typeof reason !== 'string' || !scope.literal(reason) || reason !== INVARIANT) return;
+  site.refuse(
+    'I006',
+    `reason '${INVARIANT}' is reserved`,
+    `nodes/${node.id}/in/reason`,
+    `choose another word; '${INVARIANT}' is what a guard the compiler lowers refuses with`,
+  );
 }
 
 /** A map's element arrives as `item`, or through bind: inputs typed from the list, not given in in. */

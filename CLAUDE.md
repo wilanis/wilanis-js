@@ -8,7 +8,7 @@ before changing anything; it says where things live and which direction dependen
 ```
 packages/engine/       @wilanis/engine     spec.ts kernel.ts run.ts plan.ts sources.ts redact.ts   depends on nothing
 packages/core/         @wilanis/core       model registry types assign values generate expr/ templates scope load documents placement paths validate plugin, schemas/   → engine
-packages/compiler/     @wilanis/compiler   checker.ts check/<family>.ts compiler.ts lower.ts env.ts refusals.ts sites.ts documents.ts   → core, engine
+packages/compiler/     @wilanis/compiler   checker.ts check/<family>.ts compiler.ts compiled.ts lower.ts env.ts refusals.ts sites.ts guard.ts guard-lowering.ts documents.ts   → core, engine
 packages/runtime/      @wilanis/runtime    embed tools branches serve(start) project cli, plugins/{std,cli-trigger}, docs/{std,cli}, bin/, templates/   → core, engine, compiler
 packages/plugin-http/  @wilanis/plugin-http  index.ts codecs.ts throttle.ts, docs/  → core, engine
 packages/plugin-blob/  @wilanis/plugin-blob  index.ts, docs/                        → core, engine
@@ -32,7 +32,8 @@ import against this direction, the design is wrong, not the import rule.
 Tests live next to what they test: `packages/engine/test` (kernel), `packages/core/test` (schema validation,
 scope), `packages/runtime/test` (the example tree, sabotaged variants, plugin loading, postLoad, the project's
 startup steps; the proof rules behind a field invariant, over graphs planted in a copy of the example, since
-what they refuse to prove is a guard the compiler must still lower; and the
+what they refuse to prove is a guard the compiler must still lower, and the spec each of those guards lowers
+to, node by node, since its ids are what the rehearsal, `describe` and the viewer read a guard by; and the
 branch solver behind `rehearse`), `packages/plugin-http/test` (end to end against a fake upstream),
 `packages/plugin-blob/test` (the file store, the CSV parser, the operations), `packages/plugin-reload/test`
 (the watcher, and what it does with a tree that refuses), `packages/plugin-auth/test` (sign-in against a directory
@@ -42,7 +43,8 @@ through the real checker, the `where` grammar, the engine table both ways round 
 environment, the handlers driven as the kernel drives them, and the shared suite over a fake engine),
 `libraries/access/test` (the access tree alone, and
 every A rule sabotaged),
-`packages/view/test` (the view model of the example, and the server). The compiler has no test directory of
+`packages/view/test` (the view model of the example, how a refusal is answered read from both ends, and the
+server). The compiler has no test directory of
 its own: every checker rule is exercised through the example and its sabotaged variants in
 `packages/runtime/test/example.test.ts`. The runtime and the view depend on the http plugin, the http
 plugin on the runtime, and the storage plugin on the compiler and the runtime, only as devDependencies, for tests.
@@ -122,6 +124,8 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   once and the whole tree is held to) with `invariant-holds.ts` beside it for the field form and `prove.ts`
   for whether a rule already holds where a value is made -- what the checker and the guard the compiler
   lowers both ask, through the one `heldAt`, so neither can prove a site the other would guard --,
+  `graph-nodes.ts` again for I006, which is a rule about the word a `refuse` node may name and so belongs
+  with the node it judges rather than with the invariant it reserves the word for,
   `atomic.ts` (the L and G rules about what an
   atomic graph reaches: L009, L010, L011 and G014, gathered there because each is a judgement over the one
   per-profile walk and not over a document) -- give it the next code, write the hint, and add a
@@ -151,6 +155,15 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   in the guard's `plugin.json` (`guard.credentials`, `guard.context`, `guard.refuses`), never in a trigger kind.
   What the `@auth` plugin alone can judge (a challenge method, a session write against the session shape) is its
   `check` (X101-X103).
+- **What a guard lowers to.** A field invariant the checker could not prove at a site becomes a guard the author
+  never writes (RFC 0007): `guardsOf` in `packages/compiler/src/guard.ts` asks `heldAt`'s `heldWhollyAt` which
+  sites those are and builds the three kernel nodes, and `lowerGuards` in `guard-lowering.ts` writes them into
+  the lowered spec -- the made node moved aside to `<id>:made` with whatever routed it, `<id>:check` testing the
+  rule, `<id>` answering the value, `<id>:violated` refusing with the one reserved word `invariant`; a taken site
+  is the same at `in:ok` through `Roots.aliases` in `lower.ts`, and a list of the shape a `map` over a nested
+  spec. Those ids are a contract: the rehearsal, `describe` and the viewer all read a guard by them. The reason
+  joins the walk in `refusals.ts`, so T005 holds a trigger reaching a guard to map it and T006 refuses mapping
+  it where nothing is guarded -- and a proved site adds nothing, which is the whole incentive to prove one.
 - **A schema change.** The pull request waits for the maintainer's approval in CI, as a change of decision
   does, because `main` serves the schemas to every tree. Until 1.0: edit in place. After 1.0: compatible,
   edit in place; breaking, the base URL in `model.ts` and every `$id` move to the tag `schemas-v2`, and the

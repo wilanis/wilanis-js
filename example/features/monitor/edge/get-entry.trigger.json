@@ -9,7 +9,8 @@
     "response": {
       "refusals": {
         "missing": 404,
-        "upstream": 502
+        "upstream": 502,
+        "invariant": 500
       }
     }
   },

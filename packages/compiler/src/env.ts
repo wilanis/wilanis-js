@@ -2,7 +2,7 @@
 import type { Scope } from '@wilanis/core';
 import { splitPath, TEMPLATE } from '@wilanis/core';
 import { Kernel, type Report, type RunOptions } from '@wilanis/engine';
-import type { Compiled } from './compiler.js';
+import type { Compiled } from './compiled.js';
 
 type Settings = Record<string, unknown>;
 

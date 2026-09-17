@@ -250,8 +250,9 @@ describe('branch rehearsal', () => {
     const lines = await withEdit('features/monitor/data/store-and-latest.graph.json', () => {}, 'local');
     const text = lines.join('\n');
     expect(text).toMatch(/features\/monitor\/data\/store-and-latest {2}\(atomic\) {2}switch 'route'/);
-    // the branch that answers commits, so nothing is said of it; the refusal is what undoes both writes
-    expect(text).toMatch(/when has\(record\) && has\(mark\) {2}answered from 'row'$/m);
+    // the branch that answers routes to the node the guard moved aside to, since the field invariant over
+    // Entry is not proved at 'row' and the compiler lowers a switch between it and what reads it
+    expect(text).toMatch(/when has\(record\) && has\(mark\) {2}answered from 'row:made'$/m);
     expect(text).toMatch(/refused on purpose at 'failed' as upstream: "[^"]*", rolled back$/m);
     // and the line names no reasons: describe says those
     expect(text).not.toMatch(/\(atomic\)[^\n]*rolls back/);
@@ -264,8 +265,9 @@ describe('branch rehearsal', () => {
     // atomicity is a property of the run, not of the routing: the solver walks the same branches either way
     expect(before).not.toContain('(atomic)');
     expect(before).not.toContain('rolled back');
-    expect(after.match(/\(atomic\)/g)).toHaveLength(1);
-    expect(after.replace('  (atomic)', '').replace(/, rolled back/g, '')).toBe(before);
+    // two decisions of this one graph: its own `route`, and the `row:check` the guard over Entry lowered
+    expect(after.match(/\(atomic\)/g)).toHaveLength(2);
+    expect(after.replace(/ {2}\(atomic\)/g, '').replace(/, rolled back/g, '')).toBe(before);
   });
 
   it('marks a graph with no branches at all, reached as a trigger fires its port', async () => {

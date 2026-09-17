@@ -64,7 +64,7 @@ describe('describe: no kind answers with the document as JSON', () => {
     const said = describeDoc(example, '@monitor/edge/record-entry.trigger.json');
     expect(said).toContain('    response:');
     expect(said).toContain(
-      '        refusals: {"upstream":502,"anonymous":401,"invalid_credential":401,"forbidden":403}',
+      '        refusals: {"upstream":502,"anonymous":401,"invalid_credential":401,"forbidden":403,"invariant":500}',
     );
   });
 

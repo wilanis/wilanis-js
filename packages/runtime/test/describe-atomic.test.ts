@@ -24,8 +24,10 @@ describe('describe: a data graph whose effects move together', () => {
   const said = () => describeDoc(example, LATEST);
 
   it('says it commits when it answers, and names every reason that rolls it back', () => {
-    // it refuses with 'upstream' where either write answered no record: that refusal undoes them both
-    expect(said()).toContain("atomic: commits when it answers; rolls back on 'upstream', or a fault");
+    // it refuses with 'upstream' where either write answered no record: that refusal undoes them both. And
+    // with 'invariant' where the entry it made does not satisfy the field invariant -- the guard the compiler
+    // lowered at that site refuses inside the transaction, so it rolls back like any refusal the graph writes.
+    expect(said()).toContain("atomic: commits when it answers; rolls back on 'invariant', 'upstream', or a fault");
   });
 
   it('names the one connection the transaction falls on, which no node of the graph writes down', () => {

@@ -4,8 +4,13 @@
  * every domain call. `refusalsReachable` reads the literal reasons off that walk -- the checker holds triggers
  * and policies to them (T005, T006, A002, A003) and the viewer shows them -- and `operationsReachable` reads
  * the domain operations, which is what an invariant over a port is judged against (RFC 0007).
+ *
+ * A guarded site is a reason of the graph it sits in, the same as a `refuse` node an author wrote: the compiler
+ * lowers a refusal there, so `invariant` is a word every trigger reaching it must map (T005) and none reaching
+ * no guard may map (T006). A proved site adds nothing, which is what makes proving a rule worth the trouble.
  */
 import { isSwitch, policyPath, type Scope, type TriggerDoc, type Values } from '@wilanis/core';
+import { guardsOf, INVARIANT } from './guard.js';
 
 /** One refusal a port operation can end in: the literal reason, the graph (or binding) that calls refuse, and the node (or binding operation) that does. */
 export interface ReachableRefusal {
@@ -140,6 +145,8 @@ class Walk {
     this.seen.add(graphPath);
     const graph = this.scope.registry.get('graph', graphPath);
     if (!graph) return;
+    for (const guard of guardsOf(this.scope, graph))
+      this.refusals.push({ reason: INVARIANT, file: graph.path, node: guard.id });
     for (const node of graph.doc.nodes) {
       if (isSwitch(node)) continue;
       this.call({ run: node.run, given: node.in, file: graph.path, node: node.id, through });
