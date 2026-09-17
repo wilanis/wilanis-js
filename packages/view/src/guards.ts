@@ -27,6 +27,24 @@ function heldShapes(scope: Scope): Map<string, Loaded<InvariantDoc>[]> {
   return out;
 }
 
+/**
+ * The held shapes of a tree and the sites of each, found once per scope. A page draws graph after graph and
+ * `sitesOf` walks every graph of the tree for each shape, so asking it per graph would cost the tree squared;
+ * `guardsOf` is memoized for the same reason. A scope stands for one loaded tree and nothing in it changes, so
+ * the answer cannot go stale, and a scope that is dropped takes it with it.
+ */
+const CACHE = new WeakMap<Scope, { over: Loaded<InvariantDoc>[]; sites: Site[] }[]>();
+
+/** Every shape some field invariant holds over, with its invariants and every site of it in the tree. */
+function heldSites(scope: Scope): { over: Loaded<InvariantDoc>[]; sites: Site[] }[] {
+  let found = CACHE.get(scope);
+  if (!found) {
+    found = [...heldShapes(scope)].map(([shape, over]) => ({ over, sites: sitesOf(scope, shape) }));
+    CACHE.set(scope, found);
+  }
+  return found;
+}
+
 /** How one conjunct was established, in the words RFC 0007 asks a reader to be told. */
 const heldBy = (proof: Proof): VHeld => {
   if (proof.by === 'narrowed') return { by: 'narrowed', switch: proof.switch };
@@ -84,8 +102,8 @@ export function markGuards(scope: Scope, graph: Loaded<GraphDoc>, nodes: VNode[]
 /** Every site of the graph a rule was proved at, leaving out the ones a guard already stands at. */
 function provedSites(scope: Scope, graph: Loaded<GraphDoc>, guarded: Map<string, VGuarded>): Map<string, VProved> {
   const out = new Map<string, VProved>();
-  for (const [shape, over] of heldShapes(scope))
-    for (const [id, found] of provedIn(scope, graph, shape, over)) if (!guarded.has(id)) out.set(id, found);
+  for (const held of heldSites(scope))
+    for (const [id, found] of provedIn(scope, graph, held)) if (!guarded.has(id)) out.set(id, found);
   return out;
 }
 
@@ -93,14 +111,12 @@ function provedSites(scope: Scope, graph: Loaded<GraphDoc>, guarded: Map<string,
 function provedIn(
   scope: Scope,
   graph: Loaded<GraphDoc>,
-  shape: string,
-  over: Loaded<InvariantDoc>[],
+  held: { over: Loaded<InvariantDoc>[]; sites: Site[] },
 ): Map<string, VProved> {
   const out = new Map<string, VProved>();
-  const sites = sitesOf(scope, shape);
-  for (const site of sites) {
+  for (const site of held.sites) {
     if (site.graph.path !== graph.path) continue;
-    const found = provedAt(scope, sites, site, over);
+    const found = provedAt(scope, held.sites, site, held.over);
     if (found) out.set(siteId(site), found);
   }
   return out;
@@ -109,8 +125,8 @@ function provedIn(
 /**
  * Every site of one field invariant's shape, and where each stands: proved, with how each conjunct was
  * established, or guarded. This is the table RFC 0007 asks the invariant's own page for -- a rule stated once
- * is worth nothing if a reader cannot see the thirteen places it landed and which of them cost the tree a
- * switch. The order is `sitesOf`'s, so the page and the rehearsal count the same sites in the same order.
+ * is worth nothing if a reader cannot see every place it landed and which of them cost the tree a switch. The
+ * order is `sitesOf`'s, so the page and the rehearsal count the same sites in the same order.
  */
 export function sitesOfInvariant(scope: Scope, invariant: Loaded<InvariantDoc>): VSite[] {
   const holds = invariant.doc.holds;
