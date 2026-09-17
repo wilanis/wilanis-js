@@ -83,7 +83,7 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
 
 - **DRY.** A rule lives in one place. Document kinds are declared once in `model.ts` and once as a schema;
   the two mirror each other and `validate.ts` joins them. Refusal codes are produced by the checker (D R L
-  G P B T A C S) or a plugin's `check` (X); never duplicate a check in the runtime.
+  G P B T A I C S) or a plugin's `check` (X); never duplicate a check in the runtime.
 - **Orthogonality.** The engine knows nodes, sources and handlers; it never learns about files, shapes or
   triggers. A file's bytes live in the blob registry (`packages/runtime/src/blobs.ts`) and nowhere else: a
   `blob` value is a handle, codecs stream bodies in and out of the registry, and `@blob` operations stream
@@ -117,7 +117,8 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
 - **A new rule.** Add it to its family's module under `packages/compiler/src/check/` -- `project.ts` (C, B at
   the project, startup), `contracts.ts` (shapes, ports, connections), `resolvers.ts` (P), `inputs.ts` (a call
   site's inputs), `bindings.ts` (B), `graph.ts` with `graph-nodes.ts`, `graph-reads.ts`, `graph-whole.ts` and
-  `narrowing.ts` (G), `triggers.ts` (T, S), `access.ts` (A), `atomic.ts` (the L and G rules about what an
+  `narrowing.ts` (G), `triggers.ts` (T, S), `access.ts` (A), `invariants.ts` (I: what an invariant states
+  once and the whole tree is held to), `atomic.ts` (the L and G rules about what an
   atomic graph reaches: L009, L010, L011 and G014, gathered there because each is a judgement over the one
   per-profile walk and not over a document) -- give it the next code, write the hint, and add a
   sabotage test in `packages/runtime/test/example.test.ts` that breaks the example and expects the code. What

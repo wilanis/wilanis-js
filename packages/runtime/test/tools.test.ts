@@ -87,9 +87,10 @@ describe('wilanis new', () => {
     ]);
     expect(read(join(dir, 'features/tasks/edge/ListRequest.shape.json')).layer).toBe('edge');
     // the scaffolds fit together: the binding meets the port's example operation, nothing is misplaced, every
-    // document is a valid instance of its schema. What is left is the one TODO a scaffold cannot decide for the
-    // author: the trigger must declare what it answers.
-    expect(checkTree(loadTree(dir, PLUGINS)).items.map(refusal => refusal.code)).toEqual(['T002']);
+    // document is a valid instance of its schema. What is left is the two TODOs a scaffold cannot decide for
+    // the author: the trigger must declare what it answers (T002), and the access invariant's proves names
+    // request.principal, which only a guarding plugin hands and a fresh project names none (I002).
+    expect(checkTree(loadTree(dir, PLUGINS)).items.map(refusal => refusal.code)).toEqual(['T002', 'I002']);
     expect(() => scaffold(dir, 'nonsense', 'x', {})).toThrow("unknown kind 'nonsense'");
     rmSync(dir, { recursive: true, force: true });
   });

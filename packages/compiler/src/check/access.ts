@@ -28,6 +28,31 @@ import { assignableWire, requestOnly } from './typing.js';
 
 const NO_GUARD_HINT = 'add a guarding plugin to project.json → plugins, such as @wilanis/plugin-auth';
 
+// ---- what a proof may name ----------------------------------------------------------------------
+
+/** Why a path claimed as proved is not one: what a refusal says about it, and the edit that fixes it. */
+export interface ProvesFault {
+  said: string;
+  hint: string;
+}
+
+/**
+ * The A001 judgement of one path claimed proved: it reads `request.*`, and the guard or a kind hands what it
+ * names. Nothing when it does. A policy's `proves` is judged with it, and so is an invariant's
+ * `requires.proves` (I002), since what may be proved is one rule wherever it is written.
+ */
+export function provesFault(judge: Judge, path: string): ProvesFault | undefined {
+  const segments = READ_PATH.test(path) ? splitPath(path) : [];
+  if (segments[0] !== 'request' || segments.length < 2)
+    return { said: `'${path}', which is not a request.* path`, hint: 'write request.principal, request.session...' };
+  const read = judge.scope.requestRead(segments.slice(1));
+  if (typeof read !== 'string') return undefined;
+  return {
+    said: `request.${segments.slice(1).join('.')}: ${read}`,
+    hint: 'wilanis describe the guarding plugin shows what it hands',
+  };
+}
+
 // ---- a policy on its own ------------------------------------------------------------------------
 
 /**
@@ -84,26 +109,8 @@ class PolicyCheck {
   /** A001: what the policy proves present once it allows is a request.* path the guard or a kind hands; a required resolver leans on it (A006). */
   private checkProves(): void {
     for (const [index, path] of (this.doc.proves ?? []).entries()) {
-      const at = `proves/${index}`;
-      const segments = READ_PATH.test(path) ? splitPath(path) : [];
-      if (segments[0] !== 'request' || segments.length < 2) {
-        this.refuse(
-          'A001',
-          `proves names '${path}', which is not a request.* path`,
-          at,
-          'write request.principal, request.session...',
-        );
-        continue;
-      }
-      const read = this.judge.scope.requestRead(segments.slice(1));
-      if (typeof read === 'string') {
-        this.refuse(
-          'A001',
-          `proves names request.${segments.slice(1).join('.')}: ${read}`,
-          at,
-          'wilanis describe the guarding plugin shows what it hands',
-        );
-      }
+      const wrong = provesFault(this.judge, path);
+      if (wrong) this.refuse('A001', `proves names ${wrong.said}`, `proves/${index}`, wrong.hint);
     }
   }
 

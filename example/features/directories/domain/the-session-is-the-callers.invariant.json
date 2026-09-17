@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/invariant.schema.json",
+  "label": "The session is the caller's",
+  "description": "Nothing reads or writes a session this deployment cannot name a caller for. It says what must be proved rather than which policy proves it, so any gate establishing the principal qualifies and a public trigger does not.",
+  "access": {
+    "over": [
+      "@access/domain/access.port.json#preferences",
+      "@access/domain/access.port.json#savePreferences",
+      "@access/domain/access.port.json#signOut"
+    ],
+    "requires": {
+      "proves": [
+        "request.principal"
+      ]
+    }
+  }
+}

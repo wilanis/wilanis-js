@@ -59,10 +59,22 @@ function writeUploadForm(dir: string) {
         consumes: 'multipart/form-data',
         produces: 'application/json',
         body: '@features/monitor/edge/UploadForm.shape.json',
-        response: { status: { default: 201 }, refusals: { upstream: 502 } },
+        response: {
+          status: { default: 201 },
+          refusals: { upstream: 502, anonymous: 401, invalid_credential: 401, forbidden: 403 },
+        },
       },
       in: '@features/monitor/edge/CsvUpload.shape.json',
       out: '@features/monitor/edge/EntryView.shape.json[]',
+      // this route reaches monitor.import, so the writes invariant holds it to the recorder gate like every
+      // other write: a planted trigger is not exempt from a rule the tree states once
+      policies: [
+        {
+          policy: '@access/edge/employees-only.policy.json',
+          in: { token: ['{{request.headers.authorization}}', '{{request.cookies.session}}'] },
+        },
+        '@access/edge/can-record.policy.json',
+      ],
       fire: { run: '@features/monitor/domain/monitor.port.json#import', in: { file: '{{request.body.file}}' } },
     }),
   );
