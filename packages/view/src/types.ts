@@ -254,8 +254,18 @@ export interface VReaching {
   op: string;
   /** The operation it was reached through, when the trigger does not fire it directly. */
   through?: string;
-  /** The policies it attaches that satisfy the invariant: the one named, or those whose proves cover it. */
-  satisfiedBy: { path: string; label: string }[];
+  /**
+   * Every part of `requires` met here, and what meets it: the policy the invariant names, and one per path it
+   * requires proved. Empty means the rule is not met -- which is what I001 refuses, unless `unjudged` says the
+   * checker never judged it.
+   */
+  satisfiedBy: { path: string; label: string; proves?: string }[];
+  /**
+   * The checker declines to judge this way in, because `requires` names something the invariant is itself
+   * refused for: a policy the tree has not (R001) or a path the guard cannot hand (I002). No trigger could
+   * meet it, so I001 is never raised and a page must not show an empty `satisfiedBy` as a fault here.
+   */
+  unjudged?: boolean;
 }
 
 /** The field form: the shape the rule is about, and the rule as written. Where each site stands is the compiler's, once guards land. */
