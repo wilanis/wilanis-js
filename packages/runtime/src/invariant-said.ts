@@ -104,13 +104,19 @@ export function requiresLine(requires: AccessInvariant['requires']): string {
   return said.join(' and ');
 }
 
-/** The invariants that hold over one trigger, as `describe <trigger>` and `wilanis map` print them under it. */
+/**
+ * The invariants that hold over one trigger, as `describe <trigger>` and `wilanis map` print them under it.
+ * The reaching walk is made for this trigger alone rather than for the whole tree and filtered afterwards,
+ * since `map` asks this of every trigger in turn and the walk is the expensive part.
+ */
 export function holdsLines(trigger: Loaded<TriggerDoc>, scope: Scope): string[] {
   const lines: string[] = [];
+  const policies = attached(trigger, scope);
   for (const [invariant, access] of accessInvariants(scope)) {
-    const here = reachingTriggers(access, scope).find(one => one.trigger === trigger.path);
-    if (!here) continue;
-    const how = here.met.length ? `through ${here.met.join(', ')}` : 'through nothing -- see I001';
+    const over = new Set(access.over.map(opRef => canonOp(opRef, scope)));
+    if (!reaches(trigger, over, scope)) continue;
+    const met = through(policies, access.requires, scope);
+    const how = met.length ? `through ${met.join(', ')}` : 'through nothing -- see I001';
     lines.push(`  holds  ${invariant.path}  ${how}`);
   }
   return lines;
