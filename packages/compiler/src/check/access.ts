@@ -16,6 +16,7 @@ import {
   type PolicyRef,
   policyPath,
   READ_PATH,
+  type Scope,
   show,
   splitPath,
   type TriggerDoc,
@@ -42,10 +43,19 @@ export interface ProvesFault {
  * `requires.proves` (I002), since what may be proved is one rule wherever it is written.
  */
 export function provesFault(judge: Judge, path: string): ProvesFault | undefined {
+  return provesFaultIn(judge.scope, path);
+}
+
+/**
+ * The same judgement from a scope alone, for a module that describes an invariant rather than refuses one:
+ * `invariant-said.ts` must know whether a `requires.proves` path is one the guard can hand, and asking it here
+ * keeps that one rule in one place rather than restating it wherever an invariant is shown.
+ */
+export function provesFaultIn(scope: Scope, path: string): ProvesFault | undefined {
   const segments = READ_PATH.test(path) ? splitPath(path) : [];
   if (segments[0] !== 'request' || segments.length < 2)
     return { said: `'${path}', which is not a request.* path`, hint: 'write request.principal, request.session...' };
-  const read = judge.scope.requestRead(segments.slice(1));
+  const read = scope.requestRead(segments.slice(1));
   if (typeof read !== 'string') return undefined;
   return {
     said: `request.${segments.slice(1).join('.')}: ${read}`,
