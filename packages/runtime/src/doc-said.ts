@@ -1,0 +1,131 @@
+/**
+ * What `wilanis describe` says about the kinds that carry no body of their own: a binding, a resolvers
+ * document, a feature, a connection, a codec, a scenario and the project. Each used to print
+ * `JSON.stringify(doc.doc)` and leave a reader to parse the document they had just asked about in words.
+ *
+ * The viewer never shows raw JSON by default and the CLI should not either: a reader who wanted the file can
+ * open the file, whose path is on the second line of every `describe`. What they asked `describe` for is what
+ * the document means. Each body here says that in the voice the port, policy and shape bodies already use --
+ * a fact shared by every row said once above them, and a list of paths on one line.
+ */
+import type {
+  BindingDoc,
+  CodecDoc,
+  ConnectionDoc,
+  FeatureDoc,
+  Loaded,
+  ProjectDoc,
+  ResolversDoc,
+  ScenarioDoc,
+} from '@wilanis/core';
+
+/** One list of paths on one line, as `gates:` says a policy's triggers; nothing where the list is empty. */
+const listLine = (label: string, values: string[] | undefined): string[] =>
+  values?.length ? [`${label}  ${values.join(', ')}`] : [];
+
+/**
+ * A binding: the port it meets, the resolvers its operations read, and how each operation is answered --
+ * by a graph, or by delegating to another operation. The port is said once above, since every row shares it.
+ */
+export function bindingLines(doc: Loaded): string[] {
+  const declared = doc.doc as BindingDoc;
+  const lines = [`meets  ${declared.port}`, ...listLine('reads  ', declared.resolvers ? [declared.resolvers] : [])];
+  lines.push('answers:');
+  for (const [name, op] of Object.entries(declared.operations))
+    lines.push(`    #${name}  ${answeredBy(op)}${op.description ? `  -- ${op.description}` : ''}`);
+  return lines;
+}
+
+/** How one bound operation is answered: by a graph of its own, or by delegating to another operation. */
+function answeredBy(op: { graph?: string; run?: string }): string {
+  if (op.graph) return `graph ${op.graph}`;
+  return op.run ? `→ ${op.run}` : '?? neither a graph nor a run';
+}
+
+/**
+ * A resolvers document: each named read, what it runs and whether a binding must give it. A resolver is a
+ * read and never an operation, so the line says what it reads rather than what it does.
+ */
+export function resolversLines(doc: Loaded): string[] {
+  const declared = doc.doc as ResolversDoc;
+  const lines = ['reads, each usable as {{name}} where a binding or a data graph names it:'];
+  for (const [name, read] of Object.entries(declared.resolvers)) {
+    const must = read.required ? '  (required: every trigger reaching it must prove it, A006)' : '';
+    lines.push(`    ${name}  ← ${read.read}${must}${read.description ? `  -- ${read.description}` : ''}`);
+  }
+  return lines;
+}
+
+/** A feature: the features it may name, what it lets others name, and the effects its graphs may run. */
+export function featureLines(doc: Loaded): string[] {
+  const declared = doc.doc as FeatureDoc;
+  const lines = [
+    ...listLine('depends on ', declared.dependsOn),
+    ...listLine('exports    ', declared.exports),
+    ...listLine('effects    ', declared.effects),
+  ];
+  return lines.length ? lines : ['names no other feature, exports nothing, and allows no effect'];
+}
+
+/** A connection: the kind that gives it meaning, and the settings it is configured with. */
+export function connectionLines(doc: Loaded): string[] {
+  const declared = doc.doc as ConnectionDoc;
+  const lines = [`kind  ${declared.kind}`];
+  const settings = Object.entries(declared.settings ?? {});
+  if (!settings.length) return lines;
+  lines.push('settings:');
+  for (const [name, value] of settings) lines.push(`    ${name}: ${JSON.stringify(value)}`);
+  return lines;
+}
+
+/** A codec: what it yields, which is either the type a call declares or one type it always answers in. */
+export function codecLines(doc: Loaded): string[] {
+  const { yields } = doc.doc as CodecDoc;
+  const said = yields === 'declared' ? "the type its call site declares ('declared')" : JSON.stringify(yields);
+  return [`yields  ${said}`];
+}
+
+/** A scenario: the trigger it drives, the seed it runs under, and what it expects back. */
+export function scenarioLines(doc: Loaded): string[] {
+  const declared = doc.doc as ScenarioDoc;
+  const lines = [`drives  ${declared.trigger}`, `seed    ${declared.seed}`];
+  if (declared.in !== undefined) lines.push(`in      ${JSON.stringify(declared.in)}`);
+  if (declared.stubs) lines.push(...listLine('stubs  ', Object.keys(declared.stubs)));
+  lines.push('expects:');
+  for (const [name, value] of Object.entries(declared.expect)) lines.push(`    ${name}: ${JSON.stringify(value)}`);
+  return lines;
+}
+
+/** The plugins a project loads, each with the package it came from and whether it is configured. */
+function pluginLines(declared: ProjectDoc): string[] {
+  if (!declared.plugins?.length) return [];
+  return [
+    'plugins:',
+    ...declared.plugins.map(one => {
+      const from = one.from ? `  (${one.from})` : '  (built into the runtime)';
+      return `    ${one.use}${from}${one.settings ? '  configured' : ''}`;
+    }),
+  ];
+}
+
+/** The trees a project includes, each with the features it takes from them. */
+function includeLines(declared: ProjectDoc): string[] {
+  if (!declared.includes?.length) return [];
+  return [
+    'includes:',
+    ...declared.includes.map(one => `    ${one.from}${one.features?.length ? `  (${one.features.join(', ')})` : ''}`),
+  ];
+}
+
+/** The project: what it is called, what it loads, what it includes and the aliases it gives every reference. */
+export function projectLines(doc: Loaded): string[] {
+  const declared = doc.doc as ProjectDoc;
+  const aliases = Object.entries(declared.aliases ?? {}).map(([name, target]) => `${name} → ${target}`);
+  return [
+    `name  ${declared.name}`,
+    ...pluginLines(declared),
+    ...includeLines(declared),
+    ...listLine('aliases  ', aliases),
+    ...listLine('secrets  ', Object.keys(declared.secrets ?? {})),
+  ];
+}
