@@ -7,13 +7,16 @@
  * reads through its resolvers is a node of its own, its ports the paths the resolvers name.
  *
  * For every kind, the references the document makes and the documents that make references to it, so a
- * reader can walk the tree in both directions. Nothing here draws; it answers JSON a page lays out.
+ * reader can walk the tree in both directions, and for a few the thing the document cannot say about itself:
+ * which triggers an invariant binds, which engine keeps a store's records. Nothing here draws; it answers JSON
+ * a page lays out.
  */
 
 import { checkTree } from '@wilanis/compiler';
 import type { GraphDoc, Kind, Loaded, LoadResult, PolicyDoc, TriggerDoc } from '@wilanis/core';
 import { policyPath, SCHEMA_BASE, Scope, WILANIS } from '@wilanis/core';
 import { graphView } from './graphs.js';
+import { invariantView } from './invariants.js';
 import { stemOf, targetOf } from './ports.js';
 import { callersOf, type IndexedRef, referenceIndex } from './references.js';
 import { answersOf } from './refusals.js';
@@ -163,5 +166,6 @@ export function viewOf(load: LoadResult, ref: string): DocView | undefined {
   if (doc.kind === 'trigger') triggerView(scope, doc, view);
   if (doc.kind === 'policy') policyView(scope, doc, view);
   if (doc.kind === 'store') view.store = storeView(scope, load, doc);
+  if (doc.kind === 'invariant') view.invariant = invariantView(scope, doc);
   return view;
 }

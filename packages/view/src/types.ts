@@ -210,6 +210,64 @@ export interface DocView {
   gates?: { path: string; label: string }[];
   /** On a store: the engine behind it, its collections with their key types, and the calls run against it. */
   store?: VStore;
+  /** On an invariant: the form it takes, and what it holds -- the ways in it gates, or the shape and rule it is about. */
+  invariant?: VInvariant;
+}
+
+/**
+ * What an invariant page needs beyond its own JSON: an access form's covered operations and every trigger that
+ * reaches one, with what satisfies the rule there; a field form's shape and rule. A reader who has only the
+ * document sees a list of operations and cannot see which routes the rule actually binds, which is the whole
+ * point of stating it once.
+ */
+export type VInvariant = VAccessInvariant | VHoldsInvariant;
+
+/** The access form: what must gate every way in, the operations it covers, and the triggers that reach them. */
+export interface VAccessInvariant {
+  form: 'access';
+  /** The policy every reaching trigger attaches, canonical, when the invariant names one. */
+  policy?: string;
+  policyLabel?: string;
+  /** The request.* paths some attached policy must prove, when the invariant names them instead of a policy. */
+  proves?: string[];
+  /** Each operation the invariant covers, canonical, with the port that declares it. */
+  covers: VCovered[];
+  /** Every way in the invariant binds: one row per trigger and covered operation it reaches, under any profile. */
+  reached: VReaching[];
+}
+
+/** One operation an access invariant covers: where a click lands, and what the port calls it. */
+export interface VCovered {
+  /** The canonical `path#operation`. */
+  op: string;
+  opName: string;
+  /** The port that declares it, canonical. */
+  port: string;
+  portLabel: string;
+}
+
+/** One trigger an access invariant binds: the operation it reaches, how it got there, and what satisfies the rule. */
+export interface VReaching {
+  trigger: string;
+  triggerLabel: string;
+  /** The covered operation it reaches, canonical. */
+  op: string;
+  /** The operation it was reached through, when the trigger does not fire it directly. */
+  through?: string;
+  /** The policies it attaches that satisfy the invariant: the one named, or those whose proves cover it. */
+  satisfiedBy: { path: string; label: string }[];
+}
+
+/** The field form: the shape the rule is about, and the rule as written. Where each site stands is the compiler's, once guards land. */
+export interface VHoldsInvariant {
+  form: 'holds';
+  /** The core shape, canonical. */
+  on: string;
+  onLabel: string;
+  /** The rule, in the switch grammar, its roots the shape's fields. */
+  when: string;
+  /** The shape's field names, so a reader can see which roots the rule may name. */
+  fields: string[];
 }
 
 /**
