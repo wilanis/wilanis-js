@@ -11,6 +11,7 @@
  */
 import { type InvariantSaid, invariantSaidOf, type ReachedWay } from '@wilanis/compiler';
 import type { InvariantDoc, Loaded, Scope, ShapeDoc } from '@wilanis/core';
+import { sitesOfInvariant } from './guards.js';
 import type { VAccessInvariant, VCovered, VHoldsInvariant, VInvariant, VReaching } from './types.js';
 import { labelOf, readable } from './types.js';
 
@@ -60,9 +61,10 @@ function accessView(said: InvariantSaid, invariant: Loaded<InvariantDoc>, scope:
 }
 
 /**
- * The field form: the shape the rule is about, the rule as written, and the field names its roots may be.
- * Where each value of the shape is made or taken -- and whether the rule is proved there or guarded -- is the
- * compiler's answer, and this page says nothing about it until the compiler does.
+ * The field form: the shape the rule is about, the rule as written, the field names its roots may be, and every
+ * site of the shape with how the rule stands there. Which sites those are and whether each was proved is
+ * `sitesOf` and `heldAt` in the compiler -- the same answers the guard it lowers is built from, so the table and
+ * the guard cannot disagree.
  */
 function holdsView(scope: Scope, invariant: Loaded<InvariantDoc>): VHoldsInvariant {
   const holds = invariant.doc.holds;
@@ -73,6 +75,7 @@ function holdsView(scope: Scope, invariant: Loaded<InvariantDoc>): VHoldsInvaria
     onLabel: labelOf(shape),
     when: holds?.when ?? '',
     fields: Object.keys((shape?.doc as ShapeDoc | undefined)?.fields ?? {}),
+    sites: sitesOfInvariant(scope, invariant),
   };
 }
 
