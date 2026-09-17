@@ -1,7 +1,7 @@
 /**
  * Claim: a refusal code is made where its family lives.
  * Why: `CLAUDE.md` gives each refusal family one home -- "refusal codes are produced by the checker (D R L G
- *   P B T A C S) or a plugin's `check` (X); never duplicate a check in the runtime" -- and tells anyone
+ *   P B T A I C S) or a plugin's `check` (X); never duplicate a check in the runtime" -- and tells anyone
  *   adding a rule to put it in its family's module under `packages/compiler/src/check/`. A code made
  *   somewhere else is the same judgement in two places, which is the DRY rule this repository states first,
  *   and it is how a rule quietly stops being the checker's. Only `src/` is judged: a test carries codes of
@@ -25,6 +25,7 @@ const HOME: Record<string, string[]> = {
   B: ['packages/compiler/src/check'],
   T: ['packages/compiler/src/check'],
   A: ['packages/compiler/src/check'],
+  I: ['packages/compiler/src/check'],
   C: ['packages/compiler/src/check'],
   S: ['packages/compiler/src/check'],
   X: ['packages/plugin-'],
