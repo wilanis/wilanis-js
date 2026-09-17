@@ -349,6 +349,16 @@ Sabotage tests in a new `packages/runtime/test/sabotage-invariants.test.ts`, thr
 - T005/T006: with the field invariant present, drop `invariant` from `record-entry.trigger.json`'s
   refusal table → `['T005']`; with the invariant document removed, the mapping is `['T006']`.
 
+The proof rules themselves in `packages/runtime/test/invariant-proof.test.ts`, over graphs planted in a copy
+of the example, each case reading back how `heldAt` established every conjunct at one site of `Entry`. A
+wrongly-proved invariant silently removes a guard, so what each rule refuses to prove is held as firmly as
+what it proves: a literal site proved and a contradicting one refused; a site the routing established the
+rule for proved, and the switch named; `>` proving `>=` and `!=`, and `==` a literal proving `!=` another;
+and guarded, every one of them -- `len(url) > 1` against `len(url) > 0` (no arithmetic on the literals),
+`0 < len(url)` against `len(url) > 0` (no reversed comparison), `== 'GET'` against `== 'POST'`,
+`len(url) > 0` against `has(url)`, a rule about a field the routing never mentioned, a read of a node that
+is no site of the shape, a read of a field rather than the value whole, and every taken site.
+
 Behaviour tests in `packages/runtime/test/example.test.ts` and `branches.test.ts`:
 
 - `rehearse` reports `guard 'row' An entry names a call  2/2 branches` for each guarded data graph,
@@ -443,3 +453,21 @@ with `invariant`.
    is small on purpose. Widen it only with a failing example.
 2. Whether `describe <graph>` should print the guards as nodes. Yes, marked `(guard)`, so a reader of the
    CLI sees what the viewer shows.
+3. What a pass-through may lean on: a **site of the same shape in the same graph**, and nothing else.
+   Taking any whole-template read as a pass-through would prove the rule about a value no site ever judged,
+   so `sitesOf`'s answer is threaded into the proof and a read of anything else is guarded. A read of a
+   *field* of another value (`{{asked.record}}`) is not that value either, and is guarded.
+4. A **taken site is always guarded**, and never earns I005. Nothing inside the graph establishes a value its
+   caller handed it -- neither the routing nor a sibling says anything about it -- and nothing is written
+   there for a literal to contradict. This is what makes the taken site worth guarding at all: it is exactly
+   the value the graph cannot reason about.
+5. What the literal rule reads at a made site is decided **per native operation**: `value` for
+   `@std/object.port.json#make`, and `base` laid under `over` for `#merge`. Any other operation writes
+   nothing the checker can read in place, so its site is guarded rather than guessed at.
+6. I005 is refused **against the graph**, at `nodes/<id>`, and names the invariant in its message: the value
+   written there is what is wrong, and the invariant is only what says so. The invariant's own file carries
+   I002, I003 and I004, which are faults of the rule rather than of any value.
+7. One function renames the roots of a conjunct (`renamed`, in `check/narrowing.ts`), used from both sides of
+   the comparison: what a switch established is renamed from its input names to the paths its `in` reads, and
+   what the invariant wants is renamed from the shape's fields to where the site reads them. Two spellings
+   would compare as unequal terms and silently guard everything, so there is one.
