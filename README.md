@@ -1,8 +1,10 @@
 # wilanis
 
-**Backend services written as JSON documents instead of code.** You describe the routes, the types, the
-contracts between the parts and how data flows through them. A compiler reads every file and proves they fit
-together before anything runs. A small engine runs them.
+**A language for programs made of effects, written as JSON documents, with a compiler that judges the whole
+tree before anything runs.** You describe the shapes, the contracts between the parts, how data flows through
+them, what may enter and what gates it. The compiler reads every file and proves they fit together. A small
+engine runs what it approved, and everything that touches the world -- a route, a command, a file, a database
+-- is a plugin behind a port the tree declares. The language never learns what HTTP is.
 
 The example in this repository serves a REST resource over a rate-limited upstream, CSV import and export,
 sign-in against two directories, sessions, and role-based policies over every write. Two of its files are
@@ -276,6 +278,11 @@ only. A project installs the runtime, the plugins it uses, and the trees it incl
 
 ## What this is not
 
+**Not a framework.** Express, Rails and NestJS call your code at the points they define, and what they call is
+still code, with everything code can do. Here there is no code to call. The documents are the program, the
+expression language cannot loop, call or reach a socket, and what the language cannot say goes behind a port
+in a plugin, held to what the port declares. That is the boundary of a language, not an extension point.
+
 **Not a workflow engine.** Step Functions, Airflow and Temporal run a graph you hand them, written as JSON,
 as YAML or as code; what it touches is the runtime's business at the moment it touches it. Here a graph is
 one document kind among a dozen, and the point is what the compiler does with all of them at once: that a
@@ -296,6 +303,16 @@ service: layers, ports, policies, effects and the types that flow between them.
 **Not JSON for its own sake.** The format is the least interesting decision -- JSON because every editor,
 schema, diff and model already reads it. What is worth having is the checker, and it would judge the same
 tree written any other way.
+
+**Not this code.** wilanis is a language, and what a language is, its specification says: here, the document
+kinds and their schemas, the rules the checker judges by, each with its code, and the promises the runtime
+keeps -- what a tree starts is declared, a guard stands before any graph, a rule stated once holds everywhere.
+This repository is the reference implementation of that specification, in TypeScript, which is why it is
+called `wilanis-js`. An implementation in another language that makes the same judgement over the same tree is
+wilanis. A fork that changes what a schema means or what a rule refuses is another language, and owes its
+documents another `$schema`. Today the specification is the RFCs under [`docs/rfcs/`](docs/rfcs/README.md)
+and the example with its sabotaged variants, which say for every rule what breaks it and what code it answers;
+a document of its own comes once this definition has settled.
 
 ## Status
 
