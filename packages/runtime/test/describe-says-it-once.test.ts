@@ -71,9 +71,11 @@ describe('describe: no kind answers with the document as JSON', () => {
   it('says what a graph does, its nodes among them, rather than printing the graph', () => {
     const said = describeDoc(example, '@monitor/data/store-and-latest.graph.json');
     expect(said).toContain('takes   @monitor/domain/EntryRecord.shape.json');
-    expect(said).toContain('answers @monitor/domain/Entry.shape.json  from row | failed');
+    // `row` is guarded, so the graph also answers with the guard's refusal and whatever routed `row` routes
+    // the node it moved aside to: the lines say the graph a run walks, not the one the file spells
+    expect(said).toContain('answers @monitor/domain/Entry.shape.json  from row | row:violated | failed');
     expect(said).toContain('    stored  @storage/store.port.json#put');
-    expect(said).toContain('    route  switch → row | failed');
+    expect(said).toContain('    route  switch → row:made | failed');
   });
 
   it('gives a body to each kind that had none: binding, resolvers, feature, connection, codec, project', () => {

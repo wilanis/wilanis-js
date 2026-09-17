@@ -28,6 +28,7 @@ export {
   guardsOf,
   hasGuard,
   INVARIANT,
+  idsOf,
   TAKEN_IDS,
   type Unproved,
 } from './guard.js';
