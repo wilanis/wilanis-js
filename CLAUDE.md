@@ -8,7 +8,7 @@ before changing anything; it says where things live and which direction dependen
 ```
 packages/engine/       @wilanis/engine     spec.ts kernel.ts run.ts plan.ts sources.ts redact.ts   depends on nothing
 packages/core/         @wilanis/core       model registry types assign values generate expr/ templates scope load documents placement paths validate plugin, schemas/   → engine
-packages/compiler/     @wilanis/compiler   checker.ts check/<family>.ts compiler.ts lower.ts env.ts refusals.ts documents.ts   → core, engine
+packages/compiler/     @wilanis/compiler   checker.ts check/<family>.ts compiler.ts lower.ts env.ts refusals.ts sites.ts documents.ts   → core, engine
 packages/runtime/      @wilanis/runtime    embed tools branches serve(start) project cli, plugins/{std,cli-trigger}, docs/{std,cli}, bin/, templates/   → core, engine, compiler
 packages/plugin-http/  @wilanis/plugin-http  index.ts codecs.ts throttle.ts, docs/  → core, engine
 packages/plugin-blob/  @wilanis/plugin-blob  index.ts, docs/                        → core, engine
@@ -118,7 +118,8 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   the project, startup), `contracts.ts` (shapes, ports, connections), `resolvers.ts` (P), `inputs.ts` (a call
   site's inputs), `bindings.ts` (B), `graph.ts` with `graph-nodes.ts`, `graph-reads.ts`, `graph-whole.ts` and
   `narrowing.ts` (G), `triggers.ts` (T, S), `access.ts` (A), `invariants.ts` (I: what an invariant states
-  once and the whole tree is held to), `atomic.ts` (the L and G rules about what an
+  once and the whole tree is held to) with `invariant-holds.ts` beside it for the field form and `prove.ts`
+  for whether a rule already holds where a value is made, `atomic.ts` (the L and G rules about what an
   atomic graph reaches: L009, L010, L011 and G014, gathered there because each is a judgement over the one
   per-profile walk and not over a document) -- give it the next code, write the hint, and add a
   sabotage test in `packages/runtime/test/example.test.ts` that breaks the example and expects the code. What
