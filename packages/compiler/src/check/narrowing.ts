@@ -11,8 +11,13 @@ import { expr, isSwitch, type Node, type Scope, type SwitchNode, splitPath, WHOL
 import { readValuesOf } from './judge.js';
 import { atOrBelow } from './typing.js';
 
-/** Rewrite every root of an expression through `rename`; nothing when a root has no reading of its own. */
-function renamed(term: expr.Expr, rename: (root: string) => string[] | undefined): expr.Expr | undefined {
+/**
+ * Rewrite every root of an expression through `rename`; nothing when a root has no reading of its own. Both
+ * sides of an invariant's proof go through this: what a switch established is renamed from its input names to
+ * the paths its `in` reads, and what the invariant wants is renamed from the shape's fields to where the site
+ * reads them. Two spellings mean nothing unless one function makes them, so this is the one that does.
+ */
+export function renamed(term: expr.Expr, rename: (root: string) => string[] | undefined): expr.Expr | undefined {
   switch (term.kind) {
     case 'lit':
       return term;

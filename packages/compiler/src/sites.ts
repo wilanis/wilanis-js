@@ -2,7 +2,8 @@
  * Where a value of a shape comes into being. A field invariant (RFC 0007) is a rule about a shape, and a rule
  * about a shape is judged at the places a value of it first exists: a node that makes one, and a graph that
  * takes one from its caller. `sitesOf` finds both, and the checker (I005) and the compiler (the guard it
- * lowers) read the same list, so neither can judge a site the other does not see.
+ * lowers) read the same list, so neither can judge a site the other does not see. Whether the rule already
+ * holds at one is `heldAt` in `check/prove.ts`, which reads a site the way the proof rules need it.
  */
 import {
   type GraphDoc,

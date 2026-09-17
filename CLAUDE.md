@@ -31,7 +31,8 @@ import against this direction, the design is wrong, not the import rule.
 
 Tests live next to what they test: `packages/engine/test` (kernel), `packages/core/test` (schema validation,
 scope), `packages/runtime/test` (the example tree, sabotaged variants, plugin loading, postLoad, the project's
-startup steps; and the
+startup steps; the proof rules behind a field invariant, over graphs planted in a copy of the example, since
+what they refuse to prove is a guard the compiler must still lower; and the
 branch solver behind `rehearse`), `packages/plugin-http/test` (end to end against a fake upstream),
 `packages/plugin-blob/test` (the file store, the CSV parser, the operations), `packages/plugin-reload/test`
 (the watcher, and what it does with a tree that refuses), `packages/plugin-auth/test` (sign-in against a directory
@@ -119,7 +120,9 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   site's inputs), `bindings.ts` (B), `graph.ts` with `graph-nodes.ts`, `graph-reads.ts`, `graph-whole.ts` and
   `narrowing.ts` (G), `triggers.ts` (T, S), `access.ts` (A), `invariants.ts` (I: what an invariant states
   once and the whole tree is held to) with `invariant-holds.ts` beside it for the field form and `prove.ts`
-  for whether a rule already holds where a value is made, `atomic.ts` (the L and G rules about what an
+  for whether a rule already holds where a value is made -- what the checker and the guard the compiler
+  lowers both ask, through the one `heldAt`, so neither can prove a site the other would guard --,
+  `atomic.ts` (the L and G rules about what an
   atomic graph reaches: L009, L010, L011 and G014, gathered there because each is a judgement over the one
   per-profile walk and not over a document) -- give it the next code, write the hint, and add a
   sabotage test in `packages/runtime/test/example.test.ts` that breaks the example and expects the code. What
