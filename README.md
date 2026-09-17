@@ -5,8 +5,10 @@ contracts between the parts and how data flows through them. A compiler reads ev
 together before anything runs. A small engine runs them.
 
 The example in this repository serves a REST resource over a rate-limited upstream, CSV import and export,
-sign-in against two directories, sessions, and role-based policies over every write. **Every file in it is a
-JSON document, and there is no JavaScript at all.** `wilanis check example` says how many documents that is.
+sign-in against two directories, sessions, and role-based policies over every write. Two of its files are
+invariants -- *writes are for recorders*, *the session is the caller's* -- rules stated once that the checker
+holds the whole tree to. **Every file in it is a JSON document, and there is no JavaScript at all.**
+`wilanis check example` says how many documents that is.
 
 *Pre-1.0 and moving. Nothing is on npm yet, so clone and build to try it. See [Status](#status).*
 
@@ -86,6 +88,53 @@ R001  @features/monitor/edge/get-entry.trigger.json#fire/run
 The file, the path inside it, what is wrong, and the command that shows the fix. Every reference, every
 input, every output, every effect a feature reaches: judged across the whole tree at once, not one file at a
 time.
+
+## A rule you state once
+
+The example gates every write of the monitor feature with the same policy, trigger by trigger. Nothing in
+those files says that this is a rule rather than six coincidences: a new route firing `monitor.update` and
+forgetting the policy would check clean, and the write would be public. An invariant says the rule out loud,
+in a file of its own:
+
+```json
+{
+  "label": "Writes are for recorders",
+  "access": {
+    "over": [
+      "@monitor/domain/monitor.port.json#record",
+      "@monitor/domain/monitor.port.json#update",
+      "@monitor/domain/monitor.port.json#remove",
+      "@monitor/domain/monitor.port.json#removeMany",
+      "@monitor/domain/monitor.port.json#submit",
+      "@monitor/domain/monitor.port.json#import"
+    ],
+    "requires": {
+      "policy": "@access/edge/can-record.policy.json"
+    }
+  }
+}
+```
+
+It names operations, never a role: what the gate decides is the policy's business. Drop the recorder policy
+from `POST /monitor.csv` and the tree no longer checks:
+
+```
+I001  @features/monitor/edge/import-entries.trigger.json#policies
+    trigger reaches @features/monitor/domain/monitor.port.json#import, which 'Writes are for recorders'
+    (@features/monitor/domain/writes-are-for-recorders.invariant.json) gates with
+    @access/edge/can-record.policy.json, but attaches no such policy
+    → attach "@access/edge/can-record.policy.json" under policies, or take
+      @features/monitor/domain/monitor.port.json#import out of the invariant's over
+```
+
+Reaching is transitive, so the route that forgets the gate is caught whether it fires a covered operation
+itself or a domain graph calls one two ports down; where it did not fire it directly, the refusal names the
+operation it was reached through. The route an agent adds next month is held to the rule nobody remembered
+to repeat.
+
+[M06 on the roadmap](docs/roadmap.md#m06-the-checker-knows-the-rule), *The checker knows the rule*, is the
+demo this grows into: the second form, a rule over a shape's fields, proved where the documents settle it and
+guarded where only a run can.
 
 ## Every branch runs before you ship
 
@@ -194,6 +243,7 @@ npx wilanis start example --profile local      # serve it on :8099, entries kept
 | **Graph** | A data flow: nodes that run an operation, route on a condition, or fan out over a list. A node runs when its inputs are ready. |
 | **Trigger** | An entry point: an HTTP route, a command, whatever a plugin offers. It names the operation to fire and the policies that gate it. |
 | **Policy** | A gate on a trigger. It allows by answering, or refuses with a reason. A trigger with no policies is public. |
+| **Invariant** | A rule stated once that the whole tree is held to. An `access` invariant names domain operations and says what must gate every way in that reaches them, however many ports deep. A `holds` invariant states a rule over a core shape's fields, proved wherever the documents settle it and guarded wherever only a run can. |
 | **Connection** | Where an effect goes and how it is paced: an address, credentials read from secrets, a throttle. A graph names the connection, never the address. |
 | **Store** | What a feature keeps: collections of a shape, each keyed by one of its fields, behind a connection. It says what no two records may repeat and what refers to what; the compiler judges a filter or a write against that, and swapping the connection swaps memory for a database with no other change. |
 | **Profile** | Which binding meets which port, chosen per environment, so the same documents run against a fake or the real thing. |
@@ -231,7 +281,9 @@ as YAML or as code; what it touches is the runtime's business at the moment it t
 one document kind among a dozen, and the point is what the compiler does with all of them at once: that a
 route answers a shape its graph can produce, that the port behind it is met by a binding, that every reason
 the graphs and policies behind it can refuse with is given an answer, and that none is answered which they
-cannot reach -- one judgement over the whole tree, before anything starts.
+cannot reach -- one judgement over the whole tree, before anything starts. An invariant is what that buys
+you: a rule an author states once, in one file, and the checker holds at every place it applies, including
+the route written a year later by someone who never read it.
 
 **Not a low-code tool.** n8n, Node-RED and Zapier are a canvas first and files second. Here the files are the
 source. They are diffed, reviewed and merged like any others, and the viewer is read-only: it draws a tree
