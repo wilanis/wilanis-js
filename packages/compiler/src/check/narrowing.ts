@@ -4,6 +4,11 @@
  * rules lean on: it makes an optional path present. The rest are what an invariant leans on (RFC 0007): a
  * site the routing already established the rule for is proved, and needs no guard.
  *
+ * "Routes to a node only when it held" is the whole claim, so it is asked of the switch as a whole rather
+ * than of each rule alone: a node the same switch reaches twice -- by a second rule, or by `else` -- runs
+ * both when a rule held and when it did not, and is established nothing. That distinction costs nothing
+ * while narrowing only drops an optionality, and drops a guard once an invariant leans on it.
+ *
  * A conjunct is kept renamed -- the switch's input names rewritten to the read paths its `in` gives them --
  * so it says the same thing wherever it is asked about, in the one spelling every reader of the graph uses.
  */
@@ -41,6 +46,22 @@ export function renamed(term: expr.Expr, rename: (root: string) => string[] | un
 
 /** One conjunct a switch established before routing: the switch's id, and the conjunct in this graph's reads. */
 export type Established = [string, expr.Expr];
+
+/**
+ * The nodes one switch routes to by more than one way: a second rule, or a rule and `else` together. Arriving
+ * at such a node says nothing about which way brought the run there, so nothing the switch tested is known of
+ * it. A graph is free to write one -- two cases answered the same way is a fair thing to say -- and it simply
+ * establishes nothing.
+ */
+function reachedTwice(node: SwitchNode): Set<string> {
+  const out = new Set<string>();
+  const once = new Set<string>();
+  for (const target of [...node.rules.map(rule => rule.to), node.else]) {
+    if (once.has(target)) out.add(target);
+    once.add(target);
+  }
+  return out;
+}
 
 /** The conjuncts of a rule: what `&&` at the top splits it into, each judged on its own. */
 export function conjunctsOf(term: expr.Expr, out: expr.Expr[] = []): expr.Expr[] {
@@ -94,8 +115,17 @@ export class Narrowing {
     }
   }
 
+  /**
+   * What each rule of one switch establishes at the node it routes to. A target the switch reaches more than
+   * once -- through a second rule, or through `else` -- is established nothing at all: it runs when its rule
+   * held and also when it did not, so no rule of the switch is true of every run that arrives there. G009
+   * does not refuse this, since it refuses only a *second router*, and one switch reaching one target twice
+   * has just the one. Unioning the conjuncts would prove a rule of a value that never satisfied it.
+   */
   private collectProofs(node: SwitchNode): void {
+    const reached = reachedTwice(node);
     for (const rule of node.rules) {
+      if (reached.has(rule.to)) continue;
       const proved = provedBy(node, rule.when).map((term): Established => [node.id, term]);
       if (!proved.length) continue;
       this.proved.set(rule.to, [...(this.proved.get(rule.to) ?? []), ...proved]);
