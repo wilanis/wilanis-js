@@ -14,7 +14,7 @@ import {
   type TriggerKindDoc,
 } from '@wilanis/core';
 import { graphLines } from './graph-said.js';
-import { holdsLines, invariantLines, overShape } from './invariant-said.js';
+import { holdsLines, invariantLines, overShape } from './invariant-lines.js';
 import { fieldLine, portLines, shower, storeLines } from './lines.js';
 import { storeTail } from './stores.js';
 

@@ -55,14 +55,31 @@ describe('describe: an access invariant that names the policy', () => {
     expect(said()).not.toContain('@features/monitor/edge/get-entry.trigger.json');
   });
 
-  it('says of a trigger what it was reached through, not only that it was reached', () => {
-    // nothing here is reached indirectly, so the line carries no 'reached through' -- it is there for the one
-    // that is, and a reader is never told an operation was reached without a way it was
+  it('gives every way in, not only the one a refusal would name first', () => {
+    // the checker stops at the first covered operation a trigger reaches, since one is enough to refuse; a
+    // reader has opened the invariant and is owed all of them. Nine ways in, from five triggers.
     const lines = said()
       .split('\n')
       .filter(line => line.includes('.trigger.json  @features/'));
-    expect(lines).toHaveLength(5);
+    expect(lines).toHaveLength(9);
     for (const line of lines) expect(line).not.toContain('reached through undefined');
+  });
+
+  it("names an operation reached through another, which is the RFC's own reason for the rule", () => {
+    // POST /monitor/import fires #import, whose graph calls #record for every row: the trigger reaches
+    // #record transitively and the invariant holds it to the same gate, so a domain graph cannot route around it
+    expect(said()).toContain(
+      '    @features/monitor/edge/import-entries.trigger.json  @features/monitor/domain/monitor.port.json#record  reached through @features/monitor/domain/monitor.port.json#submit',
+    );
+  });
+
+  it("orders one trigger's ways by the operations the document writes, not by how they were found", () => {
+    const rows = said()
+      .split('\n')
+      .filter(line => line.includes('import-entries.trigger.json  @features/'))
+      .map(line => line.split('#')[1].split(' ')[0]);
+    // over writes record, update, remove, removeMany, submit, import; import-entries reaches three of them
+    expect(rows).toEqual(['record', 'submit', 'import']);
   });
 });
 
@@ -113,6 +130,41 @@ describe('map: the invariants under each trigger', () => {
     expect(lines.filter(line => line.includes(`holds  ${WRITES}`))).toHaveLength(5);
     const at = lines.indexOf('@features/monitor/edge/list-entries.trigger.json  (@http/http.trigger-kind.json)');
     expect(lines[at + 1]).not.toContain('holds  ');
+  });
+});
+
+// ---- where the checker judges no trigger, and so neither does a line -------------------------------
+
+/**
+ * An invariant asking for something no trigger could give is refused against itself -- R001 for a policy the
+ * tree has not, I002 for a path the guard cannot hand -- and `TriggerGate.unmet` then says nothing about any
+ * trigger. A line reading 'I001 refuses this' would send a reader to a code `wilanis check` never printed.
+ */
+const UNMEETABLE = '@features/monitor/domain/gated-by-nothing.invariant.json';
+const { load: unjudged, dir: unjudgedDir } = loadedWith({
+  'features/monitor/domain/gated-by-nothing.invariant.json': {
+    $schema: schemaUrl('invariant'),
+    label: 'Gated by nothing',
+    description: 'Names a policy this tree does not have, so the invariant itself is refused and no trigger is.',
+    access: {
+      over: ['@monitor/domain/monitor.port.json#remove'],
+      requires: { policy: '@access/edge/there-is-no-such.policy.json' },
+    },
+  },
+});
+afterAll(() => rmSync(unjudgedDir, { recursive: true, force: true }));
+
+describe('describe: an invariant asking for what no trigger could give', () => {
+  it('says the checker did not judge it, rather than pointing at an I001 that was never emitted', () => {
+    const said = describeDoc(unjudged, UNMEETABLE);
+    expect(said).toContain('        met by not judged -- the invariant itself is refused');
+    expect(said).not.toContain('I001');
+  });
+
+  it('says the same beside the trigger, so neither reading blames the trigger for the document', () => {
+    const said = describeDoc(unjudged, '@monitor/edge/delete-entry.trigger.json');
+    expect(said).toContain(`  holds  ${UNMEETABLE}  through not judged -- the invariant itself is refused`);
+    expect(said).not.toContain('I001');
   });
 });
 
