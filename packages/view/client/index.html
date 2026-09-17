@@ -399,8 +399,11 @@
         tr.appendChild(el('td', 'name')).appendChild(link(r.op.split('#')[0], '#' + r.op.split('#')[1]));
         const through = el('td'); if (r.through) through.appendChild(link(r.through.split('#')[0], showOp(r.through))); else through.appendChild(el('span', 'desc', 'fires it'));
         tr.appendChild(through);
-        const by = el('td'); if (!r.satisfiedBy.length) by.appendChild(el('span', 'miss', 'nothing it attaches'));
-        r.satisfiedBy.forEach((p, i) => { if (i) by.appendChild(frag(', ')); by.appendChild(link(p.path, p.label)); });
+        // an empty cell is what I001 refuses -- except where `unjudged` says the checker never judged this
+        // way in, because `requires` itself is refused (R001 or I002) and no trigger could have met it
+        const by = el('td');
+        if (!r.satisfiedBy.length) by.appendChild(el('span', 'miss', r.unjudged ? 'not judged: the rule itself is refused' : 'nothing it attaches'));
+        r.satisfiedBy.forEach((p, i) => { if (i) by.appendChild(frag(', ')); by.appendChild(link(p.path, p.label)); if (p.proves) by.appendChild(el('small', null, 'proves ' + p.proves)); });
         tr.appendChild(by); t.appendChild(tr);
       }
       page.appendChild(t);

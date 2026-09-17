@@ -160,6 +160,22 @@ describe('the view of an access invariant', () => {
       'PUT /api/v1/me/preferences',
     ]);
     for (const one of seen.reached) expect(one.satisfiedBy.map(policy => policy.label)).toContain('Signed in');
+    // which path a policy proved is carried, so the page says it without working it out again
+    for (const one of seen.reached) expect(one.satisfiedBy.map(policy => policy.proves)).toEqual(['request.principal']);
+  });
+
+  it('judges the rule the way the checker does, so nothing is shown satisfied that check refuses', async () => {
+    // the whole point of asking the compiler: `requires` is the named policy AND every proved path, never
+    // either. A page that said "satisfied by" where wilanis check refuses I001 would be worse than silent,
+    // and the rule now lives in one place -- metBy in the compiler, judged as TriggerGate.unmet judges it
+    const seen = await access(WRITES);
+    expect(seen.reached.length).toBe(9);
+    expect(new Set(seen.reached.map(one => one.trigger)).size).toBe(5);
+    // the example meets its own invariants, so every way in is met and none is left unjudged
+    for (const one of seen.reached) {
+      expect(one.satisfiedBy.length).toBeGreaterThan(0);
+      expect(one.unjudged).toBeUndefined();
+    }
   });
 });
 
@@ -213,6 +229,13 @@ describe('the invariant page', () => {
     // an unsatisfied row is what the checker refuses as I001, so the table says so rather than leaving a blank
     expect(page).toContain("'nothing it attaches'");
     expect(page).toContain('Ways in it binds (');
+  });
+
+  it('does not call a way in unmet where the checker never judged it', async () => {
+    const page = await readFile(PAGE, 'utf8');
+    // `unjudged` marks a requirement the invariant is itself refused for (R001 or I002): no trigger could meet
+    // it and I001 is never raised, so the page must not point a reader at a refusal check does not emit
+    expect(page).toContain("r.unjudged ? 'not judged: the rule itself is refused' : 'nothing it attaches'");
   });
 
   it('gives the field form the shape, the rule and the fields, and claims nothing about proof', async () => {
