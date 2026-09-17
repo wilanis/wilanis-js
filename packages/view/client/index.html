@@ -54,6 +54,7 @@
   .page td { padding: 5px 10px 5px 0; border-bottom: 1px solid #1d242d; vertical-align: top; } .page td.name { font-family: var(--mono); font-size: 12px; white-space: nowrap; } .page td.desc { color: var(--muted); }
   .page td.type { font-family: var(--mono); font-size: 12px; color: var(--type); white-space: nowrap; } .page td.val { font-family: var(--mono); font-size: 12px; color: var(--lit); overflow-wrap: anywhere; }
   .page .miss { color: var(--dim); font-style: italic; }
+  .page .warn { color: var(--warn); }
   .was { text-decoration: line-through; color: var(--dim); }
   .page td.name .was { display: block; }
   .page td .until { display: block; font-family: var(--sans); font-size: 10px; color: var(--dim); white-space: normal; }
@@ -94,6 +95,12 @@
   /* a node whose effect is inside the graph's one transaction: a dashed rim and a word, so the set is seen at a glance */
   .node.joins > .box { stroke: var(--ok); stroke-dasharray: 4 3; }
   .node .txn { font: 10px var(--sans); fill: var(--ok); }
+  /* the rule a node is held to: a guard the compiler lowered names the invariant, a proved site says how, lighter */
+  .node .inv { font: 10px var(--sans); cursor: pointer; }
+  .node .inv .plate { stroke-width: 1; rx: 3; }
+  .node .inv.guard .plate { fill: #3a2a1a; stroke: var(--warn); } .node .inv.guard text { fill: var(--warn); }
+  .node .inv.held .plate { fill: #1a1f26; stroke: var(--dim); stroke-dasharray: 3 2; } .node .inv.held text { fill: var(--dim); }
+  .node .inv:hover .plate { stroke: var(--accent); } .node .inv:hover text { fill: var(--accent); }
   .node .said { font: 12px var(--sans); fill: var(--text); } .node .said .lead { fill: var(--dim); } .node .said .val { font: 11.5px var(--mono); fill: var(--lit); }
   .node .said .in { font: 600 11.5px var(--mono); fill: var(--text); cursor: default; } .node .said .in:hover, .node .said .in.lit-up { fill: var(--accent); }
   .node .port.lit-up { fill: var(--accent); } .node .pin.lit-up { stroke: var(--accent); fill: var(--accent); }
@@ -128,6 +135,10 @@
   const $ = (id) => document.getElementById(id);
   const state = { index: null, view: null, selected: null, version: null, transform: { x: 40, y: 40, k: 1 }, current: null, fit: false, source: false };
   const ARROW = '↗', ELLIPSIS = '…', SEP = ' › ', TO = ' → ', FROM = '← ';
+  /** How one conjunct was established at a site, in the words RFC 0007 asks a reader to be told. */
+  const heldSaid = (h) => h.by === 'narrowed' ? "narrowed by '" + h.switch + "'" : h.by === 'through' ? "from '" + h.node + "'" : 'literal';
+  /** How a whole rule was established: the ways its conjuncts were, each said once, in the order it writes them. */
+  const heldWays = (held) => [...new Set(held.map(heldSaid))].join(', ');
   const KIND_NAMES = { project: 'Project', feature: 'Features', trigger: 'Triggers', policy: 'Policies', resolvers: 'Request reads', graph: 'Graphs', port: 'Ports', binding: 'Bindings', shape: 'Shapes', store: 'Stores', connection: 'Connections', scenario: 'Scenarios', plugin: 'Plugins', 'trigger-kind': 'Trigger kinds', 'connection-kind': 'Connection kinds', codec: 'Codecs' };
   const KIND_ONE = { project: 'project', feature: 'feature', trigger: 'trigger', policy: 'policy', resolvers: 'request reads', graph: 'graph', port: 'port', binding: 'binding', shape: 'shape', store: 'store', connection: 'connection', scenario: 'scenario', plugin: 'plugin', 'trigger-kind': 'trigger kind', 'connection-kind': 'connection kind', codec: 'codec' };
   /** A read path shown: request.headers['user-agent'] → request › headers › user-agent. */
@@ -420,6 +431,40 @@
     const p = el('p'); inv.fields.forEach((f, i) => { if (i) p.appendChild(frag(', ')); p.appendChild(el('code', null, f)); });
     if (!inv.fields.length) p.appendChild(el('span', 'miss', 'the shape declares none'));
     page.appendChild(p);
+    renderSites(page, inv.sites || []);
+  }
+
+  /**
+   * Where the rule lands: one row per place a value of the shape comes into being, and how it stands there.
+   * A proved site says how -- the value written out in literals, a switch that routed to it, another judged
+   * value passed through -- and costs the graph nothing; a guarded one carries a switch the author never wrote
+   * and hands its triggers the reason `invariant` to map. This is the whole return on stating the rule once.
+   */
+  function renderSites(page, sites) {
+    const proved = sites.filter(one => one.held);
+    page.appendChild(el('h2', null, 'Where it lands (' + sites.length + ')'));
+    if (!sites.length) { page.appendChild(el('p', 'miss', 'No graph makes or takes a value of this shape, so this invariant holds nothing \u2014 which is what I003 refuses.')); return; }
+    const lead = el('p');
+    lead.appendChild(frag('Proved at ' + proved.length + ' of ' + sites.length + ', guarded at ' + (sites.length - proved.length) + '. A guarded site carries a switch the compiler wrote and refuses with '));
+    lead.appendChild(el('code', null, 'invariant'));
+    lead.appendChild(frag('; a proved one carries nothing at all.'));
+    page.appendChild(lead);
+    const t = el('table'); const hd = el('tr'); for (const h of ['graph', 'site', 'comes into being', 'stands']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
+    for (const one of sites) t.appendChild(siteRow(one));
+    page.appendChild(t);
+  }
+
+  /** One site as a row: the graph, the read path it answers at, how the value arrives, and how the rule stands. */
+  function siteRow(one) {
+    const tr = el('tr');
+    tr.appendChild(el('td')).appendChild(link(one.graph, one.graphLabel));
+    tr.appendChild(el('td', 'name', one.node));
+    tr.appendChild(el('td', 'desc', (one.kind === 'taken' ? 'the graph takes it' : 'a node makes it') + (one.arity === 'list' ? ', a list of them' : '')));
+    const how = el('td');
+    if (one.held) how.appendChild(el('span', null, 'proved (' + heldWays(one.held) + ')'));
+    else how.appendChild(el('span', 'warn', 'guarded'));
+    tr.appendChild(how);
+    return tr;
   }
 
   function renderDocPage(page, v) {
@@ -718,6 +763,34 @@
     return box;
   }
 
+  /** A guarded node: the invariants the compiler could not prove here, and the rule it wrote in front of the value. */
+  function guardedEl(box, guarded) {
+    box.appendChild(el('h4', null, 'guarded by (' + guarded.by.length + ')'));
+    for (const one of guarded.by) { const d = el('div', 'ref'); d.appendChild(link(one.path, one.label, 'primary')); box.appendChild(d); }
+    const why = el('p');
+    why.appendChild(frag('The value made here was not proved to satisfy ' + (guarded.by.length > 1 ? 'these rules' : 'this rule') + ', so the compiler tests it: where it does not hold the graph refuses with the reason '));
+    why.appendChild(el('code', null, 'invariant'));
+    why.appendChild(frag(', which every trigger reaching this node maps. The author wrote none of it.' + (guarded.arity === 'list' ? ' The value is a list, so every element is judged on its own.' : '')));
+    box.appendChild(why);
+    box.appendChild(el('pre', 'mono', guarded.when));
+  }
+
+  /** A proved node: every invariant established here, the rule, and how each conjunct of it was established. */
+  function provedEl(box, proved) {
+    box.appendChild(el('h4', null, 'proved here (' + proved.by.length + ')'));
+    for (const one of proved.by) {
+      const d = el('div', 'ref'); d.appendChild(link(one.path, one.label, 'primary'));
+      d.appendChild(el('span', 'sub', heldWays(one.held)));
+      box.appendChild(d);
+      box.appendChild(el('pre', 'mono', one.when));
+    }
+    const why = el('p');
+    why.appendChild(frag('The rule already holds where this value comes into being, so nothing is lowered and no trigger reaching this node maps '));
+    why.appendChild(el('code', null, 'invariant'));
+    why.appendChild(frag(' for it. Proving a rule is what a graph gets for writing the value out, routing to it, or passing another judged value through.'));
+    box.appendChild(why);
+  }
+
   function renderNodeDetails(box, n, v) {
     const color = nodeColors(v.graph).get(n.id);
     const h = el('h3'); const sw = el('span', 'swatch'); sw.style.background = color; h.appendChild(sw); h.appendChild(document.createTextNode(n.label + ' ')); const kindText = { run: 'operation', map: 'for each', rule: 'rule', in: 'input', out: 'output', const: 'constants', request: 'request' }[n.kind]; h.appendChild(NODE_SCHEMA[n.kind] ? schemaBadge(n.kind, kindText, NODE_SCHEMA[n.kind]) : badge(n.kind, kindText)); box.appendChild(h);
@@ -727,6 +800,8 @@
     if (n.description) box.appendChild(el('p', null, n.description));
     if (n.decision) { const d = n.decision, p = el('p'); p.appendChild(frag(`Rule ${d.rule} of ${d.of} in `)); p.appendChild(el('b', null, d.label)); p.appendChild(frag('. The first rule that holds wins.' + (d.description ? ' ' + d.description : ''))); box.appendChild(p); }
     if (n.participates) { box.appendChild(el('h4', null, 'in the transaction')); box.appendChild(el('p', null, 'What this node does is inside the one transaction the graph declares. It is kept only if the graph answers; a refusal or a fault anywhere below undoes it with the rest.')); }
+    if (n.guarded) guardedEl(box, n.guarded);
+    if (n.proved) provedEl(box, n.proved);
     if (n.target) {
       const t = n.target;
       box.appendChild(el('h4', null, 'runs'));
@@ -812,6 +887,9 @@
   /** A node's header: a title and a subtitle, or on a rule one line per clause of what it says. */
   const headOf = (n) => n.kind === 'rule' ? 16 + (n.says.length - 1) * 15 + 10 : HEAD;
   const rowsOf = (n) => Math.max(n.inputs.length, n.outputs.length, (n.fields || []).length, 1);
+  const BADGE = 18; // the strip along a node's foot where the invariant it is held to sits
+  /** The room a node's invariant badge takes: none where the tree holds it to nothing. */
+  const badgeOf = (n) => (n.guarded || n.proved) ? BADGE : 0;
   /** The decision a rule node belongs to; null for every other node. */
   const ladderOf = (n) => n.kind === 'rule' ? n.decision.id : null;
   /** An edge inside one ladder: a rule's otherwise stepping to the next rule. */
@@ -853,7 +931,7 @@
       cols[r].sort((a, b) => bary.get(a.id) - bary.get(b.id) || (ladderOf(a) && ladderOf(a) === ladderOf(b) ? a.decision.rule - b.decision.rule : pos.get(a.id) - pos.get(b.id)));
       cols[r].forEach((n, i) => pos.set(n.id, i));
     }
-    const height = (n) => headOf(n) + rowsOf(n) * ROW + PAD;
+    const height = (n) => headOf(n) + rowsOf(n) * ROW + PAD + badgeOf(n);
     // a ladder's container needs a header above its first rule and a foot below its last
     const firstOf = (c, i) => ladderOf(c[i]) && (i === 0 || ladderOf(c[i - 1]) !== ladderOf(c[i]));
     const lastOf = (c, i) => ladderOf(c[i]) && (i === c.length - 1 || ladderOf(c[i + 1]) !== ladderOf(c[i]));
@@ -889,6 +967,39 @@
     const op = n.target ? n.target.portLabel + SEP + n.target.opName : showOp(n.op);
     return (n.kind === 'map' ? 'for each: ' : '') + op;
   };
+
+  /**
+   * What a node's invariant badge says, and where a double-click on it lands. A guarded node names the
+   * invariants it is guarded by, since the rule it could not prove is the thing a reader came for; a proved node
+   * says only how, since which invariant is a rule that costs the graph nothing. Both open the invariant.
+   */
+  function badgeSaid(n) {
+    if (n.guarded) {
+      const names = n.guarded.by.map(one => one.label);
+      const each = n.guarded.arity === 'list' ? ' Every element of the list is judged.' : '';
+      return {
+        cls: 'guard', text: 'guarded: ' + names.join('; '), open: n.guarded.by[0].path,
+        hint: 'the compiler could not prove ' + names.join('; ') + ' here, so it guards this value:\n' + n.guarded.when + '\n\nthe graph refuses with the reason `invariant` where the rule does not hold.' + each + '\ndouble-click to open the invariant',
+      };
+    }
+    const by = n.proved.by;
+    const ways = heldWays(by.flatMap(one => one.held));
+    return {
+      cls: 'held', text: 'proved: ' + ways, open: by[0].path,
+      hint: by.map(one => one.label + ': ' + one.when + '\n  held ' + heldWays(one.held)).join('\n') + '\n\nproved here, so nothing is lowered and no trigger maps `invariant` for it.\ndouble-click to open the invariant',
+    };
+  }
+
+  /** The strip along a node's foot: the field invariant it is held to, and where a double-click on it opens. */
+  function badgeEl(n, b) {
+    const said = badgeSaid(n);
+    const gb = svg('g', { transform: 'translate(10,' + (b.h - BADGE - 1) + ')' }, 'inv ' + said.cls);
+    gb.appendChild(svg('rect', { width: b.w - 20, height: BADGE - 4 }, 'plate'));
+    gb.appendChild(txt(6, 10, trunc(said.text, 42)));
+    withTitle(gb, said.hint);
+    gb.addEventListener('dblclick', ev => { ev.stopPropagation(); go(canon(said.open)); });
+    return gb;
+  }
 
   function drawGraph(main, g) {
     main.textContent = '';
@@ -970,6 +1081,7 @@
       if (n.target && n.target.effect) gn.appendChild(withTitle(txt(b.w - (n.target ? 32 : 14), 32, 'effect', 'fx', { 'text-anchor': 'end' }), 'reaches outside the process'));
       // a participant is rimmed, and marked beside the effect: what it does is inside the graph's one transaction
       if (n.participates) gn.appendChild(withTitle(txt(b.w - (n.target && n.target.effect ? 72 : 32), 32, 'txn', 'txn', { 'text-anchor': 'end' }), 'this node\u2019s effect is inside the graph\u2019s one transaction: it is undone with the rest unless the graph answers'));
+      if (n.guarded || n.proved) gn.appendChild(badgeEl(n, b));
       const goto = n.target ? n.target.implementation : n.opens;
       if (goto) {
         const go_ = withTitle(txt(b.w - 20, 19, ARROW, 'go'), 'open ' + labelFor(goto));
@@ -1064,6 +1176,7 @@
     legend.appendChild(el('span', null, 'an edge has the colour of the node it feeds'));
     // the rim is only worth explaining where something wears it
     if (g.atomic) { const t = el('span'); t.appendChild(el('u')); t.appendChild(frag('a rimmed node is in the transaction')); legend.appendChild(t); }
+    if (g.nodes.some(n => n.guarded || n.proved)) legend.appendChild(el('span', null, 'a badge is a field invariant: named where it is guarded, lighter where it is proved \u2014 double-click to open it'));
     legend.appendChild(el('span', null, ARROW + ' or double-click opens the implementation'));
     main.appendChild(legend);
   }

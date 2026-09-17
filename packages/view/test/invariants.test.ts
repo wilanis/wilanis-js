@@ -206,11 +206,18 @@ describe('the view of a field invariant', () => {
     expect(seen.fields).toEqual(['id', 'url', 'method', 'agent', 'note']);
   });
 
-  it('says nothing about where the rule is proved or guarded, which no document yet answers', () => {
+  it('tables every site of the shape, read from the compiler and never worked out here', () => {
     const seen = holds('len(url) > 0');
-    // the sites, the proof and the guards are the compiler's (RFC 0007 steps 4 and 5); the viewer shows a
-    // loaded tree and never invents a status the tree has not got
-    expect(Object.keys(seen).sort()).toEqual(['fields', 'form', 'on', 'onLabel', 'when']);
+    expect(Object.keys(seen).sort()).toEqual(['fields', 'form', 'on', 'onLabel', 'sites', 'when']);
+    // the sites are `sitesOf`'s, which is what the checker judges (I005) and the compiler guards by: thirteen
+    // places a value of Entry comes into being in the example, twelve nodes that make one and one graph that
+    // takes a list. The viewer counts none of them itself; it asks the one function that already knows.
+    expect(seen.sites.length).toBe(13);
+    expect(seen.sites.filter(site => site.kind === 'taken').map(site => [site.graph, site.node, site.arity])).toEqual([
+      ['@features/monitor/data/write-csv.graph.json', 'in', 'list'],
+    ]);
+    // none of the example's sites proves this rule, so every one is guarded and none carries a `held`
+    expect(seen.sites.every(site => site.held === undefined)).toBe(true);
   });
 });
 
@@ -238,13 +245,21 @@ describe('the invariant page', () => {
     expect(page).toContain("r.unjudged ? 'not judged: the rule itself is refused' : 'nothing it attaches'");
   });
 
-  it('gives the field form the shape, the rule and the fields, and claims nothing about proof', async () => {
+  it('gives the field form the shape, the rule and the fields', async () => {
     const page = await readFile(PAGE, 'utf8');
     expect(page).toContain("step('holds over every value of'");
     expect(page).toMatch(/renderHoldsInvariant[\s\S]*?'The rule'/);
     expect(page).toMatch(/renderHoldsInvariant[\s\S]*?'Fields it may name'/);
-    // guards are the compiler's (RFC 0007 step 5) and nothing here invents a proof status
-    const holds = page.slice(page.indexOf('function renderHoldsInvariant'));
-    expect(holds.slice(0, holds.indexOf('\n  function '))).not.toMatch(/guarded|proved at/);
+  });
+
+  it('gives the field form a row per site, saying how the rule stands at each', async () => {
+    const page = await readFile(PAGE, 'utf8');
+    expect(page).toMatch(/renderHoldsInvariant[\s\S]*?renderSites\(page, inv\.sites/);
+    expect(page).toContain("['graph', 'site', 'comes into being', 'stands']");
+    // the two words RFC 0007 asks each site to be said in, and the three ways a proof is told
+    expect(page).toContain("'proved (' + heldWays(one.held) + ')'");
+    expect(page).toContain("el('span', 'warn', 'guarded')");
+    expect(page).toContain('"narrowed by \'" + h.switch + "\'"');
+    expect(page).toContain('"from \'" + h.node + "\'"');
   });
 });

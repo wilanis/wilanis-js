@@ -81,6 +81,52 @@ export interface VNode {
   keeps?: VKeeps;
   /** True on a node of an atomic graph whose operation takes part in the transaction. */
   participates?: boolean;
+  /** On a node the compiler put a field invariant's rule in front of: the invariants it is guarded by. */
+  guarded?: VGuarded;
+  /** On a node that makes or takes a value a field invariant was proved of: which invariants, and how. */
+  proved?: VProved;
+}
+
+/** Whether a site holds one value of a shape or a list of them: a list is guarded element by element. */
+export type VArity = 'one' | 'list';
+
+/**
+ * The guard the compiler lowered at one site: which invariants could not be proved there, and the one rule the
+ * switch it wrote tests. A site is guarded once however many rules are unproved at it, since two rules over one
+ * shape conjoin into one switch -- so the badge names them all and the rule reads as the guard tests it.
+ */
+export interface VGuarded {
+  /** Every invariant unproved here, in registry order, so a click opens the one a reader asks about. */
+  by: { path: string; label: string }[];
+  /** The rule the guard tests: each unproved rule bracketed, joined by `&&`. */
+  when: string;
+  arity: VArity;
+}
+
+/** The invariants proved at one site, each with the rule and how every conjunct of it was established. */
+export interface VProved {
+  by: { path: string; label: string; when: string; held: VHeld[] }[];
+  arity: VArity;
+}
+
+/**
+ * How one conjunct of a rule was established at a site, in the three ways RFC 0007 names: the value is written
+ * out in literals and the conjunct comes out true, a switch routing here already established it, or the whole
+ * value was read from another site of the same shape, which was judged there.
+ */
+export type VHeld = { by: 'literal' } | { by: 'narrowed'; switch: string } | { by: 'through'; node: string };
+
+/** One site of a field invariant's shape, as its page tables it: where it is, and whether it was proved there. */
+export interface VSite {
+  /** The graph the value comes into being in, canonical. */
+  graph: string;
+  graphLabel: string;
+  /** The read path the value answers at: the node's id, or `in` where the graph takes it. */
+  node: string;
+  kind: 'made' | 'taken';
+  arity: VArity;
+  /** How each conjunct of the rule was established here; absent where it was not proved, and so guarded. */
+  held?: VHeld[];
 }
 
 /**
@@ -268,7 +314,12 @@ export interface VReaching {
   unjudged?: boolean;
 }
 
-/** The field form: the shape the rule is about, and the rule as written. Where each site stands is the compiler's, once guards land. */
+/**
+ * The field form: the shape the rule is about, the rule as written, and every place a value of the shape comes
+ * into being with how the rule stands there. The sites are the whole point of stating a rule once -- a reader
+ * who sees only the document cannot tell a rule that landed on thirteen graphs from one that landed on none,
+ * nor which of them proved it and cost the tree nothing.
+ */
 export interface VHoldsInvariant {
   form: 'holds';
   /** The core shape, canonical. */
@@ -278,6 +329,8 @@ export interface VHoldsInvariant {
   when: string;
   /** The shape's field names, so a reader can see which roots the rule may name. */
   fields: string[];
+  /** Every site of the shape, in the order the compiler walks them: proved, with how, or guarded. */
+  sites: VSite[];
 }
 
 /**
