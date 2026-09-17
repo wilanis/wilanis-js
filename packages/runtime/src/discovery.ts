@@ -13,9 +13,19 @@ import {
   type TriggerDoc,
   type TriggerKindDoc,
 } from '@wilanis/core';
+import {
+  bindingLines,
+  codecLines,
+  connectionLines,
+  featureLines,
+  projectLines,
+  resolversLines,
+  scenarioLines,
+} from './doc-said.js';
 import { graphLines } from './graph-said.js';
-import { holdsLines, invariantLines, overShape } from './invariant-lines.js';
+import { holdsLines, invariantLines } from './invariant-lines.js';
 import { fieldLine, portLines, shower, storeLines } from './lines.js';
+import { shapeLines } from './shape-said.js';
 import { storeTail } from './stores.js';
 
 // ---- discovery --------------------------------------------------------------------------------------
@@ -82,82 +92,6 @@ function guardLines(declared: TriggerKindDoc, showType: (spec: unknown) => strin
     );
   return lines;
 }
-
-/** A shape: the document, who makes or writes values of it, and the invariants its values are held to. */
-function shapeLines(doc: Loaded, scope: Scope, load: LoadResult): string[] {
-  const lines = [JSON.stringify(doc.doc, null, 2)];
-  const writers = [...graphWriters(load, doc.path, scope), ...bindingWriters(load, doc.path, scope)];
-  if (writers.length) lines.push('made or written by (the attributes each gives):', ...writers);
-  lines.push(...heldBy(load, doc.path, scope));
-  lines.push(...overShape(doc.path, scope));
-  return lines;
-}
-
-/** Every node of every graph that makes or writes values of this shape. */
-function graphWriters(load: LoadResult, shape: string, scope: Scope): string[] {
-  const out: string[] = [];
-  for (const graph of load.registry.all('graph'))
-    for (const node of graph.doc.nodes) {
-      if (!('run' in node)) continue;
-      const said = writerLine({ file: graph.path, where: node.id, run: node.run, given: node.in }, shape, scope);
-      if (said) out.push(said);
-    }
-  return out;
-}
-
-/** Every binding operation that makes or writes values of this shape. */
-function bindingWriters(load: LoadResult, shape: string, scope: Scope): string[] {
-  const out: string[] = [];
-  for (const binding of load.registry.all('binding'))
-    for (const [name, op] of Object.entries(binding.doc.operations)) {
-      if (!op.run) continue;
-      const said = writerLine({ file: binding.path, where: name, run: op.run, given: op.in }, shape, scope);
-      if (said) out.push(said);
-    }
-  return out;
-}
-
-/** The keys one literal value gives, when it is an object. */
-const keysOf = (value: unknown) =>
-  value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value as Record<string, unknown>) : [];
-
-/** Which of one call's inputs the contract declares as this shape, and the keys each was given. */
-function declaredAs(run: string, given: Record<string, unknown> | undefined, shape: string, scope: Scope) {
-  const found = scope.op(run);
-  if (typeof found === 'string') return [];
-  const keys: string[] = [];
-  for (const [name, field] of Object.entries(found.op.accepts ?? {}))
-    if (typeof field.type === 'string' && scope.canon(field.type) === shape && given?.[name] !== undefined)
-      keys.push(...keysOf(given[name]), '');
-  return keys;
-}
-
-/**
- * Whether one call makes or writes values of this shape, and the keys it gives: one `type` field naming the shape
- * (object#make, session#set), or an input the contract declares as the shape (issue's attributes).
- */
-function writerLine(
-  call: { file: string; where: string; run: string; given: Record<string, unknown> | undefined },
-  shape: string,
-  scope: Scope,
-): string | undefined {
-  const byType = typeof call.given?.type === 'string' && scope.canon(call.given.type) === shape;
-  const keys = byType ? [...keysOf(call.given?.values), ...keysOf(call.given?.value)] : [];
-  const byContract = declaredAs(call.run, call.given, shape, scope);
-  if (!byType && !byContract.length) return undefined;
-  const named = [...keys, ...byContract].filter(Boolean);
-  return `    ${call.file}#${call.where}  via ${call.run}${named.length ? `  (${named.join(', ')})` : ''}`;
-}
-
-/** Every collection of every store that keeps records of this shape, so a shape says where it is kept. */
-function heldBy(load: LoadResult, shape: string, scope: Scope): string[] {
-  const out: string[] = [];
-  for (const store of load.registry.all('store'))
-    for (const [name, collection] of Object.entries(store.doc.collections))
-      if (scope.canon(collection.of) === shape) out.push(`held by  ${store.path}#${name}`);
-  return out;
-}
-
 /** A policy: what decides it, what it can answer, and the triggers it gates. */
 function policyLines(doc: Loaded, load: LoadResult): string[] {
   const lines: string[] = [];
@@ -187,28 +121,90 @@ function policyLines(doc: Loaded, load: LoadResult): string[] {
  */
 function triggerLines(doc: Loaded, scope: Scope): string[] {
   const declared = doc.doc as TriggerDoc;
-  const lines = [JSON.stringify(doc.doc, null, 2)];
-  if (declared.policies?.length) lines.push(`policies, in order: ${declared.policies.map(policyPath).join(', ')}`);
-  for (const use of declared.policies ?? [])
-    if (typeof use !== 'string' && use.in)
-      for (const [name, read] of Object.entries(use.in))
-        lines.push(`  gives the guard '${name}' read from ${JSON.stringify(read)}`);
-  lines.push(...holdsLines(doc as Loaded<TriggerDoc>, scope));
+  return [
+    `kind  ${declared.kind}`,
+    ...settingLines(declared.settings),
+    ...crossesLines(declared),
+    ...fireLines(declared),
+    ...gatedLines(declared),
+    ...holdsLines(doc as Loaded<TriggerDoc>, scope),
+  ];
+}
+
+/** What crosses the edge at this trigger: the shape it takes from the caller, and the one it answers in. */
+function crossesLines(declared: TriggerDoc): string[] {
+  return [...(declared.in ? [`takes   ${declared.in}`] : []), ...(declared.out ? [`answers ${declared.out}`] : [])];
+}
+
+/** The domain operation this trigger fires, and where each of its inputs is read from. */
+function fireLines(declared: TriggerDoc): string[] {
+  const reads = Object.entries(declared.fire.in ?? {});
+  return [
+    `fires   ${declared.fire.run}`,
+    ...reads.map(([name, read]) => `    ${name} ← ${typeof read === 'string' ? read : JSON.stringify(read)}`),
+  ];
+}
+
+/** The policies gating this trigger, in order, and the credentials each attachment gives the guard. */
+function gatedLines(declared: TriggerDoc): string[] {
+  if (!declared.policies?.length) return [];
+  const lines = [`policies, in order: ${declared.policies.map(policyPath).join(', ')}`];
+  for (const use of declared.policies)
+    for (const [name, read] of Object.entries((typeof use === 'string' ? undefined : use.in) ?? {}))
+      lines.push(`  gives the guard '${name}' read from ${JSON.stringify(read)}`);
   return lines;
 }
 
-/** The lines one document's kind adds, beyond what every kind says. */
+/** Whether a setting's value has parts of its own worth their own lines, rather than fitting on one. */
+const nested = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+/**
+ * What a trigger's kind is configured with, a setting to a line, and a setting with parts of its own opened
+ * one level -- which is where a reader looks for the status a kind answers with and the refusals it maps.
+ */
+function settingLines(settings: Record<string, unknown> | undefined): string[] {
+  const entries = Object.entries(settings ?? {});
+  if (!entries.length) return [];
+  const lines = ['settings:'];
+  for (const [name, value] of entries) {
+    if (!nested(value)) lines.push(`    ${name}: ${JSON.stringify(value)}`);
+    else {
+      lines.push(`    ${name}:`);
+      for (const [part, held] of Object.entries(value)) lines.push(`        ${part}: ${JSON.stringify(held)}`);
+    }
+  }
+  return lines;
+}
+
+/**
+ * The lines one document's kind adds, beyond what every kind says. Every kind has a body: none falls back to
+ * the raw JSON, since a reader who wanted the file has its path on the line above and what they asked
+ * `describe` for is what the document means.
+ */
 function kindBody(doc: Loaded, load: LoadResult, scope: Scope, showType: (spec: unknown) => string): string[] {
   if (doc.kind === 'port') return portLines(doc, showType);
   if (doc.kind === 'trigger-kind' || doc.kind === 'connection-kind' || doc.kind === 'plugin')
     return kindLines(doc, showType);
-  if (doc.kind === 'shape') return shapeLines(doc, scope, load);
+  if (doc.kind === 'shape') return shapeLines(doc, scope, load, showType);
   if (doc.kind === 'store') return storeLines(doc, load, scope);
   if (doc.kind === 'policy') return policyLines(doc, load);
   if (doc.kind === 'trigger') return triggerLines(doc, scope);
   if (doc.kind === 'invariant') return invariantLines(doc, scope);
   if (doc.kind === 'graph') return graphLines(doc, scope);
-  return [JSON.stringify(doc.doc, null, 2)];
+  return plainBody(doc);
+}
+
+/** The kinds whose body is the document read back in words: each says what it means, none prints its JSON. */
+function plainBody(doc: Loaded): string[] {
+  if (doc.kind === 'binding') return bindingLines(doc);
+  if (doc.kind === 'resolvers') return resolversLines(doc);
+  if (doc.kind === 'feature') return featureLines(doc);
+  if (doc.kind === 'connection') return connectionLines(doc);
+  if (doc.kind === 'codec') return codecLines(doc);
+  if (doc.kind === 'scenario') return scenarioLines(doc);
+  if (doc.kind === 'project') return projectLines(doc);
+  return [];
 }
 
 /** Who granted one document: the plugin that ships it, or the tree it was included from. */

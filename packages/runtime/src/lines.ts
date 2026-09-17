@@ -73,13 +73,44 @@ function operationLine(
   return `#${name}${pure}${refuses}${transactional}${holds}: ${op.description}`;
 }
 
-/** A port: every operation, what it accepts and what it answers. */
+/**
+ * The shape a port mostly works in: the document most of its operations answer in, counting a list of it as
+ * the same shape. Naming it once and saying `returns it` below spares a reader the same path ten times over.
+ *
+ * Only a shape the tree has a document for is hoisted. A structural type is already the reader's answer --
+ * `{record?: $T}` says what it is where it stands, and `works in {record?: $T}` above `returns it` would
+ * make a port harder to read, not easier. A port whose operations do not mostly agree names each.
+ */
+function shapeOfPort(port: PortDoc, showType: (spec: unknown) => string): string | undefined {
+  const counted = new Map<string, number>();
+  for (const op of Object.values(port.operations)) {
+    if (!op.returns) continue;
+    const bare = showType(op.returns).replace(/\[\]$/, '');
+    if (bare.startsWith('@')) counted.set(bare, (counted.get(bare) ?? 0) + 1);
+  }
+  const [best, most] = [...counted].sort(([, one], [, other]) => other - one)[0] ?? [];
+  return most > 1 ? best : undefined;
+}
+
+/** What one operation answers, said against the shape the port works in where every operation shares it. */
+const returnsLine = (shown: string, shape: string | undefined): string =>
+  shape && (shown === shape || shown === `${shape}[]`)
+    ? `    returns ${shown === shape ? 'it' : 'a list of them'}`
+    : `    returns ${shown}`;
+
+/**
+ * A port: the shape its operations work in where they agree on one, then every operation, what it accepts and
+ * what it answers. A port answering the same shape ten times said its path ten times; naming it once above
+ * and then `returns it` says the same thing, and a port whose operations disagree still names each.
+ */
 export function portLines(doc: Loaded, showType: (spec: unknown) => string): string[] {
-  const lines: string[] = [];
-  for (const [name, op] of Object.entries((doc.doc as PortDoc).operations)) {
+  const port = doc.doc as PortDoc;
+  const shape = shapeOfPort(port, showType);
+  const lines = shape ? [`works in  ${shape}`, ''] : [];
+  for (const [name, op] of Object.entries(port.operations)) {
     lines.push(operationLine(name, op));
     for (const [field, accepts] of Object.entries(op.accepts ?? {})) lines.push(acceptsLine(field, accepts, showType));
-    if (op.returns) lines.push(`    returns ${showType(op.returns)}`);
+    if (op.returns) lines.push(returnsLine(showType(op.returns), shape));
   }
   return lines;
 }
