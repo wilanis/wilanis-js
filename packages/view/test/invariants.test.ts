@@ -4,12 +4,23 @@
  * through which operation each got there, and what satisfies the rule for each. A reader with only the document
  * sees a list of operations and no way to tell a rule that binds six routes from one that binds none.
  */
-import { cpSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadProject } from '@wilanis/runtime';
+import type { PluginModule, ResolvedInclude } from '@wilanis/core';
+import { loadTree } from '@wilanis/core';
+import auth from '@wilanis/plugin-auth';
+import blob from '@wilanis/plugin-blob';
+import http from '@wilanis/plugin-http';
+import otel from '@wilanis/plugin-otel';
+import reload from '@wilanis/plugin-reload';
+import schedule from '@wilanis/plugin-schedule';
+import storage from '@wilanis/plugin-storage';
+import memory from '@wilanis/plugin-storage-memory';
+import postgres from '@wilanis/plugin-storage-postgres';
+import { BUILTIN_PLUGINS, loadProject } from '@wilanis/runtime';
 import { describe, expect, it } from 'vitest';
 import type { VAccessInvariant, VHoldsInvariant } from '../src/index.js';
 import { type DocView, viewOf } from '../src/index.js';
@@ -22,6 +33,33 @@ const CAN_RECORD = '@features/access/edge/can-record.policy.json';
 const MONITOR = '@features/monitor/domain/monitor.port.json';
 const PLANTED = 'an-entry-names-a-call.invariant.json';
 
+/**
+ * The plugins the example names, handed in rather than resolved. A copy of the tree has no `node_modules` --
+ * the example itself has none either, and resolves only because `createRequire` walks up to the workspace root
+ * -- so a copy left to resolve them loads without nine plugins and without the include, and judges a tree that
+ * is not the one on disk.
+ */
+const PLUGINS: Record<string, PluginModule> = {
+  ...BUILTIN_PLUGINS,
+  '@http': http,
+  '@blob': blob,
+  '@reload': reload,
+  '@auth': auth,
+  '@schedule': schedule,
+  '@storage': storage,
+  '@storage-memory': memory,
+  '@storage-postgres': postgres,
+  '@otel': otel,
+};
+/** The tree the example includes, as the runtime would resolve it from the example's node_modules. */
+const INCLUDES: ResolvedInclude[] = [
+  {
+    from: '@wilanis/access',
+    dir: fileURLToPath(new URL('../../../libraries/access', import.meta.url)),
+    features: ['access'],
+  },
+];
+
 const view = async (path: string): Promise<DocView> => {
   const seen = viewOf(await loadProject(EXAMPLE), path);
   if (!seen) throw new Error(`no view for ${path}`);
@@ -33,21 +71,28 @@ const access = async (path: string): Promise<VAccessInvariant> => {
   return seen;
 };
 
-/** The view of a field invariant over the example's Entry shape, written into a copy of the tree and loaded. */
-const holds = async (when: string): Promise<VHoldsInvariant> => {
+/**
+ * The view of a field invariant over the example's Entry shape: the example carries none until RFC 0007 step 4
+ * puts one there, so the tree is copied, the document written in, and the copy removed again. The plugins and
+ * the include are handed in, since a copy resolves neither, and the copy never outlives the answer.
+ */
+const holds = (when: string): VHoldsInvariant => {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-view-'));
-  // the copy keeps node_modules as the symlink it is, so the copied tree resolves its plugins and its include
-  cpSync(EXAMPLE, dir, { recursive: true, verbatimSymlinks: true });
-  const doc = {
-    $schema: '@wilanis/invariant.schema.json',
-    label: 'An entry names a call',
-    description: 'A URL is never empty, and a deletion always says who asked for it.',
-    holds: { on: '@monitor/domain/Entry.shape.json', when },
-  };
-  writeFileSync(join(dir, 'features/monitor/domain', PLANTED), JSON.stringify(doc, null, 2));
-  const seen = viewOf(await loadProject(dir), `@monitor/domain/${PLANTED}`)?.invariant;
-  if (seen?.form !== 'holds') throw new Error('the planted invariant is not a field invariant');
-  return seen;
+  try {
+    cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
+    const doc = {
+      $schema: '@wilanis/invariant.schema.json',
+      label: 'An entry names a call',
+      description: 'A URL is never empty, and a deletion always says who asked for it.',
+      holds: { on: '@monitor/domain/Entry.shape.json', when },
+    };
+    writeFileSync(join(dir, 'features/monitor/domain', PLANTED), JSON.stringify(doc, null, 2));
+    const seen = viewOf(loadTree(dir, PLUGINS, INCLUDES), `@monitor/domain/${PLANTED}`)?.invariant;
+    if (seen?.form !== 'holds') throw new Error('the planted invariant is not a field invariant');
+    return seen;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 };
 
 describe('the view of an access invariant', () => {
@@ -119,10 +164,24 @@ describe('the view of an access invariant', () => {
 });
 
 describe('the view of a field invariant', () => {
-  it('names the shape, the rule as written, and the fields its roots may be', async () => {
+  it('loads the copied tree whole, so the form is read from the example and not from a remnant of it', () => {
+    // a copy resolves no plugin and no include of its own; handed neither, it would load without nine plugins
+    // and without @wilanis/access, and every case below would be judging a tree that is not the one on disk
+    const dir = mkdtempSync(join(tmpdir(), 'wilanis-view-'));
+    try {
+      cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
+      const load = loadTree(dir, PLUGINS, INCLUDES);
+      expect(load.refusals.items).toEqual([]);
+      expect(load.registry.files.some(file => file.path.startsWith('@features/access/'))).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('names the shape, the rule as written, and the fields its roots may be', () => {
     // the example carries no holds invariant until RFC 0007 step 4 puts one there, so this copies the tree
     // and writes one: the page has to draw both forms, and the form it draws is read from a loaded document
-    const seen = await holds("len(url) > 0 && (method != 'DELETE' || has(agent))");
+    const seen = holds("len(url) > 0 && (method != 'DELETE' || has(agent))");
     expect(seen.form).toBe('holds');
     expect(seen.on).toBe('@features/monitor/domain/Entry.shape.json');
     expect(seen.onLabel).toBe('Entry');
@@ -131,8 +190,8 @@ describe('the view of a field invariant', () => {
     expect(seen.fields).toEqual(['id', 'url', 'method', 'agent', 'note']);
   });
 
-  it('says nothing about where the rule is proved or guarded, which no document yet answers', async () => {
-    const seen = await holds('len(url) > 0');
+  it('says nothing about where the rule is proved or guarded, which no document yet answers', () => {
+    const seen = holds('len(url) > 0');
     // the sites, the proof and the guards are the compiler's (RFC 0007 steps 4 and 5); the viewer shows a
     // loaded tree and never invents a status the tree has not got
     expect(Object.keys(seen).sort()).toEqual(['fields', 'form', 'on', 'onLabel', 'when']);
