@@ -15,9 +15,22 @@ export { type Reach, type Reached, type ReachedMap, reachOf } from './check/atom
 // one function by the checker, by the guard the compiler lowers, and by the tests that hold the rules honest.
 export { heldAt, heldWhollyAt, type Proof } from './check/prove.js';
 export * from './checker.js';
+export * from './compiled.js';
 export * from './compiler.js';
 export * from './documents.js';
 export * from './env.js';
+// What a field invariant lowers to where it could not be proved, named rather than spread: the node-building
+// half is the compiler's own, and a reader of one import line wants the guards of a graph and their ids.
+export {
+  type Guard,
+  guardIds,
+  guardMessage,
+  guardsOf,
+  hasGuard,
+  INVARIANT,
+  TAKEN_IDS,
+  type Unproved,
+} from './guard.js';
 export * from './invariant-said.js';
 export * from './refusals.js';
 export * from './sites.js';

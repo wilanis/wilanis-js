@@ -16,15 +16,23 @@ export interface Roots {
   request?: boolean;
   /** may read other nodes by id (a graph node's in) */
   nodes?: boolean;
+  /**
+   * Roots the compiler answers under another name: what a guard renames (RFC 0007). A guarded taken site puts
+   * the judged value at `in:ok` and leaves the caller's own at `in`, so every authored `{{in}}` must read
+   * `in:ok` instead. It is a rename of the root alone -- the path below it is untouched -- and it is applied
+   * after the named roots, so a resolver or a constant of the same name still means what it meant.
+   */
+  aliases?: Record<string, string>;
 }
 
 /** One template read as a source: a resolver reads below request, a constant bakes, the rest read their root. */
 function lowerRef(template: string, roots: Roots): KSource {
-  const [root, ...path] = splitPath(template);
-  if (roots.resolvers[root]) return { ref: 'request', path: [...roots.resolvers[root], ...path] };
-  if (root === 'in') return { ref: root, path };
-  if (root === 'const' && roots.consts) return { value: readPath(roots.consts[path[0]], path.slice(1)) };
-  if (root === 'request' && roots.request) return { ref: root, path };
+  const [named, ...path] = splitPath(template);
+  if (roots.resolvers[named]) return { ref: 'request', path: [...roots.resolvers[named], ...path] };
+  const root = roots.aliases?.[named] ?? named;
+  if (named === 'in') return { ref: root, path };
+  if (named === 'const' && roots.consts) return { value: readPath(roots.consts[path[0]], path.slice(1)) };
+  if (named === 'request' && roots.request) return { ref: root, path };
   if (roots.nodes) return { ref: root, path };
   throw new Error(`unresolvable template {{${template}}}`);
 }

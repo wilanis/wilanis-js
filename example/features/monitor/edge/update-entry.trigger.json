@@ -14,7 +14,8 @@
         "upstream": 502,
         "anonymous": 401,
         "invalid_credential": 401,
-        "forbidden": 403
+        "forbidden": 403,
+        "invariant": 500
       }
     }
   },

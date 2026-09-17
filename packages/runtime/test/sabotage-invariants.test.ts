@@ -13,6 +13,12 @@ const SESSIONS = 'features/directories/domain/the-session-is-the-callers.invaria
 const CALLS = 'features/monitor/domain/an-entry-names-a-call.invariant.json';
 /** The graph whose `row` node makes an entry: where a literal value is written to contradict the rule. */
 const STORED = 'features/monitor/data/store-and-latest.graph.json';
+/**
+ * What a tree answers once nothing of `Entry` is guarded any more: the eight triggers of the monitor that map
+ * `invariant` reach no guard, and T006 refuses each for mapping a reason it cannot be answered with. A rule
+ * that guards nothing takes its reason with it, which is the whole of what makes the word honest.
+ */
+const UNGUARDED = Array.from({ length: 8 }, () => 'T006');
 
 describe('sabotage: invariants, the access form', () => {
   it('I001 a trigger reaching a gated operation without the policy the invariant names', () => {
@@ -107,16 +113,19 @@ describe('sabotage: invariants, the field form', () => {
   });
 
   it('I002 holds.on naming an edge shape, and R001 naming no shape at all', () => {
+    // pointing the rule at another shape guards nothing of Entry any more, so every trigger that mapped the
+    // guard's reason now maps one it cannot reach (T006). That is the price the RFC names: the reason and the
+    // guard stand or fall together, and the eight mappings the example carries say so.
     expect(
       sabotage(CALLS, invariant => {
         invariant.holds.on = '@monitor/edge/EntryView.shape.json';
       }),
-    ).toEqual(['I002']);
+    ).toEqual([...UNGUARDED, 'I002']);
     expect(
       sabotage(CALLS, invariant => {
         invariant.holds.on = '@monitor/domain/Nope.shape.json';
       }),
-    ).toEqual(['R001']);
+    ).toEqual([...UNGUARDED, 'R001']);
   });
 
   it('I003 a rule over a core shape no graph makes or takes', () => {
@@ -125,7 +134,15 @@ describe('sabotage: invariants, the field form', () => {
         invariant.holds.on = '@monitor/domain/MethodLatest.shape.json';
         invariant.holds.when = 'len(url) > 0';
       }),
-    ).toEqual(['I003']);
+    ).toEqual([...UNGUARDED, 'I003']);
+  });
+
+  it('I006 a refuse node an author wrote whose reason is the word a guard is refused with', () => {
+    expect(
+      sabotageSaying(STORED, graph => {
+        graph.nodes[5].in.reason = 'invariant';
+      }).filter(one => one.startsWith('I006')),
+    ).toEqual(["I006 reason 'invariant' is reserved"]);
   });
 
   it('I005 a site whose every read is literal and contradicts the rule', () => {

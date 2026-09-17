@@ -9,7 +9,8 @@
     "produces": "text/csv",
     "response": {
       "refusals": {
-        "upstream": 502
+        "upstream": 502,
+        "invariant": 500
       }
     }
   },

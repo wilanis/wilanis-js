@@ -61,7 +61,9 @@ function writeUploadForm(dir: string) {
         body: '@features/monitor/edge/UploadForm.shape.json',
         response: {
           status: { default: 201 },
-          refusals: { upstream: 502, anonymous: 401, invalid_credential: 401, forbidden: 403 },
+          // `invariant` is the guard the compiler lowers where a field invariant could not be proved: this
+          // route reaches one, so it maps the word like every other reason it can be answered with (T005)
+          refusals: { upstream: 502, anonymous: 401, invalid_credential: 401, forbidden: 403, invariant: 500 },
         },
       },
       in: '@features/monitor/edge/CsvUpload.shape.json',

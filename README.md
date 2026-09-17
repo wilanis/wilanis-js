@@ -62,7 +62,7 @@ a document of its own comes once this definition has settled.
     "route": "/monitor/{id}",
     "method": "GET",
     "produces": "application/json",
-    "response": { "refusals": { "missing": 404, "upstream": 502 } }
+    "response": { "refusals": { "missing": 404, "upstream": 502, "invariant": 500 } }
   },
   "in": "@monitor/edge/IdRequest.shape.json",
   "out": "@monitor/edge/EntryView.shape.json",
@@ -75,7 +75,9 @@ a document of its own comes once this definition has settled.
 
 A GET on `/monitor/{id}`, open to anyone because it names no policy. It takes an `IdRequest` and answers an
 `EntryView`, both declared in files of their own. It runs the `get` operation of the `monitor` port with the
-id from the URL. If that operation refuses with `missing`, the client gets a 404; with `upstream`, a 502.
+id from the URL. If that operation refuses with `missing`, the client gets a 404; with `upstream`, a 502; with
+`invariant` -- the word a guard the compiler lowers refuses with, where an invariant of the tree could not be
+proved of the value a graph made -- a 500.
 
 The file never says *how* `get` works. In the same example a command-line trigger fires that same operation,
 under the same policies, and neither the engine nor the compiler knows what HTTP is.

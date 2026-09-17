@@ -20,7 +20,7 @@ import {
   show,
   type Type,
 } from '@wilanis/core';
-import { checkSwitch, elementInputs } from './graph-nodes.js';
+import { checkReason, checkSwitch, elementInputs } from './graph-nodes.js';
 import { GraphReads } from './graph-reads.js';
 import { checkWhole } from './graph-whole.js';
 import { checkInputs } from './inputs.js';
@@ -198,6 +198,7 @@ class GraphCheck {
     }
     const hit = this.ops.get(node.id);
     if (!hit) return;
+    checkReason(this, node, hit, this.judge.scope);
     const extra = isMap(node) ? elementInputs(this, node, read) : {};
     checkInputs(this.judge, {
       given: node.in ?? {},

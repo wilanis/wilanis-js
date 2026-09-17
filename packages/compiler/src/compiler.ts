@@ -32,45 +32,14 @@ import {
   Kernel,
   type KernelSpec,
   type KNode,
-  outcomeOf,
   type Redact,
-  Refusal,
-  type Report,
 } from '@wilanis/engine';
 import { inScope } from './atomic.js';
+import { type Compiled, type CompileOptions, nestedFailure } from './compiled.js';
 import { bindings, outputCandidates, passedInputs } from './documents.js';
+import { type GuardHandlers, guardsOf, MAKE, REFUSE, TAKEN_IDS } from './guard.js';
+import { lowerGuards } from './guard-lowering.js';
 import { bindPaths, inputsByName, lowerValue, lowerValues, type Roots, secretPaths } from './lower.js';
-
-export interface EffectInfo {
-  path: string;
-  opName: string;
-  op: Operation;
-  returns: Type | undefined;
-}
-
-export interface CompileOptions {
-  profile?: string;
-  /** When set, every effectful native operation runs this instead of the plugin (rehearse, fuzz). */
-  stubEffects?: (info: EffectInfo) => Handler;
-}
-
-export interface Compiled {
-  spec: KernelSpec;
-  handlers: Handlers;
-}
-
-/**
- * Why a nested run did not answer. A refusal is the nested graph's declared outcome: it passes up as it is,
- * reason and message, so the trigger can answer it; a fault is named by the graph and node it broke in; a
- * blocked run names what it needed.
- */
-function nestedFailure(spec: KernelSpec, report: Report): Error {
-  const outcome = outcomeOf(report);
-  if (outcome.kind === 'blocked') return new Error(`${spec.name}: blocked, needs ${outcome.needs.join(', ')}`);
-  if (outcome.kind === 'refused') return new Refusal(outcome.reason, outcome.message, outcome.detail);
-  if (outcome.kind === 'faulted' && outcome.at) return new Error(`${spec.name}: ${outcome.at}: ${outcome.error}`);
-  return new Error(`${spec.name}: failed`);
-}
 
 /**
  * Lowers a checked tree to what the kernel runs: the spec of a graph, or of the binding that meets a domain
@@ -188,15 +157,36 @@ export class Compiler {
 
   // ---- lowering -----------------------------------------------------------------------------------
 
+  /**
+   * A graph as the kernel runs it. Its nodes are lowered exactly as written, and then each site a field
+   * invariant could not be proved at is guarded: the rule becomes a switch, the value it lets through keeps
+   * the id the node had, and the branch it refuses on is the reason `invariant` (RFC 0007).
+   */
   private lowerGraph(graph: Loaded<GraphDoc>): KernelSpec {
     const doc = graph.doc;
     const consts = Object.fromEntries(
       Object.entries(doc.constants ?? {}).map(([name, constant]) => [name, constant.value]),
     );
+    const guards = guardsOf(this.scope, graph);
     const roots: Roots = { resolvers: this.resolverRoots(doc.resolvers), consts, nodes: true };
+    // a guarded taken site puts the judged value at `in:ok`, so every authored {{in}} reads it instead
+    if (guards.some(guard => guard.site.kind === 'taken')) roots.aliases = { in: TAKEN_IDS.ok };
     const nodes: Record<string, KNode> = {};
     for (const node of doc.nodes) nodes[node.id] = this.lowerNode(node, roots);
-    return { name: graph.path, nodes, output: outputCandidates(doc) };
+    const spec: KernelSpec = { name: graph.path, nodes, output: outputCandidates(doc) };
+    return guards.length ? lowerGuards(spec, guards, this.guardHandlers()) : spec;
+  }
+
+  /** What a guard's three nodes run: the two std operations it is built from, and the nested spec a list needs. */
+  private guardHandlers(): GuardHandlers {
+    return {
+      make: this.handlerFor(MAKE).handler,
+      refuse: this.handlerFor(REFUSE).handler,
+      nested: spec => {
+        this.handlers[spec.name] ??= this.nestedRunner(spec, true);
+        return spec.name;
+      },
+    };
   }
 
   private lowerNode(node: Node, roots: Roots): KNode {
