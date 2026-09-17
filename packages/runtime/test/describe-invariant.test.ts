@@ -13,7 +13,7 @@ import { rmSync } from 'node:fs';
 import { loadTree, schemaUrl } from '@wilanis/core';
 import { afterAll, describe, expect, it } from 'vitest';
 import { describe as describeDoc, ls, map } from '../src/index.js';
-import { EXAMPLE, INCLUDES, loadedWith, PLUGINS } from './example-harness.js';
+import { EXAMPLE, INCLUDES, loadedWith, PLUGINS, sabotage } from './example-harness.js';
 
 const example = loadTree(EXAMPLE, PLUGINS, INCLUDES);
 
@@ -155,6 +155,16 @@ const { load: unjudged, dir: unjudgedDir } = loadedWith({
 afterAll(() => rmSync(unjudgedDir, { recursive: true, force: true }));
 
 describe('describe: an invariant asking for what no trigger could give', () => {
+  it('is refused against the invariant and not against any trigger, which is why the line may not name I001', () => {
+    // the claim the two assertions below rest on: R001 for the policy the tree has not, and no I001 at all,
+    // though five triggers reach #remove. Proved here rather than assumed, or the lines could drift back.
+    expect(
+      sabotage(WRITES.replace('@features/', 'features/'), invariant => {
+        invariant.access.requires.policy = '@access/edge/there-is-no-such.policy.json';
+      }),
+    ).toEqual(['R001']);
+  });
+
   it('says the checker did not judge it, rather than pointing at an I001 that was never emitted', () => {
     const said = describeDoc(unjudged, UNMEETABLE);
     expect(said).toContain('        met by not judged -- the invariant itself is refused');
