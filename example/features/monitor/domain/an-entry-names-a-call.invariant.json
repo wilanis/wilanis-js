@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/invariant.schema.json",
+  "label": "An entry names a call",
+  "description": "An entry always names the call it observed: a URL is never empty, and a deletion always says which agent asked for it. Every graph that makes or takes an entry is held to this, wherever the value comes from.",
+  "holds": {
+    "on": "@monitor/domain/Entry.shape.json",
+    "when": "len(url) > 0 && (method != 'DELETE' || has(agent))"
+  }
+}
