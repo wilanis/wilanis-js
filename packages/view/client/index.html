@@ -53,6 +53,7 @@
   .page table { border-collapse: collapse; width: 100%; margin: 4px 0 8px; } .page th { text-align: left; font-size: 11px; color: var(--dim); font-weight: 600; padding: 4px 10px 4px 0; border-bottom: 1px solid var(--line); }
   .page td { padding: 5px 10px 5px 0; border-bottom: 1px solid #1d242d; vertical-align: top; } .page td.name { font-family: var(--mono); font-size: 12px; white-space: nowrap; } .page td.desc { color: var(--muted); }
   .page td.type { font-family: var(--mono); font-size: 12px; color: var(--type); white-space: nowrap; } .page td.val { font-family: var(--mono); font-size: 12px; color: var(--lit); overflow-wrap: anywhere; }
+  .page .miss { color: var(--dim); font-style: italic; }
   .was { text-decoration: line-through; color: var(--dim); }
   .page td.name .was { display: block; }
   .page td .until { display: block; font-family: var(--sans); font-size: 10px; color: var(--dim); white-space: normal; }
@@ -368,6 +369,56 @@
   const step = (k, content) => { const s = el('div', 'step'); s.appendChild(el('div', 'k', k)); const v = el('div', 'v'); v.appendChild(content); s.appendChild(v); return s; };
   const arrow = () => el('span', 'arrow', TO.trim());
 
+  /**
+   * The access form of an invariant: what must gate every way in, the operations it covers, and -- the thing the
+   * document cannot say about itself -- every trigger that reaches one, the operation it reaches it through, and
+   * the policy that satisfies the rule there. A row with nothing in the last column is what the checker refuses
+   * as I001, so the table reads the same way the refusal does.
+   */
+  function renderAccessInvariant(page, inv) {
+    const chain = el('div', 'chain');
+    chain.appendChild(step('gates', frag(inv.covers.length + (inv.covers.length === 1 ? ' operation' : ' operations'))));
+    chain.appendChild(arrow());
+    if (inv.policy) chain.appendChild(step('with the policy', link(inv.policy, inv.policyLabel)));
+    if (inv.proves && inv.proves.length) { const p = el('span'); inv.proves.forEach((x, i) => { if (i) p.appendChild(frag(', ')); p.appendChild(el('code', null, x)); }); chain.appendChild(step('proving', p)); }
+    page.appendChild(chain);
+    page.appendChild(el('p', null, inv.policy
+      ? 'Every trigger that reaches one of these operations, directly or through another domain operation, attaches that policy. The invariant says the gate stands; the policy says what it decides.'
+      : 'Every trigger that reaches one of these operations, directly or through another domain operation, attaches some policy that proves this. Which policy is the trigger’s choice; that one is there is not.'));
+    page.appendChild(el('h2', null, 'Operations it gates'));
+    const ot = el('table'); const oh = el('tr'); for (const h of ['operation', 'declared by']) oh.appendChild(el('th', null, h)); ot.appendChild(oh);
+    for (const c of inv.covers) { const tr = el('tr'); tr.appendChild(el('td', 'name')).appendChild(link(c.port, '#' + c.opName)); tr.appendChild(el('td')).appendChild(link(c.port, c.portLabel)); ot.appendChild(tr); }
+    page.appendChild(ot);
+    page.appendChild(el('h2', null, 'Ways in it binds (' + inv.reached.length + ')'));
+    if (!inv.reached.length) page.appendChild(el('p', 'miss', 'No trigger reaches any of these operations, so this invariant gates nothing.'));
+    else {
+      page.appendChild(el('p', null, 'Reaching is transitive, so a domain graph cannot route around this by calling the operation itself. One row per operation a trigger reaches, under any profile.'));
+      const t = el('table'); const hd = el('tr'); for (const h of ['trigger', 'reaches', 'through', 'satisfied by']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
+      for (const r of inv.reached) {
+        const tr = el('tr'); tr.appendChild(el('td')).appendChild(link(r.trigger, r.triggerLabel));
+        tr.appendChild(el('td', 'name')).appendChild(link(r.op.split('#')[0], '#' + r.op.split('#')[1]));
+        const through = el('td'); if (r.through) through.appendChild(link(r.through.split('#')[0], showOp(r.through))); else through.appendChild(el('span', 'desc', 'fires it'));
+        tr.appendChild(through);
+        const by = el('td'); if (!r.satisfiedBy.length) by.appendChild(el('span', 'miss', 'nothing it attaches'));
+        r.satisfiedBy.forEach((p, i) => { if (i) by.appendChild(frag(', ')); by.appendChild(link(p.path, p.label)); });
+        tr.appendChild(by); t.appendChild(tr);
+      }
+      page.appendChild(t);
+    }
+  }
+
+  /** The field form: the shape every value of which must satisfy the rule, the rule as written, and the fields its roots may name. */
+  function renderHoldsInvariant(page, inv) {
+    const chain = el('div', 'chain'); chain.appendChild(step('holds over every value of', link(inv.on, inv.onLabel))); page.appendChild(chain);
+    page.appendChild(el('h2', null, 'The rule'));
+    page.appendChild(el('pre', 'mono', inv.when));
+    page.appendChild(el('p', null, 'The roots are the shape’s fields. Where a value of it is made or taken, the checker proves the rule from the documents where it can, and the compiler guards the site where it cannot.'));
+    page.appendChild(el('h2', null, 'Fields it may name'));
+    const p = el('p'); inv.fields.forEach((f, i) => { if (i) p.appendChild(frag(', ')); p.appendChild(el('code', null, f)); });
+    if (!inv.fields.length) p.appendChild(el('span', 'miss', 'the shape declares none'));
+    page.appendChild(p);
+  }
+
   function renderDocPage(page, v) {
     const h1 = el('h1', null, v.label); h1.appendChild(schemaBadge(v.kind, null, v.kind + '.schema.json')); if (v.kind === 'shape') h1.appendChild(badge(v.kind, v.doc.layer === 'edge' ? 'edge: the world’s shape' : 'core: ours')); page.appendChild(h1);
     page.appendChild(el('p', 'lead', v.description));
@@ -545,25 +596,9 @@
         break;
       }
       case 'invariant': {
-        if (d.access) {
-          const chain = el('div', 'chain');
-          chain.appendChild(step('gates', frag(d.access.over.length + (d.access.over.length === 1 ? ' operation' : ' operations'))));
-          chain.appendChild(arrow());
-          const req = d.access.requires || {};
-          if (req.policy) chain.appendChild(step('with the policy', link(req.policy)));
-          if (req.proves && req.proves.length) chain.appendChild(step('proving', frag(req.proves.join(', '))));
-          page.appendChild(chain);
-          page.appendChild(el('p', null, 'Every trigger that reaches one of these operations, directly or through another domain operation, must satisfy this. The checker refuses one that does not.'));
-          page.appendChild(el('h2', null, 'Operations it gates'));
-          page.appendChild(chips(d.access.over, showOp));
-        } else if (d.holds) {
-          const chain = el('div', 'chain');
-          chain.appendChild(step('holds over', link(d.holds.on)));
-          page.appendChild(chain);
-          page.appendChild(el('h2', null, 'The rule'));
-          page.appendChild(el('pre', 'mono', d.holds.when));
-          page.appendChild(el('p', null, 'The roots are the shape’s fields. Where a value of it is made or taken, the checker proves the rule or the compiler guards the site.'));
-        }
+        const inv = v.invariant || {};
+        if (inv.form === 'access') renderAccessInvariant(page, inv);
+        else if (inv.form === 'holds') renderHoldsInvariant(page, inv);
         break;
       }
       case 'connection': {
