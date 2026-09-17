@@ -200,7 +200,11 @@ describe('files through the blob registry', () => {
     form.append('note', 'from a form');
     form.append('file', new Blob([big], { type: 'text/csv' }), 'bulk.csv');
     const before = rows.length;
-    const answer = await fetch('http://localhost:8099/monitor/upload', { method: 'POST', body: form });
+    const answer = await fetch('http://localhost:8099/monitor/upload', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}` },
+      body: form,
+    });
     expect(answer.status).toBe(201);
     expect(await answer.json()).toHaveLength(2000);
     expect(rows.length).toBe(before + 2000);

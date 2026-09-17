@@ -3,7 +3,8 @@
  * its module under check/:
  *   D documents (the loader)   R references   L layers/effects/visibility   G graphs (graph.ts, inputs.ts)
  *   P static fields/resolvers (resolvers.ts)   B bindings/profiles (bindings.ts, project.ts)
- *   T triggers (triggers.ts)   A access (access.ts)   C connections and settings (project.ts, contracts.ts)
+ *   T triggers (triggers.ts)   A access (access.ts)   I invariants (invariants.ts)
+ *   C connections and settings (project.ts, contracts.ts)
  *   C stores: what they keep and what they once called it (stores.ts)
  *   atomic graphs, which are L and G rules over what one reaches (atomic.ts)
  *   S scenarios (triggers.ts)   X plugin-specific (each plugin's own `check`)
@@ -14,6 +15,7 @@ import { checkAtomic } from './check/atomic.js';
 import { checkBinding } from './check/bindings.js';
 import { checkConnection, checkPort, checkShape } from './check/contracts.js';
 import { checkGraph } from './check/graph.js';
+import { checkInvariant, checkInvariantSites } from './check/invariants.js';
 import { Judge } from './check/judge.js';
 import { checkProject, checkStartup } from './check/project.js';
 import { checkResolversDoc } from './check/resolvers.js';
@@ -63,7 +65,18 @@ function judgeUses(judge: Judge): void {
   for (const binding of registry.all('binding')) checkBinding(judge, binding);
   for (const policy of registry.all('policy')) checkPolicy(judge, policy);
   for (const trigger of registry.all('trigger')) checkTrigger(judge, trigger);
+  judgeInvariants(judge);
   for (const scenario of registry.all('scenario')) checkScenario(judge, scenario);
+}
+
+/**
+ * What must hold everywhere, after the trigger loop and before the scenarios: an invariant is judged over
+ * documents already found well-formed, so an I refusal never repeats an R001, a T or an A refusal, and a
+ * trigger's attached policies are known by the time the tree is held to a rule that spans triggers.
+ */
+function judgeInvariants(judge: Judge): void {
+  for (const invariant of judge.scope.registry.all('invariant')) checkInvariant(judge, invariant);
+  checkInvariantSites(judge);
 }
 
 /** X rules: what only the plugin can judge, given its settings and a way to refuse. */

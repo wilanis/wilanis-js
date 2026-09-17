@@ -39,17 +39,19 @@ describe('sabotage: access, as the example attaches the included policies', () =
         delete trigger.settings.response.refusals.forbidden;
       }),
     ).toEqual(['T005']);
+    // dropping can-record leaves every reason still reached through employees-only, so the refusal table is
+    // untouched; what answers is the invariant, which is the coincidence it exists to turn into a rule
     expect(
       sabotage('features/monitor/edge/record-entry.trigger.json', trigger => {
         trigger.policies.pop();
       }),
-    ).toEqual([]);
+    ).toEqual(['I001']);
     expect(
       sabotage('features/monitor/edge/record-entry.trigger.json', trigger => {
         delete trigger.policies;
         delete trigger.settings.response.refusals.invalid_credential;
       }),
-    ).toEqual(['T006', 'T006']);
+    ).toEqual(['T006', 'T006', 'I001']);
   });
   it('R001 a trigger naming a policy that is not there', () => {
     expect(
