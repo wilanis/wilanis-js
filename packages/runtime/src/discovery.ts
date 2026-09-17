@@ -14,6 +14,7 @@ import {
   type TriggerKindDoc,
 } from '@wilanis/core';
 import { graphLines } from './graph-said.js';
+import { holdsLines, invariantLines, overShape } from './invariant-said.js';
 import { fieldLine, portLines, shower, storeLines } from './lines.js';
 import { storeTail } from './stores.js';
 
@@ -82,12 +83,13 @@ function guardLines(declared: TriggerKindDoc, showType: (spec: unknown) => strin
   return lines;
 }
 
-/** A shape: the document, and who makes or writes values of it. */
+/** A shape: the document, who makes or writes values of it, and the invariants its values are held to. */
 function shapeLines(doc: Loaded, scope: Scope, load: LoadResult): string[] {
   const lines = [JSON.stringify(doc.doc, null, 2)];
   const writers = [...graphWriters(load, doc.path, scope), ...bindingWriters(load, doc.path, scope)];
   if (writers.length) lines.push('made or written by (the attributes each gives):', ...writers);
   lines.push(...heldBy(load, doc.path, scope));
+  lines.push(...overShape(doc.path, scope));
   return lines;
 }
 
@@ -179,8 +181,11 @@ function policyLines(doc: Loaded, load: LoadResult): string[] {
   return lines;
 }
 
-/** A trigger: the document, the policies it attaches, and what each gives the guard. */
-function triggerLines(doc: Loaded): string[] {
+/**
+ * A trigger: the document, the policies it attaches, what each gives the guard, and the invariants that hold
+ * over it -- a rule stated once elsewhere is a rule about this trigger, and a reader of the trigger sees it.
+ */
+function triggerLines(doc: Loaded, scope: Scope): string[] {
   const declared = doc.doc as TriggerDoc;
   const lines = [JSON.stringify(doc.doc, null, 2)];
   if (declared.policies?.length) lines.push(`policies, in order: ${declared.policies.map(policyPath).join(', ')}`);
@@ -188,6 +193,7 @@ function triggerLines(doc: Loaded): string[] {
     if (typeof use !== 'string' && use.in)
       for (const [name, read] of Object.entries(use.in))
         lines.push(`  gives the guard '${name}' read from ${JSON.stringify(read)}`);
+  lines.push(...holdsLines(doc as Loaded<TriggerDoc>, scope));
   return lines;
 }
 
@@ -199,7 +205,8 @@ function kindBody(doc: Loaded, load: LoadResult, scope: Scope, showType: (spec: 
   if (doc.kind === 'shape') return shapeLines(doc, scope, load);
   if (doc.kind === 'store') return storeLines(doc, load, scope);
   if (doc.kind === 'policy') return policyLines(doc, load);
-  if (doc.kind === 'trigger') return triggerLines(doc);
+  if (doc.kind === 'trigger') return triggerLines(doc, scope);
+  if (doc.kind === 'invariant') return invariantLines(doc, scope);
   if (doc.kind === 'graph') return graphLines(doc, scope);
   return [JSON.stringify(doc.doc, null, 2)];
 }
@@ -322,6 +329,8 @@ export function map(load: LoadResult): string[] {
   for (const trigger of load.registry.all('trigger')) {
     lines.push(`${trigger.path}  (${trigger.doc.kind})`);
     lines.push(...gateLines(trigger, scope));
+    // under the gates, since an invariant is a rule about what those gates must be, not another gate
+    lines.push(...holdsLines(trigger, scope));
     lines.push(...firesLines(trigger, load, reached, scope));
   }
   for (const graph of load.registry.all('graph')) if (!reached.has(graph.path)) lines.push(`orphan  ${graph.path}`);
