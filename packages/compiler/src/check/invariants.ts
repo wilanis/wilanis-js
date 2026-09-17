@@ -2,7 +2,8 @@
  * I invariants. An invariant states a rule once and the checker holds the whole tree to it, which is why the
  * family judges the tree rather than a document: the access form says what must gate every way in that reaches
  * a domain operation, and a way in is a trigger somewhere else. `checkInvariant` judges the document on its own
- * (I002, I003) and `checkInvariantSites` judges every trigger against every access invariant (I001).
+ * (I002, I003), the field form through `checkHolds` beside it, and `checkInvariantSites` judges every trigger
+ * against every access invariant (I001).
  *
  * The A family judges each trigger alone -- its credentials, its policies' reads. An invariant spans triggers,
  * so it is not another method of `AccessCheck`, and it runs after the trigger loop so that an I refusal never
@@ -12,6 +13,7 @@ import type { AccessInvariant, InvariantDoc, Loaded, PolicyDoc, TriggerDoc } fro
 import { policyPath } from '@wilanis/core';
 import { operationsReachable } from '../refusals.js';
 import { provesFault } from './access.js';
+import { checkHolds } from './invariant-holds.js';
 import type { Judge, Refuser } from './judge.js';
 import { atOrBelow } from './typing.js';
 
@@ -33,8 +35,9 @@ const named = (invariant: Loaded<InvariantDoc>): string =>
  */
 export function checkInvariant(judge: Judge, invariant: Loaded<InvariantDoc>): void {
   const access = invariant.doc.access;
-  if (!access) return; // the holds form is judged by the site rules
-  new InvariantCheck(judge, invariant, access).run();
+  if (access) new InvariantCheck(judge, invariant, access).run();
+  const holds = invariant.doc.holds;
+  if (holds) checkHolds(judge, invariant, holds);
 }
 
 /**
