@@ -382,6 +382,10 @@ document with both or neither. `packages/view/test` gains the invariant page of 
 8. **The viewer.** `invariantView`, the page, the canvas badges. `area:view`.
 9. **The agent's rules.** A paragraph in `packages/runtime/templates/CLAUDE.md` saying when to write an
    invariant instead of repeating a policy or a check, and how to read I001. `area:runtime`.
+10. **The README.** A section beside "The compiler reads it before it runs" showing an `access` invariant
+    and the I001 refusal that removing a policy produces; an **Invariant** row in "The words"; a sentence
+    in "Not a workflow engine"; the intro naming the example's invariants; the section pointing at the
+    roadmap's M06 row. `area:process`. Documentation only, after 3.
 
 Steps 1 to 3 deliver access invariants alone and can ship before 4 to 8.
 
