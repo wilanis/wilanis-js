@@ -8,8 +8,9 @@
  * table below is small on purpose: an ordering proves a weaker ordering on the same literal, and equality
  * with a literal proves inequality with another. Everything else is guarded.
  */
-import { expr, type Node, type Scope, splitPath, WHOLE_TEMPLATE } from '@wilanis/core';
-import { conjunctsOf, type Narrowing } from './narrowing.js';
+import { expr, isRun, type Node, type Scope, splitPath, type Values, WHOLE_TEMPLATE } from '@wilanis/core';
+import { type Site, siteId } from '../sites.js';
+import { conjunctsOf, Narrowing, renamed } from './narrowing.js';
 
 type Expr = expr.Expr;
 
@@ -51,12 +52,6 @@ export function proveAt(site: ProofSite, when: string): Map<Expr, Proof> {
   }
   for (const conjunct of conjunctsOf(parsed)) out.set(conjunct, proofOf(site, conjunct));
   return out;
-}
-
-/** Whether every conjunct of a rule is established at a site: the question the compiler asks before guarding it. */
-export function provedAt(site: ProofSite, when: string): boolean {
-  const proofs = [...proveAt(site, when).values()];
-  return proofs.length > 0 && proofs.every(proof => proof.by !== 'guarded');
 }
 
 /** How one conjunct is established, in the order the rules are tried: written out, routed to, or read from. */
@@ -116,33 +111,12 @@ export function rootsOf(term: Expr, out = new Set<string>()): Set<string> {
 function narrowedBy(site: ProofSite, conjunct: Expr): string | undefined {
   const base = site.from;
   if (!base) return undefined;
-  const wanted = rename(conjunct, root => [...base, root]);
+  const wanted = renamed(conjunct, root => [...base, root]);
   if (!wanted) return undefined;
   for (const [id, established] of site.narrowing.establishedFor(site.root)) {
     if (implies(established, wanted)) return id;
   }
   return undefined;
-}
-
-/** Rewrite each root of a conjunct to the path the site reads it at. */
-function rename(term: Expr, at: (root: string) => string[]): Expr | undefined {
-  switch (term.kind) {
-    case 'lit':
-      return term;
-    case 'path':
-    case 'has':
-      return { kind: term.kind, path: [...at(term.path[0]), ...term.path.slice(1)] };
-    case 'len':
-    case 'not': {
-      const arg = rename(term.arg, at);
-      return arg ? { kind: term.kind, arg } : undefined;
-    }
-    case 'bin': {
-      const left = rename(term.left, at);
-      const right = rename(term.right, at);
-      return left && right ? { kind: 'bin', op: term.op, left, right } : undefined;
-    }
-  }
 }
 
 /**
@@ -211,6 +185,71 @@ function passedThrough(site: ProofSite): string | undefined {
 }
 
 // ---- reading a site ------------------------------------------------------------------------------
+
+/** The native operations that write a value out in place, and the inputs each writes it in. */
+const WRITES: Record<string, string[]> = {
+  '@std/object.port.json#make': ['value'],
+  '@std/object.port.json#merge': ['base', 'over'],
+};
+
+/**
+ * How each conjunct of a rule is established at one site of it: the one question the checker (I005) and the
+ * compiler (which sites to guard) both ask, so that neither can prove a site the other would guard. `sites`
+ * is every site of the shape, since a pass-through leans on a sibling site in the same graph.
+ */
+export function heldAt(scope: Scope, sites: Site[], site: Site, when: string): Map<Expr, Proof> {
+  return proveAt(siteRead(scope, sites, site), when);
+}
+
+/** Whether every conjunct of a rule is established at a site: the question asked before a guard is lowered. */
+export function heldWhollyAt(scope: Scope, sites: Site[], site: Site, when: string): boolean {
+  const proofs = [...heldAt(scope, sites, site, when).values()];
+  return proofs.length > 0 && proofs.every(proof => proof.by !== 'guarded');
+}
+
+/** One site as the proof rules read it: what it writes out, what it reads whole, and what routed it. */
+export function siteRead(scope: Scope, sites: Site[], site: Site): ProofSite {
+  const nodes = new Map(site.graph.doc.nodes.map(node => [node.id, node]));
+  const given = site.node && isRun(site.node) ? (site.node.in ?? {}) : {};
+  const writes = writesOf(scope, site.node);
+  return {
+    scope,
+    narrowing: new Narrowing(scope, nodes),
+    node: site.node,
+    root: siteId(site),
+    written: writtenAt(writes, given),
+    from: writes.length === 1 ? readWhole(given[writes[0]]) : undefined,
+    siblings: siblingsOf(sites, site),
+  };
+}
+
+/** The other sites of the same shape in one site's graph, by the read path each answers at: what a pass-through may lean on. */
+function siblingsOf(sites: Site[], site: Site): Set<string> {
+  const out = new Set<string>();
+  for (const other of sites) if (other.graph.path === site.graph.path && other !== site) out.add(siteId(other));
+  return out;
+}
+
+/** The inputs a node's operation writes its value in; none where it is not one of those operations. */
+function writesOf(scope: Scope, node: Node | undefined): string[] {
+  if (!node || !isRun(node)) return [];
+  const hit = scope.op(node.run);
+  return typeof hit === 'string' ? [] : (WRITES[`${hit.path}#${hit.opName}`] ?? []);
+}
+
+/** The object a node writes out in place, where its operation writes one and the value is an object here. */
+function writtenAt(writes: string[], given: Values): Record<string, unknown> | undefined {
+  const wrote: Record<string, unknown> = {};
+  let any = false;
+  for (const name of writes) {
+    const value = given[name];
+    if (value === undefined) continue;
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+    Object.assign(wrote, value);
+    any = true;
+  }
+  return any ? wrote : undefined;
+}
 
 /** The read path a whole template names, where the value is one and nothing else. */
 export function readWhole(value: unknown): string[] | undefined {

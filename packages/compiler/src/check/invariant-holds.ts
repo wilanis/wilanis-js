@@ -5,34 +5,10 @@
  * the rule is refused at check time (I005). What is neither proved nor contradicted is guarded, which is
  * the compiler's work (RFC 0007, step 5); this module is what tells it which sites those are.
  */
-import {
-  expr,
-  type HoldsInvariant,
-  type InvariantDoc,
-  isRun,
-  type Loaded,
-  type Node,
-  type ObjField,
-  type Type,
-  type Values,
-} from '@wilanis/core';
+import { expr, type HoldsInvariant, type InvariantDoc, type Loaded, type ObjField, type Type } from '@wilanis/core';
 import { type Site, siteId, sitesOf } from '../sites.js';
 import type { Judge, Refuser } from './judge.js';
-import { Narrowing } from './narrowing.js';
-import { literalFields, type ProofSite, proveAt, readWhole } from './prove.js';
-
-/** The native operations that write a value out in place, and the inputs each writes it in. */
-const WRITES: Record<string, string[]> = {
-  '@std/object.port.json#make': ['value'],
-  '@std/object.port.json#merge': ['base', 'over'],
-};
-
-/** The other sites of the same shape in one site's graph, by the read path each answers at: what a pass-through may lean on. */
-function siblingsOf(sites: Site[], site: Site): Set<string> {
-  const out = new Set<string>();
-  for (const other of sites) if (other.graph.path === site.graph.path && other !== site) out.add(siteId(other));
-  return out;
-}
+import { heldAt, literalFields, siteRead } from './prove.js';
 
 /** How a reader is told which invariant judged them: its label where it has one, and the file either way. */
 const named = (invariant: Loaded<InvariantDoc>): string =>
@@ -65,7 +41,7 @@ class HoldsCheck {
     if (!this.checkRule(fields)) return;
     const sites = sitesOf(this.judge.scope, this.holds.on);
     this.checkReached(sites);
-    for (const site of sites) this.checkSite(site, siblingsOf(sites, site));
+    for (const site of sites) this.checkSite(sites, site);
   }
 
   /** I002: `on` names a core shape of this tree. An unknown path is R001 and a hidden one L005. */
@@ -120,9 +96,8 @@ class HoldsCheck {
    * I005: a site whose every read is literal comes out false. The refusal is against the graph rather than the
    * invariant: the value written there is what is wrong, and the invariant is what says so.
    */
-  private checkSite(site: Site, siblings: Set<string>): void {
-    const proof = this.proofSite(site, siblings);
-    for (const values of this.contradictions(proof, site)) {
+  private checkSite(sites: Site[], site: Site): void {
+    for (const values of this.contradictions(sites, site)) {
       const at = site.node ? `nodes/${site.node.id}` : 'in';
       const message = `the value '${siteId(site)}' makes contradicts ${named(this.invariant)}: ${this.says(values)}`;
       const hint = `the value contradicts '${this.invariant.doc.label ?? this.invariant.path}' (${this.invariant.path}): ${this.holds.when}`;
@@ -131,11 +106,13 @@ class HoldsCheck {
   }
 
   /** For each conjunct a site writes out in literals and that comes out false, the values that made it so. */
-  private contradictions(proof: ProofSite, site: Site): Record<string, unknown>[] {
+  private contradictions(sites: Site[], site: Site): Record<string, unknown>[] {
     const out: Record<string, unknown>[] = [];
     if (!site.node) return out; // a taken value is the caller's; nothing is written here to contradict
-    for (const conjunct of proveAt(proof, this.holds.when).keys()) {
-      const values = literalFields(proof, conjunct);
+    const read = siteRead(this.judge.scope, sites, site);
+    for (const [conjunct, proof] of heldAt(this.judge.scope, sites, site, this.holds.when)) {
+      if (proof.by !== 'guarded') continue; // established, so it never comes out false here
+      const values = literalFields(read, conjunct);
       if (values && !expr.evaluate(conjunct, values)) out.push(values);
     }
     return out;
@@ -147,47 +124,5 @@ class HoldsCheck {
       value === undefined ? `${name} is absent` : `${name} = ${JSON.stringify(value)}`,
     );
     return `'${this.holds.when}' is false where ${wrote.join(', ')}`;
-  }
-
-  /** One site as the proof rules read it: what it writes out, what it reads whole, and what routed it. */
-  private proofSite(site: Site, siblings: Set<string>): ProofSite {
-    const nodes = new Map(site.graph.doc.nodes.map(node => [node.id, node]));
-    const given = site.node && isRun(site.node) ? (site.node.in ?? {}) : {};
-    return {
-      scope: this.judge.scope,
-      narrowing: new Narrowing(this.judge.scope, nodes),
-      node: site.node,
-      root: siteId(site),
-      written: this.writtenAt(site.node, given),
-      from: this.readAt(site.node, given),
-      siblings,
-    };
-  }
-
-  /** The object a node writes out in place, where its operation is one that writes one and the value is written. */
-  private writtenAt(node: Node | undefined, given: Values): Record<string, unknown> | undefined {
-    const wrote: Record<string, unknown> = {};
-    let any = false;
-    for (const name of this.writesOf(node)) {
-      const value = given[name];
-      if (value === undefined) continue;
-      if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
-      Object.assign(wrote, value);
-      any = true;
-    }
-    return any ? wrote : undefined;
-  }
-
-  /** The read path a node's whole value is read from, where the operation writes one input and it is one template. */
-  private readAt(node: Node | undefined, given: Values): string[] | undefined {
-    const writes = this.writesOf(node);
-    return writes.length === 1 ? readWhole(given[writes[0]]) : undefined;
-  }
-
-  /** The inputs a node's operation writes its value in; none where it is not one of those operations. */
-  private writesOf(node: Node | undefined): string[] {
-    if (!node || !isRun(node)) return [];
-    const hit = this.judge.scope.op(node.run);
-    return typeof hit === 'string' ? [] : (WRITES[`${hit.path}#${hit.opName}`] ?? []);
   }
 }
