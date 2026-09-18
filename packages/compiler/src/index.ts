@@ -1,8 +1,9 @@
 /**
  * @wilanis/compiler: `checkTree` judges a loaded tree against every rule; `Compiler` lowers a judged graph
  * to a kernel spec whose handlers are plugin functions or nested specs; `buildEnv` and `runGraph` run it;
- * `refusalsReachable` and `refusalsOfTrigger` say what a run can refuse with and `operationsReachable` what
- * it calls, `sitesOf` where a value of a shape comes into being and `heldAt` whether a field invariant already
+ * `refusalsReachable` and `refusalsOfTrigger` say what a run can refuse with, `operationsReachable` what
+ * it calls and `effectsReachable` the native sites it ends at,
+ * `sitesOf` where a value of a shape comes into being and `heldAt` whether a field invariant already
  * holds there, `reachOf` what an atomic graph reaches, `atomicOf` what a reader is told about one, and
  * `invariantSaidOf` which triggers an access invariant reaches and how each one meets it.
  */

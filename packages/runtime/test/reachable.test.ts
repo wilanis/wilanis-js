@@ -1,8 +1,9 @@
 /**
- * What a trigger reaches, over the example. `operationsReachable` and `refusalsReachable` are one walk read
- * two ways: from an operation, through the binding that meets it, into the graph it runs or the operation it
- * delegates to, and on through every domain call. The reasons are what T005 and A002 are judged against; the
- * operations are what an invariant over a port will be (RFC 0007, step 2).
+ * What a trigger reaches, over the example. `operationsReachable`, `refusalsReachable` and `effectsReachable`
+ * are one walk read three ways: from an operation, through the binding that meets it, into the graph it runs
+ * or the operation it delegates to, and on through every domain call. The reasons are what T005 and A002 are
+ * judged against; the operations are what an invariant over a port is (RFC 0007, step 2); the effects are the
+ * native sites the walk ends at, which RFC 0011's retry rules and RFC 0015's A0n2 are judged over.
  *
  * The case the RFC states is `POST /monitor.csv`: it fires `#import`, whose domain graph records every row
  * of the file through `#recordAll`, which is bound to a graph mapping `#submit`, which is bound to a graph
@@ -13,7 +14,7 @@
  * It lives here rather than in `packages/compiler/test` because the claim is about the example tree, and
  * loading that needs every plugin it names: the compiler depends on core and engine alone.
  */
-import { operationsReachable, refusalsReachable } from '@wilanis/compiler';
+import { effectsOfGraph, effectsReachable, operationsReachable, refusalsReachable } from '@wilanis/compiler';
 import { loadTree, Scope } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
@@ -110,5 +111,78 @@ describe('refusalsReachable: the same walk, read for reasons', () => {
 
   it('answers a native operation with nothing, as it did', () => {
     expect(refusalsReachable(scope, '@http/http.port.json#request', 'live')).toEqual([]);
+  });
+});
+
+describe('effectsReachable: the same walk, read for what it ends at', () => {
+  /** The native sites one operation reaches under one profile, named as a reader writes them. */
+  const effects = (opRef: string, profile: string): string[] =>
+    effectsReachable(scope, opRef, profile).map(one => one.key);
+
+  it('answers the native sites an import reaches, and no domain operation among them', () => {
+    // A domain operation is a way on, never an effect: what does the work is the native site its
+    // bindings reach. #import, #parseDrafts, #recordAll, #submit and #record are what the walk passed
+    // through, and none of them is here.
+    const reached = effects(`${MONITOR}#import`, 'local');
+    expect(reached).toContain('@storage/store.port.json#put');
+    expect(reached.some(key => key.includes('monitor.port.json'))).toBe(false);
+  });
+
+  it('answers what the profile binds, so the same operation reaches a different effect', () => {
+    // The claim A0n2 rests on: which native site a run reaches is the profile's choice. Under live
+    // #record is met by a graph calling the upstream API; under local by one writing the store.
+    expect(effects(`${MONITOR}#import`, 'live')).toContain('@http/http.port.json#request');
+    expect(effects(`${MONITOR}#import`, 'live')).not.toContain('@storage/store.port.json#put');
+    expect(effects(`${MONITOR}#import`, 'local')).toContain('@storage/store.port.json#put');
+    expect(effects(`${MONITOR}#import`, 'local')).not.toContain('@http/http.port.json#request');
+  });
+
+  it('carries the values given at the site, as the document writes them', () => {
+    // What a rule about an effect reads: RFC 0015's collectionOf finds a scoped collection by the
+    // static store and collection of a storage site, and RFC 0011's G0n2 an idempotency key the same way.
+    const put = effectsReachable(scope, `${MONITOR}#record`, 'local').find(
+      one => one.key === '@storage/store.port.json#put' && one.node === 'stored',
+    );
+    expect(put?.given).toMatchObject({
+      store: '@monitor/data/entries.store.json',
+      collection: 'entries',
+    });
+  });
+
+  it('names a different store under a profile that binds one, at the same node', () => {
+    // The per-profile half of the same claim, on the values rather than the sites: the node is the one
+    // document's, and what it is over is the profile's.
+    const under = (profile: string): unknown =>
+      effectsReachable(scope, `${MONITOR}#record`, profile).find(one => one.node === 'stored')?.given?.store;
+    expect(under('local')).toBe('@monitor/data/entries.store.json');
+    expect(under('production')).toBe('@monitor/data/entries-postgres.store.json');
+  });
+
+  it('says where each site is written and what it was reached through', () => {
+    // A rule that names a profile names these too, so a refusal need not be walked by hand.
+    const site = effectsReachable(scope, `${MONITOR}#import`, 'local').find(one => one.node === 'stored');
+    expect(site?.file).toContain('store-and-latest.graph.json');
+    expect(site?.through).toBe(`${MONITOR}#record`);
+  });
+
+  it('leaves through undefined where the walk started in the graph that holds the site', () => {
+    // effectsOfGraph is for a reader who has the graph rather than the operation it answers -- it takes the
+    // canonical path, as refusalsOfGraph does. Nothing
+    // led there, so nothing is named as having.
+    const sites = effectsOfGraph(scope, scope.canon('@monitor/data/store-and-latest.graph.json'), 'local');
+    expect(sites.length).toBeGreaterThan(0);
+    for (const site of sites) expect(site.through).toBeUndefined();
+  });
+
+  it('answers a refusing site with nothing, since a refusal is a reason and not an effect', () => {
+    // The two readings of the walk do not overlap: @std/refuse is where a reason is read, and it is
+    // not something the run does to the world.
+    const reached = effects(`${MONITOR}#import`, 'live');
+    expect(reached.some(key => key.includes('refuse'))).toBe(false);
+    expect(refusalsReachable(scope, `${MONITOR}#import`, 'live').map(one => one.reason)).toContain('upstream');
+  });
+
+  it.each(PROFILES)('answers every operation of the tree without throwing, under %s', profile => {
+    for (const opRef of EVERY_OPERATION) expect(() => effectsReachable(scope, opRef, profile)).not.toThrow();
   });
 });

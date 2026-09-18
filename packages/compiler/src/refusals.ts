@@ -1,9 +1,10 @@
 /**
- * What a run can reach, found statically. One walk answers both questions asked of it: from an operation
+ * What a run can reach, found statically. One walk answers every question asked of it: from an operation
  * through the binding that meets it, into the graph it runs or the operation it delegates to, and on through
  * every domain call. `refusalsReachable` reads the literal reasons off that walk -- the checker holds triggers
- * and policies to them (T005, T006, A002, A003) and the viewer shows them -- and `operationsReachable` reads
- * the domain operations, which is what an invariant over a port is judged against (RFC 0007).
+ * and policies to them (T005, T006, A002, A003) and the viewer shows them -- `operationsReachable` reads
+ * the domain operations, which is what an invariant over a port is judged against (RFC 0007), and
+ * `effectsReachable` reads the native sites the walk ends at, with what each was given.
  *
  * A guarded site is a reason of the graph it sits in, the same as a `refuse` node an author wrote: the compiler
  * lowers a refusal there, so `invariant` is a word every trigger reaching it must map (T005) and none reaching
@@ -28,6 +29,29 @@ export interface ReachedOperation {
    * about an operation a trigger did not fire says which one it was reached through, rather than leaving a
    * reader to walk the bindings themselves. It is one way in and not every one: a graph reached twice is
    * walked once, so what is answered is that the operation is reachable and a path by which it is.
+   */
+  through: string | undefined;
+}
+
+/**
+ * One native call site a run reaches: what it names, what it was given there, and where it is written. A rule
+ * about an effect is judged over these -- whether a retried call is idempotent (RFC 0011), or which collection
+ * a storage site is over (RFC 0015) -- so the values given at the site travel with it, unlowered: `store` and
+ * `collection` are read here the way `idempotent` reads a key, off what the document says.
+ */
+export interface ReachedEffect {
+  /** The canonical `path#operation` of the native operation the site names. */
+  key: string;
+  /** What the site gives, as the document writes it: a literal where one was written, a template where one was. */
+  given: Values | undefined;
+  /** The graph or binding the site is written in. */
+  file: string;
+  /** The node, or the binding's operation name, that names it. */
+  node: string;
+  /**
+   * The canonical domain operation whose binding led here, or nothing where the walk started in the graph
+   * that holds the site. A rule that names the profile names this too, so a reader is not left to walk the
+   * bindings by hand.
    */
   through: string | undefined;
 }
@@ -57,6 +81,24 @@ export function refusalsReachable(scope: Scope, opRef: string, profile?: string)
  */
 export function operationsReachable(scope: Scope, opRef: string, profile?: string): ReachedOperation[] {
   return new Walk(scope, profile).fromOperation(opRef).operations;
+}
+
+/**
+ * Every native call site a run of `opRef` can reach under a profile, with what each was given: the same walk
+ * the reasons and the operations are found by, asked what it ends at rather than what it passed through. A
+ * domain operation is a way on and never an effect itself; what does the work is the native site its bindings
+ * reach, which is what a rule about an effect is judged over.
+ */
+export function effectsReachable(scope: Scope, opRef: string, profile?: string): ReachedEffect[] {
+  return new Walk(scope, profile).fromOperation(opRef).effects;
+}
+
+/**
+ * Every native call site one graph can reach, for a reader who has the graph rather than the operation it
+ * answers -- a trigger's `fire.run` is walked as an operation, but a rule over a data graph starts here.
+ */
+export function effectsOfGraph(scope: Scope, graphPath: string, profile?: string): ReachedEffect[] {
+  return new Walk(scope, profile).fromGraph(graphPath).effects;
 }
 
 /**
@@ -97,6 +139,7 @@ export function refusalsOfGraph(scope: Scope, graphPath: string, profile?: strin
 class Walk {
   readonly refusals: ReachableRefusal[] = [];
   readonly operations: ReachedOperation[] = [];
+  readonly effects: ReachedEffect[] = [];
   private readonly seen = new Set<string>();
 
   constructor(
@@ -153,7 +196,12 @@ class Walk {
     }
   }
 
-  /** One call site: the literal reason where the operation refuses, else the operation followed on. */
+  /**
+   * One call site: the literal reason where the operation refuses, the site itself where what it names is
+   * native, else the operation followed on. A native site is recorded here rather than in `operation`, because
+   * what a rule about an effect asks of it -- what was given at the site, and where it is written -- is known
+   * to the caller and not to the operation it names.
+   */
   private call(call: Call): void {
     const hit = this.scope.op(call.run);
     if (typeof hit === 'string') return;
@@ -161,6 +209,11 @@ class Walk {
       const reason = call.given?.reason;
       if (typeof reason === 'string' && this.scope.literal(reason))
         this.refusals.push({ reason, file: call.file, node: call.node });
+      return;
+    }
+    if (hit.port.native) {
+      const key = `${hit.path}#${hit.opName}`;
+      this.effects.push({ key, given: call.given, file: call.file, node: call.node, through: call.through });
       return;
     }
     this.operation(call.run, call.through);
