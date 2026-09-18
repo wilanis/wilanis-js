@@ -6,9 +6,14 @@
  * read `holds` and `violated`, that the violated one is refused on purpose as a declared refusal is, and that
  * the summary says, invariant by invariant, where the tree met each one.
  *
- * The example's own invariants carry the first four claims: the field form is guarded at every site of `Entry`,
+ * The example's own invariants carry most of the claims: the field form is guarded at every site of `Entry`,
  * which is what the checker could prove and no more. `proved at N site(s)` with an N above zero needs a site the
  * proof rules do settle, so the last case plants one, the way `invariant-proof.test.ts` plants its own.
+ *
+ * One case counts the guards the walk reaches rather than only checking that each one it found settles 2/2, since
+ * the looser claim is true of a walk that reaches one guard and of a walk that reaches them all. It reaches four
+ * of the thirteen today -- the ones of arity `one` -- and that case says so with the number, so the day a list
+ * guard's nested spec is walked, it fails and is updated rather than passing quietly on a different tree.
  */
 
 import { rmSync } from 'node:fs';
@@ -67,6 +72,25 @@ describe('the rehearsal reports a guard', () => {
       expect(guards.length).toBeGreaterThan(0);
       for (const line of guards) expect(line).toContain('2/2 branches');
     }
+  });
+
+  /**
+   * How many guards the walk reaches, named rather than counted loosely, because "every guard it found settles
+   * 2/2" is true of a walk that finds one of them and of a walk that finds them all. The example's `Entry` has
+   * thirteen guarded sites and the walk reaches four: the four of arity `one`. The nine list sites lower to a
+   * `map` over `guard:<graph>#<id>`, and `nested` in `rehearse.ts` opens a `graph:` handler and a binding's and
+   * neither matches, so their `in:check` never becomes a decision. That is a known gap with an issue of its
+   * own (#437) -- closing it needs the compiler to hand a guard's spec back by name -- and this case is what
+   * will fail, loudly and with the number, on the day it closes: update the count, do not loosen the claim.
+   */
+  it('reaches the guards of arity one, and not yet those a list lowers to a nested spec', async () => {
+    const run = await localRun();
+    const guards = run.lines.filter(line => line.includes(" guard '"));
+    expect(guards).toHaveLength(4);
+    // every one of them is the single-value form, at the `<id>:check` the RFC names
+    for (const line of guards) expect(line).toContain("guard 'row:check'");
+    // while the summary counts every site the checker could not prove, walked or not
+    expect(stated(run.lines)).toContain('  An entry names a call  proved at 0 site(s), guarded at 13');
   });
 
   it('says how many invariants the tree declares, and where each is met', async () => {

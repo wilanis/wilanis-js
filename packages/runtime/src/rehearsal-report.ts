@@ -308,7 +308,13 @@ function accessMet(scope: Scope, invariant: Loaded<InvariantDoc>): string {
 /**
  * Where a field invariant stands: how many of its shape's sites the checker proved it at, and how many carry
  * a guard instead. The question is `heldWhollyAt`, the same one the compiler asked before it lowered a guard,
- * so the two counts add up to the sites and the guarded one is exactly what the branches above walked.
+ * so the two counts add up to the sites and neither can claim a proof the checker did not make.
+ *
+ * The guarded count is the tree's, not the walk's: it says how many sites carry a guard, not how many guards
+ * the branches above rehearsed. Those are the same number only for a site of arity `one`. A list site lowers
+ * to a `map` over the nested spec `guard:<graph>#<id>`, which `nested` in `rehearse.ts` cannot open -- it
+ * resolves a `graph:` handler and a binding's, and a guard's spec is named by neither -- so a list guard is
+ * counted here and not walked there. Closing that gap needs the compiler to hand the spec back by name (#437).
  */
 function holdsMet(scope: Scope, holds: { on: string; when: string }): string {
   const sites = sitesOf(scope, holds.on);
