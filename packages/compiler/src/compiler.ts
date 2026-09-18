@@ -49,6 +49,8 @@ import { bindPaths, inputsByName, lowerValue, lowerValues, type Roots, secretPat
 export class Compiler {
   private readonly handlers: Handlers = {};
   private readonly bindingSpecs = new Map<string, KernelSpec>();
+  /** the nested spec of each list site's guard, by the name `guardSpecName` gave it and its `map` calls it by */
+  private readonly guardSpecs = new Map<string, KernelSpec>();
 
   constructor(
     readonly scope: Scope,
@@ -183,10 +185,20 @@ export class Compiler {
       make: this.handlerFor(MAKE).handler,
       refuse: this.handlerFor(REFUSE).handler,
       nested: spec => {
+        this.guardSpecs.set(spec.name, spec);
         this.handlers[spec.name] ??= this.nestedRunner(spec, true);
-        return spec.name;
       },
     };
+  }
+
+  /**
+   * The nested spec a list site's guard runs, by the name its `map` calls it under. A guard of arity `list` is
+   * the one spec a reader cannot reach from a document -- it is neither a graph nor a binding -- so a walk over
+   * what a run does (the rehearsal) must be able to ask for it, the way it asks for a graph. It is held here
+   * as the lowering registered it rather than rebuilt, so what is walked is exactly what runs.
+   */
+  guardSpec(name: string): KernelSpec | undefined {
+    return this.guardSpecs.get(name);
   }
 
   private lowerNode(node: Node, roots: Roots): KNode {

@@ -160,6 +160,23 @@ export const hasGuard = (scope: Scope, graph: Loaded<GraphDoc>): boolean => guar
 
 // ---- the nodes a guard lowers to -----------------------------------------------------------------
 
+/**
+ * The name a list site's nested spec is registered and called under: the graph it stands in and the site in it,
+ * which together name one guard of one tree. Spelled here alone, because three readers depend on it agreeing --
+ * the lowering that registers the spec, `describe` that prints the map's handler, and the rehearsal that asks
+ * for the spec back by name. A name invented at one of them and matched at another is the gap #437 was.
+ */
+export const guardSpecName = (graph: string, id: string): string => `guard:${graph}#${id}`;
+
+/** Whether a handler names a guard's nested spec, and the graph and site it belongs to when it does. */
+export function guardSpecAt(handler: string): { graph: string; id: string } | undefined {
+  if (!handler.startsWith('guard:')) return undefined;
+  const rest = handler.slice('guard:'.length);
+  const hash = rest.lastIndexOf('#');
+  if (hash < 0) return undefined;
+  return { graph: rest.slice(0, hash), id: rest.slice(hash + 1) };
+}
+
 /** The handlers a guard needs, named by the compiler that owns them: it alone knows what a plugin answers. */
 export interface GuardHandlers {
   /** the handler behind `@std/object.port.json#make` */
@@ -167,10 +184,11 @@ export interface GuardHandlers {
   /** the handler behind `@std/outcome.port.json#refuse` */
   refuse: string;
   /**
-   * A handler running a nested spec with the element handed whole under `in`: what a list site's `map` calls
-   * once per element. The compiler registers it and answers the key, so nothing here reaches into a plugin.
+   * Register a nested spec, to be run with the element handed whole under `in`: what a list site's `map` calls
+   * once per element. The spec is called by its own `name`, which `guardSpecName` gave it, so the compiler
+   * registers rather than keys -- nothing invents a second name, and a reader who has the name has the spec.
    */
-  nested: (spec: KernelSpec) => string;
+  nested: (spec: KernelSpec) => void;
 }
 
 /** The switch that tests the rule: one input per root, read off the value, routing to it or to the refusal. */

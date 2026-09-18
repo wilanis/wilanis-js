@@ -11,9 +11,13 @@
  * proof rules do settle, so the last case plants one, the way `invariant-proof.test.ts` plants its own.
  *
  * One case counts the guards the walk reaches rather than only checking that each one it found settles 2/2, since
- * the looser claim is true of a walk that reaches one guard and of a walk that reaches them all. It reaches four
- * of the thirteen today -- the ones of arity `one` -- and that case says so with the number, so the day a list
- * guard's nested spec is walked, it fails and is updated rather than passing quietly on a different tree.
+ * the looser claim is true of a walk that reaches one guard and of a walk that reaches them all. It reaches every
+ * guard the profile binds, of either arity: a list site lowers to a `map` over a nested spec, and the walk opens
+ * that spec by the name the compiler keys it under, so its `in:check` is a decision like any other (#437).
+ *
+ * The walked count and the summary's count answer different questions and are held separately: the walk reaches
+ * what a run under this profile can reach, while `heldWhollyAt` counts guarded sites over the whole tree, the
+ * `-postgres` copies of the data graphs among them. A profile that binds none of them still states the same rules.
  */
 
 import { rmSync } from 'node:fs';
@@ -76,21 +80,40 @@ describe('the rehearsal reports a guard', () => {
 
   /**
    * How many guards the walk reaches, named rather than counted loosely, because "every guard it found settles
-   * 2/2" is true of a walk that finds one of them and of a walk that finds them all. The example's `Entry` has
-   * thirteen guarded sites and the walk reaches four: the four of arity `one`. The nine list sites lower to a
-   * `map` over `guard:<graph>#<id>`, and `nested` in `rehearse.ts` opens a `graph:` handler and a binding's and
-   * neither matches, so their `in:check` never becomes a decision. That is a known gap with an issue of its
-   * own (#437) -- closing it needs the compiler to hand a guard's spec back by name -- and this case is what
-   * will fail, loudly and with the number, on the day it closes: update the count, do not loosen the claim.
+   * 2/2" is true of a walk that finds one of them and of a walk that finds them all. It reaches seven, which is
+   * every guard this profile can run: `local` binds seven of the thirteen guarded sites -- the four of arity
+   * `one` at `<id>:check`, and three of arity `list`, whose guard is the `in:check` of the nested spec the
+   * compiler keys as `guard:<graph>#<id>` and the walk now opens by that name (#437). The other six sites are
+   * the `-postgres` copies of the same graphs, which only the `postgres` profile binds, so no run under this
+   * one reaches them; the summary's thirteen counts sites over the whole tree and is not a per-profile number.
+   *
+   * The two counts are therefore different questions and neither is loosened here: change either only when the
+   * example gains or loses a guarded site, and say which of the two moved.
    */
-  it('reaches the guards of arity one, and not yet those a list lowers to a nested spec', async () => {
+  it('reaches every guard the profile binds, whatever the arity of its site', async () => {
     const run = await localRun();
     const guards = run.lines.filter(line => line.includes(" guard '"));
-    expect(guards).toHaveLength(4);
-    // every one of them is the single-value form, at the `<id>:check` the RFC names
-    for (const line of guards) expect(line).toContain("guard 'row:check'");
-    // while the summary counts every site the checker could not prove, walked or not
+    expect(guards).toHaveLength(7);
+    // the four made sites of a single value, at the `<id>:check` the RFC names
+    expect(guards.filter(line => line.includes("guard 'row:check'"))).toHaveLength(4);
+    // and the three lists, each judged element by element inside a nested spec whose ids are the fixed `in:*`
+    expect(guards.filter(line => line.includes("guard 'in:check'"))).toHaveLength(3);
+    // every one of them walks both branches, a list's exactly as a single value's
+    for (const line of guards) expect(line).toContain('2/2 branches');
+    // while the summary counts every site the checker could not prove, over the tree rather than the profile
     expect(stated(run.lines)).toContain('  An entry names a call  proved at 0 site(s), guarded at 13');
+  });
+
+  it("labels a list guard's branches holds and violated, as a guard of arity one's are", async () => {
+    // the element arrives whole as `in`, so the nested spec's ids are the fixed `in:*` of a taken site
+    const said = decision((await localRun()).lines, "kept-list  guard 'in:check'");
+    expect(said[1]).toBe("  ok  holds     answered from 'in:ok'");
+    expect(said[2]).toMatch(/^ {2}ok {2}violated {2}refused on purpose at 'in:violated' as invariant: /);
+    // the map runs with onItemFailure 'fail', so the list refuses with the first element's reason
+    expect(said[2]).toContain(
+      "'An entry names a call' does not hold: len(url) > 0 && (method != 'DELETE' || has(agent))",
+    );
+    expect(said).toHaveLength(3);
   });
 
   it('says how many invariants the tree declares, and where each is met', async () => {
@@ -103,11 +126,14 @@ describe('the rehearsal reports a guard', () => {
     expect(said).toContain('  An entry names a call  proved at 0 site(s), guarded at 13');
   });
 
-  it('counts the same invariants under a profile whose bindings lower no guard at all', async () => {
+  it('counts the same invariants under a profile that reaches almost none of the guarded sites', async () => {
     // an invariant is stated over the tree, not over a profile: the sites are the same however the tree is bound
     const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'live' });
     expect(run.ok).toBe(true);
     expect(stated(run.lines)).toContain('  An entry names a call  proved at 0 site(s), guarded at 13');
+    // while the walk reaches only the one guard this profile binds -- the CSV export, whose graph every profile
+    // shares -- which is the difference between what a tree states and what one profile's run can exercise
+    expect(run.lines.filter(line => line.includes(" guard '"))).toHaveLength(1);
   });
 
   it('counts a site the proof rules settle as proved rather than guarded', async () => {

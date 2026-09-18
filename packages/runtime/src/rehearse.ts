@@ -3,13 +3,14 @@
  * took to get there said in words. It runs against stubbed effects, so nothing leaves the process.
  */
 import { guardsOf, idsOf } from '@wilanis/compiler';
-import type { BindingDoc, Loaded, LoadResult, TriggerDoc, Type } from '@wilanis/core';
+import type { Loaded, LoadResult, TriggerDoc, Type } from '@wilanis/core';
 import { Scope } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
 import { refusalOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, nonEmpty, type Stubbing, setPath, switchesOf } from './branches.js';
 import type { Embedder } from './embed.js';
 import { type Decision, format, gather, type Plain, statedOf, stateName } from './rehearsal-report.js';
+import { atomicAt, rootGraph, specBehind, type Where, whereOf } from './rehearse-where.js';
 import { embedderFor, failedBelow, generatedFire, policyRoots } from './stubbing.js';
 
 // ---- rehearse ----------------------------------------------------------------------------------------
@@ -160,21 +161,7 @@ async function rehearseTrigger(
   await probe.fire(trigger.doc, input, request);
 
   const spec = probe.operation(trigger.doc.fire.run).spec;
-  // A binding operation lowers to a wrapper spec holding a single node `op`, so a graph reached through
-  // a binding sits one level deeper than the document suggests: the kernel stubs it at `<node>.op.<id>`.
-  const nested = (handler: string): { nodes: Record<string, unknown> } | undefined => {
-    if (handler.startsWith('graph:')) {
-      try {
-        return probe.graph(handler.slice('graph:'.length)).spec;
-      } catch {
-        return undefined;
-      }
-    }
-    const ref = bindingGraph(probe, handler);
-    if (!ref) return undefined;
-    return { nodes: { op: { kind: 'call', handler: `graph:${ref}` } } };
-  };
-  const found = switchesOf(spec, nested);
+  const found = switchesOf(spec, handler => specBehind(probe, handler));
   if (!found.length) return false;
 
   const inType = probe.types(trigger.doc).in;
@@ -284,11 +271,16 @@ function downstreamOf(walk: Walk, sw: FoundSwitch): Record<string, unknown> {
  * wrote (RFC 0007); nothing where it is an ordinary switch. Which sites carry a guard is never re-derived
  * here: `guardsOf` is the compiler's own answer, and the ids it occupies are the contract the report, the
  * describe and the viewer all read a guard by, so a node id that is one of them is one.
+ *
+ * A list site's guard is matched by the site the walk descended through rather than by the node id, because
+ * inside the nested spec that guard's switch is the fixed `in:check` whatever the site was called; the id
+ * alone would name the site's own guard for a taken site and nothing at all for a made one.
  */
-function guardAt(emb: Embedder, graph: string, node: string): string | undefined {
-  const doc = emb.scope.get('graph', graph);
+function guardAt(emb: Embedder, at: Where, node: string): string | undefined {
+  const doc = emb.scope.get('graph', at.graph);
   if (!doc) return undefined;
-  const guard = guardsOf(emb.scope, doc).find(one => idsOf(one).check === node);
+  const guards = guardsOf(emb.scope, doc);
+  const guard = at.site ? guards.find(one => one.id === at.site) : guards.find(one => idsOf(one).check === node);
   return guard?.unproved.map(one => stateName(one.invariant)).join('; ');
 }
 
@@ -296,13 +288,13 @@ function guardAt(emb: Embedder, graph: string, node: string): string | undefined
 async function decisionFor(walk: Walk, sw: FoundSwitch): Promise<Decision> {
   const pre = reach(walk, sw);
   const downstream = downstreamOf(walk, sw);
-  const graph = graphOf(walk.probe, walk.trigger, sw);
+  const at = whereOf(walk.probe, walk.trigger, sw.prefix);
   const node = sw.at.split('.').pop() ?? '';
   const decision: Decision = {
-    graph,
+    graph: at.graph,
     node,
-    atomic: atomicAt(walk.probe, graph),
-    guard: guardAt(walk.probe, graph, node),
+    atomic: atomicAt(walk.probe, at.graph),
+    guard: guardAt(walk.probe, at, node),
     triggers: [walk.trigger.name],
     branches: [],
   };
@@ -336,57 +328,4 @@ async function branchOf(
     stubs: { ...steer.downstream, ...steer.pre.stubs, ...one.stubs },
   });
   return { ...at, settled: settle(report, sw, one.branch.to) };
-}
-
-/** The graph one node of a spec runs, named directly or through the binding that meets it. */
-function graphAt(emb: Embedder, spec: { nodes: Record<string, unknown> }, segment: string): string | undefined {
-  const node = spec.nodes?.[segment] as Record<string, unknown> | undefined;
-  const handler = typeof node?.handler === 'string' ? node.handler : undefined;
-  if (!handler) return undefined;
-  return handler.startsWith('graph:') ? handler.slice('graph:'.length) : bindingGraph(emb, handler);
-}
-
-/**
- * The graph a trigger's fire runs: the one the profile's binding meets the operation with, or the operation
- * itself where nothing does. The binding is read off the compiled wrapper spec -- a binding operation lowers
- * to a single node `op` -- rather than from the port reference, which names no binding and would resolve to
- * nothing.
- */
-function rootGraph(emb: Embedder, trigger: Loaded<TriggerDoc>): string {
-  const spec = emb.operation(trigger.doc.fire.run).spec as { nodes: Record<string, unknown> };
-  return emb.scope.canon(graphAt(emb, spec, 'op') ?? trigger.doc.fire.run);
-}
-
-/** True when the graph at this path says `atomic`: every branch that does not answer undoes what it wrote. */
-function atomicAt(emb: Embedder, graph: string): boolean {
-  return emb.scope.get('graph', graph)?.doc.atomic === true;
-}
-
-/** The graph document a switch belongs to: the trigger's own graph, or the one its enclosing call runs. */
-function graphOf(emb: Embedder, trigger: Loaded<TriggerDoc>, sw: FoundSwitch): string {
-  let spec = emb.operation(trigger.doc.fire.run).spec as { nodes: Record<string, unknown> };
-  let graph = rootGraph(emb, trigger);
-  for (const segment of sw.prefix) {
-    const ref = graphAt(emb, spec, segment);
-    if (!ref) continue;
-    graph = emb.scope.canon(ref);
-    try {
-      spec = emb.graph(ref).spec;
-    } catch {
-      /* keep what we have */
-    }
-  }
-  return graph;
-}
-
-/** The graph a binding operation runs, when its handler names one. */
-function bindingGraph(emb: Embedder, handler: string): string | undefined {
-  const hash = handler.lastIndexOf('#');
-  if (hash < 0) return undefined;
-  const [path, opName] = [handler.slice(0, hash), handler.slice(hash + 1)];
-  try {
-    return (emb.scope.get('binding', path)?.doc as BindingDoc | undefined)?.operations?.[opName]?.graph;
-  } catch {
-    return undefined;
-  }
 }
