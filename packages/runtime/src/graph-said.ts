@@ -14,7 +14,7 @@
  * Nothing is computed here: `atomicOf` reads the same per-profile walk the checker judges by and `guardsOf`
  * the same sites the compiler lowers at, so what a reader is told and what the tree was held to are one answer.
  */
-import { atomicOf, type Guard, guardsOf, idsOf } from '@wilanis/compiler';
+import { atomicOf, type Guard, guardSpecName, guardsOf, idsOf } from '@wilanis/compiler';
 import type { GraphDoc, Loaded, Scope } from '@wilanis/core';
 import { invariantName } from './invariant-lines.js';
 
@@ -89,7 +89,7 @@ const oneLines = (ids: ReturnType<typeof idsOf>): string[] => [
  * name is what a rehearsal and the viewer read the guard by, and the map fails on the first element to violate.
  */
 const listLines = (guard: Guard, ids: ReturnType<typeof idsOf>, graph: string): string[] => [
-  `        ${ids.ok}  maps ${ids.made} through guard:${graph}#${guard.id}, element by element  (guard)`,
+  `        ${ids.ok}  maps ${ids.made} through ${guardSpecName(graph, guard.id)}, element by element  (guard)`,
 ];
 
 /** The nodes one guard adds, under the header that says what it guards: a list's one, or a single value's three. */

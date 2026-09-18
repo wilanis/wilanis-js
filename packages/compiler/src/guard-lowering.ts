@@ -11,7 +11,16 @@
  * first element that violates the rule refuses the whole list with its reason.
  */
 import type { KernelSpec, KMap, KNode, Redact } from '@wilanis/engine';
-import { type Guard, type GuardHandlers, type GuardIds, guardIds, guardNodes, guardSpec, TAKEN_IDS } from './guard.js';
+import {
+  type Guard,
+  type GuardHandlers,
+  type GuardIds,
+  guardIds,
+  guardNodes,
+  guardSpec,
+  guardSpecName,
+  TAKEN_IDS,
+} from './guard.js';
 
 /** The ids one guard occupies in the spec it is lowered into: a taken site's are fixed, a made site's its own. */
 const idsFor = (guard: Guard): GuardIds => (guard.site.kind === 'taken' ? { ...TAKEN_IDS } : guardIds(guard.id));
@@ -66,8 +75,9 @@ function lowerOne(spec: KernelSpec, guard: Guard, handlers: GuardHandlers): Guar
     reroute(spec, guard.id, ids.made);
   }
   if (guard.arity === 'list') {
-    const nested = guardSpec(guard, `guard:${spec.name}#${guard.id}`, handlers);
-    spec.nodes[ids.ok] = guardMap(ids.made, handlers.nested(nested), redactOf(made));
+    const nested = guardSpec(guard, guardSpecName(spec.name, guard.id), handlers);
+    handlers.nested(nested);
+    spec.nodes[ids.ok] = guardMap(ids.made, nested.name, redactOf(made));
     return ids;
   }
   for (const [id, node] of Object.entries(guardNodes(guard, ids, handlers))) spec.nodes[id] = node;

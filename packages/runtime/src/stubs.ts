@@ -173,10 +173,16 @@ function elementOf(type: Type | undefined, seed: number): unknown {
 /** Stands in where a domain demands a value the type says nothing about. */
 export const PLACEHOLDER = 'x';
 
-/** A copy of `root` with `path` set to `value`; undefined deletes the key. Objects along the way are created. */
+/**
+ * A copy of `root` with `path` set to `value`; undefined deletes the key. Objects along the way are created.
+ * A step whose name is an index makes a list rather than an object, keeping what was already there when it was
+ * one: what reads such a value next is a `map`, and an object of numbered keys is not a list to run over. That
+ * is how a demand on an element of a list -- the element a guarded list's guard judges -- is written.
+ */
 export function setPath(root: unknown, path: string[], value: unknown): unknown {
   if (!path.length) return value;
   const [head, ...rest] = path;
+  if (/^\d+$/.test(head)) return inList(Array.isArray(root) ? (root as unknown[]) : [], Number(head), rest, value);
   const base: Record<string, unknown> =
     root && typeof root === 'object' && !Array.isArray(root) ? { ...(root as Record<string, unknown>) } : {};
   if (!rest.length) {
@@ -189,6 +195,14 @@ export function setPath(root: unknown, path: string[], value: unknown): unknown 
   }
   base[head] = setPath(base[head], rest, value);
   return base;
+}
+
+/** A copy of a list with one element written at an index, the list grown with empty objects where it is short. */
+function inList(list: unknown[], at: number, rest: string[], value: unknown): unknown[] {
+  const out = [...list];
+  while (out.length <= at) out.push({});
+  out[at] = rest.length ? setPath(out[at], rest, value) : value;
+  return out;
 }
 
 /** The value `path` names inside `root`, walking objects and list indices; undefined where the way runs out. */

@@ -6,7 +6,7 @@
 import { buildEnv, type Compiled, type CompileOptions, Compiler, runGraph } from '@wilanis/compiler';
 import type { Codecs, Hold, PluginModule, Scope, Serving } from '@wilanis/core';
 import { type BlobStore, conforms, type GuardArgs, type StartupStep, type TriggerDoc, type Type } from '@wilanis/core';
-import type { Report } from '@wilanis/engine';
+import type { KernelSpec, Report } from '@wilanis/engine';
 import { FileBlobStore } from './blobs.js';
 import { correlationOf, type Fired, type Ran, runId, type Started } from './fired.js';
 import { gate } from './gate.js';
@@ -145,6 +145,15 @@ export class Embedder {
       this.compiled.set(path, found);
     }
     return found;
+  }
+
+  /**
+   * The nested spec a list site's guard runs, by the name its `map` calls it under, once the graph that carries
+   * it has been compiled. Neither a graph nor a binding, so a walk over what a run does cannot reach it from a
+   * document and asks the compiler for it by name instead (RFC 0007).
+   */
+  guardSpec(name: string): KernelSpec | undefined {
+    return this.compiler.guardSpec(name);
   }
 
   /** The compiled binding behind a trigger's port operation. Compiled once per operation, like a graph. */

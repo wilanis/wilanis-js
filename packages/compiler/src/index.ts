@@ -25,6 +25,8 @@ export {
   type Guard,
   guardIds,
   guardMessage,
+  guardSpecAt,
+  guardSpecName,
   guardsOf,
   hasGuard,
   INVARIANT,

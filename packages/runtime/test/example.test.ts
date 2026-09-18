@@ -36,7 +36,9 @@ describe('the example tree', () => {
     expect(text.match(/list-rows {2}switch 'route'/g)).toHaveLength(1);
     // delete-row is reached directly by the single delete and once per element by the batch delete's map
     expect(text.match(/delete-row {2}switch 'route'/g)).toHaveLength(1);
-    expect(text).toMatch(/every branch settled -- 37 branch\(es\), 15 decision\(s\), 15 graph\(s\)/);
+    // the sixteenth decision is the guard over the CSV export's list of entries, whose nested spec the walk
+    // opens by name; the fifteen the tree's authors wrote are unchanged
+    expect(text).toMatch(/every branch settled -- 39 branch\(es\), 16 decision\(s\), 16 graph\(s\)/);
   });
   it('reaches both the answer and the declared failure of every data graph', async () => {
     const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'live' });
@@ -45,8 +47,9 @@ describe('the example tree', () => {
     expect(text.match(/refused on purpose at 'failed' as upstream/g)).toHaveLength(6);
     // the three graphs behind an id declare what a missing id means, and say so in one word the trigger maps
     expect(text.match(/refused on purpose at 'missing' as missing: "no entry /g)).toHaveLength(3);
-    // every branch that answers names the node it answered from, never a bare status word: the monitor's eight, and the access feature's
-    expect(text.match(/answered from '/g)).toHaveLength(16);
+    // every branch that answers names the node it answered from, never a bare status word: the monitor's eight,
+    // the access feature's, and the `in:ok` of the guard over the CSV export's list
+    expect(text.match(/answered from '/g)).toHaveLength(17);
     // the rule is shown as a condition, not as a bare expression next to a node id
     expect(text).toMatch(/when status == 200 && has\(body\)/);
     expect(text).toMatch(/anything else/);
@@ -271,27 +274,14 @@ describe('branch rehearsal', () => {
   });
 
   it('marks a graph with no branches at all, reached as a trigger fires its port', async () => {
-    // digest is the one graph a trigger's fire reaches through a binding and that holds no switch, so it is
-    // the run the report calls plain -- and the only one that exercises the root a plain run is marked from.
-    // Under live its listAll fetches over HTTP, which L009 refuses inside a transaction, so the copy binds
-    // that operation to the kept graph as local already does and drops the 'upstream' the export trigger
-    // then no longer reaches (T006). What is left is a tree that checks clean and writes under a transaction.
-    const { lines, codes: refused } = await withEdits(
-      {
-        'features/monitor/domain/digest.graph.json': doc => {
-          doc.atomic = true;
-        },
-        'features/monitor/data/monitor-rest.binding.json': doc => {
-          doc.operations.listAll = { graph: '@monitor/data/kept-list.graph.json' };
-        },
-        'features/monitor/edge/export-entries.trigger.json': doc => {
-          delete doc.settings.response.refusals.upstream;
-        },
-      },
-      'local',
-    );
-    expect(refused).toEqual([]);
-    // the line names the operation the trigger fires, and says the graph behind it moves as one
-    expect(lines.join('\n')).toMatch(/monitor\/domain\/monitor\.port\.json#digest {2}\(atomic\) {2}\(no branches\)/);
+    // A trigger whose fire reaches no switch anywhere is reported as one plain run rather than as decisions,
+    // and the line names the operation it fired. Greeting is that run: its graph holds no switch and reaches
+    // nothing guarded. Digest was this case's subject until #437 -- the list it reads is guarded element by
+    // element, and the walk now opens that guard's nested spec, so digest reaches a decision after all.
+    const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'local' });
+    expect(run.ok, run.lines.join('\n')).toBe(true);
+    expect(run.lines.join('\n')).toMatch(/hello\/domain\/greeting\.port\.json#hello {2}\(no branches\)/);
+    // and `(atomic)` is the other word such a line can carry, said where the graph behind a decision says so
+    expect(run.lines.join('\n')).toMatch(/store-and-latest {2}\(atomic\) {2}switch 'route'/);
   });
 });
