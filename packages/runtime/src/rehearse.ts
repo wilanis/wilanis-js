@@ -4,6 +4,7 @@
  */
 import { guardsOf, idsOf } from '@wilanis/compiler';
 import type { BindingDoc, Loaded, LoadResult, TriggerDoc, Type } from '@wilanis/core';
+import { Scope } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
 import { refusalOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, nonEmpty, type Stubbing, setPath, switchesOf } from './branches.js';
@@ -111,9 +112,9 @@ export async function rehearse(
     const found = await rehearseTrigger(load, trigger, { seed, profile: opts.profile }, decisions);
     if (!found) settledGraphs.push(await wholeOf(load, trigger, seed, opts.profile));
   }
-  // the invariants the tree states, counted over the whole tree rather than per trigger: a rule is stated once
-  const scope = embedderFor(load, { seed, profile: opts.profile }).scope;
-  const said = { verbose: opts.verbose, stated: statedOf(scope) };
+  // the invariants the tree states, counted over the whole tree rather than per trigger: a rule is stated once.
+  // A scope of its own rather than an embedder's: what is asked of it reads documents and runs nothing.
+  const said = { verbose: opts.verbose, stated: statedOf(new Scope(load.registry, load.resolve)) };
   return { ok: format(decisions, settledGraphs, lines, said), lines };
 }
 
