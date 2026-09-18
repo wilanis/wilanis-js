@@ -7,6 +7,7 @@
 import { atomicOf } from '@wilanis/compiler';
 import type { GraphDoc, Loaded, Scope, Type, Values } from '@wilanis/core';
 import { isMap, isRun, isSwitch, show, splitPath, typeAt } from '@wilanis/core';
+import { markGuards } from './guards.js';
 import {
   attributePorts,
   fieldPorts,
@@ -64,6 +65,7 @@ class GraphBuilder {
       role: this.scope.roleOf(this.graph.path),
     };
     this.markAtomic(view);
+    markGuards(this.scope, this.graph, view.nodes);
     return view;
   }
 
