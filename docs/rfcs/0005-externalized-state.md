@@ -224,7 +224,7 @@ added to it. X201 is widened so that a collection's `of` may name a shape a plug
 | B010 | `check/required.ts` | a binding of a required port delegates to an operation that `holds` or `refuses`: memory answers or fails, it never ends the run on purpose | delegate to `@auth/files.port.json` or `@storage/store.port.json` |
 | C0nn | `check/project.ts` | `blobs.connection` names a connection whose kind no named plugin offers a blob store for, or names no connection | `wilanis ls connection-kind`; name a plugin that offers one |
 | D012 | `documents.ts` (loader) | a plugin lists a path under both `grants.ports` and `requires.ports`, or a required port is not under its `docs/` | list it once |
-| X10n | `packages/plugin-auth/src/rules.ts` | `@auth/files.port.json` is delegated to with a `dir` that is not under the tree, or under a directory the loader reads (`features/`, `connections/`) | `.wilanis/auth`, or an absolute path outside the tree |
+| X104 | `packages/plugin-auth/src/dirs.ts` | `@auth/files.port.json` is delegated to with a `dir` that is not under the tree, or under a directory the loader reads (`features/`, `connections/`) | `.wilanis/auth`, or an absolute path outside the tree |
 
 Numbers are assigned when the implementing pull request lands (current highest: A006 B008 C002 D010 G013 L008
 P003 R001 S001 T006, X103).
@@ -327,7 +327,7 @@ Sabotage, in `packages/runtime/test/example.test.ts` (copies of the example hand
 - add `reads` to the state binding → B009; delegate `getSession` to `@http/server.port.json#listen` → B010;
 - set `blobs.connection` to `@connections/monitor-api.connection.json` → C0nn;
 - list `@auth/state.port.json` under `grants.ports` in a copied plugin manifest → D012 (`packages/runtime/test/required-port.test.ts`);
-- delegate `files.port.json#get` with `dir: "features"` → X10n (`packages/plugin-auth/test`).
+- delegate `files.port.json#get` with `dir: "features"` → X104 (`packages/runtime/test/sabotage-project.test.ts`).
 
 End to end:
 
@@ -348,7 +348,7 @@ End to end:
 2. `env.ports` in the embedder, limited to required ports; B009 and B010 on bindings of required ports. (`area:runtime`, `area:compiler`)
 3. `@auth/state.port.json`, the two record shapes, `@auth/files.port.json`; `tokens.ts` and `guard.ts` over
    `env.ports`; the refresh token carrying its session's `sid` so `refresh` reads by key; `settings.store`
-   removed; X10n. (`area:plugin-auth`)
+   removed; X104. (`area:plugin-auth`)
 4. The example's `features/state/`, the access tree's `-dev` binding, the runtime templates, the startup step;
    the sabotage tests. (`area:runtime`, `good first issue` for the templates and CLAUDE.md row)
 5. `project.json → blobs.connection`, `PluginModule.blobStores`, C0nn, `Embedder` choosing the store. (`area:core`, `area:runtime`)

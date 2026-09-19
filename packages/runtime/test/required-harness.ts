@@ -72,9 +72,9 @@ const binding = (edit: (doc: any) => void) => {
   return doc;
 };
 
-export const BINDING = '@features/state/data/keep-files.binding.json';
+export const BINDING = '@features/keeping/data/keep-files.binding.json';
 
-export const REFUSING = '@features/state/data/keep-refusing.graph.json';
+export const REFUSING = '@features/keeping/data/keep-refusing.graph.json';
 
 /** A data graph whose only ending is a `refuse`: what a binding may run without delegating to a refusing operation. */
 const refusingGraph = () => ({
@@ -99,17 +99,17 @@ const refusingGraph = () => ({
 function tree(bound: boolean, edit: (doc: any) => void): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-requires-'));
   cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
-  mkdirSync(join(dir, 'features/state/data'), { recursive: true });
-  writeFileSync(join(dir, 'features/state/data/keep-refusing.graph.json'), JSON.stringify(refusingGraph()));
+  mkdirSync(join(dir, 'features/keeping/data'), { recursive: true });
+  writeFileSync(join(dir, 'features/keeping/data/keep-refusing.graph.json'), JSON.stringify(refusingGraph()));
   const feature = { $schema: schemaRef('feature'), description: 'where this deployment keeps things' };
   writeFileSync(
-    join(dir, 'features/state/feature.json'),
+    join(dir, 'features/keeping/feature.json'),
     JSON.stringify({ ...feature, effects: ['@keep/files.port.json#get'] }),
   );
   const project = JSON.parse(readFileSync(join(dir, 'project.json'), 'utf8'));
   project.plugins.push({ use: '@keep' });
   if (bound) {
-    writeFileSync(join(dir, 'features/state/data/keep-files.binding.json'), JSON.stringify(binding(edit)));
+    writeFileSync(join(dir, 'features/keeping/data/keep-files.binding.json'), JSON.stringify(binding(edit)));
     for (const profile of Object.values<{ bindings: Record<string, string> }>(project.profiles))
       profile.bindings['@keep/memory.port.json'] = BINDING;
   }

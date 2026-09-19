@@ -1,0 +1,50 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Challenge record",
+  "description": "One open challenge as the guard keeps it between calls, through state.port.json: the policy and trigger it gates, the caller it was opened for, the digest of its code and the attempts spent.",
+  "layer": "core",
+  "fields": {
+    "id": {
+      "type": "string",
+      "description": "the key: what the caller reads back with the code"
+    },
+    "method": {
+      "type": "string",
+      "description": "how a code is obtained, one of settings.challenge.methods"
+    },
+    "policy": {
+      "type": "string"
+    },
+    "trigger": {
+      "type": "string",
+      "description": "the operation the gated trigger fires"
+    },
+    "subject": {
+      "type": "string",
+      "required": false,
+      "description": "the caller it was opened for, when one was identified"
+    },
+    "createdAt": {
+      "type": "string",
+      "description": "ISO 8601"
+    },
+    "expiresAt": {
+      "type": "string",
+      "description": "ISO 8601; past it the challenge is void"
+    },
+    "attempts": {
+      "type": "number",
+      "description": "wrong codes presented so far"
+    },
+    "codeHash": {
+      "type": "string",
+      "required": false,
+      "description": "the digest of the code issued, never the code itself"
+    },
+    "codeExpiresAt": {
+      "type": "string",
+      "required": false,
+      "description": "ISO 8601"
+    }
+  }
+}

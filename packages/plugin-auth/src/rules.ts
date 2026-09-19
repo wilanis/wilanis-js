@@ -3,8 +3,10 @@
  * names a method the settings do not declare, or gates a trigger no attachment of which gives a challenge answer, so it
  * could never be met. X103: a session write names another type than the session shape, or keys the shape does not
  * declare. X105: a session write names an attribute a store scopes a collection by, which the sign-in wrote once.
+ * X106 (dirs.ts): files.port.json keeps records where the loader reads documents, or outside the tree.
  */
 import { isMap, isRun, type PluginCheckContext, type PolicyDoc, policyPath, type ShapeDoc } from '@wilanis/core';
+import { checkDirs } from './dirs.js';
 import { type ScopedAttribute, scopedAttributes } from './scoped.js';
 import { doc, ROOT, type Settings } from './settings.js';
 
@@ -194,9 +196,10 @@ function checkBindingWrites(session: Session) {
         );
 }
 
-/** What only @auth can judge: X101, X102, X103 and X105. */
+/** What only @auth can judge: X101, X102, X103, X105 and X106. */
 export function check({ scope, settings, refuse }: PluginCheckContext) {
   const declared = settings as Settings;
+  checkDirs(scope, refuse);
   const shape = sessionShape(scope, declared, refuse);
   checkMethods(scope, declared, refuse);
   checkAnswerable(scope, refuse);

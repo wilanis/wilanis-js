@@ -34,9 +34,6 @@
           "accessTtl": 900,
           "refreshTtl": 604800
         },
-        "store": {
-          "dir": ".wilanis/auth"
-        },
         "session": "@access/domain/Session.shape.json",
         "challenge": {
           "ttl": 300,
