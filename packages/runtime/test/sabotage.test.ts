@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { relocate, sabotage } from './example-harness.js';
+import { relocate, sabotage, sabotageHinting, sabotagePointing, sabotageSaying } from './example-harness.js';
 
 describe('sabotage: graphs, layers, resolvers and triggers', () => {
   it('G003 a deep path that does not exist', () => {
@@ -133,12 +133,71 @@ describe('sabotage: graphs, layers, resolvers and triggers', () => {
       }),
     ).toContain('R001');
   });
-  it('G003 a read of a resolver the named document does not define', () => {
+  it('G003 a read of a name nothing binds', () => {
     expect(
       sabotage('features/monitor/data/create-row.graph.json', graph => {
         graph.nodes[0].in.headers = { 'x-forwarded-user-agent': '{{caller}}' };
       }),
     ).toContain('G003');
+  });
+  it('G003 a read of the request with the entry that bound it removed', () => {
+    // the body still says {{agent}}; with nothing under reads, the name is no longer a root
+    const said = sabotageSaying('features/monitor/data/create-row.graph.json', graph => {
+      delete graph.reads;
+    });
+    expect(said).toEqual([
+      "G003 x-forwarded-user-agent: 'agent' is not in, const, a node that runs before this one, or a name under reads",
+    ]);
+  });
+  it('G003 hints the reads entry that would bind what was read', () => {
+    expect(
+      sabotageHinting('features/monitor/data/create-row.graph.json', graph => {
+        delete graph.reads;
+      }),
+    ).toEqual([
+      'G003 to read the request, bind the name: "reads": { "agent": "@<feature>/edge/<file>.resolvers.json#agent" }',
+    ]);
+  });
+  it('P004 a read of a resolver the named document does not declare', () => {
+    expect(
+      sabotage('features/monitor/data/create-row.graph.json', graph => {
+        graph.reads = { agent: '@monitor/edge/request.resolvers.json#agents' };
+      }),
+    ).toContain('P004');
+  });
+  it('G003 a read renamed under reads but not in the body', () => {
+    // the local name is load-bearing: the entry binds 'caller', and the body's {{agent}} is a root no
+    // longer bound. Binding one resolver under a name the body never uses is not a clean tree (RFC 0029)
+    expect(
+      sabotage('features/monitor/data/create-row.graph.json', graph => {
+        graph.reads = { caller: '@monitor/edge/request.resolvers.json#agent' };
+      }),
+    ).toContain('G003');
+  });
+  it('P004 points at the entry that named the resolver, not at the document', () => {
+    expect(
+      sabotagePointing('features/monitor/data/create-row.graph.json', graph => {
+        graph.reads = { agent: '@monitor/edge/request.resolvers.json#agents' };
+      }),
+    ).toContain('P004 @features/monitor/data/create-row.graph.json#reads/agent');
+  });
+  it('R001 two documents read at once, one of which does not exist', () => {
+    // both entries are judged: the real one still resolves, and the bogus one is refused for itself
+    expect(
+      sabotage('features/monitor/data/create-row.graph.json', graph => {
+        graph.reads = {
+          bogus: '@monitor/edge/nope.resolvers.json#agent',
+          agent: '@monitor/edge/request.resolvers.json#agent',
+        };
+      }),
+    ).toEqual(['R001']);
+  });
+  it('P004 a resolvers document of another feature that does not export it', () => {
+    expect(
+      sabotage('features/monitor/data/create-row.graph.json', graph => {
+        graph.reads = { agent: '@access/edge/session.resolvers.json#sid' };
+      }),
+    ).toContain('L005');
   });
   it('P002 a resolver reading a path no trigger kind hands', () => {
     expect(

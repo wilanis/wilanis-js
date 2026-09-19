@@ -20,6 +20,7 @@ import {
   type PluginModule,
   type Scope,
   splitPath,
+  splitRef,
   substitute,
   type Type,
   type TypeSpec,
@@ -170,7 +171,7 @@ export class Compiler {
       Object.entries(doc.constants ?? {}).map(([name, constant]) => [name, constant.value]),
     );
     const guards = guardsOf(this.scope, graph);
-    const roots: Roots = { resolvers: this.resolverRoots(doc.resolvers), consts, nodes: true };
+    const roots: Roots = { resolvers: this.resolverRoots(doc.reads), consts, nodes: true };
     // a guarded taken site puts the judged value at `in:ok`, so every authored {{in}} reads it instead
     if (guards.some(guard => guard.site.kind === 'taken')) roots.aliases = { in: TAKEN_IDS.ok };
     const nodes: Record<string, KNode> = {};
@@ -249,12 +250,12 @@ export class Compiler {
     return { kind: 'call', handler, in: passIn };
   }
 
-  /** A delegation as one call: the statement's own values, the caller's by name for the rest, resolvers read below request. */
+  /** A delegation as one call: the statement's own values, the caller's by name for the rest, reads taken below request. */
   private delegateCall(binding: Loaded<BindingDoc>, bound: BindingOp, op: Operation): KCall {
     if (!bound.run) throw new Error(`${binding.path}: an operation binds a graph or a run`);
     const { handler, op: target } = this.handlerFor(bound.run);
     const given = passedInputs(target, op, bound.in);
-    const roots: Roots = { resolvers: this.resolverRoots(binding.doc.resolvers) };
+    const roots: Roots = { resolvers: this.resolverRoots(binding.doc.reads) };
     return { kind: 'call', handler, in: lowerValues(given, roots), redact: this.redactFor(target, given) };
   }
 
@@ -268,14 +269,18 @@ export class Compiler {
     }
   }
 
-  /** The resolvers a document names: name -> the segments read below request. A resolver is a read, so it lowers to no node. */
-  private resolverRoots(ref: string | undefined): Record<string, string[]> {
-    if (!ref) return {};
-    const doc = this.scope.get('resolvers', ref);
-    if (!doc) throw new Error(`unknown resolvers document '${ref}'`);
-    return Object.fromEntries(
-      Object.entries(doc.doc.resolvers).map(([name, resolver]) => [name, splitPath(resolver.read).slice(1)]),
-    );
+  /** A document's `reads`: local name -> the segments read below request. A resolver is a read, so it lowers to no node. */
+  private resolverRoots(reads: Record<string, string> | undefined): Record<string, string[]> {
+    return Object.fromEntries(Object.entries(reads ?? {}).map(([name, ref]) => [name, this.resolverPath(ref)]));
+  }
+
+  /** The segments one `@path#name` reads below request; the checker refused every reference that names nothing. */
+  private resolverPath(ref: string): string[] {
+    const { path, op } = splitRef(ref);
+    const doc = this.scope.get('resolvers', path);
+    const resolver = doc?.doc.resolvers[op];
+    if (!resolver) throw new Error(`unknown resolver '${ref}'`);
+    return splitPath(resolver.read).slice(1);
   }
 
   /** Secret paths of an operation's inputs and result (result substituted through its type fields). */

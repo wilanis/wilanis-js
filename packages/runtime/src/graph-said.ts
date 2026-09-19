@@ -37,10 +37,16 @@ function fromSaid(out: NonNullable<GraphDoc['out']>, guards: Guard[]): string {
   return from.flatMap(one => [one, ...(violated.has(one) ? [violated.get(one) ?? one] : [])]).join(' | ');
 }
 
+/** The reads a document takes from the request, each under the local name its body uses. */
+const readsSaid = (reads: Record<string, string>): string =>
+  Object.entries(reads)
+    .map(([name, ref]) => `${name} \u2190 ${ref}`)
+    .join(', ');
+
 /** What a graph takes, what it answers, and where the answer is read from. */
 function contractLines(graph: GraphDoc, guards: Guard[]): string[] {
   const lines = graph.in ? [`takes   ${graph.in}`] : [];
-  if (graph.resolvers) lines.push(`reads   ${graph.resolvers}`);
+  if (graph.reads) lines.push(`reads   ${readsSaid(graph.reads)}`);
   if (graph.constants) lines.push(`constants  ${Object.keys(graph.constants).join(', ')}`);
   if (!graph.out) return lines;
   return [...lines, `answers ${graph.out.type}  from ${fromSaid(graph.out, guards)}`];

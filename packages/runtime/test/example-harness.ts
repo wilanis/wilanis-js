@@ -53,6 +53,10 @@ export const refusalsAt = (root: string) =>
 export const refusalsSaying = (root: string) =>
   checkTree(loadTree(root, PLUGINS, INCLUDES)).items.map(one => `${one.code} ${one.message}`);
 
+/** The refusals a tree answers with, as `code hint`: what a case needs when the edit offered is the claim. */
+export const refusalsHinting = (root: string) =>
+  checkTree(loadTree(root, PLUGINS, INCLUDES)).items.map(one => `${one.code} ${one.hint}`);
+
 /** A plugin's docs directory, written from name -> document. */
 export function docsDir(docs: Record<string, unknown>): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-docs-'));
@@ -132,6 +136,14 @@ export function sabotagePointing(file: string, edit: (doc: any) => void): string
  */
 export function sabotageSaying(file: string, edit: (doc: any) => void): string[] {
   return after(editing(file, edit), refusalsSaying);
+}
+
+/**
+ * The same sabotage, answered as code and the edit each refusal offers -- what a case needs where the hint
+ * is the contract, as it is where a refusal writes the entry that would bind what was read (RFC 0029).
+ */
+export function sabotageHinting(file: string, edit: (doc: any) => void): string[] {
+  return after(editing(file, edit), refusalsHinting);
 }
 
 /** Copy the example, move one document to another path, and answer the refusal codes. */

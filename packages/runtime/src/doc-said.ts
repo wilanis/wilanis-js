@@ -24,12 +24,13 @@ const listLine = (label: string, values: string[] | undefined): string[] =>
   values?.length ? [`${label}  ${values.join(', ')}`] : [];
 
 /**
- * A binding: the port it meets, the resolvers its operations read, and how each operation is answered --
+ * A binding: the port it meets, the reads its operations take from the request, and how each is answered --
  * by a graph, or by delegating to another operation. The port is said once above, since every row shares it.
  */
 export function bindingLines(doc: Loaded): string[] {
   const declared = doc.doc as BindingDoc;
-  const lines = [`meets  ${declared.port}`, ...listLine('reads  ', declared.resolvers ? [declared.resolvers] : [])];
+  const reads = Object.entries(declared.reads ?? {}).map(([name, ref]) => `${name} \u2190 ${ref}`);
+  const lines = [`meets  ${declared.port}`, ...listLine('reads  ', reads)];
   lines.push('answers:');
   for (const [name, op] of Object.entries(declared.operations))
     lines.push(`    #${name}  ${answeredBy(op)}${op.description ? `  -- ${op.description}` : ''}`);
@@ -48,7 +49,7 @@ function answeredBy(op: { graph?: string; run?: string }): string {
  */
 export function resolversLines(doc: Loaded): string[] {
   const declared = doc.doc as ResolversDoc;
-  const lines = ['reads, each usable as {{name}} where a binding or a data graph names it:'];
+  const lines = ['reads, each bound under a binding\u2019s or a data graph\u2019s reads as @path#name:'];
   for (const [name, read] of Object.entries(declared.resolvers)) {
     const must = read.required ? '  (required: every trigger reaching it must prove it, A006)' : '';
     lines.push(`    ${name}  ← ${read.read}${must}${read.description ? `  -- ${read.description}` : ''}`);
