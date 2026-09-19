@@ -87,6 +87,33 @@ export function sabotage(edits: Record<string, Edit>): string[] {
   }
 }
 
+/**
+ * The same, for an edit that has to reach a document of the included access tree rather than the example's own:
+ * the include is copied too and handed in at its copy, so a sabotage of `features/access/...` is the tree the
+ * checker reads. Paths under `include` are relative to the access tree's root.
+ */
+export function sabotageInclude(edits: Record<string, Edit>, include: Record<string, Edit>): string[] {
+  const dir = localCopy(edits);
+  const copy = mkdtempSync(join(tmpdir(), 'wilanis-access-'));
+  cpSync(INCLUDES[0].dir, copy, {
+    recursive: true,
+    filter: path => !path.includes('node_modules') && !path.includes('.wilanis') && !path.includes('/test'),
+  });
+  for (const [relative, change] of Object.entries(include)) {
+    const path = join(copy, relative);
+    const doc = JSON.parse(readFileSync(path, 'utf8'));
+    change(doc);
+    writeFileSync(path, JSON.stringify(doc));
+  }
+  const included: ResolvedInclude[] = [{ ...INCLUDES[0], dir: copy }];
+  try {
+    return checkTree(loadTree(dir, PLUGINS, included)).items.map(refusal => refusal.code);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(copy, { recursive: true, force: true });
+  }
+}
+
 /** A response, as a test reads it. */
 export const json = async (answer: Response) => ({
   status: answer.status,
@@ -149,9 +176,12 @@ export async function issuerKey() {
   };
 }
 
-/** An identity token for the one user the fake issuer knows. */
+/**
+ * An identity token for the one user the fake issuer knows. `tenant` rides beside the rest because an OIDC
+ * directory says what it says as claims: a `verify` given a `type` reads the ones its fields name.
+ */
 function identityToken(base: string, privateKey: KeyLike) {
-  return new SignJWT({ name: 'Dee', groups: ['customer', 'beta'] })
+  return new SignJWT({ name: 'Dee', groups: ['customer', 'beta'], tenant: 'globex' })
     .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
     .setSubject('okta|dee')
     .setIssuer(base)
