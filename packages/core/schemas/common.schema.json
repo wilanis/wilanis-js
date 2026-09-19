@@ -127,9 +127,9 @@
             "pattern": "^\\$[A-Z][A-Za-z0-9]*$"
           },
           "additionalProperties": {
-            "description": "The path within the named document whose value is the type: field names separated by dots, a segment optionally taking a key by a static input ([input]) or by a sibling field ({sibling}), as collections[collection].of and collections[collection].of{key}.type.",
+            "description": "The path within the named document whose value is the type: field names separated by dots, a segment optionally taking a key by a static input ([input]) or by a sibling field ({sibling}). A key taken by an input may name one field to follow where the value found has it ([input|hop]), which is how a collection that names another is read as the one it names -- one hop only. As collections[collection].of and collections[collection|view].of{key}.type.",
             "type": "string",
-            "pattern": "^[a-z][A-Za-z0-9_]*(\\[[a-z][A-Za-z0-9_]*\\]|\\{[a-z][A-Za-z0-9_]*\\})?(\\.[a-z][A-Za-z0-9_]*(\\[[a-z][A-Za-z0-9_]*\\]|\\{[a-z][A-Za-z0-9_]*\\})?)*$"
+            "pattern": "^[a-z][A-Za-z0-9_]*(\\[[a-z][A-Za-z0-9_]*(\\|[a-z][A-Za-z0-9_]*)?\\]|\\{[a-z][A-Za-z0-9_]*\\})?(\\.[a-z][A-Za-z0-9_]*(\\[[a-z][A-Za-z0-9_]*(\\|[a-z][A-Za-z0-9_]*)?\\]|\\{[a-z][A-Za-z0-9_]*\\})?)*$"
           },
           "minProperties": 1
         }
