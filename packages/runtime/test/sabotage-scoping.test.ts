@@ -6,6 +6,10 @@
  * already judge a read judge this one: A006 holds every trigger reaching the collection to guaranteeing the
  * read, and B008 refuses a startup step that reaches it at all.
  *
+ * Who a scope may read and what a view is behind are the A family's, and are `sabotage-scope-access.test.ts`
+ * beside this: the same split the rules themselves take, since a scope that is well-formed and reads a header
+ * is a well-formed store that scopes by nothing.
+ *
  * Every case starts from the example scoped by a tenant (`scoping-harness.ts`), since the example does not
  * scope its store until RFC 0015's step 10.
  */
