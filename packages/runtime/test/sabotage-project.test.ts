@@ -1,6 +1,6 @@
 import { schemaUrl } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
-import { plantedAll, plantedEditing, sabotage, sabotagePointing } from './example-harness.js';
+import { plantedAll, plantedEditing, sabotage, sabotagePointing, without } from './example-harness.js';
 
 describe('sabotage: the project, its plugins and its startup', () => {
   it('X003 a throttle that lets nothing through', () => {
@@ -197,5 +197,21 @@ describe('sabotage: a store names a connection and the shapes it keeps', () => {
     expect(keptIn('.')).toEqual(refused);
     expect(keptIn('.wilanis/sessions')).toEqual([]);
     expect(keptIn('/var/lib/monitor/auth')).toEqual([]);
+  });
+  it("B002 a tree that leaves the guard's memory unbound, since @auth requires it", () => {
+    expect(without('features/state/data/auth-files.binding.json')).toContain('B002');
+  });
+  it("B009 and B010 a binding of the guard's memory that reads the request, or ends the run on purpose", () => {
+    const binding = 'features/state/data/auth-files.binding.json';
+    expect(
+      sabotage(binding, doc => {
+        doc.reads = { agent: '@monitor/edge/request.resolvers.json#agent' };
+      }),
+    ).toContain('B009');
+    expect(
+      sabotage(binding, doc => {
+        doc.operations.getSession = { run: '@http/server.port.json#listen' };
+      }),
+    ).toContain('B010');
   });
 });
