@@ -110,6 +110,15 @@
       "required": true
     },
     {
+      "label": "Reach the guard's memory",
+      "description": "Read one session through @auth/state.port.json before the HTTP server opens, so a tree whose sessions and challenges cannot be reached refuses to serve rather than refusing every signed-in caller. No session is kept under this key, so a reachable store answers nothing; the profile's binding decides which store that is.",
+      "run": "@auth/state.port.json#getSession",
+      "in": {
+        "key": "startup"
+      },
+      "required": true
+    },
+    {
       "label": "Watch for changes",
       "description": "Serve the tree again whenever a document changes, without closing the port. A change that does not pass wilanis check is reported and the last good tree keeps answering.",
       "run": "@reload/watch.port.json#watch"
