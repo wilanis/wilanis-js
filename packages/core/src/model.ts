@@ -309,16 +309,18 @@ export interface StoreRef {
   description?: string;
 }
 /**
- * One collection of a store: the shape its records have, the field that identifies one, the constraints the
- * records are held to, and what it holds. `unique` lists combinations no two records may repeat, each inner
- * list one constraint over those fields together; `refs` says which fields hold another collection's key;
- * `defaults` is what existing rows receive when `ensure` adds a column, never what a graph writes; `renamed`
- * and `was` say what a field or the collection was called before, so `wilanis migrate` renames rather than
- * drops and creates.
+ * One collection of a store, in exactly one of two shapes the schema keeps apart, as an invariant's two forms
+ * are kept apart. It keeps records -- the shape they have (`of`), the field that identifies one (`key`), and
+ * the constraints they are held to -- or it is a `view` of one that does. `unique` lists combinations no two
+ * records may repeat, each inner list one constraint over those fields together; `refs` says which fields hold
+ * another collection's key; `defaults` is what existing rows receive when `ensure` adds a column, never what a
+ * graph writes; `renamed` and `was` say what a field or the collection was called before, so `wilanis migrate`
+ * renames rather than drops and creates; `scoped` says which columns the store keeps beside the record and the
+ * read that fills each. A view declares none of them: it has the viewed collection's.
  */
-export interface Collection {
-  of: TypeRef;
-  key: string;
+export interface StoreCollection {
+  of?: TypeRef;
+  key?: string;
   unique?: string[][];
   refs?: Record<string, StoreRef>;
   defaults?: Record<string, unknown>;
@@ -326,15 +328,25 @@ export interface Collection {
   renamed?: Record<string, string>;
   /** the collection's name before this one on the same connection, so the table is renamed instead of recreated. */
   was?: string;
+  /** column -> the read that fills it, exactly `{{name}}` for a name the store binds under `reads`. */
+  scoped?: Record<string, string>;
+  /** the scoped collection of this store whose rows this one sees, every scope's. */
+  view?: string;
+  /** the policy every trigger reaching an operation over this view must attach, by path. */
+  behind?: string;
   description?: string;
 }
+/** A collection that keeps records: what a reader of a store sees once a view has been told apart by its `view`. */
+export type Collection = StoreCollection & { of: TypeRef; key: string };
 /**
  * What a feature keeps: the connection its records live behind, and the collections kept there, by name. The
  * collection is where the record type is written down, so a call site names the store and the collection and
- * nothing else.
+ * nothing else. `reads` binds the reads its scoped collections are filled from, as a data graph binds one.
  */
 export interface StoreDoc extends Envelope {
   connection: string;
+  /** Local name -> the resolver that declares it (`@feature/edge/file.resolvers.json#name`); read by some `scoped`. */
+  reads?: Record<string, string>;
   collections: Record<string, Collection>;
 }
 

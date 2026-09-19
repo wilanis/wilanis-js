@@ -26,8 +26,19 @@
       "description": "The connection the records live behind, by path. Its kind must be one a storage engine plugin grants -- one whose connection kind document says \"storage\": true.",
       "$ref": "common.schema.json#/$defs/path"
     },
+    "reads": {
+      "description": "The reads this store's collections are scoped by: local name -> the resolver that declares it, as @feature/edge/file.resolvers.json#name, the way a data graph or a binding binds one. Every entry is read by some collection's `scoped` (P005), and the compiler carries the read to every storage operation over that collection, so no document writes a scope.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "$ref": "common.schema.json#/$defs/ident"
+      },
+      "additionalProperties": {
+        "$ref": "common.schema.json#/$defs/resolverRef"
+      }
+    },
     "collections": {
-      "description": "name -> what is kept under it. The name is how a call site names the collection, and it is the name the engine keeps the records under, so two stores over one connection that declare the same name mean the same collection.",
+      "description": "name -> what is kept under it. The name is how a call site names the collection, and it is the name the engine keeps the records under, so two stores over one connection that declare the same name mean the same collection. A collection is one of two shapes: it keeps records (`of` and `key`), or it is a `view` of one that does, seeing every row `behind` a policy.",
       "type": "object",
       "minProperties": 1,
       "propertyNames": {
@@ -72,18 +83,14 @@
                 },
                 "onRemove": {
                   "description": "What removing a referenced record does. refuse is the only value: a removal that would orphan a record is refused, and nothing is ever deleted on a tree's behalf.",
-                  "enum": [
-                    "refuse"
-                  ]
+                  "enum": ["refuse"]
                 },
                 "description": {
                   "description": "What this reference means, for a reader of a graph that writes it.",
                   "type": "string"
                 }
               },
-              "required": [
-                "collection"
-              ],
+              "required": ["collection"],
               "additionalProperties": false
             }
           },
@@ -108,24 +115,60 @@
             "description": "The collection's name before this one on the same connection, so `wilanis migrate` renames the table instead of dropping it and creating another. Remove it once every database has applied it.",
             "$ref": "common.schema.json#/$defs/ident"
           },
+          "scoped": {
+            "description": "column -> the read that fills it. Each key names a column the store keeps beside the record, which the shape does not declare. Each value is exactly {{<name>}} for a name the store binds under `reads`: one whole read, no literal, no interpolation, no field of it. The compiler puts the read on every operation over this collection as `scope`; no document writes `scope`. The engine writes the columns on put and puts them on every statement, and `unique` constraints hold within the scope.",
+            "type": "object",
+            "minProperties": 1,
+            "propertyNames": {
+              "$ref": "common.schema.json#/$defs/ident"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "view": {
+            "description": "The scoped collection of this store whose rows this one sees, across every scope.",
+            "$ref": "common.schema.json#/$defs/ident"
+          },
+          "behind": {
+            "description": "The policy every trigger that reaches an operation over this view must attach, by path. A view is the one way across a scope, and this says what guards it.",
+            "$ref": "common.schema.json#/$defs/path"
+          },
           "description": {
             "description": "What this collection holds, for a reader of a graph that reads or writes it.",
             "type": "string"
           }
         },
-        "required": [
-          "of",
-          "key"
-        ],
+        "if": {
+          "description": "`view` is what tells the two shapes apart, so an author is answered about the one they wrote.",
+          "required": ["view"]
+        },
+        "then": {
+          "description": "A view of a scoped collection of this store: the `behind` it is seen through, and nothing a kept collection declares -- it has the viewed collection's shape, key and constraints.",
+          "required": ["behind"],
+          "properties": {
+            "of": false,
+            "key": false,
+            "unique": false,
+            "refs": false,
+            "defaults": false,
+            "renamed": false,
+            "was": false,
+            "scoped": false
+          }
+        },
+        "else": {
+          "description": "A collection that keeps records: `of` and `key`, and no `behind`, which is a view's.",
+          "required": ["of", "key"],
+          "properties": {
+            "behind": false
+          }
+        },
         "additionalProperties": false
       }
     }
   },
-  "required": [
-    "$schema",
-    "description",
-    "connection",
-    "collections"
-  ],
+  "required": ["$schema", "description", "connection", "collections"],
   "additionalProperties": false
 }

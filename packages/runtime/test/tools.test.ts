@@ -103,8 +103,17 @@ describe('wilanis new', () => {
     expect(scaffold(dir, 'store', 'features/tasks/tasks', { of: '@features/tasks/domain/Task.shape.json' })).toEqual([
       'features/tasks/data/tasks.store.json',
     ]);
+    // the scope is scaffolded whole: one read bound under `reads`, and the column it fills beside the shape
     expect(read(join(dir, 'features/tasks/data/tasks.store.json')).collections).toEqual({
-      tasks: { of: '@features/tasks/domain/Task.shape.json', key: 'id', description: 'TODO' },
+      tasks: {
+        of: '@features/tasks/domain/Task.shape.json',
+        key: 'id',
+        scoped: { tenant: '{{tenant}}' },
+        description: 'TODO',
+      },
+    });
+    expect(read(join(dir, 'features/tasks/data/tasks.store.json')).reads).toEqual({
+      tenant: '@features/TODO/edge/TODO.resolvers.json#tenant',
     });
     // a file the author named with a dash still declares a collection the grammar accepts
     scaffold(dir, 'store', 'features/tasks/audit-log', {});

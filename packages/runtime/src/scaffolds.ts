@@ -163,19 +163,25 @@ const SCAFFOLDS: Record<string, (target: string, opts: Record<string, string | u
     ];
   },
   store: (target, opts) => {
-    // one collection, named after the file and keyed by `id`; which shape it keeps is --of, the connection the author's
+    // one collection, named after the file and keyed by `id`; which shape it keeps is --of, the connection the author's.
+    // The scope is written out beside it, in TODO paths like every other reference here: `reads` binds one read of what
+    // the guard hands, `scoped` names the column it fills, and the two sit side by side so the first store an author
+    // sees shows the pattern whole -- delete both for a store whose rows belong to everyone.
     const placed = into(target, 'data', 'store');
     return [
       [
         placed,
         {
           $schema: schemaOf('store'),
-          description: 'TODO',
+          description:
+            'TODO. Its rows are scoped: reads binds one read of what the guard hands, and the collection names the column it fills. Delete reads and scoped for a store whose rows belong to everyone.',
           connection: '@connections/TODO.connection.json',
+          reads: { tenant: '@features/TODO/edge/TODO.resolvers.json#tenant' },
           collections: {
             [collectionOf(placed)]: {
               of: opts.of ?? '@features/TODO/domain/TODO.shape.json',
               key: 'id',
+              scoped: { tenant: '{{tenant}}' },
               description: 'TODO',
             },
           },

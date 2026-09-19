@@ -42,7 +42,7 @@ property is described.
 | `policy` | a gate: `decide` fires a domain operation over what the guard hands (`{{request.principal}}`), `outcomes` maps each reason its graph refuses with to `deny` or `challenge`, `proves` says what is present once it allows | `edge/` |
 | `invariant` | a rule that must hold: `access` (which policy gates writes to a port) or `holds` (a rule over a core shape's fields) | `domain/` |
 | `resolvers` | named reads of the request (`request.params.id`, `request.headers['user-agent']`, `request.session.id`), for data graphs and bindings to bind under `reads` and read as `{{name}}`; `required` when a policy guarantees the read | `edge/` |
-| `store` | what the feature keeps: a connection and collections of a core shape (or a plugin's shape), each by key, with `unique`, `refs`, `defaults`; `renamed` and `was` record what a field or the collection was called before, so a rename is read as one | `data/` |
+| `store` | what the feature keeps: a connection and collections of a core shape (or a plugin's shape), each by key, with `unique`, `refs`, `defaults`; `renamed` and `was` record what a field or the collection was called before, so a rename is read as one. A collection may be `scoped` by columns the store keeps, each filled from one read the store binds under `reads` (a `required` resolver over what the guard hands), and a `view` of a scoped collection sees every row `behind` a policy | `data/` |
 | `connection` | a channel to an external system, settings read `{{secrets.*}}` | `connections/` |
 | `scenario` | a recorded run (fuzz writes, regress replays) | `scenarios/` |
 
@@ -68,6 +68,8 @@ features/<name>/
   effectful operation it reaches is listed in `feature.json → effects` (L003). It is the only layer that
   reads the request, and only through resolvers it names: `"reads": { "agent": "@f/edge/request.resolvers.json#agent" }`,
   then `{{agent}}` wherever the value is used. A resolver is a read, not an operation: nothing runs.
+  A store binds a read the same way to scope a collection, and the compiler carries it to every storage
+  operation over it; a graph never writes a scope.
 
 A domain graph must earn its place: if it does nothing but forward its input to one port operation, it is
 boilerplate between the trigger and the binding, and the trigger should fire that operation itself (L007).
