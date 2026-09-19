@@ -1,13 +1,13 @@
 /**
  * Reading one document into the registry: parsed, judged against its kind's schema, placed where its kind
  * lives (D000, D001, D003, D004, D008), and registered under its canonical path. A plugin's documents are
- * registered the same way, under the plugin's root, marked native (D006), and its ports are held to what a
- * contract may say for itself (D011).
+ * registered the same way, under the plugin's root, marked native (D006) -- save a port it requires, which is
+ * the host's to bind (D012) -- and its ports are held to what a contract may say for itself (D011).
  */
 import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { badResolves } from './contracts.js';
-import { type AnyDoc, type Kind, layerOf, type PortDoc, type ProjectDoc } from './model.js';
+import { type AnyDoc, type Kind, layerOf, type PluginDoc, type PortDoc, type ProjectDoc } from './model.js';
 import { featureOf, stem, treePath, walk } from './paths.js';
 import { misplaced } from './placement.js';
 import type { PluginModule } from './plugin.js';
@@ -125,18 +125,24 @@ export class Documents {
       });
       return;
     }
-    if (!docs.some(file => relative(plugin.docs, file) === 'plugin.json')) {
+    const manifest = docs.find(file => relative(plugin.docs, file) === 'plugin.json');
+    if (!manifest) {
       this.refuse({
         code: 'D006',
         file: PROJECT_FILE,
         message: `plugin '${plugin.root}' ships no plugin.json in ${plugin.docs}`,
         hint: `add plugin.json under ${plugin.docs}; it says what the plugin grants`,
       });
-    }
-    for (const abs of docs) this.registerNative(plugin, abs);
+    } else this.registerNative(plugin, manifest, new Set());
+    // the manifest first, so what it requires is known before the ports it names are registered
+    const declared = this.registry.get('plugin', `${plugin.root}/plugin.json`);
+    const required = new Set(declared?.doc.requires?.ports ?? []);
+    for (const abs of docs) if (abs !== manifest) this.registerNative(plugin, abs, required);
+    if (declared) for (const refusal of requiresRefused(declared, this.registry)) this.refuse(refusal);
   }
 
-  private registerNative(plugin: PluginModule, abs: string): void {
+  /** One document a plugin ships: native, unless it is a port the plugin requires, which is the host's to bind. */
+  private registerNative(plugin: PluginModule, abs: string, required: Set<string>): void {
     const path = `${plugin.root}/${treePath(relative(plugin.docs, abs))}`;
     const parsed = parseJson(abs, path);
     if ('refusal' in parsed) {
@@ -156,8 +162,39 @@ export class Documents {
       kind: judged.kind,
       path,
       name: stem(path),
-      native: plugin.root,
+      ...ownedBy(plugin.root, judged.kind === 'port' && required.has(path)),
       file: abs,
     } as Loaded);
   }
+}
+
+/** Whose a plugin's document is: the plugin's own (native), or, for a port it requires, the host's to bind. */
+function ownedBy(root: string, required: boolean): Pick<Loaded, 'native' | 'requiredBy'> {
+  return required ? { requiredBy: root } : { native: root };
+}
+
+/** D012: a port a plugin requires is a port under its docs/, and one it does not also grant. */
+function requiresRefused(manifest: Loaded<PluginDoc>, registry: Registry): Refusal[] {
+  const granted = new Set(manifest.doc.grants.ports ?? []);
+  const refusals: Refusal[] = [];
+  for (const [index, path] of (manifest.doc.requires?.ports ?? []).entries()) {
+    const at = `requires/ports/${index}`;
+    if (granted.has(path))
+      refusals.push({
+        code: 'D012',
+        file: manifest.path,
+        at,
+        message: `'${path}' is both granted and required: a port is the plugin's to implement or the host's to bind, never both`,
+        hint: 'list it once: under grants.ports if the plugin implements it, under requires.ports if the host binds it',
+      });
+    if (registry.get('port', path)?.requiredBy !== manifest.native)
+      refusals.push({
+        code: 'D012',
+        file: manifest.path,
+        at,
+        message: `'${path}' is required, but no port by that path is under ${manifest.native}'s docs/`,
+        hint: `add the port document under the plugin's docs/, or remove '${path}' from requires.ports`,
+      });
+  }
+  return refusals;
 }

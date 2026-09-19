@@ -72,6 +72,21 @@
       },
       "additionalProperties": false
     },
+    "requires": {
+      "description": "What the plugin calls but does not implement: each is a file under the plugin's docs/, and the host binds it in a feature of its own, as it binds any domain port (B002 until it does).",
+      "type": "object",
+      "properties": {
+        "ports": {
+          "description": "The ports it requires, by path. The plugin calls their operations; a profile binds each to a binding the host writes. A path is granted or required, never both (D012).",
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/path"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
     "guard": {
       "description": "Declared by the one plugin that identifies callers. `credentials` are what it verifies -- token, challenge -- each with the type a trigger's policy attachment must give it and the context fields it yields once verified; `context` is what it adds to every trigger kind's context: request.principal, request.session, request.challenge, what policies and resolvers read. `refuses` lists the reasons it refuses with on its own (a credential that does not verify), each with what it means; a trigger giving a credential must map them (T005).",
       "type": "object",
