@@ -1,0 +1,50 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/binding.schema.json",
+  "label": "The guard's memory in files",
+  "description": "Sessions and challenges as one JSON file each under .wilanis/auth, so the access tree checks and runs alone. A host binds @auth/state.port.json in a feature of its own.",
+  "port": "@auth/state.port.json",
+  "operations": {
+    "getSession": {
+      "run": "@auth/files.port.json#get",
+      "in": {
+        "collection": "sessions",
+        "type": "@auth/SessionRecord.shape.json"
+      }
+    },
+    "putSession": {
+      "run": "@auth/files.port.json#put",
+      "in": {
+        "collection": "sessions",
+        "type": "@auth/SessionRecord.shape.json"
+      }
+    },
+    "endSession": {
+      "run": "@auth/files.port.json#remove",
+      "in": {
+        "collection": "sessions",
+        "type": "@auth/SessionRecord.shape.json"
+      }
+    },
+    "getChallenge": {
+      "run": "@auth/files.port.json#get",
+      "in": {
+        "collection": "challenges",
+        "type": "@auth/ChallengeRecord.shape.json"
+      }
+    },
+    "putChallenge": {
+      "run": "@auth/files.port.json#put",
+      "in": {
+        "collection": "challenges",
+        "type": "@auth/ChallengeRecord.shape.json"
+      }
+    },
+    "removeChallenge": {
+      "run": "@auth/files.port.json#remove",
+      "in": {
+        "collection": "challenges",
+        "type": "@auth/ChallengeRecord.shape.json"
+      }
+    }
+  }
+}
