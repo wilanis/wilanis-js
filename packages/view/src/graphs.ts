@@ -2,11 +2,12 @@
  * The graph view: nodes with typed input and output ports, a data edge for every {{node.field}} read from the field to
  * the input that reads it, one rule node per switch rule with a route from it, the out node's fields, and for each run
  * or map node where its operation leads. A deep read opens the field it reads as an attribute port under its parent,
- * so the edge leaves the attribute.
+ * so the edge leaves the attribute. What a graph reads from the request, and the node that stands for it, are
+ * `reads.ts`.
  */
 import { atomicOf } from '@wilanis/compiler';
 import type { GraphDoc, Loaded, Scope, Type, Values } from '@wilanis/core';
-import { isMap, isRun, isSwitch, show, splitPath, splitRef, typeAt } from '@wilanis/core';
+import { isMap, isRun, isSwitch, show, typeAt } from '@wilanis/core';
 import { markGuards } from './guards.js';
 import {
   attributePorts,
@@ -20,11 +21,12 @@ import {
   wire,
   written,
 } from './ports.js';
+import { markRequestPorts, type Read, readsOf, requestNode } from './reads.js';
 import { answeredBy } from './refusals.js';
 import { said } from './said.js';
 import { keepsOf } from './stores.js';
 import type { DocView, VEdge, VNode } from './types.js';
-import { labelOf, readable } from './types.js';
+import { readable } from './types.js';
 
 /**
  * A graph's view, built up node by node. It holds what every step adds to -- the nodes, the edges between them, each
@@ -36,9 +38,8 @@ class GraphBuilder {
   private readonly edges: VEdge[] = [];
   /** Each node's result type, for typing the attribute ports deep reads open. */
   private readonly types = new Map<string, Type | undefined>();
-  /** The resolvers this graph reads: name -> the segments below request, and the label a reader sees. */
-  private readonly resolvers = new Map<string, { path: string[]; label: string; description?: string }>();
-  private readonly resolversDoc;
+  /** What this graph reads from the request, one entry per name under `reads`; see `reads.ts`. */
+  private readonly resolvers: Map<string, Read>;
   private readonly doc: GraphDoc;
 
   constructor(
@@ -46,21 +47,19 @@ class GraphBuilder {
     private readonly graph: Loaded<GraphDoc>,
   ) {
     this.doc = graph.doc;
-    // one document still stands behind the request node; RFC 0029 step 5 gives each port its own `opens`
-    const first = Object.values(this.doc.reads ?? {})[0];
-    this.resolversDoc = first ? scope.get('resolvers', splitRef(first).path) : undefined;
+    this.resolvers = readsOf(scope, this.doc.reads);
   }
 
   /** The view: every node of the graph, the edges between them, the role the tree gives it, and its transaction. */
   build(): NonNullable<DocView['graph']> {
-    this.readResolvers();
     this.addInput();
     this.addConstants();
     for (const node of this.doc.nodes) this.addNode(node);
     this.addOutput();
-    this.addRequest();
+    const request = requestNode(this.scope, this.resolvers, this.edges);
+    if (request) this.nodes.unshift(request);
     this.openAttributes();
-    this.labelRequestPorts();
+    markRequestPorts(request, this.resolvers);
     const view: NonNullable<DocView['graph']> = {
       nodes: this.nodes,
       edges: this.edges,
@@ -98,19 +97,6 @@ class GraphBuilder {
       return this.scope.types.spec(spec as string);
     } catch {
       return undefined;
-    }
-  }
-
-  private readResolvers() {
-    for (const [name, ref] of Object.entries(this.doc.reads ?? {})) {
-      const { path, op } = splitRef(ref);
-      const resolver = this.scope.get('resolvers', path)?.doc.resolvers[op];
-      if (!resolver) continue;
-      this.resolvers.set(name, {
-        path: splitPath(resolver.read).slice(1),
-        label: resolver.label ?? readable(name),
-        description: resolver.description,
-      });
     }
   }
 
@@ -294,20 +280,6 @@ class GraphBuilder {
       });
   }
 
-  /** The request node: only when a read goes through a resolver. Its ports are the paths the resolvers name. */
-  private addRequest() {
-    if (!this.resolversDoc || !this.edges.some(edge => edge.from === 'request')) return;
-    this.nodes.unshift({
-      id: 'request',
-      kind: 'request',
-      label: 'Request',
-      opens: this.resolversDoc.path,
-      description: `what the trigger kind hands, read through ${labelOf(this.resolversDoc)}`,
-      inputs: [],
-      outputs: [],
-    });
-  }
-
   /** How a node's field is typed, for the attribute ports a deep read opens under it. */
   private typeAtOf(node: VNode): (path: string[]) => Type | undefined {
     if (node.kind === 'request')
@@ -330,19 +302,6 @@ class GraphBuilder {
       if (edge.kind !== 'data' || edge.fromPort === WHOLE) continue;
       const source = byId.get(edge.from);
       if (source) attributePorts(source, edge.fromPort, this.typeAtOf(source));
-    }
-  }
-
-  /** The request node's ports carry the labels its resolvers gave them. */
-  private labelRequestPorts() {
-    const request = this.nodes.find(node => node.id === 'request');
-    if (!request) return;
-    for (const resolver of this.resolvers.values()) {
-      const port = request.outputs.find(one => one.name === resolver.path.join('.'));
-      if (port) {
-        port.label = resolver.label;
-        port.description = resolver.description;
-      }
     }
   }
 }

@@ -203,22 +203,14 @@ describe('the view model of a graph', () => {
     });
   });
 
-  it('draws the request as a node whose ports are the paths the resolvers read, the leaf labelled by the resolver', async () => {
+  // what each port of the request node then says -- the name the graph reads it by, the document that
+  // declares it -- is `reads.test.ts`, which is what RFC 0029 made a concern of its own
+  it('draws the request as a node whose ports are the paths the resolvers read, edged to what reads them', async () => {
     const seen = await view('@features/monitor/data/create-row.graph.json');
     const ids = seen.graph!.nodes.map(node => node.id);
     expect(ids.slice(0, 2)).toEqual(['request', 'in']);
     const request = seen.graph!.nodes.find(node => node.id === 'request')!;
-    expect(request.opens).toBe('@features/monitor/edge/request.resolvers.json');
-    expect(request.outputs).toEqual([
-      { name: 'headers', type: '{, ...}' },
-      {
-        name: 'headers.user-agent',
-        depth: 1,
-        type: 'string',
-        label: "The caller's user agent",
-        description: 'absent when the caller sent none; the header is then not forwarded',
-      },
-    ]);
+    expect(request.outputs.map(port => port.name)).toEqual(['headers', 'headers.user-agent']);
     expect(
       edge(seen, { from: 'request', fromPort: 'headers.user-agent', to: 'asked', toPort: 'headers' }),
     ).toMatchObject({
