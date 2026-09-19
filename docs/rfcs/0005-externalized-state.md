@@ -220,8 +220,8 @@ added to it. X201 is widened so that a collection's `of` may name a shape a plug
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
 | B002 (existing) | `check/project.ts` `checkPortMet` | a required port has no binding under a profile; the message gains `(required by @auth)` | `wilanis new binding <feature>/<name> --port <path>` |
-| B0nn | `check/bindings.ts` | a binding of a required port has `reads` (RFC 0029), or one of its graphs reads `request.*`: the guard runs before the policies, with no request judged yet | remove `reads`; a state operation reads only its `in` |
-| B0nn | `check/bindings.ts` | a binding of a required port delegates to an operation that `holds` or `refuses`: memory answers or fails, it never ends the run on purpose | delegate to `@auth/files.port.json` or `@storage/store.port.json` |
+| B009 | `check/required.ts` | a binding of a required port has `reads` (RFC 0029), or one of its graphs reads `request.*`: the guard runs before the policies, with no request judged yet | remove `reads`; a state operation reads only its `in` |
+| B010 | `check/required.ts` | a binding of a required port delegates to an operation that `holds` or `refuses`: memory answers or fails, it never ends the run on purpose | delegate to `@auth/files.port.json` or `@storage/store.port.json` |
 | C0nn | `check/project.ts` | `blobs.connection` names a connection whose kind no named plugin offers a blob store for, or names no connection | `wilanis ls connection-kind`; name a plugin that offers one |
 | D012 | `documents.ts` (loader) | a plugin lists a path under both `grants.ports` and `requires.ports`, or a required port is not under its `docs/` | list it once |
 | X10n | `packages/plugin-auth/src/rules.ts` | `@auth/files.port.json` is delegated to with a `dir` that is not under the tree, or under a directory the loader reads (`features/`, `connections/`) | `.wilanis/auth`, or an absolute path outside the tree |
@@ -255,7 +255,7 @@ P003 R001 S001 T006, X103).
   answer a refresh with the wrong session, since it is asked for one key rather than for whatever matches. The
   `refreshHash` field stays on `SessionRecord` and stays the thing compared -- a `sid` says which session,
   never that the caller holds its token.
-  with no `request.*` in scope, which the B0nn rule above guarantees statically.
+  with no `request.*` in scope, which B009 guarantees statically.
 - **The blob registry.** `Embedder`'s constructor builds `this.blobs` from `blobs.connection` when present: it
   finds the plugin whose `PluginModule.blobStores` maps the connection's kind to a factory, and calls it with the
   connection's settings, secrets substituted. `FileBlobStore` stays the default. The `BlobStore` interface in
@@ -324,7 +324,7 @@ Sabotage, in `packages/runtime/test/example.test.ts` (copies of the example hand
 `ResolvedInclude`):
 
 - delete the state binding from the `live` profile → B002 naming `@auth/state.port.json` and `required by @auth`;
-- add `reads` to the state binding → B0nn; delegate `getSession` to `@http/server.port.json#listen` → B0nn;
+- add `reads` to the state binding → B009; delegate `getSession` to `@http/server.port.json#listen` → B010;
 - set `blobs.connection` to `@connections/monitor-api.connection.json` → C0nn;
 - list `@auth/state.port.json` under `grants.ports` in a copied plugin manifest → D012 (`packages/runtime/test/required-port.test.ts`);
 - delegate `files.port.json#get` with `dir: "features"` → X10n (`packages/plugin-auth/test`).
@@ -345,7 +345,7 @@ End to end:
 
 1. `plugin.schema.json → requires`, `PluginDoc`, the loader registering a required port as an open domain port,
    D012, B002's message; `wilanis describe` lines. (`area:core`, `area:compiler`, `area:runtime`)
-2. `env.ports` in the embedder, limited to required ports; B0nn on bindings of required ports. (`area:runtime`, `area:compiler`)
+2. `env.ports` in the embedder, limited to required ports; B009 and B010 on bindings of required ports. (`area:runtime`, `area:compiler`)
 3. `@auth/state.port.json`, the two record shapes, `@auth/files.port.json`; `tokens.ts` and `guard.ts` over
    `env.ports`; the refresh token carrying its session's `sid` so `refresh` reads by key; `settings.store`
    removed; X10n. (`area:plugin-auth`)
@@ -378,4 +378,8 @@ Steps 1 to 4 need nothing from RFC 0002 and can land first.
 ## Decided during implementation
 
 - The exact shape of `env.ports`' error when the binding refuses, and what `wilanis run` prints for it.
+  *Decided:* `env.ports` throws a `PortError` (`@wilanis/core`) carrying `op` and the run's `outcome`
+  (`refused` with its reason and node, `faulted` with the node that broke, or `blocked`), its message
+  `<op> refused '<reason>' at '<node>': <message>` or `<op> failed at '<node>': <error>`. A handler that lets it
+  through fails its node with that message, which is what `wilanis run` prints, as for any handler that throws.
 - Whether `@s3`'s `postLoad` probe is a `HeadBucket` or a `put`/`drop` of one byte under the prefix.

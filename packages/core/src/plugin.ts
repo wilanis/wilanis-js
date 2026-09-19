@@ -288,7 +288,7 @@ export interface PostLoadContext {
   scope: Scope;
   /** This plugin's settings from project.json, secrets substituted. */
   settings: Record<string, unknown>;
-  /** The environment handlers see: connections, plugins, canon, resolveType, resolving. */
+  /** The environment handlers see: connections, plugins, canon, resolveType, resolving, and `ports` (a `FirePort`) for the ports a plugin requires. */
   env: Record<string, unknown>;
   log: (line: string) => void;
 }

@@ -10,6 +10,7 @@ import type { KernelSpec, Report } from '@wilanis/engine';
 import { FileBlobStore } from './blobs.js';
 import { correlationOf, type Fired, type Ran, runId, type Started } from './fired.js';
 import { gate } from './gate.js';
+import { portsOf } from './ports.js';
 import { coerceWire, fillTemplates, prune } from './values.js';
 
 export { coerceWire, fillTemplates, prune } from './values.js';
@@ -104,7 +105,7 @@ export class Embedder {
     const hold: Hold = what => {
       this.held.push(what);
     };
-    this.env = { ...built.env, blobs: this.blobs, hold, root };
+    this.env = { ...built.env, blobs: this.blobs, hold, root, ports: portsOf(this) };
     this.missingSecrets = built.missing;
     this.stubbed = Boolean(opts.stubEffects);
     this.guard = plugins.find(plugin => plugin.guard);
