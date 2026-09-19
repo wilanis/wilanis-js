@@ -47,7 +47,7 @@ describe('a port a plugin requires', () => {
 
   it('describe says who requires it, and what each profile binds it to', async () => {
     const bound = (indent: string) =>
-      PROFILES.map(profile => `${indent}bound by  profile ${profile} → @features/state/data/keep-files.binding.json`);
+      PROFILES.map(profile => `${indent}bound by  profile ${profile} → @features/keeping/data/keep-files.binding.json`);
     await reading(true, keeper(), load => {
       expect(describeDoc(load, '@keep/memory.port.json')).toContain(['required by  @keep', ...bound('')].join('\n'));
       expect(describeDoc(load, '@keep/plugin.json')).toContain(

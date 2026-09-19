@@ -1,13 +1,9 @@
 /**
- * What every part of the @auth plugin reads: the settings a project declares, the records the store keeps, and the
- * small helpers over them -- the store's location, the signing key, the clock, and the session shape's judgement.
+ * What every part of the @auth plugin reads: the settings a project declares, the records it keeps through
+ * state.port.json, and the small helpers over them -- the signing key, the clock, and the session shape's judgement.
  */
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { isAbsolute, join } from 'node:path';
 import { conforms, type Type } from '@wilanis/core';
-import { type Store, storeAt } from './store.js';
-
-export type { Store };
 
 export const ROOT = '@auth';
 /** A document of this plugin, by its path under the root. */
@@ -15,7 +11,6 @@ export const doc = (file: string) => `${ROOT}/${file}`;
 
 export interface Settings {
   tokens?: { issuer?: string; audience?: string; secret?: string; accessTtl?: number; refreshTtl?: number };
-  store?: { dir?: string };
   session?: string;
   challenge?: {
     ttl?: number;
@@ -59,12 +54,6 @@ export type Env = Record<string, unknown> & {
 
 /** This plugin's settings, as the project declared them. */
 export const settingsOf = (env: Env): Settings => env.plugins?.[ROOT] ?? {};
-
-/** The store this tree keeps its sessions and challenges in. */
-export function storeOf(env: Env): Store {
-  const dir = settingsOf(env).store?.dir ?? '.wilanis/auth';
-  return storeAt(isAbsolute(dir) ? dir : join(env.root ?? process.cwd(), dir));
-}
 
 /** The one clock the plugin reads, so every record it writes and every expiry it judges agrees on the time. */
 export const now = () => Date.now();

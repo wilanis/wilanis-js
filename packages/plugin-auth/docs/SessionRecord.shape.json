@@ -1,0 +1,42 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Session record",
+  "description": "One session as the guard keeps it between calls, through state.port.json: who it belongs to, the digest of the refresh token that renews it and when that expires, and the attributes the session shape judges.",
+  "layer": "core",
+  "fields": {
+    "id": {
+      "type": "string",
+      "description": "the key: the sid an access token and a refresh token carry"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "realm": {
+      "type": "string"
+    },
+    "roles": {
+      "type": "string[]"
+    },
+    "createdAt": {
+      "type": "string",
+      "description": "ISO 8601"
+    },
+    "refreshHash": {
+      "type": "string",
+      "required": false,
+      "description": "the digest of the refresh token that renews this session, never the token itself"
+    },
+    "refreshExpiresAt": {
+      "type": "string",
+      "required": false,
+      "description": "ISO 8601; past it the session has ended, and the guard ends it on the next read"
+    },
+    "attributes": {
+      "type": {
+        "fields": {},
+        "open": true
+      },
+      "description": "what the caller carries between calls; the shape settings.session names judges every write, in the plugin"
+    }
+  }
+}

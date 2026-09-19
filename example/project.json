@@ -48,9 +48,6 @@
           "accessTtl": 900,
           "refreshTtl": 604800
         },
-        "store": {
-          "dir": ".wilanis/auth"
-        },
         "session": "@access/domain/Session.shape.json",
         "challenge": {
           "ttl": 300,
@@ -139,21 +136,24 @@
       "description": "The real monitor API, and the directories written in the connections. A production profile binds identity.port.json to a binding whose connections are an OIDC issuer and LDAP; nothing else changes.",
       "bindings": {
         "@monitor/domain/monitor.port.json": "@monitor/data/monitor-rest.binding.json",
-        "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json"
+        "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
+        "@auth/state.port.json": "@features/state/data/auth-files.binding.json"
       }
     },
     "local": {
       "description": "Everything in this process: the entries kept in memory, and the directories written in the connections. Nothing reaches the network, so `wilanis start example --profile local` serves the same routes with no upstream at all.",
       "bindings": {
         "@monitor/domain/monitor.port.json": "@monitor/data/monitor-store.binding.json",
-        "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json"
+        "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
+        "@auth/state.port.json": "@features/state/data/auth-files.binding.json"
       }
     },
     "production": {
       "description": "The entries in PostgreSQL, and the directories written in the connections. The same routes, policies, shapes and business graphs as every other profile: what changes is which binding meets monitor.port.json, and through it which connection the records live behind. The startup step prepares the database before the port opens, so a tree whose database is unreachable refuses to serve rather than answering every route with a fault.",
       "bindings": {
         "@monitor/domain/monitor.port.json": "@monitor/data/monitor-postgres.binding.json",
-        "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json"
+        "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
+        "@auth/state.port.json": "@features/state/data/auth-files.binding.json"
       }
     }
   }

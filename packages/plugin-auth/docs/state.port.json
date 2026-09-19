@@ -1,0 +1,86 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/port.schema.json",
+  "label": "The guard's memory",
+  "description": "Where sessions and challenges live between calls. Required by @auth and bound by the host: to the plugin's own file store (files.port.json) for one process, to @storage collections for many. Every read is by key, so a binding needs a keyed store and nothing more.",
+  "operations": {
+    "getSession": {
+      "description": "The session under a key; record absent where there is none.",
+      "accepts": {
+        "key": {
+          "type": "string",
+          "description": "the record's id"
+        }
+      },
+      "returns": {
+        "fields": {
+          "record": {
+            "type": "@auth/SessionRecord.shape.json",
+            "required": false,
+            "description": "absent where there is none"
+          }
+        }
+      }
+    },
+    "putSession": {
+      "description": "Write one session whole, under its own id.",
+      "accepts": {
+        "record": {
+          "type": "@auth/SessionRecord.shape.json"
+        }
+      }
+    },
+    "endSession": {
+      "description": "Forget one session, and answer it as it was; record absent where there was none.",
+      "accepts": {
+        "key": {
+          "type": "string",
+          "description": "the record's id"
+        }
+      },
+      "returns": {
+        "fields": {
+          "record": {
+            "type": "@auth/SessionRecord.shape.json",
+            "required": false,
+            "description": "the session as it was; absent where there was none"
+          }
+        }
+      }
+    },
+    "getChallenge": {
+      "description": "The challenge under a key; record absent where there is none.",
+      "accepts": {
+        "key": {
+          "type": "string",
+          "description": "the record's id"
+        }
+      },
+      "returns": {
+        "fields": {
+          "record": {
+            "type": "@auth/ChallengeRecord.shape.json",
+            "required": false,
+            "description": "absent where there is none"
+          }
+        }
+      }
+    },
+    "putChallenge": {
+      "description": "Write one challenge whole, under its own id.",
+      "accepts": {
+        "record": {
+          "type": "@auth/ChallengeRecord.shape.json"
+        }
+      }
+    },
+    "removeChallenge": {
+      "description": "Forget one challenge; nothing happens where there is none.",
+      "accepts": {
+        "key": {
+          "type": "string",
+          "description": "the record's id"
+        }
+      }
+    }
+  }
+}

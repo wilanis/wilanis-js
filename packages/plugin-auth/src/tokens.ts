@@ -5,18 +5,22 @@
 import { randomBytes } from 'node:crypto';
 import type { Handler } from '@wilanis/engine';
 import { SignJWT } from 'jose';
-import { type Env, iso, judged, keyOf, now, type SessionRecord, same, settingsOf, sha, storeOf } from './settings.js';
+import { type Env, iso, judged, keyOf, now, type SessionRecord, same, settingsOf, sha } from './settings.js';
+import { endSession, getSession, putSession } from './state.js';
 
-/** A fresh pair of tokens for a session, the refresh token recorded against it. */
+/**
+ * A fresh pair of tokens for a session, the refresh token recorded against it. The refresh token carries the sid
+ * of the session it renews, so a refresh reads that session by key; the digest of the whole token is what is
+ * compared, since a sid says which session and never that the caller holds its token.
+ */
 export async function issueTokens(env: Env, session: SessionRecord): Promise<Record<string, unknown>> {
   const settings = settingsOf(env);
-  const store = storeOf(env);
   const accessTtl = settings.tokens?.accessTtl ?? 900;
   const refreshTtl = settings.tokens?.refreshTtl ?? 604800;
-  const refreshToken = randomBytes(32).toString('base64url');
+  const refreshToken = `${session.id}.${randomBytes(32).toString('base64url')}`;
   session.refreshHash = sha(refreshToken);
   session.refreshExpiresAt = iso(now() + refreshTtl * 1000);
-  store.put('sessions', session.id, session);
+  await putSession(env, session);
   const accessToken = await new SignJWT({ realm: session.realm, roles: session.roles, sid: session.id })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(session.subject)
@@ -43,59 +47,59 @@ export const issue: Handler = async ({ in: input, ctx }) => {
   return issueTokens(env, session);
 };
 
-/** A fresh pair against a refresh token, which is spent the moment it is presented, good or expired. */
+/**
+ * A fresh pair against a refresh token, which is spent the moment it is presented, good or expired. The session
+ * is read by the sid the token carries; a token naming no session, or whose digest is not the one recorded, renews
+ * nothing.
+ */
 export const refresh: Handler = async ({ in: input, ctx }) => {
   const env = ctx.env as Env;
-  const store = storeOf(env);
-  const hash = sha(String(input.refreshToken));
-  const session = store
-    .list<SessionRecord>('sessions')
-    .find(record => record.refreshHash && same(record.refreshHash, hash));
-  if (!session) return { refreshed: false };
+  const token = String(input.refreshToken);
+  const sid = token.includes('.') ? token.slice(0, token.indexOf('.')) : '';
+  const session = sid ? await getSession(env, sid) : undefined;
+  if (!session?.refreshHash || !same(session.refreshHash, sha(token))) return { refreshed: false };
   if (!session.refreshExpiresAt || Date.parse(session.refreshExpiresAt) < now()) {
-    store.delete('sessions', session.id);
+    await endSession(env, session.id);
     return { refreshed: false };
   }
   return { refreshed: true, tokens: await issueTokens(env, session) };
 };
 
 /** The session by that id; it throws when there is none. */
-function sessionOf(env: Env, id: unknown): SessionRecord {
-  const session = storeOf(env).get<SessionRecord>('sessions', String(id));
+async function sessionOf(env: Env, id: unknown): Promise<SessionRecord> {
+  const session = await getSession(env, String(id));
   if (!session) throw new Error(`no session '${String(id)}'`);
   return session;
 }
 
 /** The attributes a session carries; it throws when the session is unknown. */
-export const sessionGet: Handler = async ({ in: input, ctx }) => sessionOf(ctx.env as Env, input.session).attributes;
+export const sessionGet: Handler = async ({ in: input, ctx }) =>
+  (await sessionOf(ctx.env as Env, input.session)).attributes;
 
 /** The attributes after merging these values in, once the session shape has accepted the whole of them. */
 export const sessionSet: Handler = async ({ in: input, ctx }) => {
   const env = ctx.env as Env;
-  const session = sessionOf(env, input.session);
+  const session = await sessionOf(env, input.session);
   const values = input.values;
   if (!values || typeof values !== 'object' || Array.isArray(values)) throw new Error('values: expected an object');
   session.attributes = judged({ ...session.attributes, ...(values as Record<string, unknown>) }, env);
-  storeOf(env).put('sessions', session.id, session);
+  await putSession(env, session);
   return session.attributes;
 };
 
 /** The attributes after dropping these keys, once the session shape has accepted what is left. */
 export const sessionRemove: Handler = async ({ in: input, ctx }) => {
   const env = ctx.env as Env;
-  const session = sessionOf(env, input.session);
+  const session = await sessionOf(env, input.session);
   const keys = Array.isArray(input.keys) ? input.keys.map(String) : [];
   const rest = { ...session.attributes };
   for (const key of keys) delete rest[key];
   session.attributes = judged(rest, env);
-  storeOf(env).put('sessions', session.id, session);
+  await putSession(env, session);
   return session.attributes;
 };
 
 /** Forget the session, and whether there was one to forget. */
-export const sessionEnd: Handler = async ({ in: input, ctx }) => {
-  const store = storeOf(ctx.env as Env);
-  const had = Boolean(store.get('sessions', String(input.session)));
-  store.delete('sessions', String(input.session));
-  return { ended: had };
-};
+export const sessionEnd: Handler = async ({ in: input, ctx }) => ({
+  ended: Boolean(await endSession(ctx.env as Env, String(input.session))),
+});

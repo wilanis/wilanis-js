@@ -1,8 +1,8 @@
 /**
  * Where sessions and challenges live: one JSON file per record under <dir>/<kind>/. A file, not memory, so that
  * a server and the `wilanis run` processes of the same tree share them -- the OTP flow on the command line opens a
- * challenge in one process, issues its code in a second and answers it in a third. A real deployment points
- * `store.dir` at a volume; a store behind a database is its own plugin.
+ * challenge in one process, issues its code in a second and answers it in a third. This is what files.port.json
+ * keeps behind a contract; a deployment of many instances binds state.port.json to a store instead.
  */
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

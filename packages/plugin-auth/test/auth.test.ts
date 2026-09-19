@@ -185,10 +185,9 @@ describe('sessions: store on one call, read on another, keyed by the token', () 
       ).status,
     ).toBe(400);
     // refresh: a new pair, the same session, the old refresh token spent
-    const second = await call('/api/v1/token/refresh', {
-      method: 'POST',
-      body: JSON.stringify({ refreshToken: first.refreshToken }),
-    });
+    const refreshing = (refreshToken: string) =>
+      call('/api/v1/token/refresh', { method: 'POST', body: JSON.stringify({ refreshToken }) });
+    const second = await refreshing(first.refreshToken);
     expect(second.status).toBe(200);
     expect(second.body.refreshToken).not.toBe(first.refreshToken);
     expect(
@@ -197,12 +196,13 @@ describe('sessions: store on one call, read on another, keyed by the token', () 
       displayName: 'Bo',
       theme: 'dark',
     });
-    expect(
-      await call('/api/v1/token/refresh', {
-        method: 'POST',
-        body: JSON.stringify({ refreshToken: first.refreshToken }),
-      }).then(answer => [answer.status, answer.body.reason]),
-    ).toEqual([401, 'invalid_refresh']);
+    const refused = [401, 'invalid_refresh'];
+    expect(await refreshing(first.refreshToken).then(answer => [answer.status, answer.body.reason])).toEqual(refused);
+    // the refresh token carries its session's sid, so a refresh reads by key; the sid alone renews nothing
+    const sid = String(second.body.refreshToken).split('.')[0];
+    const claims = JSON.parse(Buffer.from(second.body.accessToken.split('.')[1], 'base64url').toString());
+    expect(sid).toBe(claims.sid);
+    expect(await refreshing(`${sid}.forged`).then(answer => [answer.status, answer.body.reason])).toEqual(refused);
     // sign out: the cookie is cleared, and the token no longer verifies because its session has ended
     const out = await call('/api/v1/sign-out', { method: 'POST', token: second.body.accessToken });
     expect(out.status).toBe(200);
