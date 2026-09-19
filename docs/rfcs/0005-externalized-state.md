@@ -222,7 +222,7 @@ added to it. X201 is widened so that a collection's `of` may name a shape a plug
 | B002 (existing) | `check/project.ts` `checkPortMet` | a required port has no binding under a profile; the message gains `(required by @auth)` | `wilanis new binding <feature>/<name> --port <path>` |
 | B0nn | `check/bindings.ts` | a binding of a required port has `reads` (RFC 0029), or one of its graphs reads `request.*`: the guard runs before the policies, with no request judged yet | remove `reads`; a state operation reads only its `in` |
 | B0nn | `check/bindings.ts` | a binding of a required port delegates to an operation that `holds` or `refuses`: memory answers or fails, it never ends the run on purpose | delegate to `@auth/files.port.json` or `@storage/store.port.json` |
-| C0nn | `check/project.ts` | `blobs.connection` names a connection whose kind no named plugin offers a blob store for, or names no connection | `wilanis ls connection-kind`; name a plugin that offers one |
+| C014 | `check/project.ts` `checkBlobStore` | `blobs.connection` names a connection whose kind no named plugin offers a blob store for, or names no connection | `wilanis ls connection-kind`; name a plugin that offers one |
 | D012 | `documents.ts` (loader) | a plugin lists a path under both `grants.ports` and `requires.ports`, or a required port is not under its `docs/` | list it once |
 | X10n | `packages/plugin-auth/src/rules.ts` | `@auth/files.port.json` is delegated to with a `dir` that is not under the tree, or under a directory the loader reads (`features/`, `connections/`) | `.wilanis/auth`, or an absolute path outside the tree |
 
@@ -325,7 +325,7 @@ Sabotage, in `packages/runtime/test/example.test.ts` (copies of the example hand
 
 - delete the state binding from the `live` profile → B002 naming `@auth/state.port.json` and `required by @auth`;
 - add `reads` to the state binding → B0nn; delegate `getSession` to `@http/server.port.json#listen` → B0nn;
-- set `blobs.connection` to `@connections/monitor-api.connection.json` → C0nn;
+- set `blobs.connection` to `@connections/monitor-api.connection.json` → C014;
 - list `@auth/state.port.json` under `grants.ports` in a copied plugin manifest → D012 (`packages/runtime/test/required-port.test.ts`);
 - delegate `files.port.json#get` with `dir: "features"` → X10n (`packages/plugin-auth/test`).
 
@@ -351,7 +351,7 @@ End to end:
    removed; X10n. (`area:plugin-auth`)
 4. The example's `features/state/`, the access tree's `-dev` binding, the runtime templates, the startup step;
    the sabotage tests. (`area:runtime`, `good first issue` for the templates and CLAUDE.md row)
-5. `project.json → blobs.connection`, `PluginModule.blobStores`, C0nn, `Embedder` choosing the store. (`area:core`, `area:runtime`)
+5. `project.json → blobs.connection`, `PluginModule.blobStores`, C014, `Embedder` choosing the store. (`area:core`, `area:runtime`)
 6. `@wilanis/plugin-s3`: the connection kind, the streaming store, the fake, the tests, `docs/`. (new package)
 7. `auth.store.json`, the production binding of `state.port.json` over `@storage/store.port.json`, X201 widened,
    once RFC 0002 has landed; the two-instance test.

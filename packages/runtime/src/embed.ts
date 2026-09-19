@@ -7,7 +7,7 @@ import { buildEnv, type Compiled, type CompileOptions, Compiler, runGraph } from
 import type { Codecs, Hold, PluginModule, Scope, Serving } from '@wilanis/core';
 import { type BlobStore, conforms, type GuardArgs, type StartupStep, type TriggerDoc, type Type } from '@wilanis/core';
 import type { KernelSpec, Report } from '@wilanis/engine';
-import { FileBlobStore } from './blobs.js';
+import { type BlobChoice, blobStoreOf, FileBlobStore } from './blobs.js';
 import { correlationOf, type Fired, type Ran, runId, type Started } from './fired.js';
 import { gate } from './gate.js';
 import { coerceWire, fillTemplates, prune } from './values.js';
@@ -100,7 +100,12 @@ export class Embedder {
       Object.entries(scope.project?.secrets ?? {}).map(([name, value]) => [name, processEnv[value] ?? '']),
     );
     const root = opts.root ?? process.cwd();
-    this.blobs = opts.blobs ?? new FileBlobStore(root, scope.project?.blobs?.dir);
+    // a stubbed run keeps its bytes in files whatever the project names: nothing it does leaves the process
+    this.blobs =
+      opts.blobs ??
+      (opts.stubEffects
+        ? new FileBlobStore(root, scope.project?.blobs?.dir)
+        : blobStoreOf({ scope, plugins, connections: built.env.connections as BlobChoice['connections'], root }));
     const hold: Hold = what => {
       this.held.push(what);
     };
