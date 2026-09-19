@@ -240,6 +240,11 @@ export function plantedEditingSaying(docs: Record<string, unknown>, file: string
   return after(plantingAndEditing(docs, file, edit), refusalsSaying);
 }
 
+/** The same, answered as code and the edit each refusal offers: for a case whose claim is the hint. */
+export function plantedEditingHinting(docs: Record<string, unknown>, file: string, edit: (doc: any) => void): string[] {
+  return after(plantingAndEditing(docs, file, edit), refusalsHinting);
+}
+
 /** Write the planted documents into a copy, then edit one it already has. */
 const plantingAndEditing = (docs: Record<string, unknown>, file: string, edit: (doc: any) => void) => (dir: string) => {
   write(dir, docs);

@@ -2,8 +2,9 @@
  * G graphs. Node ids are free and unique (G001); every node runs an operation this graph's role may run
  * (L002, L003, L008); inputs fit their contracts (see inputs.ts); a switch's rules are boolean and route to
  * nodes of this graph, each routed once (G009, G011); a map iterates a list and binds its element (G012); no
- * cycle (G007); out.from names nodes that answer the out type (G010); everything declared is read (G008);
- * constants conform (G013). A domain graph that only forwards its input is refused (L007).
+ * cycle (G007); out.from names nodes that answer the out type (G010); everything declared is read (G008,
+ * and P005 for the `reads` map); every read's local name is free (P006); constants conform (G013). A domain
+ * graph that only forwards its input is refused (L007).
  */
 import {
   conforms,
@@ -24,13 +25,14 @@ import { checkReason, checkSwitch, elementInputs } from './graph-nodes.js';
 import { GraphReads } from './graph-reads.js';
 import { checkWhole } from './graph-whole.js';
 import { checkInputs } from './inputs.js';
-import { type Effects, type Judge, RESERVED, type Refuser, type ShapeLayer } from './judge.js';
+import { type Effects, type Judge, type JudgedResolver, RESERVED, type Refuser, type ShapeLayer } from './judge.js';
 import { resolversFor } from './resolvers.js';
 
 /**
  * Every refusal a graph can earn, in the role its layer gives it: unique ids (G001), operations the role and
  * the feature may run (L002, L003, L008), reads that resolve (G003), inputs that fit their contracts, switches
- * and maps (G004, G006, G009, G011, G012), conforming constants (G013), and the whole (G007, G008, G010).
+ * and maps (G004, G006, G009, G011, G012), conforming constants (G013), a `reads` map whose names are free
+ * (P006) and every entry of which is read (P005), and the whole (G007, G008, G010).
  * A domain graph that only forwards its input to one port operation is refused as boilerplate (L007).
  */
 export function checkGraph(judge: Judge, graph: Loaded<GraphDoc>, role: GraphRole): void {
@@ -96,8 +98,44 @@ class GraphCheck {
       inType,
       constTypes,
     });
+    this.checkReadNames(resolvers);
     for (const node of this.nodes.values()) this.checkNode(node, reads);
+    this.checkReadsUsed(resolvers, reads);
     checkWhole({ refuse: this.refuse, doc, routedBy: this.routedBy, reads, outType });
+  }
+
+  /**
+   * P006: a read's local name is the author's, so it may collide. A name a node already has, or one of the
+   * roots a value reads, would make {{name}} ambiguous -- the order `rootReadRaw` tries the roots in would
+   * decide it silently. The name is refused instead, and the order never matters.
+   */
+  private checkReadNames(resolvers: Record<string, JudgedResolver>): void {
+    for (const name of Object.keys(resolvers)) {
+      if (RESERVED.has(name)) {
+        const hint = `${[...RESERVED].join(', ')} are roots; pick another name`;
+        this.refuse('P006', `read name '${name}' is reserved`, `reads/${name}`, hint);
+        continue;
+      }
+      if (this.nodes.has(name))
+        this.refuse(
+          'P006',
+          `'${name}' is also the id of a node; {{${name}}} would be ambiguous`,
+          `reads/${name}`,
+          `rename the read: "reads": { "${name}By": "...#${name}" }`,
+        );
+    }
+  }
+
+  /**
+   * P005: `reads` is exactly what this graph reads, so an entry no value reads is refused as an unused import
+   * is. What was read is what the nodes' values named; an entry P004 already refused is not judged twice.
+   */
+  private checkReadsUsed(resolvers: Record<string, JudgedResolver>, reads: GraphReads): void {
+    for (const name of Object.keys(resolvers)) {
+      if (reads.readsResolvers.has(name)) continue;
+      const hint = `read it as {{${name}}}, or drop the entry: reads is exactly what this document reads`;
+      this.refuse('P005', `'${name}' is used by no value of this graph`, `reads/${name}`, hint);
+    }
   }
 
   // ---- the table ----------------------------------------------------------------------------------
