@@ -167,8 +167,7 @@ describe('effectsReachable: the same walk, read for what it ends at', () => {
 
   it('leaves through undefined where the walk started in the graph that holds the site', () => {
     // effectsOfGraph is for a reader who has the graph rather than the operation it answers -- it takes the
-    // canonical path, as refusalsOfGraph does. Nothing
-    // led there, so nothing is named as having.
+    // canonical path, as refusalsOfGraph does. Nothing led there, so nothing is named as having led there.
     const sites = effectsOfGraph(scope, scope.canon('@monitor/data/store-and-latest.graph.json'), 'local');
     expect(sites.length).toBeGreaterThan(0);
     for (const site of sites) expect(site.through).toBeUndefined();
