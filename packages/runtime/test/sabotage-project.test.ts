@@ -184,4 +184,11 @@ describe('sabotage: a store names a connection and the shapes it keeps', () => {
     expect(dependingOn('@monitor/domain/EntryRecord.shape.json')).toContain('L005');
     expect(dependingOn('@monitor/domain/Entry.shape.json')).toEqual([]);
   });
+  it('C014 a blob registry behind a connection no plugin offers a blob store for', () => {
+    expect(
+      sabotage('project.json', project => {
+        project.blobs = { connection: '@connections/monitor-api.connection.json' };
+      }),
+    ).toContain('C014');
+  });
 });

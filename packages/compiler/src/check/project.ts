@@ -2,9 +2,17 @@
  * The project document. C connections/settings: plugin settings read secrets only and fit the manifest (C001,
  * C002). B bindings/profiles: a profile names domain ports and bindings that implement them (R001, B003,
  * B004), and every domain port is met under every profile (B002). Startup: each step fires a domain port
- * operation (or a native one that holds) before anything is received (B006, B007, B008).
+ * operation (or a native one that holds) before anything is received (B006, B007, B008). Blobs: the connection
+ * the blob registry keeps bytes behind opens a store some plugin offers (C014).
  */
-import { EMPTY_OBJECT, type Loaded, type Operation, type PortDoc, type StartupStep } from '@wilanis/core';
+import {
+  EMPTY_OBJECT,
+  type Loaded,
+  type Operation,
+  type PluginModule,
+  type PortDoc,
+  type StartupStep,
+} from '@wilanis/core';
 import { type Judge, underProfile } from './judge.js';
 import { opNeeds } from './resolvers.js';
 import { mismatch } from './typing.js';
@@ -143,4 +151,32 @@ function checkStepReads(judge: Judge, step: StartupStep, index: number): void {
       refuse('B008', message, `startup/${index}/run`, hint);
     }
   }
+}
+
+/**
+ * C014: `blobs.connection` names a connection, and a plugin the project names offers a blob store for its kind.
+ * What a plugin offers is its module's `blobStores`, so this is judged against the plugins the tree loaded.
+ */
+export function checkBlobStore(judge: Judge, plugins: PluginModule[]): void {
+  const ref = judge.project.doc.blobs?.connection;
+  if (!ref) return;
+  const refuse = judge.refuser(judge.project.path);
+  const connection = judge.scope.get('connection', ref);
+  if (!connection) {
+    refuse(
+      'C014',
+      `blobs.connection names '${ref}', which is no connection`,
+      'blobs/connection',
+      'wilanis ls connection',
+    );
+    return;
+  }
+  const kind = judge.scope.canon(connection.doc.kind);
+  if (plugins.some(plugin => plugin.blobStores?.[kind])) return;
+  refuse(
+    'C014',
+    `blobs.connection names '${ref}', of kind '${kind}', and no plugin the project names offers a blob store for that kind`,
+    'blobs/connection',
+    'wilanis ls connection-kind; name a plugin that offers a blob store for one, or remove blobs.connection to keep files',
+  );
 }
