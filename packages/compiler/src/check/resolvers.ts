@@ -4,6 +4,11 @@
  * (P002, P003) and each entry of a `reads` map is judged where it is written (P004, L002); whether the trigger
  * kinds that reach a read hand it is judged at the trigger (T004). Also the walk that finds every request.*
  * path an operation reaches through its binding, which B008 and T004 hold their callers to.
+ *
+ * The walk has one edge no document writes: a native call site over a scoped collection reads the reads that
+ * collection is scoped by, because the compiler carries them there at lowering (RFC 0015). So a graph that
+ * names no request at all still reaches one, and A006, T004 and B008 judge a scope's read the way they judge
+ * any read a trigger reaches.
  */
 import {
   isSwitch,
@@ -12,7 +17,9 @@ import {
   type ResolversDoc,
   splitPath,
   splitRef,
+  type Values,
 } from '@wilanis/core';
+import { collectionOf } from '../documents.js';
 import { type Judge, type JudgedResolver, RESERVED, type Refuser, readValuesOf } from './judge.js';
 
 /**
@@ -145,6 +152,21 @@ function requestNeedsOf(resolvers: Record<string, JudgedResolver>, reads: string
   return out;
 }
 
+/**
+ * The reads a native call site is scoped by: where the site is over a collection some store declares `scoped`,
+ * the store's own `reads` for the names those columns fill, as if the site had written them. Nothing else
+ * reaches them, and they are what makes a scope a read the trigger must guarantee.
+ */
+function scopeNeeds(judge: Judge, run: string, given: Values | undefined): RequestNeed[] {
+  const site = collectionOf(judge.scope, { key: run, given });
+  if (!site) return [];
+  const store = judge.scope.registry.get('store', site.store);
+  const scoped = store?.doc.collections[site.collection]?.scoped;
+  if (!store || !scoped) return [];
+  const resolvers = quietResolvers(judge, store.doc.reads);
+  return requestNeedsOf(resolvers, judge.scope.templateReads(Object.values(scoped)), store.path);
+}
+
 /** Every request.* path reachable from a domain port operation, through the binding that meets it under a profile. */
 export function opNeeds(
   judge: Judge,
@@ -160,7 +182,9 @@ export function opNeeds(
   if (!bound) return [];
   if (bound.graph) return graphNeeds(judge, judge.scope.canon(bound.graph), profile, seen);
   const resolvers = quietResolvers(judge, binding.doc.reads);
-  return requestNeedsOf(resolvers, judge.scope.templateReads(bound.in), binding.path);
+  const out = requestNeedsOf(resolvers, judge.scope.templateReads(bound.in), binding.path);
+  if (bound.run) out.push(...scopeNeeds(judge, bound.run, bound.in));
+  return out;
 }
 
 /** Every request.* path read under a graph: its own `reads`, and per node the one binding operation it reaches. */
@@ -174,8 +198,9 @@ function graphNeeds(judge: Judge, graphPath: string, profile: string | undefined
   for (const node of graph.doc.nodes) {
     if (isSwitch(node)) continue;
     const hit = judge.scope.op(node.run);
-    if (typeof hit === 'string' || hit.port.native) continue;
-    out.push(...opNeeds(judge, node.run, profile, seen));
+    if (typeof hit === 'string') continue;
+    if (hit.port.native) out.push(...scopeNeeds(judge, node.run, node.in));
+    else out.push(...opNeeds(judge, node.run, profile, seen));
   }
   return out;
 }

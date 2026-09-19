@@ -51,14 +51,31 @@ const SHAPES = {
   }),
 };
 
+/**
+ * The read a case scopes the planted store by, where it declares a view: a view sees a scoped collection
+ * (C013), so the one case that plants a view plants this beside it and binds it under `reads`. Every other
+ * case scopes nothing, and binding a read no collection reads would be refused as an unused import (P005).
+ */
+const TENANCY = {
+  'features/monitor/edge/tenancy.resolvers.json': {
+    $schema: schemaUrl('resolvers'),
+    label: 'Tenancy',
+    description: 'Which tenant the caller speaks for, as the sign-in wrote it into their session.',
+    resolvers: { tenant: { read: 'request.session.attributes.displayName', required: true } },
+  },
+};
+const READS = { tenant: '@monitor/edge/tenancy.resolvers.json#tenant' };
+
 /** The store the cases break: rows keyed by a string, notes referring to them, counted keyed by a number. */
-const keeping = (collections: Record<string, unknown>) => ({
+const keeping = (collections: Record<string, unknown>, reads?: Record<string, string>) => ({
   ...SHAPES,
+  ...(reads ? TENANCY : {}),
   'features/monitor/data/planted.store.json': {
     $schema: schemaUrl('store'),
     label: 'Entries',
     description: 'The rows recorded so far, and the notes hung off them.',
     connection: KEPT,
+    ...(reads ? { reads } : {}),
     collections,
   },
 });
@@ -74,8 +91,10 @@ const notes = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 const counted = { of: '@monitor/domain/Counted.shape.json', key: 'n' };
-const codesOf = (collections: Record<string, unknown>) => plantedAll(keeping(collections));
-const pointingAt = (collections: Record<string, unknown>) => plantedPointing(keeping(collections));
+const codesOf = (collections: Record<string, unknown>, reads?: Record<string, string>) =>
+  plantedAll(keeping(collections, reads));
+const pointingAt = (collections: Record<string, unknown>, reads?: Record<string, string>) =>
+  plantedPointing(keeping(collections, reads));
 
 /** One refusal as a case expects it: the code, and the constraint of the planted store it points at. */
 const STORE = '@features/monitor/data/planted.store.json';
@@ -122,12 +141,17 @@ describe('sabotage: what a store holds its records to', () => {
 
   it('a view keeps no records, so it is judged as one and never as a collection that does', () => {
     // A view declares no shape and no key, so every rule that reads one passes it by rather than refusing a
-    // field the author never wrote: this is the whole of what `keeps` buys a reader.
-    const view = { view: 'rows', behind: '@monitor/edge/seen.policy.json' };
-    expect(codesOf({ rows: entry(), everyRow: view })).toEqual([]);
+    // field the author never wrote: this is the whole of what `keeps` buys a reader. A view sees a scoped
+    // collection (C013), so the rows it views are scoped by a read the store binds -- see sabotage-scoping.
+    const scoped = entry({ scoped: { tenant: '{{tenant}}' } });
+    const view = { view: 'rows', behind: '@access/edge/employees-only.policy.json' };
+    expect(codesOf({ rows: scoped, everyRow: view }, READS)).toEqual([]);
     // and a reference names something with a key to hold, which a view has not
     expect(
-      pointingAt({ rows: entry(), everyRow: view, notes: notes({ refs: { entryId: { collection: 'everyRow' } } }) }),
+      pointingAt(
+        { rows: scoped, everyRow: view, notes: notes({ refs: { entryId: { collection: 'everyRow' } } }) },
+        READS,
+      ),
     ).toEqual(at('C005', 'notes/refs/entryId'));
   });
 

@@ -5,7 +5,7 @@
  *   P static fields/resolvers (resolvers.ts)   B bindings/profiles (bindings.ts, project.ts)
  *   T triggers (triggers.ts)   A access (access.ts)   I invariants (invariants.ts)
  *   C connections and settings (project.ts, contracts.ts)
- *   C stores: what they keep and what they once called it (stores.ts)
+ *   C stores: what they keep and what they once called it (stores.ts), and who may see it (scopes.ts)
  *   atomic graphs, which are L and G rules over what one reaches (atomic.ts)
  *   S scenarios (triggers.ts)   X plugin-specific (each plugin's own `check`)
  */
@@ -19,6 +19,7 @@ import { checkInvariant, checkInvariantSites } from './check/invariants.js';
 import { Judge } from './check/judge.js';
 import { checkProject, checkStartup } from './check/project.js';
 import { checkResolversDoc } from './check/resolvers.js';
+import { checkStoreScoping } from './check/scopes.js';
 import { checkStore } from './check/stores.js';
 import { checkScenario, checkTrigger, checkTriggerKind } from './check/triggers.js';
 
@@ -57,10 +58,15 @@ function judgeContracts(judge: Judge): void {
   for (const kind of registry.all('trigger-kind')) checkTriggerKind(judge, kind);
 }
 
-/** What names a contract: the resolvers, graphs, bindings, policies, triggers and scenarios. */
+/**
+ * What names a contract: the resolvers, graphs, bindings, policies, triggers and scenarios. A store's scoping
+ * is judged here rather than beside the rest of the store, because what a scope claims is about the resolver
+ * it names, and a resolver is judged the line above.
+ */
 function judgeUses(judge: Judge): void {
   const { registry } = judge.scope;
   for (const resolvers of registry.all('resolvers')) checkResolversDoc(judge, resolvers);
+  for (const store of registry.all('store')) checkStoreScoping(judge, store);
   for (const graph of registry.all('graph')) checkGraph(judge, graph, judge.scope.roleOf(graph.path));
   for (const binding of registry.all('binding')) checkBinding(judge, binding);
   for (const policy of registry.all('policy')) checkPolicy(judge, policy);

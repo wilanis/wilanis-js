@@ -1,8 +1,19 @@
 /**
  * What both judges read off a document: the variables a call site binds, the inputs a delegation passes
- * on, and the nodes a graph answers with. The checker and the compiler agree on these by sharing them.
+ * on, the nodes a graph answers with, and which collection of which store a native call site is over. The
+ * checker and the compiler agree on these by sharing them.
  */
-import { type GraphDoc, type Operation, resolvedHere, type Scope, type Type, type Values } from '@wilanis/core';
+import {
+  type Field,
+  type GraphDoc,
+  type Operation,
+  type PortDoc,
+  parsePath,
+  resolvedHere,
+  type Scope,
+  type Type,
+  type Values,
+} from '@wilanis/core';
 
 /**
  * The variables an operation binds at one call site, through both channels: a `type` field whose literal is
@@ -40,4 +51,76 @@ export function passedInputs(target: Operation, op: Operation, given: Values | u
 export function outputCandidates(doc: GraphDoc): string[] | undefined {
   if (!doc.out) return undefined;
   return Array.isArray(doc.out.from) ? doc.out.from : [doc.out.from];
+}
+
+/**
+ * What `collectionOf` asks of a call site: what it names and what it was given there. A `ReachedEffect` is
+ * one, so the walk hands its sites straight over, and so is a node or a delegation a rule has in hand.
+ */
+export interface CallSite {
+  /** the `path#operation` the site names */
+  key: string;
+  given: Values | undefined;
+}
+
+/** The collection one native call site is over: the store document it names, and the collection within it. */
+export interface CollectionSite {
+  /** the canonical path of the store document the site names */
+  store: string;
+  /** the name the site gives the collection, as the store declares it */
+  collection: string;
+}
+
+/** How a port addresses one collection: the input naming the document, and the input holding the key into it. */
+interface Address {
+  named: string;
+  by: string;
+}
+
+/**
+ * Which input of a port names a document keyed by collection, and which input holds the key: read off the
+ * `resolves` paths the port writes, so nothing here learns the word `store`. A path whose first segment takes
+ * a key by an input -- `collections[collection].of` -- says that the field's literal names a document with a
+ * `collections` map and that the named input picks one out of it, which is exactly the pair a reader wants.
+ * It is a property of the port and not of one operation, since a port addresses its documents one way: `count`
+ * binds no type and writes no path, and is over a collection all the same.
+ */
+function addressing(port: PortDoc): Address | undefined {
+  for (const op of Object.values(port.operations)) {
+    for (const [named, field] of Object.entries(op.accepts ?? {})) {
+      const by = keyedBy(field);
+      if (by) return { named, by };
+    }
+  }
+  return undefined;
+}
+
+/** Which input one field's `resolves` takes the collection's name by, or nothing where none of its paths does. */
+function keyedBy(field: Field): string | undefined {
+  for (const expr of Object.values(field.resolves ?? {})) {
+    const path = parsePath(expr);
+    if (typeof path === 'string') continue;
+    const first = path[0];
+    if (first?.name === 'collections' && first.from === 'input') return first.by;
+  }
+  return undefined;
+}
+
+/**
+ * The collection a native call site is over, or nothing where it is over none: the site's static inputs read
+ * through the port's own `resolves` channel, so the compiler answers it for any port that addresses a store
+ * that way and learns nothing of what a store means. A site naming a store the tree lacks, or a collection
+ * the store does not declare, answers nothing -- R001 and the plugin's X204 refuse those where they are named.
+ */
+export function collectionOf(scope: Scope, site: CallSite): CollectionSite | undefined {
+  const hit = scope.op(site.key);
+  if (typeof hit === 'string' || !hit.port.native) return undefined;
+  const address = addressing(hit.port.doc);
+  if (!address) return undefined;
+  const named = site.given?.[address.named];
+  const collection = site.given?.[address.by];
+  if (typeof named !== 'string' || typeof collection !== 'string') return undefined;
+  const store = scope.get('store', named);
+  if (!store || !(collection in store.doc.collections)) return undefined;
+  return { store: store.path, collection };
 }
