@@ -24,6 +24,11 @@
         "key": {
           "type": "$K",
           "description": "the value of the collection's key field"
+        },
+        "scope": {
+          "type": "unknown",
+          "required": false,
+          "description": "The caller's scope over a scoped collection: an object with one key per column the collection's `scoped` declares, each the read the store binds for it. Written by the compiler from the store, never by a document. The engine writes these columns on `put` and holds every read, `patch` and `remove` to them, so a key of another scope is absent. Absent over a collection that declares no `scoped`, and over a view, which sees every row."
         }
       },
       "returns": {
@@ -72,6 +77,11 @@
           "type": "number",
           "required": false,
           "description": "skip this many first; it means nothing without an order"
+        },
+        "scope": {
+          "type": "unknown",
+          "required": false,
+          "description": "The caller's scope over a scoped collection: an object with one key per column the collection's `scoped` declares, each the read the store binds for it. Written by the compiler from the store, never by a document. The engine writes these columns on `put` and holds every read, `patch` and `remove` to them, so a key of another scope is absent. Absent over a collection that declares no `scoped`, and over a view, which sees every row."
         }
       },
       "returns": "$T[]"
@@ -94,6 +104,11 @@
           "type": "unknown",
           "required": false,
           "description": "which records match. An object whose keys are fields of the collection's shape: a literal or a read (\"{{in.method}}\") means equality, and an object means a predicate, with one or more of eq, ne, lt, lte, gt, gte (the field's type), in, notIn (a list of it), has (boolean: present or absent, for an optional field), contains, startsWith (strings). Three combinators sit beside field names: all, any (lists of filters) and not (one filter). A field that is a shape or a list may only be tested with has. Nothing else is a filter. Absent: every record."
+        },
+        "scope": {
+          "type": "unknown",
+          "required": false,
+          "description": "The caller's scope over a scoped collection: an object with one key per column the collection's `scoped` declares, each the read the store binds for it. Written by the compiler from the store, never by a document. The engine writes these columns on `put` and holds every read, `patch` and `remove` to them, so a key of another scope is absent. Absent over a collection that declares no `scoped`, and over a view, which sees every row."
         }
       },
       "returns": "number"
@@ -123,6 +138,11 @@
           "type": "boolean",
           "required": false,
           "description": "replace a record already under that key. Absent: it does"
+        },
+        "scope": {
+          "type": "unknown",
+          "required": false,
+          "description": "The caller's scope over a scoped collection: an object with one key per column the collection's `scoped` declares, each the read the store binds for it. Written by the compiler from the store, never by a document. The engine writes these columns on `put` and holds every read, `patch` and `remove` to them, so a key of another scope is absent. Absent over a collection that declares no `scoped`, and over a view, which sees every row."
         }
       },
       "returns": {
@@ -169,6 +189,11 @@
         "changes": {
           "type": "unknown",
           "description": "an object whose keys are fields of the shape other than the key, each a value of that field's type"
+        },
+        "scope": {
+          "type": "unknown",
+          "required": false,
+          "description": "The caller's scope over a scoped collection: an object with one key per column the collection's `scoped` declares, each the read the store binds for it. Written by the compiler from the store, never by a document. The engine writes these columns on `put` and holds every read, `patch` and `remove` to them, so a key of another scope is absent. Absent over a collection that declares no `scoped`, and over a view, which sees every row."
         }
       },
       "returns": {
@@ -202,6 +227,11 @@
         "key": {
           "type": "$K",
           "description": "the value of the collection's key field"
+        },
+        "scope": {
+          "type": "unknown",
+          "required": false,
+          "description": "The caller's scope over a scoped collection: an object with one key per column the collection's `scoped` declares, each the read the store binds for it. Written by the compiler from the store, never by a document. The engine writes these columns on `put` and holds every read, `patch` and `remove` to them, so a key of another scope is absent. Absent over a collection that declares no `scoped`, and over a view, which sees every row."
         }
       },
       "returns": {
