@@ -106,7 +106,8 @@ export interface ProjectDoc extends Envelope {
   startup?: StartupStep[];
   profiles?: Record<string, { description?: string; bindings: Record<string, string> }>;
   /** The blob registry's directory; absent: under the system temp dir. */
-  blobs?: { dir?: string };
+  /** Where the blob registry keeps bytes: files under `dir`, or behind `connection`, a kind some plugin offers a blob store for. */
+  blobs?: { dir?: string; connection?: string };
 }
 /**
  * What a guarding plugin adds to every trigger kind's context once it has identified the caller (request.principal,

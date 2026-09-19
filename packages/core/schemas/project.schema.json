@@ -104,6 +104,10 @@
           "description": "The directory the registry writes to, relative to the project root or absolute. Absent: a directory under the system temp dir.",
           "type": "string",
           "minLength": 1
+        },
+        "connection": {
+          "description": "The connection the registry keeps bytes behind, whose kind a plugin the project names offers a blob store for (C014): an object store, so a tree runs on many instances. Absent: files, under dir.",
+          "$ref": "common.schema.json#/$defs/path"
         }
       },
       "additionalProperties": false

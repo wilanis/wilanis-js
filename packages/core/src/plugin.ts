@@ -37,6 +37,12 @@ export interface BlobScope extends BlobStore {
 }
 
 /**
+ * How a plugin opens the blob store a connection of its kind names: given the connection's settings, secrets
+ * substituted, it answers the store the tree's blob registry is. `close` lets go of what the store holds open.
+ */
+export type BlobStoreFactory = (settings: Record<string, unknown>) => BlobStore & { close?(): Promise<void> };
+
+/**
  * What a `holds` operation is given, as `env.hold`: it hands back the way to stop what it started, and the
  * runtime keeps the process alive until every held thing has been stopped, in reverse. A handler that does
  * not hold anything never sees it; a `holds` operation that never calls it holds nothing and the run ends.
@@ -386,6 +392,8 @@ export interface PluginModule {
   triggers?: Record<string, TriggerRuntime>;
   /** codec path -> implementation */
   codecs?: Record<string, Codec>;
+  /** connection-kind path -> the blob store a connection of that kind opens, for project.json → blobs.connection. */
+  blobStores?: Record<string, BlobStoreFactory>;
   /** Identifies callers and opens challenges; at most one plugin of a tree has one, and its plugin.json declares `guard`. */
   guard?: Guard;
   /** Plugin-specific rules (X codes), run by `checkTree` after the generic ones. */
