@@ -3,7 +3,9 @@
  * reason its decision can refuse with means (A001, A002, A003). Where a trigger attaches policies, each
  * attachment's `in` gives the guard a credential it declares, read where the kind hands it (A004); a policy
  * that reads what the guard hands leans on a credential yielding it, which some attachment must give (A005);
- * a credential no policy reads is refused too (A004); each policy's input fits under the kind (A001).
+ * a credential no policy reads is refused too (A004); each policy's input fits under the kind (A001). What a
+ * trigger reaching a store's view must attach is the same family over a walk of its own, in `scope-access.ts`
+ * (A007, A008), and every trigger is held to it here.
  */
 import {
   assignable,
@@ -25,6 +27,7 @@ import {
 } from '@wilanis/core';
 import { refusalsReachable } from '../refusals.js';
 import type { Judge, Refuser } from './judge.js';
+import { checkViewGates } from './scope-access.js';
 import { assignableWire, requestOnly } from './typing.js';
 
 const NO_GUARD_HINT = 'add a guarding plugin to project.json → plugins, such as @wilanis/plugin-auth';
@@ -215,6 +218,7 @@ class AccessCheck {
     const given = this.checkCredentials();
     this.yielded = new Set([...given].flatMap(name => this.yieldsOf(name)));
     for (const [index, use] of this.uses.entries()) this.checkAttachment(use, `policies/${index}`);
+    checkViewGates(this.judge, this.trigger);
     for (const name of given) {
       if (this.yieldsOf(name).some(key => this.needed.has(key))) continue;
       const message = `credential '${name}' is given, but no policy of this trigger reads what it yields (request.${this.yieldsOf(name).join(', request.')})`;

@@ -8,10 +8,16 @@
  * Split from `stores.ts` for the same reason that was split from `contracts.ts`: a store says what it keeps
  * and what it once called it, and this says who may see it. P005 is here too, because what makes a `reads`
  * entry used on a store is a `scoped` column reading it, which is this file's word.
+ *
+ * Whether the read a column is filled from is one the guard hands is the A family's question rather than the
+ * C family's -- a scope that is well-formed and reads a header is a well-formed store that scopes by nothing
+ * -- so it is `checkStoreScopes` in `scope-access.ts`, reached from here because this is the one walk over
+ * every store's scoping and the judgement wants the same resolvers C012 has just read.
  */
 import { type Loaded, type StoreDoc, show, WHOLE_TEMPLATE } from '@wilanis/core';
 import type { Judge, JudgedResolver, Refuser } from './judge.js';
 import { resolversFor } from './resolvers.js';
+import { checkStoreScopes } from './scope-access.js';
 
 /**
  * Every refusal about how a store is scoped: each `reads` entry names a resolver of a document the store may
@@ -28,6 +34,7 @@ export function checkStoreScoping(judge: Judge, store: Loaded<StoreDoc>): void {
     checkView(judge, refuse, store, name);
   }
   checkReadsUsed(refuse, resolvers, read);
+  checkStoreScopes(judge, store);
 }
 
 /** What one scoped column is judged against: the tree, the store, and the reads the store bound. */
