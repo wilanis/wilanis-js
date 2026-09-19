@@ -6,7 +6,7 @@
  */
 import { atomicOf } from '@wilanis/compiler';
 import type { GraphDoc, Loaded, Scope, Type, Values } from '@wilanis/core';
-import { isMap, isRun, isSwitch, show, splitPath, typeAt } from '@wilanis/core';
+import { isMap, isRun, isSwitch, show, splitPath, splitRef, typeAt } from '@wilanis/core';
 import { markGuards } from './guards.js';
 import {
   attributePorts,
@@ -46,7 +46,9 @@ class GraphBuilder {
     private readonly graph: Loaded<GraphDoc>,
   ) {
     this.doc = graph.doc;
-    this.resolversDoc = this.doc.resolvers ? scope.get('resolvers', this.doc.resolvers) : undefined;
+    // one document still stands behind the request node; RFC 0029 step 5 gives each port its own `opens`
+    const first = Object.values(this.doc.reads ?? {})[0];
+    this.resolversDoc = first ? scope.get('resolvers', splitRef(first).path) : undefined;
   }
 
   /** The view: every node of the graph, the edges between them, the role the tree gives it, and its transaction. */
@@ -100,13 +102,16 @@ class GraphBuilder {
   }
 
   private readResolvers() {
-    if (!this.resolversDoc) return;
-    for (const [name, resolver] of Object.entries(this.resolversDoc.doc.resolvers))
+    for (const [name, ref] of Object.entries(this.doc.reads ?? {})) {
+      const { path, op } = splitRef(ref);
+      const resolver = this.scope.get('resolvers', path)?.doc.resolvers[op];
+      if (!resolver) continue;
       this.resolvers.set(name, {
         path: splitPath(resolver.read).slice(1),
         label: resolver.label ?? readable(name),
         description: resolver.description,
       });
+    }
   }
 
   /** The graph's input: one output port per field of its in type. */
