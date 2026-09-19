@@ -52,7 +52,7 @@ describe('a binding of a required port', () => {
       "B009 binding of '@keep/memory.port.json' declares reads, but @keep fires it with no request judged → remove reads; an operation of a port a plugin requires reads only its in",
       ...PROFILES.map(
         profile =>
-          `B009 @keep/memory.port.json#get reaches @features/state/data/keep-files.binding.json, which reads request.headers.user-agent, but @keep fires it with no request judged (profile '${profile}') → remove reads; an operation of a port a plugin requires reads only its in`,
+          `B009 @keep/memory.port.json#get reaches @features/keeping/data/keep-files.binding.json, which reads request.headers.user-agent, but @keep fires it with no request judged (profile '${profile}') → remove reads; an operation of a port a plugin requires reads only its in`,
       ),
     ]);
   });

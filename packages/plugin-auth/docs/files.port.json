@@ -1,0 +1,153 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/port.schema.json",
+  "label": "The guard's memory in files",
+  "description": "One JSON file per record under <dir>/<collection>/: what a binding of state.port.json delegates to for one process, a laptop, or several processes sharing a volume. It answers the way @storage/store.port.json does, so either meets state.port.json unchanged.",
+  "operations": {
+    "get": {
+      "description": "One record by its key; record absent where there is none.",
+      "accepts": {
+        "collection": {
+          "type": "string",
+          "static": true,
+          "enum": [
+            "sessions",
+            "challenges"
+          ],
+          "description": "which records: sessions or challenges, each in a folder of its own"
+        },
+        "dir": {
+          "type": "string",
+          "static": true,
+          "required": false,
+          "description": "where the records are kept, relative to the tree or absolute; default .wilanis/auth. Never under a directory the loader reads (X104)"
+        },
+        "type": {
+          "type": "type",
+          "binds": "$R",
+          "description": "the shape of the records: @auth/SessionRecord.shape.json or @auth/ChallengeRecord.shape.json"
+        },
+        "key": {
+          "type": "string",
+          "description": "the record's id"
+        }
+      },
+      "returns": {
+        "fields": {
+          "record": {
+            "type": "$R",
+            "required": false,
+            "description": "absent where there is none"
+          }
+        }
+      }
+    },
+    "put": {
+      "description": "Write one record whole, under its id, and answer it.",
+      "accepts": {
+        "collection": {
+          "type": "string",
+          "static": true,
+          "enum": [
+            "sessions",
+            "challenges"
+          ],
+          "description": "which records: sessions or challenges, each in a folder of its own"
+        },
+        "dir": {
+          "type": "string",
+          "static": true,
+          "required": false,
+          "description": "where the records are kept, relative to the tree or absolute; default .wilanis/auth. Never under a directory the loader reads (X104)"
+        },
+        "type": {
+          "type": "type",
+          "binds": "$R",
+          "description": "the shape of the records: @auth/SessionRecord.shape.json or @auth/ChallengeRecord.shape.json"
+        },
+        "record": {
+          "type": "$R"
+        }
+      },
+      "returns": {
+        "fields": {
+          "record": {
+            "type": "$R"
+          }
+        }
+      }
+    },
+    "remove": {
+      "description": "Remove one record by its key, and answer it as it was; record absent where there was none.",
+      "accepts": {
+        "collection": {
+          "type": "string",
+          "static": true,
+          "enum": [
+            "sessions",
+            "challenges"
+          ],
+          "description": "which records: sessions or challenges, each in a folder of its own"
+        },
+        "dir": {
+          "type": "string",
+          "static": true,
+          "required": false,
+          "description": "where the records are kept, relative to the tree or absolute; default .wilanis/auth. Never under a directory the loader reads (X104)"
+        },
+        "type": {
+          "type": "type",
+          "binds": "$R",
+          "description": "the shape of the records: @auth/SessionRecord.shape.json or @auth/ChallengeRecord.shape.json"
+        },
+        "key": {
+          "type": "string",
+          "description": "the record's id"
+        }
+      },
+      "returns": {
+        "fields": {
+          "record": {
+            "type": "$R",
+            "required": false,
+            "description": "the record as it was; absent where there was none"
+          }
+        }
+      }
+    },
+    "find": {
+      "description": "Every record whose field equals the value. A scan over every file of the collection, and it says so: no read of state.port.json needs it.",
+      "accepts": {
+        "collection": {
+          "type": "string",
+          "static": true,
+          "enum": [
+            "sessions",
+            "challenges"
+          ],
+          "description": "which records: sessions or challenges, each in a folder of its own"
+        },
+        "dir": {
+          "type": "string",
+          "static": true,
+          "required": false,
+          "description": "where the records are kept, relative to the tree or absolute; default .wilanis/auth. Never under a directory the loader reads (X104)"
+        },
+        "type": {
+          "type": "type",
+          "binds": "$R",
+          "description": "the shape of the records: @auth/SessionRecord.shape.json or @auth/ChallengeRecord.shape.json"
+        },
+        "field": {
+          "type": "string",
+          "static": true,
+          "description": "a field of the record"
+        },
+        "equals": {
+          "type": "string",
+          "description": "the value it must equal"
+        }
+      },
+      "returns": "$R[]"
+    }
+  }
+}

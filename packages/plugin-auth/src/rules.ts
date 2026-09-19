@@ -2,9 +2,10 @@
  * The plugin's own rules -- what only @auth can judge. X101: settings.session names no shape. X102: a challenge outcome
  * names a method the settings do not declare, or gates a trigger no attachment of which gives a challenge answer, so it
  * could never be met. X103: a session write names another type than the session shape, or keys the shape does not
- * declare.
+ * declare. X104 (dirs.ts): files.port.json keeps records where the loader reads documents, or outside the tree.
  */
 import { isMap, isRun, type PluginCheckContext, type PolicyDoc, policyPath, type ShapeDoc } from '@wilanis/core';
+import { checkDirs } from './dirs.js';
 import { doc, ROOT, type Settings } from './settings.js';
 
 type Scope = PluginCheckContext['scope'];
@@ -160,9 +161,10 @@ function checkBindingWrites(session: Session) {
         );
 }
 
-/** What only @auth can judge: X101, X102 and X103. */
+/** What only @auth can judge: X101, X102, X103 and X104. */
 export function check({ scope, settings, refuse }: PluginCheckContext) {
   const declared = settings as Settings;
+  checkDirs(scope, refuse);
   const shape = sessionShape(scope, declared, refuse);
   checkMethods(scope, declared, refuse);
   checkAnswerable(scope, refuse);

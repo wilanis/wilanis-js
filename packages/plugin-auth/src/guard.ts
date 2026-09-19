@@ -6,20 +6,8 @@ import { randomInt } from 'node:crypto';
 import { type Guard, type GuardArgs, splitPath, WHOLE_TEMPLATE } from '@wilanis/core';
 import type { Handler } from '@wilanis/engine';
 import { type JWTPayload, jwtVerify } from 'jose';
-import {
-  type ChallengeRecord,
-  type Env,
-  iso,
-  keyOf,
-  now,
-  type SessionRecord,
-  type Settings,
-  type Store,
-  same,
-  settingsOf,
-  sha,
-  storeOf,
-} from './settings.js';
+import { type ChallengeRecord, type Env, iso, keyOf, now, type Settings, same, settingsOf, sha } from './settings.js';
+import { getChallenge, getSession, putChallenge, removeChallenge } from './state.js';
 
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
@@ -32,16 +20,15 @@ const challengeId = () => {
 /** A code for an open challenge, which the caller answers with. */
 export const challengeIssue: Handler = async ({ in: input, ctx }) => {
   const env = ctx.env as Env;
-  const store = storeOf(env);
   const settings = settingsOf(env);
-  const record = store.get<ChallengeRecord>('challenges', String(input.id));
+  const record = await getChallenge(env, String(input.id));
   if (!record || Date.parse(record.expiresAt) < now()) return { issued: false };
   const digits = settings.challenge?.digits ?? 6;
   const code = Array.from({ length: digits }, () => String(randomInt(10))).join('');
   record.codeHash = sha(code);
   record.codeExpiresAt = record.expiresAt;
   record.attempts = 0;
-  store.put('challenges', record.id, record);
+  await putChallenge(env, record);
   return { issued: true, id: record.id, code, expiresAt: record.expiresAt };
 };
 
@@ -69,7 +56,7 @@ function place(read: unknown, value: string): string {
 }
 
 /** What a verified token says about its caller, or a refusal; a token that is there and does not verify is refused. */
-async function fromToken(token: string, settings: Settings, store: Store) {
+async function fromToken(token: string, settings: Settings, env: Env) {
   let claims: JWTPayload;
   try {
     claims = (
@@ -81,7 +68,7 @@ async function fromToken(token: string, settings: Settings, store: Store) {
   } catch (error) {
     return refuse(`the token does not verify: ${(error as Error).message}`);
   }
-  const session = typeof claims.sid === 'string' ? store.get<SessionRecord>('sessions', claims.sid) : undefined;
+  const session = typeof claims.sid === 'string' ? await getSession(env, claims.sid) : undefined;
   if (!session) return refuse('the token belongs to a session that has ended');
   return {
     context: {
@@ -115,26 +102,26 @@ function answerable(
 }
 
 /** A wrong code costs an attempt, and the last one spends the challenge. */
-function spendAttempt(record: ChallengeRecord, allowed: number, store: Store) {
+async function spendAttempt(record: ChallengeRecord, allowed: number, env: Env) {
   record.attempts++;
-  store.put('challenges', record.id, record);
-  if (record.attempts >= allowed) store.delete('challenges', record.id);
+  if (record.attempts >= allowed) await removeChallenge(env, record.id);
+  else await putChallenge(env, record);
 }
 
 /** A challenge answer: the id names an open challenge, the code must match what was issued, within its attempts. */
-function fromChallenge(
+async function fromChallenge(
   answer: { id?: unknown; code?: unknown },
   subject: string | undefined,
   settings: Settings,
-  store: Store,
+  env: Env,
 ) {
   const id = String(answer.id);
-  const found = answerable(store.get<ChallengeRecord>('challenges', id), id, answer, subject);
+  const found = answerable(await getChallenge(env, id), id, answer, subject);
   if ('why' in found) return refuse(found.why);
   const record = found.open;
   const allowed = settings.challenge?.attempts ?? 5;
   if (record.attempts >= allowed || !same(sha(String(answer.code)), record.codeHash)) {
-    spendAttempt(record, allowed, store);
+    await spendAttempt(record, allowed, env);
     return refuse(`the code for challenge '${record.id}' is wrong`);
   }
   return { context: { challenge: { id: record.id, method: record.method, verified: true } } };
@@ -147,17 +134,16 @@ const refused = (answer: unknown): answer is { refuse: Record<string, unknown> }
 export const guard: Guard = {
   async identify({ credentials, settings, env }: GuardArgs) {
     const declared = settings as Settings;
-    const store = storeOf(env as Env);
     const context: Record<string, unknown> = {};
     if (credentials.token !== undefined) {
-      const answer = await fromToken(String(credentials.token), declared, store);
+      const answer = await fromToken(String(credentials.token), declared, env as Env);
       if (refused(answer)) return answer;
       Object.assign(context, answer.context);
     }
     const answer = credentials.challenge as { id?: unknown; code?: unknown } | undefined;
     if (answer && answer.id !== undefined && answer.id !== '') {
       const subject = (context.principal as { subject?: string } | undefined)?.subject;
-      const settled = fromChallenge(answer, subject, declared, store);
+      const settled = await fromChallenge(answer, subject, declared, env as Env);
       if (refused(settled)) return settled;
       Object.assign(context, settled.context);
     }
@@ -166,7 +152,6 @@ export const guard: Guard = {
 
   async challenge({ request, reads, settings, env, trigger, policy, message, method }) {
     const declared = settings as Settings;
-    const store = storeOf(env as Env);
     const id = challengeId();
     const expiresAt = iso(now() + (declared.challenge?.ttl ?? 300) * 1000);
     const subject = (request.principal as { subject?: string } | undefined)?.subject;
@@ -180,7 +165,7 @@ export const guard: Guard = {
       expiresAt,
       attempts: 0,
     };
-    store.put('challenges', id, record);
+    await putChallenge(env as Env, record);
     const obtain = (
       declared.challenge?.methods?.[record.method]?.obtain ?? 'obtain a code for challenge {id}'
     ).replaceAll('{id}', id);
@@ -201,7 +186,6 @@ export const guard: Guard = {
   async settle({ request, env, report }) {
     // a challenge is single-use: answered and acted on, it is spent
     const answered = request.challenge as { id?: string; verified?: boolean } | undefined;
-    if (answered?.verified && answered.id && report.status === 'done')
-      storeOf(env as Env).delete('challenges', answered.id);
+    if (answered?.verified && answered.id && report.status === 'done') await removeChallenge(env as Env, answered.id);
   },
 };

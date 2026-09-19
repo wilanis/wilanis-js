@@ -29,7 +29,7 @@
             "fields": {},
             "open": true
           },
-          "description": "attribute -> value; keys not in the shape are refused by the checker (X104)"
+          "description": "attribute -> value; keys not in the shape are refused by the checker (X103)"
         },
         "type": {
           "type": "type",

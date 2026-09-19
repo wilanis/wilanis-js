@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/feature.schema.json",
   "label": "Access, for development",
-  "description": "What lets the access tree run on its own: identity.port.json bound to the directories written in connections/. A host does not include this feature; it binds the port to its own directories.",
+  "description": "What lets the access tree run on its own: identity.port.json bound to the directories written in connections/, and the guard's memory (@auth/state.port.json) bound to files. A host does not include this feature; it binds both ports itself.",
   "dependsOn": [
     "access"
   ],
@@ -9,6 +9,9 @@
   "effects": [
     "@auth/identity.port.json#verify",
     "@auth/token.port.json#issue",
-    "@auth/token.port.json#refresh"
+    "@auth/token.port.json#refresh",
+    "@auth/files.port.json#get",
+    "@auth/files.port.json#put",
+    "@auth/files.port.json#remove"
   ]
 }
