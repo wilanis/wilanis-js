@@ -111,6 +111,15 @@ describe('sabotage: layers and visibility', () => {
       }),
     ).toEqual(['L001']);
   });
+  it("L001 a tree's own shape naming the variable a native shape may name", () => {
+    // the exemption is the native document's, not the variable's: '$I' is declared by @auth/Identity.shape.json
+    // and bound at verify's call site, and a shape of this tree naming it binds nothing and is still refused
+    expect(
+      sabotage('features/hello/domain/Greeting.shape.json', shape => {
+        shape.fields[Object.keys(shape.fields)[0]].type = '$I';
+      }),
+    ).toEqual(['L001']);
+  });
   it('L005 a shape of another feature that feature does not export', () => {
     // G004 and T002 follow from the field's new type, which the graph and the trigger no longer fit
     expect(
