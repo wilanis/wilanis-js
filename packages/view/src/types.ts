@@ -11,8 +11,10 @@ export interface VPort {
   name: string;
   /** How deep an attribute port sits under its parent; absent for a top-level port. */
   depth?: number;
-  /** A human label for the port, when a resolver names it. */
+  /** A human label for the port: on the request node, the name the graph reads it by. */
   label?: string;
+  /** A document this port stands for: the resolvers document that declares a request read. */
+  opens?: string;
   /** The type, shown; absent when unknown. */
   type?: string;
   required?: boolean;
@@ -61,8 +63,6 @@ export interface VNode {
   op?: string;
   /** The graph's in or out type, shown. */
   type?: string;
-  /** A document this node stands for: the resolvers document behind the request node. */
-  opens?: string;
   description?: string;
   inputs: VPort[];
   outputs: VPort[];

@@ -587,7 +587,7 @@
       }
       case 'binding': {
         const chain = el('div', 'chain'); chain.appendChild(step('meets the port', link(d.port))); page.appendChild(chain);
-        if (d.resolvers) { const p = el('p'); p.appendChild(frag('Delegations may read the request through ')); p.appendChild(link(d.resolvers)); p.appendChild(frag('.')); page.appendChild(p); }
+        if (d.reads) { const p = el('p'); p.appendChild(frag('Delegations read the request by name: ')); Object.entries(d.reads).forEach(([n, r], i) => { if (i) p.appendChild(frag(', ')); p.appendChild(el('code', null, '{{' + n + '}}')); p.appendChild(frag(' from ')); p.appendChild(link(r.split('#')[0], showOp(r))); }); p.appendChild(frag('.')); page.appendChild(p); }
         page.appendChild(el('h2', null, 'Operations'));
         const t = el('table'); const hd = el('tr'); for (const h of ['operation', 'how it is met', 'inputs given']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
         for (const [name, op] of Object.entries(d.operations)) {
@@ -795,7 +795,8 @@
     const color = nodeColors(v.graph).get(n.id);
     const h = el('h3'); const sw = el('span', 'swatch'); sw.style.background = color; h.appendChild(sw); h.appendChild(document.createTextNode(n.label + ' ')); const kindText = { run: 'operation', map: 'for each', rule: 'rule', in: 'input', out: 'output', const: 'constants', request: 'request' }[n.kind]; h.appendChild(NODE_SCHEMA[n.kind] ? schemaBadge(n.kind, kindText, NODE_SCHEMA[n.kind]) : badge(n.kind, kindText)); box.appendChild(h);
     box.appendChild(el('div', 'id', n.decision ? n.id + '   ' + n.decision.when : n.id));
-    if (n.opens) { const p = el('p'); p.appendChild(frag('Read through ')); p.appendChild(link(n.opens)); box.appendChild(p); }
+    // a request node reads through one document per name under `reads`; each is named once, however many reads came from it
+    for (const path of [...new Set((n.outputs || []).map(p => p.opens).filter(Boolean))]) { const p = el('p'); p.appendChild(frag('Read through ')); p.appendChild(link(path)); box.appendChild(p); }
     if (n.type) { const p = el('p'); p.appendChild(frag(n.kind === 'in' ? 'The graph takes ' : 'The graph answers ')); p.appendChild(typeLink(n.type)); box.appendChild(p); }
     if (n.description) box.appendChild(el('p', null, n.description));
     if (n.decision) { const d = n.decision, p = el('p'); p.appendChild(frag(`Rule ${d.rule} of ${d.of} in `)); p.appendChild(el('b', null, d.label)); p.appendChild(frag('. The first rule that holds wins.' + (d.description ? ' ' + d.description : ''))); box.appendChild(p); }
@@ -1082,7 +1083,8 @@
       // a participant is rimmed, and marked beside the effect: what it does is inside the graph's one transaction
       if (n.participates) gn.appendChild(withTitle(txt(b.w - (n.target && n.target.effect ? 72 : 32), 32, 'txn', 'txn', { 'text-anchor': 'end' }), 'this node\u2019s effect is inside the graph\u2019s one transaction: it is undone with the rest unless the graph answers'));
       if (n.guarded || n.proved) gn.appendChild(badgeEl(n, b));
-      const goto = n.target ? n.target.implementation : n.opens;
+      // a double-click on the request node opens the document behind its first read; a port opens its own
+      const goto = n.target ? n.target.implementation : (n.outputs || []).map(p => p.opens).find(Boolean);
       if (goto) {
         const go_ = withTitle(txt(b.w - 20, 19, ARROW, 'go'), 'open ' + labelFor(goto));
         go_.addEventListener('click', ev => { ev.stopPropagation(); go(goto); });
@@ -1128,7 +1130,7 @@
         const hint = (p.label ? p.label + ': ' : '') + (n.kind === 'request' ? showRead('request.' + p.name) : (p.name || 'the whole value')) + (req ? '' : ' (optional)') + (p.type ? ': ' + showType(p.type) : '') + (p.description ? '\n' + p.description : '');
         const room = (n.inputs.length ? 14 : 30) - depth * 2;
         const t = txt(b.w - 12 - depth * 12, y + 4, trunc(label, room), 'port' + (p.name === '' ? ' type' : parentOnly ? ' type' : req ? '' : ' opt'), { 'text-anchor': 'end' });
-        gn.appendChild(opens(withTitle(t, hint), p.name === '' ? shapeOf(p.type) : null));
+        gn.appendChild(opens(withTitle(t, hint), p.opens || (p.name === '' ? shapeOf(p.type) : null)));
         if (depth) gn.appendChild(svg('path', { d: `M${b.w - 12 - depth * 12 - 4},${y - 6} v6 h-3`, stroke: 'var(--dim)', fill: 'none', 'stroke-width': 1 }));
       });
       (n.fields || []).forEach((p, i) => {
