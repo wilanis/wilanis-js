@@ -2,9 +2,10 @@
  * The plugin's own rules -- what only @auth can judge. X101: settings.session names no shape. X102: a challenge outcome
  * names a method the settings do not declare, or gates a trigger no attachment of which gives a challenge answer, so it
  * could never be met. X103: a session write names another type than the session shape, or keys the shape does not
- * declare.
+ * declare. X105: a session write names an attribute a store scopes a collection by, which the sign-in wrote once.
  */
 import { isMap, isRun, type PluginCheckContext, type PolicyDoc, policyPath, type ShapeDoc } from '@wilanis/core';
+import { type ScopedAttribute, scopedAttributes } from './scoped.js';
 import { doc, ROOT, type Settings } from './settings.js';
 
 type Scope = PluginCheckContext['scope'];
@@ -70,12 +71,14 @@ interface Write {
   given: Record<string, unknown> | undefined;
 }
 
-/** What every X103 judgement reads: the session shape, the settings that named it, and how to refuse. */
+/** What every X103 and X105 judgement reads: the session shape, the settings that named it, and how to refuse. */
 interface Session {
   shape: Shape;
   settings: Settings;
   scope: Scope;
   refuse: Refuse;
+  /** attribute -> the store and collection scoped by it; what X105 refuses a later write of. */
+  scoped: Map<string, ScopedAttribute>;
 }
 
 /** X103: the operation this write names, when it is one of the session port's; undefined otherwise. */
@@ -102,27 +105,56 @@ function judgeType(write: Write, operation: string, session: Session) {
 const declares = (session: Session, key: string) =>
   Object.hasOwn(session.shape.doc.fields, key) || Boolean(session.shape.doc.open);
 
-/** X103: every attribute a set writes is one the session shape declares. */
+/** One attribute a session write names: what the operation does to it, which it is, and where that is written. */
+interface Named {
+  file: string;
+  /** what the operation does, as the message opens: `set writes`, `remove drops`. */
+  verb: string;
+  key: string;
+  at: string;
+}
+
+/**
+ * X105: an attribute a store scopes a collection by is what the sign-in graph gave token.port.json#issue, and
+ * nothing writes it again -- a later write would move rows between scopes, which is what scoping forbids.
+ */
+function judgeScoped(named: Named, session: Session) {
+  const scoped = session.scoped.get(named.key);
+  if (!scoped) return;
+  session.refuse({
+    code: 'X105',
+    file: named.file,
+    message: `${named.verb} '${named.key}', which ${scoped.store} scopes ${scoped.collection} by; a scope is written at sign-in and never again`,
+    at: named.at,
+    hint: 'drop it: a scoped attribute is what the sign-in graph gave token.port.json#issue, and only that',
+  });
+}
+
+/** X103 and X105: every attribute a set writes is one the session shape declares and no store scopes by. */
 function judgeSet(write: Write, session: Session) {
   const values = write.given?.values;
   if (!values || typeof values !== 'object' || Array.isArray(values)) return;
-  for (const key of Object.keys(values))
+  for (const key of Object.keys(values)) {
+    const at = `${write.at}/values/${key}`;
     if (!declares(session, key))
       session.refuse({
         code: 'X103',
         file: write.file,
         message: `set writes '${key}', which ${session.settings.session} does not declare`,
-        at: `${write.at}/values/${key}`,
+        at,
         hint: 'declare the attribute in the session shape, or drop it',
       });
+    judgeScoped({ file: write.file, verb: 'set writes', key, at }, session);
+  }
 }
 
-/** X103: every attribute a remove drops is one the session shape declares. */
+/** X103 and X105: every attribute a remove drops is one the session shape declares and no store scopes by. */
 function judgeRemove(write: Write, session: Session) {
   const keys = write.given?.keys;
   if (!Array.isArray(keys)) return;
-  for (const key of keys)
-    if (typeof key === 'string' && !declares(session, key))
+  for (const key of keys) {
+    if (typeof key !== 'string') continue;
+    if (!declares(session, key))
       session.refuse({
         code: 'X103',
         file: write.file,
@@ -130,9 +162,11 @@ function judgeRemove(write: Write, session: Session) {
         at: `${write.at}/keys`,
         hint: 'name attributes of the session shape',
       });
+    judgeScoped({ file: write.file, verb: 'remove drops', key, at: `${write.at}/keys` }, session);
+  }
 }
 
-/** X103: one session operation's inputs, against the session shape. */
+/** X103 and X105: one session operation's inputs, against the session shape and what a store scopes by. */
 function judgeWrite(write: Write, session: Session) {
   const operation = sessionOperation(write, session.scope);
   if (!operation) return;
@@ -141,7 +175,7 @@ function judgeWrite(write: Write, session: Session) {
   if (operation === 'remove') judgeRemove(write, session);
 }
 
-/** X103: every session write a graph's nodes make. */
+/** X103 and X105: every session write a graph's nodes make. */
 function checkGraphWrites(session: Session) {
   for (const graph of session.scope.registry.all('graph'))
     for (const node of graph.doc.nodes)
@@ -149,7 +183,7 @@ function checkGraphWrites(session: Session) {
         judgeWrite({ file: graph.path, at: `nodes/${node.id}/in`, run: node.run, given: node.in }, session);
 }
 
-/** X103: every session write a binding's operations make. */
+/** X103 and X105: every session write a binding's operations make. */
 function checkBindingWrites(session: Session) {
   for (const binding of session.scope.registry.all('binding'))
     for (const [name, operation] of Object.entries(binding.doc.operations))
@@ -160,14 +194,15 @@ function checkBindingWrites(session: Session) {
         );
 }
 
-/** What only @auth can judge: X101, X102 and X103. */
+/** What only @auth can judge: X101, X102, X103 and X105. */
 export function check({ scope, settings, refuse }: PluginCheckContext) {
   const declared = settings as Settings;
   const shape = sessionShape(scope, declared, refuse);
   checkMethods(scope, declared, refuse);
   checkAnswerable(scope, refuse);
   if (!shape) return;
-  const session: Session = { shape, settings: declared, scope, refuse };
+  const scoped = scopedAttributes(scope);
+  const session: Session = { shape, settings: declared, scope, refuse, scoped };
   checkGraphWrites(session);
   checkBindingWrites(session);
 }

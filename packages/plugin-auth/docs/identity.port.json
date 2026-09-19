@@ -4,7 +4,7 @@
   "description": "Verifying a credential against a directory: the one place a password is judged. Answers what happened and, when the credential is good, who it belongs to; the graph decides what a rejection or an unreachable directory means (bad_credentials, directory_unavailable), the way it decides what an HTTP 404 means.",
   "operations": {
     "verify": {
-      "description": "Judge a username and password against a directory connection. `status` is verified, rejected (the directory knew the user and refused the password, or knew no such user) or unavailable (it could not be asked); `identity` is present when verified.",
+      "description": "Judge a username and password against a directory connection. `status` is verified, rejected (the directory knew the user and refused the password, or knew no such user) or unavailable (it could not be asked); `identity` is present when verified, and carries under `attributes` what the directory said beside the subject, name and groups, of the shape `type` names.",
       "accepts": {
         "connection": {
           "type": "string",
@@ -17,6 +17,12 @@
         "password": {
           "type": "string",
           "secret": true
+        },
+        "type": {
+          "type": "type",
+          "binds": "$I",
+          "required": false,
+          "description": "The shape of what the directory says about an account beside its subject, name and groups. A directory connection's account carries them under `attributes`; an OIDC identity token carries them as claims of the same names. The handler reads them, judges them against this shape as a session write is judged against the session shape, and fails the node when they do not fit: a directory that does not say what the tree asks of it is misconfigured, not a bad credential. Absent: attributes read unknown, as before."
         }
       },
       "returns": {

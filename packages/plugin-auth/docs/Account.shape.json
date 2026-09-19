@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
   "label": "Account",
-  "description": "One entry of a directory written in a connection: a username, its password (plain, for development) or its scrypt hash (scrypt:<salt>:<hash>, base64url), a display name, and the groups it belongs to. Groups become the roles the sign-in graph writes into the token.",
+  "description": "One entry of a directory written in a connection: a username, its password (plain, for development) or its scrypt hash (scrypt:<salt>:<hash>, base64url), a display name, the groups it belongs to, and whatever else this directory says about the account. Groups become the roles the sign-in graph writes into the token; attributes become identity.attributes, judged against the shape verify's `type` names.",
   "layer": "edge",
   "fields": {
     "username": {
@@ -23,6 +23,14 @@
     },
     "groups": {
       "type": "string[]"
+    },
+    "attributes": {
+      "type": {
+        "fields": {},
+        "open": true
+      },
+      "required": false,
+      "description": "what this directory says about the account beside the fields above; verify answers them as identity.attributes"
     }
   }
 }
