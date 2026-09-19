@@ -20,6 +20,15 @@ export interface Read {
   description?: string;
 }
 
+/**
+ * What a reader sees under the port: the resolver's own label and what it says it reads, in that order. The port's
+ * label is the name the document reads by, so a resolver that declares a label has nowhere else to say it -- and a
+ * resolver may declare either, both or neither, so the two are joined and nothing is dropped.
+ */
+function saying(resolver: { label?: string; description?: string }): string | undefined {
+  return [resolver.label, resolver.description].filter(Boolean).join('. ') || undefined;
+}
+
 /** Every name under a `reads` map, resolved: where it lands in the request, and which document declares it. */
 export function readsOf(scope: Scope, reads: GraphDoc['reads']): Map<string, Read> {
   const out = new Map<string, Read>();
@@ -32,7 +41,7 @@ export function readsOf(scope: Scope, reads: GraphDoc['reads']): Map<string, Rea
       path: splitPath(resolver.read).slice(1),
       label: name,
       opens: doc.path,
-      description: resolver.description ?? resolver.label,
+      description: saying(resolver),
     });
   }
   return out;
@@ -72,6 +81,7 @@ export function markRequestPorts(request: VNode | undefined, reads: Map<string, 
     if (!port) continue;
     port.label = read.label;
     port.opens = read.opens;
-    port.description = read.description;
+    // only when the resolver says something: an absent description is no key, never a key holding nothing
+    if (read.description) port.description = read.description;
   }
 }
