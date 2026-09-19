@@ -33,14 +33,24 @@ import {
   Kernel,
   type KernelSpec,
   type KNode,
+  type KSource,
   type Redact,
 } from '@wilanis/engine';
 import { inScope } from './atomic.js';
 import { type Compiled, type CompileOptions, nestedFailure } from './compiled.js';
-import { bindings, outputCandidates, passedInputs } from './documents.js';
+import { bindings, type CallSite, outputCandidates, passedInputs } from './documents.js';
 import { type GuardHandlers, guardsOf, MAKE, REFUSE, TAKEN_IDS } from './guard.js';
 import { lowerGuards } from './guard-lowering.js';
-import { bindPaths, inputsByName, lowerValue, lowerValues, type Roots, secretPaths } from './lower.js';
+import {
+  bindPaths,
+  inputsByName,
+  lowerScope,
+  lowerValue,
+  lowerValues,
+  type Roots,
+  SCOPE,
+  secretPaths,
+} from './lower.js';
 
 /**
  * Lowers a checked tree to what the kernel runs: the spec of a graph, or of the binding that meets a domain
@@ -208,7 +218,7 @@ export class Compiler {
       return { kind: 'switch', in: lowerValues(node.in, roots), rules, else: node.else };
     }
     const { handler, op } = this.handlerFor(node.run);
-    const inputs = lowerValues(node.in, roots);
+    const inputs = this.withScope(lowerValues(node.in, roots), { key: node.run, given: node.in });
     const redact = this.redactFor(op, node.in);
     if (isRun(node)) return { kind: 'call', handler, in: inputs, redact };
     const over = lowerValue(node.over, roots);
@@ -256,7 +266,19 @@ export class Compiler {
     const { handler, op: target } = this.handlerFor(bound.run);
     const given = passedInputs(target, op, bound.in);
     const roots: Roots = { resolvers: this.resolverRoots(binding.doc.reads) };
-    return { kind: 'call', handler, in: lowerValues(given, roots), redact: this.redactFor(target, given) };
+    const inputs = this.withScope(lowerValues(given, roots), { key: bound.run, given: bound.in });
+    return { kind: 'call', handler, in: inputs, redact: this.redactFor(target, given) };
+  }
+
+  /**
+   * The scope a site over a scoped collection carries, put on its inputs. It is the one input no document
+   * writes: the store says which columns it keeps and the read that fills each, and the compiler carries them
+   * to every site over the collection, so no graph can forget one (RFC 0015). Nothing is added where the site
+   * is over no scoped collection, so a tree that scopes nothing lowers exactly as it did.
+   */
+  private withScope(inputs: Record<string, KSource>, site: CallSite): Record<string, KSource> {
+    const scope = lowerScope(this.scope, site);
+    return scope ? { ...inputs, [SCOPE]: scope } : inputs;
   }
 
   /** Whether a graph takes its input whole: it declares an `in` that is not a shape (a list, a scalar), read as {{in}}. */

@@ -1,10 +1,22 @@
 /**
  * Lowering values to kernel sources. A literal bakes; a whole {{template}} reads a node, the input, a resolver
  * (a read below request) or a constant; text with templates concatenates; lists and objects lower each member.
- * Also the secret paths of a type, which a call's report redacts.
+ * Also the scope a site over a scoped collection carries, which no document writes, and the secret paths of a
+ * type, which a call's report redacts.
  */
-import { splitPath, TEMPLATE, type Type, type Values, WHOLE_TEMPLATE } from '@wilanis/core';
+import {
+  type Loaded,
+  type Scope,
+  type StoreDoc,
+  splitPath,
+  splitRef,
+  TEMPLATE,
+  type Type,
+  type Values,
+  WHOLE_TEMPLATE,
+} from '@wilanis/core';
 import { type KSource, readPath } from '@wilanis/engine';
+import { type CallSite, collectionOf } from './documents.js';
 
 /** The roots a value may read where it is written, and how each lowers. */
 export interface Roots {
@@ -79,6 +91,47 @@ export function inputsByName(names: string[]): Record<string, KSource> {
 export function bindPaths(bind: Record<string, string> | undefined): Record<string, string[]> | undefined {
   if (!bind) return undefined;
   return Object.fromEntries(Object.entries(bind).map(([name, path]) => [name, path ? path.split('.') : []]));
+}
+
+/** The input a scoped site carries its scope under, which no document may write (RFC 0015). */
+export const SCOPE = 'scope';
+
+/**
+ * The scope a native call site carries, or nothing where it is over no scoped collection: one key per column
+ * the collection declares `scoped`, each the read the store binds for it, lowered exactly as `lowerRef` lowers
+ * `{{tenant}}` on a graph. No node is added and nothing runs -- a scope is a source reference like any resolver
+ * read -- and no document writes it, so there is nowhere to forget one (RFC 0015).
+ *
+ * Which operations carry one is the port's own word, read off the `scope` input it declares: `newKey` declares
+ * none, because a key is global to the table whatever the scope. So nothing here learns which operations a
+ * store has, only that this one takes a scope and is over a collection that has one.
+ */
+export function lowerScope(scope: Scope, site: CallSite): KSource | undefined {
+  if (!takesScope(scope, site.key)) return undefined;
+  const over = collectionOf(scope, site);
+  const store = over && scope.registry.get('store', over.store);
+  const scoped = over && store?.doc.collections[over.collection]?.scoped;
+  if (!store || !scoped) return undefined;
+  const roots: Roots = { resolvers: storeRoots(scope, store) };
+  return { object: lowerValues(scoped, roots) };
+}
+
+/** Whether the operation a site names carries a scope at all: the port says so by declaring the input. */
+function takesScope(scope: Scope, key: string): boolean {
+  const hit = scope.op(key);
+  if (typeof hit === 'string' || !hit.port.native) return false;
+  return Boolean(hit.op.accepts?.[SCOPE]);
+}
+
+/** A store's `reads`: local name -> the segments read below request, as a graph's `reads` lower. */
+function storeRoots(scope: Scope, store: Loaded<StoreDoc>): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [name, ref] of Object.entries(store.doc.reads ?? {})) {
+    const { path, op } = splitRef(ref);
+    const read = path ? scope.get('resolvers', path)?.doc.resolvers[op] : undefined;
+    if (read) out[name] = splitPath(read.read).slice(1);
+  }
+  return out;
 }
 
 const SECRET_DEPTH = 6;
