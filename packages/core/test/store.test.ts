@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { keeps, kept as keptOf, type StoreDoc } from '../src/model.js';
 import { at, doc, refused } from './documents.js';
 
 describe('store', () => {
@@ -183,5 +184,18 @@ describe('a store that scopes what a caller sees', () => {
     expect(refused(store({ everyEntry: { view: 'entries', behind: 'employees-only' } }))).toEqual([
       at('collections/everyEntry/behind', 'A document path'),
     ]);
+  });
+
+  it('keeps tells the two shapes apart, and kept answers only the collections that hold records', () => {
+    // a reader asks this rather than reading `of` and `key` off whatever the map holds: the schema stopped
+    // guaranteeing the pair the moment a view became a collection, and a view has neither to read
+    const entries = { of: '@features/f/domain/Entry.shape.json', key: 'id' };
+    const everyEntry = { view: 'entries', behind: '@a/edge/p.policy.json' };
+    expect(keeps(entries)).toBe(true);
+    expect(keeps(everyEntry)).toBe(false);
+    const doc = { connection: '@connections/c.connection.json', collections: { entries, everyEntry } } as StoreDoc;
+    expect(keptOf(doc)).toEqual([['entries', entries]]);
+    // and the narrowing is what lets a reader reach the pair at all: this is the type, not just the value
+    for (const [, collection] of keptOf(doc)) expect(typeof collection.of).toBe('string');
   });
 });

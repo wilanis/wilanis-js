@@ -7,8 +7,17 @@
  * Split from `contracts.ts` when the store rules passed the house limit: a shape, a port and a connection say
  * what they are, and a store says what it keeps and what it once called it.
  */
-import type { Collection, Loaded, ObjField, StoreDoc, Type } from '@wilanis/core';
-import { conforms, show } from '@wilanis/core';
+import {
+  type Collection,
+  conforms,
+  keeps,
+  kept,
+  type Loaded,
+  type ObjField,
+  type StoreDoc,
+  show,
+  type Type,
+} from '@wilanis/core';
 import type { Judge, Refuser } from './judge.js';
 
 /**
@@ -24,7 +33,9 @@ export function checkStore(judge: Judge, store: Loaded<StoreDoc>): void {
   const connection = judge.scope.get('connection', store.doc.connection);
   if (connection) judge.visible(store, connection, 'connection');
   else refuse('R001', `unknown connection '${store.doc.connection}'`, 'connection', 'wilanis ls connection');
-  for (const [name, collection] of Object.entries(store.doc.collections)) {
+  const keeping = kept(store.doc);
+  const keptNames = keeping.map(([name]) => name);
+  for (const [name, collection] of keeping) {
     const at = `collections/${name}/of`;
     const shape = judge.scope.get('shape', collection.of);
     if (!shape) {
@@ -33,7 +44,7 @@ export function checkStore(judge: Judge, store: Loaded<StoreDoc>): void {
     }
     judge.visible(store, shape, at);
     const type = judge.type(collection.of, store.path, at);
-    if (type) checkConstraints({ judge, refuse, store, name, collection, fields: fieldsOf(type) });
+    if (type) checkConstraints({ judge, refuse, store, name, collection, fields: fieldsOf(type), keptNames });
   }
   checkWas(judge, store);
 }
@@ -46,6 +57,8 @@ interface Kept {
   name: string;
   collection: Collection;
   fields: Record<string, ObjField>;
+  /** the collections of this store a reference may name: the ones that keep records. */
+  keptNames: string[];
 }
 
 const fieldsOf = (type: Type): Record<string, ObjField> => (type.kind === 'object' ? type.fields : {});
@@ -135,10 +148,13 @@ function checkRefs(kept: Kept): void {
     if (field === collection.key)
       refuse('C007', `'${field}' keys this collection, so it identifies rather than refers`, at, HINT_ONCE);
     const target = store.doc.collections[ref.collection];
-    if (!target) {
-      const has = Object.keys(store.doc.collections).join(', ');
+    if (!target || !keeps(target)) {
+      const has = kept.keptNames.join(', ');
       const hint = 'a reference stays within one store; declare the collection here, or read it by a second get';
-      refuse('C005', `'${ref.collection}' is not a collection of this store (collections: ${has})`, at, hint);
+      const why = target
+        ? `views '${target.view}' and keeps no records of its own`
+        : 'is not a collection of this store';
+      refuse('C005', `'${ref.collection}' ${why} (collections: ${has})`, at, hint);
       continue;
     }
     checkRefType(kept, field, at, target);

@@ -8,10 +8,12 @@
  */
 import {
   type Collection,
+  keeps,
   type Loaded,
   type LoadResult,
   type PortDoc,
   type Scope,
+  type StoreCollection,
   type StoreDoc,
   show,
 } from '@wilanis/core';
@@ -186,8 +188,8 @@ function keyMark(collection: Collection, scope: Scope): string {
   return markLine('key', type ? `${collection.key}: ${type}` : collection.key);
 }
 
-/** One collection: the shape it holds, what identifies a record, and every mark it declares. */
-function collectionLines(name: string, collection: Collection, store: StoreDoc, scope: Scope): string[] {
+/** One collection that keeps records: the shape it holds, what identifies a record, and every mark it declares. */
+function keepsLines(name: string, collection: Collection, store: StoreDoc, scope: Scope): string[] {
   return [
     `  collection ${name}: ${collection.of}`,
     keyMark(collection, scope),
@@ -198,6 +200,20 @@ function collectionLines(name: string, collection: Collection, store: StoreDoc, 
     ...wasMark(collection),
     ...(collection.description ? [markLine('holds', collection.description)] : []),
   ];
+}
+
+/** One collection that views another: whose rows it sees, and the policy every trigger reaching it attaches. */
+function viewLines(name: string, collection: StoreCollection): string[] {
+  return [
+    `  collection ${name}: view of ${collection.view}`,
+    ...(collection.behind ? [markLine('behind', collection.behind)] : []),
+    ...(collection.description ? [markLine('holds', collection.description)] : []),
+  ];
+}
+
+/** One collection, in whichever of the two shapes it was written: a view says what it views, and nothing more. */
+function collectionLines(name: string, collection: StoreCollection, store: StoreDoc, scope: Scope): string[] {
+  return keeps(collection) ? keepsLines(name, collection, store, scope) : viewLines(name, collection);
 }
 
 /**

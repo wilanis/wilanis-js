@@ -7,7 +7,6 @@ import type { Resolves } from '@wilanis/core';
 import type { At, Engine, Ref } from './engine.js';
 import { engines } from './engine.js';
 import type { Lowering } from './ensure.js';
-import type { Declaring } from './plan.js';
 
 type Connection = { kind: string; settings: Record<string, unknown> };
 
@@ -18,7 +17,7 @@ interface Env {
   resolving?: Resolves;
 }
 
-/** One collection as a store document declares it. */
+/** One collection as a store document declares it: the record-keeping shape, since a view declares no `of`. */
 interface Declared {
   of: string;
   key: string;
@@ -28,7 +27,19 @@ interface Declared {
 }
 interface StoreDocument {
   connection: string;
-  collections: Record<string, Declared>;
+  collections: Record<string, Partial<Declared> & { view?: string }>;
+}
+
+/**
+ * The collections of a store that keep records, by name. A view has no shape, no key and no table of its own,
+ * so nothing here -- the references, the plan, the engine -- has anything to do with one: it is the viewed
+ * collection's rows that exist, and reading them through a view is RFC 0015's later step.
+ */
+function keeping(store: StoreDocument): Record<string, Declared> {
+  const entries = Object.entries(store.collections).filter(
+    (entry): entry is [string, Declared] => entry[1].view === undefined && !!entry[1].of && !!entry[1].key,
+  );
+  return Object.fromEntries(entries);
 }
 
 const canonOf = (env: Record<string, unknown>) => (env as Env).canon ?? ((ref: string) => ref);
@@ -58,7 +69,7 @@ function connectionOf(env: Record<string, unknown>, store: StoreDocument): { pat
  * at it.
  */
 function refsOf(store: StoreDocument): Ref[] {
-  return Object.entries(store.collections).flatMap(([from, declared]) =>
+  return Object.entries(keeping(store)).flatMap(([from, declared]) =>
     Object.entries(declared.refs ?? {}).map(([field, ref]) => ({ from, field, to: ref.collection })),
   );
 }
@@ -66,9 +77,10 @@ function refsOf(store: StoreDocument): Ref[] {
 /** One collection of a store, as the engine sees it: where it lives, what it is called, its shape and its key. */
 export function collectionAt(env: Record<string, unknown>, named: unknown, name: unknown): At {
   const store = documentOf(env, named);
-  const declared = store.collections[String(name)];
+  const collections = keeping(store);
+  const declared = collections[String(name)];
   if (!declared) {
-    const names = Object.keys(store.collections).join(', ') || 'none';
+    const names = Object.keys(collections).join(', ') || 'none';
     throw new Error(`store '${named}' has no collection '${name}' (collections: ${names})`);
   }
   const { path, conn } = connectionOf(env, store);
@@ -102,7 +114,7 @@ export function storeFor(env: Record<string, unknown>, named: unknown): Lowering
   if (!resolving) throw new Error('no tree in this environment to read a shape from');
   return {
     on: { connection: path, kind: conn.kind, settings: conn.settings },
-    declaring: { connection: path, collections: store.collections as Declaring['collections'] },
+    declaring: { connection: path, collections: keeping(store) },
     shapeOf: (of: string) => resolving.type(of),
   };
 }
