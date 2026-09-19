@@ -48,14 +48,16 @@ describe('the documents @storage ships', () => {
   });
 
   it('say where every type variable comes from, so no call site repeats the record type', () => {
+    // each path hops `view`, so a collection that names another is read as the one it names: a view has the
+    // viewed collection's shape and key, and a site over one types as a site over what it views
     const port = loadTree(dir, PLUGINS).registry.get('port', '@storage/store.port.json');
     const resolves = (name: string) => port?.doc.operations[name]?.accepts?.store?.resolves;
     expect(resolves('get')).toEqual({
-      $T: 'collections[collection].of',
-      $K: 'collections[collection].of{key}.type',
+      $T: 'collections[collection|view].of',
+      $K: 'collections[collection|view].of{key}.type',
     });
-    expect(resolves('find')).toEqual({ $T: 'collections[collection].of' });
-    expect(resolves('newKey')).toEqual({ $K: 'collections[collection].of{key}.type' });
+    expect(resolves('find')).toEqual({ $T: 'collections[collection|view].of' });
+    expect(resolves('newKey')).toEqual({ $K: 'collections[collection|view].of{key}.type' });
     expect(resolves('count')).toBeUndefined();
   });
 });

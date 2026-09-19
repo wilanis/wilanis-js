@@ -171,3 +171,18 @@ describe('sabotage: what a view is behind', () => {
     ).not.toContain('A008');
   });
 });
+
+describe('a site over a view types as the collection it views', () => {
+  it('a find over a view answers the viewed shape, so the graph it feeds is typed', () => {
+    // the view declares no `of`, so before the port hopped one a find over it answered unknown[] and the
+    // graph earned G010 against its own out. The hop is the port document's word, read through `resolves`:
+    // nothing in the compiler learns what a view is, and the whole change is which path store.port.json writes
+    expect(scopedCodes(viewedUnder('kept-list'))).not.toContain('G010');
+  });
+  it('a view earns its policy gate and nothing else: the typing of the site is not a refusal', () => {
+    // every refusal the planted view earns is about the way across the scope -- the policy a trigger must
+    // attach, and the read it must guarantee -- and none is about what the rows are
+    const codes = new Set(scopedCodes(viewedUnder('kept-list')));
+    expect([...codes].sort()).toEqual(['A006', 'A008']);
+  });
+});
