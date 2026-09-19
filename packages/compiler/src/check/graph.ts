@@ -3,7 +3,7 @@
  * (L002, L003, L008); inputs fit their contracts (see inputs.ts); a switch's rules are boolean and route to
  * nodes of this graph, each routed once (G009, G011); a map iterates a list and binds its element (G012); no
  * cycle (G007); out.from names nodes that answer the out type (G010); everything declared is read (G008,
- * and P005 for the `reads` map); every read's local name is free (P006); constants conform (G013). A domain
+ * and P005 for the `reads` map); no read is named after a node (P006); constants conform (G013). A domain
  * graph that only forwards its input is refused (L007).
  */
 import {
@@ -31,8 +31,8 @@ import { resolversFor } from './resolvers.js';
 /**
  * Every refusal a graph can earn, in the role its layer gives it: unique ids (G001), operations the role and
  * the feature may run (L002, L003, L008), reads that resolve (G003), inputs that fit their contracts, switches
- * and maps (G004, G006, G009, G011, G012), conforming constants (G013), a `reads` map whose names are free
- * (P006) and every entry of which is read (P005), and the whole (G007, G008, G010).
+ * and maps (G004, G006, G009, G011, G012), conforming constants (G013), a `reads` map naming no node of the
+ * graph (P006) and every entry of which is read (P005), and the whole (G007, G008, G010).
  * A domain graph that only forwards its input to one port operation is refused as boilerplate (L007).
  */
 export function checkGraph(judge: Judge, graph: Loaded<GraphDoc>, role: GraphRole): void {
@@ -105,24 +105,20 @@ class GraphCheck {
   }
 
   /**
-   * P006: a read's local name is the author's, so it may collide. A name a node already has, or one of the
-   * roots a value reads, would make {{name}} ambiguous -- the order `rootReadRaw` tries the roots in would
-   * decide it silently. The name is refused instead, and the order never matters.
+   * P006: a read's local name is the author's, so it may collide with a node's id -- {{name}} would be
+   * ambiguous, and the order `rootReadRaw` tries the roots in would decide it silently. The name is refused
+   * instead, and the order never matters. This half is the graph's alone, since only a graph has node ids;
+   * the half about the roots every document reads is `readFor`'s, so a binding and a store earn it too.
    */
   private checkReadNames(resolvers: Record<string, JudgedResolver>): void {
     for (const name of Object.keys(resolvers)) {
-      if (RESERVED.has(name)) {
-        const hint = `${[...RESERVED].join(', ')} are roots; pick another name`;
-        this.refuse('P006', `read name '${name}' is reserved`, `reads/${name}`, hint);
-        continue;
-      }
-      if (this.nodes.has(name))
-        this.refuse(
-          'P006',
-          `'${name}' is also the id of a node; {{${name}}} would be ambiguous`,
-          `reads/${name}`,
-          `rename the read: "reads": { "${name}By": "...#${name}" }`,
-        );
+      if (!this.nodes.has(name)) continue;
+      this.refuse(
+        'P006',
+        `'${name}' is also the id of a node; {{${name}}} would be ambiguous`,
+        `reads/${name}`,
+        `rename the read: "reads": { "${name}By": "...#${name}" }`,
+      );
     }
   }
 

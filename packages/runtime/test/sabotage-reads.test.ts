@@ -1,8 +1,9 @@
 /**
  * Sabotage: what a tree earns for the reads it takes from the request. A resolvers document declares each read
- * once (P002, P003, D001, D008), and a data graph or a binding binds the ones it takes under `reads`: the entry
- * names a resolver that exists and is visible (P004, R001), every entry is read by some value (P005), no local
- * name collides with a node or a root (P006), and a read nothing bound is refused where it is read (G003).
+ * once (P002, P003, D001, D008), and a data graph, a binding or a store binds the ones it takes under `reads`:
+ * the entry names a resolver that exists and is visible (P004, R001), every entry is read by some value (P005),
+ * no local name is a root (P006, wherever it was bound) or a node of the graph that bound it (P006, the graph's
+ * alone), and a read nothing bound is refused where it is read (G003).
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -159,6 +160,38 @@ describe('sabotage: the reads a document takes from the request', () => {
         graph.reads.in = '@monitor/edge/request.resolvers.json#agent';
       }),
     ).toContain('P006');
+  });
+  it('P006 a binding that names a read after a root', () => {
+    // a binding binds a read the same way a graph does, so the name is judged the same way: {{in.id}} in a
+    // delegation is the operation's input, and a read that answered to it would shadow it silently
+    expect(
+      sabotage('features/monitor/data/monitor-rest.binding.json', binding => {
+        binding.reads = { in: '@monitor/edge/request.resolvers.json#agent' };
+      }),
+    ).toEqual(['P006']);
+  });
+  it('P006 a store that names a read after a root', () => {
+    expect(
+      sabotage('features/monitor/data/entries.store.json', store => {
+        store.reads = { in: '@monitor/edge/request.resolvers.json#agent' };
+      }),
+    ).toEqual(['P006']);
+  });
+  it('P006 says the same thing wherever the read was bound, and points at the entry', () => {
+    // the rule is one rule: a reader who met it on a graph meets the same words on a binding and a store.
+    // The entry is added rather than assigned, so the graph keeps the read its body already makes (G003)
+    const named = (doc: any) => {
+      doc.reads = { ...doc.reads, in: '@monitor/edge/request.resolvers.json#agent' };
+    };
+    for (const file of [
+      'features/monitor/data/create-row.graph.json',
+      'features/monitor/data/monitor-rest.binding.json',
+      'features/monitor/data/entries.store.json',
+    ]) {
+      expect(sabotageSaying(file, named)).toEqual(["P006 read name 'in' is reserved"]);
+      expect(sabotagePointing(file, named)).toEqual([`P006 @${file}#reads/in`]);
+      expect(sabotageHinting(file, named)).toEqual(['P006 in, const, request, secrets are roots; pick another name']);
+    }
   });
   it('P004 a resolvers document of another feature that does not export it', () => {
     expect(

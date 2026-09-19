@@ -1,9 +1,9 @@
 /**
- * P resolvers. A resolvers document names reads of the request; a data graph or a binding binds each read it
- * takes under `reads`, local name -> `@path#resolver`, and reads {{name}}. Each document is judged once here
- * (P002, P003) and each entry of a `reads` map is judged where it is written (P004, L002); whether the trigger
- * kinds that reach a read hand it is judged at the trigger (T004). Also the walk that finds every request.*
- * path an operation reaches through its binding, which B008 and T004 hold their callers to.
+ * P resolvers. A resolvers document names reads of the request; a data graph, a binding or a store binds each
+ * read it takes under `reads`, local name -> `@path#resolver`, and reads {{name}}. Each document is judged once
+ * here (P002, P003) and each entry of a `reads` map is judged where it is written (P004, P006, L002); whether
+ * the trigger kinds that reach a read hand it is judged at the trigger (T004). Also the walk that finds every
+ * request.* path an operation reaches through its binding, which B008 and T004 hold their callers to.
  *
  * The walk has one edge no document writes: a native call site over a scoped collection reads the reads that
  * collection is scoped by, because the compiler carries them there at lowering (RFC 0015). So a graph that
@@ -67,8 +67,9 @@ function judgeResolver(judge: Judge, refuse: Refuser, name: string, spec: Resolv
 }
 
 /**
- * The resolvers a graph or binding may read, one per entry of its `reads` map, under the local name the entry
- * gave it. A domain graph takes none: the request is the world's, and the domain never sees it (L002).
+ * The resolvers a document may read, one per entry of its `reads` map, under the local name the entry gave
+ * it -- a data graph's, a binding's or a store's, since every kind that binds a read is judged here. A domain
+ * graph takes none: the request is the world's, and the domain never sees it (L002).
  */
 export function resolversFor(
   judge: Judge,
@@ -92,9 +93,10 @@ export function resolversFor(
 }
 
 /**
- * P004: one entry of a `reads` map, as the resolver it names. The value addresses a resolver of a resolvers
- * document -- `@path#name` -- so the path names a document that exists (R001) and is visible (L005), and the
- * document declares that name. The local name is the author's, and the judged read answers under it.
+ * P004, P006: one entry of a `reads` map, as the resolver it names. The local name is free (P006), and the
+ * value addresses a resolver of a resolvers document -- `@path#name` -- so the path names a document that
+ * exists (R001) and is visible (L005), and the document declares that name. The judged read answers under
+ * the local name, and an entry refused here answers under none, so nothing downstream judges it twice.
  */
 function readFor(
   judge: Judge,
@@ -103,6 +105,13 @@ function readFor(
   entry: { name: string; ref: string },
 ): JudgedResolver | undefined {
   const at = `reads/${entry.name}`;
+  // P006: a name a value reads as a root would make {{name}} ambiguous, whoever bound it -- a graph, a
+  // binding or a store. The half about a node's id is the graph's alone, and stays with the nodes it knows.
+  if (RESERVED.has(entry.name)) {
+    const hint = `${[...RESERVED].join(', ')} are roots; pick another name`;
+    refuse('P006', `read name '${entry.name}' is reserved`, at, hint);
+    return undefined;
+  }
   const { path, op: resolver } = splitRef(entry.ref);
   if (!path || !resolver) {
     const hint = 'a read names one resolver: "@feature/edge/file.resolvers.json#name"';
