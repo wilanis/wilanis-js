@@ -26,9 +26,16 @@
       "description": "Every effect this graph reaches runs in one transaction on one connection: its answer commits, a refusal or a fault rolls back. Absent: false, and each effect commits on its own.",
       "type": "boolean"
     },
-    "resolvers": {
-      "description": "The resolvers document (edge/) whose reads this graph may use as {{name}}: values taken straight from the request. Data graphs only: a domain graph never reads the request.",
-      "$ref": "common.schema.json#/$defs/path"
+    "reads": {
+      "description": "The reads this graph takes from the request: local name -> the resolver that declares it, as @feature/edge/file.resolvers.json#name. The body reads each as {{name}} or {{name.field}}; every entry is read by some value, and no name is a node's id or a reserved root. Data graphs only: a domain graph never reads the request.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "$ref": "common.schema.json#/$defs/ident"
+      },
+      "additionalProperties": {
+        "$ref": "common.schema.json#/$defs/resolverRef"
+      }
     },
     "constants": {
       "description": "Typed literals, read as {{const.name}}.",

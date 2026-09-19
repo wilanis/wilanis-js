@@ -24,6 +24,11 @@
       "type": "string",
       "pattern": "^@[A-Za-z0-9_.-]*(/[A-Za-z0-9_.-]+)*\\.json#[a-z][A-Za-z0-9_]*$"
     },
+    "resolverRef": {
+      "description": "A resolver of a resolvers document: its path, #, and the resolver's name (@monitor/edge/request.resolvers.json#agent).",
+      "type": "string",
+      "pattern": "^@[A-Za-z0-9_.-]*(/[A-Za-z0-9_.-]+)*\\.json#[a-z][A-Za-z0-9_]*$"
+    },
     "typeRef": {
       "description": "A type: string, number, boolean, blob (a stored file, carried as a handle: id, contentType, size, filename; never the bytes), unknown, or the path of a shape; any of them followed by [] for a list of it. Native contracts may also write type (a field whose value is a type reference) and $T variables bound by such fields. No bare object, no bare array.",
       "type": "string",
@@ -145,7 +150,7 @@
       }
     },
     "value": {
-      "description": "A value where an operation is called. Literals are written as they are: a string, a number, a boolean, a list or an object of values. A string may carry {{root.path}} templates: alone it takes that value and its type; embedded in text it is interpolated (scalars only). A path segment is .name, or ['a key'] for a key that is not an identifier. Roots in a graph node: in (the graph's input), const (a constant), a node id, a resolver name. In a binding delegation's in: in (the operation's accepts) and resolvers. In a trigger's fire.in: request."
+      "description": "A value where an operation is called. Literals are written as they are: a string, a number, a boolean, a list or an object of values. A string may carry {{root.path}} templates: alone it takes that value and its type; embedded in text it is interpolated (scalars only). A path segment is .name, or ['a key'] for a key that is not an identifier. Roots in a graph node: in (the graph's input), const (a constant), a node id, a name under reads. In a binding delegation's in: in (the operation's accepts) and the names under reads. In a trigger's fire.in: request."
     },
     "values": {
       "description": "The values given where an operation is called, by name: each is a literal or a {{root.path}} template read from what is in scope.",

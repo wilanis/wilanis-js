@@ -160,9 +160,12 @@ export interface BindingOp {
   in?: Values;
   description?: string;
 }
-/** How a domain port is met. `resolvers` names the resolvers document whose reads a delegation may use. */
+/** How a domain port is met. `reads` names each read of the request a delegation may use, as `@path#resolver`. */
 export interface BindingDoc extends Envelope {
   port: string;
+  /** Local name -> the resolver that declares it (`@feature/edge/file.resolvers.json#name`). */
+  reads?: Record<string, string>;
+  /** The resolvers document this binding named before `reads`; read by the compiler until RFC 0029 step 2. */
   resolvers?: string;
   operations: Record<string, BindingOp>;
 }
@@ -206,7 +209,9 @@ export const isMap = (node: Node): node is MapNode => node.type === NODE_MAP;
 export interface GraphDoc extends Envelope {
   /** Every effect this graph reaches runs in one transaction on one connection; its answer commits it. */
   atomic?: boolean;
-  /** The resolvers document whose reads this graph may use as {{name}}; data graphs only. */
+  /** Local name -> the resolver that declares it (`@feature/edge/file.resolvers.json#name`); data graphs only. */
+  reads?: Record<string, string>;
+  /** The resolvers document this graph named before `reads`; read by the compiler until RFC 0029 step 2. */
   resolvers?: string;
   constants?: Record<string, { type: TypeSpec; value: unknown; description?: string }>;
   in?: TypeRef;

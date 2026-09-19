@@ -37,11 +37,11 @@ property is described.
 | `shape` | a named object type; `layer: edge` (the world's) or `core` (ours) | `edge/` or `domain/` |
 | `port` | a contract: operations with accepts / returns, each maybe `pure`, `refuses`, `holds` or `transactional`; a field may be `static` | `domain/` |
 | `binding` | how a port is met: per operation a graph or a delegation (`run` + `in`) | `data/` |
-| `graph` | dataflow: nodes of type run / switch / map, `in`, `out.from`, constants; `atomic` when its effects commit or roll back together; a data graph may name `resolvers` | `domain/` or `data/` |
+| `graph` | dataflow: nodes of type run / switch / map, `in`, `out.from`, constants; `atomic` when its effects commit or roll back together; a data graph may name `reads` | `domain/` or `data/` |
 | `trigger` | a way in: `kind`, `settings`, `in`, `out`, `policies` (what gates it, in order, each given the credentials it needs), and `fire` -- the run node it invokes | `edge/` |
 | `policy` | a gate: `decide` fires a domain operation over what the guard hands (`{{request.principal}}`), `outcomes` maps each reason its graph refuses with to `deny` or `challenge`, `proves` says what is present once it allows | `edge/` |
 | `invariant` | a rule that must hold: `access` (which policy gates writes to a port) or `holds` (a rule over a core shape's fields) | `domain/` |
-| `resolvers` | named reads of the request (`request.params.id`, `request.headers['user-agent']`, `request.session.id`), for data graphs and bindings to read as `{{name}}`; `required` when a policy guarantees the read | `edge/` |
+| `resolvers` | named reads of the request (`request.params.id`, `request.headers['user-agent']`, `request.session.id`), for data graphs and bindings to bind under `reads` and read as `{{name}}`; `required` when a policy guarantees the read | `edge/` |
 | `store` | what the feature keeps: a connection and collections of a core shape (or a plugin's shape), each by key, with `unique`, `refs`, `defaults`; `renamed` and `was` record what a field or the collection was called before, so a rename is read as one | `data/` |
 | `connection` | a channel to an external system, settings read `{{secrets.*}}` | `connections/` |
 | `scenario` | a recorded run (fuzz writes, regress replays) | `scenarios/` |
@@ -66,7 +66,7 @@ features/<name>/
   operations it may run are pure. Every effect it needs, it reaches through a port (L002).
 - **The data layer** translates. A data graph may name edge shapes and speaks native ports, and every
   effectful operation it reaches is listed in `feature.json → effects` (L003). It is the only layer that
-  reads the request, and only through a `resolvers` document it names: `"resolvers": "@f/edge/request.resolvers.json"`,
+  reads the request, and only through resolvers it names: `"reads": { "agent": "@f/edge/request.resolvers.json#agent" }`,
   then `{{agent}}` wherever the value is used. A resolver is a read, not an operation: nothing runs.
 
 A domain graph must earn its place: if it does nothing but forward its input to one port operation, it is

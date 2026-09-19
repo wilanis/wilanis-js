@@ -2,7 +2,9 @@
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Read the session",
   "description": "Data graph behind preferences: the attributes of the session the guard identified.",
-  "resolvers": "@access/edge/session.resolvers.json",
+  "reads": {
+    "sid": "@access/edge/session.resolvers.json#sid"
+  },
   "out": {
     "type": "@access/domain/Session.shape.json",
     "from": "attributes"

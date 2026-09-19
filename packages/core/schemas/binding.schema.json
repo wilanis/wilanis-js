@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/binding.schema.json",
   "title": "binding",
-  "description": "How a domain port is met. Each operation is bound to a data graph, or delegated to one native operation with its values fixed here -- the declared statement. A delegation's in may read {{in.*}} (the operation's accepts) and {{resolver.*}}; an input it does not give is passed from the operation's accepts by name.",
+  "description": "How a domain port is met. Each operation is bound to a data graph, or delegated to one native operation with its values fixed here -- the declared statement. A delegation's in may read {{in.*}} (the operation's accepts) and the names this binding declares under reads; an input it does not give is passed from the operation's accepts by name.",
   "type": "object",
   "properties": {
     "$schema": {
@@ -25,9 +25,16 @@
     "port": {
       "$ref": "common.schema.json#/$defs/path"
     },
-    "resolvers": {
-      "description": "The resolvers document (edge/) whose reads this binding may use as {{name}}: values taken straight from the request. A delegation reads them in its in.",
-      "$ref": "common.schema.json#/$defs/path"
+    "reads": {
+      "description": "The reads this binding takes from the request: local name -> the resolver that declares it, as @feature/edge/file.resolvers.json#name. A delegation reads each as {{name}} or {{name.field}} in its in; every entry is read by some value, and no name is a reserved root.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "$ref": "common.schema.json#/$defs/ident"
+      },
+      "additionalProperties": {
+        "$ref": "common.schema.json#/$defs/resolverRef"
+      }
     },
     "operations": {
       "description": "How each operation of the port is met: by a data graph, or by delegating to another operation. Every operation of the port needs one and no others may appear (B001).",

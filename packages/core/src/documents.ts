@@ -16,6 +16,20 @@ import { validateDocument } from './validate.js';
 
 /** Kinds a plugin ships and a tree never authors. */
 const NATIVE_KINDS = new Set<Kind>(['plugin', 'trigger-kind', 'connection-kind', 'codec']);
+
+/**
+ * Scaffolding for RFC 0029: a graph or binding now declares `reads`, and the compiler still asks for the one
+ * `resolvers` document those reads name. Fill the old field from the first of them so step 1 changes the
+ * grammar without changing what the compiler sees. Until step 2 reads the map itself, a local name still has
+ * to be the resolver's own and every entry still has to name one document -- which is what the tree writes
+ * today, and what P004 will hold an author to. Step 2 reads the map and this goes with it.
+ */
+function bridgeReads(doc: unknown, kind: Kind): void {
+  if (kind !== 'graph' && kind !== 'binding') return;
+  const named = doc as { reads?: Record<string, string>; resolvers?: string };
+  const refs = Object.values(named.reads ?? {});
+  if (refs.length) named.resolvers = refs[0].slice(0, refs[0].lastIndexOf('#'));
+}
 export const PROJECT_FILE = 'project.json';
 
 /** A file parsed as JSON, or the refusal for one that is not. */
@@ -70,6 +84,7 @@ export class Documents {
       this.refuse(bad);
       return;
     }
+    bridgeReads(parsed.doc, kind);
     this.registry.add({
       doc: parsed.doc as AnyDoc,
       kind,

@@ -2,7 +2,9 @@
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "End the session",
   "description": "Data graph behind signOut: end the session the guard identified.",
-  "resolvers": "@access/edge/session.resolvers.json",
+  "reads": {
+    "sid": "@access/edge/session.resolvers.json#sid"
+  },
   "out": {
     "type": "@access/edge/SignedOut.shape.json",
     "from": "ended"
