@@ -103,7 +103,7 @@ the read. The monitor's store, once its entries belong to tenants:
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/store.schema.json",
   "label": "Entries",
-  "description": "Observed calls, one row each, kept per tenant: a caller sees the rows of the tenant their sign-in wrote into the session, and nothing else. every-entry is the support desk's view across tenants.",
+  "description": "Observed calls, one row each, kept per tenant: a caller sees the rows of the tenant their sign-in wrote into the session, and nothing else. everyEntry is the support desk's view across tenants.",
   "connection": "@connections/entries.connection.json",
   "reads": { "tenant": "@monitor/edge/request.resolvers.json#tenant" },
   "collections": {
@@ -113,7 +113,7 @@ the read. The monitor's store, once its entries belong to tenants:
       "unique": [["url", "method"]],
       "scoped": { "tenant": "{{tenant}}" }
     },
-    "every-entry": {
+    "everyEntry": {
       "view": "entries",
       "behind": "@access/edge/employees-only.policy.json",
       "description": "the same rows, every tenant's: the digest, for employees"
@@ -221,12 +221,12 @@ C0n1  @features/monitor/data/entries.store.json#collections/entries/scoped/tenan
 ```
 
 **A view across tenants.** The digest lists every entry, whoever recorded it, for the support desk. Its data graph
-runs `find` over `every-entry`, which has no scope because a view has none; and every trigger that reaches that
+runs `find` over `everyEntry`, which has no scope because a view has none; and every trigger that reaches that
 graph must attach `employees-only`, because the view says `behind`. Drop the policy from `digest.trigger.json`:
 
 ```
 A0n2  @features/monitor/edge/digest.trigger.json#policies
-    reaches @monitor/data/digest-rows.graph.json#rows, which reads every-entry, a view of entries across every tenant behind @access/edge/employees-only.policy.json, and attaches no such policy
+    reaches @monitor/data/digest-rows.graph.json#rows, which reads everyEntry, a view of entries across every tenant behind @access/edge/employees-only.policy.json, and attaches no such policy
     → attach "@access/edge/employees-only.policy.json" under policies, or read entries
 ```
 
@@ -247,7 +247,7 @@ store  @monitor/data/entries.store.json  (Entries)
                 written at sign-in by @access/domain/sign-in-customer.graph.json#issued, @access/domain/sign-in-employee.graph.json#issued
     read by     @monitor/data/get-record.graph.json#asked (get), @monitor/data/list-records.graph.json#asked (find)
     written by  @monitor/data/create-record.graph.json#saved (put), @monitor/data/delete-record.graph.json#gone (remove)
-  collection every-entry: view of entries, behind @access/edge/employees-only.policy.json
+  collection everyEntry: view of entries, behind @access/edge/employees-only.policy.json
     read by     @monitor/data/digest-rows.graph.json#rows (find)  reached by digest.trigger.json (attaches it)
 ```
 
@@ -461,9 +461,9 @@ this RFC does not pretend otherwise.
   as {{tenant}} (scopes entries)`.
 - `wilanis describe <graph>` (`nodeLines`) prints `scope tenant ← {{tenant}} of @monitor/data/entries.store.json` after
   a storage node's line: what the compiler carries there, named.
-- `wilanis describe <trigger>` prints, after its policies, `reaches every-entry (a view) behind
+- `wilanis describe <trigger>` prints, after its policies, `reaches everyEntry (a view) behind
   @access/edge/employees-only.policy.json: attached`.
-- `wilanis map` prints a scoped store as `store entries (get, scoped by tenant)` and a view as `view every-entry (find)`.
+- `wilanis map` prints a scoped store as `store entries (get, scoped by tenant)` and a view as `view everyEntry (find)`.
 - The viewer (`packages/view/src/graphs.ts`, `ports.ts`; `renderDocPage` in `client/index.html`): a storage node over a
   scoped collection carries a `scope` badge naming the column and linking the store page, from documents alone; the
   store page draws its `reads` as a graph's request node is drawn -- one port per read, each opening its resolvers
@@ -500,13 +500,13 @@ answer the codes), in a new `sabotage-scoping.test.ts`, once the example keeps i
 | Code | The edit |
 |---|---|
 | C0n1 | `"scoped": { "url": "{{tenant}}" }` (a field of the shape); `"acme"`; `"{{tenant}}-eu"`; `"{{tenant.id}}"`; `"{{in.tenant}}"`; `"{{agent}}"` with `agent` not under the store's `reads`; the resolver `tenant` without `required`; its read changed to `request.principal.roles` (a list); to `request.principal.claims.tenant` (open, so unknown); `settings.session` removed from the `@auth` plugin in `project.json` (the attribute reads unknown; the access tree's own refusals filtered) |
-| C0n2 | `"view": "nope"`; `"view": "every-entry"` (a view of a view); a view with `"of"` beside it; `"behind": "@access/edge/nope.policy.json"` (R001) |
+| C0n2 | `"view": "nope"`; `"view": "everyEntry"` (a view of a view); a view with `"of"` beside it; `"behind": "@access/edge/nope.policy.json"` (R001) |
 | P004, P005 | `"reads": { "tenant": "...#nope" }`; a second `reads` entry no `scoped` reads |
-| A0n1 | the resolver `tenant` read changed to `request.headers['x-tenant']`; to `request.params.id`; to `request.body.tenant`; the `@auth` plugin removed from `project.json` (with the access feature's other refusals filtered) |
+| A0n1 | the resolver `tenant` read changed to `request.headers['x-tenant']`; to `request.params.id`; to `request.query['tenant']`; the `@auth` plugin removed from `project.json` (with the access feature's other refusals filtered) |
 | A0n2 | `employees-only` dropped from `digest.trigger.json` |
 | A006 | `signed-in` dropped from `get-entry.trigger.json`: the message names `request.session`, read by the store |
 | B008 | a startup step naming `@monitor/domain/monitor.port.json#count` over `entries`: the message names the store's read |
-| X2n1 | `"scope": { "tenant": "{{tenant}}" }` written on `asked` in `get-record.graph.json` (the M12 demo: "the agent added the filter by hand"); on the `find` over `every-entry`; on a `newKey` |
+| X2n1 | `"scope": { "tenant": "{{tenant}}" }` written on `asked` in `get-record.graph.json` (the M12 demo: "the agent added the filter by hand"); on the `find` over `everyEntry`; on a `newKey` |
 | X1n1 | `"values": { "theme": "{{in.theme}}", "tenant": "globex" }` in `write-theme.graph.json`; `"keys": ["tenant"]` on a `session.port.json#remove`; the same through a binding delegation |
 | X208 | `"where": { "tenant": "acme" }` on the `find` over `entries` |
 | none | the example as written: `codes(EXAMPLE)` is empty; `describe` of the store prints the lines above |
@@ -528,7 +528,7 @@ Compiler and core:
 
 | Test | Where | What it does |
 |---|---|---|
-| `collectionOf` | `packages/runtime/test/example.test.ts` | the `get` node of `get-record.graph.json` names `entries`; the digest's `rows` names `every-entry`; an http node names nothing |
+| `collectionOf` | `packages/runtime/test/example.test.ts` | the `get` node of `get-record.graph.json` names `entries`; the digest's `rows` names `everyEntry`; an http node names nothing |
 | the scope edge | `packages/runtime/test/example.test.ts` | `opNeeds` of `monitor.port.json#get` includes `request.session.attributes.tenant`, required; of `#digest` it does not |
 | lowering | `packages/runtime/test/example.test.ts` | the lowered `get-record` graph's `asked` node has `scope.tenant` as `{ ref: 'request', path: ['session', 'attributes', 'tenant'] }`, and no node was added; the lowered `digest-rows` graph's `rows` has no `scope` |
 | the view gate under a profile | `sabotage-scoping.test.ts` | a second profile binding `digest` to a graph that reads `entries`: A0n2 is not raised; binding it to the view graph without the policy: raised, naming the profile |
@@ -571,7 +571,7 @@ not; over the fake OIDC issuer, the claims the type's fields name are read and t
     writes it from `{{checked.identity.attributes.tenant}}` and `sign-in-employee.graph.json` from a constant;
     `Principal.shape.json`, the guard's `plugin.json` and the token are untouched. The example's monitor feature: the
     `request.resolvers.json` gains `tenant` reading `request.session.attributes.tenant`; the store gains `reads`,
-    `scoped` and `every-entry`; no storage node changes; `get-entry` and `list-entries` attach `signed-in`; the
+    `scoped` and `everyEntry`; no storage node changes; `get-entry` and `list-entries` attach `signed-in`; the
     digest's graph reads the view and its trigger attaches `employees-only`; `sabotage-scoping.test.ts`; the README's
     storage paragraph gains a sentence on scope.
 11. Viewer: the `scope` badge; the store page's `reads`, scope and view. Test.
