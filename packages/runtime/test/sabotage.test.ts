@@ -114,22 +114,22 @@ describe('sabotage: graphs, layers, resolvers and triggers', () => {
     // list-rows is reached from the digest, a cli trigger: the command line hands no headers
     expect(
       sabotage('features/monitor/data/list-rows.graph.json', graph => {
-        graph.resolvers = '@monitor/edge/request.resolvers.json';
+        graph.reads = { agent: '@monitor/edge/request.resolvers.json#agent' };
         graph.nodes[0].in.headers = { 'x-forwarded-user-agent': '{{agent}}' };
       }),
     ).toContain('T004');
   });
-  it('L002 a domain graph that names a resolvers document', () => {
+  it('L002 a domain graph that reads the request', () => {
     expect(
       sabotage('features/monitor/domain/digest.graph.json', graph => {
-        graph.resolvers = '@monitor/edge/request.resolvers.json';
+        graph.reads = { agent: '@monitor/edge/request.resolvers.json#agent' };
       }),
     ).toContain('L002');
   });
   it('R001 a resolvers document that does not exist', () => {
     expect(
       sabotage('features/monitor/data/create-row.graph.json', graph => {
-        graph.resolvers = '@monitor/edge/nope.resolvers.json';
+        graph.reads = { agent: '@monitor/edge/nope.resolvers.json#agent' };
       }),
     ).toContain('R001');
   });

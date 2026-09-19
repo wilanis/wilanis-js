@@ -97,8 +97,11 @@ export class Registry {
   }
 }
 
-/** Split path#operation. */
-export function splitOp(opRef: string): { path: string; op: string } {
-  const hash = opRef.lastIndexOf('#');
-  return { path: opRef.slice(0, hash), op: opRef.slice(hash + 1) };
+/** Split path#name: the document, and what `#` addresses within it -- an operation of a port, or a resolver of a resolvers document. */
+export function splitRef(ref: string): { path: string; op: string } {
+  const hash = ref.lastIndexOf('#');
+  return { path: ref.slice(0, hash), op: ref.slice(hash + 1) };
 }
+
+/** `splitRef` under the name its callers still use; they are renamed with the compiler in RFC 0029 step 2. */
+export const splitOp = splitRef;

@@ -82,12 +82,6 @@ describe('port and binding', () => {
       at('operations/get', "unknown property 'params'"),
     ]);
   });
-  it('a binding names its resolvers document by path', () => {
-    expect(refused(doc('binding', { resolvers: '@features/f/edge/r.resolvers.json' }))).toEqual([]);
-    expect(refused(doc('binding', { resolvers: { caller: { read: 'request.params.id' } } }))).toEqual([
-      at('resolvers', 'must be string'),
-    ]);
-  });
 });
 
 describe('resolvers', () => {
@@ -106,12 +100,6 @@ describe('resolvers', () => {
     ]);
     expect(refused(doc('resolvers', { resolvers: {} }))).toEqual([
       at('resolvers', 'must NOT have fewer than 1 properties'),
-    ]);
-  });
-  it('a graph or binding names the resolvers document by path', () => {
-    expect(refused(doc('graph', { resolvers: '@features/f/edge/r.resolvers.json' }))).toEqual([]);
-    expect(refused(doc('graph', { resolvers: { a: { read: 'request.params.id' } } }))).toEqual([
-      at('resolvers', 'must be string'),
     ]);
   });
 });
