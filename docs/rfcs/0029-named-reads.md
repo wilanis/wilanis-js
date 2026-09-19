@@ -1,6 +1,6 @@
 # RFC 0029: `reads`: a document names each read it takes from the request
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:core`, `area:compiler`, `area:runtime`, `area:view`
 - **Tracking issue:** #198
 - **Depends on:** none. RFC 0015 is written in this grammar and depends on it; RFC 0005 and RFC 0009 name the

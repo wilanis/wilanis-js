@@ -34,7 +34,7 @@ accepted. Statuses: draft, accepted, implemented, withdrawn.
 | [0026](0026-application-manifest.md) | The application manifest | accepted |
 | [0027](0027-fitness-functions.md) | Fitness functions: decisions about the code, held by the tests that record them | implemented |
 | [0028](0028-principles-hold.md) | The principles hold: four sentences of `CLAUDE.md` that nothing held, and the two claims not to write | implemented |
-| [0029](0029-named-reads.md) | `reads`: a document names each read it takes from the request | accepted |
+| [0029](0029-named-reads.md) | `reads`: a document names each read it takes from the request | implemented |
 | [0030](0030-cache.md) | `cache`: one word on a node, a graph or an operation, lowered to the nodes it stands for | accepted |
 | [0031](0031-intent-triggers.md) | Intents: a sentence fires a route, under the route's own policies | accepted |
 | [0032](0032-site-as-declared-input.md) | The site as a declared input: what the compiler tells an operation about where it was called | accepted |
