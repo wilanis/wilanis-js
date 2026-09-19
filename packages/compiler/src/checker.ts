@@ -18,6 +18,7 @@ import { checkGraph } from './check/graph.js';
 import { checkInvariant, checkInvariantSites } from './check/invariants.js';
 import { Judge } from './check/judge.js';
 import { checkProject, checkStartup } from './check/project.js';
+import { checkRequired } from './check/required.js';
 import { checkResolversDoc } from './check/resolvers.js';
 import { checkStoreScoping } from './check/scopes.js';
 import { checkStore } from './check/stores.js';
@@ -37,8 +38,8 @@ export function checkTree(load: LoadResult): RefusalList {
 
 /**
  * The order of judgement: the project, then what a contract declares, then what names it, atomic graphs once
- * every binding is judged -- the walk goes through them -- and startup last, once every resolvers document
- * is read.
+ * every binding is judged -- the walk goes through them -- and startup and the bindings of required ports
+ * last, once every resolvers document is read.
  */
 function judgeTree(judge: Judge): void {
   checkProject(judge);
@@ -46,6 +47,7 @@ function judgeTree(judge: Judge): void {
   judgeUses(judge);
   checkAtomic(judge);
   checkStartup(judge);
+  checkRequired(judge);
 }
 
 /** What a contract says for itself: the shapes, ports, connections, stores and plugin-shipped kinds. */
