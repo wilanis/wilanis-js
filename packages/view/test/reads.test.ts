@@ -125,10 +125,11 @@ describe('the request node, one port per name a graph reads', () => {
         name: 'headers.user-agent',
         depth: 1,
         type: 'string',
-        // the local name the graph reads by ({{agent}}), not the resolver's label: the label is the description
+        // the local name the graph reads by ({{agent}}), not the resolver's label
         label: 'agent',
         opens: REQUEST_DOC,
-        description: 'absent when the caller sent none; the header is then not forwarded',
+        // the port's label is taken by the name, so the resolver's own label joins its description: neither is lost
+        description: "The caller's user agent. absent when the caller sent none; the header is then not forwarded",
       },
     ]);
   });
@@ -154,7 +155,8 @@ describe('the request node, one port per name a graph reads', () => {
         type: 'string',
         label: 'agent',
         opens: REQUEST_DOC,
-        description: 'absent when the caller sent none; the header is then not forwarded',
+        // a resolver with both says both
+        description: "The caller's user agent. absent when the caller sent none; the header is then not forwarded",
       },
       {
         name: 'headers.host',
@@ -162,6 +164,7 @@ describe('the request node, one port per name a graph reads', () => {
         type: 'string',
         label: 'host',
         opens: MORE_DOC,
+        // one with a label alone says just that, with no stray joiner
         description: 'The host asked for',
       },
     ]);
@@ -181,5 +184,27 @@ describe('the request node, one port per name a graph reads', () => {
     );
     // the resolver is named `agent`; the graph reads it as {{whoCalled}}, and the port says so
     expect(request.outputs.find(port => port.opens)).toMatchObject({ label: 'whoCalled', opens: REQUEST_DOC });
+  });
+
+  it('says nothing under a port whose resolver declares neither a label nor a description', () => {
+    const request = requestOf(
+      {
+        'features/monitor/edge/more.resolvers.json': {
+          $schema: `${SCHEMAS}/resolvers.schema.json`,
+          label: 'More context',
+          description: 'A resolver with nothing to say about itself: only what it reads.',
+          resolvers: { host: { read: 'request.headers.host' } },
+        },
+        'features/monitor/data/two-reads.graph.json': forwards(
+          { host: '@monitor/edge/more.resolvers.json#host' },
+          { 'x-forwarded-host': '{{host}}' },
+        ),
+      },
+      TWO_READS,
+    );
+    const port = request.outputs.find(one => one.opens);
+    // absent, not the empty string: an empty description would draw a blank line under the port
+    expect(port).toMatchObject({ label: 'host', opens: MORE_DOC });
+    expect(Object.keys(port ?? {})).not.toContain('description');
   });
 });
