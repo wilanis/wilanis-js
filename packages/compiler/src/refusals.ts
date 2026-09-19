@@ -51,7 +51,8 @@ export interface ReachedEffect {
   /**
    * The canonical domain operation whose binding led here, or nothing where the walk started in the graph
    * that holds the site. A rule that names the profile names this too, so a reader is not left to walk the
-   * bindings by hand.
+   * bindings by hand. It is one way in and not every one: a graph reached twice is walked once, so what is
+   * answered is that the site is reachable and a path by which it is.
    */
   through: string | undefined;
 }
@@ -131,10 +132,10 @@ export function refusalsOfGraph(scope: Scope, graphPath: string, profile?: strin
 }
 
 /**
- * One walk below one operation or graph, under one profile. It gathers both of the things a reader asks of it
- * at once, since both are read off the same steps: the literal reasons its refusing calls give, and the domain
- * operations it passed through. `seen` is over graphs, so a graph reached twice is walked once and a cycle ends
- * rather than recurring.
+ * One walk below one operation or graph, under one profile. It gathers all three of the things a reader asks
+ * of it at once, since all three are read off the same steps: the literal reasons its refusing calls give, the
+ * domain operations it passed through, and the native call sites it ends at. `seen` is over graphs, so a graph
+ * reached twice is walked once and a cycle ends rather than recurring.
  */
 class Walk {
   readonly refusals: ReachableRefusal[] = [];
