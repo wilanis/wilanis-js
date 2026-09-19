@@ -14,7 +14,8 @@ import storage from '@wilanis/plugin-storage';
 import memory from '@wilanis/plugin-storage-memory';
 import postgres from '@wilanis/plugin-storage-postgres';
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_PLUGINS, fuzz, init, regress, scaffold } from '../src/index.js';
+import { BUILTIN_PLUGINS, describe as describeDoc, fuzz, init, regress, scaffold } from '../src/index.js';
+import { loadedEditing } from './example-harness.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 /** The tree the example includes, as the runtime would resolve it from the example's node_modules. */
@@ -204,6 +205,99 @@ describe('wilanis fuzz and regress', () => {
     expect(changed.ok).toBe(false);
     expect(changed.lines.join('\n')).toContain(
       'op: ran graph:@features/monitor/data/kept-get.graph.json → graph:@features/monitor/data/get-row.graph.json',
+    );
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+/**
+ * What `wilanis describe` says about the reads a document takes from the request. A read is the one value in
+ * a tree that comes from outside it, and RFC 0029 made each one a path above its use; `describe` reads that
+ * map from both ends, so neither a `{{name}}` in a graph nor a resolver in an edge document is a name whose
+ * other end a reader has to go looking for.
+ */
+describe('wilanis describe: the reads a document takes from the request', () => {
+  const said = () => describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@monitor/data/create-row.graph.json');
+
+  it('prints the reads block before the nodes, so no {{name}} is met before what binds it', () => {
+    const lines = said().split('\n');
+    expect(lines.indexOf('reads:')).toBeGreaterThan(-1);
+    expect(lines.indexOf('reads:')).toBeLessThan(lines.indexOf('nodes:'));
+  });
+
+  it('names each read, the resolver it is bound to, and what that resolver reads of the request', () => {
+    // the ref is openable and the read beside it spares the reader opening it to learn what {{agent}} is
+    expect(said()).toContain("    agent ← @monitor/edge/request.resolvers.json#agent  (request.headers['user-agent'])");
+  });
+
+  it('says of a required read that it is required, since a trigger reaching it must prove it (A006)', () => {
+    const lines = describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@access/data/read-session.graph.json');
+    expect(lines).toContain('    sid ← @access/edge/session.resolvers.json#sid  (request.session.id, required)');
+  });
+
+  it('prints no block at all for a graph that reads nothing, rather than an empty heading', () => {
+    const lines = describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@monitor/data/get-row.graph.json');
+    expect(lines).not.toContain('reads:');
+  });
+
+  it("prints a binding's reads above its operations, since a delegation's {{name}} is one of them", () => {
+    // no binding of the example delegates over a read yet; the block is the binding's all the same
+    const { load, dir } = loadedEditing('features/monitor/data/monitor-rest.binding.json', doc => {
+      doc.reads = { agent: '@monitor/edge/request.resolvers.json#agent' };
+    });
+    const lines = describeDoc(load, '@monitor/data/monitor-rest.binding.json').split('\n');
+    expect(lines).toContain("    agent ← @monitor/edge/request.resolvers.json#agent  (request.headers['user-agent'])");
+    expect(lines.indexOf('reads:')).toBeLessThan(lines.indexOf('answers:'));
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('says the ref and nothing more where the resolver behind it cannot be read', () => {
+    // describe reads a tree the checker may not have passed; P004 is the checker's to say, not this command's
+    const { load, dir } = loadedEditing('features/monitor/data/create-row.graph.json', doc => {
+      doc.reads = { agent: '@monitor/edge/request.resolvers.json#agents' };
+    });
+    expect(describeDoc(load, '@monitor/data/create-row.graph.json')).toContain(
+      '    agent ← @monitor/edge/request.resolvers.json#agents\n',
+    );
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('wilanis describe: a resolvers document and who reads it', () => {
+  const said = () => describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@monitor/edge/request.resolvers.json');
+
+  it('prints one line per resolver, saying what it reads', () => {
+    expect(said()).toContain("    agent  ← request.headers['user-agent']");
+  });
+
+  it('names every document that binds it, and the local name each gave it', () => {
+    expect(said()).toContain('        used by @features/monitor/data/create-row.graph.json as {{agent}}');
+  });
+
+  it('names each user of a resolver several documents read, one line each', () => {
+    const lines = describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@access/edge/session.resolvers.json');
+    expect(lines).toContain('        used by @features/access/data/end-session.graph.json as {{sid}}');
+    expect(lines).toContain('        used by @features/access/data/read-session.graph.json as {{sid}}');
+    expect(lines).toContain('        used by @features/access/data/write-theme.graph.json as {{sid}}');
+  });
+
+  it('says so where a resolver is declared and nothing binds it', () => {
+    const { load, dir } = loadedEditing('features/monitor/edge/request.resolvers.json', doc => {
+      doc.resolvers.tenant = { read: 'request.session.attributes.tenant' };
+    });
+    expect(describeDoc(load, '@monitor/edge/request.resolvers.json')).toContain(
+      '        used by nothing yet -- bind it under a data graph’s or a binding’s reads',
+    );
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reads the local name the reader chose, not the resolver name', () => {
+    const { load, dir } = loadedEditing('features/monitor/data/create-row.graph.json', doc => {
+      doc.reads = { who: '@monitor/edge/request.resolvers.json#agent' };
+      doc.nodes[0].in.headers['x-forwarded-user-agent'] = '{{who}}';
+    });
+    expect(describeDoc(load, '@monitor/edge/request.resolvers.json')).toContain(
+      '        used by @features/monitor/data/create-row.graph.json as {{who}}',
     );
     rmSync(dir, { recursive: true, force: true });
   });

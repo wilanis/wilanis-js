@@ -14,10 +14,12 @@ import type {
   ConnectionDoc,
   FeatureDoc,
   Loaded,
+  LoadResult,
   ProjectDoc,
   ResolversDoc,
   ScenarioDoc,
 } from '@wilanis/core';
+import { type Reader, readersOf, readsLines } from './reads-said.js';
 
 /** One list of paths on one line, as `gates:` says a policy's triggers; nothing where the list is empty. */
 const listLine = (label: string, values: string[] | undefined): string[] =>
@@ -25,12 +27,12 @@ const listLine = (label: string, values: string[] | undefined): string[] =>
 
 /**
  * A binding: the port it meets, the reads its operations take from the request, and how each is answered --
- * by a graph, or by delegating to another operation. The port is said once above, since every row shares it.
+ * by a graph, or by delegating to another operation. The port is said once above, since every row shares it,
+ * and the reads stand above the operations, since a delegation's `{{name}}` is one of them.
  */
-export function bindingLines(doc: Loaded): string[] {
+export function bindingLines(doc: Loaded, scope: Reader): string[] {
   const declared = doc.doc as BindingDoc;
-  const reads = Object.entries(declared.reads ?? {}).map(([name, ref]) => `${name} \u2190 ${ref}`);
-  const lines = [`meets  ${declared.port}`, ...listLine('reads  ', reads)];
+  const lines = [`meets  ${declared.port}`, ...readsLines(declared.reads, scope)];
   lines.push('answers:');
   for (const [name, op] of Object.entries(declared.operations))
     lines.push(`    #${name}  ${answeredBy(op)}${op.description ? `  -- ${op.description}` : ''}`);
@@ -44,18 +46,29 @@ function answeredBy(op: { graph?: string; run?: string }): string {
 }
 
 /**
- * A resolvers document: each named read, what it runs and whether a binding must give it. A resolver is a
- * read and never an operation, so the line says what it reads rather than what it does.
+ * A resolvers document: each named read, what it runs, whether a binding must give it, and who reads it. A
+ * resolver is a read and never an operation, so the line says what it reads rather than what it does; and
+ * since `reads` binds one resolver at a time under a name of the reader's choosing, this document is the one
+ * place both ends of that binding can be seen at once -- a reader here is told where each read is used and
+ * under which local name, rather than opening every data graph to find out.
  */
-export function resolversLines(doc: Loaded): string[] {
+export function resolversLines(doc: Loaded, load: LoadResult): string[] {
   const declared = doc.doc as ResolversDoc;
+  const readers = readersOf(doc.path, load);
   const lines = ['reads, each bound under a binding\u2019s or a data graph\u2019s reads as @path#name:'];
   for (const [name, read] of Object.entries(declared.resolvers)) {
     const must = read.required ? '  (required: every trigger reaching it must prove it, A006)' : '';
     lines.push(`    ${name}  ← ${read.read}${must}${read.description ? `  -- ${read.description}` : ''}`);
+    lines.push(...usedLines(readers(name)));
   }
   return lines;
 }
+
+/** Who binds one resolver, a line each; one nothing binds says so, since a read declared and unbound is worth seeing. */
+const usedLines = (used: string[]): string[] =>
+  used.length
+    ? used.map(one => `        ${one}`)
+    : ['        used by nothing yet -- bind it under a data graph’s or a binding’s reads'];
 
 /** A feature: the features it may name, what it lets others name, and the effects its graphs may run. */
 export function featureLines(doc: Loaded): string[] {
