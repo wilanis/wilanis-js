@@ -11,8 +11,8 @@
           "type": "string",
           "static": true,
           "resolves": {
-            "$T": "collections[collection].of",
-            "$K": "collections[collection].of{key}.type"
+            "$T": "collections[collection|view].of",
+            "$K": "collections[collection|view].of{key}.type"
           },
           "description": "the path of the store document these records are kept by"
         },
@@ -49,7 +49,7 @@
           "type": "string",
           "static": true,
           "resolves": {
-            "$T": "collections[collection].of"
+            "$T": "collections[collection|view].of"
           },
           "description": "the path of the store document these records are kept by"
         },
@@ -121,7 +121,7 @@
           "type": "string",
           "static": true,
           "resolves": {
-            "$T": "collections[collection].of"
+            "$T": "collections[collection|view].of"
           },
           "description": "the path of the store document these records are kept by"
         },
@@ -172,8 +172,8 @@
           "type": "string",
           "static": true,
           "resolves": {
-            "$T": "collections[collection].of",
-            "$K": "collections[collection].of{key}.type"
+            "$T": "collections[collection|view].of",
+            "$K": "collections[collection|view].of{key}.type"
           },
           "description": "the path of the store document these records are kept by"
         },
@@ -214,8 +214,8 @@
           "type": "string",
           "static": true,
           "resolves": {
-            "$T": "collections[collection].of",
-            "$K": "collections[collection].of{key}.type"
+            "$T": "collections[collection|view].of",
+            "$K": "collections[collection|view].of{key}.type"
           },
           "description": "the path of the store document these records are kept by"
         },
@@ -261,7 +261,7 @@
           "type": "string",
           "static": true,
           "resolves": {
-            "$K": "collections[collection].of{key}.type"
+            "$K": "collections[collection|view].of{key}.type"
           },
           "description": "the path of the store document these records are kept by"
         },

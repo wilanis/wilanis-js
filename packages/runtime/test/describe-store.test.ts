@@ -168,8 +168,10 @@ describe('describe: the port a store is reached through', () => {
   });
 
   it('says where the record type and the key type come from, rather than asking a caller to repeat them', () => {
-    expect(said()).toContain('binds $T from collections[collection].of');
-    expect(said()).toContain('binds $K from collections[collection].of{key}.type');
+    // the path is printed as the port wrote it, hop and all, so a reader sees that a view is read as the
+    // collection it views rather than having to learn it somewhere else
+    expect(said()).toContain('binds $T from collections[collection|view].of');
+    expect(said()).toContain('binds $K from collections[collection|view].of{key}.type');
   });
 
   it('lays the where grammar out where find and count accept it, so a reader never guesses a filter', () => {

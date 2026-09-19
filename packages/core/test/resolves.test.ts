@@ -12,12 +12,18 @@ import { type Type, TypeError_, TypeResolver } from '../src/types.js';
 const ENTRY: Type = { kind: 'object', name: '@f/Entry.shape.json', fields: {}, open: false };
 const COUNT: Type = { kind: 'object', name: '@f/Count.shape.json', fields: {}, open: false };
 
-/** A tree holding one store and the shapes its collections keep: entries keyed by a string, counts by a number. */
+/**
+ * A tree holding one store and the shapes its collections keep: entries keyed by a string, counts by a number,
+ * and two collections that declare no shape of their own but name another under `view` -- one of a collection
+ * that keeps records, one of a view, which is the hop the grammar will not follow twice.
+ */
 const store = {
   connection: '@connections/records.connection.json',
   collections: {
     entries: { of: '@f/Entry.shape.json', key: 'id' },
     counts: { of: '@f/Count.shape.json', key: 'at' },
+    'every-entry': { view: 'entries', behind: '@f/edge/employees-only.policy.json' },
+    'twice-over': { view: 'every-entry', behind: '@f/edge/employees-only.policy.json' },
   },
 };
 
@@ -51,6 +57,18 @@ describe('the path grammar', () => {
     expect(parsePath('a.b.c')).toEqual([{ name: 'a' }, { name: 'b' }, { name: 'c' }]);
   });
 
+  it('a key taken by an input may name one field to follow, where what was found has it', () => {
+    expect(parsePath('collections[collection|view].of')).toEqual([
+      { name: 'collections', by: 'collection', from: 'input', hop: 'view' },
+      { name: 'of' },
+    ]);
+    // the hop belongs to the key an input holds; a sibling key takes none, and neither does a plain name
+    expect(parsePath('of{key|view}')).toContain('is not a field name');
+    expect(parsePath('collections|view')).toContain('is not a field name');
+    expect(parsePath('collections[collection|View]')).toContain('is not a field name');
+    expect(parsePath('collections[collection|view|again]')).toContain('is not a field name');
+  });
+
   it('says why a path that is not one is not one', () => {
     expect(parsePath('')).toBe('an empty path');
     expect(parsePath('.of')).toContain('is not a field name');
@@ -68,6 +86,12 @@ describe('the path grammar', () => {
     expect(substituted(parsePath('of{key}') as never)).toEqual([]);
     expect(showPath(path as never)).toBe('collections[collection].of');
     expect(showPath(parsePath('collections[collection].of{key}') as never)).toBe('collections[collection].of{key}');
+  });
+
+  it('a hop reads back beside the input it hops from, and adds no input of its own', () => {
+    const hopping = parsePath('collections[collection|view].of{key}.type');
+    expect(substituted(hopping as never)).toEqual(['collection']);
+    expect(showPath(hopping as never)).toBe('collections[collection|view].of{key}.type');
   });
 });
 
@@ -98,6 +122,33 @@ describe('what a path finds', () => {
       $T: COUNT,
       $K: { kind: 'number' },
     });
+  });
+
+  it('a value that names another under the hopped field is read as that one: a view has the viewed shape', () => {
+    const hopping: Field = {
+      type: 'string',
+      static: true,
+      resolves: { $T: 'collections[collection|view].of', $K: 'collections[collection|view].of{key}.type' },
+    };
+    // the view declares no shape and no key of its own; both are read from the collection it names
+    expect(resolvedBy(hopping, '@f/data/records.store.json', { collection: 'every-entry' }, tree)).toEqual({
+      $T: ENTRY,
+      $K: { kind: 'string' },
+    });
+    // a collection that keeps records has no such field, so the hop changes nothing for it
+    expect(resolvedBy(hopping, '@f/data/records.store.json', { collection: 'entries' }, tree)).toEqual({
+      $T: ENTRY,
+      $K: { kind: 'string' },
+    });
+  });
+
+  it('hops once and no further: a value naming a value that names a third binds nothing', () => {
+    const hopping: Field = { type: 'string', static: true, resolves: { $T: 'collections[collection|view].of' } };
+    expect(resolvedBy(hopping, '@f/data/records.store.json', { collection: 'twice-over' }, tree)).toEqual({});
+  });
+
+  it('without the hop the same value answers nothing, which is what earned the form', () => {
+    expect(resolvedBy(field, '@f/data/records.store.json', { collection: 'every-entry' }, tree)).toEqual({});
   });
 
   it('binds nothing where the tree cannot answer: an unknown document, a collection it lacks, a key not given', () => {
