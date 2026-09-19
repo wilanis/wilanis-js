@@ -30,7 +30,24 @@ npm install @wilanis/access @wilanis/plugin-auth @wilanis/plugin-http
    The connections are the host's, of any directory kind `@auth` grants: accounts written in the connection
    for development, an OIDC issuer for production. `wilanis check` says B002 until the port is bound.
 
-2. **Configure `@auth`** in `project.json`, with the session shape this tree ships and the `otp` method:
+2. **Bind `@auth/state.port.json`**, the guard's memory, in a feature of its own (`features/state/`). `@auth`
+   requires it and keeps every session and challenge through it; one delegation per operation, to the plugin's
+   file store for one process:
+
+   ```json
+   { "port": "@auth/state.port.json", "operations": {
+       "getSession":      { "run": "@auth/files.port.json#get",    "in": { "collection": "sessions",   "type": "@auth/SessionRecord.shape.json" } },
+       "putSession":      { "run": "@auth/files.port.json#put",    "in": { "collection": "sessions",   "type": "@auth/SessionRecord.shape.json" } },
+       "endSession":      { "run": "@auth/files.port.json#remove", "in": { "collection": "sessions",   "type": "@auth/SessionRecord.shape.json" } },
+       "getChallenge":    { "run": "@auth/files.port.json#get",    "in": { "collection": "challenges", "type": "@auth/ChallengeRecord.shape.json" } },
+       "putChallenge":    { "run": "@auth/files.port.json#put",    "in": { "collection": "challenges", "type": "@auth/ChallengeRecord.shape.json" } },
+       "removeChallenge": { "run": "@auth/files.port.json#remove", "in": { "collection": "challenges", "type": "@auth/ChallengeRecord.shape.json" } } } }
+   ```
+
+   The feature lists `@auth/files.port.json#get`, `#put` and `#remove` under `effects`. `wilanis check` says B002
+   (required by @auth) until the port is bound.
+
+3. **Configure `@auth`** in `project.json`, with the session shape this tree ships and the `otp` method:
 
    ```json
    { "use": "@auth", "from": "@wilanis/plugin-auth", "settings": {
@@ -39,7 +56,7 @@ npm install @wilanis/access @wilanis/plugin-auth @wilanis/plugin-http
        "challenge": { "methods": { "otp": { "obtain": "wilanis run @access/edge/issue-otp.trigger.json --challenge-id={id}" } } } } }
    ```
 
-3. **Gate triggers** with the policies this tree exports, giving the guard the token where the trigger reads it:
+4. **Gate triggers** with the policies this tree exports, giving the guard the token where the trigger reads it:
 
    ```json
    "policies": [
@@ -85,7 +102,7 @@ npm install @wilanis/access @wilanis/plugin-auth @wilanis/plugin-http
 ## On its own
 
 This directory is a complete tree: `features/access-dev` binds `identity.port.json` to the directories written in
-`connections/` (bo / bo-pass holds `recorder`, cy / cy-pass only `viewer`, ana / ana-pass is a customer), so
+`connections/`, and `@auth/state.port.json` to files under `.wilanis/auth` (bo / bo-pass holds `recorder`, cy / cy-pass only `viewer`, ana / ana-pass is a customer), so
 `wilanis check .`, `wilanis rehearse .` and `wilanis start .` work here with `MONITOR_JWT_SECRET` set. A host
 that includes `["access"]` gets none of that: the dev feature and the connections stay behind.
 

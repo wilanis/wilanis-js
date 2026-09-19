@@ -10,8 +10,10 @@
  * step may, B006 a startup step naming what is not an operation, D008 the trigger outside edge/. The plugin's
  * own unit cases live in `packages/plugin-schedule/test/rules.test.ts`; these say the example proves them too.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { relocate, sabotage, sabotagePointing } from './example-harness.js';
+import { EXAMPLE, relocate, sabotage, sabotagePointing } from './example-harness.js';
 
 const NIGHTLY = 'features/monitor/edge/nightly-digest.trigger.json';
 /** The same document as a refusal names it: canonical, from the tree's root. */
@@ -19,8 +21,10 @@ const AT = `@${NIGHTLY}`;
 const codesOf = (edit: (doc: any) => void) => sabotage(NIGHTLY, edit);
 const pointing = (edit: (doc: any) => void) => sabotagePointing(NIGHTLY, edit);
 
-/** The step that keeps the schedule, as project.json writes it: after the watcher, before the listener. */
-const KEEP = 3;
+/** The step that keeps the schedule, found by what it runs, so a step added before it moves nothing here. */
+const KEEP = JSON.parse(readFileSync(join(EXAMPLE, 'project.json'), 'utf8')).startup.findIndex(
+  (step: { run: string }) => step.run === '@schedule/scheduler.port.json#run',
+);
 
 describe('sabotage: a schedule that is not one -- X251', () => {
   it('six fields, where a cron expression has five', () => {
