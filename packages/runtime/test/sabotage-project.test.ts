@@ -214,4 +214,11 @@ describe('sabotage: a store names a connection and the shapes it keeps', () => {
       }),
     ).toContain('B010');
   });
+  it('C014 a blob registry behind a connection no plugin offers a blob store for', () => {
+    expect(
+      sabotage('project.json', project => {
+        project.blobs = { connection: '@connections/monitor-api.connection.json' };
+      }),
+    ).toContain('C014');
+  });
 });

@@ -18,7 +18,7 @@ import { checkConnection, checkPort, checkShape } from './check/contracts.js';
 import { checkGraph } from './check/graph.js';
 import { checkInvariant, checkInvariantSites } from './check/invariants.js';
 import { Judge } from './check/judge.js';
-import { checkProject, checkStartup } from './check/project.js';
+import { checkBlobStore, checkProject, checkStartup } from './check/project.js';
 import { checkRequired } from './check/required.js';
 import { checkResolversDoc } from './check/resolvers.js';
 import { checkStoreScoping } from './check/scopes.js';
@@ -32,7 +32,9 @@ export function checkTree(load: LoadResult): RefusalList {
   const project = load.registry.project;
   if (!project) return out;
   const scope = new Scope(load.registry, load.resolve);
-  judgeTree(new Judge(scope, project, out));
+  const judge = new Judge(scope, project, out);
+  judgeTree(judge);
+  checkBlobStore(judge, load.plugins);
   for (const plugin of load.plugins) checkPlugin(plugin, scope, out);
   return out;
 }

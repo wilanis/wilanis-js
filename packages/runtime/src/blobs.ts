@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import type { BlobHandle, BlobScope, BlobStore } from '@wilanis/core';
+import type { BlobHandle, BlobScope, BlobStore, PluginModule, Scope } from '@wilanis/core';
 
 const ID = /^[0-9a-f-]{36}$/;
 
@@ -87,4 +87,28 @@ export class FileBlobStore implements BlobStore {
     this.held.clear();
     rmSync(this.dir, { recursive: true, force: true });
   }
+}
+
+/** What choosing the tree's blob registry reads: the project, the plugins it names, its connections, and its root. */
+export interface BlobChoice {
+  scope: Scope;
+  plugins: PluginModule[];
+  /** Every connection by canonical path, its kind canonical and its settings with secrets substituted. */
+  connections: Record<string, { kind: string; settings: Record<string, unknown> }>;
+  root: string;
+}
+
+/**
+ * The tree's blob registry: the store the connection `project.json → blobs.connection` names, opened by the
+ * plugin that offers a blob store for its kind, or files under `blobs.dir` when it names none. A connection no
+ * plugin offers a store for is C014, so a tree that passed check never reaches the throw.
+ */
+export function blobStoreOf({ scope, plugins, connections, root }: BlobChoice): BlobStore {
+  const declared = scope.project?.blobs;
+  if (!declared?.connection) return new FileBlobStore(root, declared?.dir);
+  const connection = connections[scope.canon(declared.connection)];
+  const open = connection && plugins.map(plugin => plugin.blobStores?.[connection.kind]).find(Boolean);
+  if (!open)
+    throw new Error(`blobs.connection '${declared.connection}' opens no blob store: wilanis check says why (C014)`);
+  return open(connection.settings);
 }
