@@ -55,7 +55,12 @@ trigger, for every trigger kind alike, the runtime calls this plugin's guard:
 
 - `@auth/identity.port.json#verify` judges a username and password against a directory connection and
   answers `status` (`verified`, `rejected`, `unavailable`) with the `identity` (`subject`, `name`, `groups`)
-  when verified. The graph decides what a rejection means (`bad_credentials`), the way it decides what a 404 means.
+  when verified. Give it a `type` and the identity also carries `attributes`: whatever else the directory said
+  about the account, of the shape that names -- an account's `attributes` in a directory connection, the claims
+  of the same names in an OIDC identity token. They are judged against the shape as a session write is, and a
+  directory that does not say what the tree asks of it fails the node rather than rejecting the credential.
+  Without a `type`, `verify` answers what it always did. The graph decides what a rejection means
+  (`bad_credentials`), the way it decides what a 404 means.
 - `@auth/token.port.json#issue` signs an access token (HS256, `sub`, `realm`, `roles`, `sid`) and opens its
   session with the attributes given; `#refresh` trades a refresh token for a new pair, spending the old one.
 - `@auth/session.port.json#get`, `#set`, `#remove`, `#end` read and write a session's attributes -- typed by the
@@ -68,7 +73,8 @@ trigger, for every trigger kind alike, the runtime calls this plugin's guard:
 ## Directories
 
 - `@auth/directory.connection-kind.json`: the accounts written in the connection itself (username, `password`
-  or `passwordHash` as `scrypt:<salt>:<hash>`, name, groups). Development and tests.
+  or `passwordHash` as `scrypt:<salt>:<hash>`, name, groups, and any `attributes` the tree asks `verify` for).
+  Development and tests.
 - `@auth/oidc.connection-kind.json`: an OpenID Connect issuer asked with the password grant; the identity
   token it answers is verified against its published keys, and the identity read from it. The caller then
   holds *our* token, never the issuer's.
@@ -79,8 +85,10 @@ A production profile binds the same domain port to another directory, and nothin
 
 X101 `settings.session` names no shape · X102 a challenge by an undeclared method, or a challenging policy on a
 trigger no attachment of which gives a challenge answer · X103 a session write with a key the session shape
-does not declare, or another type. The checker's own A004 and A005 judge the attachments: a credential the
-guard does not verify or the kind cannot hand, and a policy reading the caller on a trigger that gives nothing.
+does not declare, or another type · X105 a session write naming an attribute a store scopes a collection by: a
+scope is what the sign-in graph gave `token.port.json#issue`, and nothing writes it again. The checker's own
+A004 and A005 judge the attachments: a credential the guard does not verify or the kind cannot hand, and a
+policy reading the caller on a trigger that gives nothing.
 
 Sessions and challenges are files under `settings.store.dir` (default `.wilanis/auth`), so a server and the
 `wilanis run` processes of the same tree share them. Depends on `@wilanis/core`, `@wilanis/engine` and `jose`.
