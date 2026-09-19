@@ -133,6 +133,8 @@ export interface PluginDoc extends Envelope {
     codecs?: string[];
     shapes?: string[];
   };
+  /** Ports the plugin calls and the host binds: open domain ports under the plugin's root (D012). */
+  requires?: { ports?: string[] };
   guard?: GuardDoc;
 }
 /**

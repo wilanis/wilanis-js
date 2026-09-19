@@ -25,6 +25,7 @@ import {
 import { graphLines } from './graph-said.js';
 import { holdsLines, invariantLines } from './invariant-lines.js';
 import { fieldLine, portLines, shower, storeLines } from './lines.js';
+import { requiredByLines, requiresLines } from './required-said.js';
 import { shapeLines } from './shape-said.js';
 import { storeTail } from './stores.js';
 
@@ -39,8 +40,9 @@ export function ls(load: LoadResult, kind?: Kind): string[] {
 }
 
 /** Where one document came from, when it is not the tree's own. */
-function whereFrom(file: { native?: string; included?: string }): string {
+function whereFrom(file: { native?: string; requiredBy?: string; included?: string }): string {
   if (file.native) return '  (native)';
+  if (file.requiredBy) return `  (required by ${file.requiredBy})`;
   return file.included ? `  (included from ${file.included})` : '';
 }
 
@@ -184,8 +186,8 @@ function settingLines(settings: Record<string, unknown> | undefined): string[] {
  */
 function kindBody(doc: Loaded, load: LoadResult, scope: Scope, showType: (spec: unknown) => string): string[] {
   if (doc.kind === 'port') return portLines(doc, showType);
-  if (doc.kind === 'trigger-kind' || doc.kind === 'connection-kind' || doc.kind === 'plugin')
-    return kindLines(doc, showType);
+  if (doc.kind === 'plugin') return [...kindLines(doc, showType), ...requiresLines(doc, scope)];
+  if (doc.kind === 'trigger-kind' || doc.kind === 'connection-kind') return kindLines(doc, showType);
   if (doc.kind === 'shape') return shapeLines(doc, scope, load, showType);
   if (doc.kind === 'store') return storeLines(doc, load, scope);
   if (doc.kind === 'policy') return policyLines(doc, load);
@@ -219,9 +221,10 @@ export function describe(load: LoadResult, ref: string): string {
   const { path } = splitOp(ref.includes('#') ? ref : `${ref}#`);
   const doc = scope.any(path || ref);
   if (!doc) return `no document at '${ref}'`;
-  // one native document is one plugin's: say which, and the package it came from, so who implements it is not one code detail
-  const from = doc.native ? scope.project?.plugins.find(plugin => plugin.use === doc.native)?.from : undefined;
-  const grantedBy = grantLine(doc, from);
+  // one native or required document is one plugin's: say which, and the package it came from, so who implements it is not one code detail
+  const owner = doc.native ?? doc.requiredBy;
+  const from = owner ? scope.project?.plugins.find(plugin => plugin.use === owner)?.from : undefined;
+  const grantedBy = doc.requiredBy ? requiredByLines(doc, from, scope) : grantLine(doc, from);
   const lines = [
     `${doc.kind}  ${doc.path}`,
     ...(doc.file ? [`file  ${doc.file}`] : []),

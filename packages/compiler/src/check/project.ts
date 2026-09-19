@@ -71,11 +71,12 @@ function checkProfileBinding(judge: Judge, name: string, [portRef, bindingRef]: 
   }
 }
 
-/** B002: a domain port has one binding under a profile. */
+/** B002: a domain port has one binding under a profile; a port a plugin requires names the plugin, since the tree never wrote it. */
 function checkPortMet(judge: Judge, port: Loaded<PortDoc>, profile: string | undefined): void {
-  const binding = judge.scope.bindingFor(port.path, profile);
-  if (typeof binding !== 'string') return;
-  const hint = 'wilanis new binding <feature>/<name> --port <path>';
+  const found = judge.scope.bindingFor(port.path, profile);
+  if (typeof found !== 'string') return;
+  const binding = port.requiredBy ? `${found} (required by ${port.requiredBy})` : found;
+  const hint = `wilanis new binding <feature>/<name> --port ${port.requiredBy ? port.path : '<path>'}`;
   if (profile)
     judge.refuser(judge.project.path)('B002', `profile '${profile}': ${binding}`, `profiles/${profile}/bindings`, hint);
   else judge.refuser(port.path)('B002', binding, undefined, hint);

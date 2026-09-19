@@ -18,6 +18,8 @@ export interface Loaded<T extends AnyDoc = AnyDoc> {
   layer?: Layer;
   /** The plugin alias that shipped it, if native. */
   native?: string;
+  /** The plugin alias that requires it, if it is a port a plugin ships for the host to bind: a domain port, not native. */
+  requiredBy?: string;
   /** The package it was included from, when it is another tree's document rather than this one's. */
   included?: string;
   /** Where it is on disk, so a reader can open it: under the tree, or under the plugin's package. */
