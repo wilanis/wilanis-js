@@ -165,8 +165,6 @@ export interface BindingDoc extends Envelope {
   port: string;
   /** Local name -> the resolver that declares it (`@feature/edge/file.resolvers.json#name`). */
   reads?: Record<string, string>;
-  /** The resolvers document this binding named before `reads`; read by the compiler until RFC 0029 step 2. */
-  resolvers?: string;
   operations: Record<string, BindingOp>;
 }
 
@@ -211,8 +209,6 @@ export interface GraphDoc extends Envelope {
   atomic?: boolean;
   /** Local name -> the resolver that declares it (`@feature/edge/file.resolvers.json#name`); data graphs only. */
   reads?: Record<string, string>;
-  /** The resolvers document this graph named before `reads`; read by the compiler until RFC 0029 step 2. */
-  resolvers?: string;
   constants?: Record<string, { type: TypeSpec; value: unknown; description?: string }>;
   in?: TypeRef;
   out?: { type: TypeRef; from: string | string[]; description?: string };

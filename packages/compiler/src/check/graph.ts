@@ -47,7 +47,7 @@ function checkNotPassThrough(judge: Judge, graph: Loaded<GraphDoc>): void {
   if (doc.nodes.length !== 1) return;
   const node = doc.nodes[0];
   if (!isRun(node)) return;
-  if (Object.keys(doc.constants ?? {}).length || doc.resolvers) return;
+  if (Object.keys(doc.constants ?? {}).length || doc.reads) return;
   const hit = judge.scope.op(node.run);
   if (typeof hit === 'string' || hit.port.native) return;
   // every input forwarded one-for-one from the graph's own in, and nothing added
@@ -80,7 +80,7 @@ class GraphCheck {
   run(): void {
     const doc = this.graph.doc;
     if (this.role === 'domain') checkNotPassThrough(this.judge, this.graph);
-    const resolvers = resolversFor(this.judge, doc.resolvers, this.graph, this.role === 'data');
+    const resolvers = resolversFor(this.judge, doc.reads, this.graph, this.role === 'data');
     const inType = this.judge.type(doc.in, this.file, 'in');
     if (doc.in) this.judge.checkLayer({ spec: doc.in, from: this.graph, at: 'in', layer: this.layer, what: 'in' });
     if (doc.out)

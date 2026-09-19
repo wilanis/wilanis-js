@@ -1,10 +1,18 @@
 /**
- * P resolvers. A resolvers document names reads of the request; a data graph or a binding names the document
- * and reads {{name}}. Each document is judged once here (P002, P003); whether the trigger kinds that reach a
- * read hand it is judged at the trigger (T004). Also the walk that finds every request.* path an operation
- * reaches through its binding, which B008 and T004 hold their callers to.
+ * P resolvers. A resolvers document names reads of the request; a data graph or a binding binds each read it
+ * takes under `reads`, local name -> `@path#resolver`, and reads {{name}}. Each document is judged once here
+ * (P002, P003) and each entry of a `reads` map is judged where it is written (P004, L002); whether the trigger
+ * kinds that reach a read hand it is judged at the trigger (T004). Also the walk that finds every request.*
+ * path an operation reaches through its binding, which B008 and T004 hold their callers to.
  */
-import { isSwitch, type Loaded, type ResolverRead as ResolverSpec, type ResolversDoc, splitPath } from '@wilanis/core';
+import {
+  isSwitch,
+  type Loaded,
+  type ResolverRead as ResolverSpec,
+  type ResolversDoc,
+  splitPath,
+  splitRef,
+} from '@wilanis/core';
 import { type Judge, type JudgedResolver, RESERVED, type Refuser, readValuesOf } from './judge.js';
 
 /**
@@ -52,35 +60,74 @@ function judgeResolver(judge: Judge, refuse: Refuser, name: string, spec: Resolv
 }
 
 /**
- * The resolvers a graph or binding may read, from the document it names. A domain graph names none: the
- * request is the world's, and the domain never sees it (L002).
+ * The resolvers a graph or binding may read, one per entry of its `reads` map, under the local name the entry
+ * gave it. A domain graph takes none: the request is the world's, and the domain never sees it (L002).
  */
 export function resolversFor(
   judge: Judge,
-  ref: string | undefined,
+  reads: Record<string, string> | undefined,
   from: Loaded,
   allowed: boolean,
 ): Record<string, JudgedResolver> {
-  if (!ref) return {};
+  if (!reads) return {};
   const refuse = judge.refuser(from.path);
   if (!allowed) {
-    const hint = 'read the request in the data layer: the data graph or the binding names the resolvers document';
-    refuse('L002', 'a domain graph never reads the request', 'resolvers', hint);
+    const hint = 'read the request in the data layer: the data graph or the binding binds it under reads';
+    refuse('L002', 'a domain graph never reads the request', 'reads', hint);
     return {};
   }
-  const doc = judge.scope.get('resolvers', ref);
-  if (!doc) {
-    refuse('R001', `unknown resolvers document '${ref}'`, 'resolvers', 'wilanis ls resolvers');
-    return {};
+  const judged: Record<string, JudgedResolver> = {};
+  for (const [name, ref] of Object.entries(reads)) {
+    const resolver = readFor(judge, refuse, from, { name, ref });
+    if (resolver) judged[name] = resolver;
   }
-  judge.visible(from, doc, 'resolvers');
-  return judge.resolverReads.get(doc.path) ?? {};
+  return judged;
 }
 
-/** The resolvers a document names, without refusing anything: the refusals were made where the document was judged. */
-function quietResolvers(judge: Judge, ref: string | undefined): Record<string, JudgedResolver> {
-  const doc = ref ? judge.scope.get('resolvers', ref) : undefined;
-  return doc ? (judge.resolverReads.get(doc.path) ?? {}) : {};
+/**
+ * P004: one entry of a `reads` map, as the resolver it names. The value addresses a resolver of a resolvers
+ * document -- `@path#name` -- so the path names a document that exists (R001) and is visible (L005), and the
+ * document declares that name. The local name is the author's, and the judged read answers under it.
+ */
+function readFor(
+  judge: Judge,
+  refuse: Refuser,
+  from: Loaded,
+  entry: { name: string; ref: string },
+): JudgedResolver | undefined {
+  const at = `reads/${entry.name}`;
+  const { path, op: resolver } = splitRef(entry.ref);
+  if (!path || !resolver) {
+    const hint = 'a read names one resolver: "@feature/edge/file.resolvers.json#name"';
+    refuse('P004', `'${entry.ref}' is not a resolver reference`, at, hint);
+    return undefined;
+  }
+  const doc = judge.scope.get('resolvers', path);
+  if (!doc) {
+    refuse('R001', `unknown resolvers document '${path}'`, at, 'wilanis ls resolvers');
+    return undefined;
+  }
+  judge.visible(from, doc, at);
+  const declared = judge.resolverReads.get(doc.path) ?? {};
+  if (!(resolver in declared)) {
+    const names = Object.keys(doc.doc.resolvers).join(', ') || 'none';
+    const hint = `wilanis describe ${path} lists its resolvers: ${names}`;
+    refuse('P004', `'${path}' declares no resolver '${resolver}'`, at, hint);
+    return undefined;
+  }
+  return declared[resolver];
+}
+
+/** The resolvers a document reads, without refusing anything: the refusals were made where the map was judged. */
+function quietResolvers(judge: Judge, reads: Record<string, string> | undefined): Record<string, JudgedResolver> {
+  const judged: Record<string, JudgedResolver> = {};
+  for (const [name, ref] of Object.entries(reads ?? {})) {
+    const { path, op: resolver } = splitRef(ref);
+    const doc = path ? judge.scope.get('resolvers', path) : undefined;
+    const declared = doc ? (judge.resolverReads.get(doc.path) ?? {}) : {};
+    if (resolver in declared) judged[name] = declared[resolver];
+  }
+  return judged;
 }
 
 /** The request.* paths a set of reads touches through the resolvers they name: what a trigger kind must hand. */
@@ -112,18 +159,18 @@ export function opNeeds(
   const bound = binding.doc.operations[hit.opName];
   if (!bound) return [];
   if (bound.graph) return graphNeeds(judge, judge.scope.canon(bound.graph), profile, seen);
-  const resolvers = quietResolvers(judge, binding.doc.resolvers);
+  const resolvers = quietResolvers(judge, binding.doc.reads);
   return requestNeedsOf(resolvers, judge.scope.templateReads(bound.in), binding.path);
 }
 
-/** Every request.* path read under a graph: its own reads through its resolvers, and per node the one binding operation it reaches. */
+/** Every request.* path read under a graph: its own `reads`, and per node the one binding operation it reaches. */
 function graphNeeds(judge: Judge, graphPath: string, profile: string | undefined, seen: Set<string>): RequestNeed[] {
   if (seen.has(graphPath)) return [];
   seen.add(graphPath);
   const graph = judge.scope.registry.get('graph', graphPath);
   if (!graph) return [];
   const reads = graph.doc.nodes.flatMap(node => judge.scope.templateReads(readValuesOf(node)));
-  const out = requestNeedsOf(quietResolvers(judge, graph.doc.resolvers), reads, graph.path);
+  const out = requestNeedsOf(quietResolvers(judge, graph.doc.reads), reads, graph.path);
   for (const node of graph.doc.nodes) {
     if (isSwitch(node)) continue;
     const hit = judge.scope.op(node.run);

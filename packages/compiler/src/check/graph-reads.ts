@@ -33,6 +33,16 @@ export interface GraphTable {
 }
 
 /**
+ * G003's hint. A root that named nothing in scope is most often a read of the request the graph never bound,
+ * so the hint writes the `reads` entry that would bind it; where the reason was something else, it says the
+ * four roots a value may read.
+ */
+function hintForRoot(root: string | undefined): string {
+  if (!root) return 'read in, const, or a node that runs before this one';
+  return `to read the request, bind the name: "reads": { "${root}": "@<feature>/edge/<file>.resolvers.json#${root}" }`;
+}
+
+/**
  * What a graph's values may read, typed: in, a constant, a resolver, or another node's answer (G003), with a
  * path the routing switch proved present losing its optionality. It remembers every read, for G008 to judge.
  */
@@ -46,6 +56,8 @@ export class GraphReads {
   private readonly refuse: Refuser;
   /** the node whose reads are being typed: what its router proved is in force */
   private reading: string | undefined;
+  /** the root of the value being typed that named nothing in scope: what G003's hint offers to bind */
+  private unbound: string | undefined;
 
   constructor(
     private readonly judge: Judge,
@@ -92,9 +104,10 @@ export class GraphReads {
 
   /** Type one value; a whole template the routing switch proved present loses its optionality. */
   private valueRead(value: unknown, at: string): Read | undefined {
+    this.unbound = undefined;
     const read = this.judge.scope.valueRead(value, (root, path) => this.rootRead(root, path));
     if (typeof read === 'string') {
-      this.refuse('G003', read, at, 'read in, const, request or a node that runs before this one');
+      this.refuse('G003', read, at, hintForRoot(this.unbound));
       return undefined;
     }
     if (read?.optional && this.narrowedWhole(value)) return { type: read.type, optional: false };
@@ -120,7 +133,7 @@ export class GraphReads {
     if (root === 'in') return this.readIn(path);
     if (root === 'const') return this.readConst(path);
     if (root === 'request')
-      return 'graphs do not read request.* -- a resolvers document does; name it in resolvers and read {{name}}';
+      return 'graphs do not read request.* -- a resolvers document does; bind it under reads and read {{name}}';
     if (root in this.table.resolvers) return readAt(this.table.resolvers[root].read, path);
     return this.readNode(root, path);
   }
@@ -141,8 +154,11 @@ export class GraphReads {
   }
 
   private readNode(root: string, path: string[]): Read | string | undefined {
-    if (!this.table.nodes.has(root))
-      return `unknown node '${root}' (nodes: ${[...this.table.nodes.keys()].join(', ')})`;
+    if (!this.table.nodes.has(root)) {
+      // a root that is none of the four is most often a read of the request the graph never bound (RFC 0029)
+      this.unbound = root;
+      return `'${root}' is not in, const, a node that runs before this one, or a name under reads`;
+    }
     this.readNodes.add(root);
     const base = this.nodeOut(root);
     return base ? typeAt(base, path) : undefined; // its operation was refused already

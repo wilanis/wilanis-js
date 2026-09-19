@@ -83,7 +83,7 @@ class BindingCheck {
   ) {
     this.refuse = judge.refuser(binding.path);
     this.effects = judge.effectsOf(binding.feature);
-    this.resolvers = resolversFor(judge, binding.doc.resolvers, binding, true);
+    this.resolvers = resolversFor(judge, binding.doc.reads, binding, true);
   }
 
   /** One bound operation: it is an operation of the port (B001), and its graph or delegate meets the contract. */
@@ -238,12 +238,12 @@ class BindingCheck {
     this.delegateAnswers(contract, run, answers);
   }
 
-  /** What a delegation's values may read: the binding's resolvers, and the operation's own inputs. */
+  /** What a delegation's values may read: the binding's `reads`, and the operation's own inputs. */
   private resolve(contract: Contract): Resolve {
     return (root, path) => {
       if (root in this.resolvers) return readAt(this.resolvers[root].read, path);
       if (root === 'in') return contract.accepts ? typeAt(contract.accepts, path) : 'this operation accepts nothing';
-      return `'${root}' is not in or a resolver of this binding (resolvers: ${Object.keys(this.resolvers).join(', ') || 'none'})`;
+      return `'${root}' is not in or a name under reads (reads: ${Object.keys(this.resolvers).join(', ') || 'none'})`;
     };
   }
 
