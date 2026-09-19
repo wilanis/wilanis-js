@@ -12,6 +12,7 @@ export * from './load.js';
 export * from './model.js';
 export * from './placement.js';
 export * from './plugin.js';
+export * from './ports.js';
 export * from './published.js';
 export * from './registry.js';
 export * from './resolves.js';
