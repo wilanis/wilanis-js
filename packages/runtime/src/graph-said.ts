@@ -17,6 +17,7 @@
 import { atomicOf, type Guard, guardSpecName, guardsOf, idsOf } from '@wilanis/compiler';
 import type { GraphDoc, Loaded, Scope } from '@wilanis/core';
 import { invariantName } from './invariant-lines.js';
+import { readsLines } from './reads-said.js';
 
 /** The connection a transaction falls on, said for a reader: one, or the several the profiles disagree about. */
 function whereLine(connections: string[]): string[] {
@@ -37,16 +38,9 @@ function fromSaid(out: NonNullable<GraphDoc['out']>, guards: Guard[]): string {
   return from.flatMap(one => [one, ...(violated.has(one) ? [violated.get(one) ?? one] : [])]).join(' | ');
 }
 
-/** The reads a document takes from the request, each under the local name its body uses. */
-const readsSaid = (reads: Record<string, string>): string =>
-  Object.entries(reads)
-    .map(([name, ref]) => `${name} \u2190 ${ref}`)
-    .join(', ');
-
 /** What a graph takes, what it answers, and where the answer is read from. */
 function contractLines(graph: GraphDoc, guards: Guard[]): string[] {
   const lines = graph.in ? [`takes   ${graph.in}`] : [];
-  if (graph.reads) lines.push(`reads   ${readsSaid(graph.reads)}`);
   if (graph.constants) lines.push(`constants  ${Object.keys(graph.constants).join(', ')}`);
   if (!graph.out) return lines;
   return [...lines, `answers ${graph.out.type}  from ${fromSaid(graph.out, guards)}`];
@@ -122,14 +116,20 @@ function nodeLines(graph: GraphDoc, guards: Guard[], path: string): string[] {
 }
 
 /**
- * A graph: what it takes and answers, the nodes it runs -- the compiler's guards among them -- and, where it
- * says so, what its being atomic means. The document itself is the file named on the line above; what a reader
- * asked for is what it does.
+ * A graph: what it takes and answers, the reads it takes from the request, the nodes it runs -- the compiler's
+ * guards among them -- and, where it says so, what its being atomic means. The reads stand above the nodes,
+ * since every `{{name}}` below them is one of them and a reader should not meet the use before the binding.
+ * The document itself is the file named on the line above; what a reader asked for is what it does.
  */
 export function graphLines(doc: Loaded, scope: Scope): string[] {
   const graph = doc.doc as GraphDoc;
   const guards = guardsOf(scope, doc as Loaded<GraphDoc>);
-  const lines = [...contractLines(graph, guards), 'nodes:', ...nodeLines(graph, guards, doc.path)];
+  const lines = [
+    ...contractLines(graph, guards),
+    ...readsLines(graph.reads, scope),
+    'nodes:',
+    ...nodeLines(graph, guards, doc.path),
+  ];
   const atomic = atomicOf(scope, doc as Loaded<GraphDoc>);
   if (!atomic) return lines;
   const rolls = atomic.rollsBackOn.length

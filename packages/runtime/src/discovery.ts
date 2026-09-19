@@ -192,13 +192,13 @@ function kindBody(doc: Loaded, load: LoadResult, scope: Scope, showType: (spec: 
   if (doc.kind === 'trigger') return triggerLines(doc, scope);
   if (doc.kind === 'invariant') return invariantLines(doc, scope);
   if (doc.kind === 'graph') return graphLines(doc, scope);
-  return plainBody(doc);
+  return plainBody(doc, load, scope);
 }
 
 /** The kinds whose body is the document read back in words: each says what it means, none prints its JSON. */
-function plainBody(doc: Loaded): string[] {
-  if (doc.kind === 'binding') return bindingLines(doc);
-  if (doc.kind === 'resolvers') return resolversLines(doc);
+function plainBody(doc: Loaded, load: LoadResult, scope: Scope): string[] {
+  if (doc.kind === 'binding') return bindingLines(doc, scope);
+  if (doc.kind === 'resolvers') return resolversLines(doc, load);
   if (doc.kind === 'feature') return featureLines(doc);
   if (doc.kind === 'connection') return connectionLines(doc);
   if (doc.kind === 'codec') return codecLines(doc);
