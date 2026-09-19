@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
   "label": "Identity",
-  "description": "Who a directory said a credential belongs to: a stable subject, a display name, the groups it belongs to, and -- when verify was given a `type` -- whatever else the directory said about the account, under `attributes`. The same whatever the directory, so one sign-in graph fits them all. `attributes` is not declared as a field here because a shape may not name a contract variable (L001); the value is there, and a sign-in reads it through the shape its own port returns.",
+  "description": "Who a directory said a credential belongs to: a stable subject, a display name, the groups it belongs to, and -- when verify was given a `type` -- whatever else the directory said about the account, under `attributes`. The same whatever the directory, so one sign-in graph fits them all.",
   "layer": "edge",
   "fields": {
     "subject": {
@@ -12,6 +12,11 @@
     },
     "groups": {
       "type": "string[]"
+    },
+    "attributes": {
+      "type": "$I",
+      "required": false,
+      "description": "Whatever the directory said about the account beside its subject, name and groups. `$I` is the variable `verify` binds from its `type` param: unknown unless the port that returns this shape binds it, so a sign-in that named a shape reads its fields and one that did not forwards the value whole."
     }
   }
 }

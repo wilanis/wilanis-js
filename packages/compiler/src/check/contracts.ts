@@ -8,11 +8,16 @@ import type { ConnectionDoc, Loaded, Operation, PortDoc, ShapeDoc } from '@wilan
 import type { Judge } from './judge.js';
 import { mismatch } from './typing.js';
 
-/** The refusals for a shape: its fields resolve (R001) and name only shapes of its own layer, visibly (L001, L005). */
+/**
+ * The refusals for a shape: its fields resolve (R001) and, in a tree's own shape, name only shapes of its
+ * own layer, visibly (L001, L005). A native shape is exempt, the way a native port is: it may name a type
+ * variable, which reads as unknown unless the port that returns the shape binds it.
+ */
 export function checkShape(judge: Judge, shape: Loaded<ShapeDoc>): void {
   const spec = { fields: shape.doc.fields, open: shape.doc.open };
   judge.type(spec, shape.path, 'fields');
-  judge.checkLayer({ spec, from: shape, at: 'fields', layer: shape.doc.layer, what: `shape '${shape.path}'` });
+  if (!shape.native)
+    judge.checkLayer({ spec, from: shape, at: 'fields', layer: shape.doc.layer, what: `shape '${shape.path}'` });
 }
 
 /**
