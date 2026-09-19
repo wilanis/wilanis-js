@@ -4,7 +4,7 @@
  * it reaches. The walks themselves live in the runtime, so `describe` and this page cannot differ about them.
  */
 import type { Loaded, LoadResult, Scope, StoreDoc, Values } from '@wilanis/core';
-import { splitOp } from '@wilanis/core';
+import { keeps, kept, splitOp } from '@wilanis/core';
 import { callsAgainst, engineOf, keyTypeOf, STORE_PORT } from '@wilanis/runtime';
 import type { VKeeps, VStore, VStoreCall } from './types.js';
 import { labelOf } from './types.js';
@@ -12,7 +12,7 @@ import { labelOf } from './types.js';
 /** The type of every collection's key, by collection name, where the shape it names declares the field. */
 function keyTypesOf(store: StoreDoc, scope: Scope): Record<string, string> {
   const types: Record<string, string> = {};
-  for (const [name, collection] of Object.entries(store.collections)) {
+  for (const [name, collection] of kept(store)) {
     const type = keyTypeOf(collection.of, collection.key, scope);
     if (type) types[name] = type;
   }
@@ -54,7 +54,8 @@ export function keepsOf(scope: Scope, run: string, given: Values | undefined): V
   if (typeof named !== 'string') return undefined;
   const store = scope.get('store', named);
   const collection = typeof given?.collection === 'string' ? given.collection : undefined;
-  const of = collection ? store?.doc.collections[collection]?.of : undefined;
+  const declared = collection ? store?.doc.collections[collection] : undefined;
+  const of = declared && keeps(declared) ? declared.of : undefined;
   return {
     store: store?.path ?? scope.canon(named),
     label: labelOf(store),

@@ -8,6 +8,7 @@ import {
   type GraphDoc,
   isMap,
   isRun,
+  keeps,
   type Loaded,
   type ObjField,
   type PluginCheckContext,
@@ -107,7 +108,7 @@ export function collectionOf(call: Call, scope: Scope): { shape: Type; fields: R
   const collection = call.given?.collection;
   if (typeof named !== 'string' || typeof collection !== 'string') return undefined;
   const declared = scope.get('store', named)?.doc.collections[collection];
-  if (!declared) return undefined;
+  if (!declared || !keeps(declared)) return undefined;
   let shape: Type;
   try {
     shape = scope.types.spec(declared.of);

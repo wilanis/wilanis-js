@@ -23,6 +23,8 @@ import {
   assignable,
   type Collection,
   conforms,
+  keeps,
+  kept,
   type Loaded,
   type ObjField,
   type PluginCheckContext,
@@ -43,11 +45,14 @@ interface Kept {
   collection: Collection;
 }
 
-/** Every collection of every store, so a rule over one reads the same thing a rule over all of them does. */
+/**
+ * Every record-keeping collection of every store, so a rule over one reads the same thing a rule over all of
+ * them does. A view keeps nothing, so there is no shape or key here to hold it to; its own rules are RFC 0015's.
+ */
 function every(scope: Scope): Kept[] {
   return scope.registry
     .all('store')
-    .flatMap(store => Object.entries(store.doc.collections).map(([name, collection]) => ({ store, name, collection })));
+    .flatMap(store => kept(store.doc).map(([name, collection]) => ({ store, name, collection })));
 }
 
 /** X201, X202: what a collection keeps, and what identifies one record of it. */
@@ -153,7 +158,8 @@ function declaredOf(call: Call, scope: Scope): Collection | undefined {
   const named = call.given?.store;
   const collection = call.given?.collection;
   if (typeof named !== 'string' || typeof collection !== 'string') return undefined;
-  return scope.get('store', named)?.doc.collections[collection];
+  const declared = scope.get('store', named)?.doc.collections[collection];
+  return declared && keeps(declared) ? declared : undefined;
 }
 
 /** X211: one field of a literal `changes`, against the shape the collection keeps. */

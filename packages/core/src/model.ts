@@ -336,8 +336,18 @@ export interface StoreCollection {
   behind?: string;
   description?: string;
 }
-/** A collection that keeps records: what a reader of a store sees once a view has been told apart by its `view`. */
+/** A collection that keeps records: the shape and the key a view does not have, guaranteed once `keeps` has told one apart. */
 export type Collection = StoreCollection & { of: TypeRef; key: string };
+/**
+ * Whether this collection keeps records rather than viewing another's: the one place a reader tells the two
+ * shapes apart, so nothing reads `of` or `key` off a view. The schema guarantees the pair, and this says so to
+ * a reader in the type; a reader that does not yet understand a view skips or refuses what this answers false.
+ */
+export const keeps = (collection: StoreCollection): collection is Collection =>
+  collection.view === undefined && collection.of !== undefined && collection.key !== undefined;
+/** Every collection of a store that keeps records, by name, so a walk over the kept ones reads as one. */
+export const kept = (store: StoreDoc): [string, Collection][] =>
+  Object.entries(store.collections).filter((entry): entry is [string, Collection] => keeps(entry[1]));
 /**
  * What a feature keeps: the connection its records live behind, and the collections kept there, by name. The
  * collection is where the record type is written down, so a call site names the store and the collection and
@@ -347,7 +357,7 @@ export interface StoreDoc extends Envelope {
   connection: string;
   /** Local name -> the resolver that declares it (`@feature/edge/file.resolvers.json#name`); read by some `scoped`. */
   reads?: Record<string, string>;
-  collections: Record<string, Collection>;
+  collections: Record<string, StoreCollection>;
 }
 
 /** The access form: the domain operations gated, and the policy or proofs every trigger reaching one -- transitively -- attaches. */

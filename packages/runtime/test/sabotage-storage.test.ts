@@ -120,6 +120,17 @@ describe('sabotage: what a store holds its records to', () => {
     expect(pointingAt(broken)).toEqual(at('C005', 'notes/refs/entryId'));
   });
 
+  it('a view keeps no records, so it is judged as one and never as a collection that does', () => {
+    // A view declares no shape and no key, so every rule that reads one passes it by rather than refusing a
+    // field the author never wrote: this is the whole of what `keeps` buys a reader.
+    const view = { view: 'rows', behind: '@monitor/edge/seen.policy.json' };
+    expect(codesOf({ rows: entry(), everyRow: view })).toEqual([]);
+    // and a reference names something with a key to hold, which a view has not
+    expect(
+      pointingAt({ rows: entry(), everyRow: view, notes: notes({ refs: { entryId: { collection: 'everyRow' } } }) }),
+    ).toEqual(at('C005', 'notes/refs/entryId'));
+  });
+
   it('C006 a reference of one type to records keyed by another', () => {
     const broken = { counted, notes: notes({ refs: { entryId: { collection: 'counted' } } }) };
     expect(pointingAt(broken)).toEqual(at('C006', 'notes/refs/entryId'));

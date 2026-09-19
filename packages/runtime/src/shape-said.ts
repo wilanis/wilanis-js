@@ -7,7 +7,7 @@
  * reader who cannot see it here has to grep for the shape's path, which is the one thing `describe` exists to
  * avoid. Nothing here judges: the checker has already refused a write that does not fit.
  */
-import type { Loaded, LoadResult, Scope, ShapeDoc } from '@wilanis/core';
+import { kept, type Loaded, type LoadResult, type Scope, type ShapeDoc } from '@wilanis/core';
 import { overShape } from './invariant-lines.js';
 import { fieldLine } from './lines.js';
 
@@ -80,11 +80,11 @@ function writerLine(
   return `    ${call.file}#${call.where}  via ${call.run}${named.length ? `  (${named.join(', ')})` : ''}`;
 }
 
-/** Every collection of every store that keeps records of this shape, so a shape says where it is kept. */
+/** Every record-keeping collection of every store that keeps records of this shape, so a shape says where it is kept. */
 function heldBy(load: LoadResult, shape: string, scope: Scope): string[] {
   const out: string[] = [];
   for (const store of load.registry.all('store'))
-    for (const [name, collection] of Object.entries(store.doc.collections))
+    for (const [name, collection] of kept(store.doc))
       if (scope.canon(collection.of) === shape) out.push(`held by  ${store.path}#${name}`);
   return out;
 }
