@@ -2,6 +2,7 @@
  * B bindings. A binding implements a domain port (R001, B003, L005) from inside a feature (L007), binds every
  * operation of it and nothing else (B001), and meets each operation's contract (B005): through a data graph
  * whose in and out fit it, or by delegating to an operation the feature allows (L003) with inputs that fit.
+ * Its `reads` map is exactly what its delegations read (P005).
  */
 import {
   assignable,
@@ -37,7 +38,7 @@ interface Contract {
 /**
  * The refusals for a binding: the domain port it implements (R001, B003, L005) from inside a feature (L007),
  * every operation of that port bound and no other (B001), each met by a data graph or a delegation whose
- * contract fits (B005) and whose effects the feature allows (L003).
+ * contract fits (B005) and whose effects the feature allows (L003), and a `reads` entry no value reads (P005).
  */
 export function checkBinding(judge: Judge, binding: Loaded<BindingDoc>): void {
   const refuse = judge.refuser(binding.path);
@@ -69,12 +70,15 @@ export function checkBinding(judge: Judge, binding: Loaded<BindingDoc>): void {
       );
   }
   for (const [opName, bound] of Object.entries(binding.doc.operations)) check.operation(opName, bound);
+  check.readsUsed();
 }
 
 class BindingCheck {
   private readonly refuse: Refuser;
   private readonly effects: Effects;
   private readonly resolvers: Record<string, JudgedResolver>;
+  /** the `reads` names some delegation's value named: what P005 holds the map to */
+  private readonly used = new Set<string>();
 
   constructor(
     private readonly judge: Judge,
@@ -84,6 +88,19 @@ class BindingCheck {
     this.refuse = judge.refuser(binding.path);
     this.effects = judge.effectsOf(binding.feature);
     this.resolvers = resolversFor(judge, binding.doc.reads, binding, true);
+  }
+
+  /**
+   * P005: `reads` is exactly what this binding reads, so an entry no delegation's value reads is refused as an
+   * unused import is. It is judged once every operation has been, since any of them may be the one that reads
+   * it; an entry P004 already refused is not judged twice.
+   */
+  readsUsed(): void {
+    for (const name of Object.keys(this.resolvers)) {
+      if (this.used.has(name)) continue;
+      const hint = `read it as {{${name}}}, or drop the entry: reads is exactly what this document reads`;
+      this.refuse('P005', `'${name}' is used by no value of this binding`, `reads/${name}`, hint);
+    }
   }
 
   /** One bound operation: it is an operation of the port (B001), and its graph or delegate meets the contract. */
@@ -241,7 +258,10 @@ class BindingCheck {
   /** What a delegation's values may read: the binding's `reads`, and the operation's own inputs. */
   private resolve(contract: Contract): Resolve {
     return (root, path) => {
-      if (root in this.resolvers) return readAt(this.resolvers[root].read, path);
+      if (root in this.resolvers) {
+        this.used.add(root);
+        return readAt(this.resolvers[root].read, path);
+      }
       if (root === 'in') return contract.accepts ? typeAt(contract.accepts, path) : 'this operation accepts nothing';
       return `'${root}' is not in or a name under reads (reads: ${Object.keys(this.resolvers).join(', ') || 'none'})`;
     };

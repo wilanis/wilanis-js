@@ -44,11 +44,13 @@ function hintForRoot(root: string | undefined): string {
 
 /**
  * What a graph's values may read, typed: in, a constant, a resolver, or another node's answer (G003), with a
- * path the routing switch proved present losing its optionality. It remembers every read, for G008 to judge.
+ * path the routing switch proved present losing its optionality. It remembers every read, for G008 to judge
+ * what is declared and never read, and for P005 to judge the same of the `reads` map.
  */
 export class GraphReads {
   readonly readsIn = new Set<string>();
   readonly readsConst = new Set<string>();
+  readonly readsResolvers = new Set<string>();
   readonly readNodes = new Set<string>();
   readonly narrowing: Narrowing;
   private readonly outTypes = new Map<string, Type | undefined>();
@@ -134,7 +136,10 @@ export class GraphReads {
     if (root === 'const') return this.readConst(path);
     if (root === 'request')
       return 'graphs do not read request.* -- a resolvers document does; bind it under reads and read {{name}}';
-    if (root in this.table.resolvers) return readAt(this.table.resolvers[root].read, path);
+    if (root in this.table.resolvers) {
+      this.readsResolvers.add(root);
+      return readAt(this.table.resolvers[root].read, path);
+    }
     return this.readNode(root, path);
   }
 
