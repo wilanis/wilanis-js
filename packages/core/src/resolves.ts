@@ -9,6 +9,12 @@
  * `collections[collection].of{key}.type` follows `of` into the shape it names and takes the field whose name
  * the collection's `key` holds -- which is how a key's type is reached without the port repeating it.
  *
+ * A segment that takes its key by an input may name a field to follow where the value found has it:
+ * `collections[collection|view].of` reads "take `collections` under the key the input `collection` holds;
+ * where what was found has a string field `view`, take `collections` under that instead". One hop only, so a
+ * document whose alias points at another alias binds nothing here and is refused where it is written. It is a
+ * word of the document being walked, never of the walker: nothing outside this file learns what `view` means.
+ *
  * A path that reaches a type reference and keeps going follows it into the shape it names: that is the one
  * place a path leaves the document it started in, and it is what makes the second form worth having.
  *
@@ -30,27 +36,39 @@ export interface Segment {
   by?: string;
   /** where that name is read: an input of the call, or a sibling of the value just read */
   from?: KeyFrom;
+  /** the field of what was found to follow once, for `collections[collection|view]` */
+  hop?: string;
 }
 
 /** A `resolves` path as parsed: the segments to walk, in order. */
 export type ResolvesPath = Segment[];
 
-const SEGMENT = /^([a-z][A-Za-z0-9_]*)(?:\[([a-z][A-Za-z0-9_]*)\]|\{([a-z][A-Za-z0-9_]*)\})?$/;
+const NAME = '[a-z][A-Za-z0-9_]*';
+const SEGMENT = new RegExp(`^(${NAME})(?:\\[(${NAME})(?:\\|(${NAME}))?\\]|\\{(${NAME})\\})?$`);
+
+/** One part of a path between the dots, or nothing where it is outside the grammar. */
+function parseSegment(part: string): Segment | undefined {
+  const match = SEGMENT.exec(part);
+  if (!match) return undefined;
+  const [, name, input, hop, sibling] = match;
+  if (input) return { name, by: input, from: 'input', ...(hop ? { hop } : {}) };
+  if (sibling) return { name, by: sibling, from: 'sibling' };
+  return { name };
+}
 
 /**
  * A `resolves` path parsed, or the reason it is not one: dot-separated field names, each optionally taking a
- * key by an input of the same call (`collections[collection]`) or by a sibling field (`of{key}`).
+ * key by an input of the same call (`collections[collection]`) or by a sibling field (`of{key}`), and a key
+ * taken by an input optionally naming one field to follow where the value found has it
+ * (`collections[collection|view]`).
  */
 export function parsePath(expr: string): ResolvesPath | string {
   if (!expr) return 'an empty path';
   const path: ResolvesPath = [];
   for (const part of expr.split('.')) {
-    const match = SEGMENT.exec(part);
-    if (!match) return `'${part}' is not a field name, optionally followed by [input] or {sibling}`;
-    const [, name, input, sibling] = match;
-    if (input) path.push({ name, by: input, from: 'input' });
-    else if (sibling) path.push({ name, by: sibling, from: 'sibling' });
-    else path.push({ name });
+    const segment = parseSegment(part);
+    if (!segment) return `'${part}' is not a field name, optionally followed by [input], [input|hop] or {sibling}`;
+    path.push(segment);
   }
   return path;
 }
@@ -65,7 +83,8 @@ export function showPath(path: ResolvesPath): string {
   return path
     .map(segment => {
       if (!segment.by) return segment.name;
-      return segment.from === 'sibling' ? `${segment.name}{${segment.by}}` : `${segment.name}[${segment.by}]`;
+      if (segment.from === 'sibling') return `${segment.name}{${segment.by}}`;
+      return `${segment.name}[${segment.by}${segment.hop ? `|${segment.hop}` : ''}]`;
     })
     .join('.');
 }
@@ -95,9 +114,22 @@ function keyOf(segment: Segment, beside: unknown, given: Values): string | undef
 }
 
 /**
+ * The value a keyed segment lands on, after following its alias once where it names one and the value found
+ * holds a string under it. One hop and no more: an alias pointing at another alias lands on nothing here, and
+ * is refused where the document writes it.
+ */
+function hopped(map: unknown, found: unknown, segment: Segment): unknown {
+  if (!segment.hop) return found;
+  const alias = under(found, segment.hop);
+  if (typeof alias !== 'string') return found;
+  const next = under(map, alias);
+  return under(next, segment.hop) === undefined ? next : undefined;
+}
+
+/**
  * One step of a path: the named field of wherever the walk stands, and then -- where the segment takes a key
- * -- what lies under that key. A sibling key is read beside the field just taken, which is why the two are
- * resolved together rather than one after the other.
+ * -- what lies under that key, and the alias it names followed once. A sibling key is read beside the field
+ * just taken, which is why the two are resolved together rather than one after the other.
  */
 function step(at: unknown, segment: Segment, given: Values, tree: Resolves): unknown {
   const here = into(at, tree);
@@ -105,7 +137,8 @@ function step(at: unknown, segment: Segment, given: Values, tree: Resolves): unk
   if (!segment.by) return field;
   const key = keyOf(segment, here, given);
   if (key === undefined) return undefined;
-  return under(into(field, tree), key);
+  const map = into(field, tree);
+  return hopped(map, under(map, key), segment);
 }
 
 /** The value a path names, or nothing where a step is missing, not an object, or a shape the tree lacks. */
