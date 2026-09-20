@@ -4,7 +4,9 @@
  * and exactly one of those reads, required and holding one value (C012); a view sees every row of one scoped
  * collection of this store, behind a policy (C013, R001). And once a collection is scoped, the rules that
  * already judge a read judge this one: A006 holds every trigger reaching the collection to guaranteeing the
- * read, and B008 refuses a startup step that reaches it at all.
+ * read, and B008 refuses a startup step that reaches it at all. What a document may say about a scope is
+ * @storage's: X214 refuses a site that writes one, and X208 already refuses a `where` naming the column,
+ * since a scope is a column the store keeps and not a field of the shape.
  *
  * Who a scope may read and what a view is behind are the A family's, and are `sabotage-scope-access.test.ts`
  * beside this: the same split the rules themselves take, since a scope that is well-formed and reads a header
@@ -15,6 +17,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  GET,
+  LIST,
   RESOLVERS,
   SESSION,
   STORE,
@@ -22,6 +26,7 @@ import {
   scopedHinting,
   scopedPointing,
   scopedSaying,
+  WRITE,
 } from './scoping-harness.js';
 
 describe('sabotage: how a store is scoped', () => {
@@ -204,6 +209,63 @@ describe('sabotage: how a store is scoped', () => {
       },
     });
     expect(new Set(codes)).toEqual(new Set(['A006', 'B008']));
+  });
+  it('X214 a scope written by hand on the site the compiler fills: the M12 demo, refused', () => {
+    // "the agent added the filter by hand" is the one thing a scope makes unwriteable: the store says how
+    // entries are scoped, the compiler carries it to every site, and a document that repeats it is refused
+    const broken = {
+      [GET]: (graph: any) => {
+        graph.nodes[0].in.scope = { tenant: '{{in.id}}' };
+      },
+    };
+    expect(scopedCodes(broken)).toContain('X214');
+    expect(scopedPointing(broken)).toContain('X214 @features/monitor/data/kept-get.graph.json#nodes/asked/in/scope');
+    expect(scopedSaying(broken)).toContain(
+      "X214 scope is the store's: 'entries' is scoped by tenant ← {{tenant}} of @monitor/data/entries.store.json, and the compiler puts it here",
+    );
+    expect(scopedHinting(broken)).toContain(
+      'X214 drop "scope": to change how \'entries\' is scoped, change @monitor/data/entries.store.json',
+    );
+  });
+  it('X214 a scope on the find over a view, which sees every row whatever a site says', () => {
+    const broken = {
+      [STORE]: (store: any) => {
+        store.collections.everyEntry = { view: 'entries', behind: '@access/edge/employees-only.policy.json' };
+      },
+      [LIST]: (graph: any) => {
+        graph.nodes[0].in.collection = 'everyEntry';
+        graph.nodes[0].in.scope = { tenant: 'acme' };
+      },
+    };
+    expect(scopedCodes(broken)).toContain('X214');
+    expect(scopedSaying(broken)).toContain("X214 'everyEntry' is a view of 'entries', and a view sees every row");
+    expect(scopedHinting(broken)).toContain('X214 drop "scope": read \'entries\' where a scope is meant');
+  });
+  it('X214 a scope on newKey, which mints a key across every scope and takes none', () => {
+    // a key is global: one tenant is never handed a key another already holds, so there is no scope to mint
+    // one under, and the port declares no `scope` on the operation at all
+    const broken = {
+      [WRITE]: (graph: any) => {
+        graph.nodes[0].in.scope = { tenant: 'acme' };
+      },
+    };
+    expect(scopedCodes(broken)).toContain('X214');
+    expect(scopedPointing(broken)).toContain(
+      'X214 @features/monitor/data/store-and-latest.graph.json#nodes/key/in/scope',
+    );
+  });
+  it("X208 a where naming the scope column: a scope is the store's column, never a field to filter on", () => {
+    // the column is not a field of Entry, so the filter names something the shape does not have -- which is
+    // what X208 already says, and is why a scope needs no filter rule of its own
+    const broken = {
+      [LIST]: (graph: any) => {
+        graph.nodes[0].in.where = { tenant: 'acme' };
+      },
+    };
+    expect(scopedCodes(broken)).toContain('X208');
+    expect(scopedPointing(broken)).toContain(
+      'X208 @features/monitor/data/kept-list.graph.json#nodes/rows/in/where/tenant',
+    );
   });
   it('the scope edge follows the store and not the shape: the session attribute is the one carrier', () => {
     // drop the attribute from the session shape and the read types unknown, which C012 refuses -- the store

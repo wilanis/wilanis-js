@@ -22,6 +22,13 @@ export const ROOT = '@storage';
 export const STORE_PORT = `${ROOT}/store.port.json`;
 export const ENGINE_PORT = `${ROOT}/storage.port.json`;
 
+/**
+ * The input a site over a scoped collection carries its scope under. The compiler writes it at every such
+ * site and no document may (X214); the name is the port's, declared on six of its operations, and is spelled
+ * here so a rule and a handler of this plugin read the one word rather than two spellings of it.
+ */
+export const SCOPE = 'scope';
+
 /** One call of a storage operation: where it is written, which operation it names, and what it was given. */
 export interface Call {
   file: string;

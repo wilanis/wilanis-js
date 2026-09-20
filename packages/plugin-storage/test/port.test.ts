@@ -6,7 +6,7 @@
 import type { Atomic, Participant } from '@wilanis/core';
 import { type Type, TypeResolver } from '@wilanis/core';
 import { MemoryEngine } from '@wilanis/plugin-storage-memory';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import plugin, { engines } from '../src/index.js';
 
 const KIND = '@fake/fake.connection-kind.json';
@@ -111,6 +111,77 @@ describe('what an operation refuses before it reaches an engine', () => {
     await expect(run('@storage/store.port.json#count', on({}))).rejects.toThrow(
       /no storage engine for connection kind '@other\/other.connection-kind.json': add the package that grants it/,
     );
+  });
+});
+
+/**
+ * The scope an operation carries, judged the way a filter is: at the value, before an engine sees it. A
+ * checked tree cannot reach any of these -- the compiler fills a scope at every site over a scoped
+ * collection and X214 refuses a document that writes one -- but a read of an edge types `unknown`, and a
+ * tree reloaded under a store that has gained a scope has sites lowered without one, so the handler says
+ * what it found rather than assuming the check that passed.
+ */
+describe('the scope an operation carries', () => {
+  const scoped = { ...on(), key: '1' };
+  const entries = storeDoc.collections.entries as { scoped?: Record<string, string> };
+  beforeEach(() => {
+    entries.scoped = { tenant: '{{tenant}}' };
+  });
+  afterEach(() => {
+    entries.scoped = undefined;
+  });
+
+  it('a scoped collection reached with no scope at all fails the node, naming the column', async () => {
+    await expect(run('@storage/store.port.json#get', scoped)).rejects.toThrow(
+      /scope: 'entries' is scoped by tenant, and this operation carries no scope/,
+    );
+  });
+
+  it('a scope missing one of the collection columns fails the node', async () => {
+    entries.scoped = {
+      tenant: '{{tenant}}',
+      owner: '{{owner}}',
+    };
+    await expect(run('@storage/store.port.json#find', { ...on(), scope: { tenant: 'acme' } })).rejects.toThrow(
+      /scope: 'entries' is scoped by 'owner', which holds a string or a number/,
+    );
+  });
+
+  it('a scope whose column holds something other than a string or a number fails the node', async () => {
+    for (const tenant of [7n, { id: 'acme' }, ['acme'], null, true])
+      await expect(run('@storage/store.port.json#count', { ...on(), scope: { tenant } })).rejects.toThrow(
+        /scope: 'entries' is scoped by 'tenant', which holds a string or a number/,
+      );
+  });
+
+  it('a scope naming a column the collection does not keep fails the node, naming the ones it does', async () => {
+    await expect(
+      run('@storage/store.port.json#remove', { ...scoped, scope: { tenant: 'acme', nope: 'x' } }),
+    ).rejects.toThrow(/scope: 'entries' keeps no column 'nope' \(scoped by: tenant\)/);
+  });
+
+  it('a scope that is not an object at all fails the node as an absent one does', async () => {
+    await expect(run('@storage/store.port.json#get', { ...scoped, scope: 'acme' })).rejects.toThrow(
+      /and this operation carries no scope/,
+    );
+  });
+
+  it('a scope that fits is judged and the operation runs', async () => {
+    const record = { id: '1', url: 'https://x', hits: 2 };
+    expect(await run('@storage/store.port.json#put', { ...on(), record, scope: { tenant: 'acme' } })).toEqual({
+      record,
+      conflict: false,
+    });
+    expect(await run('@storage/store.port.json#count', { ...on(), scope: { tenant: 7 } })).toBe(1);
+  });
+
+  it('newKey takes no scope: a key is unique across every scope, so there is none to mint it under', async () => {
+    expect(typeof (await run('@storage/store.port.json#newKey', on()))).toBe('string');
+  });
+
+  it('a collection that declares no scope takes none, and is refused nothing for arriving without one', async () => {
+    entries.scoped = undefined;
+    expect(await run('@storage/store.port.json#count', on({}))).toBe(0);
   });
 });
 

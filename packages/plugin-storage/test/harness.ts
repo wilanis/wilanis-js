@@ -157,12 +157,18 @@ function write(docs: Docs): string {
   return dir;
 }
 
-/** The refusals a tree answers with, as code and where each points. */
-export function refusals(docs: Docs): { code: string; at: string; file: string; message: string }[] {
+/** The refusals a tree answers with: the code, where each points, what it says, and the edit it offers. */
+export function refusals(docs: Docs): { code: string; at: string; file: string; message: string; hint: string }[] {
   const dir = write(docs);
   const found = checkTree(loadTree(dir, PLUGINS)).items;
   rmSync(dir, { recursive: true, force: true });
-  return found.map(one => ({ code: one.code, at: one.at ?? '', file: one.file, message: one.message }));
+  return found.map(one => ({
+    code: one.code,
+    at: one.at ?? '',
+    file: one.file,
+    message: one.message,
+    hint: one.hint ?? '',
+  }));
 }
 
 /** The refusal codes a tree answers with. */

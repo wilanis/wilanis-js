@@ -225,6 +225,96 @@ describe('what a call may ask of the records', () => {
   });
 });
 
+describe('the scope a document wrote', () => {
+  /** The tree with `entries` scoped by a tenant, and whatever else a case asks of it. */
+  const scoping = (change: (docs: Docs) => void): Docs => {
+    const docs = tree();
+    const store = docs['features/monitor/data/entries.store.json'] as any;
+    store.reads = { tenant: '@features/monitor/edge/request.resolvers.json#tenant' };
+    store.collections.entries.scoped = { tenant: '{{tenant}}' };
+    change(docs);
+    return docs;
+  };
+  /** What a tree answers with X214, and nothing else: how the store's read is bound is C012's and A's. */
+  const scoped = (change: (docs: Docs) => void) => at(refusals(scoping(change)), 'X214');
+  const wrote = (scope: unknown, over = 'entries') =>
+    scoped(docs => {
+      const store = docs['features/monitor/data/entries.store.json'] as any;
+      store.collections.everyEntry = { view: 'entries', behind: '@features/monitor/edge/nobody.policy.json' };
+      const graph = docs['features/monitor/data/read-entry.graph.json'] as any;
+      graph.nodes[0].in.collection = over;
+      graph.nodes[0].in.scope = scope;
+    });
+
+  it('X214 a scope written on a site over a scoped collection: the compiler puts it there', () => {
+    const found = wrote({ tenant: '{{in.id}}' });
+    expect(found).toHaveLength(1);
+    expect(found[0].at).toBe('nodes/asked/in/scope');
+    expect(found[0].message).toMatch(/scope is the store's: 'entries' is scoped by tenant ← \{\{tenant\}\}/);
+    expect(found[0].hint).toMatch(
+      /to change how 'entries' is scoped, change @features\/monitor\/data\/entries.store.json/,
+    );
+  });
+
+  it('X214 a scope over a collection that keeps none: there is no column for it to fill', () => {
+    const found = at(
+      graph(doc => {
+        doc.nodes[0].in.scope = { tenant: 'acme' };
+      }),
+      'X214',
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0].message).toMatch(/declares no scoped columns, so it keeps no scope/);
+    expect(found[0].hint).toBe('drop "scope": this collection keeps no scope');
+  });
+
+  it('X214 a scope over a view, which sees every row whatever a site says', () => {
+    const found = wrote({ tenant: 'acme' }, 'everyEntry');
+    expect(found).toHaveLength(1);
+    expect(found[0].message).toBe("'everyEntry' is a view of 'entries', and a view sees every row");
+    expect(found[0].hint).toBe(`drop "scope": read 'entries' where a scope is meant`);
+  });
+
+  it('X214 a scope on newKey, which mints a key across every scope and takes none', () => {
+    const found = scoped(docs => {
+      const graph = docs['features/monitor/data/read-entry.graph.json'] as any;
+      graph.nodes[0].run = '@storage/store.port.json#newKey';
+      graph.nodes[0].in = { store: STORE, collection: 'entries', scope: { tenant: 'acme' } };
+    });
+    expect(found).toHaveLength(1);
+    expect(found[0].at).toBe('nodes/asked/in/scope');
+  });
+
+  it('X214 a scope written in a binding delegation, where a call site is written too', () => {
+    const found = scoped(docs => {
+      docs['features/monitor/domain/monitor.port.json'] = {
+        $schema: '@wilanis/port.schema.json',
+        description: 'what the monitor answers about what it kept',
+        layer: 'domain',
+        operations: { listed: { description: 'every entry', accepts: {}, answers: { type: `${SHAPE}[]` } } },
+      };
+      docs['features/monitor/data/monitor.binding.json'] = {
+        $schema: '@wilanis/binding.schema.json',
+        description: 'the monitor over the entries it keeps',
+        port: '@features/monitor/domain/monitor.port.json',
+        operations: {
+          listed: {
+            run: '@storage/store.port.json#find',
+            in: { store: STORE, collection: 'entries', scope: { tenant: 'acme' } },
+          },
+        },
+      };
+    });
+    expect(found).toHaveLength(1);
+    expect(found[0].at).toBe('operations/listed/in/scope');
+    expect(found[0].file).toBe('@features/monitor/data/monitor.binding.json');
+  });
+
+  it('a site over a scoped collection that writes no scope is refused nothing here', () => {
+    expect(scoped(() => {})).toEqual([]);
+  });
+});
+
 describe('what the tree already answers, so @storage does not', () => {
   it('an input the operation does not accept is G006, which names the inputs it does', () => {
     const found = graph(doc => {
