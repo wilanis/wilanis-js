@@ -71,12 +71,14 @@ Required unless `required: false`; an optional value cannot feed a required one;
 
 ## Files are blobs
 
-A `blob` is a type: the value is a handle (id, contentType, size, filename) and the bytes live once, on disk,
-in the runtime's blob registry (`project.json → blobs.dir`). An upload streams into the registry through a
-content type mapped to `@http/codecs/blob.codec.json` and the graph gets the handle; a download is a trigger
-whose `out` is `blob`, streamed back out. `@blob/csv.port.json` reads a blob as rows of a declared shape and
-writes rows as one; every such operation is an effect, so it lives in a data graph. Nothing of a file passes
-through the engine, and a run's blobs are released once the trigger has answered.
+A `blob` is a type: the value is a handle (id, contentType, size, filename) and the bytes live once, in the
+runtime's blob registry -- files under `project.json → blobs.dir`, or the store a plugin opens for the
+connection `blobs.connection` names, so a tree may keep them where every instance of it can reach them. An
+upload streams into the registry through a content type mapped to `@http/codecs/blob.codec.json` and the graph
+gets the handle; a download is a trigger whose `out` is `blob`, streamed back out. `@blob/csv.port.json` reads
+a blob as rows of a declared shape and writes rows as one; every such operation is an effect, so it lives in a
+data graph. Nothing of a file passes through the engine, and a run's blobs are released once the trigger has
+answered.
 
 ## Triggers are generic
 
