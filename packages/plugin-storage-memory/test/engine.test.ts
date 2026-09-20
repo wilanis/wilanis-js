@@ -10,7 +10,7 @@ import { checkTree } from '@wilanis/compiler';
 import { loadTree, type PluginModule, type Type, TypeResolver } from '@wilanis/core';
 import type { At } from '@wilanis/plugin-storage';
 import storage, { engines } from '@wilanis/plugin-storage';
-import { cases } from '@wilanis/plugin-storage/suite';
+import { cases, scopeCases } from '@wilanis/plugin-storage/suite';
 import { BUILTIN_PLUGINS } from '@wilanis/runtime';
 import { afterAll, describe, expect, it } from 'vitest';
 import memory, { MemoryEngine } from '../src/index.js';
@@ -25,6 +25,16 @@ const subjectOf = () => ({
 describe('what every engine answers alike', () => {
   const subject = subjectOf();
   for (const one of cases) it(one.name, () => one.run(subject));
+});
+
+/**
+ * The scope cases, which this engine answers because it keeps the scope columns beside each record. They are
+ * a list of their own in the suite rather than part of `cases`, since keeping a scope is something an engine
+ * gains: the postgres engine runs them once RFC 0015 step 7 has written its column and its predicate.
+ */
+describe('what an engine that keeps scopes answers', () => {
+  const subject = subjectOf();
+  for (const one of scopeCases) it(one.name, () => one.run(subject));
 });
 
 const types = new TypeResolver(() => undefined);

@@ -6,19 +6,24 @@
  *   import { cases } from '@wilanis/plugin-storage/suite';
  *   for (const one of cases) it(one.name, () => one.run(subject));
  *
- * The cases of this file are what a store does with records; `suite-transactions.ts` holds what it does
- * with a transaction, `suite-scopes.ts` what it does with a scope, and `cases` below is the three together
- * -- an engine answers all of it or is not one. Each case keeps its records in a collection of its own, so
- * an engine that really persists them can run the whole suite against one database without the cases
- * reaching each other.
+ * The cases of this file are what a store does with records, and `suite-transactions.ts` holds what it does
+ * with a transaction; `cases` below is the two together -- an engine answers all of it or is not one. Each
+ * case keeps its records in a collection of its own, so an engine that really persists them can run the
+ * whole suite against one database without the cases reaching each other.
+ *
+ * `scopeCases` (`suite-scopes.ts`) is exported beside them rather than folded in, because keeping a scope is
+ * something an engine gains: the memory engine answers them now, and the postgres engine joins when RFC 0015
+ * step 7 gives it the column, the composite unique and the predicate. Folding them into `cases` would fail
+ * an engine for not yet having been written, which is a worse answer than one that says which engines keep
+ * scopes. An engine that keeps them runs both lists.
  */
 import { strict as assert } from 'node:assert';
 import { at, type Case, type Declared, entry, found, ids, SEEDS, seeded, where } from './suite-fixture.js';
-import { scopeCases } from './suite-scopes.js';
 import { transactionCases } from './suite-transactions.js';
 
 export type { Case, Subject } from './suite-fixture.js';
 export { SHAPE } from './suite-fixture.js';
+export { scopeCases } from './suite-scopes.js';
 
 /** What a store does with records: written, read back, filtered, ordered, paged and constrained. */
 const recordCases: Case[] = [
@@ -247,5 +252,5 @@ const recordCases: Case[] = [
   },
 ];
 
-/** Everything an engine must answer: records, scopes, and transactions. */
-export const cases: Case[] = [...recordCases, ...scopeCases, ...transactionCases];
+/** Everything every engine must answer: what it does with records, and what it does with a transaction. */
+export const cases: Case[] = [...recordCases, ...transactionCases];
