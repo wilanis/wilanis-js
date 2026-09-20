@@ -24,7 +24,8 @@ export type Scope = Record<string, string | number>;
  * value -- rather than assumed from the check that passed.
  *
  * A collection declaring no scope takes none: the compiler writes nothing there and X214 refuses a document
- * that does, so anything arriving is a run against a tree that was never checked.
+ * that does, so anything arriving is a run against a tree that was never checked, and fails the node rather
+ * than widening the operation over every row.
  */
 function scopeOf(given: unknown, columns: string[], name: string): Scope | undefined {
   if (columns.length === 0) {
