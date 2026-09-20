@@ -34,12 +34,44 @@ export interface Order {
   dir?: 'asc' | 'desc';
 }
 
-/** What a find asks for beyond the collection: which records, in what order, and how much of the answer. */
+/**
+ * The caller's scope over a scoped collection: one value per column the collection declares `scoped`. It is
+ * the store's own word about who is calling, carried to every site over the collection by the compiler and
+ * written by no document (X214), so an engine receives it and never composes one.
+ *
+ * `undefined` is the unscoped case and means every row: a collection that declares no `scoped`, and a view,
+ * which is the one declared way across a scope. An engine therefore reads `undefined` as "no predicate",
+ * never as "an empty scope that matches nothing".
+ */
+export type Scope = Record<string, string | number>;
+
+/**
+ * What a find asks for beyond the collection: which records, in what order, and how much of the answer.
+ *
+ * `scope` sits here rather than beside `query` because it narrows which records a find is over exactly as
+ * `where` does -- the difference being that the store wrote it and no document could -- and because the two
+ * are read together wherever a statement is built.
+ */
 export interface Query {
   where?: Where;
   order?: Order[];
   limit?: number;
   offset?: number;
+  scope?: Scope;
+}
+
+/**
+ * What a write says beyond the record or the changes: the scope it is written under. It is an object rather
+ * than a fourth parameter because `put` and `patch` already take three, and a boolean followed by a scope is
+ * exactly the call site the parameter rule exists to prevent -- `{ scope }` at the call site names what it is.
+ */
+export interface Written {
+  scope?: Scope;
+}
+
+/** What a write of a whole record says: whether it may replace one already there, and under which scope. */
+export interface Put extends Written {
+  replace: boolean;
 }
 
 /**
@@ -106,26 +138,43 @@ export interface RemoveAnswer {
  * engine that keeps the records it is a plan for, and `record.ts` says what each answers.
  */
 export interface Engine extends Recorder {
-  /** The record under that key, or `record` absent where there is none. */
-  get(at: At, key: unknown): Promise<{ record?: Record_ }>;
-  /** Every record the query matches, in the order it asks for. */
+  /**
+   * The record under that key, or `record` absent where there is none. Under a scope the row is matched by
+   * the key *and* every scope column, so another scope's row is absent rather than refused: a `get` that
+   * found it would be the hole this whole rule exists to close, and the graph already routes absence.
+   */
+  get(at: At, key: unknown, scope?: Scope): Promise<{ record?: Record_ }>;
+  /** Every record the query matches, in the order it asks for, within the query's scope. */
   find(at: At, query: Query): Promise<Record_[]>;
-  /** How many records the filter matches. */
-  count(at: At, where: Where | undefined): Promise<number>;
+  /** How many records the filter matches within the scope. */
+  count(at: At, where: Where | undefined, scope?: Scope): Promise<number>;
   /**
    * Write the whole record under its own key; with `replace` false, write nothing where one is already there.
    * A declared `unique` another record already holds, or a `refs` naming a record that is not there, is
    * answered as `violated` rather than thrown: a constraint the store declares is the opposite of unforeseen.
+   *
+   * The scope columns are written beside the record whatever it says -- it cannot say anything, since they
+   * are not its fields -- and `replace` replaces within the scope. A key already held under another scope is
+   * a `conflict`: the key is global to the collection, so one scope can never take another's row.
    */
-  put(at: At, record: Record_, replace: boolean): Promise<PutAnswer>;
-  /** Change some fields of the record under that key, or answer `record` absent where there is none. */
-  patch(at: At, key: unknown, changes: Record_): Promise<{ record?: Record_ }>;
+  put(at: At, record: Record_, put: Put): Promise<PutAnswer>;
+  /**
+   * Change some fields of the record under that key, or answer `record` absent where there is none. A key of
+   * another scope is absent and nothing is patched; a scope column is never among the changes, since it is
+   * not a field of the shape.
+   */
+  patch(at: At, key: unknown, changes: Record_, written?: Written): Promise<{ record?: Record_ }>;
   /**
    * Remove the record under that key and answer it, or `record` absent where there was none. A record another
-   * still references by a declared `refs` is kept, and the collection that references it is answered.
+   * still references by a declared `refs` is kept, and the collection that references it is answered. A key
+   * of another scope is absent and nothing is removed.
    */
-  remove(at: At, key: unknown): Promise<RemoveAnswer>;
-  /** A key no record of the collection has, of the type the collection's key field declares. */
+  remove(at: At, key: unknown, scope?: Scope): Promise<RemoveAnswer>;
+  /**
+   * A key no record of the collection has, of the type the collection's key field declares. It takes no
+   * scope: a key is global to the collection across every scope, so one is minted free of all of them and no
+   * scope can ever be handed a key another already holds.
+   */
   newKey(at: At): Promise<unknown>;
   /**
    * Create every collection that is not there yet and leave alone every one that is, and say how much was
