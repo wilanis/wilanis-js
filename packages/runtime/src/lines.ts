@@ -212,7 +212,7 @@ function keepsLines(name: string, collection: Collection, within: Within): strin
     `  collection ${name}: ${collection.of}`,
     keyMark(collection, within.scope),
     ...uniqueMark(collection),
-    ...scopeLines(name, collection, within.store, within.load),
+    ...scopeLines(name, collection, within.store, within.load).map(mark => markLine(mark.family, mark.said)),
     ...refsMark(collection, within.store.doc),
     ...defaultsMark(collection),
     ...renamedMark(collection),

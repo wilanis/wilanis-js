@@ -6,11 +6,10 @@
  *
  * Split from `access.ts`, which judges a policy on its own and what gates a trigger under its kind: these two
  * are the same family asked about a store -- A007 over the document, A008 over what a trigger reaches -- and
- * the walk they need (`effectsReachable`, `collectionOf`) is not one a policy or a credential ever makes.
+ * the walk they need (`viewsReachedBy` in `../scope-said.ts`) is not one a policy or a credential ever makes.
  */
 import { type Loaded, policyPath, type StoreDoc, splitRef, type TriggerDoc } from '@wilanis/core';
-import { collectionOf } from '../documents.js';
-import { effectsReachable } from '../refusals.js';
+import { viewsReachedBy } from '../scope-said.js';
 import { type Judge, type JudgedResolver, type Refuser, underProfiles } from './judge.js';
 
 const NO_GUARD_HINT = 'add a guarding plugin to project.json → plugins, such as @wilanis/plugin-auth';
@@ -103,20 +102,20 @@ interface ViewFault {
 }
 
 /**
- * Every view an operation reaches under one profile whose `behind` no attached policy is. The walk is
- * `effectsReachable`, which ends at the native sites a run reaches with what each was given; which of those
- * is over a view is `collectionOf`, read off the store the site names.
+ * Every view an operation reaches under one profile whose `behind` no attached policy is. The walk itself is
+ * `viewsReachedBy` in `scope-said.ts`, which `wilanis describe` and the viewer read to say the same crossings;
+ * all this rule adds is the filter, so what is refused here and what a reader is shown cannot drift apart.
  */
 function viewsReached(judge: Judge, run: string, profile: string | undefined, attached: Set<string>): ViewFault[] {
   const out: ViewFault[] = [];
-  for (const effect of effectsReachable(judge.scope, run, profile)) {
-    const site = collectionOf(judge.scope, { key: effect.key, given: effect.given });
-    if (!site) continue;
-    const collection = judge.scope.registry.get('store', site.store)?.doc.collections[site.collection];
-    const behind = collection?.view === undefined ? undefined : collection.behind;
-    if (behind === undefined || attached.has(judge.scope.canon(behind))) continue;
-    const message = `reaches ${effect.file}#${effect.node}, which reads ${site.collection}, a view of ${collection?.view} across every scope behind ${behind}, and attaches no such policy`;
-    out.push({ message, hint: `attach "${behind}" under policies, or read ${collection?.view}`, profiles: [profile] });
+  for (const found of viewsReachedBy(judge.scope, run, profile)) {
+    if (attached.has(judge.scope.canon(found.behind))) continue;
+    const message = `reaches ${found.effect.file}#${found.effect.node}, which reads ${found.collection}, a view of ${found.view} across every scope behind ${found.behind}, and attaches no such policy`;
+    out.push({
+      message,
+      hint: `attach "${found.behind}" under policies, or read ${found.view}`,
+      profiles: [profile],
+    });
   }
   return out;
 }

@@ -74,6 +74,16 @@ export function readValuesOf(node: Node): unknown {
   return isMap(node) ? [node.in ?? {}, node.over] : (node.in ?? {});
 }
 
+/**
+ * The profiles a walk is made under: each declared one, or the one unnamed profile. Every rule made per
+ * profile, and everything said about one, walks this list, so the checker and whoever explains a rule cannot
+ * disagree about how many walks there are.
+ */
+export function profilesOf(scope: Scope): (string | undefined)[] {
+  const declared = scope.profiles();
+  return declared.length ? declared : [undefined];
+}
+
 /** How a message says which profile a judgement was made under, when one was. */
 export function underProfile(profile: string | undefined): string {
   return profile ? ` (profile '${profile}')` : '';
@@ -165,8 +175,7 @@ export class Judge {
 
   /** The profiles to judge under: each declared one, or the one unnamed profile. */
   profiles(): (string | undefined)[] {
-    const declared = this.scope.profiles();
-    return declared.length ? declared : [undefined];
+    return profilesOf(this.scope);
   }
 
   /** L005 when `from` may not name `target`. */

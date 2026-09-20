@@ -117,7 +117,7 @@ export function lowerScope(scope: Scope, site: CallSite): KSource | undefined {
 }
 
 /** Whether the operation a site names carries a scope at all: the port says so by declaring the input. */
-function takesScope(scope: Scope, key: string): boolean {
+export function takesScope(scope: Scope, key: string): boolean {
   const hit = scope.op(key);
   if (typeof hit === 'string' || !hit.port.native) return false;
   return Boolean(hit.op.accepts?.[SCOPE]);

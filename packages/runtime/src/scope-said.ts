@@ -10,10 +10,11 @@
  *
  * Nothing here judges. `checkStoreScopes` and `checkViewGates` in `check/scope-access.ts` have already refused
  * a store scoped by what a caller sends (A007) and a trigger reaching a view without its policy (A008); this
- * asks the same questions with the same walks -- `effectsReachable` and `collectionOf`, the pair those rules
- * are made of -- so what a reader is shown and what the tree was held to cannot drift apart.
+ * asks the same questions with the same walks -- `viewsReachedBy` in the compiler's `scope-said.ts` is the one
+ * A008 filters, and `takesScope` the one `lowerScope` reads -- so what a reader is shown and what the tree was
+ * held to cannot drift apart.
  */
-import { collectionOf, effectsReachable } from '@wilanis/compiler';
+import { collectionOf, effectsReachable, profilesOf, takesScope, viewsReachedBy } from '@wilanis/compiler';
 import {
   type GraphDoc,
   type Loaded,
@@ -29,13 +30,6 @@ import {
   type TriggerDoc,
   type Values,
 } from '@wilanis/core';
-
-/**
- * The input a scoped site carries its scope under. The port document is where it is declared and the
- * compiler's `SCOPE` is where it is filled; this names it to ask a port whether one of its operations takes
- * one, which is the same question read off the same declaration.
- */
-const SCOPE = 'scope';
 
 /** Is a dotted path the prefix itself, or below it? What a policy proving `request.session` proves. */
 const atOrBelow = (path: string, prefix: string): boolean => path === prefix || path.startsWith(`${prefix}.`);
@@ -71,12 +65,6 @@ function reaches(trigger: Loaded<TriggerDoc>, store: string, collection: string,
     }
   }
   return false;
-}
-
-/** The profiles to walk under: each declared one, or the one unnamed profile, as the checker walks them. */
-function profilesOf(scope: Scope): (string | undefined)[] {
-  const declared = scope.profiles();
-  return declared.length ? declared : [undefined];
 }
 
 /** The policies one trigger attaches, as documents, skipping any the tree does not have. */
@@ -158,27 +146,14 @@ export interface ViewReached {
 export function viewsOfTrigger(trigger: Loaded<TriggerDoc>, scope: Scope): ViewReached[] {
   const attached = new Set((trigger.doc.policies ?? []).map(use => scope.canon(policyPath(use))));
   const out = new Map<string, ViewReached>();
-  for (const profile of profilesOf(scope)) {
-    for (const effect of effectsReachable(scope, trigger.doc.fire.run, profile)) {
-      const found = viewAt(effect, scope);
-      if (found) out.set(found.collection, { ...found, attached: attached.has(scope.canon(found.behind)) });
-    }
-  }
+  for (const profile of profilesOf(scope))
+    for (const found of viewsReachedBy(scope, trigger.doc.fire.run, profile))
+      out.set(found.collection, {
+        collection: found.collection,
+        behind: found.behind,
+        attached: attached.has(scope.canon(found.behind)),
+      });
   return [...out.values()];
-}
-
-/** The view one native site is over, where it is over one that declares a policy; nothing where it is not. */
-function viewAt(
-  effect: { key: string; given: Values | undefined },
-  scope: Scope,
-): { collection: string; behind: string } | undefined {
-  const site = collectionOf(scope, { key: effect.key, given: effect.given });
-  if (!site) return undefined;
-  const collection: StoreCollection | undefined = scope.registry.get('store', site.store)?.doc.collections[
-    site.collection
-  ];
-  if (collection?.view === undefined || collection.behind === undefined) return undefined;
-  return { collection: site.collection, behind: collection.behind };
 }
 
 /** The scope one collection is under, or nothing where it keeps its rows for everyone. */
@@ -200,18 +175,11 @@ interface Carried {
  * whatever the scope, and a line printed there would name a filter no statement carries.
  */
 function carriedScope(run: string, given: Values | undefined, scope: Scope): Carried | undefined {
-  if (!takesScope(run, scope)) return undefined;
+  if (!takesScope(scope, run)) return undefined;
   const over = collectionOf(scope, { key: run, given });
   const store = over && scope.registry.get('store', over.store);
   const scoped = store && over && scopedOf(store.doc.collections[over.collection] ?? {});
   return store && scoped ? { store: store.path, scoped } : undefined;
-}
-
-/** Whether the operation a site names carries a scope at all: the port says so by declaring the input. */
-function takesScope(run: string, scope: Scope): boolean {
-  const hit = scope.op(run);
-  if (typeof hit === 'string' || !hit.port.native) return false;
-  return Boolean(hit.op.accepts?.[SCOPE]);
 }
 
 /**
@@ -239,8 +207,15 @@ export function scopeLine(node: { run?: string; in?: Values }, scope: Scope): st
   );
 }
 
-/** One mark of a collection, indented as the marks of `lines.ts` are, so a scope reads as one more of them. */
-const markLine = (family: string, said: string) => `    ${family.padEnd(10)}  ${said}`;
+/**
+ * One mark of a collection, as `lines.ts` prints one: the family it is filed under and what that family says
+ * here. Nothing here indents -- how a mark is laid out is one decision and `lines.ts` holds it -- so a scope
+ * reads as one more of the marks beside it however that decision changes.
+ */
+export interface ScopeMark {
+  family: string;
+  said: string;
+}
 
 /**
  * What one scoped column says: the column, the read that fills it, how many triggers reach the collection and
@@ -248,30 +223,30 @@ const markLine = (family: string, said: string) => `    ${family.padEnd(10)}  ${
  * and the policies are named because a reader asking whose rows these are is asking exactly which gates stand
  * between a caller and them -- one of the RFC's two open questions, answered by naming both.
  */
-function scopedLine(
+function scopedMark(
   column: string,
   read: string,
   store: Loaded<StoreDoc>,
   at: { collection: string; load: LoadResult },
-): string {
+): ScopeMark {
   const name = read.replace(/^\{\{|\}\}$/g, '');
   const path = readPathOf(store.doc, name, new Scope(at.load.registry, at.load.resolve));
   const found = guaranteedBy(store, at.collection, path, at.load);
   const policies = [...new Set(found.flatMap(one => one.proving))];
   const by = policies.length ? ` by ${policies.join(', ')}` : '';
-  return markLine('scoped by', `${column} ← ${read}  (guaranteed at ${found.length} trigger(s)${by})`);
+  return { family: 'scoped by', said: `${column} ← ${read}  (guaranteed at ${found.length} trigger(s)${by})` };
 }
 
 /** Where the value one scoped column trusts was decided: every sign-in node that opened a session with it. */
-function signInLine(column: string, load: LoadResult): string[] {
+function signInMark(column: string, load: LoadResult): ScopeMark[] {
   const sites = writtenAtSignIn(column, load);
   if (!sites.length) return [];
   const said = sites.map(site => `${site.file}#${site.node}`).join(', ');
-  return [`${' '.repeat(16)}written at sign-in by ${said}`];
+  return [{ family: '', said: `written at sign-in by ${said}` }];
 }
 
 /**
- * Every scope of one collection, each with where its value was written. A collection under no scope prints
+ * Every scope of one collection, each with where its value was written. A collection under no scope says
  * nothing, so a store that keeps its rows for everyone reads exactly as it did before scoping existed.
  */
 export function scopeLines(
@@ -279,11 +254,11 @@ export function scopeLines(
   collection: StoreCollection,
   store: Loaded<StoreDoc>,
   load: LoadResult,
-): string[] {
+): ScopeMark[] {
   const scoped = scopedOf(collection);
   if (!scoped) return [];
   return Object.entries(scoped).flatMap(([column, read]) => [
-    scopedLine(column, read, store, { collection: name, load }),
-    ...signInLine(column, load),
+    scopedMark(column, read, store, { collection: name, load }),
+    ...signInMark(column, load),
   ]);
 }
