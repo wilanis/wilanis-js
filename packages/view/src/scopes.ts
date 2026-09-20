@@ -4,10 +4,12 @@
  * binds one, so `reads.ts` answers where each lands in the request. Nothing here is written at a call site: the
  * compiler puts the scope on every operation over the collection and no document may write one, so a node badge
  * and the store page are the only places a reader meets it -- and both ask this module, so neither can name a
- * column the other does not.
+ * column the other does not. Nothing here walks: whether an operation carries a scope (`takesScope`) and which
+ * views a run reaches (`viewsReachedBy`) are the compiler's, where the rules that refuse on them live, so the
+ * page cannot say a crossing A008 does not.
  */
-import { collectionOf, effectsReachable } from '@wilanis/compiler';
-import type { Loaded, Scope, StoreCollection, StoreDoc, TriggerDoc, Values } from '@wilanis/core';
+import { profilesOf, takesScope, type ViewReachedBy, viewsReachedBy } from '@wilanis/compiler';
+import type { Loaded, Scope, StoreCollection, StoreDoc, TriggerDoc } from '@wilanis/core';
 import { readsOf } from './reads.js';
 import type { VRequiredBy, VScope, VScopedColumn, VStoreViewOf } from './types.js';
 import { labelOf } from './types.js';
@@ -53,43 +55,29 @@ export function scopeOf(scope: Scope, over: Over): VScope | undefined {
   return by.length ? { store: over.store.path, by } : undefined;
 }
 
-/** Whether the operation a site names carries a scope at all: the port says so by declaring the input. */
-function takesScope(scope: Scope, run: string): boolean {
-  const hit = scope.op(run);
-  return typeof hit !== 'string' && Boolean(hit.port.native) && Boolean(hit.op.accepts?.scope);
-}
-
 /**
  * The views one trigger reaches, grouped by the policy each is behind: the walk A008 makes, under every profile,
- * so the *Gated by* list can say which of a trigger's policies it could not have dropped. The canonical policy
- * path is the key, since that is what an attachment is compared against.
+ * so the *Gated by* list can say which of a trigger's policies it could not have dropped. The walk itself is
+ * `viewsReachedBy`, which the rule reads too, so the page and the refusal cannot name different crossings; all
+ * this adds is the grouping. The canonical policy path is the key, since that is what an attachment is
+ * compared against.
  */
 export function viewsRequiredBy(scope: Scope, trigger: TriggerDoc): Map<string, VRequiredBy[]> {
   const out = new Map<string, VRequiredBy[]>();
   for (const profile of profilesOf(scope))
-    for (const effect of effectsReachable(scope, trigger.fire.run, profile)) {
-      const found = viewReached(scope, effect);
-      if (found) remember(out, found.behind, found.required);
-    }
+    for (const found of viewsReachedBy(scope, trigger.fire.run, profile))
+      remember(out, scope.canon(found.behind), requiredOf(scope, found));
   return out;
 }
 
-/** The profiles a walk from a trigger is made under: each declared one, or the one unnamed default. */
-const profilesOf = (scope: Scope): (string | undefined)[] => (scope.profiles().length ? scope.profiles() : [undefined]);
-
-/** One view a native call site is over, with the policy it is behind; nothing where the site is over no view. */
-function viewReached(scope: Scope, effect: { key: string; given: Values | undefined }) {
-  const site = collectionOf(scope, { key: effect.key, given: effect.given });
-  const store = site && scope.registry.get('store', site.store);
-  const collection = site && store?.doc.collections[site.collection];
-  if (!site || !store || collection?.view === undefined || collection.behind === undefined) return undefined;
-  const required: VRequiredBy = {
-    store: store.path,
-    storeLabel: labelOf(store),
-    view: site.collection,
-    of: collection.view,
+/** One view a run reaches, as the *Gated by* list names it: the store that declares it, labelled, and the pair. */
+function requiredOf(scope: Scope, found: ViewReachedBy): VRequiredBy {
+  return {
+    store: found.store,
+    storeLabel: labelOf(scope.registry.get('store', found.store)),
+    view: found.collection,
+    of: found.view,
   };
-  return { behind: scope.canon(collection.behind), required };
 }
 
 /** One view under the policy it is behind, named once however many profiles or sites reached it. */
