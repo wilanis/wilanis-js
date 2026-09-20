@@ -5,7 +5,7 @@
  */
 import type { Atomic } from '@wilanis/core';
 import type { Handler } from '@wilanis/engine';
-import type { At, Engine, Order, Query, Transaction } from './engine.js';
+import type { At, Engine, Order, Query, Scope, Transaction } from './engine.js';
 import { ensureStore } from './ensure.js';
 import { collectionAt, engineFor, scopedAt, storeFor } from './store.js';
 import { whereOf } from './where.js';
@@ -13,8 +13,7 @@ import { whereOf } from './where.js';
 type Input = Record<string, unknown>;
 type Ctx = { env: Record<string, unknown> };
 
-/** One scope as it reaches an engine: the collection's scoped columns, each holding one value. */
-export type Scope = Record<string, string | number>;
+export type { Scope } from './engine.js';
 
 /**
  * The scope an operation carries, held to the collection's own words before anything is kept or read. The
@@ -49,9 +48,9 @@ function scopeOf(given: unknown, columns: string[], name: string): Scope | undef
 
 /**
  * What an operation reached: the collection, whoever keeps it, and the scope it was carried under, judged.
- * Handing the scope on is the engine contract's, which takes it beside the key, the filter and the record;
- * until it does, this plugin's part is to have judged it, which is what makes a scope that does not fit the
- * collection's words fail the node here rather than reach a statement.
+ * The scope goes on to the engine beside the key, the filter or the record, and the engine holds every
+ * statement to it; this plugin's part is to have judged it first, so a scope that does not fit the
+ * collection's words fails the node here rather than reaching a statement.
  */
 interface Reached {
   at: At;
@@ -114,42 +113,43 @@ function objectOf(given: unknown, name: string): Record<string, unknown> {
 }
 
 const get: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine } = await at(input, ctx);
-  return engine.get(where, input.key);
+  const { at: where, engine, scope } = await at(input, ctx);
+  return engine.get(where, input.key, scope);
 };
 
 const find: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine } = await at(input, ctx);
+  const { at: where, engine, scope } = await at(input, ctx);
   const query: Query = {
     where: whereOf(input.where, where.shape),
     order: orderOf(input.order),
     limit: countOf(input.limit, 'limit'),
     offset: countOf(input.offset, 'offset'),
+    scope,
   };
   return engine.find(where, query);
 };
 
 const count: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine } = await at(input, ctx);
-  return engine.count(where, whereOf(input.where, where.shape));
+  const { at: where, engine, scope } = await at(input, ctx);
+  return engine.count(where, whereOf(input.where, where.shape), scope);
 };
 
 const put: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine } = await at(input, ctx);
-  return engine.put(where, objectOf(input.record, 'record'), input.replace !== false);
+  const { at: where, engine, scope } = await at(input, ctx);
+  return engine.put(where, objectOf(input.record, 'record'), { replace: input.replace !== false, scope });
 };
 
 const patch: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine } = await at(input, ctx);
+  const { at: where, engine, scope } = await at(input, ctx);
   const changes = objectOf(input.changes, 'changes');
   if (where.key in changes)
     throw new Error(`patch: '${where.key}' is the key of this collection, and a key is never patched`);
-  return engine.patch(where, input.key, changes);
+  return engine.patch(where, input.key, changes, { scope });
 };
 
 const remove: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine } = await at(input, ctx);
-  return engine.remove(where, input.key);
+  const { at: where, engine, scope } = await at(input, ctx);
+  return engine.remove(where, input.key, scope);
 };
 
 /**

@@ -166,13 +166,22 @@ describe('the scope an operation carries', () => {
     );
   });
 
-  it('a scope that fits is judged and the operation runs', async () => {
+  it('a scope that fits is judged, and the operation runs under exactly it', async () => {
     const record = { id: '1', url: 'https://x', hits: 2 };
     expect(await run('@storage/store.port.json#put', { ...on(), record, scope: { tenant: 'acme' } })).toEqual({
       record,
       conflict: false,
     });
-    expect(await run('@storage/store.port.json#count', { ...on(), scope: { tenant: 7 } })).toBe(1);
+    expect(await run('@storage/store.port.json#count', { ...on(), scope: { tenant: 'acme' } })).toBe(1);
+  });
+
+  it('the scope reaches the engine: another scope does not see the row this one wrote', async () => {
+    const record = { id: '1', url: 'https://x', hits: 2 };
+    await run('@storage/store.port.json#put', { ...on(), record, scope: { tenant: 'acme' } });
+    expect(await run('@storage/store.port.json#count', { ...on(), scope: { tenant: 7 } })).toBe(0);
+    expect(await run('@storage/store.port.json#get', { ...on(), key: '1', scope: { tenant: 7 } })).toEqual({
+      record: undefined,
+    });
   });
 
   it('newKey takes no scope: a key is unique across every scope, so there is none to mint it under', async () => {

@@ -17,12 +17,15 @@ export type {
   Engines,
   Made,
   Order,
+  Put,
   PutAnswer,
   Query,
   Record_,
   Ref,
   RemoveAnswer,
+  Scope,
   Transaction,
+  Written,
 } from './engine.js';
 export { engines } from './engine.js';
 export { ensureStore } from './ensure.js';
