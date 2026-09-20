@@ -2,7 +2,8 @@
  * wilanis check. Judges the whole tree statically so that nothing refuses at load. Rule families, each in
  * its module under check/:
  *   D documents (the loader)   R references   L layers/effects/visibility   G graphs (graph.ts, inputs.ts)
- *   P static fields/resolvers (resolvers.ts)   B bindings/profiles (bindings.ts, project.ts)
+ *   P static fields/resolvers (resolvers.ts)   B bindings/profiles (bindings.ts, project.ts; required.ts,
+ *     what a binding of a port a plugin requires may read and may reach)
  *   T triggers (triggers.ts)   A access (access.ts)   I invariants (invariants.ts)
  *   C connections and settings (project.ts, contracts.ts)
  *   C stores: what they keep and what they once called it (stores.ts), and who may see it (scopes.ts)
@@ -38,16 +39,16 @@ export function checkTree(load: LoadResult): RefusalList {
 
 /**
  * The order of judgement: the project, then what a contract declares, then what names it, atomic graphs once
- * every binding is judged -- the walk goes through them -- and startup and the bindings of required ports
- * last, once every resolvers document is read.
+ * every binding is judged -- the walk goes through them -- then the bindings of required ports, and startup
+ * last. Both of the last two read every resolvers document, and `checkStartup` stays the one that runs last.
  */
 function judgeTree(judge: Judge): void {
   checkProject(judge);
   judgeContracts(judge);
   judgeUses(judge);
   checkAtomic(judge);
-  checkStartup(judge);
   checkRequired(judge);
+  checkStartup(judge);
 }
 
 /** What a contract says for itself: the shapes, ports, connections, stores and plugin-shipped kinds. */

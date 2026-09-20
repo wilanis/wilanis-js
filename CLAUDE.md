@@ -119,7 +119,8 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
 
 - **A new rule.** Add it to its family's module under `packages/compiler/src/check/` -- `project.ts` (C, B at
   the project, startup), `contracts.ts` (shapes, ports, connections), `resolvers.ts` (P), `inputs.ts` (a call
-  site's inputs), `bindings.ts` (B), `graph.ts` with `graph-nodes.ts`, `graph-reads.ts`, `graph-whole.ts` and
+  site's inputs), `bindings.ts` (B), `required.ts` (B009, B010: what a binding of a port a plugin requires may read and may
+  reach), `graph.ts` with `graph-nodes.ts`, `graph-reads.ts`, `graph-whole.ts` and
   `narrowing.ts` (G), `triggers.ts` (T, S), `access.ts` (A), `invariants.ts` (I: what an invariant states
   once and the whole tree is held to) with `invariant-holds.ts` beside it for the field form and `prove.ts`
   for whether a rule already holds where a value is made -- what the checker and the guard the compiler

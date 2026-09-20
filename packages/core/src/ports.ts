@@ -9,8 +9,21 @@ import type { Outcome } from '@wilanis/engine';
  * What a plugin is given, as `env.ports`, to call a port it requires: one operation (`path#operation`) run
  * through the binding the active profile chose, answering what the operation returns. It refuses any operation
  * not under a port some plugin requires, so a handler cannot reach an arbitrary domain port.
+ *
+ * A handler that fires one from inside a run passes its own `ctx`, so the binding runs under that run's abort
+ * and in its blob scope; called with none -- from a `postLoad`, where no run is in flight -- it runs under the
+ * tree's environment, as a startup step does.
  */
-export type FirePort = (op: string, input: Record<string, unknown>) => Promise<unknown>;
+export type FirePort = (op: string, input: Record<string, unknown>, ctx?: FiringContext) => Promise<unknown>;
+
+/**
+ * What the calling run lends the binding it fires: the abort it is under, and the environment it sees, whose
+ * `blobs` is the scope that will release what the binding makes. A `RunContext` satisfies it as it stands.
+ */
+export interface FiringContext {
+  signal?: AbortSignal;
+  env?: Record<string, unknown>;
+}
 
 /** How the binding behind one required operation ended when it did not answer, as `env.ports` throws it. */
 export class PortError extends Error {

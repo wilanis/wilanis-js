@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkTree } from '@wilanis/compiler';
 import { type LoadResult, loadTree, type PluginModule, schemaRef } from '@wilanis/core';
+import type { RunContext } from '@wilanis/engine';
 import { docsDir, EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
 const port = (description: string) => ({
@@ -21,8 +22,13 @@ const port = (description: string) => ({
   },
 });
 
+/** What the last run of files.port.json#get was given, for a case that asks what the nested run inherited. */
+export const lastRun: { signal?: AbortSignal; blobs?: unknown } = {};
+
 /** What files.port.json#get answers: what was kept under the key, and a fault for the key 'broken'. */
-async function kept({ in: given }: { in: Record<string, unknown> }) {
+async function kept({ in: given, ctx }: { in: Record<string, unknown>; ctx: RunContext }) {
+  lastRun.signal = ctx.signal;
+  lastRun.blobs = ctx.env.blobs;
   if (given.key === 'broken') throw new Error('the disk is gone');
   return { record: `kept ${given.key}` };
 }
@@ -43,6 +49,12 @@ export function keeper(manifest: (grants: string[], requires: string[]) => void 
       },
       'files.port.json': port('what is kept in files'),
       'memory.port.json': port('where the plugin keeps what it is given; the host binds it'),
+      'Record.shape.json': {
+        $schema: schemaRef('shape'),
+        description: 'what one key holds',
+        layer: 'core',
+        fields: { record: { type: 'string', required: false } },
+      },
     }),
     handlers: { '@keep/files.port.json#get': kept },
   };
@@ -62,6 +74,24 @@ const binding = (edit: (doc: any) => void) => {
 
 export const BINDING = '@features/state/data/keep-files.binding.json';
 
+export const REFUSING = '@features/state/data/keep-refusing.graph.json';
+
+/** A data graph whose only ending is a `refuse`: what a binding may run without delegating to a refusing operation. */
+const refusingGraph = () => ({
+  $schema: schemaRef('graph'),
+  description: 'reads nothing and refuses: the memory is not there',
+  out: { type: '@keep/Record.shape.json', from: ['gone'] },
+  nodes: [
+    {
+      type: '@wilanis/node/run.schema.json',
+      id: 'gone',
+      label: 'No memory here',
+      run: '@std/outcome.port.json#refuse',
+      in: { reason: 'gone', message: 'nothing is kept', type: '@keep/Record.shape.json' },
+    },
+  ],
+});
+
 /**
  * A copy of the example that uses @keep, its memory bound under every profile, or under none with no binding
  * written; `edit` changes the binding.
@@ -70,6 +100,7 @@ function tree(bound: boolean, edit: (doc: any) => void): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-requires-'));
   cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
   mkdirSync(join(dir, 'features/state/data'), { recursive: true });
+  writeFileSync(join(dir, 'features/state/data/keep-refusing.graph.json'), JSON.stringify(refusingGraph()));
   const feature = { $schema: schemaRef('feature'), description: 'where this deployment keeps things' };
   writeFileSync(
     join(dir, 'features/state/feature.json'),
