@@ -2,15 +2,12 @@
  * What a trigger answers: the refusal reasons its kind and its policies can reach, the status each maps to, and which
  * outcome of which policy answers a graph's refusal.
  */
-import { refusalsOfTrigger } from '@wilanis/compiler';
+import { profilesOf, refusalsOfTrigger } from '@wilanis/compiler';
 import type { Loaded, Scope, TriggerDoc } from '@wilanis/core';
 import type { VAnswer, VAnsweredBy } from './types.js';
 import { labelOf, readable } from './types.js';
 
 // ---- refusals -------------------------------------------------------------------------------------
-
-/** The profiles a walk from a trigger is made under: each declared one, or the one unnamed default. */
-const profilesOf = (scope: Scope): (string | undefined)[] => (scope.profiles().length ? scope.profiles() : [undefined]);
 
 /** The map a trigger's kind declares for refusal reasons, read from its settings; undefined when the kind maps none. */
 export function refusalMapOf(
