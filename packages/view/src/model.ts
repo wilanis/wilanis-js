@@ -20,8 +20,9 @@ import { invariantView } from './invariants.js';
 import { stemOf, targetOf } from './ports.js';
 import { callersOf, type IndexedRef, referenceIndex } from './references.js';
 import { answersOf } from './refusals.js';
+import { viewsRequiredBy } from './scopes.js';
 import { storeView } from './stores.js';
-import type { DocView } from './types.js';
+import type { DocView, VAttachedPolicy } from './types.js';
 import { labelOf, readable } from './types.js';
 
 export * from './types.js';
@@ -93,16 +94,24 @@ function implementationsOf(scope: Scope, path: string) {
   }));
 }
 
-/** The policies a trigger attaches, in order, and what each is given. */
-function policiesOf(scope: Scope, trigger: TriggerDoc) {
+/**
+ * The policies a trigger attaches, in order, what each is given, and which of them a view it reaches requires:
+ * a view is the one way across a scope, so the attachment that is its `behind` is the one the author could not
+ * have dropped, and the page says so rather than leaving a reader to find A008 by removing it.
+ */
+function policiesOf(scope: Scope, trigger: TriggerDoc): VAttachedPolicy[] {
+  const required = viewsRequiredBy(scope, trigger);
   return (trigger.policies ?? []).map(use => {
     const ref = policyPath(use);
     const policy = scope.get('policy', ref);
+    const path = policy?.path ?? scope.canon(ref);
+    const views = required.get(path);
     return {
-      path: policy?.path ?? scope.canon(ref),
+      path,
       label: policy ? labelOf(policy) : readable(stemOf(ref)),
       decide: policy?.doc.decide.run ?? '',
       ...(typeof use !== 'string' && use.in ? { gives: use.in } : {}),
+      ...(views?.length ? { required: views } : {}),
     };
   });
 }

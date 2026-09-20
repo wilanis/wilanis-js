@@ -28,6 +28,10 @@
   .badge { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); background: var(--panel-2); white-space: nowrap; vertical-align: middle; }
   .badge.kind-graph { color: var(--accent); } .badge.kind-trigger { color: var(--ok); } .badge.kind-policy { color: var(--ok); } .badge.kind-port { color: #c792ea; } .badge.kind-binding { color: var(--warn); } .badge.kind-shape { color: var(--type); }
   .badge.bad { color: var(--bad); border-color: var(--bad); } .badge.warn { color: var(--warn); } .badge.ok { color: var(--ok); }
+  /* a scope is the store's word, not the node's: the badge opens the store that declares it */
+  .badge.scope { color: var(--type); border-color: var(--type); text-decoration: none; }
+  /* the one attachment a trigger could not drop: the policy a view it reaches is behind */
+  .card .v small.req-view { font-family: var(--sans); color: var(--warn); white-space: normal; }
   aside { border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
   aside .filter { padding: 10px; border-bottom: 1px solid var(--line); }
   aside .list { overflow: auto; flex: 1; padding: 6px 0; }
@@ -467,6 +471,61 @@
     return tr;
   }
 
+  /**
+   * Why one attachment is not the author's to drop: this trigger reaches a view, and the policy is what that view
+   * is behind. Every other policy on the list is a choice; this one the tree would refuse the trigger without.
+   */
+  function requiredEl(required) {
+    const s = el('small', 'req-view');
+    s.appendChild(frag('required: this trigger reaches '));
+    required.forEach((one, i) => {
+      if (i) s.appendChild(frag(', '));
+      s.appendChild(link(one.store, one.view, 'primary'));
+      s.appendChild(frag(', a view across every scope of ' + one.of));
+    });
+    s.appendChild(frag('. A view is the one way across a scope, and this is the policy it is behind.'));
+    return s;
+  }
+
+  /**
+   * What a store reads from the request to fill its scopes, drawn as a graph's request node is: one port per name
+   * it binds, each labelled as the store reads it and opening the resolvers document that declares it. A store
+   * binds a read the way a data graph does, so a reader meets the same node here.
+   */
+  function storeReadsEl(page, request) {
+    page.appendChild(el('h2', null, 'Read from the request'));
+    page.appendChild(el('p', null, 'What this store reads to scope its collections. Nothing runs: each is a path into what the trigger kind and the guard hand, declared by a resolvers document, and the compiler carries it to every operation over the scoped collection.'));
+    const t = el('table'); const head = el('tr'); for (const h of ['read as', 'read from', 'declared by', 'says']) head.appendChild(el('th', null, h)); t.appendChild(head);
+    for (const p of request.outputs) {
+      const tr = el('tr');
+      tr.appendChild(el('td', 'name', p.label || p.name));
+      tr.appendChild(el('td', 'val', showRead('request.' + p.name)));
+      const td = el('td'); if (p.opens) td.appendChild(link(p.opens)); tr.appendChild(td);
+      tr.appendChild(el('td', 'desc', p.description || ''));
+      t.appendChild(tr);
+    }
+    page.appendChild(t);
+  }
+
+  /**
+   * The views of this store: a collection that sees every scope's rows of one that is scoped, behind a policy.
+   * A view is the one way across a scope, and it is a document -- so the page links both ends of it, the
+   * collection it crosses and the policy every trigger reaching it must attach.
+   */
+  function storeViewsEl(page, views, collections) {
+    page.appendChild(el('h2', null, 'Views across the scope (' + Object.keys(views).length + ')'));
+    page.appendChild(el('p', null, 'A view sees every scope’s rows of one scoped collection, and has that collection’s shape and key. It is the one way across a scope: every trigger that reaches an operation over it attaches the policy it names, or the tree is refused.'));
+    const t = el('table'); const head = el('tr'); for (const h of ['view', 'sees every scope of', 'behind', 'holds']) head.appendChild(el('th', null, h)); t.appendChild(head);
+    for (const [name, view] of Object.entries(views)) {
+      const tr = el('tr'); tr.appendChild(el('td', 'name', name));
+      const of = el('td', 'mono', view.of); of.appendChild(el('span', 'until', 'its shape and key are that collection’s')); tr.appendChild(of);
+      tr.appendChild(el('td')).appendChild(link(view.behind, view.behindLabel, 'primary'));
+      tr.appendChild(el('td', 'desc', (collections[name] || {}).description || ''));
+      t.appendChild(tr);
+    }
+    page.appendChild(t);
+  }
+
   function renderDocPage(page, v) {
     const h1 = el('h1', null, v.label); h1.appendChild(schemaBadge(v.kind, null, v.kind + '.schema.json')); if (v.kind === 'shape') h1.appendChild(badge(v.kind, v.doc.layer === 'edge' ? 'edge: the world’s shape' : 'core: ours')); page.appendChild(h1);
     page.appendChild(el('p', 'lead', v.description));
@@ -509,7 +568,7 @@
         if (v.policies) {
           page.appendChild(el('h2', null, 'Gated by, in order'));
           page.appendChild(el('p', null, 'Each policy decides over what the kind and the guard hand; the first that does not allow answers, and the operation never fires.'));
-          for (const [i, pol] of v.policies.entries()) { const c = el('div', 'card'); c.appendChild(el('div', 'k', String(i + 1))); const vv = el('div', 'v'); vv.appendChild(link(pol.path, pol.label)); if (pol.gives) vv.appendChild(el('small', null, 'gives the guard: ' + Object.keys(pol.gives).join(', '))); if (pol.decide) { vv.appendChild(el('small', null, 'decides through ')); vv.appendChild(link(pol.decide.split('#')[0], showOp(pol.decide))); } c.appendChild(vv); page.appendChild(c); }
+          for (const [i, pol] of v.policies.entries()) { const c = el('div', 'card'); c.appendChild(el('div', 'k', String(i + 1))); const vv = el('div', 'v'); vv.appendChild(link(pol.path, pol.label)); if (pol.required) vv.appendChild(requiredEl(pol.required)); if (pol.gives) vv.appendChild(el('small', null, 'gives the guard: ' + Object.keys(pol.gives).join(', '))); if (pol.decide) { vv.appendChild(el('small', null, 'decides through ')); vv.appendChild(link(pol.decide.split('#')[0], showOp(pol.decide))); } c.appendChild(vv); page.appendChild(c); }
         }
         page.appendChild(el('h2', null, 'Settings the kind judges')); page.appendChild(valuesTable(d.settings));
         if (v.answers) {
@@ -609,6 +668,7 @@
         if (s.kind) { chain.appendChild(arrow()); chain.appendChild(step('by the engine', link(s.kind, s.kindLabel))); }
         page.appendChild(chain);
         if (s.plugin) { const p = el('p'); p.appendChild(frag('Granted by ')); p.appendChild(link(s.plugin + '/plugin.json', s.plugin)); p.appendChild(frag(s.from ? ' (' + s.from + '), which carries the code that keeps these records. Swapping engines is swapping the connection\u2019s kind; no graph below changes.' : ', which carries the code that keeps these records.')); page.appendChild(p); }
+        if (s.request) storeReadsEl(page, s.request);
         page.appendChild(el('h2', null, 'Collections'));
         page.appendChild(el('p', null, 'What this feature keeps, by name. The collection is where the record type is written down, so a graph names the store and the collection and never repeats the shape.'));
         const uniqueOf = c => (c.unique || []).map(fields => '[' + fields.join(', ') + ']').join(', ');
@@ -618,18 +678,23 @@
         const UNTIL = 'until wilanis migrate has applied it everywhere';
         // a renamed field reads as the name now with the name before struck through beside it: the tree is ahead of the database until migrate has caught it up
         const renamedCell = c => { const td = el('td', 'mono'); const pairs = Object.entries(c.renamed || {}); if (!pairs.length) return td; pairs.forEach(([now, before], i) => { if (i) td.appendChild(frag(', ')); td.appendChild(frag(now + ' ')); td.appendChild(el('span', 'was', before)); }); td.appendChild(el('span', 'until', UNTIL)); return td; };
-        const t = el('table'); const hd = el('tr'); for (const h of ['collection', 'records of', 'keyed by', 'unique', 'refs', 'default', 'renamed', 'holds']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
-        for (const [name, c] of Object.entries(d.collections)) {
+        // a scope says whose rows these are: the column the store keeps beside the record, and the read that fills it
+        const scopedCell = name => { const td = el('td', 'mono'); const by = (s.scoped || {})[name] || []; by.forEach((c, i) => { if (i) td.appendChild(frag(', ')); td.appendChild(frag(scopeSaid(c))); }); if (by.length) td.appendChild(el('span', 'until', 'unique holds within the scope; the compiler puts it on every operation')); return td; };
+        const t = el('table'); const hd = el('tr'); for (const h of ['collection', 'records of', 'keyed by', 'unique', 'scoped by', 'refs', 'default', 'renamed', 'holds']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
+        // a view has none of these: it is the viewed collection's rows, and is listed on its own below
+        for (const [name, c] of Object.entries(d.collections).filter(([n]) => !(s.views || {})[n])) {
           const tr = el('tr'); const nm = el('td', 'name', name);
           if (c.was) { nm.appendChild(el('span', 'was', c.was)); nm.appendChild(el('span', 'until', UNTIL)); }
           tr.appendChild(nm);
           tr.appendChild(el('td')).appendChild(typeEl(c.of)); tr.appendChild(el('td', 'mono', keyOf(name, c)));
-          tr.appendChild(el('td', 'mono', uniqueOf(c))); tr.appendChild(el('td', 'mono', refsOf(c))); tr.appendChild(el('td', 'mono', defaultsOf(c)));
+          tr.appendChild(el('td', 'mono', uniqueOf(c))); tr.appendChild(scopedCell(name));
+          tr.appendChild(el('td', 'mono', refsOf(c))); tr.appendChild(el('td', 'mono', defaultsOf(c)));
           tr.appendChild(renamedCell(c));
           tr.appendChild(el('td', 'desc', c.description || ''));
           t.appendChild(tr);
         }
         page.appendChild(t);
+        if (s.views) storeViewsEl(page, s.views, d.collections);
         page.appendChild(el('h2', null, 'Run against by (' + s.calls.length + ')'));
         if (!s.calls.length) page.appendChild(el('p', null, 'No graph names this store yet.'));
         else {
@@ -791,6 +856,29 @@
     box.appendChild(why);
   }
 
+  /** One scoped column said as a reader meets it: the column, and the read of the request that fills it. */
+  const scopeSaid = c => c.column + ' ← {{' + c.read + '}}' + (c.from ? ' (request' + SEP + showRead(c.from).replace(/^request /, '') + ')' : '');
+
+  /**
+   * The scope a node carries, as a badge naming the column and opening the store that declares it. No document
+   * wrote it: the compiler puts it on every operation over a scoped collection, so the badge is the one place a
+   * reader meets it, and it says whose word it is rather than leaving it to look like an input somebody gave.
+   */
+  function scopeEl(box, s) {
+    box.appendChild(el('h4', null, 'scope'));
+    const r = el('div', 'ref');
+    const b = el('a', 'badge scope', 'scoped by ' + s.by.map(c => c.column).join(', '));
+    b.href = '#' + canon(s.store); b.title = 'declared by ' + canon(s.store);
+    r.appendChild(b);
+    box.appendChild(r);
+    for (const c of s.by) {
+      const row = el('div', 'row'); row.appendChild(el('span', 'name req', scopeSaid(c)));
+      if (c.opens) row.appendChild(link(c.opens));
+      box.appendChild(row);
+    }
+    box.appendChild(el('p', null, 'The store scopes this collection, so the compiler puts the scope on every operation over it. No graph writes one and none can forget one; the engine holds every statement to it.'));
+  }
+
   function renderNodeDetails(box, n, v) {
     const color = nodeColors(v.graph).get(n.id);
     const h = el('h3'); const sw = el('span', 'swatch'); sw.style.background = color; h.appendChild(sw); h.appendChild(document.createTextNode(n.label + ' ')); const kindText = { run: 'operation', map: 'for each', rule: 'rule', in: 'input', out: 'output', const: 'constants', request: 'request' }[n.kind]; h.appendChild(NODE_SCHEMA[n.kind] ? schemaBadge(n.kind, kindText, NODE_SCHEMA[n.kind]) : badge(n.kind, kindText)); box.appendChild(h);
@@ -814,6 +902,7 @@
         r.appendChild(el('span', 'sub', k.collection ? 'collection ' + k.collection + ', ' + k.op : k.op));
         box.appendChild(r);
         if (k.of) { const q = el('div', 'row'); q.appendChild(el('span', 'name req', 'records of')); q.appendChild(typeLink(k.of)); box.appendChild(q); }
+        if (k.scope) scopeEl(box, k.scope);
       }
       if (n.answeredBy) {
         box.appendChild(el('h4', null, `answered by (${n.answeredBy.length})`));
