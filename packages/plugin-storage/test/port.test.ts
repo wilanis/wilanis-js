@@ -183,6 +183,13 @@ describe('the scope an operation carries', () => {
     entries.scoped = undefined;
     expect(await run('@storage/store.port.json#count', on({}))).toBe(0);
   });
+
+  it('a scope handed to a collection that keeps none fails the node rather than widening the operation', async () => {
+    entries.scoped = undefined;
+    await expect(run('@storage/store.port.json#count', { ...on(), scope: { tenant: 'acme' } })).rejects.toThrow(
+      /scope: 'entries' keeps no scope, and this operation carries one/,
+    );
+  });
 });
 
 /**
