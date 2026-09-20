@@ -18,6 +18,7 @@ import { atomicOf, type Guard, guardSpecName, guardsOf, idsOf } from '@wilanis/c
 import type { GraphDoc, Loaded, Scope } from '@wilanis/core';
 import { invariantName } from './invariant-lines.js';
 import { readsLines } from './reads-said.js';
+import { scopeLine } from './scope-said.js';
 
 /** The connection a transaction falls on, said for a reader: one, or the several the profiles disagree about. */
 function whereLine(connections: string[]): string[] {
@@ -103,13 +104,14 @@ const guardLines = (guard: Guard, graph: string): string[] => {
  * A made site's node is printed under `<id>:made`, where the compiler moved it, and the guard's nodes follow it;
  * a taken site has no authored node to move, since the value is the kernel's `in`, so its guard opens the list.
  */
-function nodeLines(graph: GraphDoc, guards: Guard[], path: string): string[] {
+function nodeLines(graph: GraphDoc, guards: Guard[], path: string, scope: Scope): string[] {
   const at = new Map(guards.filter(one => one.site.kind === 'made').map(one => [one.id, one]));
   const moved = new Map([...at].map(([id, guard]) => [id, idsOf(guard).made]));
   const lines = guards.filter(one => one.site.kind === 'taken').flatMap(one => guardLines(one, path));
   for (const node of graph.nodes) {
     const guard = at.get(node.id);
     lines.push(nodeLine(node, moved.get(node.id) ?? node.id, moved));
+    lines.push(...scopeLine(node, scope));
     if (guard) lines.push(...guardLines(guard, path));
   }
   return lines;
@@ -128,7 +130,7 @@ export function graphLines(doc: Loaded, scope: Scope): string[] {
     ...contractLines(graph, guards),
     ...readsLines(graph.reads, scope),
     'nodes:',
-    ...nodeLines(graph, guards, doc.path),
+    ...nodeLines(graph, guards, doc.path, scope),
   ];
   const atomic = atomicOf(scope, doc as Loaded<GraphDoc>);
   if (!atomic) return lines;

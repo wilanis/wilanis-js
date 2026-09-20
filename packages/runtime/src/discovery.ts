@@ -26,6 +26,7 @@ import { graphLines } from './graph-said.js';
 import { holdsLines, invariantLines } from './invariant-lines.js';
 import { fieldLine, portLines, shower, storeLines } from './lines.js';
 import { requiredByLines, requiresLines } from './required-said.js';
+import { scopeTail, viewsOfTrigger } from './scope-said.js';
 import { shapeLines } from './shape-said.js';
 import { storeTail } from './stores.js';
 
@@ -129,8 +130,22 @@ function triggerLines(doc: Loaded, scope: Scope): string[] {
     ...crossesLines(declared),
     ...fireLines(declared),
     ...gatedLines(declared),
+    ...viewLines(doc as Loaded<TriggerDoc>, scope),
     ...holdsLines(doc as Loaded<TriggerDoc>, scope),
   ];
+}
+
+/**
+ * The views this trigger reaches, after its policies: a view is the one way across a scope, so a reader of
+ * the trigger is told which crossings it makes and whether each carries the policy the store put it behind.
+ * A trigger that attaches none is not refused here -- A008 has already done that -- but is said to a reader
+ * who has the trigger open rather than the store.
+ */
+function viewLines(trigger: Loaded<TriggerDoc>, scope: Scope): string[] {
+  return viewsOfTrigger(trigger, scope).map(view => {
+    const says = view.attached ? 'attached' : 'not attached -- wilanis check refuses this (A008)';
+    return `reaches ${view.collection} (a view) behind ${view.behind}: ${says}`;
+  });
 }
 
 /** What crosses the edge at this trigger: the shape it takes from the caller, and the one it answers in. */
@@ -250,7 +265,9 @@ function nodeLines(node: Record<string, unknown>, indent: string, scope: Scope):
   if (typeof found === 'string') return { lines: [`${indent}  ${id} ?? ${run}`] };
   if (found.port.native) {
     const effect = found.op.pure ? '' : '  (effect)';
-    return { lines: [`${indent}  ${id} ${run}${effect}${storeTail(run, node.in as Record<string, unknown>, scope)}`] };
+    const given = node.in as Record<string, unknown>;
+    const tail = `${storeTail(run, given, scope)}${scopeTail(run, given, scope)}`;
+    return { lines: [`${indent}  ${id} ${run}${effect}${tail}`] };
   }
   const binding = scope.bindingFor(found.path);
   const lines = [`${indent}  ${id} ${run}`];
