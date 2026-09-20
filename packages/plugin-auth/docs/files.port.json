@@ -19,7 +19,7 @@
           "type": "string",
           "static": true,
           "required": false,
-          "description": "where the records are kept, relative to the tree or absolute; default .wilanis/auth. Never under a directory the loader reads (X104)"
+          "description": "where the records are kept, relative to the tree or absolute; default .wilanis/auth. Never under a directory the loader reads (X106)"
         },
         "type": {
           "type": "type",
@@ -57,7 +57,7 @@
           "type": "string",
           "static": true,
           "required": false,
-          "description": "where the records are kept, relative to the tree or absolute; default .wilanis/auth. Never under a directory the loader reads (X104)"
+          "description": "where the records are kept, relative to the tree or absolute; default .wilanis/auth. Never under a directory the loader reads (X106)"
         },
         "type": {
           "type": "type",
@@ -92,7 +92,7 @@
           "type": "string",
           "static": true,
           "required": false,
-          "description": "where the records are kept, relative to the tree or absolute; default .wilanis/auth. Never under a directory the loader reads (X104)"
+          "description": "where the records are kept, relative to the tree or absolute; default .wilanis/auth. Never under a directory the loader reads (X106)"
         },
         "type": {
           "type": "type",
@@ -130,7 +130,7 @@
           "type": "string",
           "static": true,
           "required": false,
-          "description": "where the records are kept, relative to the tree or absolute; default .wilanis/auth. Never under a directory the loader reads (X104)"
+          "description": "where the records are kept, relative to the tree or absolute; default .wilanis/auth. Never under a directory the loader reads (X106)"
         },
         "type": {
           "type": "type",
