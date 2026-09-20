@@ -162,7 +162,7 @@ export interface VKeeps {
 
 /**
  * The scope one node carries over a scoped collection: the columns the collection declares and the read that
- * fills each, read off the store and never off the node. No document writes it (X203) and no author can forget
+ * fills each, read off the store and never off the node. No document writes it and no author can forget
  * it, so a badge on the node is the only place a reader meets it -- which is why it names the store it came from.
  */
 export interface VScope {

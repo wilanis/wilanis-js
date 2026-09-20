@@ -2,9 +2,9 @@
  * How a store scopes its rows, and what a view of a scoped collection crosses (RFC 0015). A collection names the
  * columns it keeps beside the record and the read that fills each; the store binds those reads as a data graph
  * binds one, so `reads.ts` answers where each lands in the request. Nothing here is written at a call site: the
- * compiler puts the scope on every operation over the collection and no document may write one (X203), so a node
- * badge and the store page are the only places a reader meets it -- and both ask this module, so neither can
- * name a column the other does not.
+ * compiler puts the scope on every operation over the collection and no document may write one, so a node badge
+ * and the store page are the only places a reader meets it -- and both ask this module, so neither can name a
+ * column the other does not.
  */
 import { collectionOf, effectsReachable } from '@wilanis/compiler';
 import type { Loaded, Scope, StoreCollection, StoreDoc, TriggerDoc, Values } from '@wilanis/core';
@@ -12,7 +12,7 @@ import { readsOf } from './reads.js';
 import type { VRequiredBy, VScope, VScopedColumn, VStoreViewOf } from './types.js';
 import { labelOf } from './types.js';
 
-/** Exactly `{{name}}`, the one form a scope's value may take: a whole read of a name the store binds (C005). */
+/** Exactly `{{name}}`, the one form a scope's value may take: a whole read of a name the store binds (C012). */
 const WHOLE_READ = /^\{\{\s*([^{}]+?)\s*\}\}$/;
 
 /**
@@ -42,7 +42,7 @@ export interface Over {
 
 /**
  * The scope one call site carries, or nothing where it carries none: read off the store the site names, never
- * off the node, since a node that wrote one would be refused (X203). Which operations carry one is the port's
+ * off the node, since a node that wrote one would be refused. Which operations carry one is the port's
  * word, read off the `scope` input it declares -- `newKey` declares none, because a key is global to the table
  * whatever the scope -- so this says what the lowering put there and not what a collection happens to declare.
  */
