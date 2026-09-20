@@ -27,7 +27,10 @@ export type Scope = Record<string, string | number>;
  * that does, so anything arriving is a run against a tree that was never checked.
  */
 function scopeOf(given: unknown, columns: string[], name: string): Scope | undefined {
-  if (columns.length === 0) return undefined;
+  if (columns.length === 0) {
+    if (given !== undefined) throw new Error(`scope: '${name}' keeps no scope, and this operation carries one`);
+    return undefined;
+  }
   if (!given || typeof given !== 'object' || Array.isArray(given))
     throw new Error(`scope: '${name}' is scoped by ${columns.join(', ')}, and this operation carries no scope`);
   const scope: Scope = {};
