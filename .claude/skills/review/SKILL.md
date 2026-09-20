@@ -1,12 +1,18 @@
 ---
 name: review
-description: Review a pull request or an RFC of wilanis-js for the maintainer. Picks one, briefs them (what it changes, decision points with a recommendation, pros and cons, risks, checks), then on their explicit yes merges the pull request by rebase, posts the review comment, or accepts the RFC. Use when asked to "review PR N", "review RFC NNNN", "what is waiting for review", or "merge N".
+description: Review a pull request or an RFC of wilanis-js for the maintainer. Picks one, briefs them (what it changes, decision points with a recommendation, pros and cons, risks, checks), then on their explicit yes merges the pull request by rebase, posts the review comment, or accepts the RFC. Asked to "review open PRs" (or "review the open pull requests", "go through the PRs"), it runs the sweep instead: every open pull request is read, the ones that meet the rails and hold no defect are merged, and the rest get a review requesting the fix, written for the session that will make it. Use when asked to "review PR N", "review RFC NNNN", "what is waiting for review", "merge N", or "review open PRs".
 ---
 
 # Reviewing for the maintainer
 
 The maintainer validates every detail; this skill makes that fast and keeps the record straight. The
 procedure is one. The target is a pull request, or one RFC file inside the pull request that proposes it.
+
+There are two ways in. Named a target ("review PR N", "review RFC NNNN"), the procedure below runs on it
+and stops at a question: the maintainer decides. Asked to **review open PRs**, the request is the
+decision for every pull request open at that moment, and section 5 says what it decides: merge what
+meets the rails and holds no defect, request the fix on what does not, and leave what only the
+maintainer can settle. Sections 1 to 4 still say how each one is read and what merging means.
 
 ## 1. Pick
 
@@ -88,3 +94,57 @@ issue exists. Then, in the pull request that holds the file:
    number>`). Label the unblocked ones `status:ready`.
 The pull request merges when every full spec in it is accepted or moved out; the stubs in it merge as
 stubs.
+
+## 5. The sweep: review open PRs
+
+"Review open PRs" is a standing yes for this run and for the pull requests open when it starts. It is not
+carried past the run, and a pull request opened during it is left for the next.
+
+**Take stock.** List what is open (section 1). Set aside a draft, and a pull request whose `decision` job
+is waiting for the maintainer: a change of decision under `fitness/` or a schema under
+`packages/core/schemas/` is theirs to approve, and the sweep only reports it. Everything else is a
+candidate.
+
+**Read every candidate in its own fresh subagent** (section 2), all at once. Each brief ends in a verdict
+and its reason, one of:
+
+- `merge` -- the rails are met, the code does what the pull request says, and the reader found no defect
+  against `CLAUDE.md` (a rule in two places, an import against the arrow, a file or function past the
+  house limit that lint somehow let through, a test that does not bite, a document kind or hook the task
+  did not ask for). A decision point whose recommendation is plain is not a blocker; the sweep takes the
+  recommendation and says so in the report.
+- `fix` -- something must change before it merges. The brief names each thing: the file and line, what
+  is wrong, and the edit that fixes it.
+- `leave` -- only the maintainer can settle it: a decision point with no plain recommendation, an RFC
+  whose acceptance is a judgement, a pull request whose purpose the reader could not make out.
+
+**Order the merges.** Pull requests that touch the same files, or build one on another, go in the order
+their issues were meant to: the lower issue number first unless a pull request's body says otherwise. A
+merge puts the others behind `main`; before each next one, rebase its branch, push, and wait for the
+checks (the rails in section 4 already say so). A rebase that conflicts is not resolved by the sweep: it
+turns that pull request's verdict into `fix`, with the conflicting files named.
+
+**Merge** each `merge` verdict as section 4 says, one at a time, rails checked again at the moment of
+merging. Do the bookkeeping section 4 names (the task ticked in the tracking issue, the RFC's status when
+it was the last task).
+
+**Request the fix** on each `fix` verdict. The session that makes the fix will read the comment without
+this conversation, so the comment carries the whole case: what is wrong, where, and the edit that fixes
+it; and, where the fix is a choice, which way to take and why. A remark about a line goes on that line;
+the summary goes in a review that requests changes:
+
+```
+gh pr review N -R wilanis/wilanis-js --request-changes --body "..."
+gh api repos/wilanis/wilanis-js/pulls/N/comments -f body="..." -f path="<file>" -f commit_id="$(gh pr view N -R wilanis/wilanis-js --json headRefOid -q .headRefOid)" -F line=LINE -f side=RIGHT
+```
+
+Check each point against the code before posting it; a comment that is wrong costs the next session more
+than no comment. The comment is plain and in the maintainer's voice, with no marker and no signature; it
+posts under their account. Nothing is edited on the branch: the fix is the other session's work, and the
+sweep never pushes to a pull request it did not merge. The `coordinate` skill's step 5 is what picks the
+comment up.
+
+**Report**, one line per pull request open at the start: its number, title, verdict, and what was done --
+the commits now on `main`, the review posted, or the reason it was left. Say what the sweep did not
+verify. A `leave` line asks its one question so the maintainer can answer it in a word.
+
