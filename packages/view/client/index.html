@@ -147,6 +147,8 @@
   const KIND_ONE = { project: 'project', feature: 'feature', trigger: 'trigger', policy: 'policy', resolvers: 'request reads', graph: 'graph', port: 'port', binding: 'binding', shape: 'shape', store: 'store', connection: 'connection', scenario: 'scenario', plugin: 'plugin', 'trigger-kind': 'trigger kind', 'connection-kind': 'connection kind', codec: 'codec' };
   /** A read path shown: request.headers['user-agent'] → request › headers › user-agent. */
   const showRead = (read) => String(read).split(/\.|\[['"]|['"]\]/).filter(Boolean).join(SEP);
+  /** One scoped column said as a reader meets it: the column, and the read of the request that fills it. */
+  const scopeSaid = c => c.column + ' ← {{' + c.read + '}}' + (c.from ? ' (request' + SEP + showRead(c.from).replace(/^request /, '') + ')' : '');
   const PALETTE = ['#6cb6ff', '#f0b350', '#7bd88f', '#c792ea', '#ff8a65', '#4ecdc4', '#f78c6c', '#82aaff', '#e57fb3', '#b5d66a', '#ffd166', '#64d3ff'];
 
   // ---- data --------------------------------------------------------------------------------------
@@ -855,9 +857,6 @@
     why.appendChild(frag(' for it. Proving a rule is what a graph gets for writing the value out, routing to it, or passing another judged value through.'));
     box.appendChild(why);
   }
-
-  /** One scoped column said as a reader meets it: the column, and the read of the request that fills it. */
-  const scopeSaid = c => c.column + ' ← {{' + c.read + '}}' + (c.from ? ' (request' + SEP + showRead(c.from).replace(/^request /, '') + ')' : '');
 
   /**
    * The scope a node carries, as a badge naming the column and opening the store that declares it. No document
