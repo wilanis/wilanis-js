@@ -131,12 +131,17 @@ it was the last task).
 **Request the fix** on each `fix` verdict. The session that makes the fix will read the comment without
 this conversation, so the comment carries the whole case: what is wrong, where, and the edit that fixes
 it; and, where the fix is a choice, which way to take and why. A remark about a line goes on that line;
-the summary goes in a review that requests changes:
+the summary goes in a review whose first line says **Needs a fix before merging**. It is a comment review,
+not one that requests changes: the pull requests are the maintainer's own, and GitHub refuses a
+request-changes review on one's own pull request.
 
 ```
-gh pr review N -R wilanis/wilanis-js --request-changes --body "..."
+gh pr review N -R wilanis/wilanis-js --comment --body "..."
 gh api repos/wilanis/wilanis-js/pulls/N/comments -f body="..." -f path="<file>" -f commit_id="$(gh pr view N -R wilanis/wilanis-js --json headRefOid -q .headRefOid)" -F line=LINE -f side=RIGHT
 ```
+
+A pull request that waits on another (stacked on its branch, or asked to rebase on it) and needs no fix of
+its own gets a comment review saying so, and what to do when the one it waits on lands.
 
 Check each point against the code before posting it; a comment that is wrong costs the next session more
 than no comment. The comment is plain and in the maintainer's voice, with no marker and no signature; it
@@ -145,6 +150,8 @@ sweep never pushes to a pull request it did not merge. The `coordinate` skill's 
 comment up.
 
 **Report**, one line per pull request open at the start: its number, title, verdict, and what was done --
-the commits now on `main`, the review posted, or the reason it was left. Say what the sweep did not
+the commits now on `main`, the review posted, or the reason it was left. `main` takes only pull requests, so
+a change the sweep itself makes (this file, a tracking issue's text) goes through an issue, a branch named
+after it, and a pull request of its own. Say what the sweep did not
 verify. A `leave` line asks its one question so the maintainer can answer it in a word.
 
