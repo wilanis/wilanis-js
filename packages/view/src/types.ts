@@ -156,6 +156,32 @@ export interface VKeeps {
   of?: string;
   /** The operation of the store port, by its short name. */
   op: string;
+  /** How the collection is scoped, where it is: the columns the compiler fills here, and nothing a document wrote. */
+  scope?: VScope;
+}
+
+/**
+ * The scope one node carries over a scoped collection: the columns the collection declares and the read that
+ * fills each, read off the store and never off the node. No document writes it (X203) and no author can forget
+ * it, so a badge on the node is the only place a reader meets it -- which is why it names the store it came from.
+ */
+export interface VScope {
+  /** The store that declares the scope, canonical, so the badge opens it. */
+  store: string;
+  /** One column per key the collection's `scoped` declares, with the read that fills it. */
+  by: VScopedColumn[];
+}
+
+/** One scoped column: the column the store keeps beside the record, and the read of the request that fills it. */
+export interface VScopedColumn {
+  /** The column name the collection declares under `scoped`. */
+  column: string;
+  /** The local name the store reads it by, as `scoped` writes it: `{{tenant}}` reads as `tenant`. */
+  read: string;
+  /** The resolvers document that declares that read, canonical, when the store binds one. */
+  opens?: string;
+  /** The segments below `request` the resolver reads, joined with dots, when it resolves. */
+  from?: string;
 }
 
 /**
@@ -245,7 +271,7 @@ export interface DocView {
   /** On a trigger whose kind maps refusals: every reason it can reach or maps, how it is answered, and the nodes that refuse with it. */
   answers?: VAnswer[];
   /** On a trigger: the policies that gate it, in order, the operation each decides through, and the credentials the attachment gives the guard. */
-  policies?: { path: string; label: string; decide: string; gives?: Record<string, unknown> }[];
+  policies?: VAttachedPolicy[];
   /** On a policy: the port operation it decides through, and where that leads. */
   decides?: VTarget;
   /** On a policy: what each reason its decision can refuse with means. */
@@ -353,6 +379,21 @@ export interface VStore {
   keyTypes: Record<string, string>;
   /** Every call that runs an operation against this store. */
   calls: VStoreCall[];
+  /** What the store reads from the request to fill its scopes, drawn as a graph's request node is; absent where it reads nothing. */
+  request?: VNode;
+  /** Each scoped collection, by name, with the columns the store keeps and the read filling each. */
+  scoped?: Record<string, VScopedColumn[]>;
+  /** Each collection that is a view, by name: the collection it sees every scope of, and the policy it is behind. */
+  views?: Record<string, VStoreViewOf>;
+}
+
+/** One view of this store: the scoped collection whose rows it sees, and the policy every trigger reaching it attaches. */
+export interface VStoreViewOf {
+  /** The scoped collection it views, by the name the store declares. */
+  of: string;
+  /** The policy it is behind, canonical, so the page opens it. */
+  behind: string;
+  behindLabel: string;
 }
 
 /** One call against a store: the document it sits in, where in it, the operation and the collection. */
@@ -362,6 +403,30 @@ export interface VStoreCall {
   where: string;
   op: string;
   collection?: string;
+}
+
+/**
+ * One policy a trigger attaches: where it is, what decides it, and what the attachment gives the guard.
+ * `required` is there when the trigger reaches a view this policy is the `behind` of -- the one attachment an
+ * author did not choose freely, since A008 refuses the trigger without it.
+ */
+export interface VAttachedPolicy {
+  path: string;
+  label: string;
+  decide: string;
+  gives?: Record<string, unknown>;
+  /** The views reaching this trigger requires it for, each with the collection it crosses; absent where none does. */
+  required?: VRequiredBy[];
+}
+
+/** One view whose `behind` a trigger's attachment is: which collection of which store it crosses. */
+export interface VRequiredBy {
+  /** The store that declares the view, canonical. */
+  store: string;
+  storeLabel: string;
+  /** The view's name, and the scoped collection it sees every scope of. */
+  view: string;
+  of: string;
 }
 
 /** One refusal reason at a trigger: how the trigger answers it (absent: not mapped), and where it comes from (empty: nothing reaches it). */
