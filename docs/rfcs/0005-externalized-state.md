@@ -382,4 +382,14 @@ Steps 1 to 4 need nothing from RFC 0002 and can land first.
   (`refused` with its reason and node, `faulted` with the node that broke, or `blocked`), its message
   `<op> refused '<reason>' at '<node>': <message>` or `<op> failed at '<node>': <error>`. A handler that lets it
   through fails its node with that message, which is what `wilanis run` prints, as for any handler that throws.
+- Whether the nested run `env.ports` makes is given the calling run's abort and blob scope, or the tree's.
+  *Decided:* the caller's. `FirePort` takes the handler's own `ctx` as an optional third argument, and the
+  binding runs under that run's `signal` and in its `env.blobs`, as a trigger's operation and a startup step
+  do. A handler fires a port from inside a run, so a binding that outlived the call would outlive the abort
+  that ended it, and a blob it made would land outside the scope that would have released it. A caller with
+  no run in flight -- a `postLoad` -- passes nothing and gets the tree's environment.
+- Whether B010 judges the delegation a binding writes, or the whole walk beneath it. *Decided:* the walk.
+  `refusalsReachable` and `operationsReachable` answer it, so a binding that runs a *graph* whose last node is
+  `refuse` is refused alongside one that delegates to a refusing operation: both end the run on purpose, and
+  the plugin firing the port expects an answer or a failure from either.
 - Whether `@s3`'s `postLoad` probe is a `HeadBucket` or a `put`/`drop` of one byte under the prefix.

@@ -6,8 +6,11 @@
  */
 import { type FirePort, PortError, Scope } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
-import { Embedder } from '../src/index.js';
-import { keeper, PROFILES, reading, refusals } from './required-harness.js';
+import { Embedder, FileBlobStore } from '../src/index.js';
+import { keeper, lastRun, PROFILES, REFUSING, reading, refusals } from './required-harness.js';
+
+/** The hint every B010 carries, spelled once rather than in each expectation. */
+const HINT = 'answer or fail; a required operation never ends the run on purpose';
 
 /** The `env.ports` of an embedder over a copy of the example whose memory is bound, under the first profile. */
 const firing = <T>(fire: (ports: FirePort) => Promise<T>) =>
@@ -31,6 +34,22 @@ describe('env.ports', () => {
     expect(thrown.op).toBe('@keep/memory.port.json#get');
     expect(thrown.outcome.kind).toBe('faulted');
     expect(thrown.message).toMatch(/^@keep\/memory\.port\.json#get failed at '.+': .*the disk is gone/);
+  });
+
+  it("runs the binding under the calling run's abort and blob scope, as a trigger's operation runs", async () => {
+    const aborting = new AbortController();
+    const scope = { scoped: true };
+    await firing(ports =>
+      ports('@keep/memory.port.json#get', { key: 'a' }, { signal: aborting.signal, env: { blobs: scope } }),
+    );
+    expect(lastRun.signal).toBe(aborting.signal);
+    expect(lastRun.blobs).toBe(scope);
+  });
+
+  it("falls back to the tree's environment for a caller outside a run, as a postLoad is", async () => {
+    await firing(ports => ports('@keep/memory.port.json#get', { key: 'a' }));
+    expect(lastRun.signal).toBeUndefined();
+    expect(lastRun.blobs).toBeInstanceOf(FileBlobStore);
   });
 
   it('refuses a port no manifest requires, native or domain', async () => {
@@ -57,17 +76,35 @@ describe('a binding of a required port', () => {
     ]);
   });
 
-  it('B010 when it delegates to an operation that holds or refuses', async () => {
-    const delegating = (run: string, given: Record<string, unknown> = {}) =>
-      refusals(true, keeper(), binding => {
-        binding.operations.get = { run, in: given };
-      });
-    expect(await delegating('@http/server.port.json#listen')).toContain(
-      "B010 'get' delegates to '@http/server.port.json#listen', which holds something past the run; @keep expects it to answer or fail → delegate to an operation that answers or fails, never one that holds or refuses",
+  it('B010 when what it reaches holds something past the run', async () => {
+    const said = await refusals(true, keeper(), binding => {
+      binding.operations.get = { run: '@http/server.port.json#listen', in: {} };
+    });
+    expect(said).toContain(
+      `B010 @keep/memory.port.json#get reaches '@http/server.port.json#listen', which holds something past the run, but @keep fires it expecting an answer or a failure (profile '${PROFILES[0]}') → ${HINT}`,
     );
-    const refusing = await delegating('@std/outcome.port.json#refuse', { reason: 'gone', type: 'string' });
-    expect(refusing.filter(one => one.startsWith('B010'))).toEqual([
-      "B010 'get' delegates to '@std/outcome.port.json#refuse', which refuses on purpose; @keep expects it to answer or fail → delegate to an operation that answers or fails, never one that holds or refuses",
-    ]);
+  });
+
+  it('B010 when what it reaches refuses on purpose, delegated to or run as a graph', async () => {
+    const delegated = await refusals(true, keeper(), binding => {
+      binding.operations.get = { run: '@std/outcome.port.json#refuse', in: { reason: 'gone', type: 'string' } };
+    });
+    expect(delegated.filter(one => one.startsWith('B010'))).toEqual(
+      PROFILES.map(
+        profile =>
+          `B010 @keep/memory.port.json#get reaches a refuse of 'gone', but @keep fires it expecting an answer or a failure (profile '${profile}') → ${HINT}`,
+      ),
+    );
+    // The same rule over a binding that runs a *graph* whose ending is a refuse: nothing is delegated to a
+    // refusing operation, so only the walk beneath the binding can see it.
+    const ran = await refusals(true, keeper(), binding => {
+      binding.operations.get = { graph: REFUSING };
+    });
+    expect(ran.filter(one => one.startsWith('B010'))).toEqual(
+      PROFILES.map(
+        profile =>
+          `B010 @keep/memory.port.json#get reaches a refuse of 'gone', but @keep fires it expecting an answer or a failure (profile '${profile}') → ${HINT}`,
+      ),
+    );
   });
 });

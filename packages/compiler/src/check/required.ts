@@ -4,24 +4,28 @@
  * and must not read one (B009), and it answers or fails but never ends the run on purpose (B010).
  */
 import type { BindingDoc, Loaded, PortDoc } from '@wilanis/core';
+import { effectsReachable, refusalsReachable } from '../refusals.js';
 import { type Judge, underProfile } from './judge.js';
 import { opNeeds } from './resolvers.js';
 
-/** B009, B010: every binding of a port a plugin requires reads no request, and delegates to nothing that holds or refuses. */
+/** B009, B010: every binding of a port a plugin requires reads no request, and reaches nothing that holds or refuses. */
 export function checkRequired(judge: Judge): void {
   for (const binding of judge.scope.registry.all('binding')) {
     const port = judge.scope.get('port', binding.doc.port);
     if (!port?.requiredBy) continue;
     checkNoReads(judge, binding, port.requiredBy);
-    checkDelegations(judge, binding, port.requiredBy);
   }
   for (const port of judge.scope.registry.all('port')) if (port.requiredBy) checkOperations(judge, port);
 }
 
-/** B009 over every operation of one required port, under every profile: whatever binding the profile chose. */
+/** B009 and B010 over every operation of one required port, under every profile: whatever binding it chose. */
 function checkOperations(judge: Judge, port: Loaded<PortDoc>): void {
   for (const profile of judge.profiles())
-    for (const name of Object.keys(port.doc.operations)) checkReached(judge, `${port.path}#${name}`, profile);
+    for (const name of Object.keys(port.doc.operations)) {
+      const opRef = `${port.path}#${name}`;
+      checkReached(judge, opRef, profile);
+      checkEnding(judge, opRef, port.requiredBy ?? '', profile);
+    }
 }
 
 const NO_READS = 'remove reads; an operation of a port a plugin requires reads only its in';
@@ -42,18 +46,30 @@ function checkReached(judge: Judge, opRef: string, profile: string | undefined):
   }
 }
 
-/** B010: a delegation of a required operation answers or fails; it never holds or refuses. */
-function checkDelegations(judge: Judge, binding: Loaded<BindingDoc>, plugin: string): void {
-  for (const [name, bound] of Object.entries(binding.doc.operations)) {
-    if (!bound.run) continue;
-    const hit = judge.scope.op(bound.run);
-    if (typeof hit === 'string' || !(hit.op.holds || hit.op.refuses)) continue;
-    const does = hit.op.holds ? 'holds something past the run' : 'refuses on purpose';
-    judge.refuser(binding.path)(
+const ANSWERS_OR_FAILS = 'answer or fail; a required operation never ends the run on purpose';
+
+/**
+ * B010: what a required operation reaches answers or fails, and never holds or refuses on purpose. It is the
+ * walk that is judged rather than the delegation written in the binding, since a binding that runs a *graph*
+ * whose last node is `refuse` ends the run just as surely as one that delegates to a refusing operation, and
+ * the plugin firing it through `env.ports` expects an answer or a failure either way.
+ */
+function checkEnding(judge: Judge, opRef: string, plugin: string, profile: string | undefined): void {
+  for (const refusal of refusalsReachable(judge.scope, opRef, profile))
+    judge.refuser(refusal.file)(
       'B010',
-      `'${name}' delegates to '${bound.run}', which ${does}; ${plugin} expects it to answer or fail`,
-      `operations/${name}/run`,
-      'delegate to an operation that answers or fails, never one that holds or refuses',
+      `${opRef} reaches a refuse of '${refusal.reason}', but ${plugin} fires it expecting an answer or a failure${underProfile(profile)}`,
+      refusal.node,
+      ANSWERS_OR_FAILS,
+    );
+  for (const effect of effectsReachable(judge.scope, opRef, profile)) {
+    const hit = judge.scope.op(effect.key);
+    if (typeof hit === 'string' || !hit.op.holds) continue;
+    judge.refuser(effect.file)(
+      'B010',
+      `${opRef} reaches '${effect.key}', which holds something past the run, but ${plugin} fires it expecting an answer or a failure${underProfile(profile)}`,
+      effect.node,
+      ANSWERS_OR_FAILS,
     );
   }
 }
