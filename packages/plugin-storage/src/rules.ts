@@ -14,8 +14,11 @@
  * X212 ensure is reached by a startup step, and never run by a graph.
  * X213 a feature keeps its own records: it never names another feature's store.
  *
- * The filter a call gives -- X208, X209, X210 -- is judged in `filters.ts`, and where a call is written is
- * `calls.ts`. Two rows of RFC 0002's table are in neither, because the tree already answers them and a rule
+ * The filter a call gives -- X208, X209, X210 -- is judged in `filters.ts`, the scope one gives -- X214 --
+ * in `scopes.ts`, and where a call is written at all is `calls.ts`. Each is a judgement about one input of
+ * one call site, which is the seam this file splits along.
+ *
+ * Two rows of RFC 0002's table are in none of them, because the tree already answers them and a rule
  * lives in one place: an input an operation does not accept is G006, which names the inputs it does accept;
  * a collection name that is not an identifier is D001, from `propertyNames` on the store schema.
  */
@@ -34,6 +37,7 @@ import {
 } from '@wilanis/core';
 import { bindingCalls, type Call, collectionOf, graphCalls, operationOf } from './calls.js';
 import { checkFilter } from './filters.js';
+import { checkScope } from './scopes.js';
 
 type Scope = PluginCheckContext['scope'];
 type Refuse = PluginCheckContext['refuse'];
@@ -339,7 +343,8 @@ function checkOwnStore(call: Call, scope: Scope, refuse: Refuse): void {
 /**
  * What only @storage can judge: X201, X202, X203, X204, X207 over what a store declares, X211 over what a
  * patch changes, X212 over where ensure is reached from, X213 over whose records a feature keeps -- and,
- * through `filters.ts`, X208 to X210 over what a call asks of the records.
+ * through `filters.ts` and `scopes.ts`, X208 to X210 over what a call asks of the records and X214 over the
+ * scope it would write.
  */
 export function check({ scope, refuse }: PluginCheckContext): void {
   for (const kept of every(scope)) checkCollection(kept, scope, refuse);
@@ -351,5 +356,6 @@ export function check({ scope, refuse }: PluginCheckContext): void {
     checkChanges(call, scope, refuse);
     checkEnsure(call, scope, refuse);
     checkOwnStore(call, scope, refuse);
+    checkScope(call, scope, refuse);
   }
 }
