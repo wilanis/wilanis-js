@@ -17,6 +17,7 @@ import type {
   Engine,
   FieldType,
   On,
+  Put,
   Query,
   Record_,
   Recording,
@@ -142,8 +143,12 @@ export class PostgresEngine implements Engine {
    * Write the whole record under its own key. A `unique` the store declares is held by the database, and the
    * violation comes back as an error this engine turns into the `violated` the port promises -- a constraint
    * is answered, not thrown, and which one answered is read off the constraint's own name.
+   *
+   * It reads `replace` off the `Put` the contract now takes and does nothing yet with its `scope`: the
+   * column, the composite unique, the index and the predicate on every statement are RFC 0015 step 7's, and
+   * this signature is only what keeps the contract met until that step writes them.
    */
-  async put(at: At, given: Record_, replace: boolean) {
+  async put(at: At, given: Record_, { replace }: Put) {
     const { db, table } = this.db(at);
     const values = row(given, at);
     const key = folded(at.key);

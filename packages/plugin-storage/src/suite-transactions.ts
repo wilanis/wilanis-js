@@ -15,8 +15,8 @@ export const transactionCases: Case[] = [
     async run(subject) {
       const where_ = await seeded(subject, 'trx_commit', []);
       const trx = await began(subject, where_);
-      await trx.engine.put(where_, SEEDS[0], true);
-      await trx.engine.put(where_, SEEDS[1], true);
+      await trx.engine.put(where_, SEEDS[0], { replace: true });
+      await trx.engine.put(where_, SEEDS[1], { replace: true });
       await trx.commit();
       assert.deepEqual(ids(await subject.engine.find(where_, {})), ['a', 'b']);
     },
@@ -26,8 +26,8 @@ export const transactionCases: Case[] = [
     async run(subject) {
       const where_ = await seeded(subject, 'trx_rollback', []);
       const trx = await began(subject, where_);
-      await trx.engine.put(where_, SEEDS[0], true);
-      await trx.engine.put(where_, SEEDS[1], true);
+      await trx.engine.put(where_, SEEDS[0], { replace: true });
+      await trx.engine.put(where_, SEEDS[1], { replace: true });
       await trx.rollback();
       assert.deepEqual(ids(await subject.engine.find(where_, {})), []);
     },
@@ -49,7 +49,7 @@ export const transactionCases: Case[] = [
     async run(subject) {
       const where_ = await seeded(subject, 'trx_reads', []);
       const trx = await began(subject, where_);
-      await trx.engine.put(where_, SEEDS[0], true);
+      await trx.engine.put(where_, SEEDS[0], { replace: true });
       assert.deepEqual((await trx.engine.get(where_, 'a')).record, SEEDS[0]);
       assert.equal(await trx.engine.count(where_, undefined), 1);
       await trx.rollback();

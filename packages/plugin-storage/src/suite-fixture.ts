@@ -6,7 +6,7 @@
  */
 import { strict as assert } from 'node:assert';
 import type { Type } from '@wilanis/core';
-import type { At, Engine, Record_, Transaction } from './engine.js';
+import type { At, Engine, Record_, Scope, Transaction } from './engine.js';
 import { parseWhere } from './where.js';
 
 /** The shape the suite keeps: one required field of each kind the grammar tests, and one optional. */
@@ -84,14 +84,42 @@ export async function seeded(
 ): Promise<At> {
   const where_ = at(subject, name, declared);
   await subject.engine.ensure([where_]);
+  await emptied(subject, where_);
+  for (const record of records) await subject.engine.put(where_, record, { replace: true });
+  return where_;
+}
+
+/**
+ * Every record of a collection removed, whatever scope it was written under. It reads and removes without
+ * one, which is the view's way of seeing a table: a case that seeds a scoped collection has to start from
+ * empty across every scope, or the row a previous run left under another tenant outlives it.
+ */
+export async function emptied(subject: Subject, where_: At): Promise<void> {
   for (const record of await subject.engine.find(where_, {})) await subject.engine.remove(where_, record.id);
-  for (const record of records) await subject.engine.put(where_, record, true);
+}
+
+/**
+ * The two scopes every scope case is written against, and the collection they share. A scope is whatever the
+ * store bound; these stand for two tenants, which is the case the rule was written for.
+ */
+export const ACME: Scope = { tenant: 'acme' };
+export const GLOBEX: Scope = { tenant: 'globex' };
+
+/** A scoped collection made and emptied across every scope, so a case starts from nothing under both. */
+export async function scoped(subject: Subject, name: string, declared: Declared = {}): Promise<At> {
+  const where_ = at(subject, name, declared);
+  await subject.engine.ensure([where_]);
+  await emptied(subject, where_);
   return where_;
 }
 
 /** The keys a filter finds in one collection: the reading half of nearly every case, said once. */
 export const found = async (subject: Subject, where_: At, filter: unknown) =>
   ids(await subject.engine.find(where_, { where: where(filter) }));
+
+/** The keys one scope sees of a collection, which is the reading half of nearly every scope case. */
+export const foundIn = async (subject: Subject, where_: At, scope: Scope | undefined) =>
+  ids(await subject.engine.find(where_, { scope }));
 
 /**
  * The transaction the engine begins, failing the case rather than skipping it where it begins none: taking

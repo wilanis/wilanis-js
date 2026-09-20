@@ -24,6 +24,10 @@ export const STORE = 'features/monitor/data/entries.store.json';
 export const RESOLVERS = 'features/monitor/edge/request.resolvers.json';
 /** The session shape the guard's settings.session names, in the included access tree. */
 export const SESSION = 'features/access/domain/Session.shape.json';
+/** The data graphs over the collection: one read by key, one find, and the write that mints a key first. */
+export const GET = 'features/monitor/data/kept-get.graph.json';
+export const LIST = 'features/monitor/data/kept-list.graph.json';
+export const WRITE = 'features/monitor/data/store-and-latest.graph.json';
 
 /** Apply an edit to one document of a copied tree, in place. */
 function editing(dir: string, file: string, edit: (doc: any) => void): void {

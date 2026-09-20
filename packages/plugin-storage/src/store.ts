@@ -27,7 +27,7 @@ interface Declared {
 }
 interface StoreDocument {
   connection: string;
-  collections: Record<string, Partial<Declared> & { view?: string }>;
+  collections: Record<string, Partial<Declared> & { view?: string; scoped?: Record<string, string> }>;
 }
 
 /**
@@ -99,6 +99,18 @@ export function collectionAt(env: Record<string, unknown>, named: unknown, name:
     refs: refs.filter(ref => ref.from === String(name)),
     referenced: refs.filter(ref => ref.to === String(name)),
   };
+}
+
+/**
+ * The columns a store keeps beside one collection's records, by name -- what the collection declares `scoped`,
+ * read straight off the document. It is the store's own word about which columns a scope must fill, which is
+ * what a handler holds an arriving `scope` to; the reads that fill them are the compiler's business and no
+ * handler ever sees one. A collection that declares none, and a view, answer nothing.
+ */
+export function scopedAt(env: Record<string, unknown>, named: unknown, name: unknown): string[] {
+  const declared = documentOf(env, named).collections[String(name)];
+  if (!declared || declared.view !== undefined) return [];
+  return Object.keys(declared.scoped ?? {});
 }
 
 /**

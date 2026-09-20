@@ -6,10 +6,16 @@
  *   import { cases } from '@wilanis/plugin-storage/suite';
  *   for (const one of cases) it(one.name, () => one.run(subject));
  *
- * The cases of this file are what a store does with records; `suite-transactions.ts` holds what it does
- * with a transaction, and `cases` below is the two together -- an engine answers all of it or is not one.
- * Each case keeps its records in a collection of its own, so an engine that really persists them can run
- * the whole suite against one database without the cases reaching each other.
+ * The cases of this file are what a store does with records, and `suite-transactions.ts` holds what it does
+ * with a transaction; `cases` below is the two together -- an engine answers all of it or is not one. Each
+ * case keeps its records in a collection of its own, so an engine that really persists them can run the
+ * whole suite against one database without the cases reaching each other.
+ *
+ * `scopeCases` (`suite-scopes.ts`) is exported beside them rather than folded in, because keeping a scope is
+ * something an engine gains: the memory engine answers them now, and the postgres engine joins when RFC 0015
+ * step 7 gives it the column, the composite unique and the predicate. Folding them into `cases` would fail
+ * an engine for not yet having been written, which is a worse answer than one that says which engines keep
+ * scopes. An engine that keeps them runs both lists.
  */
 import { strict as assert } from 'node:assert';
 import { at, type Case, type Declared, entry, found, ids, SEEDS, seeded, where } from './suite-fixture.js';
@@ -17,6 +23,7 @@ import { transactionCases } from './suite-transactions.js';
 
 export type { Case, Subject } from './suite-fixture.js';
 export { SHAPE } from './suite-fixture.js';
+export { scopeCases } from './suite-scopes.js';
 
 /** What a store does with records: written, read back, filtered, ordered, paged and constrained. */
 const recordCases: Case[] = [
@@ -24,7 +31,7 @@ const recordCases: Case[] = [
     name: 'a record put is the record got, field for field',
     async run(subject) {
       const where_ = await seeded(subject, 'put_get', []);
-      const written = await subject.engine.put(where_, SEEDS[0], true);
+      const written = await subject.engine.put(where_, SEEDS[0], { replace: true });
       assert.equal(written.conflict, false);
       assert.deepEqual(written.record, SEEDS[0]);
       assert.deepEqual((await subject.engine.get(where_, 'a')).record, SEEDS[0]);
@@ -42,8 +49,10 @@ const recordCases: Case[] = [
     async run(subject) {
       const where_ = await seeded(subject, 'put_replace');
       const over = entry('a', 'https://changed.example/a', 'PUT', { hits: 99 });
-      assert.deepEqual((await subject.engine.put(where_, over, true)).record, over);
-      const refused = await subject.engine.put(where_, entry('a', 'https://not.example/a', 'DELETE'), false);
+      assert.deepEqual((await subject.engine.put(where_, over, { replace: true })).record, over);
+      const refused = await subject.engine.put(where_, entry('a', 'https://not.example/a', 'DELETE'), {
+        replace: false,
+      });
       assert.equal(refused.conflict, true);
       assert.equal(refused.record, undefined);
       assert.deepEqual((await subject.engine.get(where_, 'a')).record, over);
@@ -157,7 +166,7 @@ const recordCases: Case[] = [
       const declared: Declared = { unique: [['url', 'method']] };
       const where_ = await seeded(subject, 'unique_put', SEEDS, declared);
       const repeat = entry('z', 'https://one.example/a', 'GET');
-      const answer = await subject.engine.put(where_, repeat, true);
+      const answer = await subject.engine.put(where_, repeat, { replace: true });
       assert.equal(answer.violated, 'unique [url, method]');
       assert.equal(answer.record, undefined);
       assert.equal((await subject.engine.get(where_, 'z')).record, undefined);
@@ -169,7 +178,7 @@ const recordCases: Case[] = [
       const declared: Declared = { unique: [['url']] };
       const where_ = await seeded(subject, 'unique_self', SEEDS, declared);
       const over = entry('a', 'https://one.example/a', 'PUT', { hits: 9 });
-      const answer = await subject.engine.put(where_, over, true);
+      const answer = await subject.engine.put(where_, over, { replace: true });
       assert.equal(answer.violated, undefined);
       assert.deepEqual(answer.record, over);
     },
@@ -180,7 +189,9 @@ const recordCases: Case[] = [
       const to = await seeded(subject, 'refs_to');
       const from = at(subject, 'refs_from', { refs: [{ from: 'refs_from', field: 'ua', to: 'refs_to' }] });
       await subject.engine.ensure([from]);
-      const answer = await subject.engine.put(from, entry('n', 'https://note', 'GET', { ua: 'nobody' }), true);
+      const answer = await subject.engine.put(from, entry('n', 'https://note', 'GET', { ua: 'nobody' }), {
+        replace: true,
+      });
       assert.equal(answer.violated, 'refs refs_from.ua -> refs_to');
       assert.equal((await subject.engine.get(from, 'n')).record, undefined);
       assert.equal(await subject.engine.count(to, undefined), 3);
@@ -193,7 +204,7 @@ const recordCases: Case[] = [
       const from = at(subject, 'refs_ok_from', { refs: [{ from: 'refs_ok_from', field: 'ua', to: 'refs_ok_to' }] });
       await subject.engine.ensure([from]);
       const note = entry('n', 'https://note', 'GET', { ua: 'a' });
-      assert.deepEqual((await subject.engine.put(from, note, true)).record, note);
+      assert.deepEqual((await subject.engine.put(from, note, { replace: true })).record, note);
     },
   },
   {
@@ -203,7 +214,7 @@ const recordCases: Case[] = [
       const to = await seeded(subject, 'held_to', SEEDS, { referenced: [ref] });
       const from = at(subject, 'held_from', { refs: [ref] });
       await subject.engine.ensure([from]);
-      await subject.engine.put(from, entry('n', 'https://note', 'GET', { ua: 'a' }), true);
+      await subject.engine.put(from, entry('n', 'https://note', 'GET', { ua: 'a' }), { replace: true });
       const answer = await subject.engine.remove(to, 'a');
       assert.equal(answer.referencedBy, 'refs held_from.ua -> held_to');
       assert.equal(answer.removed, false);
@@ -217,7 +228,7 @@ const recordCases: Case[] = [
       const to = await seeded(subject, 'freed_to', SEEDS, { referenced: [ref] });
       const from = at(subject, 'freed_from', { refs: [ref] });
       await subject.engine.ensure([from]);
-      await subject.engine.put(from, entry('n', 'https://note', 'GET', { ua: 'a' }), true);
+      await subject.engine.put(from, entry('n', 'https://note', 'GET', { ua: 'a' }), { replace: true });
       await subject.engine.remove(from, 'n');
       assert.equal((await subject.engine.remove(to, 'a')).removed, true);
     },
@@ -241,5 +252,5 @@ const recordCases: Case[] = [
   },
 ];
 
-/** Everything an engine must answer: what it does with records, and what it does with a transaction. */
+/** Everything every engine must answer: what it does with records, and what it does with a transaction. */
 export const cases: Case[] = [...recordCases, ...transactionCases];
