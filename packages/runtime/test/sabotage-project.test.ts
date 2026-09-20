@@ -184,12 +184,12 @@ describe('sabotage: a store names a connection and the shapes it keeps', () => {
     expect(dependingOn('@monitor/domain/EntryRecord.shape.json')).toContain('L005');
     expect(dependingOn('@monitor/domain/Entry.shape.json')).toEqual([]);
   });
-  it("X104 the guard's memory kept where the loader reads documents, or outside the tree", () => {
+  it("X106 the guard's memory kept where the loader reads documents, or outside the tree", () => {
     const keptIn = (dir: string) =>
       sabotagePointing('features/state/data/auth-files.binding.json', binding => {
         binding.operations.getSession.in.dir = dir;
       });
-    const code = 'X104';
+    const code = 'X106';
     const refused = [`${code} @features/state/data/auth-files.binding.json#operations/getSession/in/dir`];
     expect(keptIn('features/auth')).toEqual(refused);
     expect(keptIn('connections')).toEqual(refused);

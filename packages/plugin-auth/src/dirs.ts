@@ -1,5 +1,5 @@
 /**
- * X104: where files.port.json keeps records. A relative dir is under the tree, so it must stay under it and out of
+ * X106: where files.port.json keeps records. A relative dir is under the tree, so it must stay under it and out of
  * the directories the loader reads: a record written under features/ or connections/ would be read back as a
  * document, and one written above the tree is not the tree's to keep.
  */
@@ -33,13 +33,13 @@ function delegations(scope: Scope): { path: string; name: string; dir: unknown }
   );
 }
 
-/** X104: every delegation to files.port.json names a dir under the tree the loader never reads, or an absolute one. */
+/** X106: every delegation to files.port.json names a dir under the tree the loader never reads, or an absolute one. */
 export function checkDirs(scope: Scope, refuse: Refuse) {
   for (const { path, name, dir } of delegations(scope)) {
     const why = typeof dir === 'string' ? wrongDir(dir) : undefined;
     if (why)
       refuse({
-        code: 'X104',
+        code: 'X106',
         file: path,
         message: `'${name}' keeps records in '${dir}', which ${why}`,
         at: `operations/${name}/in/dir`,

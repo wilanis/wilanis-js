@@ -86,11 +86,16 @@ A production profile binds the same domain port to another directory, and nothin
 X101 `settings.session` names no shape · X102 a challenge by an undeclared method, or a challenging policy on a
 trigger no attachment of which gives a challenge answer · X103 a session write with a key the session shape
 does not declare, or another type · X105 a session write naming an attribute a store scopes a collection by: a
-scope is what the sign-in graph gave `token.port.json#issue`, and nothing writes it again. The checker's own
+scope is what the sign-in graph gave `token.port.json#issue`, and nothing writes it again · X106 a delegation
+to `files.port.json` keeping records where the loader reads documents, or outside the tree. The checker's own
 A004 and A005 judge the attachments: a credential the guard does not verify or the kind cannot hand, and a
 policy reading the caller on a trigger that gives nothing.
 
-Sessions and challenges are files under `settings.store.dir` (default `.wilanis/auth`), so a server and the
-`wilanis run` processes of the same tree share them. Depends on `@wilanis/core`, `@wilanis/engine` and `jose`.
+Sessions and challenges live behind `@auth/state.port.json`, a port the plugin **requires** and the host
+**binds**: the guard reaches its memory through `env.ports`, and never a store of its own. Bind it to the
+plugin's own file store, `@auth/files.port.json`, for one process -- what `libraries/access`'s development
+feature does, keeping records under `.wilanis/auth` so a server and the `wilanis run` processes of one tree
+share them -- or to `@storage` collections for many. Every read is by key, so a keyed store is all a binding
+needs. Depends on `@wilanis/core`, `@wilanis/engine` and `jose`.
 
 Part of [wilanis](https://github.com/wilanis/wilanis-js). Apache-2.0.
