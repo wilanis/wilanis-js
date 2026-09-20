@@ -17,6 +17,8 @@ import {
   type StoreDoc,
   show,
 } from '@wilanis/core';
+import { readsLines } from './reads-said.js';
+import { scopedOf, scopeLines } from './scope-said.js';
 import { callsAgainst, engineOf, keyTypeOf } from './stores.js';
 
 /** A spec as one reader sees it, or the spec itself when it does not resolve. */
@@ -138,11 +140,16 @@ export function fieldLine(
 /** One mark of a collection, as its line reads: the family, and what that family says here. */
 const markLine = (family: string, said: string) => `    ${family.padEnd(10)}  ${said}`;
 
-/** Every unique constraint, each composite in the order it was declared, so several read as several. */
+/**
+ * Every unique constraint, each composite in the order it was declared, so several read as several. A scoped
+ * collection's constraints hold within the scope -- the engine adds the scope columns to each -- so the line
+ * says so rather than letting a reader think two tenants cannot record the same call.
+ */
 function uniqueMark(collection: Collection): string[] {
   const constraints = collection.unique ?? [];
   if (!constraints.length) return [];
-  return [markLine('unique', constraints.map(fields => `[${fields.join(', ')}]`).join(', '))];
+  const within = scopedOf(collection) ? '  (within the scope)' : '';
+  return [markLine('unique', `${constraints.map(fields => `[${fields.join(', ')}]`).join(', ')}${within}`)];
 }
 
 /** Every reference, as the field, the records it names and what removing one of those does. */
@@ -188,13 +195,25 @@ function keyMark(collection: Collection, scope: Scope): string {
   return markLine('key', type ? `${collection.key}: ${type}` : collection.key);
 }
 
-/** One collection that keeps records: the shape it holds, what identifies a record, and every mark it declares. */
-function keepsLines(name: string, collection: Collection, store: StoreDoc, scope: Scope): string[] {
+/** What a collection's lines are read against: the store they belong to, the tree, and the types in it. */
+interface Within {
+  store: Loaded<StoreDoc>;
+  load: LoadResult;
+  scope: Scope;
+}
+
+/**
+ * One collection that keeps records: the shape it holds, what identifies a record, every mark it declares, and
+ * the scope it is under. The scope stands with the marks because it is one: a column the store keeps beside
+ * the record, which the shape does not declare and no graph writes.
+ */
+function keepsLines(name: string, collection: Collection, within: Within): string[] {
   return [
     `  collection ${name}: ${collection.of}`,
-    keyMark(collection, scope),
+    keyMark(collection, within.scope),
     ...uniqueMark(collection),
-    ...refsMark(collection, store),
+    ...scopeLines(name, collection, within.store, within.load),
+    ...refsMark(collection, within.store.doc),
     ...defaultsMark(collection),
     ...renamedMark(collection),
     ...wasMark(collection),
@@ -202,18 +221,22 @@ function keepsLines(name: string, collection: Collection, store: StoreDoc, scope
   ];
 }
 
-/** One collection that views another: whose rows it sees, and the policy every trigger reaching it attaches. */
+/**
+ * One collection that views another: whose rows it sees, and the policy every trigger reaching it attaches.
+ * Both are on the heading, since what a reader wants of a view is the pair -- which scope it crosses and
+ * behind what -- and a view has no marks of its own to put the second among.
+ */
 function viewLines(name: string, collection: StoreCollection): string[] {
+  const behind = collection.behind ? `, behind ${collection.behind}` : '';
   return [
-    `  collection ${name}: view of ${collection.view}`,
-    ...(collection.behind ? [markLine('behind', collection.behind)] : []),
+    `  collection ${name}: view of ${collection.view}${behind}`,
     ...(collection.description ? [markLine('holds', collection.description)] : []),
   ];
 }
 
 /** One collection, in whichever of the two shapes it was written: a view says what it views, and nothing more. */
-function collectionLines(name: string, collection: StoreCollection, store: StoreDoc, scope: Scope): string[] {
-  return keeps(collection) ? keepsLines(name, collection, store, scope) : viewLines(name, collection);
+function collectionLines(name: string, collection: StoreCollection, within: Within): string[] {
+  return keeps(collection) ? keepsLines(name, collection, within) : viewLines(name, collection);
 }
 
 /**
@@ -239,17 +262,20 @@ function runLines(path: string, load: LoadResult, scope: Scope): string[] {
 }
 
 /**
- * A store: the engine its records live behind, every collection with what it holds its records to, and the
- * graphs that run an operation against it. A mark family with nothing to say prints no line, so a collection
- * that declares nothing reads as one.
+ * A store: the engine its records live behind, the reads its scopes are filled from, every collection with
+ * what it holds its records to, and the graphs that run an operation against it. A mark family with nothing
+ * to say prints no line, so a collection that declares nothing reads as one.
+ *
+ * The reads stand above the collections, as a graph's stand above its nodes: every `{{name}}` in a `scoped`
+ * below them is one of them, and a reader should not meet the use before the binding.
  */
 export function storeLines(doc: Loaded, load: LoadResult, scope: Scope): string[] {
-  const store = doc.doc as StoreDoc;
+  const store = doc as Loaded<StoreDoc>;
+  const within: Within = { store, load, scope };
   return [
-    ...engineLines(store, scope),
-    ...Object.entries(store.collections).flatMap(([name, collection]) =>
-      collectionLines(name, collection, store, scope),
-    ),
+    ...engineLines(store.doc, scope),
+    ...readsLines(store.doc.reads, scope),
+    ...Object.entries(store.doc.collections).flatMap(([name, collection]) => collectionLines(name, collection, within)),
     ...runLines(doc.path, load, scope),
   ];
 }

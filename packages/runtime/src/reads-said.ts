@@ -15,6 +15,7 @@ import {
   type Loaded,
   type LoadResult,
   type ResolversDoc,
+  type StoreDoc,
   splitRef,
 } from '@wilanis/core';
 
@@ -48,18 +49,38 @@ export function readsLines(reads: Record<string, string> | undefined, scope: Rea
   return ['reads:', ...entries.map(([name, ref]) => readLine(name, ref, scope))];
 }
 
-/** Every document that binds a resolver of one resolvers document, by resolver name, as path and local name. */
+/**
+ * Every document that binds a resolver of one resolvers document, by resolver name, as path and local name.
+ * A store binds one the way a graph does, and says beside it which collections the read scopes: a reader of
+ * the resolver is then told not only who reads it but what it decides, which for a scope is whose rows leave.
+ */
 function usersOf(path: string, load: LoadResult): Map<string, string[]> {
   const users = new Map<string, string[]>();
-  const bound = [...load.registry.all('graph'), ...load.registry.all('binding')];
-  for (const doc of bound) {
-    for (const [local, ref] of Object.entries((doc.doc as GraphDoc | BindingDoc).reads ?? {})) {
-      const { path: at, op: name } = splitRef(ref);
-      if (!at || load.resolve(at) !== path) continue;
-      users.set(name, [...(users.get(name) ?? []), `used by ${doc.path} as {{${local}}}`]);
-    }
-  }
+  const bound = [...load.registry.all('graph'), ...load.registry.all('binding'), ...load.registry.all('store')];
+  for (const doc of bound)
+    for (const use of usesIn(doc, path, load)) users.set(use.name, [...(users.get(use.name) ?? []), use.said]);
   return users;
+}
+
+/** One document's uses of the resolvers document at `path`: the resolver each names, and how it reads. */
+function usesIn(doc: Loaded, path: string, load: LoadResult): { name: string; said: string }[] {
+  const reads = (doc.doc as GraphDoc | BindingDoc | StoreDoc).reads ?? {};
+  const out: { name: string; said: string }[] = [];
+  for (const [local, ref] of Object.entries(reads)) {
+    const { path: at, op: name } = splitRef(ref);
+    if (!at || load.resolve(at) !== path) continue;
+    const scopes = doc.kind === 'store' ? scopesSaid(doc.doc as StoreDoc, local) : '';
+    out.push({ name, said: `used by ${doc.path} as {{${local}}}${scopes}` });
+  }
+  return out;
+}
+
+/** Which collections of one store a read scopes, said for a reader; nothing where it scopes none. */
+function scopesSaid(store: StoreDoc, local: string): string {
+  const scoped = Object.entries(store.collections)
+    .filter(([, collection]) => Object.values(collection.scoped ?? {}).includes(`{{${local}}}`))
+    .map(([name]) => name);
+  return scoped.length ? `  (scopes ${scoped.join(', ')})` : '';
 }
 
 /**
