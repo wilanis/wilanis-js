@@ -36,6 +36,17 @@ export { loadProject, type PluginResolution, resolveIncludes, resolvePlugins } f
 export { contentTypeOf, runStartup, runTrigger, start } from './serve.js';
 export { Served } from './served.js';
 export {
+  CAP,
+  CONFIG,
+  COUNTER,
+  gateOf,
+  type StopAnswer,
+  type StopInput,
+  stopHook,
+  type Verdict,
+  verdictOf,
+} from './stopping.js';
+export {
   callsAgainst,
   engineOf,
   keyTypeOf,
