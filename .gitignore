@@ -6,4 +6,5 @@ coverage
 .DS_Store
 *.log
 .wilanis/
+scenarios/
 _site
