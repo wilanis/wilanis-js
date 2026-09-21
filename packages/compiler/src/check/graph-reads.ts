@@ -1,7 +1,9 @@
 /**
  * Typing what a graph's nodes read: the input, a constant, a resolver, or another node's answer. A node's
  * output type comes from its operation, with the variables its type fields bind substituted; a read the
- * routing switch proved present loses its optionality. Every read is remembered, for G008.
+ * routing switch proved present loses its optionality. Every read is remembered, for G008, and who read whom
+ * is what G015 judges an effect by: one no switch routes runs on every branch, so its answer is read on all
+ * of them or the effect was misplaced.
  */
 import {
   EMPTY_OBJECT,
@@ -18,6 +20,7 @@ import {
   WHOLE_TEMPLATE,
 } from '@wilanis/core';
 import { bindings } from '../documents.js';
+import { firstReaders, type Routing, readersOf, readOnSomeBranchesOnly, routed } from './graph-routing.js';
 import type { Judge, JudgedResolver, Reader, Refuser } from './judge.js';
 import { Narrowing } from './narrowing.js';
 import { readAt } from './typing.js';
@@ -80,6 +83,32 @@ export class GraphReads {
         this.reading = previous;
       }
     };
+  }
+
+  /**
+   * G015: an effect whose answer only some branches read. A node runs when what it reads is ready, whatever a
+   * switch chose, so an effect no switch routes runs on every branch; where every reader of its answer sits
+   * behind a branch, and no switch that always runs is reached through all of its targets, the effect ran for
+   * nothing on the rest -- most often a write the author meant one branch to make. An effect out.from names
+   * is the graph's answer, one nothing reads is G008's, and a pure node running for nothing costs nothing.
+   */
+  checkEffectsRouted(routedBy: Map<string, string>, candidates: string[]): void {
+    const routing: Routing = { routedBy, dependencies: this.narrowing.dependencies };
+    const readers = readersOf(routing.dependencies);
+    for (const [id, hit] of this.table.ops) {
+      if (hit.op.pure === true || candidates.includes(id) || routed(routing, id)) continue;
+      const who = [...(readers.get(id) ?? [])];
+      if (!readOnSomeBranchesOnly(routing, this.table.nodes, who)) continue;
+      const named = firstReaders(routing, who)
+        .map(reader => `'${reader}'`)
+        .join(', ');
+      this.refuse(
+        'G015',
+        `effect '${id}' runs on every branch, but its answer is read only under ${named}`,
+        `nodes/${id}`,
+        `route the effect under the branch that reads it: make '${id}' the 'to' of the switch rule that leads to ${named}, or read its answer from every branch`,
+      );
+    }
   }
 
   /** The type a node answers: a switch the id it chose, a call its operation's returns, a map a list of them. */
