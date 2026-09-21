@@ -2,7 +2,7 @@
  * `wilanis rehearse`: every branch of every decision a trigger can reach, walked until each is answered, and what it
  * took to get there said in words. It runs against stubbed effects, so nothing leaves the process.
  */
-import { guardsOf, idsOf } from '@wilanis/compiler';
+import { guardsOf, idsOf, TAKEN_IDS } from '@wilanis/compiler';
 import type { Loaded, LoadResult, TriggerDoc, Type } from '@wilanis/core';
 import { Scope } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
@@ -267,21 +267,27 @@ function downstreamOf(walk: Walk, sw: FoundSwitch): Record<string, unknown> {
 }
 
 /**
- * The invariants a decision guards, where the switch is one the compiler lowered rather than one the author
- * wrote (RFC 0007); nothing where it is an ordinary switch. Which sites carry a guard is never re-derived
- * here: `guardsOf` is the compiler's own answer, and the ids it occupies are the contract the report, the
- * describe and the viewer all read a guard by, so a node id that is one of them is one.
+ * The invariants a decision guards, and the node it answers the value at, where the switch is one the compiler
+ * lowered rather than one the author wrote (RFC 0007); nothing where it is an ordinary switch. Which sites
+ * carry a guard is never re-derived here: `guardsOf` is the compiler's own answer, and the ids it occupies are
+ * the contract the report, the describe and the viewer all read a guard by, so a node id that is one of them
+ * is one.
  *
  * A list site's guard is matched by the site the walk descended through rather than by the node id, because
  * inside the nested spec that guard's switch is the fixed `in:check` whatever the site was called; the id
- * alone would name the site's own guard for a taken site and nothing at all for a made one.
+ * alone would name the site's own guard for a taken site and nothing at all for a made one. Its value answers
+ * at the fixed `in:ok` for the same reason.
  */
-function guardAt(emb: Embedder, at: Where, node: string): string | undefined {
+function guardAt(emb: Embedder, at: Where, node: string): Decision['guard'] {
   const doc = emb.scope.get('graph', at.graph);
   if (!doc) return undefined;
   const guards = guardsOf(emb.scope, doc);
   const guard = at.site ? guards.find(one => one.id === at.site) : guards.find(one => idsOf(one).check === node);
-  return guard?.unproved.map(one => stateName(one.invariant)).join('; ');
+  if (!guard) return undefined;
+  return {
+    for: guard.unproved.map(one => stateName(one.invariant)).join('; '),
+    answers: at.site ? TAKEN_IDS.ok : idsOf(guard).ok,
+  };
 }
 
 /** One switch as a decision: every branch, and what each settled to. */

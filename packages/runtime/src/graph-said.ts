@@ -14,7 +14,7 @@
  * Nothing is computed here: `atomicOf` reads the same per-profile walk the checker judges by and `guardsOf`
  * the same sites the compiler lowers at, so what a reader is told and what the tree was held to are one answer.
  */
-import { atomicOf, type Guard, guardSpecName, guardsOf, idsOf } from '@wilanis/compiler';
+import { atomicOf, type Guard, guardSpecName, guardsOf, idsOf, violatedIds } from '@wilanis/compiler';
 import type { GraphDoc, Loaded, Scope } from '@wilanis/core';
 import { invariantName } from './invariant-lines.js';
 import { readsLines } from './reads-said.js';
@@ -30,13 +30,16 @@ function whereLine(connections: string[]): string[] {
 
 /**
  * Where the answer is read from, the guards counted in. A graph answering with a guarded value also answers
- * with that guard's refusal -- `lowerGuards` appends `<id>:violated` after `<id>` -- so a reader told only
- * the candidates the file names would be told a graph that cannot refuse where its own rule fails.
+ * with that guard's refusals -- `lowerGuards` appends `<id>:violated`, and `<id>:violated:2`, ... where more
+ * than one rule is unproved, after `<id>` -- so a reader told only the candidates the file names would be told
+ * a graph that cannot refuse where its own rule fails.
  */
 function fromSaid(out: NonNullable<GraphDoc['out']>, guards: Guard[]): string {
   const from = Array.isArray(out.from) ? out.from : [out.from];
-  const violated = new Map(guards.filter(one => one.arity !== 'list').map(one => [one.id, idsOf(one).violated]));
-  return from.flatMap(one => [one, ...(violated.has(one) ? [violated.get(one) ?? one] : [])]).join(' | ');
+  const violated = new Map(
+    guards.filter(one => one.arity !== 'list').map(one => [one.id, violatedIds(idsOf(one), one.unproved.length)]),
+  );
+  return from.flatMap(one => [one, ...(violated.get(one) ?? [])]).join(' | ');
 }
 
 /** What a graph takes, what it answers, and where the answer is read from. */
@@ -74,14 +77,28 @@ const guardHead = (guard: Guard): string =>
   `    guard for ${guard.unproved.map(one => invariantName(one.invariant)).join(' and ')}, when ${guard.when}:`;
 
 /**
- * The three nodes a guard of one value is: the switch on the rule, the value it answers with, and the refusal
- * it ends in. Each is marked `(guard)`, because a reader meeting an id the file does not have should be told
- * on that line why, rather than having to find the header above it.
+ * The refusals one guard ends in, one per rule unproved at the site. With one rule the header has said which
+ * invariant it is for and the line does not repeat it; with several, each refusal says whose it is, since the
+ * switch routes to the first that did not hold and a reader must be able to tell the refusals apart.
  */
-const oneLines = (ids: ReturnType<typeof idsOf>): string[] => [
-  `        ${ids.check}  switch → ${ids.ok} | ${ids.violated}  (guard)`,
+function violatedLines(guard: Guard, ids: ReturnType<typeof idsOf>): string[] {
+  const several = guard.unproved.length > 1;
+  return violatedIds(ids, guard.unproved.length).map((id, at) => {
+    const { invariant } = guard.unproved[at];
+    const whose = several ? ` for '${invariant.doc.label ?? invariant.path}'` : '';
+    return `        ${id}  refuses 'invariant'${whose}  (guard)`;
+  });
+}
+
+/**
+ * The nodes a guard of one value is: the switch on the rule, the value it answers with, and the refusal it
+ * ends in -- one per rule unproved there. Each is marked `(guard)`, because a reader meeting an id the file
+ * does not have should be told on that line why, rather than having to find the header above it.
+ */
+const oneLines = (guard: Guard, ids: ReturnType<typeof idsOf>): string[] => [
+  `        ${ids.check}  switch → ${[ids.ok, ...violatedIds(ids, guard.unproved.length)].join(' | ')}  (guard)`,
   `        ${ids.ok}  answers ${ids.made}, which the rule let through  (guard)`,
-  `        ${ids.violated}  refuses 'invariant'  (guard)`,
+  ...violatedLines(guard, ids),
 ];
 
 /**
@@ -96,7 +113,7 @@ const listLines = (guard: Guard, ids: ReturnType<typeof idsOf>, graph: string): 
 /** The nodes one guard adds, under the header that says what it guards: a list's one, or a single value's three. */
 const guardLines = (guard: Guard, graph: string): string[] => {
   const ids = idsOf(guard);
-  return [guardHead(guard), ...(guard.arity === 'list' ? listLines(guard, ids, graph) : oneLines(ids))];
+  return [guardHead(guard), ...(guard.arity === 'list' ? listLines(guard, ids, graph) : oneLines(guard, ids))];
 };
 
 /**

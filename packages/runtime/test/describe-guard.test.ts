@@ -101,8 +101,10 @@ describe('describe: a graph with nothing to guard', () => {
 
 /**
  * A site is guarded once however many rules were unproved there (RFC 0007, decided during implementation): the
- * one switch tests their conjunction. The header must read correctly in that case too, or a reader would go
- * looking for a rule the guard tests and the line never named.
+ * one switch tests their conjunction, and where it fails routes to the refusal of the first rule that did not
+ * hold, so the caller is told that rule alone (#492). The header must read correctly in that case too, or a
+ * reader would go looking for a rule the guard tests and the line never named; and each refusal must say whose
+ * it is, or a reader could not tell `row:violated` from `row:violated:2`.
  */
 const SECOND = '@features/monitor/domain/an-entry-has-a-method.invariant.json';
 const { load: two, dir: twoDir } = loadedWith({
@@ -125,9 +127,25 @@ describe('describe: a site two invariants are unproved at', () => {
     );
   });
 
-  it('still lowers one guard, so the four ids are what they were with one rule', () => {
+  it('still lowers one guard, whose switch routes to one refusal per rule, the first keeping its id', () => {
     const said = describeDoc(two, KEPT_GET);
     expect(said.split('guard for')).toHaveLength(2);
-    expect(said).toContain('        row:check  switch → row | row:violated  (guard)');
+    expect(said).toContain('        row:check  switch → row | row:violated | row:violated:2  (guard)');
+    expect(said).toContain('        row  answers row:made, which the rule let through  (guard)');
+  });
+
+  it('says which invariant each refusal is for, in the order the header names them', () => {
+    const said = describeDoc(two, KEPT_GET);
+    expect(said).toContain("        row:violated  refuses 'invariant' for 'An entry has a method'  (guard)");
+    expect(said).toContain("        row:violated:2  refuses 'invariant' for 'An entry names a call'  (guard)");
+    // and the graph answers with either refusal, since it refuses with whichever the guard routed to
+    expect(said).toContain(
+      'answers @monitor/domain/Entry.shape.json  from row | row:violated | row:violated:2 | missing',
+    );
+  });
+
+  it('does not repeat the invariant on the refusal where the guard stands for one rule alone', () => {
+    // the header has said it; a second spelling on the one refusal would be the same fact twice
+    expect(describeDoc(example, KEPT_GET)).toContain("        row:violated  refuses 'invariant'  (guard)");
   });
 });

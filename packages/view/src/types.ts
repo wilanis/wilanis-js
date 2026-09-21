@@ -93,7 +93,9 @@ export type VArity = 'one' | 'list';
 /**
  * The guard the compiler lowered at one site: which invariants could not be proved there, and the one rule the
  * switch it wrote tests. A site is guarded once however many rules are unproved at it, since two rules over one
- * shape conjoin into one switch -- so the badge names them all and the rule reads as the guard tests it.
+ * shape conjoin into one switch -- so the badge names them all and the rule reads as the guard tests it. Which
+ * of them a value broke is the run's to say: the switch routes to the refusal of the first rule that did not
+ * hold, and that refusal names its invariant alone.
  */
 export interface VGuarded {
   /** Every invariant unproved here, in registry order, so a click opens the one a reader asks about. */

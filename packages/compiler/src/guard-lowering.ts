@@ -20,6 +20,7 @@ import {
   guardSpec,
   guardSpecName,
   TAKEN_IDS,
+  violatedIds,
 } from './guard.js';
 
 /** The ids one guard occupies in the spec it is lowered into: a taken site's are fixed, a made site's its own. */
@@ -87,15 +88,17 @@ function lowerOne(spec: KernelSpec, guard: Guard, handlers: GuardHandlers): Guar
 }
 
 /**
- * `<id>:violated` appended after `<id>` wherever the graph answered with `<id>`, so a graph refuses when its
- * guard does. A list site adds nothing: its map refuses with the element's reason rather than routing anywhere.
+ * `<id>:violated` -- and `<id>:violated:2`, ... where more than one rule is unproved -- appended after `<id>`
+ * wherever the graph answered with `<id>`, so a graph refuses when its guard does, with the one refusal the
+ * guard routed to. A list site adds nothing: its map refuses with the element's reason rather than routing
+ * anywhere.
  */
 function withViolated(output: string[] | undefined, guard: Guard, ids: GuardIds): string[] | undefined {
   if (!output || guard.arity === 'list') return output;
   const out: string[] = [];
   for (const candidate of output) {
     out.push(candidate);
-    if (candidate === ids.ok) out.push(ids.violated);
+    if (candidate === ids.ok) out.push(...violatedIds(ids, guard.unproved.length));
   }
   return out;
 }

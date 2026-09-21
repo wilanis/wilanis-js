@@ -39,6 +39,7 @@ export {
   idsOf,
   TAKEN_IDS,
   type Unproved,
+  violatedIds,
 } from './guard.js';
 export * from './invariant-said.js';
 // The scope a site carries and the name it is carried under, named rather than spread: `lower.ts` is the whole
