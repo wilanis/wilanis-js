@@ -9,7 +9,7 @@ import type { BlobHandle, Trace } from '@wilanis/core';
 import { KINDS, type Kind, type LoadResult } from '@wilanis/core';
 import { loadProject } from './project.js';
 import { runTrigger, start } from './serve.js';
-import { describe, fuzz, init, ls, map, migrate, regress, rehearse, scaffold } from './tools.js';
+import { describe, fuzz, init, ls, map, migrate, regress, rehearse, SCENARIOS, scaffold } from './tools.js';
 import { atLevel, type Level, traceJson, traceText } from './trace.js';
 
 /** Every flag `wilanis migrate` knows; anything else is exit 2, since a misspelt flag must never silently plan. */
@@ -128,6 +128,10 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
   },
   fuzz: async ({ flags, rootArg }) => {
     const loaded = await check(rootArg(0));
+    // said first, so whoever sees the directory appear knows it is generated and kept out of git, as .wilanis/ is
+    console.log(
+      `writing scenarios to ${join(loaded.root, SCENARIOS)} -- generated, and ignored by git as .wilanis/ is`,
+    );
     const written = await fuzz(loaded, { runs: flags.runs ? Number(flags.runs) : undefined, profile: flags.profile });
     console.log(written.map(file => `wrote ${file}`).join('\n'));
   },
