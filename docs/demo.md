@@ -1,9 +1,13 @@
 # The route written a year later
 
 This is the demo as a script: one story, five beats, twenty minutes. The rule is
-`features/monitor/domain/writes-are-for-recorders.invariant.json`, stated once. The protagonist is a new hire
-who never read it and adds a write route. The compiler is the character who talks back, and the room wants
-the new hire to get it wrong.
+`features/monitor/domain/writes-are-for-recorders.invariant.json`, stated once. The protagonist is an agent
+given a one-line task, *add a way to archive an entry*, that never read the rule. The compiler is the
+character who talks back, and the room wants the agent to get it wrong.
+
+[`docs/demo/index.html`](demo/index.html) is the record of one real run of this story, and
+`node docs/demo/build.mjs` regenerates it: it copies the example, runs every step, asserts the payoff of each
+and writes the page only when all of them hold. A failed assertion is the demo telling you it no longer plays.
 
 Every beat has four parts. **Say** is what the presenter says. **Do** is one command, or one paste of a file
 under [`docs/demo/`](demo/). **Point at** is the one line of output that pays the beat off. **If asked** is the
@@ -23,9 +27,9 @@ lands: the hints do the explaining.
 ## 1. The hook
 
 **Say.** Every team has a rule like this one: every route that writes goes through the recorder check. It
-lives in a wiki page, a review checklist, or one senior engineer's head. It holds for a year, and then someone
-who never read it adds a route, the reviewer is on holiday, and the write is public. This is a tree with that
-rule in it, and it is a file.
+lives in a wiki page, a review checklist, or one senior engineer's head, and it holds until someone who never
+read it adds a route. Today that someone is an agent. It writes fast and plausibly; what it lacks is the rule
+it never read and the consequence it cannot see. This is a tree with that rule in it, and it is a file.
 
 **Do.** Before anything, the whole tree is judged.
 
@@ -71,16 +75,16 @@ reached by (every one met by @features/access/edge/can-record.policy.json):
 a write today, and the rule names none of them. It names six operations and one policy, and the checker
 works out who reaches what.
 
-**If asked.** *"We have this. It is a middleware on the router."* A middleware is attached where someone
-remembers to attach it, and the router does not know which handlers write. This file says which operations
-are writes, and `reached by` is computed, not maintained: the sixth route will appear there on its own, or be
-refused. The next beat is that route.
+**If asked.** *"We have this. It is a middleware on the router, and the agent's instructions say to use it."*
+A middleware is attached where someone remembers to, and an agent remembers what is in its context. This
+rule is in the tree, not the context, and `reached by` is computed, not maintained: the sixth route will
+appear there on its own, or be refused. The next beat is that route.
 
 ## 2. The new hire
 
-**Say.** A year later. Someone joins, is asked for a way to archive an entry, and finds the `remove`
-operation on the monitor port. They have not read the invariant. They have not read the wiki either, because
-there is none: the rule is in the tree.
+**Say.** A year later. An agent is given one line: add a way to archive an entry. It finds the `remove`
+operation on the monitor port and scaffolds a route that fires it. It has not read the invariant, and
+nothing asked it to.
 
 **Do.** Scaffold the route from the operation it fires, then check.
 
@@ -120,19 +124,19 @@ I001  @features/monitor/edge/archive-entry.trigger.json#policies
     → attach "@access/edge/can-record.policy.json" under policies, or take @features/monitor/domain/monitor.port.json#remove out of the invariant's over
 ```
 
-The file written a minute ago, the rule it broke by its name, the file the rule lives in, and the two edits
-that would fix it. Nothing has run. The other five say the route takes nothing, answers nothing, and has no
-answer for three ways the operation behind it can end.
+The file the agent wrote a second ago, the rule it broke by its label, the file the rule lives in, and the
+two edits that would fix it. Nothing has run. Each of the six has a stable code, the file, the path inside it
+(`#in`, `#policies`, `#settings/response/refusals`) and a hint that is an edit: an agent's whole loop, write, check, edit.
 
-**If asked.** *"A linter would catch a missing decorator."* A linter reads the file it is given. This read
-the route, the port it fires, the graphs bound to that port and the invariant, and said the graph behind
-`remove` can refuse with `missing` before anyone wrote the route's response. `kept-remove` is the graph that
-will run under this profile, two ports down from the file the new hire wrote.
+**If asked.** *"The agent should have read the invariant first."* It would have, had it known there was one
+to read. Instead the checker read the route, the port it fires, the graphs bound to that port and the
+invariant, and told the agent about the rule in the one place it was going to look: the output of the
+command it runs after every edit. `kept-remove` is the graph two ports down that will run under this profile.
 
 ## 3. Following the hints
 
-**Say.** The new hire does what the first five hints say: declare what the route takes and answers, and map
-the three reasons to statuses. They do not attach the policy yet, because they still do not know why.
+**Say.** The agent does what the first five hints say: declare what the route takes and answers, and map the
+three reasons to statuses. It leaves the policy alone, since nothing yet told it why.
 
 **Do.** Paste the route with the shapes and the refusals filled in.
 
@@ -149,7 +153,7 @@ I001  @features/monitor/edge/archive-entry.trigger.json#policies
 1 refusal(s)
 ```
 
-One left. Now do exactly what it says, and no more: add this line to the file, under `out`.
+One round took five refusals to zero. Now the agent does exactly what the last one says, and no more:
 
 ```json
 "policies": ["@access/edge/can-record.policy.json"],
@@ -173,10 +177,10 @@ T005  @features/monitor/edge/archive-entry.trigger.json#settings/response/refusa
 3 refusal(s)
 ```
 
-**Point at.** `A005 ... no attachment on this trigger gives one`, and the JSON in its hint. The policy decides
-on who is calling, and nothing on this route hands the guard a token to find that out. The two T005 below it
-are new because the route is new: a gated route can now end `forbidden` or `anonymous`, and the route has
-to say what those are on the wire.
+**Point at.** `A005 ... no attachment on this trigger gives one`, and the JSON in its hint. Fixing one refusal
+surfaced three the agent could not have seen: the policy decides on who is calling, and nothing on this route
+hands the guard a token; and a gated route can now end `forbidden` or `anonymous`, which the route has to
+map. A rule catching a route is a conversation, and every turn of it is an edit.
 
 Paste the finished route: the policy given the token as the hint wrote it, and 403, 401, 401 for `forbidden`,
 `anonymous` and `invalid_credential`.
@@ -190,15 +194,18 @@ npx wilanis check .
 ok: 186 documents
 ```
 
+Three rounds of write, check, edit, and the agent read no manual.
+
 **If asked.** *"So the checker wanted the policy all along. Why not just add it for me?"* Because the second
 half of the I001 hint is the other legal edit: take `remove` out of the invariant. Whether archiving is a
-write for recorders is the team's decision, and the checker refuses to make it. What it does instead is
-refuse to let it go unmade.
+write for recorders is the team's decision, and the checker refuses to make it or to let it go unmade. The
+invariant is the one sentence the human wrote that the agent cannot talk its way past: however it phrased
+the route, the route reached `remove`, and every way to `remove` is gated or refused.
 
 ## 4. No test was written
 
-**Say.** Nobody wrote a test for this route. The tree has a rehearsal: it runs every route, every policy and
-every branch of every switch with the effects stubbed, and says whether each branch settled.
+**Say.** The agent wrote no test for this route. The tree has a rehearsal: it runs every route, every policy
+and every branch of every switch with the effects stubbed, and says whether each branch settled.
 
 **Do.**
 
@@ -221,8 +228,8 @@ every branch settled -- 44 branch(es), 20 decision(s), 16 graph(s).
   Writes are for recorders  holds at 6 trigger(s)
 ```
 
-`holds at 6 trigger(s)`: it was five in beat 1. Then the map, which says how a request flows and what gates
-it:
+This is the test suite the agent did not write. `holds at 6 trigger(s)`: it was five in beat 1. Then the map,
+which says how a request flows and what gates it:
 
 ```
 npx wilanis map . --profile local
@@ -299,11 +306,11 @@ curl -s -X POST localhost:8099/monitor/$ID/archive -H "authorization: Bearer $TO
 The same branch, the same sentence. The rehearsal ran it with the effects stubbed before the server was up;
 the route mapped the reason to 403 in beat 3; the guard, the policy and the graph did the rest.
 
-**If asked.** *"Where is the role check? I want to read it."* One switch, in
-`features/access/domain/require-recorder.graph.json`: `has(principal) && 'recorder' in principal.roles`. It
-is the only place a condition can be written, and the rehearsal walked all three of its branches. The route
-never saw the token: the guard verified it before any graph ran and handed `request.principal` to the policy.
-No document in this tree validates a token, and no graph checks access.
+**If asked.** *"Where is the role check? I want to read what the agent wrote."* The agent wrote none. One
+switch, in `features/access/domain/require-recorder.graph.json`: `has(principal) && 'recorder' in
+principal.roles`, the only place a condition can be written, and the rehearsal walked all three branches.
+The route never saw the token: the guard verified it before any graph ran and handed `request.principal` to
+the policy. No document validates a token and no graph checks access, so an agent cannot get that wrong.
 
 ## 5. The closer: all of it or none of it
 
@@ -349,23 +356,22 @@ compiler refuses an atomic graph that could not be one transaction, so the word 
 
 **If asked.** *"That is just a database transaction."* It is one, and the point is who opened it. The graph
 says it is atomic; the compiler proved every effect it reaches sits on one connection that can roll back, and
-would have refused the word otherwise. Under the `live` profile the same operation is bound to a graph
-without the word, because an HTTP call to the upstream is not something a transaction can undo.
+would have refused the word otherwise, so an agent that writes it gets the promise or a refusal, never a
+half-written store. Under `live` the same operation is bound to a graph without the word: an HTTP call is not something a transaction can undo.
 
 ## Other closers
 
 **The PostgreSQL swap.** `--profile production` binds the monitor port to a store in PostgreSQL; not one
 route, policy, shape or business graph differs from `local`, and beat 1 judged it with everything else.
 `npx wilanis migrate . --profile production` prints what the database would have to do and does nothing until
-`--apply`. It needs a PostgreSQL to talk to, its URL in `MONITOR_DATABASE_URL`, and the walk in
-[`example/README.md`](../example/README.md#changing-the-shape-and-the-plan-that-follows) as the script.
+`--apply`. It needs a PostgreSQL, its URL in `MONITOR_DATABASE_URL`, and [`example/README.md`](../example/README.md#changing-the-shape-and-the-plan-that-follows) as the script.
 
-**The reload while serving.** With `start` still running, paste the beat-3 file back over the route
-(`cp $DEMO/archive-entry.step2.trigger.json features/monitor/edge/archive-entry.trigger.json`): the log
-prints `reload refused, still serving the last good tree:` followed by the I001 refusal, hint and all, while
-`curl` keeps answering 401. Paste the finished file back and it prints `reload: 186 documents, serving the
-new tree`. It needs nothing beyond what this script already runs, and answered exactly that on the day this
-was written.
+**The edit that never reaches the serving tree.** With `start` still running, paste the beat-3 file back
+over the route (`cp $DEMO/archive-entry.step2.trigger.json features/monitor/edge/archive-entry.trigger.json`):
+the log prints `reload refused, still serving the last good tree:` with the I001 refusal, hint and all, while
+`curl` keeps answering 401, so an agent editing a live tree cannot make the write public for one request.
+Paste the finished file back and it prints `reload: 186 documents, serving the new tree`. It needs nothing
+beyond what this script already runs; `build.mjs` runs it as its last step.
 
 ## Reset
 
@@ -386,9 +392,8 @@ export MONITOR_DATABASE_URL=postgres://unused
 ```
 
 The JWT secret is what the tree signs its tokens with, generated fresh each run with `openssl rand`. The
-database URL is a placeholder and is never dialled: today `start` reads every profile's secrets before it
-chooses one, so `local` asks for a URL it will not use. Issues #302, #303 and #304 change that so only the
-secrets the chosen profile reads are asked for; when they land, the last two lines go.
+database URL is a placeholder, never dialled: today `start` reads every profile's secrets before it chooses
+one, so `local` asks for a URL it will not use. #302, #303 and #304 change that; when they land, the last two lines go.
 
 The prepared files are `docs/demo/archive-entry.step2.trigger.json` and `.step3.trigger.json` (beat 3) and
 `docs/demo/entries.bad.csv` (beat 5); each JSON file says in its `description` which beat pastes it.
