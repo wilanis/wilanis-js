@@ -2,14 +2,38 @@
  * What `wilanis map` draws under a profile. The example's monitor port has three bindings -- the REST upstream, the
  * in-memory store and PostgreSQL -- and a profile chooses one, as `rehearse` chooses it. Without a profile the map
  * draws every binding and says the port needs one; under a profile it draws the chosen binding alone, and never
- * the `??` line, since there is nothing left to choose.
+ * the `??` line, since there is nothing left to choose. What the other profiles' bindings run is then named after
+ * the triggers, bound by whoever runs it, and never called an orphan: that word keeps meaning a graph no binding
+ * of any profile reaches.
  */
-import { loadTree } from '@wilanis/core';
-import { describe, expect, it } from 'vitest';
+import { rmSync } from 'node:fs';
+import { loadTree, schemaUrl } from '@wilanis/core';
+import { afterAll, describe, expect, it } from 'vitest';
 import { map } from '../src/index.js';
-import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
+import { EXAMPLE, INCLUDES, loadedWith, PLUGINS } from './example-harness.js';
 
 const example = loadTree(EXAMPLE, PLUGINS, INCLUDES);
+const POSTGRES = '@features/monitor/data/monitor-postgres.binding.json';
+const REST = '@features/monitor/data/monitor-rest.binding.json';
+const KEPT_REMOVE_POSTGRES = '@features/monitor/data/kept-remove-postgres.graph.json';
+/** A graph nothing binds: the one thing the map may call an orphan, planted in a copy of the example. */
+const NOBODY = '@features/monitor/data/nobody-reaches.graph.json';
+const { load: planted, dir: plantedDir } = loadedWith({
+  'features/monitor/data/nobody-reaches.graph.json': {
+    $schema: schemaUrl('graph'),
+    description: 'A graph no binding of any profile names, so nothing reaches it under any profile.',
+    nodes: [
+      {
+        type: '@wilanis/node/run.schema.json',
+        id: 'first',
+        run: '@std/text.port.json#fill',
+        in: { values: {}, template: 'nobody' },
+      },
+    ],
+    out: { type: 'string', from: 'first' },
+  },
+});
+afterAll(() => rmSync(plantedDir, { recursive: true, force: true }));
 const DELETE = '@features/monitor/edge/delete-entry.trigger.json  (@http/http.trigger-kind.json)';
 /** Fires a domain graph that calls the monitor port again, which is where a binding has to be chosen mid-walk. */
 const DIGEST = '@features/monitor/edge/digest.trigger.json  (@cli/cli.trigger-kind.json)';
@@ -58,10 +82,40 @@ describe('map under a profile', () => {
     expect(lines.some(line => line.includes('kept-remove.graph.json  '))).toBe(false);
   });
 
-  it('a graph only another profile reaches is an orphan under this one, which is what the profile means', () => {
+  it('names a graph only another profile runs as unreached under this one, bound by whoever runs it', () => {
+    const lines = map(example, 'local');
+    expect(lines).toContain(`unreached under local  ${KEPT_REMOVE_POSTGRES}  bound by ${POSTGRES}`);
+    expect(lines).toContain(`unreached under local  @features/monitor/data/delete-row.graph.json  bound by ${REST}`);
+    // one line per graph the other profiles' bindings run, after the triggers and before any orphan
+    const unreached = lines.filter(line => line.startsWith('unreached under local  '));
+    expect(unreached).toHaveLength(6);
+    expect(unreached.every(line => line.includes(`bound by ${POSTGRES}`) || line.includes(`bound by ${REST}`))).toBe(
+      true,
+    );
+    const lastTrigger = lines.map(line => /^@.*\.trigger\.json/.test(line)).lastIndexOf(true);
+    expect(lines.indexOf(unreached[0])).toBeGreaterThan(lastTrigger);
+    // and never an orphan: what another profile runs is the other half of what profiles are for. The orphans
+    // are the same graphs with a profile and without, which is what the word has always meant
     const orphans = (profile?: string) => map(example, profile).filter(line => line.startsWith('orphan '));
-    expect(orphans()).not.toContain('orphan  @features/monitor/data/kept-remove-postgres.graph.json');
-    expect(orphans('local')).toContain('orphan  @features/monitor/data/kept-remove-postgres.graph.json');
-    expect(orphans('local')).not.toContain('orphan  @features/monitor/data/kept-remove.graph.json');
+    expect(orphans('local')).not.toContain(`orphan  ${KEPT_REMOVE_POSTGRES}`);
+    expect(orphans('local')).toEqual(orphans());
+    expect(orphans('production')).toEqual(orphans());
+    expect(map(example).filter(line => line.startsWith('unreached under '))).toEqual([]);
+  });
+
+  it('keeps orphan for a graph no binding of any profile reaches, with a profile and without', () => {
+    const orphans = (load = planted, profile?: string) => map(load, profile).filter(line => line.startsWith('orphan '));
+    const before = orphans(example);
+    expect(before).not.toContain(`orphan  ${NOBODY}`);
+    expect(orphans()).toContain(`orphan  ${NOBODY}`);
+    expect(orphans().filter(line => line !== `orphan  ${NOBODY}`)).toEqual(before);
+    expect(orphans(planted, 'local')).toEqual(orphans());
+    expect(orphans(planted, 'production')).toEqual(orphans());
+    // the orphan comes after what the other profiles run, so the tail reads: theirs, then nobody's
+    const lines = map(planted, 'local');
+    expect(lines.indexOf(`orphan  ${NOBODY}`)).toBeGreaterThan(
+      lines.findIndex(line => line.startsWith('unreached under ')),
+    );
+    expect(lines.some(line => line.startsWith('unreached under ') && line.includes(NOBODY))).toBe(false);
   });
 });
