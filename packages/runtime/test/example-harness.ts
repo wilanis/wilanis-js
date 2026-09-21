@@ -64,8 +64,8 @@ export function docsDir(docs: Record<string, unknown>): string {
   return dir;
 }
 
-/** A throwaway copy of the example, without what a check must not read. */
-function copyOfExample(): string {
+/** A throwaway copy of the example, without what a check must not read. The caller removes it. */
+export function copyOfExample(): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-'));
   cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
   return dir;
