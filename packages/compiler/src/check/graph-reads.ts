@@ -90,13 +90,15 @@ export class GraphReads {
    * switch chose, so an effect no switch routes runs on every branch; where every reader of its answer sits
    * behind a branch, and no switch that always runs is reached through all of its targets, the effect ran for
    * nothing on the rest -- most often a write the author meant one branch to make. An effect out.from names
-   * is the graph's answer, one nothing reads is G008's, and a pure node running for nothing costs nothing.
+   * is the graph's answer, and a pure node running for nothing costs nothing. One no value read at all is
+   * G008's alone, judged by the same `readNodes`, so a node earns one refusal for one misunderstanding.
    */
   checkEffectsRouted(routedBy: Map<string, string>, candidates: string[]): void {
     const routing: Routing = { routedBy, dependencies: this.narrowing.dependencies };
     const readers = readersOf(routing.dependencies);
     for (const [id, hit] of this.table.ops) {
-      if (hit.op.pure === true || candidates.includes(id) || routed(routing, id)) continue;
+      if (hit.op.pure === true || !this.readNodes.has(id) || candidates.includes(id)) continue;
+      if (routed(routing, id)) continue;
       const who = [...(readers.get(id) ?? [])];
       if (!readOnSomeBranchesOnly(routing, this.table.nodes, who)) continue;
       const named = firstReaders(routing, who)
