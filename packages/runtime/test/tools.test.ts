@@ -14,7 +14,7 @@ import storage from '@wilanis/plugin-storage';
 import memory from '@wilanis/plugin-storage-memory';
 import postgres from '@wilanis/plugin-storage-postgres';
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_PLUGINS, describe as describeDoc, fuzz, init, regress, scaffold } from '../src/index.js';
+import { BUILTIN_PLUGINS, describe as describeDoc, fuzz, regress, scaffold } from '../src/index.js';
 import { loadedEditing } from './example-harness.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
@@ -166,20 +166,6 @@ describe('wilanis new', () => {
       'features/tasks/domain/elsewhere.store.json: a store may not live in the domain layer',
     );
     expect(existsSync(join(dir, 'features/tasks/domain/elsewhere.store.json'))).toBe(false);
-    rmSync(dir, { recursive: true, force: true });
-  });
-});
-
-describe('wilanis init', () => {
-  it('writes CLAUDE.md and the hooks, keeps what exists, and says which', () => {
-    const dir = tmp();
-    writeFileSync(join(dir, 'CLAUDE.md'), '# mine\n');
-    const lines = init(dir);
-    expect(lines).toEqual([`kept ${join(dir, 'CLAUDE.md')}`, `wrote ${join(dir, '.claude', 'settings.json')}`]);
-    expect(readFileSync(join(dir, 'CLAUDE.md'), 'utf8')).toBe('# mine\n');
-    expect(read(join(dir, '.claude', 'settings.json')).hooks.Stop).toBeDefined();
-    // a second run changes nothing
-    expect(init(dir).every(line => line.startsWith('kept '))).toBe(true);
     rmSync(dir, { recursive: true, force: true });
   });
 });
