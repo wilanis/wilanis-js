@@ -32,8 +32,22 @@ const BATCH = 512;
 /** Beyond this many spans waiting, the collector is not keeping up and the oldest are dropped rather than the process. */
 const CEILING = 8192;
 
-/** What went wrong, in one line a log can carry, whatever was thrown. */
-const reasonOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
+/**
+ * What went wrong, in one line a log can carry, whatever was thrown: its message, else its code, else the first
+ * reason among the errors it gathers. Node answers a refused connection with an `AggregateError` -- one attempt
+ * per address -- whose message is empty and whose code is `ECONNREFUSED`, so a log that read only the message
+ * said `()`. Nothing readable at all is that same refusal from a transport that kept even the code to itself.
+ */
+export function reasonOf(error: unknown): string {
+  if (typeof error !== 'object' || error === null) return String(error);
+  const { message, code, errors } = error as { message?: unknown; code?: unknown; errors?: unknown };
+  if (typeof message === 'string' && message) return message;
+  if (typeof code === 'string' && code) return code;
+  const inner = Array.isArray(errors)
+    ? errors.map(reasonOf).find(reason => reason !== 'connection refused')
+    : undefined;
+  return inner ?? 'connection refused';
+}
 
 /**
  * One tree's export: traces arrive from the runtime's observer, spans leave in batches. It is deliberately
