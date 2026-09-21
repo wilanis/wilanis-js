@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
+  "label": "POST /monitor/{id}/archive",
+  "description": "Pasted over features/monitor/edge/archive-entry.trigger.json in beat 3 of docs/demo.md: the route with its shapes and refusals filled in as the T002 and T005 hints said, and still no policy, so one refusal is left, I001.",
+  "kind": "@http/http.trigger-kind.json",
+  "settings": {
+    "route": "/monitor/{id}/archive",
+    "method": "POST",
+    "produces": "application/json",
+    "response": {
+      "refusals": {
+        "missing": 404,
+        "upstream": 502,
+        "invariant": 500
+      }
+    }
+  },
+  "in": "@monitor/edge/IdRequest.shape.json",
+  "out": "@monitor/edge/EntryView.shape.json",
+  "fire": {
+    "run": "@monitor/domain/monitor.port.json#remove",
+    "in": {
+      "id": "{{request.params.id}}"
+    }
+  }
+}

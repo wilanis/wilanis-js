@@ -1,0 +1,6 @@
+url,method
+https://api.example.com/orders,GET
+https://api.example.com/orders,POST
+https://api.example.com/orders/7,PUT
+https://api.example.com/customers,GET
+,DELETE
