@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/plugin.schema.json",
   "label": "Reload",
-  "description": "Watch the tree and serve it again when a document changes. Meant for development: a project names it in its startup list, before whatever listens, and an edit takes effect without a restart. It judges the tree the way `wilanis check` does and serves it only when it is clean, so a half-written document never becomes what answers.",
+  "description": "Watch the tree and serve it again when a document changes. Meant for development: a project names it in its startup list, before whatever listens, and an edit takes effect without a restart. It judges the tree the way `wilanis check` does and serves it only when it is clean, so a half-written document never becomes what answers. Only a `.json` file counts as a change, and never one under `.wilanis/` (the tree's own working state: the @auth files store writes sessions there, and a sign-in is not an edit), `scenarios/` (what `wilanis fuzz` records), `node_modules/`, `dist/` or `.git/`.",
   "settings": {
     "fields": {
       "debounceMs": {
