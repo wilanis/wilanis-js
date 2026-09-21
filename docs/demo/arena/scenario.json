@@ -1,0 +1,26 @@
+{
+ "title": "Three agents, one gate",
+ "thesis": "Three models are each given the same one-paragraph task in identical copies of the example, unsupervised: add an operation that toggles a boolean on an entry and expose it over HTTP. Beside the task sits an acceptance test the reviewer wrote first, accept.sh, and the agent is told its work is done when the test prints PASS on every criterion. The test asserts what the endpoint must do and what the checker and the rehearsal must say; it never asserts how the tree is written. One thing it reports without judging: the tree's access rule, Writes are for recorders, names its write operations one by one, and the toggle is a write the rule does not name. Whether a toggle is a write the rule should cover is each agent's to decide, and the gate accepts either answer. This page records what each did, what each decided, what it cost, and the gate's own verdict on each result, run again by the reviewer.",
+ "invariant": {
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/invariant.schema.json",
+  "label": "Writes are for recorders",
+  "description": "Every trigger that can change an entry attaches the recorder policy. Reads stay public. Without this the six write triggers are six coincidences: a new route firing monitor.update and forgetting the policy would check clean, and the write would be public.",
+  "access": {
+   "over": [
+    "@monitor/domain/monitor.port.json#record",
+    "@monitor/domain/monitor.port.json#update",
+    "@monitor/domain/monitor.port.json#remove",
+    "@monitor/domain/monitor.port.json#removeMany",
+    "@monitor/domain/monitor.port.json#submit",
+    "@monitor/domain/monitor.port.json#import"
+   ],
+   "requires": {
+    "policy": "@access/edge/can-record.policy.json"
+   }
+  }
+ },
+ "setup": "Before the run, each copy gained an optional boolean `pinned` on Entry (and on the REST binding's row shape), a port of its own, the CLAUDE.md and hooks that `wilanis init` writes for a consumer tree, the graph-idiom skill and the Stop hook this harness carries provisionally (issues #494 and #495), a hook that keeps the agent inside its copy, the acceptance test, and a git commit as the baseline every diff below is measured against. `wilanis check` passed on every copy and the gate rejected every copy on the criteria about the endpoint and nothing else. The rule above is the one already in the tree; nothing was added to it.",
+ "facts_intro": "Every cell is derived from the finished tree against its baseline commit by facts.py: the checker and the rehearsal run again, the new trigger's document read, the invariants compared with what the baseline held, the gate run again with the trigger's own verb and route. Green is what the tree wanted, red is not; a cell with no colour is a decision the task left to the agent and the gate accepts either way.",
+ "validation_intro": "Run by the reviewer after each agent had stopped, against a fresh start of each tree: sign in as bo and cy, wait for the reload the sign-in causes (#490), record one GET entry and one POST entry as bo, then the same nine calls in the same order with the same bodies. Tokens are masked in the commands shown. A tree that does not check does not start, so every curl below then answers [000].",
+ "footer": "Transcripts were reduced with parse.py, the facts derived with facts.py, the gate run again by the reviewer on each finished tree and the nine curls of validate.sh beside it. Cost is computed from the token counts the API reported, at list price. Regenerate this page with `bash docs/demo/arena/run.sh` from the repository root after `npm run build`; docs/demo/arena/README.md says the rest."
+}
