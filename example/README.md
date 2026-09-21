@@ -1,5 +1,7 @@
 # monitor
 
+*This page is the reference. To present the tree rather than read it, [`docs/demo.md`](../docs/demo.md) is the script.*
+
 A wilanis project: a monitor of observed HTTP calls, with sign-in, sessions and policies over its writes, and
 a command-line greeting gated by a one-time code. Everything in this directory is JSON; `package.json`
 installs the runtime and the plugin packages it uses. The one secret is the key our tokens are signed with,

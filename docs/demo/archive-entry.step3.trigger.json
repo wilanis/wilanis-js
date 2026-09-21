@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
+  "label": "POST /monitor/{id}/archive",
+  "description": "Pasted over features/monitor/edge/archive-entry.trigger.json at the end of beat 3 of docs/demo.md: the finished route. The recorder policy is attached and given the token as the A005 hint said, and the two ways a gated route can end, forbidden and anonymous, are mapped as the T005 hints said; invalid_credential comes with them, since a bad token is a way in too.",
+  "kind": "@http/http.trigger-kind.json",
+  "settings": {
+    "route": "/monitor/{id}/archive",
+    "method": "POST",
+    "produces": "application/json",
+    "response": {
+      "refusals": {
+        "missing": 404,
+        "upstream": 502,
+        "anonymous": 401,
+        "invalid_credential": 401,
+        "forbidden": 403,
+        "invariant": 500
+      }
+    }
+  },
+  "in": "@monitor/edge/IdRequest.shape.json",
+  "out": "@monitor/edge/EntryView.shape.json",
+  "policies": [
+    {
+      "policy": "@access/edge/can-record.policy.json",
+      "in": {
+        "token": "{{request.headers.authorization}}"
+      }
+    }
+  ],
+  "fire": {
+    "run": "@monitor/domain/monitor.port.json#remove",
+    "in": {
+      "id": "{{request.params.id}}"
+    }
+  }
+}

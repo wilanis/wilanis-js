@@ -322,6 +322,8 @@ Pre-1.0. Everything above runs today. Nothing is published to npm yet, on purpos
 accepted RFC that changes a schema has landed or been withdrawn, so the schemas are final before they are
 frozen.
 
+[`docs/demo.md`](docs/demo.md) is the demo as a script: the route written a year later, in five beats, each command with the output it answered.
+
 [`docs/roadmap.md`](docs/roadmap.md) is the plan, and each milestone is a demo: entries in a real database,
 sessions shared across instances, a request drawn as a trace, work moved off the request, one command that
 deploys it, tenants that cannot leak into each other, an agent repairing a broken tree. Each draws on RFCs under [`docs/rfcs/`](docs/rfcs/README.md),
