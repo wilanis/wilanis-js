@@ -1,11 +1,11 @@
 /**
- * `wilanis new` and `wilanis init`: the documents a tree starts from. Where each kind lives is placement's business
- * (HOME in core), so this module only says what one looks like when it is first written -- and asks placement,
- * before writing, whether the place it chose is one `wilanis check` would refuse.
+ * `wilanis new`: the documents a tree starts from. Where each kind lives is placement's business (HOME in core),
+ * so this module only says what one looks like when it is first written -- and asks placement, before writing,
+ * whether the place it chose is one `wilanis check` would refuse. `wilanis init` lives in init.ts and is
+ * re-exported here, so the tools reach both from one module.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { type AnyDoc, featureOf, type Kind, misplaced, schemaUrl } from '@wilanis/core';
 
 // ---- scaffolds -------------------------------------------------------------------------------------
@@ -278,32 +278,4 @@ export function scaffold(
   return written;
 }
 
-/**
- * wilanis init: write the agent's CLAUDE.md and hooks into a tree from the runtime's templates. A file that
- * exists is kept, never overwritten. Answers one line per file: `wrote <path>` or `kept <path>`.
- */
-export function init(
-  root: string,
-  templates = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates'),
-): string[] {
-  const out: string[] = [];
-  const put = (from: string, to: string) => {
-    if (existsSync(to)) {
-      out.push(`kept ${to}`);
-      return;
-    }
-    mkdirSync(dirname(to), { recursive: true });
-    writeFileSync(to, readFileSync(from));
-    out.push(`wrote ${to}`);
-  };
-  for (const name of readdirSync(templates)) {
-    const from = join(templates, name);
-    const to = join(root, name.replace(/^dot-/, '.'));
-    if (name === 'dot-claude') {
-      for (const name of readdirSync(from)) put(join(from, name), join(to, name));
-      continue;
-    }
-    put(from, to);
-  }
-  return out;
-}
+export { init } from './init.js';
