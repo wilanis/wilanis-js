@@ -323,6 +323,7 @@ accepted RFC that changes a schema has landed or been withdrawn, so the schemas 
 frozen.
 
 [`docs/demo.md`](docs/demo.md) is the demo as a script: the route written a year later, in five beats, each command with the output it answered.
+[wilanis.dev](https://wilanis.dev/) serves the example drawn by the viewer at [/example/](https://wilanis.dev/example/), the demo as a record of one run at [/demo/](https://wilanis.dev/demo/), and the arena at [/arena/](https://wilanis.dev/arena/).
 
 [`docs/roadmap.md`](docs/roadmap.md) is the plan, and each milestone is a demo: entries in a real database,
 sessions shared across instances, a request drawn as a trace, work moved off the request, one command that
