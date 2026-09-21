@@ -39,7 +39,11 @@ G003  @features/monitor/data/get-row.graph.json#nodes/asked/in/path
 ```
 
 Edits are debounced (120ms by default, `settings.debounceMs` or the operation's `debounceMs` to change
-it), and only `.json` files outside `node_modules`, `dist` and `.git` count as a change.
+it), and only `.json` files count as a change. A write under `.wilanis/`, `scenarios/`, `node_modules/`,
+`dist/` or `.git/` never does: `.wilanis/` is the tree's own working state (the `@auth` files store keeps
+its sessions there, and a sign-in must not reload the tree and empty every memory engine), `scenarios/` is
+what `wilanis fuzz` records, and the rest nobody edits by hand. The list lives in one place, `IGNORED_DIRS`
+in `src/index.ts`.
 
 ## Where the work happens
 

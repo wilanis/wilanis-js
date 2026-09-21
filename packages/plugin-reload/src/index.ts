@@ -6,7 +6,7 @@
  */
 import { type FSWatcher, watch } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { Hold, PluginModule, Serving } from '@wilanis/core';
+import { HOME, type Hold, type PluginModule, type Serving } from '@wilanis/core';
 import type { Handler } from '@wilanis/engine';
 
 const ROOT = '@reload';
@@ -15,8 +15,15 @@ const DOCS = fileURLToPath(new URL('../docs', import.meta.url));
 const shipped = (name: string) => `${ROOT}/${name}`;
 const DEFAULT_DEBOUNCE = 120;
 
-/** Directories whose churn is never a document change: what a reload would read is under neither. */
-const IGNORED = /(^|[\\/])(node_modules|dist|\.git)([\\/]|$)/;
+/**
+ * The directories a write under is never an edit of the tree, in the one place the watcher decides it: the tree's
+ * own working state (`.wilanis/`, where the @auth files store keeps its sessions -- a sign-in must not reload the
+ * tree and empty every memory engine), what `wilanis fuzz` records (`scenarios/`), and what nobody edits by hand
+ * (`node_modules/`, `dist/`, `.git/`). Wherever one of these appears in a path, what is under it is left alone.
+ */
+const IGNORED_DIRS = ['.wilanis', HOME.scenario?.dir ?? 'scenarios', 'node_modules', 'dist', '.git'];
+const escaped = (dir: string) => dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const IGNORED = new RegExp(`(^|[\\\\/])(${IGNORED_DIRS.map(escaped).join('|')})([\\\\/]|$)`);
 
 /**
  * Watch the tree and serve it again when a document changes. Answers once the watcher is up; the watching

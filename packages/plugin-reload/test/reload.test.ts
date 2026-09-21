@@ -1,13 +1,16 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Serving } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import plugin from '../src/index.js';
 
+const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
+
 /** A stand-in for what the runtime hands a `holds` operation: it records the reloads it was asked for. */
-function serving(answer: () => Awaited<ReturnType<Serving['reload']>>) {
-  const dir = mkdtempSync(join(tmpdir(), 'wilanis-reload-'));
+function serving(answer: () => Awaited<ReturnType<Serving['reload']>>, root?: string) {
+  const dir = root ?? mkdtempSync(join(tmpdir(), 'wilanis-reload-'));
   const logs: string[] = [];
   let reloads = 0;
   const held: { label: string; stop: () => Promise<void> }[] = [];
@@ -89,6 +92,30 @@ describe('watching a tree', () => {
     writeFileSync(join(watcher.dir, 'notes.txt'), 'not a document');
     await sleep(120);
     expect(watcher.reloads()).toBe(0);
+    await watcher.held[0].stop();
+  });
+
+  it('leaves the working state and the generated directories of a copy of the example alone', async () => {
+    // the @auth files store writes a session under .wilanis/ on every sign-in, and `wilanis fuzz` records under
+    // scenarios/: neither is an edit, and a reload on either would empty every memory engine of the tree
+    const copy = mkdtempSync(join(tmpdir(), 'wilanis-reload-example-'));
+    cpSync(EXAMPLE, copy, { recursive: true });
+    const watcher = serving(() => ({ ok: true, documents: 185 }), copy);
+    await watch(watcher.env, { debounceMs: 10 });
+    // a document first, until the watcher is known to be live: a write it missed while registering proves nothing
+    expect(await touchUntilSeen(watcher, /185 documents/, 'features/monitor/domain/Probe.shape.json')).toBe(true);
+    const before = watcher.reloads();
+
+    for (const dir of ['.wilanis/auth/sessions', 'scenarios', 'node_modules/some-package']) {
+      mkdirSync(join(copy, dir), { recursive: true });
+      writeFileSync(join(copy, dir, 'record.json'), '{"session":"s1"}');
+    }
+    await sleep(150);
+    expect(watcher.reloads()).toBe(before);
+
+    // and a document written afterwards is still served again
+    writeFileSync(join(copy, 'features/monitor/domain/Probe.shape.json'), '{"n":"again"}');
+    expect(await until(() => watcher.reloads() > before)).toBe(true);
     await watcher.held[0].stop();
   });
 
