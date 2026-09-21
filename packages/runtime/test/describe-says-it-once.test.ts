@@ -64,7 +64,7 @@ describe('describe: no kind answers with the document as JSON', () => {
     const said = describeDoc(example, '@monitor/edge/record-entry.trigger.json');
     expect(said).toContain('    response:');
     expect(said).toContain(
-      '        refusals: {"upstream":502,"anonymous":401,"invalid_credential":401,"forbidden":403,"invariant":500}',
+      '        refusals: {"upstream":502,"conflict":409,"anonymous":401,"invalid_credential":401,"forbidden":403,"invariant":500}',
     );
   });
 
@@ -73,9 +73,9 @@ describe('describe: no kind answers with the document as JSON', () => {
     expect(said).toContain('takes   @monitor/domain/EntryRecord.shape.json');
     // `row` is guarded, so the graph also answers with the guard's refusal and whatever routed `row` routes
     // the node it moved aside to: the lines say the graph a run walks, not the one the file spells
-    expect(said).toContain('answers @monitor/domain/Entry.shape.json  from row | row:violated | failed');
+    expect(said).toContain('answers @monitor/domain/Entry.shape.json  from row | row:violated | repeated | failed');
     expect(said).toContain('    stored  @storage/store.port.json#put');
-    expect(said).toContain('    route  switch → row:made | failed');
+    expect(said).toContain('    route  switch → repeated | row:made | failed');
   });
 
   it('gives a body to each kind that had none: binding, resolvers, feature, connection, codec, project', () => {

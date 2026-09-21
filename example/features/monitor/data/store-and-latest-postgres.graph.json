@@ -8,6 +8,7 @@
     "type": "@monitor/domain/Entry.shape.json",
     "from": [
       "row",
+      "repeated",
       "failed"
     ]
   },
@@ -57,12 +58,17 @@
     {
       "type": "@wilanis/node/switch.schema.json",
       "id": "route",
-      "label": "Were both written?",
+      "label": "Were both written, or did a constraint stop the entry?",
       "in": {
         "record": "{{stored.record}}",
+        "violated": "{{stored.violated}}",
         "mark": "{{latest.record}}"
       },
       "rules": [
+        {
+          "when": "has(violated)",
+          "to": "repeated"
+        },
         {
           "when": "has(record) && has(mark)",
           "to": "row"
@@ -82,9 +88,21 @@
     },
     {
       "type": "@wilanis/node/run.schema.json",
+      "id": "repeated",
+      "label": "An entry already records this call",
+      "description": "The store honoured a constraint it declares -- unique [url, method] -- and answered violated rather than writing. That is a conflict with what is kept, not a fault of the store, so it is refused as one; the transaction rolls back, and the latest row this run would have replaced is left as it was.",
+      "run": "@std/outcome.port.json#refuse",
+      "in": {
+        "reason": "conflict",
+        "message": "an entry already records {{in.method}} {{in.url}} ({{stored.violated}})",
+        "type": "@monitor/domain/Entry.shape.json"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
       "id": "failed",
       "label": "Nothing was written",
-      "description": "The transaction rolls back, so neither write survives this refusal.",
+      "description": "The store answered neither a record nor a violated constraint, which no engine promises to do; the transaction rolls back, so neither write survives this refusal.",
       "run": "@std/outcome.port.json#refuse",
       "in": {
         "reason": "upstream",

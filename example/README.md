@@ -20,8 +20,11 @@ record the same call, and `defaults: { "agent": "unknown" }` says what an entry 
 column existed reads as once `ensure` adds it -- about rows already there, never about what a graph writes,
 since `put` always gives the whole record. The compiler judges both against `Entry`: misspell a field in
 either and `wilanis check` names it, rather than PostgreSQL finding out on the first write. A `unique` a
-write would repeat is answered, not thrown -- `put` hands back `violated` and the graph routes on it with a
-`switch`, the same way it routes on `conflict`.
+write would repeat is answered, not thrown -- `put` hands back `violated`, naming the constraint as the store
+spells it (`unique [url, method]`), and `store-and-latest.graph.json` routes on `has(violated)` with a `switch`
+to refuse as `conflict`, its message naming the call and the unique it repeats. `POST /monitor` and
+`POST /monitor.csv` map that word to a 409; the same import under `live` never sees it, since the REST API
+declares no such thing.
 
 **A third profile keeps the same entries in PostgreSQL.** `production` binds the monitor port to
 `monitor-postgres.binding.json`, whose data graphs name a store over a connection of the postgres engine's
@@ -256,7 +259,8 @@ the runtime stops when the process ends. `wilanis describe @http/server.port.jso
 `remove`, `parseDrafts`, `toCsv`, `removeMany`, `submit`, `recordAll`, `list`, `digest`, `import`, `export`. `monitor-rest.binding.json` meets the first eight with a data
 graph each, which issues one declared request and decides with a `switch` on `status` what the answer means:
 the rows, the declared refusal `no entry {id}` with reason `missing` when the API answers 404, or the refusal
-`upstream` for anything else. The http triggers map those two words to statuses (`"refusals": { "missing": 404, "upstream": 502 }`),
+`upstream` for anything else. The http triggers map those words to statuses (`"refusals": { "missing": 404, "upstream": 502 }`,
+and `"conflict": 409` on the writes a store may refuse),
 so the graphs never mention HTTP and a client is told `{ "reason": "missing", "message": "no entry 7" }` with a 404. The
 last four are met by domain graphs that compose those operations: `list` routes on whether a method filter
 is present, `submit` attributes the entry to its recorder and records it, `removeMany` maps `remove` over the ids,
