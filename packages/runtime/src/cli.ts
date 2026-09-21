@@ -30,7 +30,7 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
                    --allow-destructive names each as <connection>/<target>, the pair that names a table
   wilanis ls       [root] [kind]                   every document, or those of one kind
   wilanis describe <path> [root]                   a document, with its contract laid out
-  wilanis map      [root]                          trigger → graph → port → binding → graph
+  wilanis map      [root] [--profile word]         trigger → graph → port → binding → graph
   wilanis new      <kind> <name|path> [root] [--layer edge|data] [--port word] [--run word#op] [--kind k]
                    [--of shape] [--over word#op] [--on shape]
                    kinds: project feature shape port graph binding store trigger policy resolvers invariant
@@ -207,8 +207,8 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
   describe: async ({ positional, rootArg }) => {
     console.log(describe(await load(rootArg(1)), positional[0]));
   },
-  map: async ({ rootArg }) => {
-    console.log(map(await load(rootArg(0))).join('\n'));
+  map: async ({ flags, rootArg }) => {
+    console.log(map(await load(rootArg(0)), flags.profile).join('\n'));
   },
   new: async ({ flags, positional, rootArg }) => {
     const [kind, target] = positional;
