@@ -6,6 +6,7 @@
 import { assignable, type GraphDoc, isSwitch, show, type Type } from '@wilanis/core';
 import { outputCandidates } from '../documents.js';
 import type { GraphReads } from './graph-reads.js';
+import { routed } from './graph-routing.js';
 import type { Refuser } from './judge.js';
 
 /** A graph with every node judged: its document, who routes whom, what was read, and the type it declares to answer. */
@@ -31,19 +32,6 @@ export function checkWhole(graph: WholeGraph): void {
   checkUnusedIn(graph);
   checkUnusedConstants(graph);
   checkUnusedNodes(graph, dependencies);
-}
-
-/** Does a node sit behind a switch: routed itself, or reading something that is? Otherwise it runs on every branch. */
-function routed(
-  graph: WholeGraph,
-  dependencies: Map<string, Set<string>>,
-  id: string,
-  seen = new Set<string>(),
-): boolean {
-  if (seen.has(id)) return false;
-  seen.add(id);
-  if (graph.routedBy.has(id)) return true;
-  return [...(dependencies.get(id) ?? [])].some(dependency => routed(graph, dependencies, dependency, seen));
 }
 
 /** G007. */
@@ -113,7 +101,7 @@ function checkCandidate(graph: WholeGraph, id: string): void {
 /** Candidates are alternatives: one that no switch routes always settles, so later candidates are dead. */
 function checkAlternatives(graph: WholeGraph, candidates: string[], dependencies: Map<string, Set<string>>): void {
   for (const id of candidates) {
-    if (!graph.reads.table.nodes.has(id) || routed(graph, dependencies, id)) continue;
+    if (!graph.reads.table.nodes.has(id) || routed({ routedBy: graph.routedBy, dependencies }, id)) continue;
     const message = `out.from candidate '${id}' is never routed -- it always settles, so later candidates are dead`;
     graph.refuse('G010', message, 'out/from', 'candidates are alternatives; each one sits behind a switch');
   }
@@ -153,7 +141,7 @@ function checkUnusedNodes(graph: WholeGraph, dependencies: Map<string, Set<strin
     const hit = graph.reads.table.ops.get(node.id);
     const effect = hit !== undefined && hit.op.pure !== true;
     const hint =
-      effect && !routed(graph, dependencies, node.id)
+      effect && !routed({ routedBy: graph.routedBy, dependencies }, node.id)
         ? `nothing routes to '${node.id}', so it runs on every branch: make it the 'to' of a switch rule, or read its answer from every branch`
         : 'wire its result into another node, or name it in out.from';
     graph.refuse('G008', `node '${node.id}' is read by nothing`, `nodes/${node.id}`, hint);

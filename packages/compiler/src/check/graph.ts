@@ -3,8 +3,8 @@
  * (L002, L003, L008); inputs fit their contracts (see inputs.ts); a switch's rules are boolean and route to
  * nodes of this graph, each routed once (G009, G011); a map iterates a list and binds its element (G012); no
  * cycle (G007); out.from names nodes that answer the out type (G010); everything declared is read (G008,
- * and P005 for the `reads` map); no read is named after a node (P006); constants conform (G013). A domain
- * graph that only forwards its input is refused (L007).
+ * and P005 for the `reads` map); an effect no switch routes is read on every branch (G015); no read is named
+ * after a node (P006); constants conform (G013). A domain graph that only forwards its input is refused (L007).
  */
 import {
   conforms,
@@ -21,6 +21,7 @@ import {
   show,
   type Type,
 } from '@wilanis/core';
+import { outputCandidates } from '../documents.js';
 import { checkReason, checkSwitch, elementInputs } from './graph-nodes.js';
 import { GraphReads } from './graph-reads.js';
 import { checkWhole } from './graph-whole.js';
@@ -101,6 +102,7 @@ class GraphCheck {
     this.checkReadNames(resolvers);
     for (const node of this.nodes.values()) this.checkNode(node, reads);
     this.checkReadsUsed(resolvers, reads);
+    reads.checkEffectsRouted(this.routedBy, outputCandidates(doc) ?? []);
     checkWhole({ refuse: this.refuse, doc, routedBy: this.routedBy, reads, outType });
   }
 
