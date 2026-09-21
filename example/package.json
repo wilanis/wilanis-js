@@ -11,7 +11,8 @@
     "regress": "wilanis regress .",
     "digest": "wilanis run @monitor/edge/digest.trigger.json .",
     "start": "wilanis start .",
-    "hello": "wilanis run @hello/edge/hello-gated.trigger.json ."
+    "hello": "wilanis run @hello/edge/hello-gated.trigger.json .",
+    "issue-otp": "wilanis run @access/edge/issue-otp.trigger.json ."
   },
   "dependencies": {
     "@wilanis/access": "0.1.0",
