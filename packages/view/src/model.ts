@@ -13,7 +13,7 @@
  */
 
 import { checkTree } from '@wilanis/compiler';
-import type { GraphDoc, Kind, Loaded, LoadResult, PolicyDoc, TriggerDoc } from '@wilanis/core';
+import type { GraphDoc, Kind, Loaded, LoadResult, PolicyDoc, Refusal, TriggerDoc } from '@wilanis/core';
 import { policyPath, SCHEMA_BASE, Scope, WILANIS } from '@wilanis/core';
 import { graphView } from './graphs.js';
 import { invariantView } from './invariants.js';
@@ -136,8 +136,25 @@ function policyView(scope: Scope, doc: Loaded, view: DocView) {
     .map(trigger => ({ path: trigger.path, label: labelOf(trigger) }));
 }
 
+/**
+ * What every view of one tree reads and no document owns: the scope, every reference in the tree, and every
+ * refusal the checker made. Made once and handed to each `viewOf`, so a site of many pages checks the tree once.
+ */
+export interface TreeReads {
+  scope: Scope;
+  index: IndexedRef[];
+  refusals: Refusal[];
+}
+
+/** The reads every view of a loaded tree shares: its scope, the reference index over it, and the checker's refusals. */
+export function treeReadsOf(load: LoadResult): TreeReads {
+  const scope = new Scope(load.registry, load.resolve);
+  return { scope, index: referenceIndex(load, scope), refusals: checkTree(load).items };
+}
+
 /** What every kind carries: where it sits, what it says, and the references it makes and receives. */
-function baseView(scope: Scope, load: LoadResult, doc: Loaded, index: IndexedRef[]): DocView {
+function baseView(reads: TreeReads, doc: Loaded): DocView {
+  const { scope, index, refusals } = reads;
   return {
     path: doc.path,
     kind: doc.kind,
@@ -160,16 +177,19 @@ function baseView(scope: Scope, load: LoadResult, doc: Loaded, index: IndexedRef
         at: reference.at,
       })),
     callers: callersOf(doc.path, index, scope),
-    refusals: checkTree(load).items.filter(refusal => refusal.file === doc.path || `@${refusal.file}` === doc.path),
+    refusals: refusals.filter(refusal => refusal.file === doc.path || `@${refusal.file}` === doc.path),
   };
 }
 
-/** The view of one document by path (an alias is accepted); undefined when there is no such document. */
-export function viewOf(load: LoadResult, ref: string): DocView | undefined {
-  const scope = new Scope(load.registry, load.resolve);
+/**
+ * The view of one document by path (an alias is accepted); undefined when there is no such document. A caller
+ * drawing many documents of one tree hands in its `treeReadsOf` once, rather than checking the tree per view.
+ */
+export function viewOf(load: LoadResult, ref: string, reads: TreeReads = treeReadsOf(load)): DocView | undefined {
+  const { scope } = reads;
   const doc = scope.any(ref);
   if (!doc) return undefined;
-  const view = baseView(scope, load, doc, referenceIndex(load, scope));
+  const view = baseView(reads, doc);
   if (doc.kind === 'graph') view.graph = graphView(scope, doc as Loaded<GraphDoc>);
   if (doc.kind === 'port') view.implementations = implementationsOf(scope, doc.path);
   if (doc.kind === 'trigger') triggerView(scope, doc, view);
