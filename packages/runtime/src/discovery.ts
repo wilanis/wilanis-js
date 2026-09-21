@@ -1,10 +1,9 @@
 /**
- * `wilanis ls`, `wilanis describe` and `wilanis map`: what one tree holds, what one document says, and how the tree hangs
- * together, each answered as lines one terminal prints.
+ * `wilanis ls` and `wilanis describe`: what one tree holds and what one document says, each answered as lines one
+ * terminal prints. How the tree hangs together is `wilanis map`, in `map.ts` beside this.
  */
 import type { LoadResult } from '@wilanis/core';
 import {
-  type BindingDoc,
   type Kind,
   type Loaded,
   type PolicyDoc,
@@ -27,9 +26,8 @@ import { graphLines } from './graph-said.js';
 import { holdsLines, invariantLines } from './invariant-lines.js';
 import { fieldLine, portLines, shower, storeLines } from './lines.js';
 import { requiredByLines, requiresLines } from './required-said.js';
-import { scopeTail, viewsOfTrigger } from './scope-said.js';
+import { viewsOfTrigger } from './scope-said.js';
 import { shapeLines } from './shape-said.js';
-import { storeTail } from './stores.js';
 
 // ---- discovery --------------------------------------------------------------------------------------
 
@@ -251,127 +249,4 @@ export function describe(load: LoadResult, ref: string): string {
   const showType = shower(scope);
   lines.push(...kindBody(doc, load, scope, showType));
   return lines.join('\n');
-}
-
-/** trigger → graph → ports → bindings → graphs, as one tree. */
-/** Where one node of one graph leads: one switch's routes, one native operation, or the binding that meets it. */
-function nodeLines(node: Record<string, unknown>, indent: string, walk: Walk): { lines: string[]; into?: string } {
-  const { scope } = walk;
-  const id = String(node.id);
-  if (!('run' in node)) {
-    const rules = node.rules as { to: string }[];
-    return { lines: [`${indent}  ${id} [switch → ${[...rules.map(rule => rule.to), node.else].join(' | ')}]`] };
-  }
-  const run = String(node.run);
-  const found = scope.op(run);
-  if (typeof found === 'string') return { lines: [`${indent}  ${id} ?? ${run}`] };
-  if (found.port.native) {
-    const effect = found.op.pure ? '' : '  (effect)';
-    const given = node.in as Record<string, unknown>;
-    const tail = `${storeTail(run, given, scope)}${scopeTail(run, given, scope)}`;
-    return { lines: [`${indent}  ${id} ${run}${effect}${tail}`] };
-  }
-  const binding = scope.bindingFor(found.path, walk.profile);
-  const lines = [`${indent}  ${id} ${run}`];
-  if (typeof binding === 'string') return { lines: [...lines, `${indent}    ?? ${binding}`] };
-  const op = binding.doc.operations[found.opName];
-  lines.push(`${indent}    ${binding.path}#${found.opName}${op?.run ? ` → ${op.run}` : ''}`);
-  return { lines, into: op?.graph };
-}
-
-/**
- * What one walk of the map carries: the scope it reads, the profile that chooses a binding where a port has
- * several, the graphs it has written, and every graph it reached.
- */
-interface Walk {
-  scope: Scope;
-  /** Chooses each domain port's binding as `rehearse` does; without one, a port with several is said to need it. */
-  profile?: string;
-  /** Written once per trigger, so a graph two triggers reach is drawn under each. */
-  seen: Set<string>;
-  /** Shared across the whole map: what is left over is the orphans. */
-  reached: Set<string>;
-}
-
-/**
- * One graph and everything it reaches, indented; one graph already seen is named but not walked again. A graph
- * whose effects move together is marked where the map names it, so a reader of the tree sees the transaction
- * without opening the document.
- */
-function mappedGraph(ref: string, indent: string, walk: Walk): string[] {
-  const graph = walk.scope.get('graph', ref);
-  if (!graph) return [`${indent}?? ${ref}`];
-  walk.reached.add(graph.path);
-  const lines = [`${indent}${graph.path}${graph.doc.atomic ? '  [atomic]' : ''}`];
-  if (walk.seen.has(graph.path)) return lines;
-  walk.seen.add(graph.path);
-  for (const node of graph.doc.nodes) {
-    const said = nodeLines(node as unknown as Record<string, unknown>, indent, walk);
-    lines.push(...said.lines);
-    if (said.into) lines.push(...mappedGraph(said.into, `${indent}      `, walk));
-  }
-  return lines;
-}
-
-/** The policies one trigger is gated by, in order. */
-function gateLines(trigger: Loaded<TriggerDoc>, scope: Scope): string[] {
-  const lines: string[] = [];
-  for (const use of trigger.doc.policies ?? []) {
-    const ref = policyPath(use);
-    const policy = scope.get('policy', ref);
-    const decides = policy ? ` → ${policy.doc.decide.run}` : '';
-    const given = typeof use !== 'string' && use.in ? `  given ${Object.keys(use.in).join(', ')}` : '';
-    lines.push(`  gated by ${policy?.path ?? `?? ${ref}`}${decides}${given}`);
-  }
-  return lines;
-}
-
-/**
- * The bindings drawn under the port one trigger fires: the one the profile chooses, or every binding of the port
- * when no profile was given -- and the reason, where a profile was given and still chooses none.
- */
-function bindingsShown(portPath: string, walk: Omit<Walk, 'seen'>): { bindings: Loaded<BindingDoc>[]; why?: string } {
-  if (walk.profile === undefined) return { bindings: walk.scope.bindingsFor(portPath) };
-  const chosen = walk.scope.bindingFor(portPath, walk.profile);
-  return typeof chosen === 'string' ? { bindings: [], why: chosen } : { bindings: [chosen] };
-}
-
-/** What each binding of the port one trigger fires meets it with, and the graph behind it. */
-function firesLines(trigger: Loaded<TriggerDoc>, load: LoadResult, walk: Omit<Walk, 'seen'>): string[] {
-  const port = load.registry.get('port', load.resolve(trigger.doc.fire.run.split('#')[0]));
-  const opName = trigger.doc.fire.run.split('#')[1];
-  const lines = [`  ${trigger.doc.fire.run}`];
-  if (!port) return lines;
-  const shown = bindingsShown(port.path, walk);
-  if (shown.why) lines.push(`    ?? ${shown.why}`);
-  for (const binding of shown.bindings) {
-    const op = binding.doc.operations[opName];
-    if (op?.graph) lines.push(...mappedGraph(op.graph, '    ', { ...walk, seen: new Set() }));
-    else if (op?.run) lines.push(`    ${binding.path}#${opName} → ${op.run}`);
-  }
-  return lines;
-}
-
-/**
- * Every trigger of the tree, everything each one reaches, and the graphs nothing reaches. The graphs reached
- * are gathered as the walk goes rather than read back off its lines: a line carries marks beside the path
- * (`[atomic]`), and a graph must not become an orphan because of how it is written down.
- *
- * Under a profile, each domain port is met by the binding the profile chooses, as `rehearse` chooses it; without
- * one, every binding is drawn, and a call on a port with several says so. A graph only another profile's binding
- * reaches is then an orphan under this one, which is what the profile means.
- */
-export function map(load: LoadResult, profile?: string): string[] {
-  const scope = new Scope(load.registry, load.resolve);
-  const lines: string[] = [];
-  const reached = new Set<string>();
-  for (const trigger of load.registry.all('trigger')) {
-    lines.push(`${trigger.path}  (${trigger.doc.kind})`);
-    lines.push(...gateLines(trigger, scope));
-    // under the gates, since an invariant is a rule about what those gates must be, not another gate
-    lines.push(...holdsLines(trigger, scope));
-    lines.push(...firesLines(trigger, load, { scope, profile, reached }));
-  }
-  for (const graph of load.registry.all('graph')) if (!reached.has(graph.path)) lines.push(`orphan  ${graph.path}`);
-  return lines;
 }
