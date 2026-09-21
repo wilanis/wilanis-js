@@ -9,7 +9,7 @@ import type { BlobHandle, Trace } from '@wilanis/core';
 import { KINDS, type Kind, type LoadResult } from '@wilanis/core';
 import { loadProject } from './project.js';
 import { runTrigger, start } from './serve.js';
-import { describe, fuzz, init, ls, map, migrate, regress, rehearse, scaffold } from './tools.js';
+import { describe, fuzz, init, ls, map, migrate, regress, rehearse, SCENARIOS, scaffold } from './tools.js';
 import { atLevel, type Level, traceJson, traceText } from './trace.js';
 
 /** Every flag `wilanis migrate` knows; anything else is exit 2, since a misspelt flag must never silently plan. */
@@ -30,7 +30,7 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
                    --allow-destructive names each as <connection>/<target>, the pair that names a table
   wilanis ls       [root] [kind]                   every document, or those of one kind
   wilanis describe <path> [root]                   a document, with its contract laid out
-  wilanis map      [root]                          trigger → graph → port → binding → graph
+  wilanis map      [root] [--profile word]         trigger → graph → port → binding → graph
   wilanis new      <kind> <name|path> [root] [--layer edge|data] [--port word] [--run word#op] [--kind k]
                    [--of shape] [--over word#op] [--on shape]
                    kinds: project feature shape port graph binding store trigger policy resolvers invariant
@@ -128,6 +128,10 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
   },
   fuzz: async ({ flags, rootArg }) => {
     const loaded = await check(rootArg(0));
+    // said first, so whoever sees the directory appear knows it is generated and kept out of git, as .wilanis/ is
+    console.log(
+      `writing scenarios to ${join(loaded.root, SCENARIOS)} -- generated, and ignored by git as .wilanis/ is`,
+    );
     const written = await fuzz(loaded, { runs: flags.runs ? Number(flags.runs) : undefined, profile: flags.profile });
     console.log(written.map(file => `wrote ${file}`).join('\n'));
   },
@@ -207,8 +211,8 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
   describe: async ({ positional, rootArg }) => {
     console.log(describe(await load(rootArg(1)), positional[0]));
   },
-  map: async ({ rootArg }) => {
-    console.log(map(await load(rootArg(0))).join('\n'));
+  map: async ({ flags, rootArg }) => {
+    console.log(map(await load(rootArg(0)), flags.profile).join('\n'));
   },
   new: async ({ flags, positional, rootArg }) => {
     const [kind, target] = positional;

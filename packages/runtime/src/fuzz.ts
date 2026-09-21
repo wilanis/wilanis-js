@@ -5,11 +5,14 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { LoadResult } from '@wilanis/core';
-import { type ScenarioDoc, schemaUrl } from '@wilanis/core';
+import { HOME, type ScenarioDoc, schemaUrl } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
 import { embedderFor, generatedFire } from './stubbing.js';
 
 // ---- fuzz / regress ----------------------------------------------------------------------------------
+
+/** Where fuzz writes, under the root: the one directory placement says a scenario lives in (HOME, D008). */
+export const SCENARIOS = HOME.scenario?.dir ?? 'scenarios';
 
 /**
  * What one node did: how it ended, the operation it ran, where a switch routed, and what it answered. The
@@ -44,7 +47,7 @@ export async function fuzz(
   opts: { runs?: number; profile?: string; out?: string } = {},
 ): Promise<string[]> {
   const written: string[] = [];
-  const dir = join(load.root, opts.out ?? 'scenarios');
+  const dir = join(load.root, opts.out ?? SCENARIOS);
   mkdirSync(dir, { recursive: true });
   for (const trigger of load.registry.all('trigger')) {
     for (let seed = 1; seed <= (opts.runs ?? 5); seed++) {

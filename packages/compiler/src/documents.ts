@@ -1,7 +1,7 @@
 /**
  * What both judges read off a document: the variables a call site binds, the inputs a delegation passes
- * on, the nodes a graph answers with, and which collection of which store a native call site is over. The
- * checker and the compiler agree on these by sharing them.
+ * on, the nodes a graph answers with, which collection of which store a native call site is over, and which
+ * connection it goes to. The checker and the compiler agree on these by sharing them.
  */
 import {
   type Field,
@@ -123,4 +123,26 @@ export function collectionOf(scope: Scope, site: CallSite): CollectionSite | und
   const store = scope.get('store', named);
   if (!store || !(collection in store.doc.collections)) return undefined;
   return { store: store.path, collection };
+}
+
+/**
+ * The canonical connection a native call goes to, or nothing where the call does not say. It is read from
+ * one of the two static fields such an operation accepts (C009): `connection`, a connection document's path,
+ * or `store`, the path of a store document that names one. The atomic rules read it for where a transaction
+ * falls, and the reach of a profile for which connections it needs.
+ *
+ * It stays quiet throughout. A field that is absent, or names a document that is not there, is the business
+ * of the rules that judge the call site and the store itself (R001 from `checkStore`), so a tree with one
+ * fault answers one refusal rather than the same fault told twice.
+ */
+export function connectionOf(scope: Scope, op: Operation, given: Values | undefined): string | undefined {
+  const named = (field: string): string | undefined => {
+    const value = given?.[field];
+    return op.accepts?.[field]?.static && typeof value === 'string' ? value : undefined;
+  };
+  const direct = named('connection');
+  if (direct) return scope.get('connection', direct) ? scope.canon(direct) : undefined;
+  const store = named('store');
+  const doc = store ? scope.get('store', store) : undefined;
+  return doc ? scope.canon(doc.doc.connection) : undefined;
 }

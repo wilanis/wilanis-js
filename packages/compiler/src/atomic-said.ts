@@ -18,7 +18,7 @@
  * where it reaches nothing transactional, so what is described here is a graph waiting to be bound.
  */
 import type { GraphDoc, Loaded, Scope } from '@wilanis/core';
-import { profilesReaching, reachOf } from './check/atomic.js';
+import { atomicReachOf, profilesReaching } from './check/atomic.js';
 import { refusalsOfGraph } from './refusals.js';
 
 /** What one atomic graph commits, where, and what undoes it. */
@@ -40,7 +40,7 @@ function transactionOf(scope: Scope, graph: Loaded<GraphDoc>, profiles: (string 
   const connections = new Set<string>();
   const participants = new Set<string>();
   for (const profile of profiles) {
-    for (const effect of reachOf(scope, graph, profile).effects) {
+    for (const effect of atomicReachOf(scope, graph, profile).effects) {
       if (!effect.transactional) continue;
       if (effect.connection) connections.add(effect.connection);
       participants.add(effect.from);
