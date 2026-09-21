@@ -30,7 +30,20 @@ export function checkWhole(graph: WholeGraph): void {
   checkOutput(graph, dependencies);
   checkUnusedIn(graph);
   checkUnusedConstants(graph);
-  checkUnusedNodes(graph);
+  checkUnusedNodes(graph, dependencies);
+}
+
+/** Does a node sit behind a switch: routed itself, or reading something that is? Otherwise it runs on every branch. */
+function routed(
+  graph: WholeGraph,
+  dependencies: Map<string, Set<string>>,
+  id: string,
+  seen = new Set<string>(),
+): boolean {
+  if (seen.has(id)) return false;
+  seen.add(id);
+  if (graph.routedBy.has(id)) return true;
+  return [...(dependencies.get(id) ?? [])].some(dependency => routed(graph, dependencies, dependency, seen));
 }
 
 /** G007. */
@@ -99,13 +112,8 @@ function checkCandidate(graph: WholeGraph, id: string): void {
 
 /** Candidates are alternatives: one that no switch routes always settles, so later candidates are dead. */
 function checkAlternatives(graph: WholeGraph, candidates: string[], dependencies: Map<string, Set<string>>): void {
-  const routed = (id: string, seen = new Set<string>()): boolean => {
-    if (seen.has(id)) return false;
-    seen.add(id);
-    return graph.routedBy.has(id) || [...(dependencies.get(id) ?? [])].some(dependency => routed(dependency, seen));
-  };
   for (const id of candidates) {
-    if (!graph.reads.table.nodes.has(id) || routed(id)) continue;
+    if (!graph.reads.table.nodes.has(id) || routed(graph, dependencies, id)) continue;
     const message = `out.from candidate '${id}' is never routed -- it always settles, so later candidates are dead`;
     graph.refuse('G010', message, 'out/from', 'candidates are alternatives; each one sits behind a switch');
   }
@@ -134,15 +142,20 @@ function checkUnusedConstants(graph: WholeGraph): void {
   }
 }
 
-/** G008: every node's answer is read by another node or named in out.from. */
-function checkUnusedNodes(graph: WholeGraph): void {
+/**
+ * G008: every node's answer is read by another node or named in out.from. An effect nothing reads and no
+ * switch routes is the one case the hint names the idiom for: a node runs when its inputs are ready, whatever
+ * a switch chose, so that effect runs on every branch -- the author most often meant it to sit under one.
+ */
+function checkUnusedNodes(graph: WholeGraph, dependencies: Map<string, Set<string>>): void {
   for (const node of graph.reads.table.nodes.values()) {
     if (isSwitch(node) || graph.reads.readNodes.has(node.id)) continue;
-    graph.refuse(
-      'G008',
-      `node '${node.id}' is read by nothing`,
-      `nodes/${node.id}`,
-      'wire its result into another node, or name it in out.from',
-    );
+    const hit = graph.reads.table.ops.get(node.id);
+    const effect = hit !== undefined && hit.op.pure !== true;
+    const hint =
+      effect && !routed(graph, dependencies, node.id)
+        ? `nothing routes to '${node.id}', so it runs on every branch: make it the 'to' of a switch rule, or read its answer from every branch`
+        : 'wire its result into another node, or name it in out.from';
+    graph.refuse('G008', `node '${node.id}' is read by nothing`, `nodes/${node.id}`, hint);
   }
 }
