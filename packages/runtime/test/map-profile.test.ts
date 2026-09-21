@@ -3,8 +3,8 @@
  * in-memory store and PostgreSQL -- and a profile chooses one, as `rehearse` chooses it. Without a profile the map
  * draws every binding and says the port needs one; under a profile it draws the chosen binding alone, and never
  * the `??` line, since there is nothing left to choose. What the other profiles' bindings run is then named after
- * the triggers, bound by whoever runs it, and never called an orphan: that word keeps meaning a graph no binding
- * of any profile reaches.
+ * the triggers, bound by whoever runs it, and never called an orphan: that word means a graph the checker's walk
+ * enters under no profile at all, which over the example is none.
  */
 import { rmSync } from 'node:fs';
 import { loadTree, schemaUrl } from '@wilanis/core';
@@ -103,12 +103,18 @@ describe('map under a profile', () => {
     expect(map(example).filter(line => line.startsWith('unreached under '))).toEqual([]);
   });
 
-  it('keeps orphan for a graph no binding of any profile reaches, with a profile and without', () => {
+  it('calls nothing in the example an orphan: every graph is entered under some profile', () => {
+    // the policy graphs run at every gate, the digest's list graphs behind `listAll` mid-walk, `record-each`
+    // under a `map` node's nested spec, the CSV graphs behind `import` and `export`: the drawing above stops
+    // short of each, and the checker's walk enters them all, so the word reads that walk and not the drawing
+    for (const profile of [undefined, 'local', 'production', 'live']) {
+      expect(map(example, profile).filter(line => line.startsWith('orphan '))).toEqual([]);
+    }
+  });
+
+  it('calls a graph no binding names the one orphan, with a profile and without', () => {
     const orphans = (load = planted, profile?: string) => map(load, profile).filter(line => line.startsWith('orphan '));
-    const before = orphans(example);
-    expect(before).not.toContain(`orphan  ${NOBODY}`);
-    expect(orphans()).toContain(`orphan  ${NOBODY}`);
-    expect(orphans().filter(line => line !== `orphan  ${NOBODY}`)).toEqual(before);
+    expect(orphans()).toEqual([`orphan  ${NOBODY}`]);
     expect(orphans(planted, 'local')).toEqual(orphans());
     expect(orphans(planted, 'production')).toEqual(orphans());
     // the orphan comes after what the other profiles run, so the tail reads: theirs, then nobody's

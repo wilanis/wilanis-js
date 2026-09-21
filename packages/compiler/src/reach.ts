@@ -164,11 +164,22 @@ export interface Reach {
  * profile and a connection stands in for itself: `startup[].profiles` and `connectionFor` narrow both there.
  */
 export function reachOf(scope: Scope, profile: string | undefined): Reach {
-  const reaching = new Reaching(scope, profile);
+  return rooted(new Reaching(scope, profile)).done();
+}
+
+/** The canonical path of every graph a profile's walk enters, from the roots `reachOf` starts at, each once. */
+export function graphsReachedBy(scope: Scope, profile: string | undefined): string[] {
+  const graphs: string[] = [];
+  rooted(new Reaching(scope, profile, graphs));
+  return graphs;
+}
+
+/** One reader walked from every root: the triggers and their policies, the required ports, the startup steps. */
+function rooted(reaching: Reaching): Reaching {
   reaching.triggers();
   reaching.required();
   reaching.startup();
-  return reaching.done();
+  return reaching;
 }
 
 /** The reader of the walk that gathers a profile's reach: the roots it starts at, and what it keeps of each site. */
@@ -181,9 +192,16 @@ class Reaching implements Listener<Root> {
   constructor(
     private readonly scope: Scope,
     profile: string | undefined,
+    /** Where each graph entered is written, for a reader after the graphs rather than the effects. */
+    private readonly graphs?: string[],
   ) {
     this.walk = new Walk(scope, profile, this);
     this.projectPath = scope.registry.project?.path ?? 'project.json';
+  }
+
+  /** A graph entered: its path kept where a reader asked for the graphs; the walk enters each once. */
+  graph(entered: Loaded<GraphDoc>): void {
+    this.graphs?.push(entered.path);
   }
 
   /** A native site: kept where its operation is not pure, with the connection its inputs name. */
