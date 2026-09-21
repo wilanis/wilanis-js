@@ -1,10 +1,11 @@
 name: pages
 
-# What wilanis.dev serves: the example, drawn by the viewer, with nothing running behind it.
-# `wilanis-view --static` writes the page and every answer it would otherwise ask a server for, so the site is
-# files on a CDN: no tree is loaded, no document is run, and no path outside this repository is named. A
-# document the viewer cannot draw fails this job rather than the page. The demo sits at /example/ so the root
-# is free for whatever the site becomes.
+# What wilanis.dev serves, with nothing running behind it: the example drawn by the viewer at /example/, the
+# demo's page at /demo/, the arena's page at /arena/, and a landing page at the root (docs/site/index.html).
+# `wilanis-view --static` writes the example's page and every answer it would otherwise ask a server for, so
+# the site is files on a CDN: no tree is loaded, no document is run, and no path outside this repository is
+# named. A document the viewer cannot draw, or a demo step that no longer plays, fails this job rather than
+# the page.
 
 on:
   push:
@@ -35,17 +36,19 @@ jobs:
       - run: npm run build
       - name: the example, written out as files
         run: npx wilanis-view example --static _site/example
-      - name: the domain, and a root that points at the demo
+      - name: the demo, run and written only if every step passes
+        # build.mjs plays the demo against a copy of the example and asserts each step's payoff; a demo that
+        # no longer plays fails the deploy here rather than publishing a stale record.
+        run: |
+          node docs/demo/build.mjs
+          mkdir -p _site/demo && cp docs/demo/index.html _site/demo/index.html
+      - name: the arena, as last run by hand
+        # the arena needs the claude CLI and an account, so it cannot run here; docs/demo/arena/run.sh refreshes it
+        run: mkdir -p _site/arena && cp docs/demo/arena/index.html _site/arena/index.html
+      - name: the domain, and the root
         run: |
           echo 'wilanis.dev' > _site/CNAME
-          cat > _site/index.html <<'HTML'
-          <!doctype html>
-          <meta charset="utf-8">
-          <title>wilanis</title>
-          <meta http-equiv="refresh" content="0; url=/example/">
-          <link rel="canonical" href="https://wilanis.dev/example/">
-          <p><a href="/example/">The example, drawn by the viewer.</a>
-          HTML
+          cp docs/site/index.html _site/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

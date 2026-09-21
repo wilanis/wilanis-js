@@ -8,3 +8,5 @@ coverage
 .wilanis/
 scenarios/
 _site
+# written by node docs/demo/build.mjs from a passing run, at deploy; the arena's page stays committed
+docs/demo/index.html

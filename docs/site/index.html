@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>wilanis</title>
+<meta name="description" content="A language for programs made of effects, written as JSON documents, with a compiler that judges the whole tree before anything runs.">
+<style>
+:root { color-scheme: light dark; --bg: #fff; --fg: #1a1a1a; --mute: #5c5c5c; --line: #d9d9d9; --link: #0b57d0; }
+@media (prefers-color-scheme: dark) { :root { --bg: #131313; --fg: #e6e6e6; --mute: #a0a0a0; --line: #333; --link: #8ab4f8; } }
+* { box-sizing: border-box; }
+html { background: var(--bg); color: var(--fg); }
+body { margin: 0 auto; padding: 2rem 16px 3rem; max-width: 42rem; font: 17px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+h1 { font-size: 2rem; line-height: 1.2; margin: 1rem 0 .5rem; }
+p { margin: .6rem 0; }
+a { color: var(--link); }
+ul { list-style: none; padding: 0; margin: 2rem 0 0; }
+li { padding: 1rem 0; border-top: 1px solid var(--line); }
+li a { font-size: 1.15rem; font-weight: 600; text-decoration: none; }
+li a:hover { text-decoration: underline; }
+li p { color: var(--mute); margin: .25rem 0 0; }
+footer { margin-top: 3rem; color: var(--mute); font-size: .9rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+code { font: 90% ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+</style>
+</head>
+<body>
+<h1>wilanis</h1>
+<p>A language for programs made of effects, written as JSON documents, with a compiler that judges the whole
+tree before anything runs. You describe the shapes, the contracts between the parts, how data flows through
+them, what may enter and what gates it. The compiler reads every file and proves they fit together. A small
+engine runs what it approved, and everything that touches the world, a route, a command, a file, a database,
+is a plugin behind a port the tree declares. The language never learns what HTTP is.</p>
+<ul>
+<li><a href="/example/">The example, drawn by the viewer</a>
+<p>Every document of the example tree, read as the compiler reads it: routes, ports, bindings, graphs, policies, invariants, and how a refusal is answered from both ends. Nothing runs behind this page.</p></li>
+<li><a href="/demo/">The demo, as a record of one run</a>
+<p>The route written a year later: an agent adds a write route without having read the rule, and the compiler talks back until the route is honest about every way it can end. Every output on the page is what that run printed; the page is written only when every step passes.</p></li>
+<li><a href="/arena/">The arena, three agents behind one gate</a>
+<p>Three models given the same unsupervised task in identical copies of the example, with an acceptance test as the gate. What each decided, what it cost, the gate's verdict on each, and the same nine calls against each result. Run again with one command.</p></li>
+</ul>
+<footer><p>Pre-1.0. The source, the RFCs and the roadmap are on <a href="https://github.com/wilanis/wilanis-js">GitHub</a>. <code>wilanis check example</code> says how many documents the example is.</p></footer>
+</body>
+</html>
