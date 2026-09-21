@@ -31,11 +31,12 @@ const view = (path: string): DocView => {
 
 describe('the view model of an atomic data graph', () => {
   it('carries the connection its one transaction falls on, which no node of it writes down', () => {
-    // the nodes name a store and a collection; the store names the connection. 'invariant' is beside
-    // 'upstream' because the guard the compiler lowers at this graph's `row` refuses inside the transaction
+    // the nodes name a store and a collection; the store names the connection. 'conflict' is the graph's own,
+    // for a unique the store answered violated; 'invariant' is beside 'upstream' because the guard the compiler
+    // lowers at this graph's `row` refuses inside the transaction
     expect(view(LATEST).graph?.atomic).toEqual({
       connections: ['@connections/entries.connection.json'],
-      rollsBackOn: ['invariant', 'upstream'],
+      rollsBackOn: ['conflict', 'invariant', 'upstream'],
     });
   });
 
