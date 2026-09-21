@@ -1,11 +1,12 @@
 /**
  * `wilanis new` and `wilanis init`: the documents a tree starts from. Where each kind lives is placement's business
- * (HOME in core), so this module only says what one looks like when it is first written.
+ * (HOME in core), so this module only says what one looks like when it is first written -- and asks placement,
+ * before writing, whether the place it chose is one `wilanis check` would refuse.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type AnyDoc, type Kind, schemaUrl } from '@wilanis/core';
+import { type AnyDoc, featureOf, type Kind, misplaced, schemaUrl } from '@wilanis/core';
 
 // ---- scaffolds -------------------------------------------------------------------------------------
 
@@ -24,6 +25,38 @@ function into(target: string, layer: 'edge' | 'domain' | 'data', kind: string): 
     return target + suffix;
   }
   return `${layer}/${target}${suffix}`;
+}
+
+/** The features a tree has: the directories under features/, or none when there is no such directory yet. */
+function featuresOf(root: string): string[] {
+  const dir = join(root, 'features');
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true })
+    .filter(entry => entry.isDirectory())
+    .map(entry => entry.name)
+    .sort();
+}
+
+/**
+ * Why one scaffolded file may not be written, or nothing: it sits where `wilanis check` would refuse it as D008.
+ * Placement is asked through core's `misplaced`, never restated here, so the tool and the checker agree by
+ * construction. A bare name puts a kind that lives inside a feature at the tree's root, where no feature is: the
+ * hint says the path to give instead, in the layer the scaffold chose, and which features there are to give it under.
+ */
+function refusedPlace(
+  asked: { root: string; kind: string; target: string },
+  rel: string,
+  doc: unknown,
+): string | undefined {
+  const refusal = misplaced({ kind: asked.kind as Kind, file: rel, feature: featureOf(rel), doc });
+  if (!refusal) return undefined;
+  if (asked.target.includes('/')) return `${rel}: ${refusal.message}; ${refusal.hint}`;
+  const layer = rel.split('/')[0];
+  const features = featuresOf(asked.root);
+  const under = features.length
+    ? `where <feature> is one of ${features.join(', ')}`
+    : 'after wilanis new feature <feature>, since this tree has none yet';
+  return `${refusal.message}; give the path: features/<feature>/${layer}/${asked.target}, ${under}`;
 }
 
 /** What `wilanis new <kind>` writes: one builder per kind, each answering the files it creates. */
@@ -229,6 +262,11 @@ export function scaffold(
       `unknown kind '${kind}'; one of project, feature, shape, port, graph, binding, store, trigger, policy, resolvers, invariant`,
     );
   const files = build(target, opts);
+  // placement first, for every file: nothing is written that the checker would then refuse
+  for (const [rel, doc] of files) {
+    const why = refusedPlace({ root, kind, target }, rel, doc);
+    if (why) throw new Error(why);
+  }
   const written: string[] = [];
   for (const [rel, doc] of files) {
     const abs = join(root, rel);
