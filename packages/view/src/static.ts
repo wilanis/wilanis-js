@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import type { PluginModule } from '@wilanis/core';
 import { WILANIS } from '@wilanis/core';
 import { loadProject } from '@wilanis/runtime';
-import { indexOf, schemaRelOf, schemaViewOf, viewOf } from './model.js';
+import { indexOf, schemaRelOf, schemaViewOf, treeReadsOf, viewOf } from './model.js';
 import { PAGE, versionOf } from './serve.js';
 
 export interface SiteOptions {
@@ -63,8 +63,10 @@ export async function siteOf(root: string, opts: SiteOptions = {}): Promise<Reco
   const files: Record<string, unknown> = {
     'index.json': withoutPrefix({ ...index, version: versionOf(tree) }, prefix),
   };
+  // the check and the reference index are over the whole tree, so one site reads them once, not once per page
+  const reads = treeReadsOf(load);
   for (const entry of index.docs) {
-    const view = viewOf(load, entry.path);
+    const view = viewOf(load, entry.path, reads);
     if (view) files[fileOf(entry.path)] = withoutPrefix(view, prefix);
   }
   for (const [rel, schema] of Object.entries(await schemasOf())) files[`schemas/${rel}`] = schemaViewOf(rel, schema);
