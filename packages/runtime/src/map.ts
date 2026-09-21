@@ -1,8 +1,9 @@
 /**
  * `wilanis map`: how the tree hangs together -- trigger → graph → ports → bindings → graphs, as one tree of lines a
  * terminal prints. Under a profile the map draws what that profile runs; what the other profiles run is named
- * after it, and only a graph no binding of any profile reaches is an orphan.
+ * after it, and only a graph the tree reaches under no profile at all is an orphan.
  */
+import { graphsReachedBy, profilesOf } from '@wilanis/compiler';
 import type { LoadResult } from '@wilanis/core';
 import { type BindingDoc, type Loaded, policyPath, Scope, type TriggerDoc } from '@wilanis/core';
 import { holdsLines } from './invariant-lines.js';
@@ -148,13 +149,29 @@ function walked(load: LoadResult, scope: Scope, profile?: string): { lines: stri
 // ---- map ---------------------------------------------------------------------------------------------
 
 /**
+ * The graphs the tree enters under no profile at all: what `reachOf` walks -- every trigger's `fire`, every
+ * policy a trigger attaches, every required port, every startup step -- taken over each declared profile, or the
+ * unnamed one, and subtracted from the graphs the tree has. The drawing above follows a trigger into the graph
+ * behind it and no further than its nodes; the checker's walk is what says whether a graph runs, so it is what
+ * the word `orphan` reads.
+ */
+function orphans(load: LoadResult, scope: Scope): string[] {
+  const entered = new Set<string>();
+  for (const profile of profilesOf(scope)) for (const path of graphsReachedBy(scope, profile)) entered.add(path);
+  return load.registry
+    .all('graph')
+    .filter(graph => !entered.has(graph.path))
+    .map(graph => graph.path);
+}
+
+/**
  * Every trigger of the tree, everything each one reaches, and the graphs nothing reaches.
  *
  * Under a profile, each domain port is met by the binding the profile chooses, as `rehearse` chooses it; without
  * one, every binding is drawn, and a call on a port with several says so. A graph only another profile's binding
  * reaches is not dead -- it is the other half of what profiles are for -- so it is named after the triggers as
  * `unreached under <profile>`, with the binding that runs it, and a reader can follow it there. An orphan keeps
- * its meaning whatever the profile: a graph no binding of any profile reaches.
+ * its meaning whatever the profile: a graph the tree reaches under none of them.
  */
 export function map(load: LoadResult, profile?: string): string[] {
   const scope = new Scope(load.registry, load.resolve);
@@ -166,6 +183,6 @@ export function map(load: LoadResult, profile?: string): string[] {
     if (!bound || under.reach.has(graph.path)) continue;
     lines.push(`unreached under ${profile}  ${graph.path}  bound by ${[...bound].sort().join(', ')}`);
   }
-  for (const graph of load.registry.all('graph')) if (!everywhere.has(graph.path)) lines.push(`orphan  ${graph.path}`);
+  for (const path of orphans(load, scope)) lines.push(`orphan  ${path}`);
   return lines;
 }
