@@ -112,6 +112,29 @@ A session is opened when a token is issued and carries attributes of a shape the
 and writes them through `@auth/session.port.json`, keyed by `request.session.id`, and `wilanis describe` on the
 shape lists who writes what.
 
+## Invariants are stated once
+
+An `invariant` lives in a feature's `domain/` and states a rule the whole tree is held to, so that no document
+has to remember it. An **access** invariant names domain port operations and the gate every way in that reaches
+them must attach; reaching is transitive, so a graph cannot route around it by calling the operation itself, and
+a trigger that reaches one of those operations without the gate is I001. A **field** invariant names a core shape
+and a rule over its fields in the `switch` grammar (`len(url) > 0 && (method != 'DELETE' || has(agent))`).
+
+A field invariant is judged where a value of the shape comes into being: a node that makes one, and a graph that
+takes one as `in`. Where the rule is established there -- every root a literal, or a `switch` that routes to the
+node having already said it, or the value read whole from another site of the same shape -- the site is proved
+and costs nothing. Where it is not, the compiler lowers a guard the author never writes: a `switch` on the rule
+routing to the value when it holds and to a refusal with the reserved reason `invariant` when it does not. The
+trigger maps that reason like any other (T005), and `wilanis rehearse` reports each site as proved or guarded.
+
+**A field invariant guards the value a graph answers, not the row a store keeps.** The guard stands at the site,
+and a site is where the value is made -- so a graph that writes before it answers has already written when the
+guard fires. Patch a record into a state the rule forbids and the patch commits, the guard refuses the answer,
+and the row stays as it was written: every later read of it is guarded too, and refuses. Until that changes
+(issue #489, RFC 0033), write the graph so the decision precedes the effect -- read the record, `switch` on the
+rule, and reach the write only from the branch that holds -- or mark the graph `atomic`, so that the refusal
+ends the transaction and the write rolls back with it.
+
 ## A tree includes trees
 
 `project.json → includes` names npm packages whose `features/` load as if they sat here -- the same paths, the

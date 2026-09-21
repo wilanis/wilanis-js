@@ -140,6 +140,10 @@ input) each get a milestone with its own demo when someone picks them up. RFC 00
 rather than on work: the operation it was written for, RFC 0002's `raw`, is left out of that RFC on
 purpose, and the next consumer is the fault message RFC 0019 asks for, under M13.
 
+RFC 0033 (a guard before the write) is unscheduled for a different reason: it corrects RFC 0007, which M06
+already demonstrated, and it carries no demo of its own. It lays out three ways to close the hole and picks
+none, so there is nothing to schedule until the maintainer chooses one; the milestone is set with the option.
+
 ## Process RFCs
 
 RFC 0001 (the RFC process), RFC 0027 (fitness functions) and RFC 0028 (the principles hold) change how
