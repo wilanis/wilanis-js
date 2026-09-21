@@ -2,16 +2,16 @@
  * P resolvers. A resolvers document names reads of the request; a data graph, a binding or a store binds each
  * read it takes under `reads`, local name -> `@path#resolver`, and reads {{name}}. Each document is judged once
  * here (P002, P003) and each entry of a `reads` map is judged where it is written (P004, P006, L002); whether
- * the trigger kinds that reach a read hand it is judged at the trigger (T004). Also the walk that finds every
- * request.* path an operation reaches through its binding, which B008 and T004 hold their callers to.
+ * the trigger kinds that reach a read hand it is judged at the trigger (T004). Also `opNeeds`, which finds every
+ * request.* path an operation reaches through its binding -- what B008, B009 and T004 hold their callers to --
+ * as one reader of the walk `reach.ts` makes for the reach of a profile.
  *
- * The walk has one edge no document writes: a native call site over a scoped collection reads the reads that
+ * The reads have one edge no document writes: a native call site over a scoped collection reads the reads that
  * collection is scoped by, because the compiler carries them there at lowering (RFC 0015). So a graph that
  * names no request at all still reaches one, and A006, T004 and B008 judge a scope's read the way they judge
  * any read a trigger reaches.
  */
 import {
-  isSwitch,
   type Loaded,
   type ResolverRead as ResolverSpec,
   type ResolversDoc,
@@ -20,6 +20,7 @@ import {
   type Values,
 } from '@wilanis/core';
 import { collectionOf } from '../documents.js';
+import { Walk } from '../reach.js';
 import { type Judge, type JudgedResolver, RESERVED, type Refuser, readValuesOf } from './judge.js';
 
 /**
@@ -176,40 +177,25 @@ function scopeNeeds(judge: Judge, run: string, given: Values | undefined): Reque
   return requestNeedsOf(resolvers, judge.scope.templateReads(Object.values(scoped)), store.path);
 }
 
-/** Every request.* path reachable from a domain port operation, through the binding that meets it under a profile. */
-export function opNeeds(
-  judge: Judge,
-  opRef: string,
-  profile: string | undefined,
-  seen = new Set<string>(),
-): RequestNeed[] {
-  const hit = judge.scope.op(opRef);
-  if (typeof hit === 'string' || hit.port.native) return [];
-  const binding = judge.scope.bindingFor(hit.path, profile);
-  if (typeof binding === 'string') return [];
-  const bound = binding.doc.operations[hit.opName];
-  if (!bound) return [];
-  if (bound.graph) return graphNeeds(judge, judge.scope.canon(bound.graph), profile, seen);
-  const resolvers = quietResolvers(judge, binding.doc.reads);
-  const out = requestNeedsOf(resolvers, judge.scope.templateReads(bound.in), binding.path);
-  if (bound.run) out.push(...scopeNeeds(judge, bound.run, bound.in));
-  return out;
-}
-
-/** Every request.* path read under a graph: its own `reads`, and per node the one binding operation it reaches. */
-function graphNeeds(judge: Judge, graphPath: string, profile: string | undefined, seen: Set<string>): RequestNeed[] {
-  if (seen.has(graphPath)) return [];
-  seen.add(graphPath);
-  const graph = judge.scope.registry.get('graph', graphPath);
-  if (!graph) return [];
-  const reads = graph.doc.nodes.flatMap(node => judge.scope.templateReads(readValuesOf(node)));
-  const out = requestNeedsOf(quietResolvers(judge, graph.doc.reads), reads, graph.path);
-  for (const node of graph.doc.nodes) {
-    if (isSwitch(node)) continue;
-    const hit = judge.scope.op(node.run);
-    if (typeof hit === 'string') continue;
-    if (hit.port.native) out.push(...scopeNeeds(judge, node.run, node.in));
-    else out.push(...opNeeds(judge, node.run, profile, seen));
-  }
+/**
+ * Every request.* path reachable from a domain port operation, through the binding that meets it under a
+ * profile: one reader of the walk `reachOf` makes (reach.ts). A graph reads through its own `reads` and every
+ * value its nodes write, a delegation through the binding's `reads` and its `in`, and a native site through the
+ * reads the collection it is over is scoped by.
+ */
+export function opNeeds(judge: Judge, opRef: string, profile: string | undefined): RequestNeed[] {
+  const out: RequestNeed[] = [];
+  const walk = new Walk<undefined>(judge.scope, profile, {
+    graph: graph => {
+      const reads = graph.doc.nodes.flatMap(node => judge.scope.templateReads(readValuesOf(node)));
+      out.push(...requestNeedsOf(quietResolvers(judge, graph.doc.reads), reads, graph.path));
+    },
+    delegation: (binding, _, bound) => {
+      const resolvers = quietResolvers(judge, binding.doc.reads);
+      out.push(...requestNeedsOf(resolvers, judge.scope.templateReads(bound.in), binding.path));
+    },
+    native: site => out.push(...scopeNeeds(judge, site.key, site.given)),
+  });
+  walk.operation(opRef, undefined);
   return out;
 }

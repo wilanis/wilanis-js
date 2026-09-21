@@ -9,29 +9,9 @@
  * the profile being judged, followed through nested domain operations. It is made per profile, since which
  * binding meets an operation is what a profile chooses.
  */
-import { type GraphDoc, isMap, isSwitch, type Loaded, type Operation, type Scope, type Values } from '@wilanis/core';
+import { type GraphDoc, isMap, isSwitch, type Loaded, type Scope, type Values } from '@wilanis/core';
+import { connectionOf } from '../documents.js';
 import { type Judge, underProfiles } from './judge.js';
-
-/**
- * The canonical connection a transactional call goes to, or nothing where the call does not say. It is read
- * from one of the two static fields such an operation accepts (C009): `connection`, a connection document's
- * path, or `store`, the path of a store document that names one.
- *
- * It stays quiet throughout. A field that is absent, or names a document that is not there, is the business
- * of the rules that judge the call site and the store itself (R001 from `checkStore`), so a tree with one
- * fault answers one refusal rather than the same fault told twice.
- */
-export function connectionOf(scope: Scope, op: Operation, given: Values | undefined): string | undefined {
-  const named = (field: string): string | undefined => {
-    const value = given?.[field];
-    return op.accepts?.[field]?.static && typeof value === 'string' ? value : undefined;
-  };
-  const direct = named('connection');
-  if (direct) return scope.get('connection', direct) ? scope.canon(direct) : undefined;
-  const store = named('store');
-  const doc = store ? scope.get('store', store) : undefined;
-  return doc ? scope.canon(doc.doc.connection) : undefined;
-}
 
 /** One effect an atomic graph reaches: what it runs, where that call is written, and whether it may take part. */
 export interface Reached {
@@ -60,7 +40,7 @@ export interface ReachedMap {
 }
 
 /** Everything the walk found below one atomic graph: the effects it reaches, and the maps among them. */
-export interface Reach {
+export interface AtomicReach {
   effects: Reached[];
   maps: ReachedMap[];
 }
@@ -80,7 +60,7 @@ interface Call {
  * judge, the profile it is made under, the graphs already walked and what has been found -- so that no step
  * has to be handed them one by one.
  */
-export function reachOf(scope: Scope, graph: Loaded<GraphDoc>, profile: string | undefined): Reach {
+export function atomicReachOf(scope: Scope, graph: Loaded<GraphDoc>, profile: string | undefined): AtomicReach {
   const walk = new Walk(scope, profile);
   walk.graph(graph, undefined);
   return walk.found;
@@ -91,7 +71,7 @@ export function reachOf(scope: Scope, graph: Loaded<GraphDoc>, profile: string |
  * ends rather than recurring -- the same guard `refusalsReachable` keeps.
  */
 class Walk {
-  readonly found: Reach = { effects: [], maps: [] };
+  readonly found: AtomicReach = { effects: [], maps: [] };
   private readonly seen = new Set<string>();
 
   constructor(
@@ -163,7 +143,7 @@ const atomicGraphs = (scope: Scope): Loaded<GraphDoc>[] =>
  *
  * This is the set L009 and L010 are judged under. A profile that never runs a graph has nothing to be
  * refused for: the graph's effects are only reached through a binding, and a binding a profile does not
- * choose is a binding whose graph it never runs. The test is over the bindings rather than over `reachOf`,
+ * choose is a binding whose graph it never runs. The test is over the bindings rather than over `atomicReachOf`,
  * which walks the document's own nodes and so answers the same under every profile.
  */
 export function profilesReaching(
@@ -234,7 +214,7 @@ class Faults {
 export function checkAtomic(judge: Judge): void {
   const profiles = judge.profiles();
   for (const graph of atomicGraphs(judge.scope)) {
-    const walk = (profile: string | undefined) => ({ profile, reach: reachOf(judge.scope, graph, profile) });
+    const walk = (profile: string | undefined) => ({ profile, reach: atomicReachOf(judge.scope, graph, profile) });
     const participants = new Faults();
     const connections = new Faults();
     for (const { profile, reach } of profilesReaching(judge.scope, graph, profiles).map(walk)) {
@@ -250,7 +230,12 @@ export function checkAtomic(judge: Judge): void {
 }
 
 /** L009: every effect an atomic graph reaches can take part in a transaction. */
-function checkParticipants(found: Faults, graph: Loaded<GraphDoc>, reach: Reach, profile: string | undefined): void {
+function checkParticipants(
+  found: Faults,
+  graph: Loaded<GraphDoc>,
+  reach: AtomicReach,
+  profile: string | undefined,
+): void {
   for (const effect of reach.effects) {
     if (effect.transactional) continue;
     found.found(
@@ -268,7 +253,12 @@ function checkParticipants(found: Faults, graph: Loaded<GraphDoc>, reach: Reach,
 }
 
 /** L010: one transaction is one connection, so every transactional effect reached falls on the same one. */
-function checkOneConnection(found: Faults, graph: Loaded<GraphDoc>, reach: Reach, profile: string | undefined): void {
+function checkOneConnection(
+  found: Faults,
+  graph: Loaded<GraphDoc>,
+  reach: AtomicReach,
+  profile: string | undefined,
+): void {
   const connections = [...new Set(reach.effects.filter(effect => effect.transactional).map(one => one.connection))];
   const named = connections.filter((one): one is string => one !== undefined);
   if (named.length < 2) return;
@@ -286,7 +276,7 @@ function checkOneConnection(found: Faults, graph: Loaded<GraphDoc>, reach: Reach
 }
 
 /** L011: a graph says atomic only where something it reaches could roll back. */
-function checkSomethingToRollBack(judge: Judge, graph: Loaded<GraphDoc>, walks: Reach[]): void {
+function checkSomethingToRollBack(judge: Judge, graph: Loaded<GraphDoc>, walks: AtomicReach[]): void {
   if (walks.some(reach => reach.effects.some(effect => effect.transactional))) return;
   judge.refuser(graph.path)(
     'L011',
@@ -297,7 +287,7 @@ function checkSomethingToRollBack(judge: Judge, graph: Loaded<GraphDoc>, walks: 
 }
 
 /** G014: a failed element ends the transaction, so a map below an atomic graph cannot collect its failure. */
-function checkCollectingMaps(judge: Judge, graph: Loaded<GraphDoc>, walks: Reach[]): void {
+function checkCollectingMaps(judge: Judge, graph: Loaded<GraphDoc>, walks: AtomicReach[]): void {
   const seen = new Set<string>();
   for (const reach of walks) {
     for (const map of reach.maps) {
