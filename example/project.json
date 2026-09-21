@@ -56,7 +56,7 @@
           "methods": {
             "otp": {
               "description": "a one-time code: printed by the issue-otp command in this example, delivered out of band in a real tree -- the binding of access.port.json#deliverCode decides",
-              "obtain": "wilanis run @access/edge/issue-otp.trigger.json --challenge-id={id}"
+              "obtain": "npm run issue-otp -- --challenge-id={id}"
             }
           }
         }

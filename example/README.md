@@ -204,8 +204,8 @@ as `{{sid}}` through `session.resolvers.json`, declared `required` because the `
 $ npm run hello
 { "reason": "otp", "message": "this command needs a one-time code",
   "challenge": { "id": "K7Q2-M9XA", "method": "otp", "expiresAt": "..." },
-  "how": "wilanis run @access/edge/issue-otp.trigger.json --challenge-id=K7Q2-M9XA; then repeat this call with --challenge-id=K7Q2-M9XA --code=<code>" }
-$ npx wilanis run @access/edge/issue-otp.trigger.json . --challenge-id=K7Q2-M9XA
+  "how": "npm run issue-otp -- --challenge-id=K7Q2-M9XA; then repeat this call with --challenge-id=K7Q2-M9XA --code=<code>" }
+$ npm run issue-otp -- --challenge-id=K7Q2-M9XA
 { "id": "K7Q2-M9XA", "code": "482913", "expiresAt": "..." }
 $ npx wilanis run @hello/edge/hello-gated.trigger.json . --challenge-id=K7Q2-M9XA --code=482913
 { "greeting": "hello, gated" }

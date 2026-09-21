@@ -247,7 +247,7 @@ describe('a one-time code on the command line', () => {
     });
     const id = first.answer.challenge.id as string;
     expect(first.answer.how).toBe(
-      `wilanis run @access/edge/issue-otp.trigger.json --challenge-id=${id}; then repeat this call with --challenge-id=${id} --code=<code>`,
+      `npm run issue-otp -- --challenge-id=${id}; then repeat this call with --challenge-id=${id} --code=<code>`,
     );
     // the id without a code is refused by the guard, before the policy
     expect(
