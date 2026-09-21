@@ -16,6 +16,12 @@ import { atLevel, type Level, traceJson, traceText } from './trace.js';
 /** Every flag `wilanis migrate` knows; anything else is exit 2, since a misspelt flag must never silently plan. */
 const MIGRATE_FLAGS = ['profile', 'apply', 'allow-destructive', 'adopt', 'history', 'json'];
 
+/**
+ * The flags that name one of several things rather than one thing, so a second `--branch` adds a branch instead
+ * of replacing the first. Every other flag is last-wins, which is what a caller repeating one by accident means.
+ */
+const REPEATABLE = ['branch'];
+
 const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a stateless engine
 
   wilanis check    [root] [--profile word]            judge the whole tree; exit 1 with every refusal
@@ -34,6 +40,8 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
   wilanis map      [root] [--profile word]         trigger → graph → port → binding → graph
   wilanis new      <kind> <name|path> [root] [--layer edge|data] [--port word] [--run word#op] [--kind k]
                    [--of shape] [--over word#op] [--on shape]
+                   graph, read-decide-write: --store <store> --collection <name> --read-then patch|put|remove
+                   [--branch <id>:<when> ...]   one write per branch, each routed to by its when; repeat the flag
                    kinds: project feature shape port graph binding store trigger policy resolvers invariant
   wilanis init     [root]                          write CLAUDE.md and agent hooks into a tree
   wilanis stop-hook [root]                         the Stop hook: judge the tree, answer the harness on stdout
@@ -64,7 +72,8 @@ function parse(argv: string[]) {
     }
     const [name, written] = word.slice(2).split(/=(.*)/s);
     const { value, next } = flagValue(argv, at, written);
-    flags[name] = value;
+    const before = flags[name];
+    flags[name] = REPEATABLE.includes(name) && before !== undefined ? `${before}\n${value}` : value;
     at = next;
   }
   return { flags, positional };

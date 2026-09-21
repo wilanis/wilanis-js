@@ -7,6 +7,7 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { type AnyDoc, featureOf, type Kind, misplaced, schemaUrl } from '@wilanis/core';
+import { graphScaffold } from './scaffold-graph.js';
 
 // ---- scaffolds -------------------------------------------------------------------------------------
 
@@ -134,24 +135,9 @@ const SCAFFOLDS: Record<string, (target: string, opts: Record<string, string | u
     ];
   },
   graph: (target, opts) => {
-    return [
-      [
-        into(target, opts.layer === 'data' ? 'data' : 'domain', 'graph'),
-        {
-          $schema: schemaOf('graph'),
-          description: 'TODO',
-          nodes: [
-            {
-              type: '@wilanis/node/run.schema.json',
-              id: 'first',
-              run: '@std/text.port.json#fill',
-              in: { values: {}, template: 'hello' },
-            },
-          ],
-          out: { type: 'string', from: 'first' },
-        },
-      ],
-    ];
+    // two forms, both in scaffold-graph.ts: one node to replace, or the read-decide-write shape --store asks for
+    const { layer, doc } = graphScaffold(opts, schemaOf);
+    return [[into(target, layer, 'graph'), doc]];
   },
   binding: (target, opts) => {
     // meets the `example` operation a scaffolded port declares, by delegation; a real port's operations are B001s that name themselves
