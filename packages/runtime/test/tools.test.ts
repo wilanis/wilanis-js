@@ -96,6 +96,45 @@ describe('wilanis new', () => {
     expect(() => scaffold(dir, 'nonsense', 'x', {})).toThrow("unknown kind 'nonsense'");
     rmSync(dir, { recursive: true, force: true });
   });
+  it('refuses a bare name for a kind that lives inside a feature, naming the path to give and the features there are', () => {
+    const dir = tmp();
+    scaffold(dir, 'project', 'board', {});
+    scaffold(dir, 'feature', 'tasks', {});
+    scaffold(dir, 'feature', 'audit', {});
+    const run = '@features/tasks/domain/tasks.port.json#example';
+    // the very thing the demo stumbled on: a trigger at the root is a file `wilanis check` refuses as D008
+    expect(() => scaffold(dir, 'trigger', 'archive-entry', { run })).toThrow(
+      'a trigger lives inside a feature, under edge/; give the path: features/<feature>/edge/archive-entry, where <feature> is one of audit, tasks',
+    );
+    expect(existsSync(join(dir, 'edge'))).toBe(false);
+    // the layer named is the one the scaffold would have chosen: a shape is the domain's unless --layer edge
+    expect(() => scaffold(dir, 'shape', 'Task', {})).toThrow('give the path: features/<feature>/domain/Task,');
+    expect(() => scaffold(dir, 'shape', 'TaskView', { layer: 'edge' })).toThrow(
+      'give the path: features/<feature>/edge/TaskView,',
+    );
+    expect(() => scaffold(dir, 'graph', 'fetch', { layer: 'data' })).toThrow(
+      'give the path: features/<feature>/data/fetch,',
+    );
+    // a path in a layer the kind may not live in is refused with the checker's own hint, and nothing is written either
+    expect(() => scaffold(dir, 'trigger', 'features/tasks/domain/list', { run })).toThrow(
+      'features/tasks/domain/list.trigger.json: a trigger may not live in the domain layer',
+    );
+    expect(existsSync(join(dir, 'features/tasks/domain/list.trigger.json'))).toBe(false);
+    // a path is honoured as before
+    expect(scaffold(dir, 'trigger', 'features/tasks/archive-entry', { run })).toEqual([
+      'features/tasks/edge/archive-entry.trigger.json',
+    ]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+  it('tells a tree with no feature yet to make one before placing a document in it', () => {
+    const dir = tmp();
+    scaffold(dir, 'project', 'board', {});
+    expect(() => scaffold(dir, 'port', 'tasks', {})).toThrow(
+      'a port lives inside a feature, under domain/; give the path: features/<feature>/domain/tasks, after wilanis new feature <feature>, since this tree has none yet',
+    );
+    expect(readdirSync(dir).sort()).toEqual(['package.json', 'project.json']);
+    rmSync(dir, { recursive: true, force: true });
+  });
   it('writes a store into data/, with one collection named after the file and keyed by id', () => {
     const dir = tmp();
     scaffold(dir, 'project', 'board', {});
@@ -121,11 +160,12 @@ describe('wilanis new', () => {
     expect(Object.keys(read(join(dir, 'features/tasks/data/audit-log.store.json')).collections)).toEqual(['auditLog']);
     // both validate and are where a store lives: the loader has nothing to say about them
     expect(loadTree(dir, PLUGINS).refusals.items).toEqual([]);
-    // anywhere else it is D008: how records are kept is the data layer's job
-    scaffold(dir, 'store', 'features/tasks/domain/elsewhere', {});
-    expect(loadTree(dir, PLUGINS).refusals.items.map(refusal => [refusal.code, refusal.file])).toEqual([
-      ['D008', 'features/tasks/domain/elsewhere.store.json'],
-    ]);
+    // anywhere else it is D008: how records are kept is the data layer's job -- and the scaffold refuses before
+    // writing, in the checker's words, rather than write a file the checker then refuses
+    expect(() => scaffold(dir, 'store', 'features/tasks/domain/elsewhere', {})).toThrow(
+      'features/tasks/domain/elsewhere.store.json: a store may not live in the domain layer',
+    );
+    expect(existsSync(join(dir, 'features/tasks/domain/elsewhere.store.json'))).toBe(false);
     rmSync(dir, { recursive: true, force: true });
   });
 });
