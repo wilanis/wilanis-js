@@ -7,6 +7,7 @@
  */
 import {
   assignable,
+  expr,
   type Field,
   type Fields,
   hasVars,
@@ -16,7 +17,7 @@ import {
   substitute,
   type Type,
 } from '@wilanis/core';
-import type { Judge, Reader, Refuser, Resolve, ShapeLayer } from './judge.js';
+import { type Judge, RESERVED, type Reader, type Refuser, type Resolve, type ShapeLayer } from './judge.js';
 
 /** Where an operation is called: what is given, what it accepts, and how a value given there is typed. */
 export interface CallSite {
@@ -47,6 +48,25 @@ export function reader(judge: Judge, resolve: Resolve, file: string): Reader {
 /** Judge a call site; answers the variables its type fields bind. */
 export function checkInputs(judge: Judge, site: CallSite): Record<string, Type> {
   return new InputCheck(judge, site).run();
+}
+
+const BRACES = /^\{\{(.*)\}\}$/s;
+
+/**
+ * Is the value `{{a.x || b.y}}`, two nodes' answers joined with `||`? No template reads that way -- the braces
+ * hold one read path -- so the value types as text and fails the contract. The author meant the branches to
+ * converge; they converge at out.from, and G004's hint says so where this shape is seen.
+ */
+function joinsAnswers(value: unknown): boolean {
+  const inner = typeof value === 'string' ? BRACES.exec(value)?.[1] : undefined;
+  if (inner === undefined || !inner.includes('||')) return false;
+  try {
+    const parsed = expr.parse(inner);
+    if (parsed.kind !== 'bin' || parsed.op !== '||') return false;
+    return [parsed.left, parsed.right].every(side => side.kind === 'path' && !RESERVED.has(side.path[0]));
+  } catch {
+    return false;
+  }
 }
 
 class InputCheck {
@@ -145,13 +165,11 @@ class InputCheck {
       return;
     }
     const bad = assignable(read.type, want);
-    if (bad)
-      this.refuse(
-        'G004',
-        `'${name}': ${bad}`,
-        at,
-        `make what '${name}' reads and what ${this.site.what} takes one type`,
-      );
+    if (!bad) return;
+    const hint = joinsAnswers(this.site.given[name])
+      ? "two nodes' answers are joined at out.from, one per branch, never with ||: give each branch its own node and list both under out.from"
+      : `make what '${name}' reads and what ${this.site.what} takes one type`;
+    this.refuse('G004', `'${name}': ${bad}`, at, hint);
   }
 
   /** How an input is typed: from `extra`, from the value given (a static field as a literal, P001), or not at all (G005 when required). */
