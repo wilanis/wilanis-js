@@ -21,7 +21,7 @@
  */
 
 import { rmSync } from 'node:fs';
-import { loadTree } from '@wilanis/core';
+import { loadTree, schemaUrl } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { rehearse } from '../src/index.js';
 import { EXAMPLE, INCLUDES, loadedWith, PLUGINS } from './example-harness.js';
@@ -134,6 +134,46 @@ describe('the rehearsal reports a guard', () => {
     // while the walk reaches only the one guard this profile binds -- the CSV export, whose graph every profile
     // shares -- which is the difference between what a tree states and what one profile's run can exercise
     expect(run.lines.filter(line => line.includes(" guard '"))).toHaveLength(1);
+  });
+
+  /**
+   * A site two invariants are unproved at is one guard with one refusal per rule (#492): the conjunction holds,
+   * or the first rule broke, or what remains -- the second -- did. The report reads the two refusals as two
+   * `violated` branches, each quoting the sentence of its own invariant, so a reader is told which rule a value
+   * can break here and never that both broke at once.
+   */
+  it('reports a guard two invariants share as one decision with a violated branch per rule', async () => {
+    const { load, dir } = loadedWith({
+      'features/monitor/domain/an-entry-has-a-method.invariant.json': {
+        $schema: schemaUrl('invariant'),
+        label: 'An entry has a method',
+        description: 'A second rule over the same shape, unproved at the same sites, so one guard stands for both.',
+        holds: { on: ENTRY, when: 'len(method) > 0' },
+      },
+    });
+    try {
+      const run = await rehearse(load, { seed: 1, profile: 'local' });
+      expect(run.ok).toBe(true);
+      const said = decision(run.lines, "kept-get  guard 'row:check'");
+      expect(said[0]).toBe(
+        "features/monitor/data/kept-get  guard 'row:check' An entry has a method; An entry names a call  3/3 branches",
+      );
+      expect(said[1]).toBe("  ok  holds     answered from 'row'");
+      expect(said[2]).toBe(
+        `  ok  violated  refused on purpose at 'row:violated' as invariant: "'An entry has a method' does not hold: len(method) > 0"`,
+      );
+      expect(said[3]).toBe(
+        `  ok  violated  refused on purpose at 'row:violated:2' as invariant: "'An entry names a call' does not hold: len(url) > 0 && (method != 'DELETE' || has(agent))"`,
+      );
+      expect(said).toHaveLength(4);
+      // a list site's nested spec is the same three ways round, at the fixed `in:*`
+      const list = decision(run.lines, "kept-list  guard 'in:check'");
+      expect(list[0]).toContain('3/3 branches');
+      expect(list[2]).toContain("at 'in:violated' as invariant: \"'An entry has a method' does not hold");
+      expect(list[3]).toContain("at 'in:violated:2' as invariant: \"'An entry names a call' does not hold");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('counts a site the proof rules settle as proved rather than guarded', async () => {

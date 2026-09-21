@@ -7,12 +7,13 @@
  * The four ids are a contract, not a choice -- the rehearsal, `describe` and the viewer all read a guard by
  * them -- so they are asserted here rather than left to whatever the lowering happens to spell.
  */
-import { Compiler, guardsOf, hasGuard } from '@wilanis/compiler';
-import { loadTree, Scope } from '@wilanis/core';
-import type { KCall, KSwitch } from '@wilanis/engine';
-import { beforeAll, describe, expect, it } from 'vitest';
-import { BUILTIN_PLUGINS } from '../src/index.js';
-import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
+import { rmSync } from 'node:fs';
+import { Compiler, guardsOf, hasGuard, runGraph } from '@wilanis/compiler';
+import { loadTree, Scope, schemaUrl } from '@wilanis/core';
+import { type KCall, type KSwitch, outcomeOf } from '@wilanis/engine';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { BUILTIN_PLUGINS, Embedder } from '../src/index.js';
+import { EXAMPLE, INCLUDES, loadedWith, PLUGINS } from './example-harness.js';
 
 const KEPT_GET = '@features/monitor/data/kept-get.graph.json';
 const WRITE_CSV = '@features/monitor/data/write-csv.graph.json';
@@ -127,5 +128,110 @@ describe('lowering a guard', () => {
   it('leaves a graph with nothing to guard exactly as it was', () => {
     const spec = new Compiler(scope, Object.values(BUILTIN_PLUGINS), { profile: 'local' }).graph(GREET).spec;
     expect(Object.keys(spec.nodes).some(id => id.includes(':'))).toBe(false);
+  });
+});
+
+// ---- two rules over one shape, unproved at one site -------------------------------------------------
+
+/**
+ * A site is guarded once however many rules are unproved there, and the caller is told the one that broke
+ * (#492). The switch's first rule is still the conjunction, routing to the value; where it fails, one rule per
+ * invariant but the last asks whether that invariant's own rule is what did not hold and routes to its own
+ * refusal, and the last invariant's refusal is the `else`. So the first pair keeps `<id>:check` and
+ * `<id>:violated`, a second rule adds `<id>:violated:2` and nothing else, and a value that satisfies one rule
+ * and not the other is refused with that other's sentence alone. The second rule is `len(method) > 0`, which
+ * the registry holds before the example's own, so it is the first the switch asks about.
+ */
+const METHOD_RULE = 'len(method) > 0';
+const CALL_RULE = "len(url) > 0 && (method != 'DELETE' || has(agent))";
+const two = loadedWith({
+  'features/monitor/domain/an-entry-has-a-method.invariant.json': {
+    $schema: schemaUrl('invariant'),
+    label: 'An entry has a method',
+    description: 'A second rule over the same shape, unproved at the same sites, so one guard stands for both.',
+    holds: { on: '@monitor/domain/Entry.shape.json', when: METHOD_RULE },
+  },
+});
+afterAll(() => rmSync(two.dir, { recursive: true, force: true }));
+
+describe('lowering a guard two invariants are unproved at', () => {
+  const twoScope = new Scope(two.load.registry, two.load.resolve);
+  const embedder = new Embedder(twoScope, two.load.plugins, { env: {}, root: two.dir, profile: 'local' });
+  const spec = () => embedder.graph(KEPT_GET).spec;
+
+  it('keeps the four ids of the frame and adds one refusal for the second rule', () => {
+    expect(Object.keys(spec().nodes).sort()).toEqual([
+      'asked',
+      'missing',
+      'route',
+      'row',
+      'row:check',
+      'row:made',
+      'row:violated',
+      'row:violated:2',
+    ]);
+  });
+
+  it('tests the conjunction first, then asks which rule failed, the last being what remains', () => {
+    const check = spec().nodes['row:check'] as KSwitch;
+    expect(check.rules.map(rule => [rule.label, rule.to])).toEqual([
+      [`(${METHOD_RULE}) && (${CALL_RULE})`, 'row'],
+      [`!(${METHOD_RULE})`, 'row:violated'],
+    ]);
+    expect(check.else).toBe('row:violated:2');
+    // one input per root either rule reads, still read off the made value
+    expect(Object.keys(check.in).sort()).toEqual(['agent', 'method', 'url']);
+  });
+
+  it('gives each refusal the sentence of its own invariant and no other', () => {
+    const first = spec().nodes['row:violated'] as KCall;
+    const second = spec().nodes['row:violated:2'] as KCall;
+    expect(first.in.message).toEqual({ value: `'An entry has a method' does not hold: ${METHOD_RULE}` });
+    expect(second.in.message).toEqual({ value: `'An entry names a call' does not hold: ${CALL_RULE}` });
+    for (const node of [first, second]) {
+      expect(node.handler).toBe('@std/outcome.port.json#refuse');
+      expect(node.in.reason).toEqual({ value: 'invariant' });
+    }
+  });
+
+  it('appends every refusal after the value wherever the graph answered with it', () => {
+    expect(spec().output).toEqual(['row', 'row:violated', 'row:violated:2', 'missing']);
+  });
+
+  /** The graph run with the store's answer seeded, so the guard judges exactly the entry a case hands it. */
+  const judged = async (record: Record<string, unknown>) => {
+    const compiled = embedder.graph(KEPT_GET);
+    const report = await runGraph(compiled, { initial: { in: { id: 'x' }, asked: { record } }, env: embedder.env });
+    return outcomeOf(report);
+  };
+
+  it('refuses a value that breaks one rule with that invariant alone, whichever of the two it is', async () => {
+    // the URL is fine and the method is empty: only the second invariant's rule fails
+    const noMethod = await judged({ id: 'x', url: 'https://x', method: '', agent: 'probe' });
+    expect(noMethod).toMatchObject({
+      kind: 'refused',
+      reason: 'invariant',
+      at: 'row:violated',
+      message: `'An entry has a method' does not hold: ${METHOD_RULE}`,
+    });
+    // the method is fine and the URL is empty: only the example's own rule fails
+    const noUrl = await judged({ id: 'x', url: '', method: 'GET', agent: 'probe' });
+    expect(noUrl).toMatchObject({
+      kind: 'refused',
+      reason: 'invariant',
+      at: 'row:violated:2',
+      message: `'An entry names a call' does not hold: ${CALL_RULE}`,
+    });
+    for (const outcome of [noMethod, noUrl]) {
+      if (outcome.kind !== 'refused') throw new Error(outcome.kind);
+      expect(outcome.message).not.toContain(';');
+    }
+  });
+
+  it('names the first rule where both fail, and lets a value satisfying both through', async () => {
+    const both = await judged({ id: 'x', url: '', method: '', agent: 'probe' });
+    expect(both).toMatchObject({ kind: 'refused', at: 'row:violated' });
+    const fine = await judged({ id: 'x', url: 'https://x', method: 'GET', agent: 'probe' });
+    expect(fine).toMatchObject({ kind: 'answered', output: { id: 'x', url: 'https://x', method: 'GET' } });
   });
 });

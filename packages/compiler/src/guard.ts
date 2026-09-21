@@ -11,8 +11,11 @@
  * already runs -- and nothing to the vocabulary but the one reserved reason word.
  *
  * A site is guarded once, not once per invariant: where two rules over one shape are both unproved there, the
- * one guard tests their conjunction and says both in its message. One switch per site keeps the ids the RFC
- * names exactly one each, which is what the rehearsal, `describe` and the viewer read a guard by.
+ * one guard tests their conjunction, and where that fails it routes to the refusal of the first rule that did
+ * not hold, so the caller is told the rule that broke and not every rule the site is held to (#492). One switch
+ * per site keeps the ids the RFC names exactly one each -- `<id>:check`, `<id>`, `<id>:violated` -- which is
+ * what the rehearsal, `describe` and the viewer read a guard by; a second rule adds only its own refusal,
+ * `<id>:violated:2`, as one more branch of the same switch.
  */
 import { expr, type GraphDoc, type InvariantDoc, type Loaded, type Scope } from '@wilanis/core';
 import type { KCall, KernelSpec, KNode, KSwitch } from '@wilanis/engine';
@@ -47,6 +50,9 @@ export interface Guard {
   when: string;
 }
 
+/** The four ids one guard occupies: where the judged value is read, and the three nodes that judge it. */
+export type GuardIds = { made: string; check: string; ok: string; violated: string };
+
 /**
  * The four ids a made site's guard occupies. The original node moves aside to `<id>:made` so that `<id>` still
  * answers the value and every read of it elsewhere is untouched. A colon cannot collide with an authored id,
@@ -68,11 +74,18 @@ export const TAKEN_IDS = { made: 'in', check: 'in:check', ok: 'in:ok', violated:
 /** The ids one guard occupies, whichever kind of site it stands at. */
 export const idsOf = (guard: Guard) => (guard.site.kind === 'taken' ? TAKEN_IDS : guardIds(guard.id));
 
-/** What a guard's refusal says: each invariant it stands for, and the rule the value did not satisfy. */
-export function guardMessage(guard: Guard): string {
-  return guard.unproved
-    .map(one => `'${one.invariant.doc.label ?? one.invariant.path}' does not hold: ${one.when}`)
-    .join('; ');
+/** What one refusal of a guard says: the invariant it stands for, and the rule the value did not satisfy. */
+export function guardMessage(one: Unproved): string {
+  return `'${one.invariant.doc.label ?? one.invariant.path}' does not hold: ${one.when}`;
+}
+
+/**
+ * The refusals one guard occupies, one per rule unproved at the site, in the order the rules are held: the
+ * first is the frame's own `<id>:violated`, and each further rule's is suffixed `:2`, `:3`, ... A guard of one
+ * rule therefore has exactly the ids it always had, and a reader who walks a guard by them still finds one.
+ */
+export function violatedIds(ids: GuardIds, count: number): string[] {
+  return Array.from({ length: count }, (_, at) => (at === 0 ? ids.violated : `${ids.violated}:${at + 1}`));
 }
 
 /** The field names a rule reads, without repeats: one switch input per root, each read off the made value. */
@@ -191,16 +204,24 @@ export interface GuardHandlers {
   nested: (spec: KernelSpec) => void;
 }
 
-/** The switch that tests the rule: one input per root, read off the value, routing to it or to the refusal. */
-function checkNode(guard: Guard, from: string, ids: { ok: string; violated: string }): KSwitch {
+/**
+ * The switch that tests the rules: one input per root, read off the value. Its first rule is the conjunction,
+ * routing to the value; where that fails, one rule per invariant but the last asks whether that invariant's
+ * rule is what did not hold and routes to its own refusal, and the last invariant's refusal is the `else`,
+ * since what remains once every other rule held is that one. The refusals are reached in the order the
+ * invariants are held, so where two rules fail at once the first is the one named. A guard of one rule is the
+ * switch it always was: the rule to the value, the else to the refusal.
+ */
+function checkNode(guard: Guard, from: string, ids: GuardIds): KSwitch {
   const inputs: Record<string, KSwitch['in'][string]> = {};
   for (const root of guardRoots(guard.when)) inputs[root] = { ref: from, path: [root] };
-  return {
-    kind: 'switch',
-    in: inputs,
-    rules: [{ when: expr.compilePredicate(guard.when), to: ids.ok, label: guard.when }],
-    else: ids.violated,
-  };
+  const violated = violatedIds(ids, guard.unproved.length);
+  const rules: KSwitch['rules'] = [{ when: expr.compilePredicate(guard.when), to: ids.ok, label: guard.when }];
+  for (let at = 0; at < guard.unproved.length - 1; at++) {
+    const failed = `!(${guard.unproved[at].when})`;
+    rules.push({ when: expr.compilePredicate(failed), to: violated[at], label: failed });
+  }
+  return { kind: 'switch', in: inputs, rules, else: violated[violated.length - 1] };
 }
 
 /**
@@ -215,41 +236,43 @@ const okNode = (from: string, handlers: GuardHandlers): KCall => ({
   in: { value: { ref: from, path: [] } },
 });
 
-/** The call that refuses where the rule did not hold: the one reserved reason, and what the invariant says. */
-const violatedNode = (guard: Guard, handlers: GuardHandlers): KCall => ({
+/** The call that refuses where one rule did not hold: the one reserved reason, and what that invariant says. */
+const violatedNode = (one: Unproved, shape: string, handlers: GuardHandlers): KCall => ({
   kind: 'call',
   handler: handlers.refuse,
   in: {
     reason: { value: INVARIANT },
-    message: { value: guardMessage(guard) },
-    type: { value: guard.shape },
+    message: { value: guardMessage(one) },
+    type: { value: shape },
   },
 });
 
-/** The four ids one guard occupies: where the judged value is read, and the three nodes that judge it. */
-export type GuardIds = { made: string; check: string; ok: string; violated: string };
-
 /**
- * The three nodes a guard of one value is: the switch on the rule, the value it answers with, and the refusal
- * it ends in. The judged value is read from `ids.made` -- the node the original moved aside to, or `in`.
+ * The nodes a guard of one value is: the switch on the rules, the value it answers with, and the refusal it
+ * ends in -- one refusal per rule unproved at the site, each saying its own invariant. The judged value is read
+ * from `ids.made` -- the node the original moved aside to, or `in`.
  */
 export function guardNodes(guard: Guard, ids: GuardIds, handlers: GuardHandlers): Record<string, KNode> {
-  return {
+  const nodes: Record<string, KNode> = {
     [ids.check]: checkNode(guard, ids.made, ids),
     [ids.ok]: okNode(ids.made, handlers),
-    [ids.violated]: violatedNode(guard, handlers),
   };
+  const violated = violatedIds(ids, guard.unproved.length);
+  guard.unproved.forEach((one, at) => {
+    nodes[violated[at]] = violatedNode(one, guard.shape, handlers);
+  });
+  return nodes;
 }
 
 /**
  * A list site's guard, as the nested spec one element runs through. The element arrives whole as `in`, so the
- * three nodes are the ones a single value gets, read from the pseudo-node the kernel supplies. The map that
- * runs it fails on the first element that refuses, so the list refuses with that element's reason.
+ * nodes are the ones a single value gets, read from the pseudo-node the kernel supplies. The map that runs it
+ * fails on the first element that refuses, so the list refuses with that element's reason.
  */
 export function guardSpec(guard: Guard, name: string, handlers: GuardHandlers): KernelSpec {
   return {
     name,
     nodes: guardNodes(guard, TAKEN_IDS, handlers),
-    output: [TAKEN_IDS.ok, TAKEN_IDS.violated],
+    output: [TAKEN_IDS.ok, ...violatedIds(TAKEN_IDS, guard.unproved.length)],
   };
 }

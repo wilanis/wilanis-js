@@ -20,10 +20,11 @@ export interface Decision {
   /** True when that graph says `atomic`, so every branch that does not answer undoes what it wrote. */
   atomic?: boolean;
   /**
-   * The invariants this decision guards, where it is a guard the compiler lowered and not a switch the author
-   * wrote: their labels, joined. A switch has none, and reads as one.
+   * Where this decision is a guard the compiler lowered and not a switch the author wrote: the invariants it
+   * guards, their labels joined, and the node it answers the value at -- the one branch that reads `holds`,
+   * since every other routes to the refusal of the rule that did not hold. A switch has none, and reads as one.
    */
-  guard?: string;
+  guard?: { for: string; answers: string };
   /** The triggers whose runs reach this switch. */
   triggers: string[];
   branches: { when: string; to: string; settled?: Settled; uncovered?: string }[];
@@ -104,12 +105,14 @@ function phrase(when: string): string {
 /**
  * A branch as it reads under a guard: the two words the rule can come out as. The rule itself is the header's,
  * said once beside the invariant that states it, so repeating it on the branch that tests it would say nothing
- * -- and `anything else` is not what the other branch means when the else is a refusal the compiler wrote.
+ * -- and `anything else` is not what the other branches mean when each is a refusal the compiler wrote. Which
+ * word is decided by where the branch goes: the one that answers the value holds, every other violated.
  */
-const guarded = (when: string): string => (when === 'else' ? 'violated' : 'holds');
+const guarded = (to: string, answers: string): string => (to === answers ? 'holds' : 'violated');
 
 /** How one branch is named: by the rule it routes on, or, under a guard, by what the rule decided. */
-const branchName = (when: string, guard: boolean): string => (guard ? guarded(when) : phrase(when));
+const branchName = (branch: { when: string; to: string }, guard: Decision['guard']): string =>
+  guard ? guarded(branch.to, guard.answers) : phrase(branch.when);
 
 /** How a run with no branches ended. */
 function verdict(status: string): string {
@@ -123,10 +126,10 @@ const short = (path: string) => path.replace(/^@/, '').replace(/\.graph\.json$/,
 /** How one branch settled: the line the report shows, and the problem it names when something is wrong. */
 function branchLine(
   branch: Decision['branches'][number],
-  at: { graph: string; node: string; atomic?: boolean; guard?: boolean; verbose?: boolean },
+  at: { graph: string; node: string; atomic?: boolean; guard?: Decision['guard']; verbose?: boolean },
   width: number,
 ): { line: string; problem?: string } {
-  const when = branchName(branch.when, at.guard === true).padEnd(width);
+  const when = branchName(branch, at.guard).padEnd(width);
   const where = `${at.graph} '${at.node}'`;
   if (branch.uncovered)
     return {
@@ -235,17 +238,17 @@ function plainLines(run: Plain, lines: string[]): string[] {
  * its id is not a node a reader can open. A switch the author wrote says so and names itself.
  */
 const headed = (decision: Decision): string =>
-  decision.guard ? `guard '${decision.node}' ${decision.guard}` : `switch '${decision.node}'`;
+  decision.guard ? `guard '${decision.node}' ${decision.guard.for}` : `switch '${decision.node}'`;
 
 /** One decision: how many branches were covered, and how each settled. */
 function decisionLines(decision: Decision, lines: string[], verbose?: boolean): string[] {
-  const guard = decision.guard !== undefined;
+  const { guard } = decision;
   const covered = decision.branches.filter(branch => !branch.uncovered).length;
   const via = verbose ? `  [via ${decision.triggers.join(', ')}]` : '';
   const named = `${short(decision.graph)}${marked(decision.atomic)}`;
   lines.push(`${named}  ${headed(decision)}  ${covered}/${decision.branches.length} branches${via}`);
   // one width for the whole decision, so the outcomes line up and the odd one out is visible
-  const width = Math.max(...decision.branches.map(branch => branchName(branch.when, guard).length));
+  const width = Math.max(...decision.branches.map(branch => branchName(branch, guard).length));
   const problems: string[] = [];
   const at = { graph: short(decision.graph), node: decision.node, atomic: decision.atomic, guard, verbose };
   for (const branch of decision.branches) {
