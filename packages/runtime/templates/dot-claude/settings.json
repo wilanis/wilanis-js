@@ -7,7 +7,7 @@
       }
     ],
     "Stop": [
-      { "hooks": [ { "type": "command", "command": "npx wilanis check . 2>&1 | tail -40 && npx wilanis rehearse . 2>&1 | tail -20" } ] }
+      { "hooks": [ { "type": "command", "command": "npx wilanis stop-hook ." } ] }
     ]
   }
 }

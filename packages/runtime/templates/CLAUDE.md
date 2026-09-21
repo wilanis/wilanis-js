@@ -15,6 +15,12 @@ the file, the rule and the fix.
 3. `wilanis fuzz` writes scenarios; `wilanis regress` replays them. Run regress after any change to a graph or binding.
 4. When a contract is unclear: `wilanis describe <path>`. When you need the lay of the land: `wilanis ls`, `wilanis map`.
 
+A Stop hook judges the tree before you may finish: `wilanis check`, then `wilanis rehearse`, then the gate
+named as `gate` in `.claude/wilanis.json` where the tree declares one, and anything that refuses blocks the
+stop with what refused as the reason. What unblocks it is a tree that checks, rehearses and passes its gate --
+nothing else; after five blocks in a row the stop is allowed with the verdict attached, and then your answer
+must say the tree does not check and what refused.
+
 ## Vocabulary
 
 Every file opens with its `$schema` and a `description`. A `label` (optional, on any document and on any

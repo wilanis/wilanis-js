@@ -9,6 +9,7 @@ import type { BlobHandle, Trace } from '@wilanis/core';
 import { KINDS, type Kind, type LoadResult } from '@wilanis/core';
 import { loadProject } from './project.js';
 import { runTrigger, start } from './serve.js';
+import { type StopInput, stopHook } from './stopping.js';
 import { describe, fuzz, init, ls, map, migrate, regress, rehearse, SCENARIOS, scaffold } from './tools.js';
 import { atLevel, type Level, traceJson, traceText } from './trace.js';
 
@@ -35,6 +36,7 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
                    [--of shape] [--over word#op] [--on shape]
                    kinds: project feature shape port graph binding store trigger policy resolvers invariant
   wilanis init     [root]                          write CLAUDE.md and agent hooks into a tree
+  wilanis stop-hook [root]                         the Stop hook: judge the tree, answer the harness on stdout
 
 Every path is @-rooted (@features/tasks/tasks.port.json) or through a project alias.
 Plugins beyond @std and @cli are npm packages named by "from" in project.json.`;
@@ -229,7 +231,24 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
   init: async ({ rootArg }) => {
     console.log(init(resolve(rootArg(0))).join('\n'));
   },
+  // the Stop hook: the harness hands it JSON on stdin and reads JSON back, so nothing else may reach stdout
+  'stop-hook': async ({ rootArg }) => {
+    const answer = await stopHook(await stdinJson(), resolve(rootArg(0)));
+    if (Object.keys(answer).length) console.log(JSON.stringify(answer));
+  },
 };
+
+/** What the harness wrote on stdin, as an object; an empty one where it wrote nothing or nothing parseable. */
+async function stdinJson(): Promise<StopInput> {
+  if (process.stdin.isTTY) return {};
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') as StopInput;
+  } catch {
+    return {};
+  }
+}
 
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
