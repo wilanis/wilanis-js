@@ -24,6 +24,8 @@ export interface KCall {
   /** Every value the handler takes, literal or read; the compiler lowers a node's `in` to this. */
   in: Record<string, KSource>;
   redact?: Redact;
+  /** An opaque tag the compiler gives this call, handed to the handler as `ctx.site`. The kernel never reads it. */
+  site?: string;
 }
 export interface KSwitch {
   kind: 'switch';
@@ -40,6 +42,8 @@ export interface KMap {
   bind?: Record<string, string[]>;
   onItemFailure: 'fail' | 'collect';
   redact?: Redact;
+  /** An opaque tag the compiler gives this map, handed to every element's handler as `ctx.site`. The kernel never reads it. */
+  site?: string;
 }
 export type KNode = KCall | KSwitch | KMap;
 
@@ -95,6 +99,11 @@ export interface NodeReport {
   /** call bound to a graph: the nested run. */
   sub?: Report;
   /**
+   * call, or one element of a map: the tries before the one this report shows, oldest first. Absent: it ran
+   * once. The node's status, out and error are the last try's; its `startedAt` and `endedAt` span every try.
+   */
+  attempts?: Attempt[];
+  /**
    * map: one report per element, in order -- its status, in, out or error, and the nested run in `sub` when
    * the operation is a graph. Every element settles before the node does, so a failed map still says what
    * each element did, and a caller can seed the finished ones (`initial['<id>.<index>']`) and run the rest.
@@ -102,6 +111,14 @@ export interface NodeReport {
   items?: NodeReport[];
   startedAt?: number;
   endedAt?: number;
+}
+
+/** One try of a node that did not stand: when it ran, why it was tried again, and the nested run when it was a graph. */
+export interface Attempt {
+  startedAt: number;
+  endedAt: number;
+  error: string;
+  sub?: Report;
 }
 
 export interface Report {
@@ -120,6 +137,10 @@ export interface RunContext {
   nodePath: string[];
   /** Attach the nested report of a graph-bound operation to the calling node. */
   attach: (sub: Report) => void;
+  /** Record a try of this node that did not stand: the node's report keeps them, in order, under `attempts`. */
+  attempted: (attempt: Attempt) => void;
+  /** The running node's `site`, as the compiler tagged it. Absent when the node carries none. */
+  site?: string;
   /** Pre-recorded results by dotted node path; when present the handler is not called. */
   stubs?: Record<string, unknown>;
   /** The trigger context (`request`) of this run, forwarded to nested graphs. */
