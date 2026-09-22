@@ -36,7 +36,7 @@ describe('sabotage: who a scope may read', () => {
   });
   it('A007 names the collections the read scopes and what the caller could do', () => {
     expect(scopedSaying(reading("request.headers['x-tenant']"))).toContain(
-      'A007 scopes entries, and reads request.headers.x-tenant: a caller may send any value there',
+      'A007 scopes customers, and reads request.headers.x-tenant: a caller may send any value there',
     );
   });
   it('A007 offers the roots the guard hands, and the command that lists them', () => {
@@ -59,7 +59,7 @@ describe('sabotage: who a scope may read', () => {
     };
     expect(scopedCodes(broken)).toContain('A007');
     expect(scopedSaying(broken)).toContain(
-      "A007 'tenant' scopes entries, but no plugin of this project identifies callers",
+      "A007 'tenant' scopes customers, but no plugin of this project identifies callers",
     );
     expect(scopedHinting(broken)).toContain(
       'A007 add a guarding plugin to project.json → plugins, such as @wilanis/plugin-auth',
@@ -75,7 +75,7 @@ describe('sabotage: who a scope may read', () => {
     // reads, and a store with no scope has no caller to be wrong about
     const codes = scopedCodes({
       [STORE]: store => {
-        delete store.collections.entries.scoped;
+        delete store.collections.customers.scoped;
       },
       ...reading("request.headers['x-tenant']"),
     });
@@ -84,9 +84,9 @@ describe('sabotage: who a scope may read', () => {
   });
 });
 
-/** A view of the scoped entries, across every tenant, behind the policy the access tree declares for employees. */
+/** A view of the scoped customers, across every tenant, behind the policy the access tree declares for employees. */
 const VIEW = {
-  view: 'entries',
+  view: 'customers',
   behind: '@access/edge/employees-only.policy.json',
   description: 'the same rows, every tenant',
 };
@@ -99,10 +99,10 @@ const VIEW = {
  */
 const viewedUnder = (graph: string): Edits => ({
   [STORE]: store => {
-    store.collections.everyEntry = { ...VIEW };
+    store.collections.everyCustomer = { ...VIEW };
   },
   [`features/customers/data/${graph}.graph.json`]: doc => {
-    doc.nodes[0].in.collection = 'everyEntry';
+    doc.nodes[0].in.collection = 'everyCustomer';
   },
 });
 
@@ -113,12 +113,12 @@ describe('sabotage: what a view is behind', () => {
   });
   it('A008 names the node, the view, the collection it views and the policy', () => {
     expect(scopedSaying(viewedUnder('kept-list'))).toContain(
-      "A008 reaches @features/customers/data/kept-list.graph.json#rows, which reads everyEntry, a view of entries across every scope behind @access/edge/employees-only.policy.json, and attaches no such policy (profile 'local')",
+      "A008 reaches @features/customers/data/kept-list.graph.json#rows, which reads everyCustomer, a view of customers across every scope behind @access/edge/employees-only.policy.json, and attaches no such policy (profile 'local')",
     );
   });
   it('A008 offers the policy to attach, or the scoped collection to read instead', () => {
     expect(scopedHinting(viewedUnder('kept-list'))).toContain(
-      'A008 attach "@access/edge/employees-only.policy.json" under policies, or read entries',
+      'A008 attach "@access/edge/employees-only.policy.json" under policies, or read customers',
     );
   });
   it('A008 points at the policies of every trigger that reaches it', () => {
@@ -165,7 +165,7 @@ describe('sabotage: what a view is behind', () => {
     expect(
       scopedCodes({
         [STORE]: store => {
-          store.collections.everyEntry = { ...VIEW };
+          store.collections.everyCustomer = { ...VIEW };
         },
       }),
     ).not.toContain('A008');
