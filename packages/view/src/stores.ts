@@ -6,7 +6,7 @@
  * the node badge ask it the same question, so neither can say a column the other does not.
  */
 import type { Loaded, LoadResult, Scope, StoreDoc, Values } from '@wilanis/core';
-import { keeps, kept, splitOp } from '@wilanis/core';
+import { keeps, kept, splitRef } from '@wilanis/core';
 import { callsAgainst, engineOf, keyTypeOf, STORE_PORT } from '@wilanis/runtime';
 import { markRequestPorts, readsOf } from './reads.js';
 import { type Over, scopedColumns, scopeOf, viewsOf } from './scopes.js';
@@ -94,7 +94,7 @@ function storeRequest(scope: Scope, store: StoreDoc): { request?: VNode } {
  * to every operation over a scoped collection, so a reader meets it on the node that could not have written it.
  */
 export function keepsOf(scope: Scope, run: string, given: Values | undefined): VKeeps | undefined {
-  const { path, op } = splitOp(run);
+  const { path, op } = splitRef(run);
   if (!path || !op || scope.canon(path) !== scope.canon(STORE_PORT)) return undefined;
   const named = given?.store;
   if (typeof named !== 'string') return undefined;

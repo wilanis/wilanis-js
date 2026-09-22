@@ -246,7 +246,7 @@ this grammar. No other RFC names the header.
 | Test | Where | What it does |
 |---|---|---|
 | the schema | `packages/core/test/validate.test.ts` | the baseline data graph and binding carry `reads`; a `resolvers` header is refused; a `reads` value without `#`, with a name that is not an identifier, or an empty `reads` is refused |
-| `splitRef` | `packages/core/test/registry.test.ts` | splits `@a/b.port.json#op` and `@a/b.resolvers.json#name`; `splitOp` still answers |
+| `splitRef` | `packages/core/test/registry.test.ts` | splits `@a/b.port.json#op` and `@a/b.resolvers.json#name` |
 | P004 | `packages/runtime/test/example.test.ts`, sabotage | `#agents` (no such resolver); `@customers/edge/nope.resolvers.json#agent` (R001); `@access/edge/session.resolvers.json#sid` from a customers graph when access does not export it (L005) |
 | P005 | sabotage | `create-row.graph.json` given `"tenant": "...#tenant"` and no read of it |
 | P006 | sabotage | `create-row.graph.json` given `"saved": "...#agent"` (a node id); `"in": "...#agent"` (reserved) |

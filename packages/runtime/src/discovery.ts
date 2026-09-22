@@ -9,7 +9,7 @@ import {
   type PolicyDoc,
   policyPath,
   Scope,
-  splitOp,
+  splitRef,
   type TriggerDoc,
   type TriggerKindDoc,
 } from '@wilanis/core';
@@ -232,7 +232,7 @@ function grantLine(doc: { native?: string; included?: string }, from: string | u
 /** One document said in full: where it lives, who granted it, what it describes, and what its kind adds. */
 export function describe(load: LoadResult, ref: string): string {
   const scope = new Scope(load.registry, load.resolve);
-  const { path } = splitOp(ref.includes('#') ? ref : `${ref}#`);
+  const { path } = splitRef(ref.includes('#') ? ref : `${ref}#`);
   const doc = scope.any(path || ref);
   if (!doc) return `no document at '${ref}'`;
   // one native or required document is one plugin's: say which, and the package it came from, so who implements it is not one code detail

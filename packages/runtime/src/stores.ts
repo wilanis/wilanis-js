@@ -6,7 +6,7 @@
  * the JSON cannot see any of it, which is what `describe` and the viewer exist to fix.
  */
 import type { ConnectionDoc, LoadResult, Scope, StoreDoc } from '@wilanis/core';
-import { show, splitOp } from '@wilanis/core';
+import { show, splitRef } from '@wilanis/core';
 
 /** The port every store operation is asked through; a call names this port or it is not a store call. */
 export const STORE_PORT = '@storage/store.port.json';
@@ -76,7 +76,7 @@ function callOf(
   site: { file: string; where: string; run: string; given: Record<string, unknown> | undefined },
   scope: Scope,
 ): StoreCall | undefined {
-  const { path, op } = splitOp(site.run);
+  const { path, op } = splitRef(site.run);
   if (!path || !op || scope.canon(path) !== scope.canon(STORE_PORT)) return undefined;
   const named = namesOf(site.given, scope);
   if (!named) return undefined;
