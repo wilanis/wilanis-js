@@ -80,3 +80,30 @@ describe.skipIf(!url)('a statement carries the filter and the scope at once', ()
     expect(found.map(record => record.id)).toEqual(['a']);
   });
 });
+
+/**
+ * A scoped read of a table nothing has written yet. `ensure` creates the table from the declaration, and a
+ * scope column is not part of one -- so the column arrives with the first scoped write and not before. Every
+ * statement here carries the predicate, so a read that ran before that write would name a column the table
+ * does not have and fail on it, where the memory engine answers nothing at all. An empty tenant's listing is
+ * the first request a fresh deployment answers, so it is the first thing this has to get right.
+ */
+describe.skipIf(!url)('a scoped read of a table nothing has written yet', () => {
+  const at = {
+    ...subject.connection,
+    name: 'read_before_write',
+    shape: SHAPE,
+    key: 'id',
+    unique: [],
+    refs: [],
+    referenced: [],
+    defaults: {},
+  };
+
+  it('find, get and count under a scope answer empty rather than failing', async () => {
+    await subject.engine.ensure([at]);
+    expect(await subject.engine.find(at, { scope: { tenant: 'acme' } })).toEqual([]);
+    expect((await subject.engine.get(at, 'a', { tenant: 'acme' })).record).toBeUndefined();
+    expect(await subject.engine.count(at, undefined, { tenant: 'acme' })).toBe(0);
+  });
+});

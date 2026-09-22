@@ -108,6 +108,20 @@ export class PostgresEngine implements Engine {
   }
 
   /**
+   * The database, with the table made ready to be narrowed by this scope: every statement below carries the
+   * predicate, so every one of them has to know the columns are there. A scope column is not part of what the
+   * store declares, so `ensure` never makes one and the first statement that names a scope is what does --
+   * whether that statement reads or writes. A read that ran first would otherwise name a column the table
+   * does not have, where the memory engine answers no rows; the memo keeps it to one catalog read per table
+   * per load, so only the first such statement pays for it.
+   */
+  private async scoped(at: At, scope: Scope | undefined) {
+    const where = this.db(at);
+    await ensureScope(where.db, { schema: where.schema, table: folded(at.name), lasting: !this.on }, at, scope);
+    return where;
+  }
+
+  /**
    * A select of every column of the collection, filtered as the caller asked and narrowed to the scope. A
    * scope adds one equality per column it names; no scope adds nothing at all, which is how a view -- and a
    * collection that keeps no scope -- sees every row.
@@ -121,6 +135,7 @@ export class PostgresEngine implements Engine {
 
   /** The record under that key within the scope, or `record` absent where the collection holds none. */
   async get(at: At, key: unknown, scope?: Scope) {
+    await this.scoped(at, scope);
     const found = await this.selecting(at, undefined, scope)
       .where(folded(at.key) as never, '=', key as never)
       .executeTakeFirst();
@@ -129,6 +144,7 @@ export class PostgresEngine implements Engine {
 
   /** Every record of the scope the query matches, in the order asked for and cut to the page asked for. */
   async find(at: At, query: Query) {
+    await this.scoped(at, query.scope);
     let select = this.selecting(at, query.where, query.scope);
     for (const one of orderingsOf(query.order, at.shape))
       select = select.orderBy(folded(one.by) as never, one.dir) as never;
@@ -140,7 +156,7 @@ export class PostgresEngine implements Engine {
 
   /** How many records of the scope the filter matches. */
   async count(at: At, where: Where | undefined, scope?: Scope) {
-    const { db, table } = this.db(at);
+    const { db, table } = await this.scoped(at, scope);
     let query = db.selectFrom(table as never).select(eb => eb.fn.countAll().as('n'));
     if (where) query = query.where(eb => conditionOf(eb as never, where, at.shape) as never) as never;
     query = query.where(eb => within(eb as never, scope) as never) as never;
@@ -159,8 +175,7 @@ export class PostgresEngine implements Engine {
    * and nothing comes back, which is the key being global to the collection said in SQL.
    */
   async put(at: At, given: Record_, { replace, scope }: Put) {
-    const { db, table, schema } = this.db(at);
-    await ensureScope(db, { schema, table: folded(at.name), lasting: !this.on }, at, scope);
+    const { db, table } = await this.scoped(at, scope);
     const values = { ...row(given, at), ...scopeValues(scope) };
     const key = folded(at.key);
     try {
@@ -198,7 +213,7 @@ export class PostgresEngine implements Engine {
    * stays under the scope it was written with.
    */
   async patch(at: At, key: unknown, changes: Record_, written?: Written) {
-    const { db, table } = this.db(at);
+    const { db, table } = await this.scoped(at, written?.scope);
     const values = changed(changes, at);
     if (!Object.keys(values).length) return this.get(at, key, written?.scope);
     const after = await db
@@ -217,7 +232,7 @@ export class PostgresEngine implements Engine {
    * promises; a key of another scope matches nothing, so a remove of it removes nothing.
    */
   async remove(at: At, key: unknown, scope?: Scope) {
-    const { db, table } = this.db(at);
+    const { db, table } = await this.scoped(at, scope);
     try {
       const gone = await db
         .deleteFrom(table as never)
