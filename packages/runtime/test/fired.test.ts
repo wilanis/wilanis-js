@@ -73,7 +73,7 @@ describe('what one fire leaves behind', () => {
   });
 
   it('keeps the operation beside every decision when the gate let the run through', async () => {
-    const built = gatedTree(() => ({ context: { principal: { subject: 'bo', role: 'recorder' } } }));
+    const built = gatedTree(() => ({ context: { principal: { subject: 'bo', role: 'registrar' } } }));
     const { report, heard } = await fired(built, { token: 'a-token' });
 
     const one = heard[0] as Fired;
@@ -86,7 +86,7 @@ describe('what one fire leaves behind', () => {
   });
 
   it('carries no correlation from a kind that declares none, and reads the one a kind does declare', async () => {
-    const built = gatedTree(() => ({ context: { principal: { subject: 'bo', role: 'recorder' } } }));
+    const built = gatedTree(() => ({ context: { principal: { subject: 'bo', role: 'registrar' } } }));
     const { heard } = await fired(built, { token: 'a-token' });
     // a command line has no caller trace, so its kind declares no correlation and a fire of it carries none
     expect((heard[0] as Fired).correlation).toBeUndefined();

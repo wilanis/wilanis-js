@@ -2,7 +2,7 @@
 
 This is the demo as a script: one story, five beats, twenty minutes. The rule is
 `features/customers/domain/writes-are-for-registrars.invariant.json`, stated once. The protagonist is an agent
-given a one-line task, *add a way to archive an entry*, that never read the rule. The compiler is the
+given a one-line task, *add a way to archive a customer*, that never read the rule. The compiler is the
 character who talks back, and the room wants the agent to get it wrong.
 
 [`docs/demo/index.html`](demo/index.html) is the record of one real run of this story, and
@@ -82,7 +82,7 @@ appear there on its own, or be refused. The next beat is that route.
 
 ## 2. The new hire
 
-**Say.** A year later. An agent is given one line: add a way to archive an entry. It finds the `remove`
+**Say.** A year later. An agent is given one line: add a way to archive a customer. It finds the `remove`
 operation on the customer port and scaffolds a route that fires it. It has not read the invariant, and
 nothing asked it to.
 
@@ -224,7 +224,7 @@ features/access/domain/require-registrar  switch 'decide'  3/3 branches
 every branch settled -- 44 branch(es), 20 decision(s), 16 graph(s).
 3 invariant(s) declared:
   The session is the caller's  holds at 3 trigger(s)
-  An entry names a call  proved at 0 site(s), guarded at 13
+  A customer is reachable  proved at 0 site(s), guarded at 13
   Writes are for registrars  holds at 6 trigger(s)
 ```
 
@@ -241,7 +241,7 @@ bind left out; check it against the real output once #481 lands. -->
 
 ```
 @features/customers/edge/archive-customer.trigger.json  (@http/http.trigger-kind.json)
-  gated by @features/access/edge/can-register.policy.json → @access/domain/access.port.json#requireRecorder  given token
+  gated by @features/access/edge/can-register.policy.json → @access/domain/access.port.json#requireRegistrar  given token
   holds  @features/customers/domain/writes-are-for-registrars.invariant.json  through @features/access/edge/can-register.policy.json
   @customers/domain/customer.port.json#remove
     @features/customers/data/kept-remove.graph.json
@@ -315,7 +315,7 @@ the policy. No document validates a token and no graph checks access, so an agen
 ## 5. The closer: all of it or none of it
 
 **Say.** One more thing this tree says once. `POST /customers.csv` registers a file of customers. Here is a file
-whose fifth row is not an entry: the URL is empty.
+whose fifth row is not a customer: the URL is empty.
 
 ```
 cat $DEMO/customers.bad.csv
@@ -339,7 +339,7 @@ curl -s localhost:8099/customers -w '  [%{http_code}]\n'
 ```
 
 ```
-{"reason":"invariant","message":"'An entry names a call' does not hold: len(url) > 0 && (method != 'DELETE' || has(agent))"}  [500]
+{"reason":"invariant","message":"'A customer is reachable' does not hold: len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))"}  [500]
 []  [200]
 ```
 

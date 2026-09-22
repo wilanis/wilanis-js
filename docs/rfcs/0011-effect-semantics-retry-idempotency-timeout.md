@@ -24,7 +24,7 @@ not: the second can fail after the first succeeded, and a retry of the whole gra
 tree today lets the checker see that, because the port document does not say what a repeated call does.
 
 The example already shows the smaller, everyday form of the same gap. `@customers/data/get-row.graph.json` sends
-one `GET /monitor/{id}` to a REST upstream; when the network drops the request, `fetch` rejects, the node `asked`
+one `GET /customers/{id}` to a REST upstream; when the network drops the request, `fetch` rejects, the node `asked`
 fails on a fault, and the route answers 500. Nothing says that a GET may be sent again, so nobody sends it
 again -- or worse, an author who wants resilience writes a second `asked` node routed from the first's failure,
 which the language cannot express (a failed node cancels what waits on it, `Run.fail` in
@@ -36,7 +36,7 @@ What an author cannot express today:
 - that a call may take at most so long. The one bound that exists, `timeoutMs` on an http connection
   (`Conn.settings.timeoutMs`, enforced in `send` in `packages/plugin-http/src/request.ts`, defaulting to 30000),
   is the transport's and is the same for every call over that connection;
-- that a domain operation such as `monitor.get` is safe to repeat -- a promise RFC 0009's queue kinds need when they
+- that a domain operation such as `customer.get` is safe to repeat -- a promise RFC 0009's queue kinds need when they
   redeliver a message, and that today nobody can make or check.
 
 What this RFC does not do. It does not add compensation across systems (sagas): RFC 0004 keeps atomicity to one
@@ -64,7 +64,7 @@ waiting 200 ms and then 400 ms. A retry may also say `when`, an expression over 
 that reports rather than fails: `@http/http.port.json#request` answers a 503 as `{ status: 503 }` and leaves the
 decision to a switch, so `"when": "status >= 500"` is how a retry sees it.
 
-The example's read of one entry, made resilient:
+The example's read of one customer, made resilient:
 
 ```json
 {
@@ -77,7 +77,7 @@ The example's read of one entry, made resilient:
   "in": {
     "connection": "@connections/customers-api.connection.json",
     "method": "GET",
-    "path": "/monitor/{{in.id}}",
+    "path": "/customers/{{in.id}}",
     "produces": "application/json",
     "returns": "@customers/edge/CustomerRow.shape.json"
   }
@@ -93,7 +93,7 @@ answers:
 ```
 G0n2  @features/customers/data/create-row.graph.json#nodes/asked
     retry over '@http/http.port.json#request', which is not idempotent here: method is "POST"
-    → a POST that failed may have been applied, so repeating it may record the entry twice; drop retry, or
+    → a POST that failed may have been applied, so repeating it may record the customer twice; drop retry, or
       reach a store whose write carries a key
 ```
 
@@ -113,8 +113,8 @@ every request it reaches is a GET -- and bounds it:
 }
 ```
 
-A domain graph writes neither word. `@customers/domain/register-customer.graph.json` says that an entry is recorded
-with the recorder the domain chose; whether recording it is a POST to a flaky upstream or a row in a local store
+A domain graph writes neither word. `@customers/domain/register-customer.graph.json` says that a customer is recorded
+with the registrar the domain chose; whether recording it is a POST to a flaky upstream or a row in a local store
 is the profile's business, and so is whether to try twice. Put `retry` on its node `recorded` and the checker
 says so:
 
@@ -129,7 +129,7 @@ A domain port may promise that an operation is idempotent, and the checker holds
 
 ```json
 "get": {
-  "description": "One entry by id. Fails when there is no such entry.",
+  "description": "One customer by id. Fails when there is no such customer.",
   "idempotent": true,
   "accepts": { "id": { "type": "string" } },
   "returns": "@customers/domain/Customer.shape.json"
@@ -229,7 +229,7 @@ is not, or nothing:
 - `idempotent: true`: idempotent;
 - `idempotent` is an expression: the fields it reads must be literals at the site (`Scope.literal`, the test P001
   makes of a static field); it is compiled with `expr.compilePredicate` and evaluated over them; false or a
-  non-literal read is the reason (`method is "POST"`, `method is read from {{in.method}}; write it as a literal`);
+  non-literal read is the reason (`method is "POST"`, `method is read from {{in.tier}}; write it as a literal`);
 - `key` declared: idempotent when the key field is given at the site, literal or read; the reason otherwise is
   `'<key>' is not given`;
 - none of these: `'<path>#<op>' declares neither idempotent nor key`.
@@ -321,8 +321,8 @@ The wait between tries is a timer in the compiler package. The compiler thereby 
 must never do; the alternative -- handing a `sleep` in through `env` -- would be a fourth run-scope value for no
 gain, and a test sets `backoffMs` to 1.
 
-**The report: one node, with its tries.** A node is one entry of `KernelSpec.nodes`, and a `NodeReport` is made
-per entry in the `Run` constructor before anything runs; one node per attempt would need the spec to grow while it
+**The report: one node, with its tries.** A node is one customer of `KernelSpec.nodes`, and a `NodeReport` is made
+per customer in the `Run` constructor before anything runs; one node per attempt would need the spec to grow while it
 runs, or the engine to synthesise reports it does not understand. So the report stays one node, whose `status`,
 `out`, `error`, `startedAt` and `endedAt` are the last try's, as the engine already writes them, and gains what
 came before:
@@ -376,7 +376,7 @@ declared and break every run wherever one is not, and neither is a finding. The 
 below, against a handler that fails once.
 
 **Traces (RFC 0006).** `traceOf` in `packages/runtime/src/trace.ts` gains one row: a `run` node or map element
-with `attempts` emits one child span per entry, named `<node id> try <n>`, status `failed`, `wilanis.error` at
+with `attempts` emits one child span per customer, named `<node id> try <n>`, status `failed`, `wilanis.error` at
 level `full` only (an `Attempt.error` is a message and follows the rule for messages), and the node's own span
 carries `wilanis.attempts` (the count of tries before the one that stood). A timed-out node is a failed span whose
 error reads `timed out after <n>ms`; a distinct kind for it is RFC 0014's to give, if it gives failures kinds.
@@ -399,8 +399,8 @@ its caller rather than cancelled. That is the seam, and it is named so 0012 can 
 - `wilanis map` is unchanged: a retry is not a document.
 - The viewer's graph page (`packages/view/client/index.html`, `renderDocPage`) shows a badge on a node that
   retries or is bounded, and the side panel the policy; the port page lists `idempotent` and `key` with the other
-  flags. The view model (`packages/view/src/model.ts`) carries the two fields on a node entry and on a binding
-  operation entry.
+  flags. The view model (`packages/view/src/model.ts`) carries the two fields on a node customer and on a binding
+  operation customer.
 
 ### Plugin contract
 
@@ -431,7 +431,7 @@ Sabotage tests in `packages/runtime/test/example.test.ts` and `sabotage.test.ts`
 | C0n1 | `"key": "id"` on `@customers/domain/customer.port.json#get` |
 | L0n1 | `"retry": { "times": 1 }` on `recorded` in `register-customer.graph.json`; `"timeoutMs": 100` on `drafts` in `import-customers.graph.json` |
 | G0n1 | `"retry": { "times": 1 }` on `row` in `get-row.graph.json` (`@std/object.port.json#make`, pure) |
-| G0n2 | `"retry": { "times": 1 }` on `asked` in `create-row.graph.json` (POST); on `asked` in `update-row.graph.json` with `method` changed to `"{{in.method}}"` (a read, so the expression cannot be judged); on the binding's `record` operation (its graph POSTs) |
+| G0n2 | `"retry": { "times": 1 }` on `asked` in `create-row.graph.json` (POST); on `asked` in `update-row.graph.json` with `method` changed to `"{{in.tier}}"` (a read, so the expression cannot be judged); on the binding's `record` operation (its graph POSTs) |
 | G0n3 | `"when": "status"` on a retry over `asked` in `get-row.graph.json` (number, not boolean); `"when": "has(x)"` on a retry over a binding operation bound to `write-csv.graph.json` (answers a `blob`, not an object) |
 | B0n1 | `"idempotent": true` on `customer.port.json#register`; the refusal names `live`, `customers-rest.binding.json` and `asked` |
 | none | `"idempotent": true` on `customer.port.json#get` and the retry of the guide's example on `asked` in `get-row.graph.json`: `codes(...)` is empty |
@@ -454,12 +454,12 @@ scripted (fail the first n calls, hang, answer `{ status }`), registered beside 
 | a node without a policy is untouched | the wrapper calls the base handler once and records nothing; the report equals the pre-RFC report |
 | the report's handler is the operation | `report.nodes.asked.handler === '@http/http.port.json#request'` on a retried node |
 
-Engine, in `packages/engine/test/kernel.test.ts`: a handler that calls `ctx.attempted` twice leaves two entries on
+Engine, in `packages/engine/test/kernel.test.ts`: a handler that calls `ctx.attempted` twice leaves two customers on
 the node; `ctx.site` carries the spec's tag to the handler and the kernel never reads it (a spec with and without
 `site` runs identically).
 
 Http, in `packages/plugin-http/test/http.test.ts` against the fake upstream in `harness.ts`: an upstream that
-answers 503 once then 200, with the guide's retry on `get-row.graph.json`, answers `GET /monitor/{id}` 200; an
+answers 503 once then 200, with the guide's retry on `get-row.graph.json`, answers `GET /customers/{id}` 200; an
 upstream that holds the socket, with `timeoutMs: 50` on the site and `timeoutMs: 10000` on the connection, fails
 the node in about 50 ms, not 10 s; a run signal aborted mid-request rejects the fetch.
 
@@ -500,7 +500,7 @@ Discoverability, in `packages/runtime/test/tools.test.ts`: `describe @http/http.
 ## Drawbacks and alternatives
 
 **Retry at the domain call site.** The stub's sketch put `retry` on any `run` node. A domain graph node names a
-domain operation whose binding differs per profile: under `live`, `monitor.record` is a POST that must not be
+domain operation whose binding differs per profile: under `live`, `customer.register` is a POST that must not be
 repeated; under a storage profile it is a keyed `put` that may be. The knowledge of whether repeating is *safe*
 (the native operation's idempotency, or its key) and whether it *helps* (a flaky transport) is the binding's --
 "how a port is met" -- and a domain graph that wrote `retry` would fix a transport policy in the one layer that

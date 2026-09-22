@@ -1,7 +1,7 @@
 # RFC 0030: `cache`: one word on a node, a graph or an operation, lowered to the nodes it stands for
 
 - **Status:** accepted
-- **Areas:** `area:core` (one `$defs` entry and five optional fields), `area:compiler` (the lowering and two rule
+- **Areas:** `area:core` (one `$defs` customer and five optional fields), `area:compiler` (the lowering and two rule
   families), `area:runtime` (`describe`, the example), `area:view` (a badge and the project page), and one new package
   (`area:plugin-cache`, `@wilanis/plugin-cache`)
 - **Schemas:** `common.schema.json`, `node/run.schema.json`, `node/map.schema.json`, `graph.schema.json`,
@@ -28,7 +28,7 @@ its `remove` stays the one node an author writes, where a write must forget what
 
 ## Motivation
 
-`GET /monitor/{id}` reaches the upstream on every call, and the upstream is a public mock with a rate limit. An author
+`GET /customers/{id}` reaches the upstream on every call, and the upstream is a public mock with a rate limit. An author
 who wants to remember an answer for a minute has, today, no port to remember it with; and with the plugin RFC 0023
 drafted they would have had three nodes to write around every read that wants it -- `get`, a `switch` on `hit`, `put`
 -- and a fourth, `@std/object.port.json#make`, to give the cached value a type. RFC 0023's own guide called that "three
@@ -54,7 +54,7 @@ happens, and for how long an answer stands is the data layer's fact, as RFC 0011
 does not cache a `pure` operation (nothing to save), an operation that `refuses` or `holds` (nothing to answer twice), or
 one whose repeat would change something (skipping the call would skip the change). It does not add a second cache to a
 tree: one connection, named at the root; a tree that wants two has two trees. It does not invalidate on its own beyond
-the lifetime: a write that must forget a read's entry writes one `remove` node and names the key, which is why a site
+the lifetime: a write that must forget a read's customer writes one `remove` node and names the key, which is why a site
 may name its key. It does not add a lock, a lease or a queue (RFC 0009, RFC 0010). It does not make the memory kind
 shared across processes; a shared kind is the last step and comes when a tree on two instances asks.
 
@@ -64,7 +64,7 @@ shared across processes; a shared kind is the last step and comes when a tree on
 grants: `"cache": { "ttlMs": <number>, "key"?: <text> }`, or `false`. It means: before calling, ask the tree's cache
 for what this call answered last time, under this key; if it knows, answer that; otherwise call, and remember the
 answer for `ttlMs`. The key is the operation, its inputs and its lifetime unless `key` says otherwise; who called is not
-in it, so two sites that ask the same thing share one entry. A site inherits the `cache` of
+in it, so two sites that ask the same thing share one customer. A site inherits the `cache` of
 the operation it runs when the port declared one, and writes `"cache": false` to decline it.
 
 **One cache per tree.** `project.json → cache` names the connection, once:
@@ -81,30 +81,30 @@ and `example/connections/cache.connection.json` says what it is:
   "label": "Answer cache",
   "description": "Where this tree remembers what an operation answered, for as long as the site said, in this process. A tree on several instances names a shared kind here instead; nothing else changes.",
   "kind": "@cache/memory.connection-kind.json",
-  "settings": { "maxEntries": 1000 }
+  "settings": { "maxCustomers": 1000 }
 }
 ```
 
-### The monitor's read, cached
+### The customers's read, cached
 
 `example/features/customers/data/get-row.graph.json`, one line added to the node that calls the upstream:
 
 ```json
 { "type": "@wilanis/node/run.schema.json", "id": "asked", "label": "GET the row",
   "run": "@http/http.port.json#request",
-  "cache": { "ttlMs": 60000, "key": "entry:{{in.id}}" },
-  "in": { "connection": "@connections/customers-api.connection.json", "method": "GET", "path": "/monitor/{{in.id}}",
+  "cache": { "ttlMs": 60000, "key": "customer:{{in.id}}" },
+  "in": { "connection": "@connections/customers-api.connection.json", "method": "GET", "path": "/customers/{{in.id}}",
           "produces": "application/json", "returns": "@customers/edge/CustomerRow.shape.json" } }
 ```
 
 Nothing else in the graph changes: `route` still reads `{{asked.status}}` and `{{asked.body}}`, and gets them from the
 cache or from the upstream without knowing which. `update-row.graph.json` and `delete-row.graph.json` gain one node
-each, the one an author does write, because only the author knows that a PUT makes the GET's entry stale:
+each, the one an author does write, because only the author knows that a PUT makes the GET's customer stale:
 
 ```json
 { "type": "@wilanis/node/run.schema.json", "id": "forgot", "label": "Forget the cached row",
   "run": "@cache/cache.port.json#remove",
-  "in": { "connection": "@connections/cache.connection.json", "key": "entry:{{row.id}}" } }
+  "in": { "connection": "@connections/cache.connection.json", "key": "customer:{{row.id}}" } }
 ```
 
 `forgot` reads `row`, so it runs once the upstream has answered the new row and not before; nobody reads `forgot`, so
@@ -175,7 +175,7 @@ C0n1  project.json#cache
 ### Documents and schemas
 
 **`common.schema.json`** gains `$defs/cache`: `false`, or an object with `ttlMs` (integer, at least 1: "how long an
-answer stands, in milliseconds; a cache entry without a lifetime is a store, RFC 0002") and `key` (string, optional: "the
+answer stands, in milliseconds; a cache customer without a lifetime is a store, RFC 0002") and `key` (string, optional: "the
 key the answer is kept under, text with `{{in.*}}` reads; absent: the operation, every input, every resolver value a
 cached graph reads, and `ttlMs`, canonicalised; never the caller. Name it where a write elsewhere must `remove` it").
 `additionalProperties: false`.
@@ -212,14 +212,14 @@ adapter contract to the letter, and is the port the compiler lowers to.
 | Operation | Accepts | Returns | Declares |
 |---|---|---|---|
 | `get` | `connection` (static), `key` (string or object: "text, or the inputs of a call; an object is canonicalised -- keys sorted, JSON -- by the kind"), `type` (type, binds `$V`) | `{ hit: boolean, value?: $V }` | `idempotent: true` |
-| `put` | `connection`, `key`, `value` (`$V`), `type` (binds `$V`), `ttlMs` (number: "how long the entry stands; required, a cache entry without a lifetime is a store") | `{ key: string, expiresAt: string }` | `idempotent: true` |
+| `put` | `connection`, `key`, `value` (`$V`), `type` (binds `$V`), `ttlMs` (number: "how long the customer stands; required, a cache customer without a lifetime is a store") | `{ key: string, expiresAt: string }` | `idempotent: true` |
 | `remove` | `connection`, `key` | `{ removed: boolean }` | `idempotent: true` |
 
 `get` is not `pure`: it reads state outside the run, so a data graph lists it, a domain graph never runs it (L002), and
 `rehearse` stubs it, which is what makes both branches of a cache walkable. A stored value that does not conform to the
 `type` a `get` asks for is a miss and is dropped, so a shape that changed between two deploys empties the cache rather
 than failing every read. `put` judges `value` against `type` before storing, as `@std/object#make` judges. Kinds:
-`docs/memory.connection-kind.json`, settings `maxEntries` (number, optional, default 10000: the most entries kept, least
+`docs/memory.connection-kind.json`, settings `maxCustomers` (number, optional, default 10000: the most customers kept, least
 recently used dropped first); no secret, no server, one map per connection per process; the development kind and the
 one the example names. A shared kind (Redis, Valkey) brings a client library and is a package of its own,
 `@wilanis/plugin-cache-redis`, the plan's last step. The kind's `ttlMs` default RFC 0023 drafted is not here: a
@@ -292,20 +292,20 @@ stubs address the nodes by dotted path, `asked.cached`, as they address a bound 
 before any handler runs, so a recorded scenario replays whether or not the cache is warm.
 
 **`run` and `start`.** Nothing starts: the memory kind makes its map on first use and drops it with the process; no
-`postLoad`, nothing `holds`, no startup step. `wilanis start example` with a `--trace` shows `GET /monitor/{id}` twice
+`postLoad`, nothing `holds`, no startup step. `wilanis start example` with a `--trace` shows `GET /customers/{id}` twice
 as one request and one hit. A reload (`@reload`) that replaces the tree keeps the process and so keeps the map; a
 document change does not empty a cache, the lifetime does.
 
 **Handlers.** `packages/plugin-cache/src/handlers.ts` registers the three, reads the connection through the same
 `env.connections[canon(named)]` lookup `@http` uses, refuses at run time with the same two errors for a connection
 replaced under a reload, and picks `memory.ts` off the kind. `memory.ts`: a `Map` in insertion order, re-inserted on
-read, dropped from the front past `maxEntries`; an entry past its `expiresAt` misses and is dropped on read; an object
+read, dropped from the front past `maxCustomers`; a customer past its `expiresAt` misses and is dropped on read; an object
 key is canonicalised (keys sorted at every depth, `JSON.stringify`). Every handler reads `ctx.signal`. Every value is a
 value: a `blob` never reaches a cache (G0n3, X0n3).
 
 ### Discoverability
 
-- `wilanis describe <graph>` (`nodeLines`): `cached 60s (key entry:{{in.id}})` on a cached node; `cached 5m (by in)` under
+- `wilanis describe <graph>` (`nodeLines`): `cached 60s (key customer:{{in.id}})` on a cached node; `cached 5m (by in)` under
   a cached graph's header; `cached 60s, declined` on a site that wrote `false`.
 - `wilanis describe <port>` (`operationLine`): `(idempotent, cached 1h)` beside RFC 0011's marks.
 - `wilanis describe project`: a `cache` line naming the connection and its kind, beside `blobs`.
@@ -326,8 +326,8 @@ one word in its port document; nothing is registered.
 IR v1, compatible. Six schemas gain optional fields; every document written before this RFC validates and means what
 it meant: no cache. A lowered graph without a `cache` is byte-for-byte what it was; one with a `cache` carries the same
 node ids and one handler whose name begins `cache:`, and `Report` gains nothing, since `sub` exists. `@wilanis/access`
-is unchanged. The example changes: a plugin entry, `project.json → cache`, one connection, one line in
-`get-row.graph.json`, one node each in `update-row.graph.json` and `delete-row.graph.json`, three entries in
+is unchanged. The example changes: a plugin customer, `project.json → cache`, one connection, one line in
+`get-row.graph.json`, one node each in `update-row.graph.json` and `delete-row.graph.json`, three customers in
 `feature.json → effects`. No `schemas-v2`.
 
 ## Tests
@@ -350,13 +350,13 @@ clock, registered beside `PLUGINS` from the harness, over a copy of the example:
 
 | Case | Asserts |
 |---|---|
-| a second call hits | two runs of `monitor.get` with one id: the effect ran once; the second report's `asked.sub` has `cached`, `known`, `hit` and no `origin` |
+| a second call hits | two runs of `customer.get` with one id: the effect ran once; the second report's `asked.sub` has `cached`, `known`, `hit` and no `origin` |
 | a lifetime ends | the clock past `ttlMs`: the effect ran twice |
 | the key is the inputs | two ids: two calls; the same id twice: one |
 | the caller is not the key | two data graphs running the same call with the same inputs: the effect ran once |
-| a lifetime is part of the key | two sites, `ttlMs` 60000 and 5000, the same inputs: two entries, the effect ran twice |
+| a lifetime is part of the key | two sites, `ttlMs` 60000 and 5000, the same inputs: two customers, the effect ran twice |
 | a cached graph reads the request | `cache` on a data graph with a `resolvers` read: two requests differing only in that value: two calls |
-| a named key | `key: "entry:{{in.id}}"`: `update` then `get` of the same id calls the effect again (the `forgot` node removed it) |
+| a named key | `key: "customer:{{in.id}}"`: `update` then `get` of the same id calls the effect again (the `forgot` node removed it) |
 | a whole graph | `cache` on a data graph's root: one call for one `in`, keyed by it |
 | a port default and a decline | a fake port declaring `cache`: cached with no word at the site; `"cache": false` at the site: not |
 | a map | `cache` on a `map` node over three elements, one repeated: the effect ran twice |
@@ -364,10 +364,10 @@ clock, registered beside `PLUGINS` from the harness, over a copy of the example:
 | a retry stays on the call | RFC 0011's `retry` on a cached site: `asked.sub.nodes.origin.attempts` on a scripted fault, and nothing on `cached` |
 
 `packages/plugin-cache/test/cache.test.ts`: `put` then `get` answers `hit: true` and the value; `get` of an unknown key
-misses; `remove` answers `removed` and a following `get` misses; an entry past its `ttlMs` misses (fake clock); the
-`maxEntries`-plus-first entry evicts the least recently read; a value stored as one shape and read as another misses and
+misses; `remove` answers `removed` and a following `get` misses; a customer past its `ttlMs` misses (fake clock); the
+`maxCustomers`-plus-first customer evicts the least recently read; a value stored as one shape and read as another misses and
 is dropped; `put` of a value that does not conform faults before storing; an object key and its canonical text are one
-entry; two connections are two maps. `rules.test.ts`: X0n1 to X0n4. `packages/core/test/validate.test.ts`: the baseline
+customer; two connections are two maps. `rules.test.ts`: X0n1 to X0n4. `packages/core/test/validate.test.ts`: the baseline
 documents gain a cached node, a cached graph, a cached operation and `project.json → cache`; `ttlMs: 0` and a `cache`
 with neither form are refused by the schema. `packages/runtime/test/tools.test.ts`: `describe` of the cached graph prints
 `cached 60s`. `packages/view/test`: the badge and the project page.
@@ -390,7 +390,7 @@ Each step is one pull request and one sub-issue of #265.
    (`Judge.idempotentAt`, `effectsReachable`); until then it refuses only what `pure` and `key` already tell.
 5. **Discoverability** (`area:runtime`, `area:view`): `nodeLines`, `operationLine`, the project line; the view model and
    the viewer's badges and project page. `good first issue`.
-6. **The example**: the plugin entry, `project.json → cache`, `cache.connection.json`, the line on `asked`, `forgot` in
+6. **The example**: the plugin customer, `project.json → cache`, `cache.connection.json`, the line on `asked`, `forgot` in
    the two write graphs, `feature.json → effects`; a paragraph in `example/README.md` and one in the root `README.md`
    beside "Every branch runs before you deploy". `good first issue` once 1 to 4 have landed.
 7. **A shared kind** (`@wilanis/plugin-cache-redis`): when a tree on two instances asks; hashes an object key; finds
@@ -415,13 +415,13 @@ Each step is one pull request and one sub-issue of #265.
   gave none when the connection did. A lifetime is a fact about the answer, not about the store, and a site that
   forgets it should be told, not defaulted. `ttlMs` is required at the site and on a port default; the kind has none.
 - **A key of the inputs, or a key the author names.** The inputs are always right and never wrong to write, so they
-  are the default; but a write that must forget a read's entry cannot reproduce the read's canonical inputs, so a site
+  are the default; but a write that must forget a read's customer cannot reproduce the read's canonical inputs, so a site
   may name its key in text and the `remove` names the same text. Both are in the report under `in.$key`.
 - **The caller is not in the key.** The answer depends on the call, not on the graph that made it, so two sites asking
-  the same thing share one entry and a port's default cache is worth having. Everything the answer can depend on must
+  the same thing share one customer and a port's default cache is worth having. Everything the answer can depend on must
   then be in the key as a value: the inputs are, a cached graph's resolver reads are added for that reason, and `ttlMs`
-  is added so a site promising five seconds never reads an entry another site kept for a minute. A site that wants an
-  entry of its own names a `key` and puts what makes it its own in the text.
+  is added so a site promising five seconds never reads a customer another site kept for a minute. A site that wants an
+  customer of its own names a `key` and puts what makes it its own in the text.
 - **`cache` on a binding operation.** RFC 0011 put `retry` there because a binding is where the data layer meets a
   domain operation. A bound graph is cached at the graph; a delegation to a native operation is one call and is cached
   by the operation's default or by a one-node data graph. Adding a fourth place would say the same thing twice, and the

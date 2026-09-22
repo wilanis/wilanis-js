@@ -34,7 +34,7 @@ Two commands already do most of this, and neither keeps what the other needs.
   -v`: 15 decisions in 15 graphs, several reached from two or three triggers) are re-solved on every run and pinned
   nowhere, so a graph that starts routing its 404 to `failed` is caught only while someone reads the lines.
 - **Fuzz keeps runs nobody chose.** `fuzz` in `fuzz.ts` fires each trigger under seeds 1..N with `generatedFire` and
-  writes `<trigger>.<seed>.scenario.json`. For `get-entry` under seed 1 the recorded upstream answer is
+  writes `<trigger>.<seed>.scenario.json`. For `get-customer` under seed 1 the recorded upstream answer is
   `{ "status": 3.5, "headers": {} }` and the request's body is `200`: values `generate` drew from the shapes, taking
   whichever branch they happened to satisfy (here the else). Five seeds of seventeen triggers are 85 files, and the
   `missing` branch of `get-row` may be in none of them. The suite is neither complete nor readable, and a reader
@@ -78,12 +78,12 @@ generated ones do not. The three live apart:
 ```
 scenarios/
   rehearsed/            written by wilanis rehearse --record; owned by it: regenerate, never edit
-    get-entry/
-      monitor.get-row.route.missing.scenario.json
-      monitor.get-row.route.row.scenario.json
-      monitor.get-row.route.failed.scenario.json
-    list-entries/
-      monitor.list-entries.route.byMethod.scenario.json
+    get-customer/
+      customers.get-row.route.missing.scenario.json
+      customers.get-row.route.row.scenario.json
+      customers.get-row.route.failed.scenario.json
+    list-customers/
+      customer.list-customers.route.byMethod.scenario.json
       ...
     policies/
       employees-only/
@@ -93,11 +93,11 @@ scenarios/
     hello-gated/
       whole.scenario.json                       a trigger whose graph has no switch: one run is the whole of it
   edges/                written by wilanis fuzz --edges; owned by it
-    get-entry/
+    get-customer/
       id.empty.scenario.json
       id.long.scenario.json
   fuzz/                 written by wilanis fuzz; owned by it
-    get-entry.1.scenario.json
+    get-customer.1.scenario.json
   first-customer-signs-in.scenario.json         hand-written: yours, kept until you delete it
 ```
 
@@ -105,12 +105,12 @@ scenarios/
 path segment, so the subdirectories are home; the loader reads every `*.json` under the root, so they load.
 
 **Recording.** `wilanis rehearse example --record` runs the rehearsal it runs today and, beside the lines, writes one
-file per trigger and branch. The `missing` branch of `get-row`, reached from `GET /monitor/{id}`:
+file per trigger and branch. The `missing` branch of `get-row`, reached from `GET /customers/{id}`:
 
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
-  "description": "get-entry: get-row 'route' when status == 404 routes to missing, which refuses as missing. Written by wilanis rehearse --record; regenerate it, do not edit it.",
+  "description": "get-customer: get-row 'route' when status == 404 routes to missing, which refuses as missing. Written by wilanis rehearse --record; regenerate it, do not edit it.",
   "generated": "rehearse",
   "trigger": "@features/customers/edge/get-customer.trigger.json",
   "branch": {
@@ -159,9 +159,9 @@ graph declared.
 rule to `status == 410` and:
 
 ```
-scenarios/rehearsed/get-entry/monitor.get-row.route.missing.scenario.json: DIFF branch 'status == 404' → missing no longer routes there: op.route routed missing → failed; op.missing: failed → cancelled; op.failed: cancelled → failed; reason missing → upstream
-scenarios/rehearsed/get-entry/monitor.get-row.route.row.scenario.json: same
-scenarios/rehearsed/get-entry/monitor.get-row.route.failed.scenario.json: same
+scenarios/rehearsed/get-customer/customers.get-row.route.missing.scenario.json: DIFF branch 'status == 404' → missing no longer routes there: op.route routed missing → failed; op.missing: failed → cancelled; op.failed: cancelled → failed; reason missing → upstream
+scenarios/rehearsed/get-customer/customers.get-row.route.row.scenario.json: same
+scenarios/rehearsed/get-customer/customers.get-row.route.failed.scenario.json: same
 ```
 
 The first clause is new: a scenario with a `branch` says the decision that moved, before the nodes that moved with
@@ -169,7 +169,7 @@ it. The recorded file is now stale as well as failing, and the second command sa
 
 ```
 $ wilanis rehearse example --check
-stale    scenarios/rehearsed/get-entry/monitor.get-row.route.missing.scenario.json
+stale    scenarios/rehearsed/get-customer/customers.get-row.route.missing.scenario.json
 1 file(s) differ from what the solver writes for this tree -- run wilanis rehearse --record and review the diff
 ```
 
@@ -185,7 +185,7 @@ has(body)`, as `packages/runtime/test/example.test.ts` does to provoke `NEVER RU
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
-  "description": "list-entries: list-rows 'route' when status == 200 && has(body) routes to rows, and no input reaches it: the rules before it already cover every input, so 'status == 200 && has(body)' is unreachable. Written by wilanis rehearse --record; regenerate it, do not edit it.",
+  "description": "list-customers: list-rows 'route' when status == 200 && has(body) routes to rows, and no input reaches it: the rules before it already cover every input, so 'status == 200 && has(body)' is unreachable. Written by wilanis rehearse --record; regenerate it, do not edit it.",
   "generated": "rehearse",
   "trigger": "@features/customers/edge/list-customers.trigger.json",
   "branch": {
@@ -210,14 +210,14 @@ with its scenario. A tree with such a file is a tree whose rehearsal fails; the 
 licence for it.
 
 **A policy's decision.** `employees-only` is rehearsed as a root of its own under the kind of each trigger that
-attaches it -- five of the monitor's triggers, all HTTP, so one root. Its scenario names the first of them in path
+attaches it -- five of the customers's triggers, all HTTP, so one root. Its scenario names the first of them in path
 order, whose kind and settings the root borrows, and the policy whose `decide` it fires instead of the trigger's
 `fire`:
 
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
-  "description": "employees-only as attached by delete-entries: require-employee 'decide' when has(principal) && principal.realm == 'employee' routes to granted. Written by wilanis rehearse --record; regenerate it, do not edit it.",
+  "description": "employees-only as attached by delete-customers: require-employee 'decide' when has(principal) && principal.realm == 'employee' routes to granted. Written by wilanis rehearse --record; regenerate it, do not edit it.",
   "generated": "rehearse",
   "trigger": "@features/customers/edge/delete-customers.trigger.json",
   "policy": "@features/access/edge/employees-only.policy.json",
@@ -246,7 +246,7 @@ order, whose kind and settings the root borrows, and the policy whose `decide` i
 ```
 
 **Edges.** `wilanis fuzz example --edges` writes, per trigger, one scenario per field of its input type and per edge
-that type has. `get-entry`'s input is `IdRequest`, one string field, so three files: `id.empty`, `id.one`, `id.long`.
+that type has. `get-customer`'s input is `IdRequest`, one string field, so three files: `id.empty`, `id.one`, `id.long`.
 Each is the seed's input with that one field replaced, run and recorded like any scenario, `"generated": "edges"`. An
 edge is a fixed value, so the directory is as deterministic as the rehearsed one, and `fuzz --edges --check` says
 whether it is current.
@@ -254,7 +254,7 @@ whether it is current.
 **The refusal an author meets.** Rename `get-row`'s `missing` node to `gone` and forget the scenarios:
 
 ```
-S0n2  @scenarios/rehearsed/get-entry/monitor.get-row.route.missing.scenario.json#branch/to
+S0n2  @scenarios/rehearsed/get-customer/customers.get-row.route.missing.scenario.json#branch/to
     the branch names node 'missing' of switch 'route' in @features/customers/data/get-row.graph.json, which no rule of the switch routes to
     → wilanis rehearse --record rewrites scenarios/rehearsed/ from the tree as it stands; a hand-written scenario names a node the switch has
 ```
@@ -290,7 +290,7 @@ stay as they are. The baseline in `packages/core/test/validate.test.ts` gains a 
 scenario; an `unreachable` without the status, a `branch` missing `to`, and `generated: "hand"` are refused.
 
 **Placement**: unchanged. `HOME.scenario` is `{ dir: 'scenarios' }`, and `misplacedDir` compares the first segment,
-so `scenarios/rehearsed/get-entry/x.scenario.json` is home. The three generated directories are not a rule of the
+so `scenarios/rehearsed/get-customer/x.scenario.json` is home. The three generated directories are not a rule of the
 checker: they are where the three commands write and what `--check` owns.
 
 **`packages/runtime/templates/CLAUDE.md`**: the `scenario` row becomes "a recorded run: `wilanis rehearse --record`
@@ -349,7 +349,7 @@ plus `reason` from `refusalOf(report)` when the run failed with a declared reaso
 same way, without `branch`. A branch `casesFor` could not solve (`one.branch.unsolved`) or steer
 (`one.unreachable`) is recorded with `expect.status: 'unreachable'` and the sentence `branchLine` prints after
 `NEVER RUN`. A policy root records `policy: <the policy's path>` and `trigger: <the first attaching trigger in path
-order, whose kind the root borrowed>`; `policyRoots` gains that trigger's path on the root it builds so the recorder
+order, whose kind the root borrowed>`; `policyRoots` gains that trigger's path on the root it builds so the registrar
 can name it.
 
 **Naming.** Files are named from what they prove, so a reorder of rules moves nothing and a change of target renames
@@ -361,9 +361,9 @@ scenarios/rehearsed/<trigger stem>/whole.scenario.json
 scenarios/rehearsed/policies/<policy stem>/<feature>.<graph stem>.<switch id>.<to>[.<n>].scenario.json
 ```
 
-`<feature>` is the graph's feature (`monitor`, `access`), so two features' `get-row` graphs do not collide; `<n>` is
+`<feature>` is the graph's feature (`customers`, `access`), so two features' `get-row` graphs do not collide; `<n>` is
 the rule's index and appears only when two rules of the switch route to the same node, so the common case has none.
-A decision reached from three triggers (`list-rows` via `digest`, `export-entries` and `list-entries`) is three
+A decision reached from three triggers (`list-rows` via `digest`, `export-customers` and `list-customers`) is three
 files, since a scenario replays a way in and the three runs differ in their inputs; the rehearsal's lines still
 report it once, as `gather` does today.
 
@@ -462,7 +462,7 @@ Sabotage tests through `planted` in `packages/runtime/test/sabotage-unproved.tes
 | Code | The edit |
 |---|---|
 | S0n2 | a recorded scenario whose `branch.graph` is `@customers/data/no-such.graph.json`; whose `branch.node` is `asked` (a run node, not a switch); whose `branch.to` is `gone`; the message for `to` names `missing, row, failed` |
-| S0n3 | `policy` naming `@features/access/edge/signed-in.policy.json` on a `delete-entry` scenario (attaches `employees-only` and `can-register`); `policy` on a `get-entry` scenario, which attaches none; `policy` naming no document |
+| S0n3 | `policy` naming `@features/access/edge/signed-in.policy.json` on a `delete-customer` scenario (attaches `employees-only` and `can-register`); `policy` on a `get-customer` scenario, which attaches none; `policy` naming no document |
 | S001 | as today, from `check/scenarios.ts` after the move |
 | none | a hand-written scenario with `"when": "else"` and no `generated`; a policy scenario naming a trigger that attaches it |
 
@@ -476,9 +476,9 @@ Runtime, in `packages/runtime/test/tools.test.ts`, on a copy of the example (`cp
 | a routing change is a diff and a stale file | `get-row`'s first rule changed to `status == 410`: `regress` prints `DIFF branch 'status == 404' → missing no longer routes there` for the `missing` file; `check` lists it `stale` |
 | a renamed target | `missing` renamed `gone` in `get-row` (rule and `out.from` too): `check` answers one `missing` (`...route.gone`) and one `extra` (`...route.missing`); `checkTree` refuses the extra as S0n2 |
 | ownership | a hand-written `scenarios/mine.scenario.json` survives `--record`; a stray `scenarios/rehearsed/old.scenario.json` is removed |
-| a policy's decision | `policies/employees-only/access.require-employee.decide.anonymous.scenario.json` exists with `policy` set, `trigger` naming `delete-entries` and `expect.reason: 'anonymous'`; `regress` replays it `same`; with `require-employee`'s `anonymous` node changed to refuse as `nobody`, `DIFF reason anonymous → nobody` |
+| a policy's decision | `policies/employees-only/access.require-employee.decide.anonymous.scenario.json` exists with `policy` set, `trigger` naming `delete-customers` and `expect.reason: 'anonymous'`; `regress` replays it `same`; with `require-employee`'s `anonymous` node changed to refuse as `nobody`, `DIFF reason anonymous → nobody` |
 | unreachable | `list-rows` reordered as `example.test.ts` reorders it: `rehearse` is not ok, the `rows` branch is written with `status: 'unreachable'` and no `in`; `regress` answers `same`; the order restored, `regress` on the stale directory answers `DIFF ... is reachable now` and `check` lists the file stale |
-| edges | `fuzz(load, { edges: true })` writes `get-entry/id.empty`, `id.one`, `id.long`; `record-entry`'s `RegisterRequest` yields three for `url` and five `method.enum.<member>`; `list-entries`'s `ListRequest`, whose `method` is optional, yields the five members and `method.absent`; every file has `generated: 'edges'`; a second run is byte-identical; `regress` replays them `same` |
+| edges | `fuzz(load, { edges: true })` writes `get-customer/id.empty`, `id.one`, `id.long`; `record-customer`'s `RegisterRequest` yields three for `url` and five `method.enum.<member>`; `list-customers`'s `ListRequest`, whose `method` is optional, yields the five members and `method.absent`; every file has `generated: 'edges'`; a second run is byte-identical; `regress` replays them `same` |
 | the CLI | `wilanis rehearse <copy> --check` exits 1 on a stale directory and prints the hint; `--record --check` behaves as `--check` |
 
 Core, in `packages/core/test/validate.test.ts` (the schema cases above) and a new `packages/core/test/edges.test.ts`:
@@ -549,7 +549,7 @@ three branchless runs under its own `scenarios/rehearsed/` (its own triggers, th
   `scenarios/rehearsed/`, through its `-dev` binding, and its tests replay them; the loader leaves an include's
   `scenarios/` behind as it leaves its connections (`load.ts`: features and aliases come along, nothing else). The
   host records the included decisions again under its own triggers -- `policies/employees-only/...` in the example
-  names `delete-entries`, a host trigger -- because a scenario replays a way in, and the way in is the host's. The stub's third
+  names `delete-customers`, a host trigger -- because a scenario replays a way in, and the way in is the host's. The stub's third
   question is settled so; the cost is that a decision in a library is recorded twice, once per side of the seam,
   which is also what the seam means.
 

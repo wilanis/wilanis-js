@@ -23,7 +23,7 @@ keeps bytes, as it does today.
 ## Motivation
 
 Today a tree has no way to keep a value between two requests except by calling something outside
-itself. The example's monitor feature stores its entries by `POST`ing them to a public REST API
+itself. The example's customers feature stores its customers by `POST`ing them to a public REST API
 (`example/features/customers/data/create-row.graph.json`), and the `@auth` plugin keeps its sessions in
 files under `.wilanis/auth` that no document names. An agent asked to "record an order" has nothing to
 reach for: it would have to invent an HTTP upstream, or the runtime would have to grow code nobody can
@@ -57,13 +57,13 @@ police. Swapping engines is swapping the connection's `kind`.
 **Port, `@storage/store.port.json`.** The operations a data graph runs against a collection. Every one
 is an effect: it lives in a data graph and is listed in `feature.json → effects` (L003).
 
-The monitor feature, kept in a store instead of the REST API. The connection, at the tree's root:
+The customers feature, kept in a store instead of the REST API. The connection, at the tree's root:
 
 ```json
 {
   "$schema": "@wilanis/connection.schema.json",
-  "label": "Entries",
-  "description": "Where the monitor's entries are kept. Memory in development; production names the postgres kind instead.",
+  "label": "Customers",
+  "description": "Where the customers's customers are kept. Memory in development; production names the postgres kind instead.",
   "kind": "@storage-memory/memory.connection-kind.json"
 }
 ```
@@ -73,14 +73,14 @@ The store, `example/features/customers/data/customers.store.json`:
 ```json
 {
   "$schema": "@wilanis/store.schema.json",
-  "label": "Entry store",
-  "description": "The monitor's entries, one collection, keyed by id.",
+  "label": "Customer store",
+  "description": "The customers's customers, one collection, keyed by id.",
   "connection": "@connections/customers.connection.json",
   "collections": {
-    "entries": {
+    "customers": {
       "of": "@customers/domain/Customer.shape.json",
       "key": "id",
-      "description": "every observed call"
+      "description": "every customer"
     }
   }
 }
@@ -93,18 +93,18 @@ Compare it with `get-row.graph.json` today: the request and its status become on
 {
   "$schema": "@wilanis/graph.schema.json",
   "label": "Get a record",
-  "description": "Data graph behind monitor.get: read the record by id; absent is the declared refusal.",
+  "description": "Data graph behind customer.get: read the record by id; absent is the declared refusal.",
   "in": "@customers/domain/CustomerRef.shape.json",
   "out": { "type": "@customers/domain/Customer.shape.json", "from": ["row", "missing"] },
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "asked",
-      "label": "Read the entry",
+      "label": "Read the customer",
       "run": "@storage/store.port.json#get",
       "in": {
         "store": "@customers/data/customers.store.json",
-        "collection": "entries",
+        "collection": "customers",
         "key": "{{in.id}}"
       }
     },
@@ -119,16 +119,16 @@ Compare it with `get-row.graph.json` today: the request and its status become on
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "row",
-      "label": "The entry",
+      "label": "The customer",
       "run": "@std/object.port.json#make",
       "in": { "value": "{{asked.record}}", "type": "@customers/domain/Customer.shape.json" }
     },
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "missing",
-      "label": "No such entry",
+      "label": "No such customer",
       "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" }
+      "in": { "reason": "missing", "message": "no customer {{in.id}}", "type": "@customers/domain/Customer.shape.json" }
     }
   ]
 }
@@ -145,7 +145,7 @@ from it, the record put. No id is invented by the domain and none is generated s
 {
   "$schema": "@wilanis/graph.schema.json",
   "label": "Create a record",
-  "description": "Data graph behind monitor.record: a new key, the entry made from it, stored.",
+  "description": "Data graph behind customer.register: a new key, the customer made from it, stored.",
   "in": "@customers/domain/CustomerRecord.shape.json",
   "out": { "type": "@customers/domain/Customer.shape.json", "from": "answer" },
   "nodes": [
@@ -153,14 +153,14 @@ from it, the record put. No id is invented by the domain and none is generated s
       "type": "@wilanis/node/run.schema.json",
       "id": "key",
       "run": "@storage/store.port.json#newKey",
-      "in": { "store": "@customers/data/customers.store.json", "collection": "entries" }
+      "in": { "store": "@customers/data/customers.store.json", "collection": "customers" }
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "entry",
+      "id": "customer",
       "run": "@std/object.port.json#make",
       "in": {
-        "value": { "id": "{{key}}", "url": "{{in.url}}", "method": "{{in.method}}", "ua": "{{in.ua}}" },
+        "value": { "id": "{{key}}", "email": "{{in.email}}", "tier": "{{in.tier}}", "registrar": "{{in.registrar}}" },
         "type": "@customers/domain/Customer.shape.json"
       }
     },
@@ -170,14 +170,14 @@ from it, the record put. No id is invented by the domain and none is generated s
       "run": "@storage/store.port.json#put",
       "in": {
         "store": "@customers/data/customers.store.json",
-        "collection": "entries",
-        "record": "{{entry}}"
+        "collection": "customers",
+        "record": "{{customer}}"
       }
     },
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "answer",
-      "label": "The stored entry",
+      "label": "The stored customer",
       "run": "@std/object.port.json#make",
       "in": { "value": "{{stored.record}}", "type": "@customers/domain/Customer.shape.json" }
     }
@@ -190,7 +190,7 @@ default and never sets `conflict`, which is why it can hand the record on withou
 that passes `"replace": false` routes on `conflict` exactly as `get` routes on `has(record)`, and the
 narrowing rules already know `record` is present on the branch where `conflict` is false.
 
-`listByMethod` becomes one `find` with a declared filter, `{ "where": { "method": "{{in.method}}" } }`;
+`listByMethod` becomes one `find` with a declared filter, `{ "where": { "tier": "{{in.tier}}" } }`;
 `listAll` a `find` with none; `update` a `patch` of `url` and `method` by key; `remove` a `remove` by key,
 each followed by the same `has(record)` decision as `get`. The binding
 `example/features/customers/data/customers-store.binding.json` binds the six storage operations to these
@@ -207,7 +207,7 @@ graphs and the business operations (`submit`, `list`, `digest`, `removeMany`, `i
 ]
 ```
 
-The startup step the example already has, `Reach the entry store`, keeps firing
+The startup step the example already has, `Reach the customer store`, keeps firing
 `customer.port.json#listAll`; a new first step fires `customer.port.json#prepare`, bound to a data graph
 that runs `@storage/storage.port.json#ensure` so the tables exist before anything listens.
 
@@ -215,7 +215,7 @@ The refusal an author meets first, when a call names a collection the store does
 
 ```
 X204  @features/customers/data/get-record.graph.json#nodes/asked/in/collection
-    @customers/data/customers.store.json has no collection 'entry' (collections: entries)
+    @customers/data/customers.store.json has no collection 'customer' (collections: customers)
     → wilanis describe @customers/data/customers.store.json
 ```
 
@@ -381,7 +381,7 @@ key by, and what `newKey` answers for it, is the engine plugin's own judgment (i
 below with the engines.
 
 **The `where` grammar.** A filter is an object whose keys are fields of the collection's shape. A value is
-a literal or a read (`"{{in.method}}"`) meaning equality, or a predicate object with one or more of:
+a literal or a read (`"{{in.tier}}"`) meaning equality, or a predicate object with one or more of:
 `eq`, `ne`, `lt`, `lte`, `gt`, `gte` (the field's type), `in`, `notIn` (a list of it), `has` (boolean:
 present or absent, for optional fields), `contains`, `startsWith` (strings). Three combinators sit
 beside field names: `all: [where, ...]`, `any: [where, ...]`, `not: where`. Nothing else is a filter; a
@@ -390,7 +390,7 @@ the grammar can nest; the handler judges it at run time and fails the node on an
 operator. Judging it at compile time is RFC 0003.
 
 ```json
-"where": { "method": { "in": ["GET", "POST"] }, "ua": { "has": true }, "any": [{ "url": { "startsWith": "https://" } }, { "url": { "contains": "localhost" } }] }
+"where": { "tier": { "in": ["bronze", "silver"] }, "note": { "has": true }, "any": [{ "email": { "startsWith": "ada" } }, { "email": { "contains": "example.com" } }] }
 ```
 
 **`changes`** in `patch` is an object whose keys are fields of the shape other than the key, each a
@@ -403,7 +403,7 @@ time until RFC 0003 refuses it at check time. A `patch` never removes a field; a
 **Two stores, one connection.** Nothing stops two features declaring a store over the same connection,
 and they should be able to: one database per tree is the normal case. A collection is therefore named
 by the pair (connection, collection name), not by the store document -- two stores over one connection
-that both declare `entries` name the *same* collection, and if their shapes differ the engine meets
+that both declare `customers` name the *same* collection, and if their shapes differ the engine meets
 two shapes for one table. X207 refuses that: two collections of one connection with the same name and
 a different `of`. The same name with the same shape is allowed and is how two features share a table
 deliberately. Prefixing collection names per feature was the alternative, and it is rejected because a
@@ -416,7 +416,7 @@ table's name would then be a fact no document states.
 | `ensure` | `store: string, static` | `{ collections: number }` | creates every collection of the store that does not exist yet, from its shape, and never alters one that does; what that means is the engine's (nothing to do, for memory) |
 
 `ensure` is an effect, not `holds`: a startup step reaches it through a domain port bound to a data
-graph, the way the example's `Reach the entry store` step does today (B006 stays as it is).
+graph, the way the example's `Reach the customer store` step does today (B006 stays as it is).
 
 **How a shape becomes a table**, in `@wilanis/plugin-storage-postgres` and nowhere else -- `@storage`
 never learns what a column is. Table: the collection name, in the connection's schema.
@@ -559,7 +559,7 @@ does not list; nothing to add.
   shape lists who writes what).
 - `wilanis describe @storage/store.port.json` lays the port out like any native port; every field is
   described in the document, including the `where` grammar.
-- `wilanis map` prints a store the way it prints an upstream connection today: `route → port → graph → store entries (get)`.
+- `wilanis map` prints a store the way it prints an upstream connection today: `route → port → graph → store customers (get)`.
 - The viewer draws a store's page, and a graph node that runs a storage operation links to the store
   and the collection.
 
@@ -572,7 +572,7 @@ change is the *contract a port document may express*: `resolves` on a field, in
 
 ## Compatibility
 
-Additive for every existing document. One schema file is added and `KINDS` gains an entry, so the D001
+Additive for every existing document. One schema file is added and `KINDS` gains a customer, so the D001
 hint that lists the kinds gains a name; no existing document changes meaning. The example gains
 documents and a profile and keeps the REST binding.
 
@@ -698,7 +698,7 @@ the `store` baseline. The compiler's new rows are exercised through sabotaged co
   separate plugins makes that question sharper, not softer: swapping engines is now swapping a
   connection's `kind`, which is exactly what a profile cannot do yet.
 - **Three packages instead of one.** `@storage`, `-memory` and `-postgres` mean three `package.json`
-  files, three READMEs and three entries in `npm run release` for what one package could have shipped
+  files, three READMEs and three customers in `npm run release` for what one package could have shipped
   behind an enum. What it buys: a tree that uses memory installs no driver, a driver's dependency
   never reaches a tree that does not name it, each engine judges its own limits in its own X band, and
   an engine we did not write is a plugin like ours rather than a patch to our enum. RFC 0022's SQLite

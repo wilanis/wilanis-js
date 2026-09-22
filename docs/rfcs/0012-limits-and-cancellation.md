@@ -38,7 +38,7 @@ A production service is judged by what happens when something hangs. Today, in t
   mid-run fails the run, so `settle(false)` rolls back"; RFC 0011 read `run.ts` and found the first half is not
   what the code does, and handed the question here. This RFC answers it.
 - **A fan-out has no ceiling.** `Run.runMap` does `Promise.all(over.map(...))`: every element at once, however
-  many. `DELETE /monitor` (`example/features/customers/edge/delete-customers.trigger.json`) fans one `monitor.remove`
+  many. `DELETE /customers` (`example/features/customers/edge/delete-customers.trigger.json`) fans one `customer.remove`
   out per id in the body, and nothing in the tree bounds the body's list. The connection's `throttle`
   (`packages/plugin-http/src/throttle.ts`) paces the *requests* against one upstream; it cannot bound how many
   nested graph runs a map holds in flight, nor how long the list is.
@@ -71,15 +71,15 @@ with 504 and no body of the answer, whatever had settled.
 
 An http route writes its deadline in its own settings, and the plugin's settings in `project.json` give every
 route of the tree one. The tighter of the two is not chosen: the route's, when written, *is* the deadline, and the
-plugin's is what a route that writes none gets. `GET /monitor/{id}`, bounded to two seconds:
+plugin's is what a route that writes none gets. `GET /customers/{id}`, bounded to two seconds:
 
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
-  "label": "GET /monitor/{id}",
-  "description": "GET /monitor/{id} → the entry; 404 { reason: missing, message: `no entry {id}` } when there is none, 502 as upstream when the monitor API broke, 504 after two seconds.",
+  "label": "GET /customers/{id}",
+  "description": "GET /customers/{id} → the customer; 404 { reason: missing, message: `no customer {id}` } when there is none, 502 as upstream when the customer API broke, 504 after two seconds.",
   "settings": {
-    "route": "/monitor/{id}",
+    "route": "/customers/{id}",
     "method": "GET",
     "produces": "application/json",
     "deadlineMs": 2000,
@@ -128,26 +128,26 @@ any codec has finished with it, whichever codec: a JSON body is not parsed, a CS
 
 **A list has a most.** A field of a shape whose type is a list may say `maxItems`, and the edge judges it when the
 body arrives, the way it judges every other field (`conforms`, in `packages/core/src/values.ts`). The body of
-`DELETE /monitor`, bounded:
+`DELETE /customers`, bounded:
 
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
   "label": "Delete request",
   "layer": "edge",
-  "description": "DELETE /monitor body: the ids of every entry to remove, a hundred at most. Closed: an undeclared field is a 400.",
+  "description": "DELETE /customers body: the ids of every customer to remove, a hundred at most. Closed: an undeclared field is a 400.",
   "fields": {
     "ids": {
       "type": "string[]",
       "maxItems": 100,
-      "description": "the entries to remove, each by id"
+      "description": "the customers to remove, each by id"
     }
   }
 }
 ```
 
 A public trigger -- one with no `policies`, so anyone may call it -- must bound every list its edge shapes take,
-because an unbounded list from an anonymous caller is the request-shaped denial of service. `DELETE /monitor` is
+because an unbounded list from an anonymous caller is the request-shaped denial of service. `DELETE /customers` is
 gated, so `maxItems` there is good manners; take its policies away and leave the bound off, and the checker says:
 
 ```
@@ -159,15 +159,15 @@ T0nn  @features/customers/edge/delete-customers.trigger.json#in
 
 **A fan-out has a ceiling and a pace.** A `map` may say `limit`, the most elements it will run over -- more is a
 fault of the node before any element starts -- and `concurrency`, how many elements run at once; the rest wait
-their turn, in index order. The map behind `DELETE /monitor`
+their turn, in index order. The map behind `DELETE /customers`
 (`example/features/customers/domain/remove-customers.graph.json`), eight removals at a time:
 
 ```json
 {
   "type": "@wilanis/node/map.schema.json",
   "id": "removed",
-  "label": "Remove each entry",
-  "description": "monitor.remove once per id, eight at a time; the element is the id itself",
+  "label": "Remove each customer",
+  "description": "customer.remove once per id, eight at a time; the element is the id itself",
   "run": "@customers/domain/customer.port.json#remove",
   "over": "{{in}}",
   "limit": 100,
@@ -184,7 +184,7 @@ graph is for -- a batch, not a bulk load. `maxItems` on the edge shape and `limi
 here on purpose: the first refuses the caller at the door with a 400, the second is the graph's own guarantee
 whoever calls it, from a trigger or from another graph.
 
-**What a cancelled run looks like.** `DELETE /monitor` with twenty ids, `concurrency: 8`, an upstream that has
+**What a cancelled run looks like.** `DELETE /customers` with twenty ids, `concurrency: 8`, an upstream that has
 stopped answering, and a deadline of two seconds. The route answers `504 { "error": "cancelled: the deadline
 passed" }`, and the report, summarised the way `wilanis run --verbose` prints one (`summarize` in
 `packages/runtime/src/stubbing.ts`):
@@ -206,7 +206,7 @@ passed" }`, and the report, summarised the way `wilanis run --verbose` prints on
 ```
 
 Eight removals were done before the deadline, eight were in flight when it struck and were told to stop, four
-never started. The first eight entries are gone from the upstream; the caller was told 504. That is the honest
+never started. The first eight customers are gone from the upstream; the caller was told 504. That is the honest
 state of things, and the report is how an operator learns it.
 
 ## Reference
@@ -412,7 +412,7 @@ startup step that a plugin's teardown interrupts is not this RFC's; `failureOf` 
   `cancelled` is `{ status: 504, body: { error: 'cancelled: the deadline passed' } }`. Without it today's `encode`
   would answer a cancelled report as it answers a done one -- 200 with an undefined body -- since it treats
   everything not `failed` or `blocked` as answered; the status and the branch land in one step. A cancelled run is
-  never read as a refusal (`refusalOf` answers nothing for it), so `response.refusals` needs no entry and T005 is
+  never read as a refusal (`refusalOf` answers nothing for it), so `response.refusals` needs no customer and T005 is
   not involved: 504 is the kind's own answer, fixed the way 400, 404, 415 and 500 are. The log line
   (`→ 504 (2004ms, ... cancelled)`) already prints the report's status.
 - *The body's size.* `readBody` in `serve.ts` resolves `route.settings.maxBodyBytes ?? settings.maxBodyBytes` and,
@@ -471,7 +471,7 @@ was in flight reads `failed` with its error at level `full`, which is the fact.
 - `wilanis map` is unchanged: a limit is not a document.
 - The viewer (`packages/view/client/index.html`, `renderDocPage`) shows `limit` and `concurrency` as a badge on a
   map node, `maxItems` beside a list field on a shape page, and the deadline in a trigger's settings; the node
-  entries `viewOf` builds in `packages/view/src/model.ts` carry the two numbers.
+  customers `viewOf` builds in `packages/view/src/model.ts` carry the two numbers.
 
 ### Plugin contract
 
@@ -526,11 +526,11 @@ open through `InFlight`):
 
 | What | Asserts |
 |---|---|
-| a deadline strikes | `GET /monitor/{id}` with `deadlineMs: 50` against an upstream that holds the socket answers 504 with `{ error }` in well under the connection's `timeoutMs`; the log line says `cancelled` (with RFC 0011's step 6; before it, the test is marked pending) |
+| a deadline strikes | `GET /customers/{id}` with `deadlineMs: 50` against an upstream that holds the socket answers 504 with `{ error }` in well under the connection's `timeoutMs`; the log line says `cancelled` (with RFC 0011's step 6; before it, the test is marked pending) |
 | the plugin's default applies | no `deadlineMs` on the route, `50` in the plugin's settings: the same 504 |
 | a body too large | a JSON body past `maxBodyBytes` answers 413 and the handler is never called; a CSV upload past it answers 413 and the registry holds no blob after the scope is released |
 | an answer too large | a connection with `maxBodyBytes: 100` and an upstream answering 1 KB: the node fails with `answer body exceeds 100 bytes`, answered 500 |
-| a list too long | `DELETE /monitor` with 101 ids against `maxItems: 100` answers 400 with `$.ids: at most 100 items`; nothing fires |
+| a list too long | `DELETE /customers` with 101 ids against `maxItems: 100` answers 400 with `$.ids: at most 100 items`; nothing fires |
 | a cancelled run is not a refusal | a cancelled run with a `refuse` node in flight answers 504, not the mapped status |
 
 Core, in `packages/core/test/validate.test.ts` and `types.test.ts`: the baseline shape gains a bounded list field,
@@ -578,7 +578,7 @@ memory engine's store as it was.
 
 ## Drawbacks and alternatives
 
-**Cancellation undoes nothing.** A cancelled run's effects that ran, ran: eight of twenty entries are gone, a mail
+**Cancellation undoes nothing.** A cancelled run's effects that ran, ran: eight of twenty customers are gone, a mail
 was sent, a row was written. Inside one connection an atomic graph rolls them back (RFC 0004); across connections
 nothing does (RFC 0011 sent compensation on to RFC 0021). A cancelled run is therefore not a clean run; it is a
 run that stopped, with a report honest about where. The route answers 504 and the operator reads the trace. An

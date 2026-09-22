@@ -30,7 +30,7 @@ tree asks. A cache is not an adapter but a word on a node, and is RFC 0030's.
 
 A tree talks to the world through connections, and today the world is HTTP (`@http`), files (`@blob`), a directory
 (`@auth`) and, with RFC 0002, a database. Everything else a backend does -- send a receipt, charge a card, find
-the entries whose URL mentions a word -- can be done today through
+the customers whose URL mentions a word -- can be done today through
 `@http/http.port.json#request` with an edge shape per response, and that stays available. But three things go wrong
 when it is the only way.
 
@@ -78,9 +78,9 @@ feature of its own, `example/features/codes/`, that asks access for the code and
 {
   "$schema": "@wilanis/connection.schema.json",
   "label": "Outgoing mail",
-  "description": "Where the monitor's mail goes. In development every message is written under .wilanis/mail as one .eml file and one log line, and nothing leaves the machine; a deployment names the smtp kind or a provider's here.",
+  "description": "Where the customers's mail goes. In development every message is written under .wilanis/mail as one .eml file and one log line, and nothing leaves the machine; a deployment names the smtp kind or a provider's here.",
   "kind": "@email/log.connection-kind.json",
-  "settings": { "from": "monitor@example.test", "dir": ".wilanis/mail" }
+  "settings": { "from": "customers@example.test", "dir": ".wilanis/mail" }
 }
 ```
 
@@ -97,7 +97,7 @@ The data graph that sends, `example/features/codes/data/mail-code.graph.json`:
     { "type": "@wilanis/node/run.schema.json", "id": "mailed", "label": "Send it",
       "run": "@email/email.port.json#send",
       "in": { "connection": "@connections/mail.connection.json", "to": ["{{in.to}}"],
-              "subject": "Your monitor code",
+              "subject": "Your customers code",
               "text": "Your one-time code is {{in.code}}. It expires at {{in.expiresAt}}." } },
     { "type": "@wilanis/node/run.schema.json", "id": "sent", "label": "Which mail",
       "run": "@std/object.port.json#make",
@@ -133,7 +133,7 @@ checker can see, or it does not retry. A worker that sends receipts off RFC 0009
 
 ### A payment, the worked example of `key`
 
-The monitor sells nothing, and a feature invented to exercise a plugin is the kind of feature `CLAUDE.md` says not to
+The customers sells nothing, and a feature invented to exercise a plugin is the kind of feature `CLAUDE.md` says not to
 add. The payment plugin's worked example is therefore the small tree under its own `test/tree/`, an `orders` feature
 whose data graph charges:
 
@@ -170,7 +170,7 @@ does, the package is a week and not a design: `@search/index.port.json` with `in
 a key, into a named index), `remove` and `query` (a text query and a filter, answering the hits typed as the shape),
 all `idempotent: true`, over `@search/memory.connection-kind.json` for development and a Meilisearch kind for a
 cluster, since Meilisearch is open source and runs on the local cluster the roadmap already stands up (RFC 0024). The
-example is unchanged by this RFC; a `q` on `GET /monitor` is the demo of the milestone that picks search up.
+example is unchanged by this RFC; a `q` on `GET /customers` is the demo of the milestone that picks search up.
 
 ### What `describe` says
 
@@ -393,7 +393,7 @@ operation path and its inputs, as it does for `@http`. The words `idempotent` an
 are RFC 0011's change, made once there; an adapter published before that change would not validate, which is why the
 plan's first step is blocked on RFC 0011's. A tree that names none of the four plugins is unaffected in every way.
 
-The example changes: a plugin entry, an alias, one connection, a feature and one edited `obtain` string.
+The example changes: a plugin customer, an alias, one connection, a feature and one edited `obtain` string.
 It is a workspace member and not a published package, so nothing downstream sees the change; its tests are the
 RFC's proof that the adapters compose with the http, blob and auth plugins already there. `@wilanis/access` is
 unchanged: its `deliverCode` still answers the code, its `issue-otp` command still prints it, and its README's one
@@ -469,7 +469,7 @@ picks it up (the demo: a challenged `hello` is unlocked from a code read out of 
    `good first issue`.
 ## Drawbacks and alternatives
 
-- **Three packages to keep.** Each is a README, a release entry, a real-provider suite someone must run, and a
+- **Three packages to keep.** Each is a README, a release customer, a real-provider suite someone must run, and a
   dependency a tree installs. The stub said an abandoned adapter is worse than none; this RFC's answer is the shared
   suite and the owner line: a kind that does not pass the suite is not released, and a package whose owner line is
   empty is dropped from `npm run release` at the next release rather than shipped as a promise nobody keeps. The

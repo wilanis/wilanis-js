@@ -23,7 +23,7 @@ echo "review $MODEL: facts and the gate"
 free_port
 python3 "$HERE/facts.py" "$TREE" "$RUNS/$MODEL.facts.json" "$RUNS/$MODEL.gate.txt" > /dev/null
 METHOD=$(node -e 'const f=require(process.argv[1]);process.stdout.write(f.trigger.method||"POST")' "$RUNS/$MODEL.facts.json")
-ROUTE=$(node -e 'const f=require(process.argv[1]);process.stdout.write(f.trigger.route||"/monitor/{id}/pin")' "$RUNS/$MODEL.facts.json")
+ROUTE=$(node -e 'const f=require(process.argv[1]);process.stdout.write(f.trigger.route||"/customers/{id}/active")' "$RUNS/$MODEL.facts.json")
 echo "review $MODEL: the nine curls against $METHOD $ROUTE"
 free_port
 bash "$HERE/validate.sh" "$TREE" "$METHOD" "$ROUTE" "$RUNS/$MODEL.validation.txt" > /dev/null

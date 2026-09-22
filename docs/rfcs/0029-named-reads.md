@@ -9,13 +9,13 @@
 ## Summary
 
 A data graph or a binding that reads the request says, at its head, which reads it takes and where each is declared:
-`"reads": { "agent": "@customers/edge/request.resolvers.json#agent" }`, one entry per name, each a path to a resolvers
+`"reads": { "agent": "@customers/edge/request.resolvers.json#agent" }`, one customer per name, each a path to a resolvers
 document and the resolver's name after `#`. The body reads `{{agent}}` as it does today. This replaces the
 `"resolvers": "@doc"` header, which bound every name of one document at once and left the reader to open it and
 search. After this, every cross-document reference in a tree is a path, a name's origin is one labelled line above
 its use, a document may read from two features' resolvers and give a read the name it likes, and the set of reads a
 document makes is exactly its `reads` map -- so the checker's walk from a trigger to the request paths it must
-guarantee reads a map rather than scanning a body, an entry nothing reads is refused like an unused import, and a
+guarantee reads a map rather than scanning a body, a customer nothing reads is refused like an unused import, and a
 name that shadows a node is a refusal rather than a surprise.
 
 ## Motivation
@@ -63,7 +63,7 @@ data graph or a binding **uses** a resolver by giving it a local name under `rea
 resolver's name: `"<local>": "@<feature>/edge/<file>.resolvers.json#<resolver>"`. The body reads `{{<local>}}` or
 `{{<local>.<field>}}`. The local name is usually the resolver's own, and need not be.
 
-**Writing it.** The monitor's `create-row.graph.json` today names one document and reads one resolver:
+**Writing it.** The customers's `create-row.graph.json` today names one document and reads one resolver:
 
 ```json
 "resolvers": "@customers/edge/request.resolvers.json",
@@ -106,12 +106,12 @@ P004  @features/customers/data/create-row.graph.json#reads/agent
     → wilanis describe @customers/edge/request.resolvers.json lists its resolvers: agent, tenant
 ```
 
-Keep an entry the body never reads:
+Keep a customer the body never reads:
 
 ```
 P005  @features/customers/data/create-row.graph.json#reads/tenant
     'tenant' is used by no value of this graph
-    → read it as {{tenant}}, or drop the entry: reads is exactly what this document reads
+    → read it as {{tenant}}, or drop the customer: reads is exactly what this document reads
 ```
 
 Give a read a name a node already has:
@@ -160,7 +160,7 @@ resolver's name (`@customers/edge/request.resolvers.json#agent`)." The pattern i
 **`graph.schema.json`** and **`binding.schema.json`**: `resolvers` (path) is removed; `reads` (object, optional;
 keys are `ident`, values are `resolverRef`, `minProperties: 1`) is added: "The reads this document takes from the
 request: local name → the resolver that declares it. The body reads each as `{{name}}` or `{{name.field}}`; every
-entry is read by some value (P005), and no name is a node's id or a reserved root (P006). Data graphs and bindings
+customer is read by some value (P005), and no name is a node's id or a reserved root (P006). Data graphs and bindings
 only: a domain graph never reads the request (L002)." **`resolvers.schema.json`**: the document's description and the
 `resolvers` property's say "used under `reads` as `@path#name`" where they say "names this document and reads
 `{{name}}`"; the rules are unchanged.
@@ -192,9 +192,9 @@ document's); the implementing pull request takes what is free when it lands.
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
 | P004 | `check/resolvers.ts`, `resolversFor`, at `reads/<name>` | a `reads` value is not `path#name` (the schema refuses most; this refuses what it cannot); its path names no resolvers document (R001, as today at `resolvers`); the document is another feature's and not visible (L005 through `judge.visible`, as today); or the document declares no resolver of that name | `wilanis describe <resolvers doc> lists its resolvers: <names>` |
-| P005 | `check/graph.ts` after the nodes are judged; `check/bindings.ts` after the operations are | a `reads` name that no value of the document reads (`Scope.templateReads` over every node's values, or every delegation's `in`, has no read rooted at it) | `read it as {{<name>}}, or drop the entry: reads is exactly what this document reads` |
+| P005 | `check/graph.ts` after the nodes are judged; `check/bindings.ts` after the operations are | a `reads` name that no value of the document reads (`Scope.templateReads` over every node's values, or every delegation's `in`, has no read rooted at it) | `read it as {{<name>}}, or drop the customer: reads is exactly what this document reads` |
 | P006 | `check/graph.ts`, at `reads/<name>` | a `reads` name is a node's id, or is in `RESERVED` (`in`, `const`, `request`, `secrets`) | `rename the read: "reads": { "<name>By": "...#<resolver>" }` / `in, const, request and secrets are roots; pick another name` |
-| G003 (existing) | `check/graph-reads.ts`, `rootReadRaw` | unchanged in what it refuses; the message names `reads`: `'<root>' is not in, const, a node that runs before this one, or a name under reads`, and the hint writes the entry | `to read the request, bind the name: "reads": { "<root>": "@<feature>/edge/<file>.resolvers.json#<root>" }` |
+| G003 (existing) | `check/graph-reads.ts`, `rootReadRaw` | unchanged in what it refuses; the message names `reads`: `'<root>' is not in, const, a node that runs before this one, or a name under reads`, and the hint writes the customer | `to read the request, bind the name: "reads": { "<root>": "@<feature>/edge/<file>.resolvers.json#<root>" }` |
 | L002 (existing) | `check/resolvers.ts`, `resolversFor` | a domain graph has `reads` (today: has `resolvers`); the `at` is `reads` | unchanged |
 | B-family (existing) | `check/bindings.ts`, `rootRead` | a delegation's value reads a root that is neither an input nor a `reads` name; the message lists the `reads` names where it lists the resolvers today | unchanged |
 
@@ -219,7 +219,7 @@ Nothing runs differently. `lowerGraph` and the binding lowering in `packages/com
   `required`, description -- and `used by <document> as {{<local>}}` for every graph or binding whose `reads` names
   it. Until now the command printed the envelope and stopped.
 - `wilanis map` is unchanged: it prints operations and effects, not reads.
-- The viewer: `GraphView` in `packages/view/src/graphs.ts` builds its `resolvers` map from `reads`, one entry per
+- The viewer: `GraphView` in `packages/view/src/graphs.ts` builds its `resolvers` map from `reads`, one customer per
   local name, each carrying the document it came from; the request node's ports are labelled by the local name and
   each port `opens` its own resolvers document, so a graph using two features' resolvers shows one request node with
   ports that open two documents. `leaves` in `ports.ts` is unchanged: it takes the map.
@@ -247,10 +247,10 @@ this grammar. No other RFC names the header.
 |---|---|---|
 | the schema | `packages/core/test/validate.test.ts` | the baseline data graph and binding carry `reads`; a `resolvers` header is refused; a `reads` value without `#`, with a name that is not an identifier, or an empty `reads` is refused |
 | `splitRef` | `packages/core/test/registry.test.ts` | splits `@a/b.port.json#op` and `@a/b.resolvers.json#name`; `splitOp` still answers |
-| P004 | `packages/runtime/test/example.test.ts`, sabotage | `#agents` (no such resolver); `@customers/edge/nope.resolvers.json#agent` (R001); `@access/edge/session.resolvers.json#sid` from a monitor graph when access does not export it (L005) |
+| P004 | `packages/runtime/test/example.test.ts`, sabotage | `#agents` (no such resolver); `@customers/edge/nope.resolvers.json#agent` (R001); `@access/edge/session.resolvers.json#sid` from a customers graph when access does not export it (L005) |
 | P005 | sabotage | `create-row.graph.json` given `"tenant": "...#tenant"` and no read of it |
 | P006 | sabotage | `create-row.graph.json` given `"saved": "...#agent"` (a node id); `"in": "...#agent"` (reserved) |
-| G003 | sabotage | `{{agent}}` read with `reads` removed: the message names `reads` and the hint writes the entry |
+| G003 | sabotage | `{{agent}}` read with `reads` removed: the message names `reads` and the hint writes the customer |
 | L002 | sabotage (existing case, edited) | `reads` on `register-customer.graph.json` |
 | the walk holds | existing tests, unchanged in expectation | the A006, T004 and B008 cases of `example.test.ts` and `sabotage.test.ts` pass as they do: `opNeeds` answers the same paths |
 | the example | `packages/runtime/test/example.test.ts` | `codes(EXAMPLE)` is empty after the migration; the access tree's tests in `libraries/access/test` likewise |
@@ -294,7 +294,7 @@ that proposes this RFC; no task carries them.
   a resolver is -- "a resolver is a read, never an operation"; `Read`, `templateReads`, `resolverReads` in the code --
   and because every other key that states a contract is a third-person verb: `proves`, `accepts`, `returns`,
   `refuses`, `holds`, `binds`, `includes`, `resolves`. `using` would have been the grammar's one participle. The cost
-  is a neighbour: a resolvers document has `read` on each entry, holding a `request.*` path, and an author may write
+  is a neighbour: a resolvers document has `read` on each customer, holding a `request.*` path, and an author may write
   such a path under `reads` on a graph. The schema refuses it, since a value must be `@path#name`, and P004's hint
   says where the path belongs; the refusal teaches the layer rule, which is what a refusal is for.
 - **A shorthand `"reads": "@doc"` for every name of a document** was considered and rejected: it is the implicit
@@ -302,7 +302,7 @@ that proposes this RFC; no task carries them.
 
 ## Open questions
 
-Settled on acceptance: the word is `reads`, for the reasons under *Drawbacks*; and an entry nothing reads is a
+Settled on acceptance: the word is `reads`, for the reasons under *Drawbacks*; and a customer nothing reads is a
 refusal (P005), not a note -- `reads` is exactly the read set, which is what makes the walk a map and what a small
 model can be held to.
 

@@ -76,7 +76,7 @@ hook. The port document says so in its description, so `wilanis describe @model/
 
 ### The worked example
 
-The monitor has nothing to ask a model, and a feature invented to exercise a plugin is the kind `CLAUDE.md` says not to
+The customers has nothing to ask a model, and a feature invented to exercise a plugin is the kind `CLAUDE.md` says not to
 add; RFC 0023 makes the same call for payment. The worked example is therefore the small tree under
 `packages/plugin-model/test/tree/`, a `triage` project whose one feature classifies a support ticket. It is written the
 way the example is written, and everything below is a document in it.
@@ -519,7 +519,7 @@ None before `accepted`.
   tree that wants a long text asks for `{ "text": "..." }` and waits.
 - **A non-conforming answer is a fault**, not a word of `stop`: it is the unexpected, as a 2xx body that does not
   conform is for `@http`; RFC 0014's `catch` routes it and RFC 0011's `retry` repeats it, both in the report.
-- **The worked example is the plugin's own tree.** The monitor has nothing to ask a model, and the roadmap gives this
+- **The worked example is the plugin's own tree.** The customers has nothing to ask a model, and the roadmap gives this
   RFC a milestone and a demo when someone picks it up.
 
 **Left to implementation, deliberately:** which constrained-output mechanism each wire module uses when a provider

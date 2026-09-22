@@ -34,26 +34,26 @@ write, its own check of the write's answer, and its own refusal.
 6. One `make` and one `refuse` per branch. A node has one router (G009), so two switches cannot share a refusal node.
 7. `out.from` names every leaf: each `make` and each `refuse`.
 
-The graph below flips an entry's `method` between `GET` and `POST` over the store the example tree keeps
-(`@customers/data/customers.store.json`, collection `entries`, of `@customers/domain/Customer.shape.json`, keyed by
+The graph below flips a customer's `tier` between `bronze` and `silver` over the store the example tree keeps
+(`@customers/data/customers.store.json`, collection `customers`, of `@customers/domain/Customer.shape.json`, keyed by
 `id`). It checks clean and every branch rehearses. For a boolean field, the second switch reads
-`{{read.record.pinned}}` and its rule is `pinned`.
+`{{read.record.active}}` and its rule is `active`.
 
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
-  "description": "Flip one entry's method between GET and POST: read it, decide on what was read, write on one branch, answer what was written.",
+  "description": "Flip one customer's tier between bronze and silver: read it, decide on what was read, write on one branch, answer what was written.",
   "in": "@customers/domain/CustomerRef.shape.json",
   "out": {
     "type": "@customers/domain/Customer.shape.json",
-    "from": ["posted", "got", "missing", "goneBeforePost", "goneBeforeGet"]
+    "from": ["silvered", "bronzed", "missing", "goneBeforeSilver", "goneBeforeBronze"]
   },
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "read",
       "run": "@storage/store.port.json#get",
-      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "key": "{{in.id}}" }
+      "in": { "store": "@customers/data/customers.store.json", "collection": "customers", "key": "{{in.id}}" }
     },
     {
       "type": "@wilanis/node/switch.schema.json",
@@ -65,71 +65,71 @@ The graph below flips an entry's `method` between `GET` and `POST` over the stor
     {
       "type": "@wilanis/node/switch.schema.json",
       "id": "decide",
-      "in": { "method": "{{read.record.method}}" },
-      "rules": [{ "when": "method == 'GET'", "to": "toPost" }],
-      "else": "toGet"
+      "in": { "tier": "{{read.record.tier}}" },
+      "rules": [{ "when": "tier == 'bronze'", "to": "toSilver" }],
+      "else": "toBronze"
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "toPost",
+      "id": "toSilver",
       "run": "@storage/store.port.json#patch",
-      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "key": "{{in.id}}", "changes": { "method": "POST" } }
+      "in": { "store": "@customers/data/customers.store.json", "collection": "customers", "key": "{{in.id}}", "changes": { "tier": "silver" } }
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "toGet",
+      "id": "toBronze",
       "run": "@storage/store.port.json#patch",
-      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "key": "{{in.id}}", "changes": { "method": "GET" } }
+      "in": { "store": "@customers/data/customers.store.json", "collection": "customers", "key": "{{in.id}}", "changes": { "tier": "bronze" } }
     },
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "stillThereAfterPost",
-      "in": { "record": "{{toPost.record}}" },
-      "rules": [{ "when": "has(record)", "to": "posted" }],
-      "else": "goneBeforePost"
+      "id": "stillThereAfterSilver",
+      "in": { "record": "{{toSilver.record}}" },
+      "rules": [{ "when": "has(record)", "to": "silvered" }],
+      "else": "goneBeforeSilver"
     },
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "stillThereAfterGet",
-      "in": { "record": "{{toGet.record}}" },
-      "rules": [{ "when": "has(record)", "to": "got" }],
-      "else": "goneBeforeGet"
+      "id": "stillThereAfterBronze",
+      "in": { "record": "{{toBronze.record}}" },
+      "rules": [{ "when": "has(record)", "to": "bronzed" }],
+      "else": "goneBeforeBronze"
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "posted",
+      "id": "silvered",
       "run": "@std/object.port.json#make",
-      "in": { "value": "{{toPost.record}}", "type": "@customers/domain/Customer.shape.json" }
+      "in": { "value": "{{toSilver.record}}", "type": "@customers/domain/Customer.shape.json" }
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "got",
+      "id": "bronzed",
       "run": "@std/object.port.json#make",
-      "in": { "value": "{{toGet.record}}", "type": "@customers/domain/Customer.shape.json" }
+      "in": { "value": "{{toBronze.record}}", "type": "@customers/domain/Customer.shape.json" }
     },
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "missing",
       "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" }
+      "in": { "reason": "missing", "message": "no customer {{in.id}}", "type": "@customers/domain/Customer.shape.json" }
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "goneBeforePost",
+      "id": "goneBeforeSilver",
       "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "entry {{in.id}} vanished before the write", "type": "@customers/domain/Customer.shape.json" }
+      "in": { "reason": "missing", "message": "customer {{in.id}} vanished before the write", "type": "@customers/domain/Customer.shape.json" }
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "goneBeforeGet",
+      "id": "goneBeforeBronze",
       "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "entry {{in.id}} vanished before the write", "type": "@customers/domain/Customer.shape.json" }
+      "in": { "reason": "missing", "message": "customer {{in.id}} vanished before the write", "type": "@customers/domain/Customer.shape.json" }
     }
   ]
 }
 ```
 
-Read `{{read.record.method}}` is allowed in `decide` because `decide` is the `to` of a `has(record)` rule: a
+Read `{{read.record.tier}}` is allowed in `decide` because `decide` is the `to` of a `has(record)` rule: a
 switch rule `has(x)` proves `x` present for the node it routes to, and for nothing else. Read it from a
 node the switch does not route to and G004 says so.
 
