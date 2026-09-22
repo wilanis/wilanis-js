@@ -44,7 +44,7 @@ export function hear(serving: Serving): () => void {
 
 /**
  * How a run ended, in the trace's words: `ok`, `refused: <reason>`, `denied: <reason>` and `challenged: <reason>`
- * where the gate ended it, `failed at '<node>': <message>`, `blocked: needs <roots>`. A reason the route does not
+ * where the gate ended it, `failed at '<node>': <message>`, `blocked: needs <roots>`, `cancelled`. A reason the route does not
  * map is said as one, since its answer was a fault's and this line is where an operator finds out why.
  */
 export function outcomeWords(report: Report, heard: Heard, mapped: (reason: string) => boolean): string {
@@ -55,6 +55,7 @@ export function outcomeWords(report: Report, heard: Heard, mapped: (reason: stri
     return mapped(outcome.reason) ? words : `${words}, which response.refusals does not map: ${outcome.message}`;
   }
   if (outcome.kind === 'blocked') return `blocked: needs ${outcome.needs.join(', ')}`;
+  if (outcome.kind === 'cancelled') return 'cancelled';
   return outcome.at ? `failed at '${outcome.at}': ${outcome.error}` : `failed: ${outcome.error}`;
 }
 

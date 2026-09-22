@@ -150,12 +150,13 @@ export type Encoded = { status: number; body: unknown; cookies?: string[] };
 /**
  * How a report is answered on the wire. An answer takes the status the response block chooses from it, and sets
  * the cookies response.cookies takes from it. A fault (a node that broke) and a blocked run are 500 with the id of
- * the run, where the listener heard it, and nothing of what went wrong.
+ * the run, where the listener heard it, and nothing of what went wrong. A cancelled run is 504, whatever had settled.
  */
 export function encode(trigger: TriggerDoc, report: Report, run?: string): Encoded {
   const settings = trigger.settings as unknown as HttpSettings;
   const outcome = outcomeOf(report);
   if (outcome.kind === 'refused') return encodeRefusal(settings, outcome, run);
+  if (outcome.kind === 'cancelled') return { status: 504, body: { error: 'cancelled: the deadline passed' } };
   if (outcome.kind !== 'answered') return fault(run);
   const { headers, body } = cookiesOf(settings, report.output);
   return { status: statusFor(settings, report), body, ...(headers.length ? { cookies: headers } : {}) };

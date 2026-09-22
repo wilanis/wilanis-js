@@ -40,5 +40,6 @@ export class PortError extends Error {
 function said(outcome: Exclude<Outcome, { kind: 'answered' }>): string {
   if (outcome.kind === 'refused') return `refused '${outcome.reason}' at '${outcome.at}': ${outcome.message}`;
   if (outcome.kind === 'faulted') return `failed at '${outcome.at}': ${outcome.error}`;
+  if (outcome.kind === 'cancelled') return 'cancelled';
   return `blocked: nothing supplied ${outcome.needs.join(', ')}`;
 }
