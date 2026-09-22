@@ -10,7 +10,6 @@ import {
   type BindingOp,
   expr,
   type GraphDoc,
-  hasVars,
   isRun,
   isSwitch,
   type Loaded,
@@ -21,10 +20,8 @@ import {
   type Scope,
   splitPath,
   splitRef,
-  substitute,
   type Type,
   type TypeSpec,
-  type Values,
 } from '@wilanis/core';
 import {
   type Handler,
@@ -34,23 +31,14 @@ import {
   type KernelSpec,
   type KNode,
   type KSource,
-  type Redact,
 } from '@wilanis/engine';
 import { inScope } from './atomic.js';
+import { attempting, type Sites, tagSite } from './attempts.js';
 import { type Compiled, type CompileOptions, nestedFailure } from './compiled.js';
-import { bindings, type CallSite, outputCandidates, passedInputs } from './documents.js';
+import { type CallSite, outputCandidates, passedInputs } from './documents.js';
 import { type GuardHandlers, guardsOf, MAKE, REFUSE, TAKEN_IDS } from './guard.js';
 import { lowerGuards } from './guard-lowering.js';
-import {
-  bindPaths,
-  inputsByName,
-  lowerScope,
-  lowerValue,
-  lowerValues,
-  type Roots,
-  SCOPE,
-  secretPaths,
-} from './lower.js';
+import { bindPaths, inputsByName, lowerScope, lowerValue, lowerValues, type Roots, redactOf, SCOPE } from './lower.js';
 
 /**
  * Lowers a checked tree to what the kernel runs: the spec of a graph, or of the binding that meets a domain
@@ -62,6 +50,8 @@ export class Compiler {
   private readonly bindingSpecs = new Map<string, KernelSpec>();
   /** the nested spec of each list site's guard, by the name `guardSpecName` gave it and its `map` calls it by */
   private readonly guardSpecs = new Map<string, KernelSpec>();
+  /** what each call tagged with a site says about retrying and bounding it; every handler reads it (attempts.ts) */
+  private readonly sites: Sites = new Map();
 
   constructor(
     readonly scope: Scope,
@@ -111,17 +101,19 @@ export class Compiler {
     if (this.handlers[key]) return key;
     const stub = hit.op.pure !== true ? this.opts.stubEffects : undefined;
     if (stub) {
-      this.handlers[key] = stub({
-        path: hit.path,
-        opName: hit.opName,
-        op: hit.op,
-        returns: this.quietType(hit.op.returns),
-      });
+      this.handlers[key] = this.attempting(
+        stub({
+          path: hit.path,
+          opName: hit.opName,
+          op: hit.op,
+          returns: this.quietType(hit.op.returns),
+        }),
+      );
       return key;
     }
     const plugin = this.plugins.find(candidate => candidate.handlers[key]);
     if (!plugin) throw new Error(`no plugin implements '${key}'`);
-    this.handlers[key] = plugin.handlers[key];
+    this.handlers[key] = this.attempting(plugin.handlers[key]);
     return key;
   }
 
@@ -141,8 +133,13 @@ export class Compiler {
     const binding = this.scope.bindingFor(hit.path, this.opts.profile);
     if (typeof binding === 'string') throw new Error(binding);
     const key = `${binding.path}#${hit.opName}`;
-    this.handlers[key] ??= this.nestedRunner(this.lowerBindingOp(binding, hit));
+    this.handlers[key] ??= this.attempting(this.nestedRunner(this.lowerBindingOp(binding, hit)));
     return { handler: key, op: hit.op };
+  }
+
+  /** A handler the compiler registers, tried as the site of each call says (RFC 0011); at no site, once. */
+  private attempting(base: Handler): Handler {
+    return attempting(base, this.sites);
   }
 
   /**
@@ -185,7 +182,7 @@ export class Compiler {
     // a guarded taken site puts the judged value at `in:ok`, so every authored {{in}} reads it instead
     if (guards.some(guard => guard.site.kind === 'taken')) roots.aliases = { in: TAKEN_IDS.ok };
     const nodes: Record<string, KNode> = {};
-    for (const node of doc.nodes) nodes[node.id] = this.lowerNode(node, roots);
+    for (const node of doc.nodes) nodes[node.id] = this.lowerNode(node, roots, graph.path);
     const spec: KernelSpec = { name: graph.path, nodes, output: outputCandidates(doc) };
     return guards.length ? lowerGuards(spec, guards, this.guardHandlers()) : spec;
   }
@@ -212,15 +209,17 @@ export class Compiler {
     return this.guardSpecs.get(name);
   }
 
-  private lowerNode(node: Node, roots: Roots): KNode {
+  /** One node as the kernel runs it; a call or map that says `retry` or `timeoutMs` is tagged `<graph>#<id>`. */
+  private lowerNode(node: Node, roots: Roots, graphPath: string): KNode {
     if (isSwitch(node)) {
       const rules = node.rules.map(rule => ({ when: expr.compilePredicate(rule.when), to: rule.to, label: rule.when }));
       return { kind: 'switch', in: lowerValues(node.in, roots), rules, else: node.else };
     }
     const { handler, op } = this.handlerFor(node.run);
     const inputs = this.withScope(lowerValues(node.in, roots), { key: node.run, given: node.in });
-    const redact = this.redactFor(op, node.in);
-    if (isRun(node)) return { kind: 'call', handler, in: inputs, redact };
+    const redact = redactOf(this.scope, op, node.in);
+    const site = tagSite(this.sites, `${graphPath}#${node.id}`, node);
+    if (isRun(node)) return { kind: 'call', handler, in: inputs, redact, ...site };
     const over = lowerValue(node.over, roots);
     return {
       kind: 'map',
@@ -230,16 +229,18 @@ export class Compiler {
       onItemFailure: node.onItemFailure ?? 'fail',
       redact,
       bind: bindPaths(node.bind),
+      ...site,
     };
   }
 
-  /** A binding operation as a nested spec: one call, of the bound graph or of the delegate. */
+  /** A binding operation as a nested spec: one call, of the bound graph or of the delegate, tagged `<binding>#<op>` when it retries or is bounded. */
   private lowerBindingOp(binding: Loaded<BindingDoc>, hit: OpHit): KernelSpec {
     const key = `${binding.path}#${hit.opName}`;
     const cached = this.bindingSpecs.get(key);
     if (cached) return cached;
     const bound = binding.doc.operations[hit.opName];
-    const op = bound.graph ? this.graphCall(bound.graph, hit.op) : this.delegateCall(binding, bound, hit.op);
+    const call = bound.graph ? this.graphCall(bound.graph, hit.op) : this.delegateCall(binding, bound, hit.op);
+    const op: KCall = { ...call, ...tagSite(this.sites, key, bound) };
     const spec: KernelSpec = { name: key, nodes: { op }, output: hit.op.returns ? ['op'] : undefined };
     this.bindingSpecs.set(key, spec);
     return spec;
@@ -254,7 +255,9 @@ export class Compiler {
     if (!graph) throw new Error(`unknown graph '${graphRef}'`);
     const handler = `graph:${graph.path}`;
     const whole = this.takesWhole(graph);
-    this.handlers[handler] ??= this.nestedRunner(this.lowerGraph(graph), whole, graph.doc.atomic === true);
+    this.handlers[handler] ??= this.attempting(
+      this.nestedRunner(this.lowerGraph(graph), whole, graph.doc.atomic === true),
+    );
     const names = Object.keys(op.accepts ?? {});
     const passIn = whole ? { in: { ref: 'in', path: [names[0]] } } : inputsByName(names);
     return { kind: 'call', handler, in: passIn };
@@ -267,7 +270,7 @@ export class Compiler {
     const given = passedInputs(target, op, bound.in);
     const roots: Roots = { resolvers: this.resolverRoots(binding.doc.reads) };
     const inputs = this.withScope(lowerValues(given, roots), { key: bound.run, given: bound.in });
-    return { kind: 'call', handler, in: inputs, redact: this.redactFor(target, given) };
+    return { kind: 'call', handler, in: inputs, redact: redactOf(this.scope, target, given) };
   }
 
   /**
@@ -303,21 +306,5 @@ export class Compiler {
     const resolver = doc?.doc.resolvers[op];
     if (!resolver) throw new Error(`unknown resolver '${ref}'`);
     return splitPath(resolver.read).slice(1);
-  }
-
-  /** Secret paths of an operation's inputs and result (result substituted through its type fields). */
-  private redactFor(op: Operation, given: Values | undefined): Redact | undefined {
-    let inType: Type | undefined;
-    let outType: Type | undefined;
-    try {
-      inType = this.scope.types.fields(op.accepts);
-      outType = op.returns ? this.scope.types.spec(op.returns) : undefined;
-      if (outType && hasVars(outType)) outType = substitute(outType, bindings(this.scope, op, given));
-    } catch {
-      return undefined;
-    }
-    const inPaths = secretPaths(inType);
-    const outPaths = secretPaths(outType);
-    return inPaths.length || outPaths.length ? { in: inPaths, out: outPaths } : undefined;
   }
 }
