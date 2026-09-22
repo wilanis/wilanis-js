@@ -1,6 +1,6 @@
 # RFC 0035: The whole record before the write: a guarded shape is made upstream of the effect, never from it
 
-- **Status:** draft
+- **Status:** accepted
 - **Areas:** `area:core` (one alternative on `accepts` in `port.schema.json`; `Operation.accepts` in `model.ts`),
   `area:compiler` (two `I` rules, one `L` rule, `B005` and `acceptsType` reading a shape), `area:runtime`
   (`describe`, the graph scaffold, the template's guidance), `area:view` (the port page reads a shape). Nothing in
@@ -102,6 +102,8 @@ operation takes by naming the shape, once:
 }
 ```
 
+`update` takes `CustomerUpdate`, not `Customer`: a caller changing who a customer is does not get to change who
+registered them or whether the account is open, and the domain graph below is where the partial becomes the whole.
 `CustomerUpdate` gains `"note": { "type": "string", "required": false }`, so a caller moving a customer to gold
 can say why. `UpdateBody` and `UpdateRequest` stay: they are the world's shapes, and T001 holds a trigger's `settings`
 to edge shapes. What goes is the port spelling the same fields a third time; `update` now names the core shape the
@@ -161,8 +163,9 @@ fields it has.
 ```
 
 `record: "{{in}}"` is a whole read of a taken site, guarded at `in:ok` by RFC 0007's decision 4. The guard runs
-twice on one value, once at `customer` and once here; both are pure, and the second is what makes this graph
-correct under any caller, not only the domain graph above it. `kept` is a made site behind the write, as every
+twice on one value, once at `customer` and once here, and stays so: both are pure, and the second is what makes
+this graph correct under any caller, not only the domain graph above it. Proving it away would make the data
+graph's correctness depend on who binds to it, which is the wrong direction for a binding to matter. `kept` is a made site behind the write, as every
 read site is: it judges what the store answered, which is the right thing to do with a row the tree did not just
 compose.
 
@@ -216,6 +219,12 @@ it is a rule about what a layer may do.
 | I0nn | `check/invariant-writes.ts` | a `run` or `map` node runs `@storage/store.port.json#patch` over a collection whose `of` is a guarded shape, and a key of its `changes` is a field some `holds` invariant on that shape reads (`rootsOf` in `check/prove.ts` over the invariant's `when`). `at` is `nodes/<id>/in/changes`. | `load the record, make the new one with @std/object.port.json#merge in a domain graph, and #put it whole through an operation that takes a <Shape>` |
 | I0nn | `check/invariant-writes.ts` | a node runs `#put` over a collection whose `of` is a guarded shape and its `record` is written in place -- an object literal, or anything but one whole read of a node or of `in` (`readWhole` in `check/prove.ts`). `at` is `nodes/<id>/in/record`. | `make it in a node -- @std/object.port.json#make with "type": "<Shape>" -- and give #put "record": "{{<node>}}"` |
 | L0nn | `check/graph.ts` | a data graph holds a made site of a guarded shape (`sitesOf` in `sites.ts`, `kind: 'made'`) and some effectful node of the graph reads that node, directly or through the routing (`readersOf` in `check/graph-routing.ts`). A made site no effect reads -- the `kept` node above, which translates what the store answered -- is not refused. `at` is `nodes/<id>` of the site. | `a data graph translates; make the record in a domain graph and hand it to this one whole, as its in` |
+
+L0nn is a refusal, not guidance. The two `I` rules alone put the guard before every write; L0nn additionally
+holds the making to a domain graph, and its cost is concrete in `register`, where the key comes from `#newKey`, an
+effect, so a domain graph that makes the record reaches it through a `nextId` operation. That is one operation per
+collection that generates its own keys, and it is the price of the layer meaning what `CLAUDE.md` says it means: a
+data graph that composes the business value is the shape that produced this RFC.
 
 What the rules do not refuse, on purpose: a `#patch` of an unguarded field of a guarded shape (`active` on
 `Customer`, which no invariant reads); a `#put` with `record: "{{in}}"` or `record: "{{customer}}"`; a domain graph
@@ -338,21 +347,9 @@ set out to end.
 
 ## Open questions
 
-Before `accepted`:
+Decided at acceptance, each in the text above: L0nn is a refusal and not guidance ("Checker rules"); `update`
+accepts `CustomerUpdate` and not `Customer` ("Guide-level explanation"); a taken site fed only by a guarded made
+site stays guarded ("Guide-level explanation", at `keep-customer`).
 
-1. **Whether L0nn is a refusal or guidance.** The two `I` rules alone put the guard before every write; L0nn
-   additionally says the making is a domain graph's. Its cost is concrete in `register`: the key comes from
-   `#newKey`, an effect, so a domain graph that makes the record needs a `nextId` operation to reach it through.
-   Recommendation: a refusal. A data graph that composes the business value is the shape that produced this RFC,
-   and one extra operation per key-generating collection is the price of the layer meaning what `CLAUDE.md` says
-   it means.
-2. **What `update` accepts.** `CustomerUpdate` with an optional `note` (the domain graph merges it over the kept
-   record), or `Customer` whole (the caller sends everything, `registrar` and `active` included). Recommendation:
-   `CustomerUpdate`. A caller changing who a customer is should not be able to change who registered them.
-3. **Whether a taken site fed only by a guarded made site stays guarded.** RFC 0007's decision 4 says a taken site
-   is always guarded, so `keep-customer` judges the rule a second time on a value `update-customer` already judged.
-   Recommendation: leave it. The data graph is correct under any caller, the guard is pure, and proving it away
-   would make the data graph's correctness depend on who binds to it.
-
-During implementation: the three codes; the names `keep` and `nextId`; whether `--read-then patch` stays in the
-scaffold for a collection no invariant reads or goes altogether; and the exact wording of the three hints.
+Decided during implementation: the three codes; the names `keep` and `nextId`; whether `--read-then patch` stays
+in the scaffold for a collection no invariant reads or goes altogether; and the exact wording of the three hints.
