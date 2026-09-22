@@ -69,7 +69,7 @@ function write(tree: Tree): string {
       kind: '@storage-postgres/postgres.connection-kind.json',
       settings: { url: '{{secrets.database}}', schema },
     },
-    'features/customers/feature.json': { $schema: schemaRef('feature'), description: 'what the monitor keeps' },
+    'features/customers/feature.json': { $schema: schemaRef('feature'), description: 'what the registry keeps' },
     'features/customers/domain/Customer.shape.json': {
       $schema: schemaRef('shape'),
       description: 'one observed call',

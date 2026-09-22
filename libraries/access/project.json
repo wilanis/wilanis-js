@@ -28,8 +28,8 @@
       "from": "@wilanis/plugin-auth",
       "settings": {
         "tokens": {
-          "issuer": "monitor",
-          "audience": "monitor-api",
+          "issuer": "customers",
+          "audience": "customers-api",
           "secret": "{{secrets.jwt}}",
           "accessTtl": 900,
           "refreshTtl": 604800

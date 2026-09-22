@@ -53,7 +53,7 @@ describe('describe: a domain graph whose effects move together', () => {
   const said = () => describeDoc(example, ALL);
 
   it('names the node whose operation leads to the store, not the data graph below it', () => {
-    // record-all runs one map over monitor.submit; the writes are two graphs further down
+    // register-all runs one map over customer.submit; the writes are two graphs further down
     expect(said()).toContain('    taken part in by  recorded');
   });
 

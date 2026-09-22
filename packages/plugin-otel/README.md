@@ -10,7 +10,7 @@ npm install @wilanis/plugin-otel
 ```json
 {
   "plugins": [
-    { "use": "@otel", "from": "@wilanis/plugin-otel", "settings": { "endpoint": "{{secrets.OTLP_ENDPOINT}}", "service": "monitor" } }
+    { "use": "@otel", "from": "@wilanis/plugin-otel", "settings": { "endpoint": "{{secrets.OTLP_ENDPOINT}}", "service": "customers" } }
   ],
   "startup": [
     { "label": "Export traces", "run": "@otel/exporter.port.json#export" },
@@ -37,7 +37,7 @@ that called it:
 ```
 fire @customers/edge/get-customer.trigger.json                    143ms  refused: upstream
   @customers/domain/customer.port.json#get                      141ms  refused: upstream
-    binding @customers/data/monitor.binding.json#get           141ms
+    binding @customers/data/customers-rest.binding.json#get           141ms
       get-row (@customers/data/get-row.graph.json)             140ms  refused: upstream
         asked   @http/http.port.json#request                 131ms  ok  status=500
         route   switch → failed                                0ms  ok

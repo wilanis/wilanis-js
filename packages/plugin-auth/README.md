@@ -11,7 +11,7 @@ npm install @wilanis/plugin-auth
 
 ```json
 { "use": "@auth", "from": "@wilanis/plugin-auth", "settings": {
-    "tokens": { "issuer": "monitor", "audience": "monitor-api", "secret": "{{secrets.jwt}}", "accessTtl": 900, "refreshTtl": 604800 },
+    "tokens": { "issuer": "customers", "audience": "customers-api", "secret": "{{secrets.jwt}}", "accessTtl": 900, "refreshTtl": 604800 },
     "session": "@access/domain/Session.shape.json",
     "challenge": { "methods": { "otp": { "obtain": "wilanis run @access/edge/issue-otp.trigger.json --challenge-id={id}" } } } } }
 ```
