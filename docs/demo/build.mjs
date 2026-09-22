@@ -135,7 +135,7 @@ function step4(ctx) {
 function step5(ctx) {
   const title = "Tests nobody wrote";
   const reh = wilanis(ctx, "rehearse", ".", "--profile", "local").text;
-  const block = reh.match(/^features\/access\/domain\/require-registrar {2}switch 'decide' {2}3\/3 branches\n(?: .*\n?){3}/m)?.[0]?.trimEnd();
+  const block = reh.match(/^features\/access\/domain\/require-registrar {2}switch 'isRegistrar' {2}3\/3 branches\n(?: .*\n?){3}/m)?.[0]?.trimEnd();
   const summary = reh.slice(reh.indexOf("every branch settled")).trimEnd();
   assert(title, Boolean(block) && summary.includes("Writes are for registrars  holds at 6 trigger(s)"), reh, "rehearse shows require-registrar 3/3 branches and Writes are for registrars holds at 6 trigger(s)");
   const map = wilanis(ctx, "map", ".", "--profile", "local").text;
