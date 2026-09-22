@@ -5,18 +5,21 @@
  * type, which a call's report redacts.
  */
 import {
+  hasVars,
   type Loaded,
+  type Operation,
   type Scope,
   type StoreDoc,
   splitPath,
   splitRef,
+  substitute,
   TEMPLATE,
   type Type,
   type Values,
   WHOLE_TEMPLATE,
 } from '@wilanis/core';
-import { type KSource, readPath } from '@wilanis/engine';
-import { type CallSite, collectionOf } from './documents.js';
+import { type KSource, type Redact, readPath } from '@wilanis/engine';
+import { bindings, type CallSite, collectionOf } from './documents.js';
 
 /** The roots a value may read where it is written, and how each lowers. */
 export interface Roots {
@@ -151,4 +154,20 @@ export function secretPaths(
     else secretPaths(field.type, [...prefix, name], out, depth + 1);
   }
   return out;
+}
+
+/** The secret paths of an operation's inputs and result at a call, the result substituted through what the call gives its type fields. */
+export function redactOf(scope: Scope, op: Operation, given: Values | undefined): Redact | undefined {
+  let inType: Type | undefined;
+  let outType: Type | undefined;
+  try {
+    inType = scope.types.fields(op.accepts);
+    outType = op.returns ? scope.types.spec(op.returns) : undefined;
+    if (outType && hasVars(outType)) outType = substitute(outType, bindings(scope, op, given));
+  } catch {
+    return undefined;
+  }
+  const inPaths = secretPaths(inType);
+  const outPaths = secretPaths(outType);
+  return inPaths.length || outPaths.length ? { in: inPaths, out: outPaths } : undefined;
 }

@@ -7,10 +7,12 @@
  * holds there, `reachOf` what a profile reaches -- the effectful operations, connections, secrets and holds
  * of one place a tree runs --, `atomicReachOf` what an atomic graph reaches, `atomicOf` what a reader is told
  * about one, `invariantSaidOf` which triggers an access invariant reaches and how each one meets it, and
- * `viewsReachedBy` every view across a scope a run reaches.
+ * `viewsReachedBy` every view across a scope a run reaches; `attempting` tries a handler as its call's site says
+ * (RFC 0011's retry and timeout).
  */
 export * from './atomic.js';
 export * from './atomic-said.js';
+export * from './attempts.js';
 // The walk below an atomic graph, named rather than spread: `./atomic.js` beside it is the run scope, and
 // a reader of one import line should not have to know which of the two a name came from.
 export { type AtomicReach, atomicReachOf, type Reached, type ReachedMap } from './check/atomic.js';
