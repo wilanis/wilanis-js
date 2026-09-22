@@ -48,7 +48,10 @@ const ANY_OF: Type[] = [
 const LEAF_DEPTH = 2;
 const LIST_DEPTH = 3;
 
-/** Generate a value of a type under a seed: every required field, optional ones half the time, lists of 0..3. */
+/**
+ * Generate a value of a type under a seed: every required field, optional ones half the time, lists of 0..3
+ * and never past their bound.
+ */
 export function generate(type: Type, random: Rng, depth = 0): unknown {
   switch (type.kind) {
     case 'string':
@@ -65,7 +68,7 @@ export function generate(type: Type, random: Rng, depth = 0): unknown {
     case 'unknown':
       return depth > LEAF_DEPTH ? random.pick([null, 0, 'x', true]) : generate(random.pick(ANY_OF), random, depth + 1);
     case 'list':
-      return Array.from({ length: depth > LIST_DEPTH ? 0 : random.int(0, 3) }, () =>
+      return Array.from({ length: depth > LIST_DEPTH ? 0 : random.int(0, Math.min(3, type.max ?? 3)) }, () =>
         generate(type.of, random, depth + 1),
       );
     case 'object':

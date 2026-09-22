@@ -7,6 +7,7 @@ import {
   BOOLEAN,
   isBlobHandle,
   isTypeRef,
+  type ListType,
   NUMBER,
   type ObjectType,
   type ObjField,
@@ -84,7 +85,7 @@ export function conforms(value: unknown, type: Type, at = '$'): string | null {
     case 'blob':
       return isBlobHandle(value) ? null : `${at}: expected a blob (the handle of a stored file: id, contentType, size)`;
     case 'list':
-      return conformsList(value, type.of, at);
+      return conformsList(value, type, at);
     case 'object':
       return conformsObject(value, type, at);
   }
@@ -97,10 +98,12 @@ function conformsString(value: unknown, allowed: string[] | undefined, at: strin
   return null;
 }
 
-function conformsList(value: unknown, of: Type, at: string): string | null {
+/** A list: an array no longer than its bound, each item conforming to what it is a list of. */
+function conformsList(value: unknown, type: ListType, at: string): string | null {
   if (!Array.isArray(value)) return `${at}: expected list`;
+  if (type.max !== undefined && value.length > type.max) return `${at}: at most ${type.max} items`;
   for (const [index, item] of value.entries()) {
-    const bad = conforms(item, of, `${at}[${index}]`);
+    const bad = conforms(item, type.of, `${at}[${index}]`);
     if (bad) return bad;
   }
   return null;
@@ -150,7 +153,7 @@ export function toJsonSchema(type: Type): Record<string, unknown> {
     case 'blob':
       return toJsonSchema(BLOB_HANDLE);
     case 'list':
-      return { type: 'array', items: toJsonSchema(type.of) };
+      return { type: 'array', items: toJsonSchema(type.of), ...(type.max === undefined ? {} : { maxItems: type.max }) };
     case 'object':
       return objectSchema(type);
   }

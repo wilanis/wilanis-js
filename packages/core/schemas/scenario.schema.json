@@ -42,16 +42,22 @@
       "type": "object",
       "additionalProperties": {}
     },
+    "cancelAt": {
+      "description": "The dotted node path of one stubbed effect at which the replay cancels the run: wilanis regress aborts the run's signal when that node is reached, and the node rejects the way an aborted call does. Must be a key of stubs. wilanis fuzz never writes it; an author does, to pin a deadline.",
+      "type": "string",
+      "minLength": 1
+    },
     "expect": {
       "description": "The report this run produced, which wilanis regress replays against and diffs node by node.",
       "type": "object",
       "properties": {
         "status": {
-          "description": "How the run as a whole ended: done, failed, or blocked by a policy or the guard.",
+          "description": "How the run as a whole ended: done, failed, blocked by a policy or the guard, or cancelled when its signal fired before it finished.",
           "enum": [
             "done",
             "failed",
-            "blocked"
+            "blocked",
+            "cancelled"
           ]
         },
         "output": {

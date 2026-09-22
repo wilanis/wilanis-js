@@ -61,7 +61,7 @@ export function substitute(type: Type, subst: Record<string, Type>): Type {
     case 'var':
       return subst[type.name] ?? UNKNOWN;
     case 'list':
-      return { kind: 'list', of: substitute(type.of, subst) };
+      return { ...type, of: substitute(type.of, subst) };
     case 'object': {
       if (!hasVars(type)) return type;
       const fields: Record<string, ObjField> = {};

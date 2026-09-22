@@ -46,6 +46,14 @@ describe('the baseline', () => {
     const retried = { graph: '@features/f/graphs/g.graph.json', retry: { times: 1 }, timeoutMs: 8000 };
     expect(refused(doc('binding', { operations: { get: retried } }))).toEqual([]);
   });
+  it('a bounded list field, a limited and paced map, and a scenario that pins a cancellation conform too', () => {
+    expect(refused(doc('shape', { fields: { ids: { type: 'string[]', maxItems: 100 } } }))).toEqual([]);
+    const map = { type: NODE_MAP, id: 'm', run: '@x/p.json#op', over: '{{in.ids}}', limit: 100, concurrency: 8 };
+    expect(refused(doc('graph', { nodes: [map] }))).toEqual([]);
+    const expected = { status: 'cancelled', nodes: { 'op.asked': { status: 'failed' } } };
+    const pinned = { stubs: { 'op.asked': {} }, cancelAt: 'op.asked', expect: expected };
+    expect(refused(doc('scenario', pinned))).toEqual([]);
+  });
 });
 
 describe('the envelope', () => {
