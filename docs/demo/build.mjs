@@ -43,14 +43,14 @@ const REGISTRATION = '{"name":"Ada Lovelace","email":"ada@example.com","tier":"b
 function step0(ctx) {
   const title = "The tree and its two rules";
   const out = check(ctx);
-  assert(title, out === "ok: 185 documents", out, "check answers ok: 185 documents");
+  assert(title, out === "ok: 194 documents", out, "check answers ok: 194 documents");
   return {
     number: 0,
     title,
     summary: out,
     does: [{ text: "Nothing yet. The tree is the example as it ships, and it is judged before anyone touches it.", pre: "npx wilanis check ." }],
     answers: [{ pre: out }],
-    why: "Every one of the 185 is a JSON document and none is code, so there is nothing an agent can write that the checker does not read whole. The two sentences above are the rules a human wrote; step 1 is where the first is caught, step 7 the second. Neither is repeated anywhere else in the tree.",
+    why: "Every one of the 194 is a JSON document and none is code, so there is nothing an agent can write that the checker does not read whole. The two sentences above are the rules a human wrote; step 1 is where the first is caught, step 7 the second. Neither is repeated anywhere else in the tree.",
   };
 }
 
@@ -121,7 +121,7 @@ function step4(ctx) {
   const title = "The finished route";
   paste(ctx, "archive-customer.step3.trigger.json");
   const out = check(ctx);
-  assert(title, out === "ok: 186 documents", out, "check answers ok: 186 documents");
+  assert(title, out === "ok: 195 documents", out, "check answers ok: 195 documents");
   return {
     number: 4,
     title,
@@ -161,7 +161,7 @@ function step5(ctx) {
 async function step6(ctx) {
   const title = "Live";
   ctx.server = new Server(ctx, join(ctx.scratch, "node_modules", ".bin", "wilanis"), ["start", ".", "--profile", "local"]);
-  await ctx.server.waitFor(/startup 7\/7 Listen: ok/, 30_000);
+  await ctx.server.waitFor(/startup 8\/8 Listen: ok/, 30_000);
   const anon = await call("POST", "/customers/x/archive");
   assert(title, anon.status === 401 && anon.json?.reason === "anonymous", `${anon.status} ${anon.text}`, "no token answers 401 anonymous");
   const cy = await call("POST", "/customers/x/archive", { token: await signIn("cy", "cy-pass") });
