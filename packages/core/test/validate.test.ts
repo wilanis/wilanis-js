@@ -39,6 +39,13 @@ describe('the baseline', () => {
     expect(validateDocument(doc(kind), 'f.json')).toEqual({ kind, refusals: [] });
     expect(validateDocument(doc(kind, {}, schemaUrl(kind)), 'f.json')).toEqual({ kind, refusals: [] });
   });
+  it('a keyed operation, a retried and bounded node, and a retried binding operation conform too', () => {
+    const keyed = { description: 'one', accepts: { id: { type: 'string' } }, key: 'id' };
+    expect(refused(doc('port', { operations: { get: keyed } }))).toEqual([]);
+    expect(refused(doc('graph', { nodes: [run('a', { retry: { times: 2 }, timeoutMs: 5000 })] }))).toEqual([]);
+    const retried = { graph: '@features/f/graphs/g.graph.json', retry: { times: 1 }, timeoutMs: 8000 };
+    expect(refused(doc('binding', { operations: { get: retried } }))).toEqual([]);
+  });
 });
 
 describe('the envelope', () => {

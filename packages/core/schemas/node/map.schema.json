@@ -49,6 +49,12 @@
         "collect"
       ],
       "default": "fail"
+    },
+    "timeoutMs": {
+      "$ref": "../common.schema.json#/$defs/timeoutMs"
+    },
+    "retry": {
+      "$ref": "../common.schema.json#/$defs/retry"
     }
   },
   "required": [

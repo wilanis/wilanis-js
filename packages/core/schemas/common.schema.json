@@ -161,6 +161,37 @@
       "additionalProperties": {
         "$ref": "#/$defs/value"
       }
+    },
+    "retry": {
+      "description": "When a call that faults or times out is tried again: at most times more, waiting backoffMs before the second try and twice as long before each further one. A declared refusal is never tried again: it is the graph deciding, not a fault.",
+      "type": "object",
+      "properties": {
+        "times": {
+          "description": "How many more times the call is tried after the first: times 2 runs it at most three times.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "backoffMs": {
+          "description": "The wait before the second try, in milliseconds; doubled before each further one. Absent: 0.",
+          "type": "number",
+          "minimum": 0,
+          "default": 0
+        },
+        "when": {
+          "description": "An expression over the fields of the answer, in the grammar of a switch rule; an answer it accepts is tried again, and on the last try stands as the answer (status >= 500). Absent: only a fault or a timeout is tried again.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "times"
+      ],
+      "additionalProperties": false
+    },
+    "timeoutMs": {
+      "description": "The most this call may take, in milliseconds, counted from the moment it starts (a map: each element). When it strikes, the call fails as a fault and the handler is told through its signal. Absent: the call waits as long as its handler does.",
+      "type": "number",
+      "exclusiveMinimum": 0
     }
   }
 }

@@ -58,6 +58,18 @@
           "transactional": {
             "description": "True when running it can take part in the transaction of an atomic graph. Such an operation accepts a static field the checker resolves a connection from: `connection`, the path of a connection document, or `store`, the path of a store document that names one. A plugin grants it.",
             "type": "boolean"
+          },
+          "idempotent": {
+            "description": "True when calling it again with the same inputs changes nothing further. A string is an expression over the operation's accepted fields, in the grammar of a switch rule, that says when it is (method == 'GET'): the checker evaluates it over the literal inputs of each call site that retries. A pure operation never declares it; a domain operation declares true only, which its bindings are held to under every profile.",
+            "type": [
+              "boolean",
+              "string"
+            ],
+            "minLength": 1
+          },
+          "key": {
+            "description": "The accepted field the plugin recognises a repeated call by, so that a caller who gives it makes the call safe to repeat. Not written together with idempotent: one says the operation is repeatable as it is, the other how to make it so. A domain operation never declares it: the field belongs to the native operation its binding reaches.",
+            "$ref": "common.schema.json#/$defs/ident"
           }
         },
         "required": [

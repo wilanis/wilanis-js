@@ -41,9 +41,9 @@ property is described.
 | `project` | aliases, plugins (`use`, `from`, `settings` incl. the codecs table), includes (trees whose features load here), secrets, startup, profiles | `project.json` |
 | `feature` | dependsOn, exports, effects allowlist | `features/<name>/feature.json` |
 | `shape` | a named object type; `layer: edge` (the world's) or `core` (ours) | `edge/` or `domain/` |
-| `port` | a contract: operations with accepts / returns, each maybe `pure`, `refuses`, `holds` or `transactional`; a field may be `static` | `domain/` |
-| `binding` | how a port is met -- a domain port, or one a plugin requires: per operation a graph or a delegation (`run` + `in`) | `data/` |
-| `graph` | dataflow: nodes of type run / switch / map, `in`, `out.from`, constants; `atomic` when its effects commit or roll back together; a data graph may name `reads`. One that changes a record it first read takes the read-decide-write form -- `#get`, a switch on `has(record)` and on what it holds, one write per branch, a switch on what that write answered, a record or a refusal each -- which `wilanis new graph <path> --store <store> --collection <name> --read-then patch\|put\|remove --branch <id>:<when>` writes with the ids and the routing in place and `TODO` where a value goes | `domain/` or `data/` |
+| `port` | a contract: operations with accepts / returns, each maybe `pure`, `refuses`, `holds` or `transactional`; a field may be `static`; an operation may say `idempotent` (always, or when an expression over its inputs holds) or name its `key` | `domain/` |
+| `binding` | how a port is met -- a domain port, or one a plugin requires: per operation a graph or a delegation (`run` + `in`); an operation may say `timeoutMs` and `retry` | `data/` |
+| `graph` | dataflow: nodes of type run / switch / map, `in`, `out.from`, constants; `atomic` when its effects commit or roll back together; a data graph may name `reads`, and a data graph's node may say `timeoutMs` and `retry`. One that changes a record it first read takes the read-decide-write form -- `#get`, a switch on `has(record)` and on what it holds, one write per branch, a switch on what that write answered, a record or a refusal each -- which `wilanis new graph <path> --store <store> --collection <name> --read-then patch\|put\|remove --branch <id>:<when>` writes with the ids and the routing in place and `TODO` where a value goes | `domain/` or `data/` |
 | `trigger` | a way in: `kind`, `settings`, `in`, `out`, `policies` (what gates it, in order, each given the credentials it needs), and `fire` -- the run node it invokes | `edge/` |
 | `policy` | a gate: `decide` fires a domain operation over what the guard hands (`{{request.principal}}`), `outcomes` maps each reason its graph refuses with to `deny` or `challenge`, `proves` says what is present once it allows | `edge/` |
 | `invariant` | a rule that must hold: `access` (which policy gates writes to a port) or `holds` (a rule over a core shape's fields) | `domain/` |
@@ -69,7 +69,9 @@ features/<name>/
   **domain port operation** it runs, with the values it passes. A trigger never names a graph -- it says what it wants done,
   and the port's binding decides how (D008, L006).
 - **The domain** holds the rules. A domain graph speaks core shapes and domain ports; the only native
-  operations it may run are pure. Every effect it needs, it reaches through a port (L002).
+  operations it may run are pure. Every effect it needs, it reaches through a port (L002). It never says
+  `retry` or `timeoutMs`: how long and how often a call is tried is the data layer's, on a data graph's node or
+  a binding's operation.
 - **The data layer** translates. A data graph may name edge shapes and speaks native ports, and every
   effectful operation it reaches is listed in `feature.json → effects` (L003). It is the only layer that
   reads the request, and only through resolvers it names: `"reads": { "agent": "@f/edge/request.resolvers.json#agent" }`,
