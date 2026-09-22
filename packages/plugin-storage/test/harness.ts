@@ -17,8 +17,8 @@ import storage from '../src/index.js';
 export const ENGINE = '@fake-engine';
 export const KIND = `${ENGINE}/fake.connection-kind.json`;
 export const CONNECTION = '@connections/records.connection.json';
-export const STORE = '@features/monitor/data/entries.store.json';
-export const SHAPE = '@features/monitor/domain/Entry.shape.json';
+export const STORE = '@features/customers/data/customers.store.json';
+export const SHAPE = '@features/customers/domain/Customer.shape.json';
 
 /** A directory of documents, written as a plugin's docs. */
 function docsDir(docs: Record<string, unknown>): string {
@@ -89,12 +89,12 @@ export function tree(): Docs {
       kind: KIND,
       settings: {},
     },
-    'features/monitor/feature.json': {
+    'features/customers/feature.json': {
       $schema: schemaRef('feature'),
       description: 'what the monitor observes',
       effects: ['@storage/store.port.json#find'],
     },
-    'features/monitor/domain/Entry.shape.json': {
+    'features/customers/domain/Customer.shape.json': {
       $schema: schemaRef('shape'),
       description: 'one observed call',
       layer: 'core',
@@ -107,28 +107,28 @@ export function tree(): Docs {
         ua: { type: 'string', required: false },
       },
     },
-    'features/monitor/domain/Ref.shape.json': {
+    'features/customers/domain/Ref.shape.json': {
       $schema: schemaRef('shape'),
       description: 'which entries are wanted: one id, the urls to match, and whether the tags matter',
       layer: 'core',
       fields: { id: { type: 'string' }, urls: { type: 'string[]' }, tagged: { type: 'boolean' } },
     },
-    'features/monitor/edge/EntryRow.shape.json': {
+    'features/customers/edge/CustomerRow.shape.json': {
       $schema: schemaRef('shape'),
       description: 'an entry as the world sends it',
       layer: 'edge',
       fields: { id: { type: 'string' }, url: { type: 'string' } },
     },
-    'features/monitor/data/entries.store.json': {
+    'features/customers/data/customers.store.json': {
       $schema: schemaRef('store'),
       description: 'the entries kept so far',
       connection: CONNECTION,
       collections: { entries: { of: SHAPE, key: 'id' } },
     },
-    'features/monitor/data/read-entry.graph.json': {
+    'features/customers/data/read-entry.graph.json': {
       $schema: schemaRef('graph'),
       description: 'one entry by its id',
-      in: '@features/monitor/domain/Ref.shape.json',
+      in: '@features/customers/domain/Ref.shape.json',
       out: { type: `${SHAPE}[]`, from: ['asked'] },
       nodes: [
         {

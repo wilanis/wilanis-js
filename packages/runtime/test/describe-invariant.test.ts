@@ -19,10 +19,10 @@ import { EXAMPLE, INCLUDES, loadedWith, PLUGINS, sabotage } from './example-harn
 
 const example = loadTree(EXAMPLE, PLUGINS, INCLUDES);
 
-const WRITES = '@features/monitor/domain/writes-are-for-recorders.invariant.json';
+const WRITES = '@features/customers/domain/writes-are-for-registrars.invariant.json';
 const SESSION = '@features/directories/domain/the-session-is-the-callers.invariant.json';
-const CALLS = '@features/monitor/domain/an-entry-names-a-call.invariant.json';
-const CAN_RECORD = '@features/access/edge/can-record.policy.json';
+const CALLS = '@features/customers/domain/a-customer-is-reachable.invariant.json';
+const CAN_RECORD = '@features/access/edge/can-register.policy.json';
 const SIGNED_IN = '@features/access/edge/signed-in.policy.json';
 
 describe('ls: the invariants of a tree', () => {
@@ -44,12 +44,12 @@ describe('describe: an access invariant that names the policy', () => {
 
   it('says the form it takes and every domain operation it gates', () => {
     expect(said()).toContain('access: every trigger reaching these domain operations is gated');
-    expect(said()).toContain('    @monitor/domain/monitor.port.json#remove');
-    expect(said()).toContain('    @monitor/domain/monitor.port.json#import');
+    expect(said()).toContain('    @customers/domain/customer.port.json#remove');
+    expect(said()).toContain('    @customers/domain/customer.port.json#import');
   });
 
   it('says what it asks of every way in, in the words the document wrote it', () => {
-    expect(said()).toContain('requires: attaches @access/edge/can-record.policy.json');
+    expect(said()).toContain('requires: attaches @access/edge/can-register.policy.json');
   });
 
   it('names each trigger once, however many of the gated operations it reaches', () => {
@@ -59,8 +59,8 @@ describe('describe: an access invariant that names the policy', () => {
       .split('\n')
       .filter(line => line.includes('.trigger.json  #'));
     expect(rows).toHaveLength(5);
-    expect(said()).not.toContain('@features/monitor/edge/list-entries.trigger.json');
-    expect(said()).not.toContain('@features/monitor/edge/get-entry.trigger.json');
+    expect(said()).not.toContain('@features/customers/edge/list-customers.trigger.json');
+    expect(said()).not.toContain('@features/customers/edge/get-customer.trigger.json');
   });
 
   it('says once, above the list, what every way in is met by, rather than on all nine rows', () => {
@@ -68,7 +68,7 @@ describe('describe: an access invariant that names the policy', () => {
     // so the policy is named in the header and on no row at all
     expect(said()).toContain(`reached by (every one met by ${CAN_RECORD}):`);
     expect(said().split(CAN_RECORD)).toHaveLength(2);
-    expect(said()).not.toContain('met by @features/access/edge/can-record.policy.json\n    @features');
+    expect(said()).not.toContain('met by @features/access/edge/can-register.policy.json\n    @features');
   });
 
   it('gives every way in, not only the one a refusal would name first', () => {
@@ -85,20 +85,20 @@ describe('describe: an access invariant that names the policy', () => {
     // POST /monitor/import fires #import, whose graph calls #record for every row: the trigger reaches
     // #record transitively and the invariant holds it to the same gate, so a domain graph cannot route around it
     expect(said()).toContain(
-      '    @features/monitor/edge/import-entries.trigger.json  #record (through #submit), #submit (through #recordAll), #import',
+      '    @features/customers/edge/import-customers.trigger.json  #record (through #submit), #submit (through #recordAll), #import',
     );
   });
 
   it('spells an operation bare where the over block above has already named the one port', () => {
-    // #remove, not @features/monitor/domain/monitor.port.json#remove, as a port's own describe spells its own
-    expect(said()).toContain('    @features/monitor/edge/delete-entry.trigger.json  #remove');
-    expect(said()).not.toContain('.trigger.json  @features/monitor/domain');
+    // #remove, not @features/customers/domain/customer.port.json#remove, as a port's own describe spells its own
+    expect(said()).toContain('    @features/customers/edge/delete-customer.trigger.json  #remove');
+    expect(said()).not.toContain('.trigger.json  @features/customers/domain');
   });
 
   it("orders one trigger's ways by the operations the document writes, not by how they were found", () => {
     const row = said()
       .split('\n')
-      .filter(line => line.includes('import-entries.trigger.json'))[0];
+      .filter(line => line.includes('import-customers.trigger.json'))[0];
     // over writes record, update, remove, removeMany, submit, import; import-entries reaches three of them
     expect(row.slice(row.indexOf('  #') + 2).split(', ')).toEqual([
       '#record (through #submit)',
@@ -123,12 +123,12 @@ describe('describe: an access invariant that names what must be proved', () => {
 
 describe('describe: a trigger an invariant holds over', () => {
   it('says which invariants hold over it and through what, beside the policies it attaches', () => {
-    const said = describeDoc(example, '@monitor/edge/delete-entry.trigger.json');
+    const said = describeDoc(example, '@customers/edge/delete-customer.trigger.json');
     expect(said).toContain(`  holds  ${WRITES}  through ${CAN_RECORD}`);
   });
 
   it('says nothing of the sort about a trigger no invariant reaches', () => {
-    expect(describeDoc(example, '@monitor/edge/list-entries.trigger.json')).not.toContain('  holds  ');
+    expect(describeDoc(example, '@customers/edge/list-customers.trigger.json')).not.toContain('  holds  ');
   });
 
   it('says the proving policy and the path where the invariant asks for a proof', () => {
@@ -141,7 +141,7 @@ describe('map: the invariants under each trigger', () => {
   const lines = map(example);
 
   it('prints the holds line under the gates of every trigger an invariant reaches', () => {
-    const at = lines.indexOf('@features/monitor/edge/delete-entry.trigger.json  (@http/http.trigger-kind.json)');
+    const at = lines.indexOf('@features/customers/edge/delete-customer.trigger.json  (@http/http.trigger-kind.json)');
     expect(at).toBeGreaterThan(-1);
     // the gates first, then what those gates are held to: an invariant is a rule about the gates, not another gate
     expect(lines[at + 1]).toContain('gated by @features/access/edge/employees-only.policy.json');
@@ -151,7 +151,7 @@ describe('map: the invariants under each trigger', () => {
 
   it('prints one for every write trigger, and none for a read', () => {
     expect(lines.filter(line => line.includes(`holds  ${WRITES}`))).toHaveLength(5);
-    const at = lines.indexOf('@features/monitor/edge/list-entries.trigger.json  (@http/http.trigger-kind.json)');
+    const at = lines.indexOf('@features/customers/edge/list-customers.trigger.json  (@http/http.trigger-kind.json)');
     expect(lines[at + 1]).not.toContain('holds  ');
   });
 });
@@ -163,14 +163,14 @@ describe('map: the invariants under each trigger', () => {
  * tree has not, I002 for a path the guard cannot hand -- and `TriggerGate.unmet` then says nothing about any
  * trigger. A line reading 'I001 refuses this' would send a reader to a code `wilanis check` never printed.
  */
-const UNMEETABLE = '@features/monitor/domain/gated-by-nothing.invariant.json';
+const UNMEETABLE = '@features/customers/domain/gated-by-nothing.invariant.json';
 const { load: unjudged, dir: unjudgedDir } = loadedWith({
-  'features/monitor/domain/gated-by-nothing.invariant.json': {
+  'features/customers/domain/gated-by-nothing.invariant.json': {
     $schema: schemaUrl('invariant'),
     label: 'Gated by nothing',
     description: 'Names a policy this tree does not have, so the invariant itself is refused and no trigger is.',
     access: {
-      over: ['@monitor/domain/monitor.port.json#remove'],
+      over: ['@customers/domain/customer.port.json#remove'],
       requires: { policy: '@access/edge/there-is-no-such.policy.json' },
     },
   },
@@ -203,7 +203,7 @@ describe('describe: an invariant asking for what no trigger could give', () => {
   });
 
   it('says the same beside the trigger, so neither reading blames the trigger for the document', () => {
-    const said = describeDoc(unjudged, '@monitor/edge/delete-entry.trigger.json');
+    const said = describeDoc(unjudged, '@customers/edge/delete-customer.trigger.json');
     expect(said).toContain(`  holds  ${UNMEETABLE}  through not judged (the invariant itself is refused)`);
     expect(said).not.toContain('I001');
   });
@@ -216,9 +216,9 @@ describe('describe: an invariant asking for what no trigger could give', () => {
  * for. The others are met and it is not, so nothing can be said once for all of them, and the row I001
  * refuses has to be the loud one on the page.
  */
-const DELETE_ENTRY = 'features/monitor/edge/delete-entry.trigger.json';
+const DELETE_ENTRY = 'features/customers/edge/delete-customer.trigger.json';
 const ungated = JSON.parse(JSON.stringify(example.registry.get('trigger', `@${DELETE_ENTRY}`)?.doc));
-ungated.policies = [ungated.policies[0]]; // keep employees-only, drop can-record: the invariant asks for the latter
+ungated.policies = [ungated.policies[0]]; // keep employees-only, drop can-register: the invariant asks for the latter
 const { load: partly, dir: partlyDir } = loadedWith({ [DELETE_ENTRY]: ungated });
 afterAll(() => rmSync(partlyDir, { recursive: true, force: true }));
 
@@ -232,21 +232,23 @@ describe('describe: one trigger meeting nothing among others that do', () => {
 
   it('names what I001 refuses on the row it refuses, and leaves the others saying what met them', () => {
     expect(said()).toContain(
-      '    @features/monitor/edge/delete-entry.trigger.json  #remove  -- met by nothing, which I001 refuses',
+      '    @features/customers/edge/delete-customer.trigger.json  #remove  -- met by nothing, which I001 refuses',
     );
-    expect(said()).toContain(`    @features/monitor/edge/update-entry.trigger.json  #update  -- met by ${CAN_RECORD}`);
+    expect(said()).toContain(
+      `    @features/customers/edge/update-customer.trigger.json  #update  -- met by ${CAN_RECORD}`,
+    );
   });
 });
 
 // ---- the field form, planted, since the example has none ---------------------------------------------
 
-const HOLDS = '@features/monitor/domain/an-entry-names-a-call.invariant.json';
+const HOLDS = '@features/customers/domain/a-customer-is-reachable.invariant.json';
 const { load: planted, dir } = loadedWith({
-  'features/monitor/domain/an-entry-names-a-call.invariant.json': {
+  'features/customers/domain/a-customer-is-reachable.invariant.json': {
     $schema: schemaUrl('invariant'),
     label: 'An entry names a call',
     description: 'A URL is never empty, and a deletion always says who asked for it.',
-    holds: { on: '@monitor/domain/Entry.shape.json', when: "len(url) > 0 && (method != 'DELETE' || has(ua))" },
+    holds: { on: '@customers/domain/Customer.shape.json', when: "len(url) > 0 && (method != 'DELETE' || has(ua))" },
   },
 });
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -254,7 +256,7 @@ afterAll(() => rmSync(dir, { recursive: true, force: true }));
 describe('describe: a field invariant', () => {
   it('says the shape every value of which is held to it, and the rule itself', () => {
     const said = describeDoc(planted, HOLDS);
-    expect(said).toContain('holds: every value of @monitor/domain/Entry.shape.json satisfies the rule');
+    expect(said).toContain('holds: every value of @customers/domain/Customer.shape.json satisfies the rule');
     expect(said).toContain("    when  len(url) > 0 && (method != 'DELETE' || has(ua))");
   });
 
@@ -268,12 +270,12 @@ describe('describe: a field invariant', () => {
 
 describe('describe: a shape an invariant is stated over', () => {
   it('says what its values are always held to, beside who writes them', () => {
-    expect(describeDoc(planted, '@monitor/domain/Entry.shape.json')).toContain(
+    expect(describeDoc(planted, '@customers/domain/Customer.shape.json')).toContain(
       `held to  'An entry names a call' (${HOLDS}): len(url) > 0 && (method != 'DELETE' || has(ua))`,
     );
   });
 
   it('says nothing of the sort about a shape no invariant is stated over', () => {
-    expect(describeDoc(planted, '@monitor/domain/Digest.shape.json')).not.toContain('held to');
+    expect(describeDoc(planted, '@customers/domain/Digest.shape.json')).not.toContain('held to');
   });
 });

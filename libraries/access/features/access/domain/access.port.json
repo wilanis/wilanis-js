@@ -96,8 +96,8 @@
       },
       "returns": "@access/domain/Grant.shape.json"
     },
-    "requireRecorder": {
-      "description": "Allow a caller holding the recorder role; refuse anonymous or forbidden.",
+    "requireRegistrar": {
+      "description": "Allow a caller holding the registrar role; refuse anonymous or forbidden.",
       "accepts": {
         "principal": {
           "type": "@access/domain/Principal.shape.json",

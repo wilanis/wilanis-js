@@ -44,7 +44,7 @@
               "$ref": "common.schema.json#/$defs/path"
             },
             "proves": {
-              "description": "request.* paths some policy the trigger attaches must prove, by its own `proves` (the path itself or one above it). Names what must be established rather than which policy establishes it, so signed-in, employees-only and can-record all qualify and a public trigger does not.",
+              "description": "request.* paths some policy the trigger attaches must prove, by its own `proves` (the path itself or one above it). Names what must be established rather than which policy establishes it, so signed-in, employees-only and can-register all qualify and a public trigger does not.",
               "type": "array",
               "items": {
                 "type": "string",

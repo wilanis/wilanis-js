@@ -33,8 +33,8 @@ const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 const ACCESS = fileURLToPath(new URL('../../../libraries/access', import.meta.url));
 
 /** The store the monitor keeps its entries in, and the one edge document of that feature that reads the request. */
-export const STORE_FILE = 'features/monitor/data/entries.store.json';
-export const RESOLVERS_FILE = 'features/monitor/edge/request.resolvers.json';
+export const STORE_FILE = 'features/customers/data/customers.store.json';
+export const RESOLVERS_FILE = 'features/customers/edge/request.resolvers.json';
 /** The session shape the guard's settings.session names, in the included access tree. */
 export const SESSION_FILE = 'features/access/domain/Session.shape.json';
 
@@ -96,7 +96,7 @@ function scope(example: string, access: string): void {
     };
   });
   editing(example, STORE_FILE, store => {
-    store.reads = { tenant: '@monitor/edge/request.resolvers.json#tenant' };
+    store.reads = { tenant: '@customers/edge/request.resolvers.json#tenant' };
     store.collections.entries.scoped = { tenant: '{{tenant}}' };
   });
 }

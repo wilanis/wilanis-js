@@ -22,7 +22,7 @@ import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);
 const scope = new Scope(load.registry, load.resolve);
 
-const MONITOR = '@features/monitor/domain/monitor.port.json';
+const MONITOR = '@features/customers/domain/customer.port.json';
 const PROFILES = ['live', 'local', 'production'];
 
 /** Every domain operation the tree declares, as `path#operation`: what a walk over the whole tree is made of. */
@@ -91,7 +91,7 @@ describe('operationsReachable: what an operation calls', () => {
 
 describe('operationsReachable: what it is not', () => {
   it('does not walk a policy, which is the gate and not a way in', () => {
-    // POST /monitor.csv attaches can-record, whose decide.run is @access/domain/access.port.json#requireRecorder.
+    // POST /monitor.csv attaches can-register, whose decide.run is @access/domain/access.port.json#requireRecorder.
     // The walk is from what the trigger fires, so the policy's own operations are not among what it reaches.
     const reached = operationsReachable(scope, `${MONITOR}#import`, 'local').map(one => one.key);
     expect(reached.some(key => key.includes('access.port.json'))).toBe(false);
@@ -125,7 +125,7 @@ describe('effectsReachable: the same walk, read for what it ends at', () => {
     // through, and none of them is here.
     const reached = effects(`${MONITOR}#import`, 'local');
     expect(reached).toContain('@storage/store.port.json#put');
-    expect(reached.some(key => key.includes('monitor.port.json'))).toBe(false);
+    expect(reached.some(key => key.includes('customer.port.json'))).toBe(false);
   });
 
   it('answers what the profile binds, so the same operation reaches a different effect', () => {
@@ -144,7 +144,7 @@ describe('effectsReachable: the same walk, read for what it ends at', () => {
       one => one.key === '@storage/store.port.json#put' && one.node === 'stored',
     );
     expect(put?.given).toMatchObject({
-      store: '@monitor/data/entries.store.json',
+      store: '@customers/data/customers.store.json',
       collection: 'entries',
     });
   });
@@ -154,8 +154,8 @@ describe('effectsReachable: the same walk, read for what it ends at', () => {
     // document's, and what it is over is the profile's.
     const under = (profile: string): unknown =>
       effectsReachable(scope, `${MONITOR}#record`, profile).find(one => one.node === 'stored')?.given?.store;
-    expect(under('local')).toBe('@monitor/data/entries.store.json');
-    expect(under('production')).toBe('@monitor/data/entries-postgres.store.json');
+    expect(under('local')).toBe('@customers/data/customers.store.json');
+    expect(under('production')).toBe('@customers/data/customers-postgres.store.json');
   });
 
   it('says where each site is written and what it was reached through', () => {
@@ -168,7 +168,7 @@ describe('effectsReachable: the same walk, read for what it ends at', () => {
   it('leaves through undefined where the walk started in the graph that holds the site', () => {
     // effectsOfGraph is for a reader who has the graph rather than the operation it answers -- it takes the
     // canonical path, as refusalsOfGraph does. Nothing led there, so nothing is named as having led there.
-    const sites = effectsOfGraph(scope, scope.canon('@monitor/data/store-and-latest.graph.json'), 'local');
+    const sites = effectsOfGraph(scope, scope.canon('@customers/data/store-and-latest.graph.json'), 'local');
     expect(sites.length).toBeGreaterThan(0);
     for (const site of sites) expect(site.through).toBeUndefined();
   });

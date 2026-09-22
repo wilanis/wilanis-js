@@ -35,8 +35,8 @@ describe('AtomicScope', () => {
 
     // What `Run.execute` does: both nodes are ready, so both start before either has awaited.
     const [first, second] = await Promise.all([
-      scope.join('@connections/entries.connection.json', one.open),
-      scope.join('@connections/entries.connection.json', one.open),
+      scope.join('@connections/customers.connection.json', one.open),
+      scope.join('@connections/customers.connection.json', one.open),
     ]);
 
     expect(one.opened).toBe(1);
@@ -47,8 +47,8 @@ describe('AtomicScope', () => {
     const one = fake();
     const scope = new AtomicScope();
 
-    await scope.join('@connections/entries.connection.json', one.open);
-    await scope.join('@connections/entries.connection.json', one.open);
+    await scope.join('@connections/customers.connection.json', one.open);
+    await scope.join('@connections/customers.connection.json', one.open);
 
     expect(one.opened).toBe(1);
   });
@@ -57,7 +57,7 @@ describe('AtomicScope', () => {
     const one = fake();
     const scope = new AtomicScope();
 
-    await scope.join('@connections/entries.connection.json', one.open);
+    await scope.join('@connections/customers.connection.json', one.open);
     await scope.settle(true);
 
     expect(one.log).toEqual(['commit']);
@@ -67,7 +67,7 @@ describe('AtomicScope', () => {
     const one = fake();
     const scope = new AtomicScope();
 
-    await scope.join('@connections/entries.connection.json', one.open);
+    await scope.join('@connections/customers.connection.json', one.open);
     await scope.settle(false);
 
     expect(one.log).toEqual(['rollback']);
@@ -83,7 +83,7 @@ describe('AtomicScope', () => {
     const one = fake();
     const scope = new AtomicScope();
 
-    await scope.join('@connections/entries.connection.json', one.open);
+    await scope.join('@connections/customers.connection.json', one.open);
 
     await expect(scope.join('@connections/other.connection.json', one.open)).rejects.toThrow(/two connections/);
   });

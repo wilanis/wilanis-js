@@ -10,55 +10,55 @@ type Write = (relative: string, doc: unknown) => void;
 
 /** Every edge document of the tree: the shapes a request and an answer have, and the triggers. */
 export function edge(write: Write): void {
-  write('features/monitor/edge/IdRequest.shape.json', {
+  write('features/customers/edge/IdRequest.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'an id asked for',
     layer: 'edge',
     fields: { id: { type: 'string' } },
   });
-  write('features/monitor/edge/EntryRequest.shape.json', {
+  write('features/customers/edge/EntryRequest.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'an entry asked to be kept',
     layer: 'edge',
     fields: { id: { type: 'string' }, url: { type: 'string' }, method: { type: 'string' } },
   });
-  write('features/monitor/edge/NoteRequest.shape.json', {
+  write('features/customers/edge/NoteRequest.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'a note asked to be kept',
     layer: 'edge',
     fields: { id: { type: 'string' }, entryId: { type: 'string' }, text: { type: 'string' } },
   });
-  write('features/monitor/edge/WrittenView.shape.json', {
+  write('features/customers/edge/WrittenView.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'what the command line prints after a write',
     layer: 'edge',
     fields: {
-      record: { type: '@features/monitor/edge/EntryView.shape.json', required: false },
+      record: { type: '@features/customers/edge/CustomerView.shape.json', required: false },
       violated: { type: 'string', required: false },
     },
   });
-  write('features/monitor/edge/EntryView.shape.json', {
+  write('features/customers/edge/CustomerView.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'one entry, as the command line prints it',
     layer: 'edge',
     fields: { id: { type: 'string' }, url: { type: 'string' }, method: { type: 'string' } },
   });
-  write('features/monitor/edge/NotedView.shape.json', {
+  write('features/customers/edge/NotedView.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'what the command line prints after writing a note',
     layer: 'edge',
     fields: {
-      record: { type: '@features/monitor/edge/NoteView.shape.json', required: false },
+      record: { type: '@features/customers/edge/NoteView.shape.json', required: false },
       violated: { type: 'string', required: false },
     },
   });
-  write('features/monitor/edge/NoteView.shape.json', {
+  write('features/customers/edge/NoteView.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'one note, as the command line prints it',
     layer: 'edge',
     fields: { id: { type: 'string' }, entryId: { type: 'string' }, text: { type: 'string' } },
   });
-  write('features/monitor/edge/GoneView.shape.json', {
+  write('features/customers/edge/GoneView.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'what the command line prints after a removal',
     layer: 'edge',
@@ -72,32 +72,32 @@ export function edge(write: Write): void {
     settings: { command: name },
     in: what.in,
     out: what.out,
-    fire: { run: `@features/monitor/domain/entries.port.json#${what.op}`, in: what.fire },
+    fire: { run: `@features/customers/domain/entries.port.json#${what.op}`, in: what.fire },
   });
   write(
-    'features/monitor/edge/record.trigger.json',
+    'features/customers/edge/record.trigger.json',
     trigger('record', {
       op: 'record',
-      in: '@features/monitor/edge/EntryRequest.shape.json',
-      out: '@features/monitor/edge/WrittenView.shape.json',
+      in: '@features/customers/edge/EntryRequest.shape.json',
+      out: '@features/customers/edge/WrittenView.shape.json',
       fire: { id: '{{request.flags.id}}', url: '{{request.flags.url}}', method: '{{request.flags.method}}' },
     }),
   );
   write(
-    'features/monitor/edge/note.trigger.json',
+    'features/customers/edge/note.trigger.json',
     trigger('note', {
       op: 'note',
-      in: '@features/monitor/edge/NoteRequest.shape.json',
-      out: '@features/monitor/edge/NotedView.shape.json',
+      in: '@features/customers/edge/NoteRequest.shape.json',
+      out: '@features/customers/edge/NotedView.shape.json',
       fire: { id: '{{request.flags.id}}', entryId: '{{request.flags.entryId}}', text: '{{request.flags.text}}' },
     }),
   );
   write(
-    'features/monitor/edge/forget.trigger.json',
+    'features/customers/edge/forget.trigger.json',
     trigger('forget', {
       op: 'forget',
-      in: '@features/monitor/edge/IdRequest.shape.json',
-      out: '@features/monitor/edge/GoneView.shape.json',
+      in: '@features/customers/edge/IdRequest.shape.json',
+      out: '@features/customers/edge/GoneView.shape.json',
       fire: { id: '{{request.flags.id}}' },
     }),
   );

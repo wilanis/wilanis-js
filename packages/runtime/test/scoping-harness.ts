@@ -20,14 +20,14 @@ import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 export type Edits = Record<string, (doc: any) => void>;
 
 /** The store the monitor keeps its entries in, and the one edge document of that feature that reads the request. */
-export const STORE = 'features/monitor/data/entries.store.json';
-export const RESOLVERS = 'features/monitor/edge/request.resolvers.json';
+export const STORE = 'features/customers/data/customers.store.json';
+export const RESOLVERS = 'features/customers/edge/request.resolvers.json';
 /** The session shape the guard's settings.session names, in the included access tree. */
 export const SESSION = 'features/access/domain/Session.shape.json';
 /** The data graphs over the collection: one read by key, one find, and the write that mints a key first. */
-export const GET = 'features/monitor/data/kept-get.graph.json';
-export const LIST = 'features/monitor/data/kept-list.graph.json';
-export const WRITE = 'features/monitor/data/store-and-latest.graph.json';
+export const GET = 'features/customers/data/kept-get.graph.json';
+export const LIST = 'features/customers/data/kept-list.graph.json';
+export const WRITE = 'features/customers/data/store-and-latest.graph.json';
 
 /** Apply an edit to one document of a copied tree, in place. */
 function editing(dir: string, file: string, edit: (doc: any) => void): void {
@@ -62,7 +62,7 @@ function scope(example: string, access: string): void {
     };
   });
   editing(example, STORE, store => {
-    store.reads = { tenant: '@monitor/edge/request.resolvers.json#tenant' };
+    store.reads = { tenant: '@customers/edge/request.resolvers.json#tenant' };
     store.collections.entries.scoped = { tenant: '{{tenant}}' };
   });
 }

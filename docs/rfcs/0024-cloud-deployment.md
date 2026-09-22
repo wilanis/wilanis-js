@@ -564,7 +564,7 @@ readiness and prints the URL; `down` deletes the cluster. It is the only thing t
 - `wilanis describe @http/server.port.json` prints, for an operation that declares `listens`:
   `listen  (holds until stopped; port: in.port, else @http settings.port, else 8080; host: in.host, else
   @http settings.host, else every interface)`.
-- `wilanis describe @connections/monitor-api.connection.json` prints `endpoint  https://.../api/v1
+- `wilanis describe @connections/customers-api.connection.json` prints `endpoint  https://.../api/v1
   (baseUrl, by @http/http.connection-kind.json)`; a connection of a kind that declares none prints nothing
   extra, as today.
 - `wilanis manifest` carries `node`, `connections[].endpoint` and `profiles.<name>.listens` with its host
@@ -629,7 +629,7 @@ the example hand `@wilanis/access` in as a `ResolvedInclude`):
 **The manifest**, in `packages/runtime/test/manifest.test.ts` (RFC 0026's file):
 
 - `node` is `>=22` for the example and `null` for a tree whose `package.json` declares no `engines`;
-- `connections[]` for `monitor-api.connection.json` has `endpoint` equal to its `baseUrl`, for
+- `connections[]` for `customers-api.connection.json` has `endpoint` equal to its `baseUrl`, for
   `employees.connection.json` `null`, and for the production stand-in the template text when a tree writes
   `{{secrets.*}}` there;
 - `profiles.production.listens` is one row, `@http/server.port.json#listen` on port 8080 with `host: null`,

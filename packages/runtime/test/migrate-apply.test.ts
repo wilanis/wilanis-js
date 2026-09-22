@@ -6,7 +6,7 @@ describe('wilanis migrate: what it applies and records', () => {
   it('applies when told, and says which migration recorded it', async () => {
     const { dir, calls, plugins } = tree({ targets: [target([step(), step({ do: 'rename', says: 'ua → agent' })])] });
     const answer = await run(dir, plugins, { apply: true });
-    expect(calls).toEqual(['postLoad', 'plan', 'apply:@connections/entries.connection.json', 'postLoadDown']);
+    expect(calls).toEqual(['postLoad', 'plan', 'apply:@connections/customers.connection.json', 'postLoadDown']);
     expect(answer.lines.join('\n')).toMatch(/additive {8}applied/);
     expect(answer.lines.at(-1)).toBe(
       '2 steps applied in one transaction; recorded as migration 4 (2026-09-11T09:14:02Z).',
@@ -19,9 +19,9 @@ describe('wilanis migrate: what it applies and records', () => {
     const { dir, calls, plugins } = tree({
       targets: [target([step({ do: 'drop', target: 'notes', class: 'destructive', says: 'collection notes' })])],
     });
-    const allowed = ['@connections/entries.connection.json/notes'];
+    const allowed = ['@connections/customers.connection.json/notes'];
     const answer = await run(dir, plugins, { apply: true, allowDestructive: allowed });
-    expect(calls).toContain('apply:@connections/entries.connection.json');
+    expect(calls).toContain('apply:@connections/customers.connection.json');
     expect(answer.lines.join('\n')).toMatch(/destructive {5}applied/);
     expect(answer.code).toBe(0);
     rmSync(dir, { recursive: true, force: true });
@@ -42,7 +42,7 @@ describe('wilanis migrate: what it applies and records', () => {
     });
     const answer = await run(dir, plugins, { apply: true });
     // a plan is one transaction, so the additive step beside the refused one did not apply either
-    expect(calls).not.toContain('apply:@connections/entries.connection.json');
+    expect(calls).not.toContain('apply:@connections/customers.connection.json');
     expect(answer.lines.join('\n')).toMatch(/→ a constraint over rows that break it/);
     expect(answer.code).toBe(1);
     rmSync(dir, { recursive: true, force: true });

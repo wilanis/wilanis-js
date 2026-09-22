@@ -240,8 +240,8 @@ path, because the walk is RFC 0007's reach walk and not a look at the route's `f
 **What the plugin refuses.** Point an intent at the CSV import route, whose body is a blob:
 
 ```
-X0m1  @features/monitor/edge/import-csv.intent.json#for
-    @monitor/edge/import-entries.trigger.json takes a body a person cannot say: text/csv, a blob
+X0m1  @features/customers/edge/import-csv.intent.json#for
+    @customers/edge/import-customers.trigger.json takes a body a person cannot say: text/csv, a blob
     → an intent says a route whose placeholders and JSON body hold strings, numbers, booleans, enums and lists of them
 ```
 
@@ -461,10 +461,10 @@ unchanged. A tree that does not name the plugin, or names it and has no intent, 
 `packages/core/test/validate.test.ts`: the intent baseline, and `access.kinds` on an invariant. `packages/core/test/`
 gains `intents.test.ts` for `sayable`: placeholders as required strings, body fields with their requiredness, the
 descriptions, and each refusal (CSV, blob, open, secret, a shared name). `packages/runtime/test/example.test.ts`:
-D008 for an intent under `domain/`; I0n1 by giving the example's `writes-are-for-recorders.invariant.json`
-`kinds: ["@http/http.trigger-kind.json"]` and adding a cli-kind trigger that fires `monitor.port.json#remove`, then an
-intent for `delete-entries.trigger.json`, then a route whose operation reaches `remove` through another; I002 by
-`kinds: ["@monitor/domain/Entry.shape.json"]`; and the example unbroken with `kinds` naming the http kind.
+D008 for an intent under `domain/`; I0n1 by giving the example's `writes-are-for-registrars.invariant.json`
+`kinds: ["@http/http.trigger-kind.json"]` and adding a cli-kind trigger that fires `customer.port.json#remove`, then an
+intent for `delete-customers.trigger.json`, then a route whose operation reaches `remove` through another; I002 by
+`kinds: ["@customers/domain/Customer.shape.json"]`; and the example unbroken with `kinds` naming the http kind.
 `packages/runtime/test/tools.test.ts`: `wilanis new intent`, `describe` of an intent and the `said by` line, `ls
 intent`. `packages/view/test`: the intent page renders `for`, the said fields and the examples.
 

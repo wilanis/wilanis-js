@@ -22,7 +22,7 @@ unpin.record}}`): each is optional on the other's branch, and the checker refuse
 right to.
 
 When you need a shape, find the nearest graph already in the tree and copy it: `npx wilanis ls graph .`, then
-`npx wilanis describe <path> .`. In this tree `features/monitor/data/kept-update.graph.json` is the write
+`npx wilanis describe <path> .`. In this tree `features/customers/data/kept-update.graph.json` is the write
 after a read.
 
 ## The shape: read, decide, write
@@ -47,38 +47,38 @@ The same graph over this tree's store, with `pinned` as the flag:
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Toggle a flag on what is kept",
   "description": "Read the record, decide from what it holds, write one value on one branch.",
-  "in": "@monitor/domain/EntryRef.shape.json",
-  "out": { "type": "@monitor/domain/Entry.shape.json", "from": ["setRow", "unsetRow", "missing", "vanishedOnSet", "vanishedOnUnset"] },
+  "in": "@customers/domain/CustomerRef.shape.json",
+  "out": { "type": "@customers/domain/Customer.shape.json", "from": ["setRow", "unsetRow", "missing", "vanishedOnSet", "vanishedOnUnset"] },
   "nodes": [
     { "type": "@wilanis/node/run.schema.json", "id": "asked", "label": "Read the record", "run": "@storage/store.port.json#get",
-      "in": { "store": "@monitor/data/entries.store.json", "collection": "entries", "key": "{{in.id}}" } },
+      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "key": "{{in.id}}" } },
     { "type": "@wilanis/node/switch.schema.json", "id": "found", "label": "Is it kept?", "in": { "record": "{{asked.record}}" },
       "rules": [{ "when": "has(record)", "to": "wasSet" }], "else": "missing" },
     { "type": "@wilanis/node/switch.schema.json", "id": "wasSet", "label": "Is it set now?", "in": { "flag": "{{asked.record.pinned}}" },
       "rules": [{ "when": "has(flag) && flag", "to": "unset" }], "else": "set" },
     { "type": "@wilanis/node/run.schema.json", "id": "set", "label": "Set it", "run": "@storage/store.port.json#patch",
-      "in": { "store": "@monitor/data/entries.store.json", "collection": "entries", "key": "{{in.id}}", "changes": { "pinned": true } } },
+      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "key": "{{in.id}}", "changes": { "pinned": true } } },
     { "type": "@wilanis/node/run.schema.json", "id": "unset", "label": "Unset it", "run": "@storage/store.port.json#patch",
-      "in": { "store": "@monitor/data/entries.store.json", "collection": "entries", "key": "{{in.id}}", "changes": { "pinned": false } } },
+      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "key": "{{in.id}}", "changes": { "pinned": false } } },
     { "type": "@wilanis/node/switch.schema.json", "id": "setRoute", "label": "Still there?", "in": { "record": "{{set.record}}" },
       "rules": [{ "when": "has(record)", "to": "setRow" }], "else": "vanishedOnSet" },
     { "type": "@wilanis/node/switch.schema.json", "id": "unsetRoute", "label": "Still there?", "in": { "record": "{{unset.record}}" },
       "rules": [{ "when": "has(record)", "to": "unsetRow" }], "else": "vanishedOnUnset" },
     { "type": "@wilanis/node/run.schema.json", "id": "setRow", "label": "The record, set", "run": "@std/object.port.json#make",
-      "in": { "value": "{{set.record}}", "type": "@monitor/domain/Entry.shape.json" } },
+      "in": { "value": "{{set.record}}", "type": "@customers/domain/Customer.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "unsetRow", "label": "The record, unset", "run": "@std/object.port.json#make",
-      "in": { "value": "{{unset.record}}", "type": "@monitor/domain/Entry.shape.json" } },
+      "in": { "value": "{{unset.record}}", "type": "@customers/domain/Customer.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "missing", "label": "No such entry", "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@monitor/domain/Entry.shape.json" } },
+      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "vanishedOnSet", "label": "Gone before the write", "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@monitor/domain/Entry.shape.json" } },
+      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "vanishedOnUnset", "label": "Gone before the write", "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@monitor/domain/Entry.shape.json" } }
+      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" } }
   ]
 }
 ```
 
-A port operation is met in every profile (B001): the same graph over `entries-postgres.store.json` for
+A port operation is met in every profile (B001): the same graph over `customers-postgres.store.json` for
 `production`, and a read-then-`PUT` over `@http/http.port.json#request` for `live`, each named in its
 profile's binding.
 

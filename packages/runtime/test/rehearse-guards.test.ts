@@ -26,7 +26,7 @@ import { describe, expect, it } from 'vitest';
 import { rehearse } from '../src/index.js';
 import { EXAMPLE, INCLUDES, loadedWith, PLUGINS } from './example-harness.js';
 
-const ENTRY = '@monitor/domain/Entry.shape.json';
+const ENTRY = '@customers/domain/Customer.shape.json';
 
 /** The example rehearsed under the profile whose bindings reach the store, where the guards are lowered. */
 const localRun = () => rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'local' });
@@ -52,10 +52,10 @@ describe('the rehearsal reports a guard', () => {
     expect(run.ok).toBe(true);
     // the compiler's own node, named by the rule it tests rather than by an id nobody wrote
     expect(run.lines).toContain(
-      "features/monitor/data/kept-get  guard 'row:check' An entry names a call  2/2 branches",
+      "features/customers/data/kept-get  guard 'row:check' An entry names a call  2/2 branches",
     );
     // and the switch the author did write is untouched, still headed as a switch
-    expect(run.lines).toContain("features/monitor/data/kept-get  switch 'route'  2/2 branches");
+    expect(run.lines).toContain("features/customers/data/kept-get  switch 'route'  2/2 branches");
   });
 
   it("labels a guard's branches holds and violated, and refuses the violated one on purpose", async () => {
@@ -144,7 +144,7 @@ describe('the rehearsal reports a guard', () => {
    */
   it('reports a guard two invariants share as one decision with a violated branch per rule', async () => {
     const { load, dir } = loadedWith({
-      'features/monitor/domain/an-entry-has-a-method.invariant.json': {
+      'features/customers/domain/an-entry-has-a-method.invariant.json': {
         $schema: schemaUrl('invariant'),
         label: 'An entry has a method',
         description: 'A second rule over the same shape, unproved at the same sites, so one guard stands for both.',
@@ -156,7 +156,7 @@ describe('the rehearsal reports a guard', () => {
       expect(run.ok).toBe(true);
       const said = decision(run.lines, "kept-get  guard 'row:check'");
       expect(said[0]).toBe(
-        "features/monitor/data/kept-get  guard 'row:check' An entry has a method; An entry names a call  3/3 branches",
+        "features/customers/data/kept-get  guard 'row:check' An entry has a method; An entry names a call  3/3 branches",
       );
       expect(said[1]).toBe("  ok  holds     answered from 'row'");
       expect(said[2]).toBe(
@@ -179,7 +179,7 @@ describe('the rehearsal reports a guard', () => {
   it('counts a site the proof rules settle as proved rather than guarded', async () => {
     // a node whose every read is a literal satisfying the rule: `literal`, which is a proof and lowers no guard
     const { load, dir } = loadedWith({
-      'features/monitor/data/proving.graph.json': {
+      'features/customers/data/proving.graph.json': {
         $schema: 'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json',
         label: 'Proving',
         description: 'A graph planted so that one site of Entry is proved and the count is not all guarded.',

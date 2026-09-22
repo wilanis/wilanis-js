@@ -27,11 +27,11 @@ import { type DocView, viewOf } from '../src/index.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 const PAGE = fileURLToPath(new URL('../client/index.html', import.meta.url));
-const WRITES = '@features/monitor/domain/writes-are-for-recorders.invariant.json';
+const WRITES = '@features/customers/domain/writes-are-for-registrars.invariant.json';
 const SESSION = '@features/directories/domain/the-session-is-the-callers.invariant.json';
-const CAN_RECORD = '@features/access/edge/can-record.policy.json';
-const MONITOR = '@features/monitor/domain/monitor.port.json';
-const PLANTED = 'an-entry-names-a-call.invariant.json';
+const CAN_RECORD = '@features/access/edge/can-register.policy.json';
+const MONITOR = '@features/customers/domain/customer.port.json';
+const PLANTED = 'a-customer-is-reachable.invariant.json';
 
 /**
  * The plugins the example names, handed in rather than resolved. A copy of the tree has no `node_modules` --
@@ -84,10 +84,10 @@ const holds = (when: string): VHoldsInvariant => {
       $schema: '@wilanis/invariant.schema.json',
       label: 'An entry names a call',
       description: 'A URL is never empty, and a deletion always says who asked for it.',
-      holds: { on: '@monitor/domain/Entry.shape.json', when },
+      holds: { on: '@customers/domain/Customer.shape.json', when },
     };
-    writeFileSync(join(dir, 'features/monitor/domain', PLANTED), JSON.stringify(doc, null, 2));
-    const seen = viewOf(loadTree(dir, PLUGINS, INCLUDES), `@monitor/domain/${PLANTED}`)?.invariant;
+    writeFileSync(join(dir, 'features/customers/domain', PLANTED), JSON.stringify(doc, null, 2));
+    const seen = viewOf(loadTree(dir, PLUGINS, INCLUDES), `@customers/domain/${PLANTED}`)?.invariant;
     if (seen?.form !== 'holds') throw new Error('the planted invariant is not a field invariant');
     return seen;
   } finally {
@@ -199,7 +199,7 @@ describe('the view of a field invariant', () => {
     // and writes one: the page has to draw both forms, and the form it draws is read from a loaded document
     const seen = holds("len(url) > 0 && (method != 'DELETE' || has(agent))");
     expect(seen.form).toBe('holds');
-    expect(seen.on).toBe('@features/monitor/domain/Entry.shape.json');
+    expect(seen.on).toBe('@features/customers/domain/Customer.shape.json');
     expect(seen.onLabel).toBe('Entry');
     expect(seen.when).toBe("len(url) > 0 && (method != 'DELETE' || has(agent))");
     // the roots a reader is told they may name are the shape's own fields, read from the shape and not the rule
@@ -214,7 +214,7 @@ describe('the view of a field invariant', () => {
     // takes a list. The viewer counts none of them itself; it asks the one function that already knows.
     expect(seen.sites.length).toBe(13);
     expect(seen.sites.filter(site => site.kind === 'taken').map(site => [site.graph, site.node, site.arity])).toEqual([
-      ['@features/monitor/data/write-csv.graph.json', 'in', 'list'],
+      ['@features/customers/data/write-csv.graph.json', 'in', 'list'],
     ]);
     // none of the example's sites proves this rule, so every one is guarded and none carries a `held`
     expect(seen.sites.every(site => site.held === undefined)).toBe(true);

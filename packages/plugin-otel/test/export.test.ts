@@ -64,22 +64,22 @@ async function exporting(env: unknown, input: Record<string, unknown> = {}) {
 /** The trace of one request, as the runtime will hand it: a fire, the operation, and the node that asked. */
 function trace(correlation?: string): Trace {
   return {
-    name: 'fire @monitor/edge/get-entry.trigger.json',
+    name: 'fire @customers/edge/get-customer.trigger.json',
     startedAt: 1_700_000_000_000,
     endedAt: 1_700_000_000_143,
     status: 'refused: upstream',
     attributes: {
-      'wilanis.trigger': '@monitor/edge/get-entry.trigger.json',
+      'wilanis.trigger': '@customers/edge/get-customer.trigger.json',
       'wilanis.kind': '@http/http.trigger-kind.json',
       ...(correlation ? { 'wilanis.correlation': correlation } : {}),
     },
     children: [
       {
-        name: '@monitor/domain/monitor.port.json#get',
+        name: '@customers/domain/customer.port.json#get',
         startedAt: 1_700_000_000_002,
         endedAt: 1_700_000_000_143,
         status: 'refused: upstream',
-        attributes: { 'wilanis.port': '@monitor/domain/monitor.port.json', 'wilanis.operation': 'get' },
+        attributes: { 'wilanis.port': '@customers/domain/customer.port.json', 'wilanis.operation': 'get' },
         children: [
           {
             name: 'asked @http/http.port.json#request',
@@ -88,7 +88,7 @@ function trace(correlation?: string): Trace {
             status: 'ok',
             attributes: {
               'wilanis.node': 'asked',
-              'wilanis.connection': '@connections/monitor-api.connection.json',
+              'wilanis.connection': '@connections/customers-api.connection.json',
               'http.response.status_code': 500,
               'wilanis.in': '{"id":"golf"}',
             },
@@ -130,8 +130,8 @@ describe('spans reach a collector', () => {
     expect(await until(() => open?.batches() === 1)).toBe(true);
     const spans = open.spans();
     expect(spans.map(one => one.name)).toEqual([
-      'fire @monitor/edge/get-entry.trigger.json',
-      '@monitor/domain/monitor.port.json#get',
+      'fire @customers/edge/get-customer.trigger.json',
+      '@customers/domain/customer.port.json#get',
       'asked @http/http.port.json#request',
     ]);
 
@@ -144,9 +144,9 @@ describe('spans reach a collector', () => {
 
     // the service the tree is called by -- OTLP groups a batch by resource, so every span carries it
     expect(new Set(open.services())).toEqual(new Set(['monitor']));
-    expect(attributesOf(asked)['wilanis.connection']).toBe('@connections/monitor-api.connection.json');
+    expect(attributesOf(asked)['wilanis.connection']).toBe('@connections/customers-api.connection.json');
     expect(attributesOf(asked)['http.response.status_code']).toBe(500);
-    expect(attributesOf(root)['wilanis.trigger']).toBe('@monitor/edge/get-entry.trigger.json');
+    expect(attributesOf(root)['wilanis.trigger']).toBe('@customers/edge/get-customer.trigger.json');
   });
 
   it('the timing the run stamped is the timing the collector reads, to the nanosecond', async () => {
@@ -222,7 +222,7 @@ describe('what a level lets leave the process', () => {
     const asked = spans.find(one => one.name.startsWith('asked'));
     expect(asked && attributesOf(asked)['wilanis.in']).toBeUndefined();
     // what a reader searches on is still there
-    expect(asked && attributesOf(asked)['wilanis.connection']).toBe('@connections/monitor-api.connection.json');
+    expect(asked && attributesOf(asked)['wilanis.connection']).toBe('@connections/customers-api.connection.json');
   });
 
   it("full carries the report's redacted values and keeps the cancelled branches", async () => {

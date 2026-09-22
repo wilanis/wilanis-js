@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
+  "label": "GET /customers/{id}",
+  "description": "GET /customers/{id} \u2192 the customer; 404 { reason: missing, message: `no customer {id}` } when there is none, 502 as upstream when the monitor API broke.",
+  "settings": {
+    "route": "/customers/{id}",
+    "method": "GET",
+    "produces": "application/json",
+    "response": {
+      "refusals": {
+        "missing": 404,
+        "upstream": 502,
+        "invariant": 500
+      }
+    }
+  },
+  "in": "@customers/edge/IdRequest.shape.json",
+  "out": "@customers/edge/CustomerView.shape.json",
+  "kind": "@http/http.trigger-kind.json",
+  "fire": {
+    "run": "@customers/domain/customer.port.json#get",
+    "in": {
+      "id": "{{request.params.id}}"
+    }
+  }
+}

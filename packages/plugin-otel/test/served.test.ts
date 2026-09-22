@@ -49,7 +49,7 @@ describe('a tree that really ran', () => {
     const tree = await servingTree(open.url);
     try {
       // nothing here is instrumented: the project's startup list names `export`, and that is the whole of it
-      const trigger = tree.load.registry.get('trigger', '@features/monitor/edge/digest.trigger.json');
+      const trigger = tree.load.registry.get('trigger', '@features/customers/edge/digest.trigger.json');
       const report = await tree.serving.fire({
         trigger: (trigger as NonNullable<typeof trigger>).doc,
         input: undefined,
@@ -62,20 +62,20 @@ describe('a tree that really ran', () => {
 
     expect(await until(() => (open?.batches() ?? 0) > 0)).toBe(true);
     const spans = open.spans();
-    const root = spans.find(one => one.name === 'fire @features/monitor/edge/digest.trigger.json');
+    const root = spans.find(one => one.name === 'fire @features/customers/edge/digest.trigger.json');
     expect(root).toBeDefined();
     const fire = root as NonNullable<typeof root>;
     expect(attributesOf(fire)['wilanis.kind']).toBe('@cli/cli.trigger-kind.json');
 
     // the walk beneath it is the runtime's: the port an author named, the binding, the graph, the node
     const names = spans.map(one => one.name);
-    expect(names).toContain('@features/monitor/domain/monitor.port.json#digest');
-    expect(names).toContain('binding @features/monitor/data/digest.binding.json#digest');
-    expect(names).toContain('@features/monitor/data/count.graph.json');
+    expect(names).toContain('@features/customers/domain/customer.port.json#digest');
+    expect(names).toContain('binding @features/customers/data/digest.binding.json#digest');
+    expect(names).toContain('@features/customers/data/count.graph.json');
     expect(names).toContain('counted @std/object.port.json#make');
 
     // one trace: every span of the fire hangs off the root the runtime built
-    const operation = spans.find(one => one.name === '@features/monitor/domain/monitor.port.json#digest');
+    const operation = spans.find(one => one.name === '@features/customers/domain/customer.port.json#digest');
     expect(operation?.parentSpanId).toBe(fire.spanId);
     expect(operation?.traceId).toBe(fire.traceId);
   }, 30_000);

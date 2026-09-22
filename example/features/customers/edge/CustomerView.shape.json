@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Customer (client view)",
+  "layer": "edge",
+  "description": "A customer as a client sees them. The trigger prunes anything the domain carries beyond these fields.",
+  "fields": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "tier": {
+      "type": "string"
+    },
+    "active": {
+      "type": "boolean",
+      "required": false
+    }
+  }
+}

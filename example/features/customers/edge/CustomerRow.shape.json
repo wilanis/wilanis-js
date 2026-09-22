@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "API row",
+  "layer": "edge",
+  "description": "A record as the customer API returns it. Extra fields are tolerated -- createdAt is the API's own spelling and stays at the edge; trigger-facing shapes never see it.",
+  "fields": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "tier": {
+      "type": "string"
+    },
+    "active": {
+      "type": "boolean",
+      "required": false
+    },
+    "registrar": {
+      "type": "string",
+      "required": false
+    },
+    "note": {
+      "type": "string",
+      "required": false
+    },
+    "createdAt": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "open": true
+}

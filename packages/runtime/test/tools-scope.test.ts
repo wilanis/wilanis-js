@@ -56,10 +56,10 @@ const VIEW = {
 };
 /** A copy whose digest reads that view, since a view is reached only where a graph names it. */
 const VIEWED: Edits = {
-  'features/monitor/data/entries.store.json': (store: any) => {
+  'features/customers/data/customers.store.json': (store: any) => {
     store.collections.everyEntry = { ...VIEW };
   },
-  'features/monitor/data/kept-list.graph.json': (graph: any) => {
+  'features/customers/data/kept-list.graph.json': (graph: any) => {
     graph.nodes[0].in.collection = 'everyEntry';
   },
 };
@@ -71,13 +71,13 @@ const SIGN_IN: Edits = {
 };
 /** The store of a scoped copy, said in full, with whatever further edits a case asks of either tree. */
 const storeSaid = (edits: Edits = {}, access: Edits = {}) =>
-  scopedTree(load => describeDoc(load, '@monitor/data/entries.store.json'), edits, access);
+  scopedTree(load => describeDoc(load, '@customers/data/customers.store.json'), edits, access);
 
 describe('wilanis describe and map: the scope a store keeps its rows under', () => {
   it('prints the reads block above the collections, so no {{name}} is met before what binds it', () => {
     const lines = storeSaid().split('\n');
     expect(lines).toContain(
-      '    tenant ← @monitor/edge/request.resolvers.json#tenant  (request.session.attributes.tenant, required)',
+      '    tenant ← @customers/edge/request.resolvers.json#tenant  (request.session.attributes.tenant, required)',
     );
     expect(lines.indexOf('reads:')).toBeLessThan(lines.findIndex(line => line.startsWith('  collection entries')));
   });
@@ -107,7 +107,7 @@ describe('wilanis describe and map: the scope a store keeps its rows under', () 
   });
 
   it('leaves an unscoped store reading exactly as it did before scoping existed', () => {
-    const said = describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@monitor/data/entries.store.json');
+    const said = describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@customers/data/customers.store.json');
     expect(said).toContain('    unique      [url, method]\n');
     expect(said).not.toContain('scoped by');
     expect(said).not.toContain('reads:');
@@ -120,32 +120,34 @@ describe('wilanis describe and map: the scope a store keeps its rows under', () 
   });
 
   it('tells a reader of the resolvers document that a store binds the read, and what it scopes', () => {
-    const said = scopedTree(load => describeDoc(load, '@monitor/edge/request.resolvers.json'));
-    expect(said).toContain('        used by @features/monitor/data/entries.store.json as {{tenant}}  (scopes entries)');
+    const said = scopedTree(load => describeDoc(load, '@customers/edge/request.resolvers.json'));
+    expect(said).toContain(
+      '        used by @features/customers/data/customers.store.json as {{tenant}}  (scopes entries)',
+    );
   });
 
   it('prints the scope a storage node carries under it, which the graph document does not write', () => {
-    const said = scopedTree(load => describeDoc(load, '@monitor/data/kept-get.graph.json')).split('\n');
+    const said = scopedTree(load => describeDoc(load, '@customers/data/kept-get.graph.json')).split('\n');
     const node = said.indexOf('    asked  @storage/store.port.json#get');
-    expect(said[node + 1]).toBe('        scope tenant ← {{tenant}} of @features/monitor/data/entries.store.json');
+    expect(said[node + 1]).toBe('        scope tenant ← {{tenant}} of @features/customers/data/customers.store.json');
   });
 
   it('prints no scope under a newKey, whose key is global to the table whatever the scope', () => {
-    const said = scopedTree(load => describeDoc(load, '@monitor/data/store-and-latest.graph.json')).split('\n');
+    const said = scopedTree(load => describeDoc(load, '@customers/data/store-and-latest.graph.json')).split('\n');
     const key = said.indexOf('    key  @storage/store.port.json#newKey');
     expect(said[key + 1]).not.toContain('scope tenant');
   });
 
   it('prints no scope under a node over a collection that keeps its rows for everyone', () => {
-    const said = scopedTree(load => describeDoc(load, '@monitor/data/store-and-latest.graph.json')).split('\n');
+    const said = scopedTree(load => describeDoc(load, '@customers/data/store-and-latest.graph.json')).split('\n');
     const latest = said.lastIndexOf('    latest  @storage/store.port.json#put');
     expect(said[latest + 1]).not.toContain('scope tenant');
   });
 
   it('tells a reader of a trigger which views it reaches and that each carries the view’s policy', () => {
-    const said = scopedTree(load => describeDoc(load, '@monitor/edge/digest.trigger.json'), {
+    const said = scopedTree(load => describeDoc(load, '@customers/edge/digest.trigger.json'), {
       ...VIEWED,
-      'features/monitor/edge/digest.trigger.json': (doc: any) => {
+      'features/customers/edge/digest.trigger.json': (doc: any) => {
         doc.policies = ['@access/edge/employees-only.policy.json'];
       },
     });
@@ -153,7 +155,7 @@ describe('wilanis describe and map: the scope a store keeps its rows under', () 
   });
 
   it('says so where a trigger reaches a view and attaches no such policy, naming the rule that refuses it', () => {
-    const said = scopedTree(load => describeDoc(load, '@monitor/edge/digest.trigger.json'), VIEWED);
+    const said = scopedTree(load => describeDoc(load, '@customers/edge/digest.trigger.json'), VIEWED);
     expect(said).toContain(
       'reaches everyEntry (a view) behind @access/edge/employees-only.policy.json: not attached -- wilanis check refuses this (A008)',
     );

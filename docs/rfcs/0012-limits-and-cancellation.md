@@ -38,7 +38,7 @@ A production service is judged by what happens when something hangs. Today, in t
   mid-run fails the run, so `settle(false)` rolls back"; RFC 0011 read `run.ts` and found the first half is not
   what the code does, and handed the question here. This RFC answers it.
 - **A fan-out has no ceiling.** `Run.runMap` does `Promise.all(over.map(...))`: every element at once, however
-  many. `DELETE /monitor` (`example/features/monitor/edge/delete-entries.trigger.json`) fans one `monitor.remove`
+  many. `DELETE /monitor` (`example/features/customers/edge/delete-customers.trigger.json`) fans one `monitor.remove`
   out per id in the body, and nothing in the tree bounds the body's list. The connection's `throttle`
   (`packages/plugin-http/src/throttle.ts`) paces the *requests* against one upstream; it cannot bound how many
   nested graph runs a map holds in flight, nor how long the list is.
@@ -90,11 +90,11 @@ plugin's is what a route that writes none gets. `GET /monitor/{id}`, bounded to 
       }
     }
   },
-  "in": "@monitor/edge/IdRequest.shape.json",
-  "out": "@monitor/edge/EntryView.shape.json",
+  "in": "@customers/edge/IdRequest.shape.json",
+  "out": "@customers/edge/CustomerView.shape.json",
   "kind": "@http/http.trigger-kind.json",
   "fire": {
-    "run": "@monitor/domain/monitor.port.json#get",
+    "run": "@customers/domain/customer.port.json#get",
     "in": {
       "id": "{{request.params.id}}"
     }
@@ -151,8 +151,8 @@ because an unbounded list from an anonymous caller is the request-shaped denial 
 gated, so `maxItems` there is good manners; take its policies away and leave the bound off, and the checker says:
 
 ```
-T0nn  @features/monitor/edge/delete-entries.trigger.json#in
-    public trigger takes '@monitor/edge/DeleteRequest.shape.json', whose field 'ids' is a list with no maxItems
+T0nn  @features/customers/edge/delete-customers.trigger.json#in
+    public trigger takes '@customers/edge/DeleteRequest.shape.json', whose field 'ids' is a list with no maxItems
     → add "maxItems" to ids in DeleteRequest.shape.json: the most an anonymous caller may send; or gate the
       trigger with a policy
 ```
@@ -160,7 +160,7 @@ T0nn  @features/monitor/edge/delete-entries.trigger.json#in
 **A fan-out has a ceiling and a pace.** A `map` may say `limit`, the most elements it will run over -- more is a
 fault of the node before any element starts -- and `concurrency`, how many elements run at once; the rest wait
 their turn, in index order. The map behind `DELETE /monitor`
-(`example/features/monitor/domain/remove-entries.graph.json`), eight removals at a time:
+(`example/features/customers/domain/remove-customers.graph.json`), eight removals at a time:
 
 ```json
 {
@@ -168,7 +168,7 @@ their turn, in index order. The map behind `DELETE /monitor`
   "id": "removed",
   "label": "Remove each entry",
   "description": "monitor.remove once per id, eight at a time; the element is the id itself",
-  "run": "@monitor/domain/monitor.port.json#remove",
+  "run": "@customers/domain/customer.port.json#remove",
   "over": "{{in}}",
   "limit": 100,
   "concurrency": 8,
@@ -190,9 +190,9 @@ passed" }`, and the report, summarised the way `wilanis run --verbose` prints on
 `packages/runtime/src/stubbing.ts`):
 
 ```
-@monitor/data/monitor-rest.binding.json#removeMany: cancelled
-  op: failed -- @monitor/domain/remove-entries.graph.json: cancelled
-    @monitor/domain/remove-entries.graph.json: cancelled
+@customers/data/customers-rest.binding.json#removeMany: cancelled
+  op: failed -- @customers/domain/remove-customers.graph.json: cancelled
+    @customers/domain/remove-customers.graph.json: cancelled
       removed: failed -- map 'removed' element 8: This operation was aborted
         removed.0: done
         ...
@@ -515,10 +515,10 @@ document, answer the codes), in `example.test.ts` and `sabotage.test.ts`:
 
 | Code | The edit |
 |---|---|
-| T0nn | delete `policies` from `delete-entries.trigger.json` while `DeleteRequest.shape.json` has no `maxItems`; the refusal is at `in` and names `ids`. With `maxItems: 100` restored, or the policies back: `codes(...)` has none |
-| C0nn | `"maxItems": 5` on `method` in `ListRequest.shape.json`; on `id` in `@monitor/domain/monitor.port.json#get`'s `accepts` |
+| T0nn | delete `policies` from `delete-customers.trigger.json` while `DeleteRequest.shape.json` has no `maxItems`; the refusal is at `in` and names `ids`. With `maxItems: 100` restored, or the policies back: `codes(...)` has none |
+| C0nn | `"maxItems": 5` on `method` in `ListRequest.shape.json`; on `id` in `@customers/domain/customer.port.json#get`'s `accepts` |
 | S0nn | a scenario under `scenarios/` whose `cancelAt` is `nope` |
-| X0nn | `"deadlineMs": 0` on `get-entry.trigger.json`; `"maxBodyBytes": -1` in `@http`'s settings in `project.json`; `"maxBodyBytes": 1.5` on `monitor-api.connection.json` |
+| X0nn | `"deadlineMs": 0` on `get-customer.trigger.json`; `"maxBodyBytes": -1` in `@http`'s settings in `project.json`; `"maxBodyBytes": 1.5` on `customers-api.connection.json` |
 | none | the guide's `deadlineMs`, `maxBodyBytes`, `maxItems`, `limit` and `concurrency` on the example |
 
 Http, in `packages/plugin-http/test/http.test.ts` against `fakeUpstream` in `harness.ts` (which can hold a request
@@ -539,7 +539,7 @@ the baseline map `limit` and `concurrency`, the baseline scenario `cancelAt`; `m
 `generate` never exceeds it; `assignable` ignores it.
 
 Runtime, in `packages/runtime/test/tools.test.ts`: a hand-written scenario with `cancelAt: "op.asked"` for
-`get-entry.trigger.json` replays `same` under `regress`, with `expect.status: "cancelled"`, `op.asked` `failed`
+`get-customer.trigger.json` replays `same` under `regress`, with `expect.status: "cancelled"`, `op.asked` `failed`
 and the rest of `get-row.graph.json` `cancelled`; `describe` of the trigger prints `deadline 2000ms`, of the graph
 `8 at once`, of the shape `at most 100`. In `packages/runtime/test/attempts.test.ts` (0011, new), once it exists: a
 retried node whose run is cancelled during its first try records no second try.
@@ -568,7 +568,7 @@ memory engine's store as it was.
 8. **Discoverability** (`area:runtime`, `area:view`, `good first issue`): `triggerLines`, `nodeLines`,
    `fieldLine`; the view model and the viewer's badges.
 9. **The example**: `deadlineMs` and `maxBodyBytes` in `@http`'s settings, `deadlineMs: 2000` on
-   `get-entry.trigger.json`, `maxItems: 100` on `DeleteRequest.shape.json`, `limit` and `concurrency` on `removed`;
+   `get-customer.trigger.json`, `maxItems: 100` on `DeleteRequest.shape.json`, `limit` and `concurrency` on `removed`;
    a paragraph in `example/README.md` and one in the root `README.md` on what happens when something hangs.
 10. **Blob** (`area:plugin-blob`, `good first issue`): `parse` in `packages/plugin-blob/src/csv.ts` stops between
     rows when `ctx.signal?.aborted`, so a cancelled import does not read the whole file first.

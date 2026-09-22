@@ -23,7 +23,7 @@ upstream API. Draws on RFC 0002 and the call-site rules of RFC 0003.
 ```
 npx wilanis start example
 curl -X POST :8099/monitor -d '{...}'   # then GET /monitor/{id} answers what you posted
-npx wilanis describe @monitor/data/entries.store.json
+npx wilanis describe @customers/data/customers.store.json
 ```
 
 First because RFC 0002 depends on nothing and RFC 0004, RFC 0005, RFC 0015, RFC 0017, RFC 0021 and
@@ -33,7 +33,7 @@ RFC 0022 all depend on it.
 
 Start the example under a production profile against PostgreSQL; the startup log shows the store prepared
 before the port opens. Not one route, policy, shape, port or business graph changes between profiles: what a
-profile swaps is which binding meets `monitor.port.json`, and through it which connection the records live
+profile swaps is which binding meets `customer.port.json`, and through it which connection the records live
 behind. Draws on the PostgreSQL engine of RFC 0002 and `ensure` of RFC 0003.
 
 ```

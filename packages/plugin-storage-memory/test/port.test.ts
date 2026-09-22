@@ -49,131 +49,131 @@ function treeServing(): string {
     kind: KIND,
     settings: {},
   });
-  write('features/monitor/feature.json', {
+  write('features/customers/feature.json', {
     $schema: '@wilanis/feature.schema.json',
     description: 'what the monitor observes',
-    exports: ['@features/monitor/domain/entries.port.json', '@features/monitor/domain/Entry.shape.json'],
+    exports: ['@features/customers/domain/entries.port.json', '@features/customers/domain/Customer.shape.json'],
     effects: ['@storage/store.port.json#put', '@storage/store.port.json#get', '@storage/store.port.json#count'],
   });
-  write('features/monitor/domain/Entry.shape.json', {
+  write('features/customers/domain/Customer.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'one observed call',
     layer: 'core',
     fields: { id: { type: 'string' }, url: { type: 'string' } },
   });
-  write('features/monitor/data/entries.store.json', {
+  write('features/customers/data/customers.store.json', {
     $schema: '@wilanis/store.schema.json',
     description: 'the entries, kept in memory',
     connection: CONNECTION,
-    collections: { entries: { of: '@features/monitor/domain/Entry.shape.json', key: 'id' } },
+    collections: { entries: { of: '@features/customers/domain/Customer.shape.json', key: 'id' } },
   });
-  write('features/monitor/domain/Kept.shape.json', {
+  write('features/customers/domain/Kept.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'what a write answers: the entry, and whether the key was already taken',
     layer: 'core',
     fields: {
-      record: { type: '@features/monitor/domain/Entry.shape.json', required: false },
+      record: { type: '@features/customers/domain/Customer.shape.json', required: false },
       conflict: { type: 'boolean' },
     },
   });
-  write('features/monitor/domain/Found.shape.json', {
+  write('features/customers/domain/Found.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'what a read answers: the entry, where there is one under that key',
     layer: 'core',
-    fields: { record: { type: '@features/monitor/domain/Entry.shape.json', required: false } },
+    fields: { record: { type: '@features/customers/domain/Customer.shape.json', required: false } },
   });
-  write('features/monitor/domain/entries.port.json', {
+  write('features/customers/domain/entries.port.json', {
     $schema: '@wilanis/port.schema.json',
     description: 'what the domain needs of entry storage',
     operations: {
       record: {
         description: 'Keep one entry.',
         accepts: { id: { type: 'string' }, url: { type: 'string' } },
-        returns: '@features/monitor/domain/Kept.shape.json',
+        returns: '@features/customers/domain/Kept.shape.json',
       },
       get: {
         description: 'One entry by its id.',
         accepts: { id: { type: 'string' } },
-        returns: '@features/monitor/domain/Found.shape.json',
+        returns: '@features/customers/domain/Found.shape.json',
       },
       howMany: { description: 'How many entries are kept.', returns: 'number' },
     },
   });
-  write('features/monitor/data/entries-memory.binding.json', {
+  write('features/customers/data/entries-memory.binding.json', {
     $schema: '@wilanis/binding.schema.json',
     description: 'the port over an @storage store',
-    port: '@features/monitor/domain/entries.port.json',
+    port: '@features/customers/domain/entries.port.json',
     operations: {
-      record: { graph: '@features/monitor/data/record-entry.graph.json' },
-      get: { graph: '@features/monitor/data/get-entry.graph.json' },
-      howMany: { graph: '@features/monitor/data/count-entries.graph.json' },
+      record: { graph: '@features/customers/data/register-customer.graph.json' },
+      get: { graph: '@features/customers/data/get-entry.graph.json' },
+      howMany: { graph: '@features/customers/data/count-entries.graph.json' },
     },
   });
-  write('features/monitor/data/record-entry.graph.json', {
+  write('features/customers/data/register-customer.graph.json', {
     $schema: '@wilanis/graph.schema.json',
     description: 'put the whole record, and answer it',
-    in: '@features/monitor/domain/Entry.shape.json',
-    out: { type: '@features/monitor/domain/Kept.shape.json', from: ['kept'] },
+    in: '@features/customers/domain/Customer.shape.json',
+    out: { type: '@features/customers/domain/Kept.shape.json', from: ['kept'] },
     nodes: [
       node('kept', '@storage/store.port.json#put', {
-        store: '@features/monitor/data/entries.store.json',
+        store: '@features/customers/data/customers.store.json',
         collection: 'entries',
         record: { id: '{{in.id}}', url: '{{in.url}}' },
       }),
     ],
   });
-  write('features/monitor/data/get-entry.graph.json', {
+  write('features/customers/data/get-entry.graph.json', {
     $schema: '@wilanis/graph.schema.json',
     description: 'read one record back',
-    in: '@features/monitor/edge/IdRequest.shape.json',
-    out: { type: '@features/monitor/domain/Found.shape.json', from: ['found'] },
+    in: '@features/customers/edge/IdRequest.shape.json',
+    out: { type: '@features/customers/domain/Found.shape.json', from: ['found'] },
     nodes: [
       node('found', '@storage/store.port.json#get', {
-        store: '@features/monitor/data/entries.store.json',
+        store: '@features/customers/data/customers.store.json',
         collection: 'entries',
         key: '{{in.id}}',
       }),
     ],
   });
-  write('features/monitor/data/count-entries.graph.json', {
+  write('features/customers/data/count-entries.graph.json', {
     $schema: '@wilanis/graph.schema.json',
     description: 'how many are kept',
     out: { type: 'number', from: ['counted'] },
     nodes: [
       node('counted', '@storage/store.port.json#count', {
-        store: '@features/monitor/data/entries.store.json',
+        store: '@features/customers/data/customers.store.json',
         collection: 'entries',
       }),
     ],
   });
-  write('features/monitor/edge/KeptView.shape.json', {
+  write('features/customers/edge/KeptView.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'what the command line prints after a write',
     layer: 'edge',
     fields: {
-      record: { type: '@features/monitor/edge/EntryView.shape.json', required: false },
+      record: { type: '@features/customers/edge/CustomerView.shape.json', required: false },
       conflict: { type: 'boolean' },
     },
   });
-  write('features/monitor/edge/FoundView.shape.json', {
+  write('features/customers/edge/FoundView.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'what the command line prints after a read',
     layer: 'edge',
-    fields: { record: { type: '@features/monitor/edge/EntryView.shape.json', required: false } },
+    fields: { record: { type: '@features/customers/edge/CustomerView.shape.json', required: false } },
   });
-  write('features/monitor/edge/EntryView.shape.json', {
+  write('features/customers/edge/CustomerView.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'one entry, as the command line prints it',
     layer: 'edge',
     fields: { id: { type: 'string' }, url: { type: 'string' } },
   });
-  write('features/monitor/edge/EntryRequest.shape.json', {
+  write('features/customers/edge/EntryRequest.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'an entry asked to be kept',
     layer: 'edge',
     fields: { id: { type: 'string' }, url: { type: 'string' } },
   });
-  write('features/monitor/edge/IdRequest.shape.json', {
+  write('features/customers/edge/IdRequest.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'an id asked for',
     layer: 'edge',
@@ -192,25 +192,25 @@ function treeServing(): string {
     ...(what.in ? { in: what.in } : {}),
     out,
     fire: {
-      run: `@features/monitor/domain/entries.port.json#${op}`,
+      run: `@features/customers/domain/entries.port.json#${op}`,
       ...(what.fire ? { in: what.fire } : {}),
     },
   });
   write(
-    'features/monitor/edge/record.trigger.json',
-    trigger('record', 'record', '@features/monitor/edge/KeptView.shape.json', {
-      in: '@features/monitor/edge/EntryRequest.shape.json',
+    'features/customers/edge/record.trigger.json',
+    trigger('record', 'record', '@features/customers/edge/KeptView.shape.json', {
+      in: '@features/customers/edge/EntryRequest.shape.json',
       fire: { id: '{{request.flags.id}}', url: '{{request.flags.url}}' },
     }),
   );
   write(
-    'features/monitor/edge/get.trigger.json',
-    trigger('get', 'get', '@features/monitor/edge/FoundView.shape.json', {
-      in: '@features/monitor/edge/IdRequest.shape.json',
+    'features/customers/edge/get.trigger.json',
+    trigger('get', 'get', '@features/customers/edge/FoundView.shape.json', {
+      in: '@features/customers/edge/IdRequest.shape.json',
       fire: { id: '{{request.flags.id}}' },
     }),
   );
-  write('features/monitor/edge/count.trigger.json', trigger('count', 'howMany', 'number'));
+  write('features/customers/edge/count.trigger.json', trigger('count', 'howMany', 'number'));
   return dir;
 }
 
@@ -243,7 +243,7 @@ afterAll(async () => {
  * `fire`, which is what makes the handler's env a copy of the tree's rather than the tree's itself.
  */
 const fire = async (name: string, input?: Record<string, unknown>) => {
-  const path = `@features/monitor/edge/${name}.trigger.json`;
+  const path = `@features/customers/edge/${name}.trigger.json`;
   const found = tree.registry.get('trigger', tree.resolve(path));
   if (!found) throw new Error(`no trigger at '${path}'`);
   const blobs = emb.blobs.scope();

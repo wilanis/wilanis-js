@@ -1,0 +1,32 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "List what is kept, by tier",
+  "description": "Data graph behind customer.listByTier under the local profile: the records whose tier is the one asked for. The filter names a field of the collection's shape, and the checker holds it to that.",
+  "in": "@customers/domain/Tier.shape.json",
+  "out": {
+    "type": "@customers/domain/Customer.shape.json[]",
+    "from": [
+      "rows"
+    ]
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "rows",
+      "label": "Read the customers of one tier",
+      "run": "@storage/store.port.json#find",
+      "in": {
+        "store": "@customers/data/customers.store.json",
+        "collection": "customers",
+        "where": {
+          "tier": "{{in.tier}}"
+        },
+        "order": [
+          {
+            "by": "email"
+          }
+        ]
+      }
+    }
+  ]
+}

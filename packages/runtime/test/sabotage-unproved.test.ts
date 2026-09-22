@@ -54,14 +54,14 @@ describe('sabotage: the documents a tree may not have', () => {
     // twice: the alias is judged where it is declared and again where the include's aliases are folded in
     expect(
       sabotage('project.json', project => {
-        project.aliases['@features'] = '@features/monitor';
+        project.aliases['@features'] = '@features/customers';
       }),
     ).toEqual(['D007', 'D007']);
   });
   it('D007 an alias that collides with a plugin root', () => {
     expect(
       sabotage('project.json', project => {
-        project.aliases['@http'] = '@features/monitor';
+        project.aliases['@http'] = '@features/customers';
       }),
     ).toEqual(['D007']);
   });
@@ -88,7 +88,7 @@ describe('sabotage: ports, bindings and secrets', () => {
   });
   it('C001 settings that read anything but a secret', () => {
     expect(
-      sabotage('connections/monitor-api.connection.json', connection => {
+      sabotage('connections/customers-api.connection.json', connection => {
         connection.settings.baseUrl = '{{request.host}}';
       }),
     ).toEqual(['C001']);
@@ -124,7 +124,7 @@ describe('sabotage: layers and visibility', () => {
     // G004 and T002 follow from the field's new type, which the graph and the trigger no longer fit
     expect(
       sabotage('features/hello/domain/Greeting.shape.json', shape => {
-        shape.fields[Object.keys(shape.fields)[0]].type = '@monitor/domain/Digest.shape.json';
+        shape.fields[Object.keys(shape.fields)[0]].type = '@customers/domain/Digest.shape.json';
       }),
     ).toEqual(['L005', 'G004', 'T002']);
   });
@@ -133,7 +133,7 @@ describe('sabotage: layers and visibility', () => {
 describe('sabotage: graphs', () => {
   it('G001 two nodes with one id', () => {
     expect(
-      sabotage('features/monitor/data/list-rows.graph.json', graph => {
+      sabotage('features/customers/data/list-rows.graph.json', graph => {
         graph.nodes.push(JSON.parse(JSON.stringify(graph.nodes[0])));
       }),
     ).toEqual(['G001']);
@@ -149,7 +149,7 @@ describe('sabotage: graphs', () => {
   it('G009 a switch that routes to a node the graph does not declare', () => {
     // G004 and G010 follow: the node the rule left unreached is the one the answer read
     expect(
-      sabotage('features/monitor/data/list-rows.graph.json', graph => {
+      sabotage('features/customers/data/list-rows.graph.json', graph => {
         graph.nodes.find((node: any) => node.id === 'route').rules[0].to = 'nowhere';
       }),
     ).toEqual(['G009', 'G004', 'G010']);
@@ -157,14 +157,14 @@ describe('sabotage: graphs', () => {
   it('G011 a rule whose when is not a boolean', () => {
     // G004: the branch that no longer decides feeds an input that needed it
     expect(
-      sabotage('features/monitor/data/list-rows.graph.json', graph => {
+      sabotage('features/customers/data/list-rows.graph.json', graph => {
         graph.nodes.find((node: any) => node.id === 'route').rules[0].when = 'status';
       }),
     ).toEqual(['G011', 'G004']);
   });
   it('G011 a rule whose when does not parse', () => {
     expect(
-      sabotage('features/monitor/data/list-rows.graph.json', graph => {
+      sabotage('features/customers/data/list-rows.graph.json', graph => {
         graph.nodes.find((node: any) => node.id === 'route').rules[0].when = 'status >=';
       }),
     ).toEqual(['G011', 'G004']);
@@ -182,13 +182,15 @@ describe('sabotage: triggers, scenarios and a pluginrule', () => {
   it('T001 a type setting written as anything but a string', () => {
     // twice: the setting is judged against the kind's shape and again as a type reference
     expect(
-      sabotage('features/monitor/edge/list-entries.trigger.json', trigger => {
+      sabotage('features/customers/edge/list-customers.trigger.json', trigger => {
         trigger.settings.body = { not: 'a string' };
       }),
     ).toEqual(['T001', 'T001']);
   });
   it('S001 a scenario that names a trigger the tree does not have', () => {
-    expect(planted('scenarios/probe.scenario.json', scenario('@monitor/edge/no-such.trigger.json'))).toEqual(['S001']);
+    expect(planted('scenarios/probe.scenario.json', scenario('@customers/edge/no-such.trigger.json'))).toEqual([
+      'S001',
+    ]);
   });
   it('X001 a codec table that names something that is not a codec', () => {
     expect(

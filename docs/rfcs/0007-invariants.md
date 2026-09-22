@@ -21,14 +21,14 @@ and a `refuse` node the compiler synthesises.
 
 ## Motivation
 
-The example gates every write of the monitor feature with `@access/edge/can-record.policy.json`. It
-does so trigger by trigger: five triggers each attach `employees-only` and `can-record`, and a sixth
+The example gates every write of the monitor feature with `@access/edge/can-register.policy.json`. It
+does so trigger by trigger: five triggers each attach `employees-only` and `can-register`, and a sixth
 operation, `#record`, is gated only because the two that reach it are. Nothing in the tree says that this
 is a rule rather than five coincidences and a piece of luck. An agent adding `PATCH /monitor/{id}/method`
-that fires `monitor.port.json#update` and forgets the policies produces a tree `wilanis check` accepts.
+that fires `customer.port.json#update` and forgets the policies produces a tree `wilanis check` accepts.
 The write is public, and the only thing that would catch it is a human reading the trigger.
 
-The same holds for the values the domain trusts. `Entry.shape.json` says `url` is a string. It cannot
+The same holds for the values the domain trusts. `Customer.shape.json` says `url` is a string. It cannot
 say the string is never empty. A data graph translating a row from the upstream API can hand the domain
 an entry with `"url": ""`, and every graph downstream believes it.
 
@@ -62,15 +62,15 @@ the policy says what it decides.
   "description": "Every trigger that can change an entry attaches the recorder policy. Reads stay public.",
   "access": {
     "over": [
-      "@monitor/domain/monitor.port.json#record",
-      "@monitor/domain/monitor.port.json#update",
-      "@monitor/domain/monitor.port.json#remove",
-      "@monitor/domain/monitor.port.json#removeMany",
-      "@monitor/domain/monitor.port.json#submit",
-      "@monitor/domain/monitor.port.json#import"
+      "@customers/domain/customer.port.json#register",
+      "@customers/domain/customer.port.json#update",
+      "@customers/domain/customer.port.json#remove",
+      "@customers/domain/customer.port.json#removeMany",
+      "@customers/domain/customer.port.json#submit",
+      "@customers/domain/customer.port.json#import"
     ],
     "requires": {
-      "policy": "@access/edge/can-record.policy.json"
+      "policy": "@access/edge/can-register.policy.json"
     }
   }
 }
@@ -88,16 +88,16 @@ domain graph cannot route around an invariant by calling the operation itself.
 
 Every trigger reaching the operations then attaches some policy whose `proves` lists `request.principal`
 or a path above it, the same rule A006 applies to a required resolver. `signed-in`, `employees-only`
-and `can-record` all qualify; a public trigger does not.
+and `can-register` all qualify; a public trigger does not.
 
-Drop `can-record` from `delete-entry.trigger.json` and `wilanis check` answers:
+Drop `can-register` from `delete-customer.trigger.json` and `wilanis check` answers:
 
 ```
-I001  @features/monitor/edge/delete-entry.trigger.json#policies
-    trigger reaches @monitor/domain/monitor.port.json#remove, which 'Writes are for recorders'
-    (@monitor/domain/writes-are-for-recorders.invariant.json) gates with @access/edge/can-record.policy.json,
+I001  @features/customers/edge/delete-customer.trigger.json#policies
+    trigger reaches @customers/domain/customer.port.json#remove, which 'Writes are for recorders'
+    (@customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json,
     but attaches no such policy
-    → attach "@access/edge/can-record.policy.json" under policies, or take #remove out of the invariant's over
+    → attach "@access/edge/can-register.policy.json" under policies, or take #remove out of the invariant's over
 ```
 
 **A field invariant** names a core shape and a rule over its fields, in the grammar a `switch` rule
@@ -109,7 +109,7 @@ already uses: `has()`, `len()`, comparisons, `in`, `&&`, `||`, `!`. The fields a
   "label": "An entry names a call",
   "description": "A URL is never empty, and a deletion always says who asked for it.",
   "holds": {
-    "on": "@monitor/domain/Entry.shape.json",
+    "on": "@customers/domain/Customer.shape.json",
     "when": "len(url) > 0 && (method != 'DELETE' || has(ua))"
   }
 }
@@ -128,7 +128,7 @@ Where a value of `Entry` comes into being, the rule is judged:
 `wilanis rehearse` then reports a guard as it reports a decision:
 
 ```
-features/monitor/data/create-row  guard 'row' An entry names a call  2/2 branches
+features/customers/data/create-row  guard 'row' An entry names a call  2/2 branches
   ok  holds     answered from 'row'
   ok  violated  refused on purpose at 'row:violated' as invariant: "An entry names a call does not hold"
 
@@ -307,7 +307,7 @@ A taken site guards what the embedder hands to the graph, inside the graph.
 form, what it covers, and how it is met: for `access`, each reaching trigger and the policy that
 satisfies it; for `holds`, each site as `proved (literal|narrowed by '<switch>'|from '<node>')` or
 `guarded`. `describe <trigger>` gains a line per access invariant it satisfies:
-`holds  @monitor/domain/writes-are-for-recorders.invariant.json  through @access/edge/can-record.policy.json`.
+`holds  @customers/domain/writes-are-for-registrars.invariant.json  through @access/edge/can-register.policy.json`.
 `describe <shape>` lists the invariants over it. `wilanis map` prints the same `holds` line under each
 trigger's gates. `wilanis ls invariant` lists them.
 
@@ -334,19 +334,19 @@ change in place; after it, a breaking change goes to `schemas-v2` (see RFC 0008)
 Sabotage tests in a new `packages/runtime/test/sabotage-invariants.test.ts`, through `sabotage` and
 `codes` from `example-harness.ts`, once the two example invariants are in place:
 
-- I001: pop `can-record` from `delete-entry.trigger.json` → `['I001']` (`forbidden` stays reached
+- I001: pop `can-register` from `delete-customer.trigger.json` → `['I001']` (`forbidden` stays reached
   through `employees-only`, so no T006). Delete `policies` and the three access reasons from
-  `import-entries.trigger.json` → `['I001']`, the message naming `#record` as reached through `#import`.
+  `import-customers.trigger.json` → `['I001']`, the message naming `#record` as reached through `#import`.
 - I002: `over: ["@http/http.port.json#request"]`; `proves: ["request.nope"]`;
-  `on: "@monitor/edge/EntryView.shape.json"`. `requires.policy: "@access/edge/nope.policy.json"` → R001.
-- I003: `over: ["@monitor/domain/monitor.port.json#listByMethod"]` with `list-entries.graph.json`
+  `on: "@customers/edge/CustomerView.shape.json"`. `requires.policy: "@access/edge/nope.policy.json"` → R001.
+- I003: `over: ["@customers/domain/customer.port.json#listByTier"]` with `list-customers.graph.json`
   edited not to call it; `on` a core shape no graph makes or takes.
 - I004: `when: "quantity >= 0"` (no such field); `when: "url > 3"` (string against number);
   `when: "len(url) >"` (parse error).
-- I005: in `record-entry.graph.json`, a `make` node with a literal `{ "id": "x", "url": "", "method": "GET" }`.
+- I005: in `register-customer.graph.json`, a `make` node with a literal `{ "id": "x", "url": "", "method": "GET" }`.
 - I006: `reason: "invariant"` on `create-row.graph.json`'s `failed` node.
 - D008: `relocate` an invariant to `edge/` or `data/`.
-- T005/T006: with the field invariant present, drop `invariant` from `record-entry.trigger.json`'s
+- T005/T006: with the field invariant present, drop `invariant` from `register-customer.trigger.json`'s
   refusal table → `['T005']`; with the invariant document removed, the mapping is `['T006']`.
 
 The proof rules themselves in `packages/runtime/test/invariant-proof.test.ts`, over graphs planted in a copy
@@ -362,10 +362,10 @@ is no site of the shape, a read of a field rather than the value whole, and ever
 Behaviour tests in `packages/runtime/test/example.test.ts` and `branches.test.ts`:
 
 - `rehearse` reports `guard 'row' An entry names a call  2/2 branches` for each guarded data graph,
-  `proved` for `record-entry.graph.json`'s pass-through, and the summary line, for every seed 1 to 8.
+  `proved` for `register-customer.graph.json`'s pass-through, and the summary line, for every seed 1 to 8.
 - A run through `wilanis run` with a stubbed upstream answering `"url": ""` refuses with reason
   `invariant`, and the http kind answers the status the trigger maps.
-- `describe` of the invariant, of `delete-entry.trigger.json` and of `Entry.shape.json` print the lines
+- `describe` of the invariant, of `delete-customer.trigger.json` and of `Customer.shape.json` print the lines
   above; `map` prints `holds` under each write trigger.
 - Compiler: a guarded graph's spec has `row:made`, `row:check`, `row`, `row:violated`, and
   `row:violated` in `output`; a proved site has none.
@@ -410,7 +410,7 @@ a payment result") are transitions over stored state. They need a record's old a
 storage operation, and are best stated against a lifecycle construct. Section "Class 3" names the shape
 of the design so RFC 0002 and RFC 0021 leave room for it; this RFC does not design it.
 
-**A rule on the shape itself** (`"where": "len(url) > 0"` inside `Entry.shape.json`) was considered.
+**A rule on the shape itself** (`"where": "len(url) > 0"` inside `Customer.shape.json`) was considered.
 It is shorter, but a shape is a type and this is a rule with a label, a description and a place in the
 checker's output; a document of its own is what `describe`, `map` and the viewer can name, and what an
 include can ship. It also keeps the shape schema unchanged.

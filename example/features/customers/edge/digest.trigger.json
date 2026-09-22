@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
+  "label": "digest",
+  "description": "wilanis run @customers/edge/digest.trigger.json prints the digest: the count and one line per customer.",
+  "kind": "@cli/cli.trigger-kind.json",
+  "settings": {
+    "command": "digest"
+  },
+  "out": "@customers/edge/DigestView.shape.json",
+  "fire": {
+    "run": "@customers/domain/customer.port.json#digest"
+  }
+}

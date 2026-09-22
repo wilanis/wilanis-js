@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Customer",
+  "layer": "core",
+  "description": "A customer of the business, as the domain knows one.",
+  "fields": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "tier": {
+      "type": "string"
+    },
+    "active": {
+      "type": "boolean",
+      "required": false,
+      "description": "whether the account is open for business; absent reads as inactive"
+    },
+    "note": {
+      "type": "string",
+      "required": false,
+      "description": "what an account manager wrote about this customer; a note lives on the customer itself"
+    }
+  }
+}

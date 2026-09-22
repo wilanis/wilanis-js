@@ -1,0 +1,115 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "Store a customer and their tier's latest",
+  "atomic": true,
+  "description": "Data graph behind customer.register: the customer is stored and the latest registration of their tier is written beside it, and the graph answers only when both are in. The two writes move together -- a reader asking who was registered into gold most recently can never be told a customer that was not stored, and no customer can be stored without their tier's latest catching up. That is what atomic buys here, and it is one word rather than a graph that undoes what it wrote. The same graph as @customers/data/store-and-latest.graph.json, against the store kept in PostgreSQL: a store is named statically at a call site, so pointing these at another connection is a copy until a profile may swap one.",
+  "in": "@customers/domain/CustomerRecord.shape.json",
+  "out": {
+    "type": "@customers/domain/Customer.shape.json",
+    "from": [
+      "row",
+      "repeated",
+      "failed"
+    ]
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "key",
+      "label": "A key no record has",
+      "run": "@storage/store.port.json#newKey",
+      "in": {
+        "store": "@customers/data/customers-postgres.store.json",
+        "collection": "customers"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "stored",
+      "label": "Write the customer under that key",
+      "run": "@storage/store.port.json#put",
+      "in": {
+        "store": "@customers/data/customers-postgres.store.json",
+        "collection": "customers",
+        "record": {
+          "id": "{{key}}",
+          "name": "{{in.name}}",
+          "email": "{{in.email}}",
+          "tier": "{{in.tier}}",
+          "registrar": "{{in.registrar}}"
+        }
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "latest",
+      "label": "Record it as the tier's latest",
+      "description": "One row per tier, so a put under the tier replaces whatever was there.",
+      "run": "@storage/store.port.json#put",
+      "in": {
+        "store": "@customers/data/customers-postgres.store.json",
+        "collection": "latest",
+        "record": {
+          "tier": "{{in.tier}}",
+          "email": "{{in.email}}",
+          "customer": "{{key}}"
+        }
+      }
+    },
+    {
+      "type": "@wilanis/node/switch.schema.json",
+      "id": "route",
+      "label": "Were both written, or did a constraint stop the customer?",
+      "in": {
+        "record": "{{stored.record}}",
+        "violated": "{{stored.violated}}",
+        "mark": "{{latest.record}}"
+      },
+      "rules": [
+        {
+          "when": "has(violated)",
+          "to": "repeated"
+        },
+        {
+          "when": "has(record) && has(mark)",
+          "to": "row"
+        }
+      ],
+      "else": "failed"
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "row",
+      "label": "The customer",
+      "run": "@std/object.port.json#make",
+      "in": {
+        "value": "{{stored.record}}",
+        "type": "@customers/domain/Customer.shape.json"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "repeated",
+      "label": "A customer already uses this address",
+      "description": "The store honoured a constraint it declares -- unique [email] -- and answered violated rather than writing. That is a conflict with what is kept, not a fault of the store, so it is refused as one; the transaction rolls back, and the latest row this run would have replaced is left as it was.",
+      "run": "@std/outcome.port.json#refuse",
+      "in": {
+        "reason": "conflict",
+        "message": "a customer already uses {{in.email}} ({{stored.violated}})",
+        "type": "@customers/domain/Customer.shape.json"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "failed",
+      "label": "Nothing was written",
+      "description": "The store answered neither a record nor a violated constraint, which no engine promises to do; the transaction rolls back, so neither write survives this refusal.",
+      "run": "@std/outcome.port.json#refuse",
+      "in": {
+        "reason": "upstream",
+        "message": "the store answered no record for {{in.email}}",
+        "type": "@customers/domain/Customer.shape.json"
+      }
+    }
+  ]
+}

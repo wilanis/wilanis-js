@@ -39,7 +39,7 @@ export const firstRow = (): Record<string, unknown> => ({
 /** A multipart upload beside the raw one: the file is one part of a form, a note another. */
 function writeUploadForm(dir: string) {
   writeFileSync(
-    join(dir, 'features/monitor/edge/UploadForm.shape.json'),
+    join(dir, 'features/customers/edge/UploadForm.shape.json'),
     JSON.stringify({
       $schema: `${SCHEMAS}shape.schema.json`,
       description: 'a form with a file and a note',
@@ -48,7 +48,7 @@ function writeUploadForm(dir: string) {
     }),
   );
   writeFileSync(
-    join(dir, 'features/monitor/edge/upload-form.trigger.json'),
+    join(dir, 'features/customers/edge/upload-form.trigger.json'),
     JSON.stringify({
       $schema: `${SCHEMAS}trigger.schema.json`,
       description: 'POST /monitor/upload as a form',
@@ -58,7 +58,7 @@ function writeUploadForm(dir: string) {
         method: 'POST',
         consumes: 'multipart/form-data',
         produces: 'application/json',
-        body: '@features/monitor/edge/UploadForm.shape.json',
+        body: '@features/customers/edge/UploadForm.shape.json',
         response: {
           status: { default: 201 },
           // `invariant` is the guard the compiler lowers where a field invariant could not be proved: this
@@ -73,8 +73,8 @@ function writeUploadForm(dir: string) {
           },
         },
       },
-      in: '@features/monitor/edge/CsvUpload.shape.json',
-      out: '@features/monitor/edge/EntryView.shape.json[]',
+      in: '@features/customers/edge/CsvUpload.shape.json',
+      out: '@features/customers/edge/CustomerView.shape.json[]',
       // this route reaches monitor.import, so the writes invariant holds it to the recorder gate like every
       // other write: a planted trigger is not exempt from a rule the tree states once
       policies: [
@@ -82,9 +82,9 @@ function writeUploadForm(dir: string) {
           policy: '@access/edge/employees-only.policy.json',
           in: { token: ['{{request.headers.authorization}}', '{{request.cookies.session}}'] },
         },
-        '@access/edge/can-record.policy.json',
+        '@access/edge/can-register.policy.json',
       ],
-      fire: { run: '@features/monitor/domain/monitor.port.json#import', in: { file: '{{request.body.file}}' } },
+      fire: { run: '@features/customers/domain/customer.port.json#import', in: { file: '{{request.body.file}}' } },
     }),
   );
 }
@@ -103,7 +103,7 @@ export function localCopy(): string {
     change(doc);
     writeFileSync(path, JSON.stringify(doc));
   };
-  edit('connections/monitor-api.connection.json', connection => {
+  edit('connections/customers-api.connection.json', connection => {
     connection.settings.baseUrl = `http://localhost:${UPSTREAM}/api/v1`;
     connection.settings.throttle = { concurrency: 2 };
   });

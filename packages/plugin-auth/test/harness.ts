@@ -64,7 +64,7 @@ export function localCopy(edits: Record<string, Edit> = {}): string {
     change(doc);
     writeFileSync(path, JSON.stringify(doc));
   };
-  edit('connections/monitor-api.connection.json', connection => {
+  edit('connections/customers-api.connection.json', connection => {
     connection.settings.baseUrl = `http://localhost:${UPSTREAM}/api/v1`;
   });
   edit('project.json', project => {

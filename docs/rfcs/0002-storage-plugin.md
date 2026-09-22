@@ -24,7 +24,7 @@ keeps bytes, as it does today.
 
 Today a tree has no way to keep a value between two requests except by calling something outside
 itself. The example's monitor feature stores its entries by `POST`ing them to a public REST API
-(`example/features/monitor/data/create-row.graph.json`), and the `@auth` plugin keeps its sessions in
+(`example/features/customers/data/create-row.graph.json`), and the `@auth` plugin keeps its sessions in
 files under `.wilanis/auth` that no document names. An agent asked to "record an order" has nothing to
 reach for: it would have to invent an HTTP upstream, or the runtime would have to grow code nobody can
 read from the tree.
@@ -68,17 +68,17 @@ The monitor feature, kept in a store instead of the REST API. The connection, at
 }
 ```
 
-The store, `example/features/monitor/data/entries.store.json`:
+The store, `example/features/customers/data/customers.store.json`:
 
 ```json
 {
   "$schema": "@wilanis/store.schema.json",
   "label": "Entry store",
   "description": "The monitor's entries, one collection, keyed by id.",
-  "connection": "@connections/entries.connection.json",
+  "connection": "@connections/customers.connection.json",
   "collections": {
     "entries": {
-      "of": "@monitor/domain/Entry.shape.json",
+      "of": "@customers/domain/Customer.shape.json",
       "key": "id",
       "description": "every observed call"
     }
@@ -86,7 +86,7 @@ The store, `example/features/monitor/data/entries.store.json`:
 }
 ```
 
-The data graph behind `monitor.port.json#get`, `example/features/monitor/data/get-record.graph.json`.
+The data graph behind `customer.port.json#get`, `example/features/customers/data/get-record.graph.json`.
 Compare it with `get-row.graph.json` today: the request and its status become one read and a `has()`:
 
 ```json
@@ -94,8 +94,8 @@ Compare it with `get-row.graph.json` today: the request and its status become on
   "$schema": "@wilanis/graph.schema.json",
   "label": "Get a record",
   "description": "Data graph behind monitor.get: read the record by id; absent is the declared refusal.",
-  "in": "@monitor/domain/EntryRef.shape.json",
-  "out": { "type": "@monitor/domain/Entry.shape.json", "from": ["row", "missing"] },
+  "in": "@customers/domain/CustomerRef.shape.json",
+  "out": { "type": "@customers/domain/Customer.shape.json", "from": ["row", "missing"] },
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
@@ -103,7 +103,7 @@ Compare it with `get-row.graph.json` today: the request and its status become on
       "label": "Read the entry",
       "run": "@storage/store.port.json#get",
       "in": {
-        "store": "@monitor/data/entries.store.json",
+        "store": "@customers/data/customers.store.json",
         "collection": "entries",
         "key": "{{in.id}}"
       }
@@ -121,14 +121,14 @@ Compare it with `get-row.graph.json` today: the request and its status become on
       "id": "row",
       "label": "The entry",
       "run": "@std/object.port.json#make",
-      "in": { "value": "{{asked.record}}", "type": "@monitor/domain/Entry.shape.json" }
+      "in": { "value": "{{asked.record}}", "type": "@customers/domain/Customer.shape.json" }
     },
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "missing",
       "label": "No such entry",
       "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@monitor/domain/Entry.shape.json" }
+      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" }
     }
   ]
 }
@@ -138,7 +138,7 @@ Compare it with `get-row.graph.json` today: the request and its status become on
 what absence means, the way a `switch` on `status` decides what a 404 means today. `rehearse` solves
 `has(record)` and runs both branches.
 
-The graph behind `monitor.port.json#record`, `create-record.graph.json`: a fresh key, the record made
+The graph behind `customer.port.json#register`, `create-record.graph.json`: a fresh key, the record made
 from it, the record put. No id is invented by the domain and none is generated silently:
 
 ```json
@@ -146,14 +146,14 @@ from it, the record put. No id is invented by the domain and none is generated s
   "$schema": "@wilanis/graph.schema.json",
   "label": "Create a record",
   "description": "Data graph behind monitor.record: a new key, the entry made from it, stored.",
-  "in": "@monitor/domain/EntryRecord.shape.json",
-  "out": { "type": "@monitor/domain/Entry.shape.json", "from": "answer" },
+  "in": "@customers/domain/CustomerRecord.shape.json",
+  "out": { "type": "@customers/domain/Customer.shape.json", "from": "answer" },
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "key",
       "run": "@storage/store.port.json#newKey",
-      "in": { "store": "@monitor/data/entries.store.json", "collection": "entries" }
+      "in": { "store": "@customers/data/customers.store.json", "collection": "entries" }
     },
     {
       "type": "@wilanis/node/run.schema.json",
@@ -161,7 +161,7 @@ from it, the record put. No id is invented by the domain and none is generated s
       "run": "@std/object.port.json#make",
       "in": {
         "value": { "id": "{{key}}", "url": "{{in.url}}", "method": "{{in.method}}", "ua": "{{in.ua}}" },
-        "type": "@monitor/domain/Entry.shape.json"
+        "type": "@customers/domain/Customer.shape.json"
       }
     },
     {
@@ -169,7 +169,7 @@ from it, the record put. No id is invented by the domain and none is generated s
       "id": "stored",
       "run": "@storage/store.port.json#put",
       "in": {
-        "store": "@monitor/data/entries.store.json",
+        "store": "@customers/data/customers.store.json",
         "collection": "entries",
         "record": "{{entry}}"
       }
@@ -179,7 +179,7 @@ from it, the record put. No id is invented by the domain and none is generated s
       "id": "answer",
       "label": "The stored entry",
       "run": "@std/object.port.json#make",
-      "in": { "value": "{{stored.record}}", "type": "@monitor/domain/Entry.shape.json" }
+      "in": { "value": "{{stored.record}}", "type": "@customers/domain/Customer.shape.json" }
     }
   ]
 }
@@ -193,9 +193,9 @@ narrowing rules already know `record` is present on the branch where `conflict` 
 `listByMethod` becomes one `find` with a declared filter, `{ "where": { "method": "{{in.method}}" } }`;
 `listAll` a `find` with none; `update` a `patch` of `url` and `method` by key; `remove` a `remove` by key,
 each followed by the same `has(record)` decision as `get`. The binding
-`example/features/monitor/data/monitor-store.binding.json` binds the six storage operations to these
+`example/features/customers/data/customers-store.binding.json` binds the six storage operations to these
 graphs and the business operations (`submit`, `list`, `digest`, `removeMany`, `import`, `export`,
-`parseDrafts`, `toCsv`) to the same domain graphs `monitor-rest.binding.json` binds today. A new profile
+`parseDrafts`, `toCsv`) to the same domain graphs `customers-rest.binding.json` binds today. A new profile
 `local` in `project.json` chooses it; `live` keeps the REST binding. The feature lists what it now reaches:
 
 ```json
@@ -208,15 +208,15 @@ graphs and the business operations (`submit`, `list`, `digest`, `removeMany`, `i
 ```
 
 The startup step the example already has, `Reach the entry store`, keeps firing
-`monitor.port.json#listAll`; a new first step fires `monitor.port.json#prepare`, bound to a data graph
+`customer.port.json#listAll`; a new first step fires `customer.port.json#prepare`, bound to a data graph
 that runs `@storage/storage.port.json#ensure` so the tables exist before anything listens.
 
 The refusal an author meets first, when a call names a collection the store does not hold:
 
 ```
-X204  @features/monitor/data/get-record.graph.json#nodes/asked/in/collection
-    @monitor/data/entries.store.json has no collection 'entry' (collections: entries)
-    → wilanis describe @monitor/data/entries.store.json
+X204  @features/customers/data/get-record.graph.json#nodes/asked/in/collection
+    @customers/data/customers.store.json has no collection 'entry' (collections: entries)
+    → wilanis describe @customers/data/customers.store.json
 ```
 
 There is no refusal about the record's type at a call site, because no call site states one: the
@@ -673,7 +673,7 @@ the `store` baseline. The compiler's new rows are exercised through sabotaged co
 7. **`@wilanis/plugin-storage-postgres`.** Kysely with `pg`: the connection kind, the plugin's
    settings, the shape-to-table mapping, `ensure`, the operations, the filter compiled to Kysely
    expressions, X221 to X223, `engine.test.ts` behind the environment variable.
-8. **The example.** `entries.connection.json` (the memory kind), `entries.store.json`, the store
+8. **The example.** `customers.connection.json` (the memory kind), `customers.store.json`, the store
    binding and its data graphs, the `local` profile, the `prepare` operation and step; the example's
    README.
 9. **Discoverability.** `ls store`, `describe` of a store and of the port, `map`, the viewer page.

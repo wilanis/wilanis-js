@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { EXAMPLE, relocate, sabotage, sabotagePointing } from './example-harness.js';
 
-const NIGHTLY = 'features/monitor/edge/nightly-digest.trigger.json';
+const NIGHTLY = 'features/customers/edge/nightly-digest.trigger.json';
 /** The same document as a refusal names it: canonical, from the tree's root. */
 const AT = `@${NIGHTLY}`;
 const codesOf = (edit: (doc: any) => void) => sabotage(NIGHTLY, edit);
@@ -99,7 +99,7 @@ describe('sabotage: what a tick cannot fill or remember -- X252, X253, X254', ()
   it('X252 an in nothing fills: nothing arrives on a tick', () => {
     expect(
       pointing(trigger => {
-        trigger.in = '@monitor/edge/ListRequest.shape.json';
+        trigger.in = '@customers/edge/ListRequest.shape.json';
       }),
     ).toEqual([`X252 ${AT}#in`]);
   });
@@ -113,7 +113,7 @@ describe('sabotage: what a tick cannot fill or remember -- X252, X253, X254', ()
   it('X254 a lease on a connection whose kind keeps none', () => {
     expect(
       sabotagePointing('project.json', project => {
-        project.startup[KEEP].in = { lease: '@connections/monitor-api.connection.json' };
+        project.startup[KEEP].in = { lease: '@connections/customers-api.connection.json' };
       }),
     ).toEqual([`X254 @project.json#startup/${KEEP}/in/lease`]);
   });
@@ -143,7 +143,7 @@ describe('sabotage: what a scheduled trigger shares with a route', () => {
   it('T003 a read of a request the kind never hands', () => {
     expect(
       codesOf(trigger => {
-        trigger.in = '@monitor/edge/ListRequest.shape.json';
+        trigger.in = '@customers/edge/ListRequest.shape.json';
         trigger.fire.in = { method: '{{request.body.method}}' };
       }),
     ).toContain('T003');
@@ -153,9 +153,9 @@ describe('sabotage: what a scheduled trigger shares with a route', () => {
     // fire that path from the clock and the kind hands no headers at all
     expect(
       codesOf(trigger => {
-        trigger.in = '@monitor/edge/RecordRequest.shape.json';
-        trigger.out = '@monitor/edge/EntryView.shape.json';
-        trigger.fire.run = '@monitor/domain/monitor.port.json#submit';
+        trigger.in = '@customers/edge/RegisterRequest.shape.json';
+        trigger.out = '@customers/edge/CustomerView.shape.json';
+        trigger.fire.run = '@customers/domain/customer.port.json#submit';
         trigger.fire.in = { url: 'https://x.example/', method: 'GET' };
       }),
     ).toContain('T004');
@@ -163,19 +163,19 @@ describe('sabotage: what a scheduled trigger shares with a route', () => {
   it('A005 a policy that reads a caller nobody is', () => {
     expect(
       codesOf(trigger => {
-        trigger.policies = ['@access/edge/can-record.policy.json'];
+        trigger.policies = ['@access/edge/can-register.policy.json'];
       }),
     ).toContain('A005');
   });
   it('D008 the scheduled trigger outside the edge layer', () => {
-    expect(relocate(NIGHTLY, 'features/monitor/domain/nightly-digest.trigger.json')).toContain('D008');
+    expect(relocate(NIGHTLY, 'features/customers/domain/nightly-digest.trigger.json')).toContain('D008');
   });
 });
 
 describe('sabotage: what only a startup step may name', () => {
   it('L008 a data graph running the scheduler', () => {
     expect(
-      sabotage('features/monitor/data/list-rows.graph.json', graph => {
+      sabotage('features/customers/data/list-rows.graph.json', graph => {
         graph.nodes[0].run = '@schedule/scheduler.port.json#run';
         graph.nodes[0].in = {};
       }),

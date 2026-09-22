@@ -34,8 +34,8 @@ A change that does not pass the check is reported and refused, and the last good
 reload: 68 documents, serving the new tree
 
 reload refused, still serving the last good tree:
-G003  @features/monitor/data/get-row.graph.json#nodes/asked/in/path
-    no field 'nosuchfield' in @features/monitor/domain/EntryRef.shape.json
+G003  @features/customers/data/get-row.graph.json#nodes/asked/in/path
+    no field 'nosuchfield' in @features/customers/domain/CustomerRef.shape.json
 ```
 
 Edits are debounced (120ms by default, `settings.debounceMs` or the operation's `debounceMs` to change

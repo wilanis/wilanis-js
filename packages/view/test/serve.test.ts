@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { type DocView, type SchemaView, schemaRelOf, schemaViewOf, serveView } from '../src/index.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
-const GET_ROW = '@features/monitor/data/get-row.graph.json';
+const GET_ROW = '@features/customers/data/get-row.graph.json';
 
 describe('schemas as pages', () => {
   it('recognises a schema reference in either form, and nothing else', () => {
@@ -14,7 +14,7 @@ describe('schemas as pages', () => {
         'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json',
       ),
     ).toBe('trigger.schema.json');
-    expect(schemaRelOf('@features/monitor/domain/Entry.shape.json')).toBeUndefined();
+    expect(schemaRelOf('@features/customers/domain/Customer.shape.json')).toBeUndefined();
     expect(schemaRelOf('@wilanis/../package.json')).toBeUndefined();
     expect(schemaRelOf(42)).toBeUndefined();
   });
@@ -50,7 +50,7 @@ describe('the view server', () => {
       expect(typeof idx.version).toBe('string');
       expect(idx.schemaBase).toMatch(/^https:\/\/.*\/schemas$/);
       const doc = (await (
-        await fetch(`${server.url}api/doc?path=${encodeURIComponent('@monitor/data/get-row.graph.json')}`)
+        await fetch(`${server.url}api/doc?path=${encodeURIComponent('@customers/data/get-row.graph.json')}`)
       ).json()) as DocView;
       expect(doc.path).toBe(GET_ROW);
       expect(doc.graph?.nodes.length).toBe(8);

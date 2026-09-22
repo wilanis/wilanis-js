@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { MemoryEngine } from '../src/engine.js';
 
 const on: On = {
-  connection: '@connections/entries.connection.json',
+  connection: '@connections/customers.connection.json',
   kind: '@storage-memory/memory.connection-kind.json',
   settings: {},
 };

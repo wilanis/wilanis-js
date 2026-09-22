@@ -24,10 +24,10 @@ const { load: minority, dir: minorityDir } = loadedWith({
     label: 'Many',
     description: 'Answers in six different things, so no one of them speaks for the rest.',
     operations: {
-      one: operation('@monitor/domain/Entry.shape.json'),
-      two: operation('@monitor/domain/Entry.shape.json'),
-      three: operation('@monitor/domain/Digest.shape.json'),
-      four: operation('@monitor/domain/EntryDraft.shape.json'),
+      one: operation('@customers/domain/Customer.shape.json'),
+      two: operation('@customers/domain/Customer.shape.json'),
+      three: operation('@customers/domain/Digest.shape.json'),
+      four: operation('@customers/domain/CustomerDraft.shape.json'),
       five: operation('string'),
       six: operation('number'),
     },
@@ -50,18 +50,18 @@ describe('describe: no kind answers with the document as JSON', () => {
   });
 
   it('says what a trigger means rather than printing it, and never twice', () => {
-    const said = describeDoc(example, '@monitor/edge/record-entry.trigger.json');
+    const said = describeDoc(example, '@customers/edge/register-customer.trigger.json');
     expect(said).toContain('kind  @http/http.trigger-kind.json');
-    expect(said).toContain('fires   @monitor/domain/monitor.port.json#submit');
+    expect(said).toContain('fires   @customers/domain/customer.port.json#submit');
     expect(said).toContain('    url ← {{request.body.url}}');
     // the description is prose at the top of every describe; printing the document repeated it verbatim below
-    const description = (example.registry.get('trigger', '@features/monitor/edge/record-entry.trigger.json')?.doc
+    const description = (example.registry.get('trigger', '@features/customers/edge/register-customer.trigger.json')?.doc
       .description ?? '') as string;
     expect(said.split(description)).toHaveLength(2);
   });
 
   it('opens a setting that has parts of its own, where a reader looks for the status and the refusals', () => {
-    const said = describeDoc(example, '@monitor/edge/record-entry.trigger.json');
+    const said = describeDoc(example, '@customers/edge/register-customer.trigger.json');
     expect(said).toContain('    response:');
     expect(said).toContain(
       '        refusals: {"upstream":502,"conflict":409,"anonymous":401,"invalid_credential":401,"forbidden":403,"invariant":500}',
@@ -69,24 +69,26 @@ describe('describe: no kind answers with the document as JSON', () => {
   });
 
   it('says what a graph does, its nodes among them, rather than printing the graph', () => {
-    const said = describeDoc(example, '@monitor/data/store-and-latest.graph.json');
-    expect(said).toContain('takes   @monitor/domain/EntryRecord.shape.json');
+    const said = describeDoc(example, '@customers/data/store-and-latest.graph.json');
+    expect(said).toContain('takes   @customers/domain/CustomerRecord.shape.json');
     // `row` is guarded, so the graph also answers with the guard's refusal and whatever routed `row` routes
     // the node it moved aside to: the lines say the graph a run walks, not the one the file spells
-    expect(said).toContain('answers @monitor/domain/Entry.shape.json  from row | row:violated | repeated | failed');
+    expect(said).toContain(
+      'answers @customers/domain/Customer.shape.json  from row | row:violated | repeated | failed',
+    );
     expect(said).toContain('    stored  @storage/store.port.json#put');
     expect(said).toContain('    route  switch → repeated | row:made | failed');
   });
 
   it('gives a body to each kind that had none: binding, resolvers, feature, connection, codec, project', () => {
-    expect(describeDoc(example, '@monitor/data/monitor-store.binding.json')).toContain(
-      'meets  @monitor/domain/monitor.port.json',
+    expect(describeDoc(example, '@customers/data/customers-store.binding.json')).toContain(
+      'meets  @customers/domain/customer.port.json',
     );
-    expect(describeDoc(example, '@features/monitor/edge/request.resolvers.json')).toContain(
+    expect(describeDoc(example, '@features/customers/edge/request.resolvers.json')).toContain(
       "    agent  ← request.headers['user-agent']",
     );
-    expect(describeDoc(example, '@features/monitor/feature.json')).toContain('depends on   access');
-    expect(describeDoc(example, '@connections/entries.connection.json')).toContain(
+    expect(describeDoc(example, '@features/customers/feature.json')).toContain('depends on   access');
+    expect(describeDoc(example, '@connections/customers.connection.json')).toContain(
       'kind  @storage-memory/memory.connection-kind.json',
     );
     expect(describeDoc(example, '@http/codecs/json.codec.json')).toContain('yields  the type its call site declares');
@@ -100,19 +102,23 @@ describe('describe: no kind answers with the document as JSON', () => {
     expect(said).toContain('starts, in order:');
     expect(said).toContain('    @http/server.port.json#listen  (serving proceeds if it refuses)  -- Listen');
     expect(said).toContain(
-      '    @monitor/domain/monitor.port.json#prepare  (required: serving stops if it refuses)  -- Prepare the entry store',
+      '    @customers/domain/customer.port.json#prepare  (required: serving stops if it refuses)  -- Prepare the entry store',
     );
   });
 
   it('says how each profile binds its ports, since which binding meets a port is a profile s choice', () => {
     const said = describeDoc(example, '@project.json');
     expect(said).toContain('profiles (each names the binding it meets a port with):');
-    expect(said).toContain('        @monitor/domain/monitor.port.json → @monitor/data/monitor-store.binding.json');
-    expect(said).toContain('        @monitor/domain/monitor.port.json → @monitor/data/monitor-postgres.binding.json');
+    expect(said).toContain(
+      '        @customers/domain/customer.port.json → @customers/data/customers-store.binding.json',
+    );
+    expect(said).toContain(
+      '        @customers/domain/customer.port.json → @customers/data/customers-postgres.binding.json',
+    );
   });
 
   it('says a shape as its fields rather than its JSON, keeping what each field means', () => {
-    const said = describeDoc(example, '@monitor/domain/Entry.shape.json');
+    const said = describeDoc(example, '@customers/domain/Customer.shape.json');
     expect(said).toContain('layer  core');
     expect(said).toContain('    agent?: string  -- the user agent that made the call');
     expect(said).not.toContain('"$schema"');
@@ -120,22 +126,22 @@ describe('describe: no kind answers with the document as JSON', () => {
 });
 
 describe('describe: a port names the shape it works in once', () => {
-  const said = () => describeDoc(example, '@monitor/domain/monitor.port.json');
+  const said = () => describeDoc(example, '@customers/domain/customer.port.json');
 
   it('hoists the shape most of its operations answer in, and says `returns it` beneath', () => {
-    expect(said()).toContain('works in  @features/monitor/domain/Entry.shape.json');
+    expect(said()).toContain('works in  @features/customers/domain/Customer.shape.json');
     expect(said()).toContain('    returns it');
     expect(said()).toContain('    returns a list of them');
   });
 
   it('names the path twice at most, where it named it twelve times', () => {
-    expect(said().split('@features/monitor/domain/Entry.shape.json')).toHaveLength(3);
+    expect(said().split('@features/customers/domain/Customer.shape.json')).toHaveLength(3);
   });
 
   it('leaves every operation answering in something else naming its own, so nothing is lost', () => {
     // the port answers in four types; only the one most operations share is hoisted
-    expect(said()).toContain('    returns @features/monitor/domain/Digest.shape.json');
-    expect(said()).toContain('    returns @features/monitor/domain/EntryDraft.shape.json[]');
+    expect(said()).toContain('    returns @features/customers/domain/Digest.shape.json');
+    expect(said()).toContain('    returns @features/customers/domain/CustomerDraft.shape.json[]');
     expect(said()).toContain('    returns blob');
   });
 
@@ -156,8 +162,8 @@ describe('describe: a port names the shape it works in once', () => {
     // their own beneath a line claiming to cover them, which is worse than naming all six
     const said = describeDoc(minority, '@features/hello/domain/many.port.json');
     expect(said).not.toContain('works in');
-    expect(said).toContain('    returns @features/monitor/domain/Entry.shape.json');
-    expect(said).toContain('    returns @features/monitor/domain/Digest.shape.json');
+    expect(said).toContain('    returns @features/customers/domain/Customer.shape.json');
+    expect(said).toContain('    returns @features/customers/domain/Digest.shape.json');
   });
 });
 

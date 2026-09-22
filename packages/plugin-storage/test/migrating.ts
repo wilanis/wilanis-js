@@ -19,7 +19,7 @@ import type { Applied, Applying, Declared, Engine, On, Recording, Step } from '.
 import storage, { engines } from '../src/index.js';
 import { ENGINE, KIND, engine as kindPlugin } from './harness.js';
 
-export const ENTRIES = '@connections/entries.connection.json';
+export const ENTRIES = '@connections/customers.connection.json';
 export const NOTES = '@connections/notes.connection.json';
 
 /** What a case says a connection already holds: the record, the catalog beside it, and the rows in the way. */
@@ -154,28 +154,28 @@ function documents(collections: { entries: Record<string, Declares>; notes: Reco
       description: 'a tree that keeps what it observes, over two connections',
       plugins: [{ use: '@std' }, { use: '@storage' }, { use: ENGINE }],
     },
-    'connections/entries.connection.json': connection('entries'),
+    'connections/customers.connection.json': connection('entries'),
     'connections/notes.connection.json': connection('notes'),
-    'features/monitor/feature.json': { $schema: schemaRef('feature'), description: 'what the monitor observes' },
-    'features/monitor/domain/Entry.shape.json': {
+    'features/customers/feature.json': { $schema: schemaRef('feature'), description: 'what the monitor observes' },
+    'features/customers/domain/Customer.shape.json': {
       $schema: schemaRef('shape'),
       description: 'one observed call',
       layer: 'core',
       fields: { id: { type: 'string' }, url: { type: 'string' }, ua: { type: 'string', required: false } },
     },
-    'features/monitor/domain/Renamed.shape.json': {
+    'features/customers/domain/Renamed.shape.json': {
       $schema: schemaRef('shape'),
       description: 'the same call, with the user agent under the name a rename gave it',
       layer: 'core',
       fields: { id: { type: 'string' }, url: { type: 'string' }, agent: { type: 'string', required: false } },
     },
-    'features/monitor/data/entries.store.json': {
+    'features/customers/data/customers.store.json': {
       $schema: schemaRef('store'),
       description: 'the entries kept so far',
       connection: ENTRIES,
       collections: collections.entries,
     },
-    'features/monitor/data/notes.store.json': {
+    'features/customers/data/notes.store.json': {
       $schema: schemaRef('store'),
       description: 'the notes kept so far',
       connection: NOTES,
@@ -185,10 +185,10 @@ function documents(collections: { entries: Record<string, Declares>; notes: Reco
 }
 
 /** The shape most collections of these cases keep: an id, a url and an optional user agent. */
-export const SHAPE = '@features/monitor/domain/Entry.shape.json';
+export const SHAPE = '@features/customers/domain/Customer.shape.json';
 
 /** The same shape with the agent under the name a rename gave it, so a `renamed` mark has something to name. */
-export const RENAMED_SHAPE = '@features/monitor/domain/Renamed.shape.json';
+export const RENAMED_SHAPE = '@features/customers/domain/Renamed.shape.json';
 
 /** `entries` as the tree declares it, with whatever marks a case adds. */
 export const declares = (over: Partial<Declares> = {}): Declares => ({ of: SHAPE, key: 'id', ...over });

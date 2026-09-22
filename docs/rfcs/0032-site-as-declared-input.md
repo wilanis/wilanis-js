@@ -37,7 +37,7 @@ site is not where the operator is looking.
 
 **A fault's message.** RFC 0019 wants every message an agent repairs from to name the document and the path. A handler
 that throws names what it knows, and the runtime's report adds the node id and the handler; the file is added later,
-by whoever reads the report against the tree. A plugin that could say `at features/monitor/data/save.graph.json#nodes/saved`
+by whoever reads the report against the tree. A plugin that could say `at features/customers/data/save.graph.json#nodes/saved`
 in its own message would say it once, where the message is made.
 
 **A log line.** A logging adapter -- `@log/log.port.json#write`, a plugin in RFC 0023's shape, or `console.log` behind
@@ -101,7 +101,7 @@ plugin has, whose one port keeps a note of who wrote what. Its port, `docs/note.
 }
 ```
 
-A copy of the example gains the plugin and one node in `features/monitor/data/create-record.graph.json`:
+A copy of the example gains the plugin and one node in `features/customers/data/create-record.graph.json`:
 
 ```json
 { "type": "@wilanis/node/run.schema.json", "id": "noted", "label": "Note the record",
@@ -115,7 +115,7 @@ A copy of the example gains the plugin and one node in `features/monitor/data/cr
 ```json
 "noted": { "status": "done", "handler": "@note/note.port.json#record",
   "in": { "text": "https://example.test/", 
-          "site": { "file": "@features/monitor/data/create-record.graph.json", "at": "nodes/noted" } },
+          "site": { "file": "@features/customers/data/create-record.graph.json", "at": "nodes/noted" } },
   "out": true }
 ```
 
@@ -126,7 +126,7 @@ second segment. Nothing the handler read was carried in the spec, so editing the
 Write `site` at the node, `"in": { "text": "...", "site": { "file": "elsewhere" } }`, and the checker refuses:
 
 ```
-G0n1  @features/monitor/data/create-record.graph.json#nodes/noted/in/site
+G0n1  @features/customers/data/create-record.graph.json#nodes/noted/in/site
     'site' is provided by the compiler where @note/note.port.json#record is called
     → drop it; the operation is told where it was called without being asked
 ```
@@ -134,7 +134,7 @@ G0n1  @features/monitor/data/create-record.graph.json#nodes/noted/in/site
 Mark a field of a *domain* operation `provided`, and:
 
 ```
-L0n1  @features/monitor/domain/monitor.port.json#operations/record/accepts/site
+L0n1  @features/customers/domain/customer.port.json#operations/record/accepts/site
     domain operation 'record' marks 'site' provided -- a domain operation is met by a binding; the site is a native operation's to ask for
     → drop provided, or ask for the site in the native operation the binding runs
 ```
@@ -260,7 +260,7 @@ tree that names no operation declaring `provided` never sees it.
   `test/fixtures/plugin-note/` and the `noted` node: the run's report has `in.site` equal to the two strings above; the
   handler received it, opened the graph through `env.document` and kept the node's label (the fixture keeps what it
   was handed and what it read); G0n1 when the node writes `site`; L0n1 when
-  `monitor.port.json#record` marks a field `provided`, when `note.port.json#record`'s `site` is typed `string`, marked
+  `customer.port.json#register` marks a field `provided`, when `note.port.json#record`'s `site` is typed `string`, marked
   `secret`, or `required: false`; the copy unbroken, `codes(...)` empty. A binding operation calling `record` and a
   startup step naming a fixture `holds` operation that declares a site each receive the site their row above says.
 - `packages/runtime/test/tools.test.ts`, where `regress` is exercised: two runs diff clean at `noted`; editing the node's

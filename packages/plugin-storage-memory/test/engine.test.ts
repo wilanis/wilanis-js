@@ -127,21 +127,21 @@ function treeKeeping(): string {
     kind: KIND,
     settings: {},
   });
-  write('features/monitor/feature.json', {
+  write('features/customers/feature.json', {
     $schema: '@wilanis/feature.schema.json',
     description: 'what the monitor observes',
   });
-  write('features/monitor/domain/Entry.shape.json', {
+  write('features/customers/domain/Customer.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'one observed call',
     layer: 'core',
     fields: { id: { type: 'string' }, url: { type: 'string' } },
   });
-  write('features/monitor/data/entries.store.json', {
+  write('features/customers/data/customers.store.json', {
     $schema: '@wilanis/store.schema.json',
     description: 'the entries, kept in memory',
     connection: CONNECTION,
-    collections: { entries: { of: '@features/monitor/domain/Entry.shape.json', key: 'id' } },
+    collections: { entries: { of: '@features/customers/domain/Customer.shape.json', key: 'id' } },
   });
   return dir;
 }

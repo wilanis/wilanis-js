@@ -16,7 +16,7 @@ import { classed, counts } from '../src/plan-class.js';
 
 const types = new TypeResolver(() => undefined);
 
-const CONNECTION = '@connections/entries.connection.json';
+const CONNECTION = '@connections/customers.connection.json';
 const KIND = '@fake/fake.connection-kind.json';
 const on: On = { connection: CONNECTION, kind: KIND, settings: {} };
 
@@ -30,7 +30,7 @@ const ENTRY: Type = types.inline({
   },
 });
 
-const ENTRIES: Declared = declaredOf({ of: '@x/Entry.shape.json', key: 'id', unique: [['url', 'method']] }, ENTRY);
+const ENTRIES: Declared = declaredOf({ of: '@x/Customer.shape.json', key: 'id', unique: [['url', 'method']] }, ENTRY);
 
 /** What the fake engine was asked, so a test can say a count was taken and what for. */
 interface Asked {

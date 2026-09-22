@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Customer draft",
+  "layer": "core",
+  "description": "A registration request as the domain receives it: who the customer is. Who registered them is the domain's decision.",
+  "fields": {
+    "name": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["bronze", "silver", "gold"]
+    }
+  }
+}

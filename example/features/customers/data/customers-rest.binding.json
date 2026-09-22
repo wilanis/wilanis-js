@@ -1,0 +1,70 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/binding.schema.json",
+  "label": "REST storage",
+  "description": "customer.port.json over the REST API: one data graph per operation, each a declared request plus the decision of what its status means.",
+  "port": "@customers/domain/customer.port.json",
+  "operations": {
+    "listAll": {
+      "graph": "@customers/data/list-rows.graph.json"
+    },
+    "listByTier": {
+      "graph": "@customers/data/list-rows-by-tier.graph.json"
+    },
+    "get": {
+      "graph": "@customers/data/get-row.graph.json"
+    },
+    "register": {
+      "graph": "@customers/data/create-row.graph.json"
+    },
+    "update": {
+      "graph": "@customers/data/update-row.graph.json"
+    },
+    "remove": {
+      "graph": "@customers/data/delete-row.graph.json"
+    },
+    "removeMany": {
+      "description": "The business graph that fans one removal out per id and waits for all of them.",
+      "graph": "@customers/domain/remove-customers.graph.json"
+    },
+    "submit": {
+      "description": "The business graph that attributes and records.",
+      "graph": "@customers/domain/register-customer.graph.json"
+    },
+    "registerAll": {
+      "description": "The business graph that records each draft. Nothing here says they move together: an upstream API is not something a transaction can roll back.",
+      "graph": "@customers/domain/register-each.graph.json"
+    },
+    "list": {
+      "description": "The business graph that routes on the filter.",
+      "graph": "@customers/domain/list-customers.graph.json"
+    },
+    "digest": {
+      "description": "The business graph that composes the digest.",
+      "graph": "@customers/domain/digest.graph.json"
+    },
+    "parseDrafts": {
+      "graph": "@customers/data/parse-drafts.graph.json"
+    },
+    "toCsv": {
+      "graph": "@customers/data/write-csv.graph.json"
+    },
+    "import": {
+      "description": "The business graph that reads the file and submits each row.",
+      "graph": "@customers/domain/import-customers.graph.json"
+    },
+    "export": {
+      "description": "The business graph that lists and writes the file.",
+      "graph": "@customers/domain/export-customers.graph.json"
+    },
+    "prepare": {
+      "description": "Reading the collection once is what readiness means for an upstream API: there is nothing to create, and a tree that cannot reach it refuses to serve.",
+      "run": "@http/http.port.json#request",
+      "in": {
+        "connection": "@connections/customers-api.connection.json",
+        "method": "GET",
+        "path": "/customers",
+        "produces": "application/json"
+      }
+    }
+  }
+}

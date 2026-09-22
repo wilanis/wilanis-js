@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { type DocView, viewOf } from '../src/index.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
-const GET_ROW = '@features/monitor/data/get-row.graph.json';
+const GET_ROW = '@features/customers/data/get-row.graph.json';
 
 const view = async (path: string): Promise<DocView> => {
   const seen = viewOf(await loadProject(EXAMPLE), path);
@@ -22,7 +22,7 @@ const view = async (path: string): Promise<DocView> => {
 
 describe('how the viewer says a refusal is answered', () => {
   it('says how a trigger answers each refusal it can reach, and which node refuses with it', async () => {
-    const seen = await view('@features/monitor/edge/get-entry.trigger.json');
+    const seen = await view('@features/customers/edge/get-customer.trigger.json');
     expect(seen.answers).toEqual([
       // one reason, refused in every binding's graphs: the viewer names each, since which one runs is the
       // profile's choice and a reader of the route wants to see every place the answer can come from
@@ -32,13 +32,13 @@ describe('how the viewer says a refusal is answered', () => {
         from: [
           { graph: GET_ROW, graphLabel: 'Get a row', node: 'missing', nodeLabel: 'No such entry' },
           {
-            graph: '@features/monitor/data/kept-get.graph.json',
+            graph: '@features/customers/data/kept-get.graph.json',
             graphLabel: 'Get what is kept',
             node: 'missing',
             nodeLabel: 'No such entry',
           },
           {
-            graph: '@features/monitor/data/kept-get-postgres.graph.json',
+            graph: '@features/customers/data/kept-get-postgres.graph.json',
             graphLabel: 'Get what is kept',
             node: 'missing',
             nodeLabel: 'No such entry',
@@ -57,13 +57,13 @@ describe('how the viewer says a refusal is answered', () => {
         answer: 500,
         from: [
           {
-            graph: '@features/monitor/data/kept-get.graph.json',
+            graph: '@features/customers/data/kept-get.graph.json',
             graphLabel: 'Get what is kept',
             node: 'row',
             nodeLabel: 'The record',
           },
           {
-            graph: '@features/monitor/data/kept-get-postgres.graph.json',
+            graph: '@features/customers/data/kept-get-postgres.graph.json',
             graphLabel: 'Get what is kept',
             node: 'row',
             nodeLabel: 'The record',
@@ -72,42 +72,42 @@ describe('how the viewer says a refusal is answered', () => {
       },
     ]);
     // reached through a domain graph and a map: the batch delete refuses where delete-row does
-    const batch = await view('@features/monitor/edge/delete-entries.trigger.json');
+    const batch = await view('@features/customers/edge/delete-customers.trigger.json');
     expect(batch.answers!.find(answer => answer.reason === 'missing')).toMatchObject({
       answer: 404,
       from: [
-        { graph: '@features/monitor/data/delete-row.graph.json', node: 'missing' },
-        { graph: '@features/monitor/data/kept-remove.graph.json', node: 'missing' },
-        { graph: '@features/monitor/data/kept-remove-postgres.graph.json', node: 'missing' },
+        { graph: '@features/customers/data/delete-row.graph.json', node: 'missing' },
+        { graph: '@features/customers/data/kept-remove.graph.json', node: 'missing' },
+        { graph: '@features/customers/data/kept-remove-postgres.graph.json', node: 'missing' },
       ],
     });
     // a kind that maps no refusals has nothing to say here
-    expect((await view('@features/monitor/edge/digest.trigger.json')).answers).toBeUndefined();
+    expect((await view('@features/customers/edge/digest.trigger.json')).answers).toBeUndefined();
   });
   it('tells a refusing node which triggers reach it and how each answers its reason', async () => {
     const missing = (await view(GET_ROW)).graph!.nodes.find(node => node.id === 'missing')!;
     expect(missing.target?.refuses).toBe(true);
     expect(missing.answeredBy).toEqual([
       {
-        trigger: '@features/monitor/edge/get-entry.trigger.json',
+        trigger: '@features/customers/edge/get-customer.trigger.json',
         triggerLabel: 'GET /monitor/{id}',
         maps: true,
         answer: 404,
       },
     ]);
     // list-rows is reached by the http listing, which maps the reason, and by the cli digest, whose kind answers every refusal alike
-    const failed = (await view('@features/monitor/data/list-rows.graph.json')).graph!.nodes.find(
+    const failed = (await view('@features/customers/data/list-rows.graph.json')).graph!.nodes.find(
       node => node.id === 'failed',
     )!;
     expect(failed.answeredBy).toEqual(
       expect.arrayContaining([
         {
-          trigger: '@features/monitor/edge/list-entries.trigger.json',
+          trigger: '@features/customers/edge/list-customers.trigger.json',
           triggerLabel: 'GET /monitor',
           maps: true,
           answer: 502,
         },
-        { trigger: '@features/monitor/edge/digest.trigger.json', triggerLabel: 'digest', maps: false },
+        { trigger: '@features/customers/edge/digest.trigger.json', triggerLabel: 'digest', maps: false },
       ]),
     );
     // a node that answers has no such list

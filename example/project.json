@@ -2,9 +2,9 @@
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/project.schema.json",
   "label": "Monitor",
   "name": "monitor",
-  "description": "A monitor of observed HTTP calls: the routes talk to a REST API (mockapi.io); entries are imported from and exported to CSV files through the blob registry. Reads are public; writes are for signed-in employees holding the recorder role, identified by our own token, issued by the included access tree (@wilanis/access) at /api/v1/auth-employees against a directory this project binds (customers sign in at /api/v1/auth-customers and hold a token too, but no write). Preferences live in the session. A command-line greeting is gated by a one-time code. Plugins come from npm packages named by \"from\".",
+  "description": "A monitor of observed HTTP calls: the routes talk to a REST API (mockapi.io); customers are imported from and exported to CSV files through the blob registry. Reads are public; writes are for signed-in employees holding the registrar role, identified by our own token, issued by the included access tree (@wilanis/access) at /api/v1/auth-employees against a directory this project binds (customers sign in at /api/v1/auth-customers and hold a token too, but no write). Preferences live in the session. A command-line greeting is gated by a one-time code. Plugins come from npm packages named by \"from\".",
   "aliases": {
-    "@monitor": "@features/monitor",
+    "@customers": "@features/customers",
     "@hello": "@features/hello"
   },
   "plugins": [
@@ -94,19 +94,19 @@
   ],
   "secrets": {
     "jwt": "MONITOR_JWT_SECRET",
-    "entriesDatabase": "MONITOR_DATABASE_URL"
+    "customersDatabase": "MONITOR_DATABASE_URL"
   },
   "startup": [
     {
-      "label": "Prepare the entry store",
+      "label": "Prepare the customer store",
       "description": "Make storage ready once, before anything reads it: under local that creates the collections the store declares, and under live there is nothing to create, so it reads the collection once. Only a startup step prepares, and only because project.json says so.",
-      "run": "@monitor/domain/monitor.port.json#prepare",
+      "run": "@customers/domain/customer.port.json#prepare",
       "required": true
     },
     {
-      "label": "Reach the entry store",
-      "description": "Read the entries once before the HTTP server opens, so a tree whose storage is unreachable refuses to serve instead of answering every route with a fault. The port is bound per profile, so this checks whatever storage the profile chose.",
-      "run": "@monitor/domain/monitor.port.json#listAll",
+      "label": "Reach the customer store",
+      "description": "Read the customers once before the HTTP server opens, so a tree whose storage is unreachable refuses to serve instead of answering every route with a fault. The port is bound per profile, so this checks whatever storage the profile chose.",
+      "run": "@customers/domain/customer.port.json#listAll",
       "required": true
     },
     {
@@ -144,23 +144,23 @@
     "live": {
       "description": "The real monitor API, and the directories written in the connections. A production profile binds identity.port.json to a binding whose connections are an OIDC issuer and LDAP; nothing else changes.",
       "bindings": {
-        "@monitor/domain/monitor.port.json": "@monitor/data/monitor-rest.binding.json",
+        "@customers/domain/customer.port.json": "@customers/data/customers-rest.binding.json",
         "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
         "@auth/state.port.json": "@features/state/data/auth-files.binding.json"
       }
     },
     "local": {
-      "description": "Everything in this process: the entries kept in memory, and the directories written in the connections. Nothing reaches the network, so `wilanis start example --profile local` serves the same routes with no upstream at all.",
+      "description": "Everything in this process: the customers kept in memory, and the directories written in the connections. Nothing reaches the network, so `wilanis start example --profile local` serves the same routes with no upstream at all.",
       "bindings": {
-        "@monitor/domain/monitor.port.json": "@monitor/data/monitor-store.binding.json",
+        "@customers/domain/customer.port.json": "@customers/data/customers-store.binding.json",
         "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
         "@auth/state.port.json": "@features/state/data/auth-files.binding.json"
       }
     },
     "production": {
-      "description": "The entries in PostgreSQL, and the directories written in the connections. The same routes, policies, shapes and business graphs as every other profile: what changes is which binding meets monitor.port.json, and through it which connection the records live behind. The startup step prepares the database before the port opens, so a tree whose database is unreachable refuses to serve rather than answering every route with a fault.",
+      "description": "The customers in PostgreSQL, and the directories written in the connections. The same routes, policies, shapes and business graphs as every other profile: what changes is which binding meets customer.port.json, and through it which connection the records live behind. The startup step prepares the database before the port opens, so a tree whose database is unreachable refuses to serve rather than answering every route with a fault.",
       "bindings": {
-        "@monitor/domain/monitor.port.json": "@monitor/data/monitor-postgres.binding.json",
+        "@customers/domain/customer.port.json": "@customers/data/customers-postgres.binding.json",
         "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
         "@auth/state.port.json": "@features/state/data/auth-files.binding.json"
       }

@@ -112,9 +112,9 @@ file per trigger and branch. The `missing` branch of `get-row`, reached from `GE
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
   "description": "get-entry: get-row 'route' when status == 404 routes to missing, which refuses as missing. Written by wilanis rehearse --record; regenerate it, do not edit it.",
   "generated": "rehearse",
-  "trigger": "@features/monitor/edge/get-entry.trigger.json",
+  "trigger": "@features/customers/edge/get-customer.trigger.json",
   "branch": {
-    "graph": "@features/monitor/data/get-row.graph.json",
+    "graph": "@features/customers/data/get-row.graph.json",
     "node": "route",
     "when": "status == 404",
     "to": "missing"
@@ -187,9 +187,9 @@ has(body)`, as `packages/runtime/test/example.test.ts` does to provoke `NEVER RU
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
   "description": "list-entries: list-rows 'route' when status == 200 && has(body) routes to rows, and no input reaches it: the rules before it already cover every input, so 'status == 200 && has(body)' is unreachable. Written by wilanis rehearse --record; regenerate it, do not edit it.",
   "generated": "rehearse",
-  "trigger": "@features/monitor/edge/list-entries.trigger.json",
+  "trigger": "@features/customers/edge/list-customers.trigger.json",
   "branch": {
-    "graph": "@features/monitor/data/list-rows.graph.json",
+    "graph": "@features/customers/data/list-rows.graph.json",
     "node": "route",
     "when": "status == 200 && has(body)",
     "to": "rows"
@@ -219,7 +219,7 @@ order, whose kind and settings the root borrows, and the policy whose `decide` i
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
   "description": "employees-only as attached by delete-entries: require-employee 'decide' when has(principal) && principal.realm == 'employee' routes to granted. Written by wilanis rehearse --record; regenerate it, do not edit it.",
   "generated": "rehearse",
-  "trigger": "@features/monitor/edge/delete-entries.trigger.json",
+  "trigger": "@features/customers/edge/delete-customers.trigger.json",
   "policy": "@features/access/edge/employees-only.policy.json",
   "branch": {
     "graph": "@features/access/domain/require-employee.graph.json",
@@ -255,7 +255,7 @@ whether it is current.
 
 ```
 S0n2  @scenarios/rehearsed/get-entry/monitor.get-row.route.missing.scenario.json#branch/to
-    the branch names node 'missing' of switch 'route' in @features/monitor/data/get-row.graph.json, which no rule of the switch routes to
+    the branch names node 'missing' of switch 'route' in @features/customers/data/get-row.graph.json, which no rule of the switch routes to
     → wilanis rehearse --record rewrites scenarios/rehearsed/ from the tree as it stands; a hand-written scenario names a node the switch has
 ```
 
@@ -461,8 +461,8 @@ Sabotage tests through `planted` in `packages/runtime/test/sabotage-unproved.tes
 
 | Code | The edit |
 |---|---|
-| S0n2 | a recorded scenario whose `branch.graph` is `@monitor/data/no-such.graph.json`; whose `branch.node` is `asked` (a run node, not a switch); whose `branch.to` is `gone`; the message for `to` names `missing, row, failed` |
-| S0n3 | `policy` naming `@features/access/edge/signed-in.policy.json` on a `delete-entry` scenario (attaches `employees-only` and `can-record`); `policy` on a `get-entry` scenario, which attaches none; `policy` naming no document |
+| S0n2 | a recorded scenario whose `branch.graph` is `@customers/data/no-such.graph.json`; whose `branch.node` is `asked` (a run node, not a switch); whose `branch.to` is `gone`; the message for `to` names `missing, row, failed` |
+| S0n3 | `policy` naming `@features/access/edge/signed-in.policy.json` on a `delete-entry` scenario (attaches `employees-only` and `can-register`); `policy` on a `get-entry` scenario, which attaches none; `policy` naming no document |
 | S001 | as today, from `check/scenarios.ts` after the move |
 | none | a hand-written scenario with `"when": "else"` and no `generated`; a policy scenario naming a trigger that attaches it |
 
@@ -478,7 +478,7 @@ Runtime, in `packages/runtime/test/tools.test.ts`, on a copy of the example (`cp
 | ownership | a hand-written `scenarios/mine.scenario.json` survives `--record`; a stray `scenarios/rehearsed/old.scenario.json` is removed |
 | a policy's decision | `policies/employees-only/access.require-employee.decide.anonymous.scenario.json` exists with `policy` set, `trigger` naming `delete-entries` and `expect.reason: 'anonymous'`; `regress` replays it `same`; with `require-employee`'s `anonymous` node changed to refuse as `nobody`, `DIFF reason anonymous → nobody` |
 | unreachable | `list-rows` reordered as `example.test.ts` reorders it: `rehearse` is not ok, the `rows` branch is written with `status: 'unreachable'` and no `in`; `regress` answers `same`; the order restored, `regress` on the stale directory answers `DIFF ... is reachable now` and `check` lists the file stale |
-| edges | `fuzz(load, { edges: true })` writes `get-entry/id.empty`, `id.one`, `id.long`; `record-entry`'s `RecordRequest` yields three for `url` and five `method.enum.<member>`; `list-entries`'s `ListRequest`, whose `method` is optional, yields the five members and `method.absent`; every file has `generated: 'edges'`; a second run is byte-identical; `regress` replays them `same` |
+| edges | `fuzz(load, { edges: true })` writes `get-entry/id.empty`, `id.one`, `id.long`; `record-entry`'s `RegisterRequest` yields three for `url` and five `method.enum.<member>`; `list-entries`'s `ListRequest`, whose `method` is optional, yields the five members and `method.absent`; every file has `generated: 'edges'`; a second run is byte-identical; `regress` replays them `same` |
 | the CLI | `wilanis rehearse <copy> --check` exits 1 on a stale directory and prints the hint; `--record --check` behaves as `--check` |
 
 Core, in `packages/core/test/validate.test.ts` (the schema cases above) and a new `packages/core/test/edges.test.ts`:

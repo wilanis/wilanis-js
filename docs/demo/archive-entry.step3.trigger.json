@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
   "label": "POST /monitor/{id}/archive",
-  "description": "Pasted over features/monitor/edge/archive-entry.trigger.json at the end of beat 3 of docs/demo.md: the finished route. The recorder policy is attached and given the token as the A005 hint said, and the two ways a gated route can end, forbidden and anonymous, are mapped as the T005 hints said; invalid_credential comes with them, since a bad token is a way in too.",
+  "description": "Pasted over features/customers/edge/archive-entry.trigger.json at the end of beat 3 of docs/demo.md: the finished route. The recorder policy is attached and given the token as the A005 hint said, and the two ways a gated route can end, forbidden and anonymous, are mapped as the T005 hints said; invalid_credential comes with them, since a bad token is a way in too.",
   "kind": "@http/http.trigger-kind.json",
   "settings": {
     "route": "/monitor/{id}/archive",
@@ -18,18 +18,18 @@
       }
     }
   },
-  "in": "@monitor/edge/IdRequest.shape.json",
-  "out": "@monitor/edge/EntryView.shape.json",
+  "in": "@customers/edge/IdRequest.shape.json",
+  "out": "@customers/edge/CustomerView.shape.json",
   "policies": [
     {
-      "policy": "@access/edge/can-record.policy.json",
+      "policy": "@access/edge/can-register.policy.json",
       "in": {
         "token": "{{request.headers.authorization}}"
       }
     }
   ],
   "fire": {
-    "run": "@monitor/domain/monitor.port.json#remove",
+    "run": "@customers/domain/customer.port.json#remove",
     "in": {
       "id": "{{request.params.id}}"
     }

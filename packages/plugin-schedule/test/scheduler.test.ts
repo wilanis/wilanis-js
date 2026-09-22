@@ -191,17 +191,17 @@ describe('missed, and what a start knows', () => {
 
 describe('what a reload puts behind the scheduler', () => {
   it('a trigger added is fired and one removed is not, at the next wake-up', async () => {
-    const digest = trigger({ everyMs: 60_000 }, '@monitor/domain/monitor.port.json#digest');
-    const sweep = trigger({ everyMs: 60_000 }, '@monitor/domain/monitor.port.json#sweep');
+    const digest = trigger({ everyMs: 60_000 }, '@customers/domain/customer.port.json#digest');
+    const sweep = trigger({ everyMs: 60_000 }, '@customers/domain/customer.port.json#sweep');
     const one = started([digest]);
     await one.clock.advance(60_000);
-    expect(one.fired.map(each => each.run)).toEqual(['@monitor/domain/monitor.port.json#digest']);
+    expect(one.fired.map(each => each.run)).toEqual(['@customers/domain/customer.port.json#digest']);
     one.reloadWith([sweep]); // the tree is replaced underneath, as a reload does
     // the next wake-up reads the new set: the removed trigger's tick is not fired, and the new one's is
     await one.clock.advance(120_000);
     expect(one.fired.map(each => each.run)).toEqual([
-      '@monitor/domain/monitor.port.json#digest',
-      '@monitor/domain/monitor.port.json#sweep',
+      '@customers/domain/customer.port.json#digest',
+      '@customers/domain/customer.port.json#sweep',
     ]);
     await one.scheduler.stop();
   });
@@ -273,10 +273,10 @@ describe('what a tick is logged as', () => {
 describe('a schedule is named by its trigger, not by what it fires', () => {
   it('two triggers firing one operation on one schedule both fire: neither collapses into the other', async () => {
     // the same operation, the same schedule, different inputs: only the path tells the two apart
-    const run = '@monitor/domain/monitor.port.json#digest';
+    const run = '@customers/domain/customer.port.json#digest';
     const one = started([
-      trigger({ everyMs: 60_000 }, run, 'features/monitor/edge/nightly.trigger.json'),
-      trigger({ everyMs: 60_000 }, run, 'features/monitor/edge/weekly.trigger.json'),
+      trigger({ everyMs: 60_000 }, run, 'features/customers/edge/nightly.trigger.json'),
+      trigger({ everyMs: 60_000 }, run, 'features/customers/edge/weekly.trigger.json'),
     ]);
     expect(one.answer.triggers).toBe(2); // both were seeded, not one over the other
     await one.clock.advance(60_000);

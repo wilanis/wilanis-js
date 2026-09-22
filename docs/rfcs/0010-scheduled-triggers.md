@@ -21,7 +21,7 @@ without one, every process that names the step fires, and the RFC says so rather
 
 A nightly digest, an hourly import, a sweep of expired sessions: every service has a few of these, and today the
 only way to run one is a cron outside the tree calling `wilanis run` on a command-line trigger.
-`example/features/monitor/edge/digest.trigger.json` is exactly that: `wilanis run @monitor/edge/digest.trigger.json`
+`example/features/customers/edge/digest.trigger.json` is exactly that: `wilanis run @customers/edge/digest.trigger.json`
 prints the digest, and an operator who wants it every night writes `0 3 * * * npx wilanis run …` in a crontab the
 tree knows nothing about. The schedule is then invisible to `wilanis check` (a cron line naming a trigger that was
 renamed fails at three in the morning), to `wilanis map` and the viewer (the digest looks like a command someone
@@ -58,7 +58,7 @@ is logged with its reason, since there is nobody to answer.
 **The scheduler** is `wilanis start` on a tree whose `project.json → startup` names
 `@schedule/scheduler.port.json#run`. Delete the step and no tick fires, as deleting `listen` closes the port.
 
-The example, with the digest as a nightly job. One document, `example/features/monitor/edge/nightly-digest.trigger.json`:
+The example, with the digest as a nightly job. One document, `example/features/customers/edge/nightly-digest.trigger.json`:
 
 ```json
 {
@@ -70,9 +70,9 @@ The example, with the digest as a nightly job. One document, `example/features/m
     "cron": "0 3 * * *",
     "timezone": "UTC"
   },
-  "out": "@monitor/edge/DigestView.shape.json",
+  "out": "@customers/edge/DigestView.shape.json",
   "fire": {
-    "run": "@monitor/domain/monitor.port.json#digest"
+    "run": "@customers/domain/customer.port.json#digest"
   }
 }
 ```
@@ -87,7 +87,7 @@ The example, with the digest as a nightly job. One document, `example/features/m
   ...
 ],
 "startup": [
-  { "label": "Reach the entry store", "run": "@monitor/domain/monitor.port.json#listAll", "required": true },
+  { "label": "Reach the entry store", "run": "@customers/domain/customer.port.json#listAll", "required": true },
   { "label": "Watch for changes", "run": "@reload/watch.port.json#watch" },
   { "label": "Keep the schedule", "run": "@schedule/scheduler.port.json#run" },
   { "label": "Listen", "run": "@http/server.port.json#listen" }
@@ -95,21 +95,21 @@ The example, with the digest as a nightly job. One document, `example/features/m
 ```
 
 `wilanis start example` then logs
-`schedule: 1 trigger(s) -- @monitor/edge/nightly-digest.trigger.json at 0 3 * * * UTC, next 2026-09-11T03:00:00.000Z`
+`schedule: 1 trigger(s) -- @customers/edge/nightly-digest.trigger.json at 0 3 * * * UTC, next 2026-09-11T03:00:00.000Z`
 beside `http: listening on :8080`, and each tick one line:
-`schedule @monitor/edge/nightly-digest.trigger.json 2026-09-11T03:00:00.000Z → done (61ms, @monitor/domain/monitor.port.json#digest) { count: 12 }`.
+`schedule @customers/edge/nightly-digest.trigger.json 2026-09-11T03:00:00.000Z → done (61ms, @customers/domain/customer.port.json#digest) { count: 12 }`.
 The command-line `digest.trigger.json` stays: the same operation, fired by a person instead of the clock, which is
 the point of a trigger never naming a graph.
 
 **Reading the tick.** An operation that takes a time reads it from the context like any input. A cleanup of
 entries older than the tick, were the example to have one, would be a scheduled trigger with
-`"in": "@monitor/edge/CutoffRequest.shape.json"` and `"fire": { "run": "…#purgeBefore", "in": { "before": "{{request.scheduled}}" } }`;
+`"in": "@customers/edge/CutoffRequest.shape.json"` and `"fire": { "run": "…#purgeBefore", "in": { "before": "{{request.scheduled}}" } }`;
 T003 types the read as a string, the shape declares `before` a string, and the data graph compares it to a row's
 timestamp with `<`. Nothing in the domain calls a clock, so `wilanis run --seed` and `regress` replay the tick
 they were given.
 
 **What a tick may do.** Anything a trigger may do, and it is judged as any trigger is. A scheduled trigger that
-fires an operation RFC 0007's access invariant covers -- `monitor.port.json#remove`, say -- is refused by I001,
+fires an operation RFC 0007's access invariant covers -- `customer.port.json#remove`, say -- is refused by I001,
 because the invariant says who may and a tick is nobody. That is the right answer, and the fix is the domain's: an
 operation written for the job (`#purgeExpired`, not `#remove`) that the invariant does not cover, or a policy over
 the tick that the invariant names. The kind cannot present a token, and this RFC does not invent a "system caller":
@@ -125,7 +125,7 @@ it; the pattern is named so an author does not fan a thousand DELETEs out of a s
 `wilanis check` answers:
 
 ```
-X0n1  @features/monitor/edge/nightly-digest.trigger.json#settings/cron
+X0n1  @features/customers/edge/nightly-digest.trigger.json#settings/cron
     '0 3 * * * *' has 6 fields; a cron expression has five: minute hour day-of-month month day-of-week
     → write five fields (for seconds, use everyMs), e.g. "0 3 * * *" for 03:00 every day
 ```
@@ -400,7 +400,7 @@ shutdown signal, once it exists, is what cuts a run that will not end; this RFC 
   -- and `overlap`, `catchUp` and `deadlineMs` where set, the way it prints a route's settings. It prints no next
   tick: `describe` is a pure reading of the tree and does not consult a clock; `start` logs the next tick.
 - `wilanis map` prints a scheduled trigger the way it prints a route:
-  `schedule 0 3 * * * UTC → @monitor/edge/nightly-digest.trigger.json → monitor.port.json#digest → …`.
+  `schedule 0 3 * * * UTC → @customers/edge/nightly-digest.trigger.json → customer.port.json#digest → …`.
 - `wilanis start` logs each scheduled trigger and its next tick at the `run` step, and one line per tick.
 - The viewer's trigger page (`renderDocPage`, `case 'trigger'` in `packages/view/client/index.html`) shows the
   schedule in the chain's `fired by` step -- `@schedule/schedule.trigger-kind.json, at 0 3 * * * UTC` -- and the
@@ -435,13 +435,13 @@ Sabotage tests in `packages/runtime/test/sabotage.test.ts` and `sabotage-project
 | Code | The edit |
 |---|---|
 | X0n1 | `settings.cron: "0 3 * * * *"` (six fields); `"61 3 * * *"`; `"0 3 * * mon-fry"`; `"@daily"`; both `cron` and `everyMs: 60000`; neither; `everyMs: 500`; `everyMs: 60000` with `timezone: "UTC"`; `timezone: "Mars/Olympus"`; `deadlineMs: 0`; the plugin's `settings.leaseTtlMs: 10` |
-| X0n2 | `in: "@monitor/edge/ListRequest.shape.json"` with no `fire.in` |
+| X0n2 | `in: "@customers/edge/ListRequest.shape.json"` with no `fire.in` |
 | X0n3 | `settings.catchUp: true` with the example's `run` step as written (no `lease`) |
-| X0n4 | `startup[2].in.lease: "@connections/monitor-api.connection.json"` (an http kind, no `leases`); `"@connections/nope.connection.json"`; and none with a fake kind under `docsDir` declaring `"leases": true` |
+| X0n4 | `startup[2].in.lease: "@connections/customers-api.connection.json"` (an http kind, no `leases`); `"@connections/nope.connection.json"`; and none with a fake kind under `docsDir` declaring `"leases": true` |
 | T001 | `settings.overlap: "sometimes"`; `settings.cron: 3` |
 | T003 | `fire.in: { "before": "{{request.body.since}}" }` after adding `in` -- the kind hands no `body` |
-| T004 | `fire.run: "@monitor/domain/monitor.port.json#submit"` with `fire.in: { "url": "https://x.example/", "method": "GET" }` and the matching `in`: `record-entry.graph.json` reaches `create-row.graph.json`, which reads the `agent` resolver (`request.headers['user-agent']`), and the schedule kind hands no `headers` |
-| A005 | `policies: ["@access/edge/can-record.policy.json"]` -- reads the caller, given nothing |
+| T004 | `fire.run: "@customers/domain/customer.port.json#submit"` with `fire.in: { "url": "https://x.example/", "method": "GET" }` and the matching `in`: `register-customer.graph.json` reaches `create-row.graph.json`, which reads the `agent` resolver (`request.headers['user-agent']`), and the schedule kind hands no `headers` |
+| A005 | `policies: ["@access/edge/can-register.policy.json"]` -- reads the caller, given nothing |
 | L008 | a data graph node running `@schedule/scheduler.port.json#run` |
 | B006 | a startup step naming `@schedule/schedule.trigger-kind.json#run` (not an operation) |
 | D008 | `relocate` the scheduled trigger to `domain/` |
@@ -462,7 +462,7 @@ Unit tests in `packages/plugin-schedule/test/`, no clock and no sleep:
 | a crash lets the tick go | the holder's clock stops mid-run (no renewal, no `markFired`); after `leaseTtlMs` the other scheduler's ask for the same tick is granted and the operation runs again; with `markFired` done before the stop, it is not |
 | a reload is seen | `serving.triggers` answers a new set after the fake clock passes a minute; the new trigger's tick fires; the removed one's does not |
 | stop drains | `stop()` during a run resolves after that run's outcome; no tick fires after `stop()` began |
-| the gate runs on a tick | a tick-only policy (its decision reads `request.scheduled`) allows on one instant and refuses on another, and the refusal is logged with its reason; `can-record` attached is A005 at check, never reached |
+| the gate runs on a tick | a tick-only policy (its decision reads `request.scheduled`) allows on one instant and refuses on another, and the refusal is logged with its reason; `can-register` attached is A005 at check, never reached |
 | an answer is judged | `out` declared and the operation answering something else: the run is `failed` at `out`, logged |
 | no keeper registered | `lease` naming a kind no plugin registered: `run` throws naming the connection and the kind; `start` stops |
 | `encode` | a report refusing `missing` answers `{ reason: 'missing', message }`; a `done` report answers its output |

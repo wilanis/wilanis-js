@@ -35,10 +35,10 @@ then the operation; under the operation one span per node that ran, and a bindin
 that called it:
 
 ```
-fire @monitor/edge/get-entry.trigger.json                    143ms  refused: upstream
-  @monitor/domain/monitor.port.json#get                      141ms  refused: upstream
-    binding @monitor/data/monitor.binding.json#get           141ms
-      get-row (@monitor/data/get-row.graph.json)             140ms  refused: upstream
+fire @customers/edge/get-customer.trigger.json                    143ms  refused: upstream
+  @customers/domain/customer.port.json#get                      141ms  refused: upstream
+    binding @customers/data/monitor.binding.json#get           141ms
+      get-row (@customers/data/get-row.graph.json)             140ms  refused: upstream
         asked   @http/http.port.json#request                 131ms  ok  status=500
         route   switch → failed                                0ms  ok
         failed  @std/outcome.port.json#refuse                  0ms  refused: upstream

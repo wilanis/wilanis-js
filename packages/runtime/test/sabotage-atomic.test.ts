@@ -33,9 +33,9 @@ import {
   sabotageSaying,
 } from './example-harness.js';
 
-const KEPT = 'features/monitor/data/store-and-latest.graph.json';
-const IMPORT = 'features/monitor/domain/import-entries.graph.json';
-const RECORD = 'features/monitor/domain/record-entry.graph.json';
+const KEPT = 'features/customers/data/store-and-latest.graph.json';
+const IMPORT = 'features/customers/domain/import-customers.graph.json';
+const RECORD = 'features/customers/domain/register-customer.graph.json';
 
 /** Mark one graph of the example atomic, and answer what the tree then refuses with. */
 const atomic = (file: string, also: (doc: any) => void = () => {}) =>
@@ -54,7 +54,7 @@ describe('a graph that says it is atomic', () => {
   it('is accepted where everything it reaches is a store read -- L011', () => {
     // kept-list only finds records, and a find takes part in the transaction: an atomic read-only graph
     // is the consistent snapshot RFC 0004 decided to allow, not a graph with nothing to roll back
-    expect(atomic('features/monitor/data/kept-list.graph.json')).toEqual([]);
+    expect(atomic('features/customers/data/kept-list.graph.json')).toEqual([]);
   });
 
   it('is refused where it reaches an effect that cannot take part -- L009', () => {
@@ -69,24 +69,24 @@ describe('a graph that says it is atomic', () => {
       doc.atomic = true;
     }).filter(one => one.startsWith('L009') && one.includes('@blob/csv.port.json#parse'));
     expect(said).toEqual([
-      "L009 atomic graph '@features/monitor/domain/import-entries.graph.json' reaches '@blob/csv.port.json#parse', which cannot take part in a transaction (profiles 'live', 'local', 'production')",
+      "L009 atomic graph '@features/customers/domain/import-customers.graph.json' reaches '@blob/csv.port.json#parse', which cannot take part in a transaction (profiles 'live', 'local', 'production')",
     ]);
   });
 
   it('names only the profile whose binding reaches an effect that cannot take part -- L009', () => {
-    // create-row is reached through monitor-rest.binding.json, which only the live profile chooses: the
+    // create-row is reached through customers-rest.binding.json, which only the live profile chooses: the
     // refusal for its @http node says 'live' and no other, where the @blob one says all three
     const said = sabotageSaying(IMPORT, doc => {
       doc.atomic = true;
     }).filter(one => one.startsWith('L009') && one.includes('@http/http.port.json#request'));
     expect(said).toEqual([
-      "L009 atomic graph '@features/monitor/domain/import-entries.graph.json' reaches '@http/http.port.json#request', which cannot take part in a transaction (profile 'live')",
+      "L009 atomic graph '@features/customers/domain/import-customers.graph.json' reaches '@http/http.port.json#request', which cannot take part in a transaction (profile 'live')",
     ]);
   });
 
   it('is refused where nothing it reaches could roll back -- L011', () => {
     // parse-drafts only reads a file: there is no transaction for "atomic" to be about
-    expect(atomic('features/monitor/data/parse-drafts.graph.json')).toContain('L011');
+    expect(atomic('features/customers/data/parse-drafts.graph.json')).toContain('L011');
   });
 
   it('is refused where a map below it collects the failures -- G014', () => {
@@ -99,7 +99,7 @@ describe('a graph that says it is atomic', () => {
         run: '@storage/store.port.json#put',
         over: '{{in.tags}}',
         onItemFailure: 'collect',
-        in: { store: '@monitor/data/entries.store.json', collection: 'entries', record: '{{stored.record}}' },
+        in: { store: '@customers/data/customers.store.json', collection: 'entries', record: '{{stored.record}}' },
       });
     });
     expect(broken).toContain('G014');
@@ -115,13 +115,13 @@ const ELSEWHERE = {
     kind: '@storage-memory/memory.connection-kind.json',
     settings: {},
   },
-  'features/monitor/data/notes.store.json': {
+  'features/customers/data/notes.store.json': {
     $schema: schemaUrl('store'),
     label: 'Notes',
     description: 'Notes kept beside the entries, and deliberately not with them.',
     connection: '@connections/notes.connection.json',
     collections: {
-      notes: { description: 'one note per entry', of: '@monitor/domain/Entry.shape.json', key: 'id' },
+      notes: { description: 'one note per entry', of: '@customers/domain/Customer.shape.json', key: 'id' },
     },
   },
 };
@@ -132,7 +132,7 @@ const NOTED = {
   id: 'noted',
   label: 'Note it elsewhere',
   run: '@storage/store.port.json#put',
-  in: { store: '@monitor/data/notes.store.json', collection: 'notes', record: '{{recorded}}' },
+  in: { store: '@customers/data/notes.store.json', collection: 'notes', record: '{{recorded}}' },
 };
 
 describe('an atomic graph over more than one connection', () => {
@@ -146,8 +146,8 @@ describe('an atomic graph over more than one connection', () => {
       },
     });
     expect(broken.filter(one => one.startsWith('L010'))).toEqual([
-      'L010 @features/monitor/data/store-and-latest.graph.json#atomic',
-      'L010 @features/monitor/domain/record-all.graph.json#atomic',
+      'L010 @features/customers/data/store-and-latest.graph.json#atomic',
+      'L010 @features/customers/domain/register-all.graph.json#atomic',
     ]);
   });
 
@@ -161,8 +161,8 @@ describe('an atomic graph over more than one connection', () => {
     });
     // each profile's fault is said once, naming that profile and the connections it put the effects on
     expect([...new Set(broken.filter(one => one.startsWith('L010')))]).toEqual([
-      "L010 atomic graph reaches effects on 2 connections (@connections/entries.connection.json, @connections/notes.connection.json) (profile 'local')",
-      "L010 atomic graph reaches effects on 2 connections (@connections/entries-postgres.connection.json, @connections/notes.connection.json) (profile 'production')",
+      "L010 atomic graph reaches effects on 2 connections (@connections/customers.connection.json, @connections/notes.connection.json) (profile 'local')",
+      "L010 atomic graph reaches effects on 2 connections (@connections/customers-postgres.connection.json, @connections/notes.connection.json) (profile 'production')",
     ]);
     // and it is said by each graph that promised a transaction over it: record-all reaches record-entry
     // through submit and is atomic itself, so two promises answer for the one fault, each naming itself
@@ -174,10 +174,10 @@ describe('an atomic graph over more than one connection', () => {
         },
       }).filter(one => one.startsWith('L010')),
     ).toEqual([
-      'L010 @features/monitor/domain/record-all.graph.json#atomic',
-      'L010 @features/monitor/domain/record-all.graph.json#atomic',
-      'L010 @features/monitor/domain/record-entry.graph.json#atomic',
-      'L010 @features/monitor/domain/record-entry.graph.json#atomic',
+      'L010 @features/customers/domain/register-all.graph.json#atomic',
+      'L010 @features/customers/domain/register-all.graph.json#atomic',
+      'L010 @features/customers/domain/register-customer.graph.json#atomic',
+      'L010 @features/customers/domain/register-customer.graph.json#atomic',
     ]);
     // the live profile meets the port over HTTP, which is no second connection but an effect that cannot
     // take part at all
@@ -248,19 +248,19 @@ describe('an operation that says it is transactional', () => {
  * the profile filter is about.
  */
 const BATCH = {
-  'features/monitor/domain/record-batch.graph.json': {
+  'features/customers/domain/record-batch.graph.json': {
     $schema: schemaUrl('graph'),
     label: 'Record a batch',
     atomic: true,
     description: 'Every draft of a batch recorded, or none.',
-    in: '@monitor/domain/EntryDraft.shape.json[]',
-    out: { type: '@monitor/domain/Entry.shape.json[]', from: 'recorded' },
+    in: '@customers/domain/CustomerDraft.shape.json[]',
+    out: { type: '@customers/domain/Customer.shape.json[]', from: 'recorded' },
     nodes: [
       {
         type: schemaRef('node/map'),
         id: 'recorded',
         label: 'Record each draft',
-        run: '@monitor/domain/monitor.port.json#submit',
+        run: '@customers/domain/customer.port.json#submit',
         over: '{{in}}',
         bind: { url: 'url', method: 'method' },
       },
@@ -270,11 +270,11 @@ const BATCH = {
 
 /** Meet `removeMany` with the batch graph in one binding, so the profiles choosing it reach the graph. */
 const meetsBatch = (doc: any) => {
-  doc.operations.removeMany = { graph: '@monitor/domain/record-batch.graph.json' };
+  doc.operations.removeMany = { graph: '@customers/domain/record-batch.graph.json' };
 };
 
-const STORE_BINDING = 'features/monitor/data/monitor-store.binding.json';
-const REST_BINDING = 'features/monitor/data/monitor-rest.binding.json';
+const STORE_BINDING = 'features/customers/data/customers-store.binding.json';
+const REST_BINDING = 'features/customers/data/customers-rest.binding.json';
 
 /**
  * Which profiles an atomic graph is judged under. L009 and L010 ask what one run of the graph would do, and a
@@ -283,7 +283,7 @@ const REST_BINDING = 'features/monitor/data/monitor-rest.binding.json';
  * other, and which refusals it earns has to follow the bindings that name it.
  *
  * The case is written over `removeMany` because every profile of the example binds every operation of
- * `monitor.port.json`: pointing one profile's binding at the graph and not another's is what makes one
+ * `customer.port.json`: pointing one profile's binding at the graph and not another's is what makes one
  * profile reach it. The type it answers is the same either way, so nothing else in the tree moves.
  */
 describe('an atomic graph the profiles do not all reach', () => {
@@ -299,7 +299,7 @@ describe('an atomic graph the profiles do not all reach', () => {
     // now reaches a transaction it cannot hold, and the refusal names that profile and no other
     const said = plantedEditingAllSaying(BATCH, { [STORE_BINDING]: meetsBatch, [REST_BINDING]: meetsBatch });
     expect(said.filter(one => one.startsWith('L009') && one.includes('record-batch'))).toEqual([
-      "L009 atomic graph '@features/monitor/domain/record-batch.graph.json' reaches '@http/http.port.json#request', which cannot take part in a transaction (profile 'live')",
+      "L009 atomic graph '@features/customers/domain/record-batch.graph.json' reaches '@http/http.port.json#request', which cannot take part in a transaction (profile 'live')",
     ]);
   });
 
@@ -308,17 +308,17 @@ describe('an atomic graph the profiles do not all reach', () => {
     // profile, so an unreached graph answers what it is rather than an empty union and silence
     const said = plantedEditingAllSaying(
       {
-        'features/monitor/domain/record-batch.graph.json': {
-          ...BATCH['features/monitor/domain/record-batch.graph.json'],
+        'features/customers/domain/record-batch.graph.json': {
+          ...BATCH['features/customers/domain/record-batch.graph.json'],
           in: 'blob',
-          out: { type: '@monitor/domain/EntryDraft.shape.json[]', from: 'recorded' },
+          out: { type: '@customers/domain/CustomerDraft.shape.json[]', from: 'recorded' },
           nodes: [
             {
               type: schemaRef('node/run'),
               id: 'recorded',
               label: 'Read the file',
               run: '@blob/csv.port.json#parse',
-              in: { file: '{{in}}', type: '@monitor/domain/EntryDraft.shape.json' },
+              in: { file: '{{in}}', type: '@customers/domain/CustomerDraft.shape.json' },
             },
           ],
         },

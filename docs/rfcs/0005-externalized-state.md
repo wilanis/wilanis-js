@@ -331,7 +331,7 @@ Sabotage, in `packages/runtime/test/example.test.ts` (copies of the example hand
 
 - delete the state binding from the `live` profile → B002 naming `@auth/state.port.json` and `required by @auth`;
 - add `reads` to the state binding → B009; delegate `getSession` to `@http/server.port.json#listen` → B010;
-- set `blobs.connection` to `@connections/monitor-api.connection.json` → C014;
+- set `blobs.connection` to `@connections/customers-api.connection.json` → C014;
 - list `@auth/state.port.json` under `grants.ports` in a copied plugin manifest → D012 (`packages/runtime/test/required-port.test.ts`);
 - delegate `files.port.json#get` with `dir: "features"` → X106 (`packages/runtime/test/sabotage-project.test.ts`).
 

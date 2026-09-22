@@ -25,10 +25,10 @@ import { type VNode, viewOf } from '../src/index.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 const SCHEMAS = 'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas';
-const CREATE_ROW = '@features/monitor/data/create-row.graph.json';
-const TWO_READS = '@features/monitor/data/two-reads.graph.json';
-const REQUEST_DOC = '@features/monitor/edge/request.resolvers.json';
-const MORE_DOC = '@features/monitor/edge/more.resolvers.json';
+const CREATE_ROW = '@features/customers/data/create-row.graph.json';
+const TWO_READS = '@features/customers/data/two-reads.graph.json';
+const REQUEST_DOC = '@features/customers/edge/request.resolvers.json';
+const MORE_DOC = '@features/customers/edge/more.resolvers.json';
 
 /** The plugins the example names, handed in: a copy of the tree has no node_modules and resolves none of them. */
 const PLUGINS: Record<string, PluginModule> = {
@@ -92,8 +92,8 @@ const forwards = (reads: Record<string, string>, headers: Record<string, string>
   label: 'Two reads',
   description: 'Planted to see the request node draw a port per name, each opening the document it came from.',
   reads,
-  in: '@monitor/domain/EntryRecord.shape.json',
-  out: { type: '@monitor/edge/EntryRow.shape.json', from: 'asked' },
+  in: '@customers/domain/CustomerRecord.shape.json',
+  out: { type: '@customers/edge/CustomerRow.shape.json', from: 'asked' },
   nodes: [
     {
       type: '@wilanis/node/run.schema.json',
@@ -102,13 +102,13 @@ const forwards = (reads: Record<string, string>, headers: Record<string, string>
       run: '@http/http.port.json#request',
       in: {
         body: '{{in}}',
-        connection: '@connections/monitor-api.connection.json',
+        connection: '@connections/customers-api.connection.json',
         method: 'POST',
         path: '/monitor',
         headers,
         consumes: 'application/json',
         produces: 'application/json',
-        returns: '@monitor/edge/EntryRow.shape.json',
+        returns: '@customers/edge/CustomerRow.shape.json',
       },
     },
   ],
@@ -137,9 +137,9 @@ describe('the request node, one port per name a graph reads', () => {
   it("opens two documents from the one request node when a graph reads two of its feature's resolvers", () => {
     const request = requestOf(
       {
-        'features/monitor/edge/more.resolvers.json': MORE,
-        'features/monitor/data/two-reads.graph.json': forwards(
-          { agent: '@monitor/edge/request.resolvers.json#agent', host: '@monitor/edge/more.resolvers.json#host' },
+        'features/customers/edge/more.resolvers.json': MORE,
+        'features/customers/data/two-reads.graph.json': forwards(
+          { agent: '@customers/edge/request.resolvers.json#agent', host: '@customers/edge/more.resolvers.json#host' },
           { 'x-forwarded-user-agent': '{{agent}}', 'x-forwarded-host': '{{host}}' },
         ),
       },
@@ -175,8 +175,8 @@ describe('the request node, one port per name a graph reads', () => {
   it('gives a read the name the graph chose, not the one the resolver declares', () => {
     const request = requestOf(
       {
-        'features/monitor/data/two-reads.graph.json': forwards(
-          { whoCalled: '@monitor/edge/request.resolvers.json#agent' },
+        'features/customers/data/two-reads.graph.json': forwards(
+          { whoCalled: '@customers/edge/request.resolvers.json#agent' },
           { 'x-forwarded-user-agent': '{{whoCalled}}' },
         ),
       },
@@ -189,14 +189,14 @@ describe('the request node, one port per name a graph reads', () => {
   it('says nothing under a port whose resolver declares neither a label nor a description', () => {
     const request = requestOf(
       {
-        'features/monitor/edge/more.resolvers.json': {
+        'features/customers/edge/more.resolvers.json': {
           $schema: `${SCHEMAS}/resolvers.schema.json`,
           label: 'More context',
           description: 'A resolver with nothing to say about itself: only what it reads.',
           resolvers: { host: { read: 'request.headers.host' } },
         },
-        'features/monitor/data/two-reads.graph.json': forwards(
-          { host: '@monitor/edge/more.resolvers.json#host' },
+        'features/customers/data/two-reads.graph.json': forwards(
+          { host: '@customers/edge/more.resolvers.json#host' },
           { 'x-forwarded-host': '{{host}}' },
         ),
       },

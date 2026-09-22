@@ -1,0 +1,46 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
+  "label": "POST /customers.csv",
+  "description": "POST /customers.csv with a text/csv body (header url,method) \u2192 201 with every customer recorded, in file order. The file streams into the blob registry; the graph gets its handle. 409 as conflict when a customer already records one of the calls (the store declares (url, method) unique). 502 as upstream when the monitor API broke. Employees holding the registrar role only: 401 as anonymous without a token or as invalid_credential with a bad one, 403 as forbidden for a customer or an employee without the role.",
+  "settings": {
+    "route": "/customers.csv",
+    "method": "POST",
+    "consumes": "text/csv",
+    "produces": "application/json",
+    "body": "blob",
+    "response": {
+      "status": {
+        "default": 201
+      },
+      "refusals": {
+        "upstream": 502,
+        "conflict": 409,
+        "anonymous": 401,
+        "invalid_credential": 401,
+        "forbidden": 403,
+        "invariant": 500
+      }
+    }
+  },
+  "in": "@customers/edge/CsvUpload.shape.json",
+  "out": "@customers/edge/CustomerView.shape.json[]",
+  "policies": [
+    {
+      "policy": "@access/edge/employees-only.policy.json",
+      "in": {
+        "token": [
+          "{{request.headers.authorization}}",
+          "{{request.cookies.session}}"
+        ]
+      }
+    },
+    "@access/edge/can-register.policy.json"
+  ],
+  "kind": "@http/http.trigger-kind.json",
+  "fire": {
+    "run": "@customers/domain/customer.port.json#import",
+    "in": {
+      "file": "{{request.body}}"
+    }
+  }
+}

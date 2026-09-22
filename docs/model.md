@@ -229,7 +229,7 @@ $ npx wilanis start example
 startup 1/3 Reach the entry store: ok
 reload: watching /path/to/example -- an edit is served once it passes wilanis check
 startup 2/3 Watch for changes: ok
-http: listening on :8099 -- GET /monitor → @monitor/domain/monitor.port.json#list, ...
+http: listening on :8099 -- GET /monitor → @customers/domain/customer.port.json#list, ...
 startup 3/3 Listen: ok
 ```
 

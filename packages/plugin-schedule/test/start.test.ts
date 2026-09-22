@@ -22,7 +22,7 @@ afterEach(() => {
 /** The small tree on disk, with its schedule set to fire every second and no lease to hold a tick on. */
 function written(): string {
   const docs: Docs = tree();
-  (docs['features/monitor/edge/digest.trigger.json'] as any).settings = { everyMs: 1000 };
+  (docs['features/customers/edge/digest.trigger.json'] as any).settings = { everyMs: 1000 };
   (docs['project.json'] as any).startup[0].in = undefined;
   const at = mkdtempSync(join(tmpdir(), 'wilanis-schedule-start-'));
   for (const [relative, doc] of Object.entries(docs)) {
@@ -39,10 +39,10 @@ function written(): string {
  */
 function writtenAnsweringWrongly(): string {
   const docs: Docs = tree();
-  (docs['features/monitor/edge/digest.trigger.json'] as Record<string, unknown>).settings = { everyMs: 1000 };
+  (docs['features/customers/edge/digest.trigger.json'] as Record<string, unknown>).settings = { everyMs: 1000 };
   ((docs['project.json'] as Record<string, unknown>).startup as Record<string, unknown>[])[0].in = undefined;
   // the trigger's out says count is a number; the graph is made to answer a string instead
-  const graph = docs['features/monitor/data/count.graph.json'] as Record<string, unknown>;
+  const graph = docs['features/customers/data/count.graph.json'] as Record<string, unknown>;
   const nodes = graph.nodes as Record<string, unknown>[];
   (nodes[0].in as Record<string, unknown>).value = { count: 'not a number' };
   const at = mkdtempSync(join(tmpdir(), 'wilanis-schedule-judged-'));
@@ -102,7 +102,7 @@ describe('a tree that asks to be scheduled', () => {
 
   it('a tree that names no run step schedules nothing, however many scheduled triggers it has', async () => {
     const docs: Docs = tree();
-    (docs['features/monitor/edge/digest.trigger.json'] as any).settings = { everyMs: 1000 };
+    (docs['features/customers/edge/digest.trigger.json'] as any).settings = { everyMs: 1000 };
     (docs['project.json'] as any).startup = [];
     dir = mkdtempSync(join(tmpdir(), 'wilanis-schedule-none-'));
     for (const [relative, doc] of Object.entries(docs)) {

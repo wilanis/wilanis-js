@@ -72,9 +72,9 @@ describe('the access tree on its own', () => {
     for (const seed of [1, 2, 3]) {
       const run = await rehearse(loadTree(TREE, PLUGINS), { seed });
       expect(run.ok).toBe(true);
-      expect(run.lines.join('\n')).toMatch(/require-recorder {2}switch 'decide' {2}3\/3 branches/);
+      expect(run.lines.join('\n')).toMatch(/require-registrar {2}switch 'decide' {2}3\/3 branches/);
       expect(run.lines.join('\n')).toMatch(
-        /when has\(principal\) && 'recorder' in principal.roles {2}answered from 'granted'/,
+        /when has\(principal\) && 'registrar' in principal.roles {2}answered from 'granted'/,
       );
     }
   });
@@ -85,7 +85,7 @@ describe('the access tree on its own', () => {
       '@features/access/domain/identity.port.json',
       '@features/access/edge/signed-in.policy.json',
       '@features/access/edge/employees-only.policy.json',
-      '@features/access/edge/can-record.policy.json',
+      '@features/access/edge/can-register.policy.json',
       '@features/access/edge/otp-verified.policy.json',
     ]);
   });

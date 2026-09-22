@@ -43,16 +43,16 @@ is the monitor's store, once the REST API is replaced by a table:
   "$schema": "@wilanis/store.schema.json",
   "label": "Entries",
   "description": "Observed calls, one row each; a url is observed once per method. Notes hang off an entry.",
-  "connection": "@connections/entries.connection.json",
+  "connection": "@connections/customers.connection.json",
   "collections": {
     "entries": {
-      "of": "@monitor/domain/Entry.shape.json",
+      "of": "@customers/domain/Customer.shape.json",
       "key": "id",
       "unique": [["url", "method"]],
       "defaults": { "ua": "unknown" }
     },
     "notes": {
-      "of": "@monitor/domain/Note.shape.json",
+      "of": "@customers/domain/Note.shape.json",
       "key": "id",
       "refs": { "entryId": { "collection": "entries" } }
     }
@@ -79,7 +79,7 @@ A data graph reads the store the way RFC 0002 shows, with the filter it declares
   "id": "asked",
   "run": "@storage/store.port.json#find",
   "in": {
-    "store": "@monitor/data/entries.store.json",
+    "store": "@customers/data/customers.store.json",
     "collection": "entries",
     "where": { "method": "{{in.method}}", "ua": { "has": true } },
     "order": [{ "by": "url" }]
@@ -90,9 +90,9 @@ A data graph reads the store the way RFC 0002 shows, with the filter it declares
 Misspell the field and `wilanis check` answers, instead of the handler at run time:
 
 ```
-X208  @features/monitor/data/list-rows.graph.json#nodes/asked/in/where/methd
-    'methd' is not a field of @monitor/domain/Entry.shape.json (fields: id, url, method, ua)
-    → wilanis describe @monitor/data/entries.store.json
+X208  @features/customers/data/list-rows.graph.json#nodes/asked/in/where/methd
+    'methd' is not a field of @customers/domain/Customer.shape.json (fields: id, url, method, ua)
+    → wilanis describe @customers/data/customers.store.json
 ```
 
 Write `{ "method": 7 }` and the answer is that `method` is a string, not a number. Write `{ "method":
@@ -103,11 +103,11 @@ The declaration reaches PostgreSQL at start, the way RFC 0002 arranges it: a sta
 operation, and the profile's binding delegates it to `@storage/storage.port.json#ensure`:
 
 ```json
-{ "label": "Prepare the entry store", "run": "@monitor/domain/monitor.port.json#prepare" }
+{ "label": "Prepare the entry store", "run": "@customers/domain/customer.port.json#prepare" }
 ```
 
 ```json
-"prepare": { "run": "@storage/storage.port.json#ensure", "in": { "store": "@monitor/data/entries.store.json" } }
+"prepare": { "run": "@storage/storage.port.json#ensure", "in": { "store": "@customers/data/customers.store.json" } }
 ```
 
 RFC 0002's `ensure` creates a collection that does not exist and leaves one that does alone. This RFC widens
@@ -289,25 +289,25 @@ before it what they can see.
 `packages/runtime/src/discovery.ts`, a `store` case in `kindBody`); the store's page gains the marks:
 
 ```
-store  @monitor/data/entries.store.json  (Entries)
-  connection  @connections/entries.connection.json  (engine postgres)
-  collection entries: @monitor/domain/Entry.shape.json
+store  @customers/data/customers.store.json  (Entries)
+  connection  @connections/customers.connection.json  (engine postgres)
+  collection entries: @customers/domain/Customer.shape.json
     key         id
     unique      [url, method], [slug]
     default     ua = "unknown"
-    read by     @monitor/data/get-row.graph.json#asked (get), @monitor/data/list-rows.graph.json#asked (find)
-    written by  @monitor/data/create-row.graph.json#saved (put), @monitor/data/delete-row.graph.json#gone (remove)
-  collection notes: @monitor/domain/Note.shape.json
+    read by     @customers/data/get-row.graph.json#asked (get), @customers/data/list-rows.graph.json#asked (find)
+    written by  @customers/data/create-row.graph.json#saved (put), @customers/data/delete-row.graph.json#gone (remove)
+  collection notes: @customers/domain/Note.shape.json
     key         id
     refs        entryId → entries.id (refuse on remove)
-  ensured by  @monitor/domain/monitor.port.json#prepare  (startup 1/3, profile live)
+  ensured by  @customers/domain/customer.port.json#prepare  (startup 1/3, profile live)
 ```
 
 One line per mark family, its constraints comma-separated and each composite in declaration order, so a
 collection with several uniques grows one line rather than one unreadable one; the label column is the
 `padEnd` the rest of `discovery.ts` already uses, and a family with nothing to say prints no line. The
 readers and writers come from the same walk the plugin's rules make. `describe` of a shape held by a
-collection gains a line `held by  @monitor/data/entries.store.json#entries`, beside the lines saying who
+collection gains a line `held by  @customers/data/customers.store.json#entries`, beside the lines saying who
 writes it. `wilanis map` already prints `store entries (get)` (RFC 0002); nothing to add.
 
 The viewer's `store` case in `renderDocPage` (`packages/view/client/index.html`, RFC 0002) grows one column

@@ -32,11 +32,11 @@ import { viewOf } from '../src/index.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 const PAGE = fileURLToPath(new URL('../client/index.html', import.meta.url));
-const ENTRY = '@monitor/domain/Entry.shape.json';
-const CALLS = '@features/monitor/domain/an-entry-names-a-call.invariant.json';
-const KEPT_GET = '@features/monitor/data/kept-get.graph.json';
-const WRITE_CSV = '@features/monitor/data/write-csv.graph.json';
-const PLANTED = '@features/monitor/data/proving.graph.json';
+const ENTRY = '@customers/domain/Customer.shape.json';
+const CALLS = '@features/customers/domain/a-customer-is-reachable.invariant.json';
+const KEPT_GET = '@features/customers/data/kept-get.graph.json';
+const WRITE_CSV = '@features/customers/data/write-csv.graph.json';
+const PLANTED = '@features/customers/data/proving.graph.json';
 
 /** The plugins the example names, handed in: a copy of the tree has no node_modules and resolves none of them. */
 const PLUGINS: Record<string, PluginModule> = {
@@ -105,7 +105,7 @@ const reads = (id: string) => ({
   id,
   label: id,
   run: '@storage/store.port.json#get',
-  in: { store: '@monitor/data/entries.store.json', collection: 'entries', key: 'k' },
+  in: { store: '@customers/data/customers.store.json', collection: 'entries', key: 'k' },
 });
 /** A refusal for a switch's else branch to land on, so every node is reachable. */
 const refuses = (id: string) => ({
@@ -118,7 +118,7 @@ const refuses = (id: string) => ({
 
 /** The nodes of the planted graph, as the view marked them: what each carries about the invariant over Entry. */
 const markedIn = (nodes: unknown[], rest: Record<string, unknown>): Map<string, VNode> => {
-  const file = 'features/monitor/data/proving.graph.json';
+  const file = 'features/customers/data/proving.graph.json';
   return planted({ [file]: graph(nodes, rest) }, load => {
     const seen = viewOf(load, PLANTED);
     if (!seen?.graph) throw new Error('no view of the planted graph');
@@ -227,7 +227,7 @@ describe('the invariant page tables every site', () => {
     // the whole return on stating the rule once: thirteen places, each named, and what each costs the tree
     expect(marked.sites.filter(one => one.held).length).toBe(0);
     expect(marked.sites[0]).toEqual({
-      graph: '@features/monitor/data/kept-get-postgres.graph.json',
+      graph: '@features/customers/data/kept-get-postgres.graph.json',
       graphLabel: 'Get what is kept',
       node: 'row',
       kind: 'made',
@@ -236,7 +236,7 @@ describe('the invariant page tables every site', () => {
   });
 
   it('carries how a proved site was proved, so the table can say it without working it out again', () => {
-    const file = 'features/monitor/data/proving.graph.json';
+    const file = 'features/customers/data/proving.graph.json';
     const nodes = [makes('row', { id: 'a', url: 'https://x', method: 'GET', agent: 'a' })];
     const seen = planted({ [file]: graph(nodes, { out: { type: ENTRY, from: 'row' } }) }, load => {
       const found = viewOf(load, CALLS)?.invariant;

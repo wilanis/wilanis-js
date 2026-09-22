@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "Record each draft",
+  "description": "Domain graph behind customer.registerAll where the customers live behind an upstream API: the same fan-out as record-all, and nothing that says the rows move together. An HTTP call cannot take part in a transaction, so this profile gets the graph without the promise rather than a promise the upstream cannot keep. Which of the two a run uses is the binding's choice, and the caller's graph does not change.",
+  "in": "@customers/domain/CustomerDraft.shape.json[]",
+  "out": {
+    "type": "@customers/domain/Customer.shape.json[]",
+    "from": "recorded"
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/map.schema.json",
+      "id": "recorded",
+      "label": "Record each draft",
+      "description": "customer.submit once per row; the row's name, email and tier are the submission",
+      "run": "@customers/domain/customer.port.json#submit",
+      "over": "{{in}}",
+      "bind": {
+        "name": "name",
+        "email": "email",
+        "tier": "tier"
+      }
+    }
+  ]
+}

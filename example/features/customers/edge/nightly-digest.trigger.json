@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
+  "label": "nightly digest",
+  "description": "At three in the morning, UTC, the digest: the count and one line per customer, logged by the scheduler. The same operation the digest command prints; nobody is calling, so no policy and nothing to answer. A tick that finds the previous night's run still going is skipped and counted.",
+  "kind": "@schedule/schedule.trigger-kind.json",
+  "settings": {
+    "cron": "0 3 * * *",
+    "timezone": "UTC"
+  },
+  "out": "@customers/edge/DigestView.shape.json",
+  "fire": {
+    "run": "@customers/domain/customer.port.json#digest"
+  }
+}

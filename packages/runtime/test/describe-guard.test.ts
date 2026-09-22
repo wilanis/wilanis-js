@@ -18,12 +18,12 @@ import { EXAMPLE, INCLUDES, loadedWith, PLUGINS } from './example-harness.js';
 
 const example = loadTree(EXAMPLE, PLUGINS, INCLUDES);
 
-const CALLS = "'An entry names a call' (@features/monitor/domain/an-entry-names-a-call.invariant.json)";
+const CALLS = "'An entry names a call' (@features/customers/domain/a-customer-is-reachable.invariant.json)";
 const RULE = "(len(url) > 0 && (method != 'DELETE' || has(agent)))";
 
-const KEPT_GET = '@monitor/data/kept-get.graph.json';
-const KEPT_LIST = '@monitor/data/kept-list.graph.json';
-const WRITE_CSV = '@monitor/data/write-csv.graph.json';
+const KEPT_GET = '@customers/data/kept-get.graph.json';
+const KEPT_LIST = '@customers/data/kept-list.graph.json';
+const WRITE_CSV = '@customers/data/write-csv.graph.json';
 const GREET = '@hello/domain/greet.graph.json';
 
 describe('describe: a graph whose made value is guarded', () => {
@@ -54,7 +54,7 @@ describe('describe: a graph whose made value is guarded', () => {
   });
 
   it('answers with the guard s refusal too, which is how the graph refuses when its own rule fails', () => {
-    expect(said()).toContain('answers @monitor/domain/Entry.shape.json  from row | row:violated | missing');
+    expect(said()).toContain('answers @customers/domain/Customer.shape.json  from row | row:violated | missing');
   });
 });
 
@@ -63,13 +63,13 @@ describe('describe: a graph whose value is a list of the shape', () => {
     const said = describeDoc(example, KEPT_LIST);
     expect(said).toContain(`    guard for ${CALLS}, when ${RULE}:`);
     expect(said).toContain(
-      '        rows  maps rows:made through guard:@features/monitor/data/kept-list.graph.json#rows, element by element  (guard)',
+      '        rows  maps rows:made through guard:@features/customers/data/kept-list.graph.json#rows, element by element  (guard)',
     );
     expect(said).toContain('    rows:made  @storage/store.port.json#find');
   });
 
   it('appends no refusal to what the graph answers, since the map refuses with the element s reason', () => {
-    expect(describeDoc(example, KEPT_LIST)).toContain('answers @monitor/domain/Entry.shape.json[]  from rows');
+    expect(describeDoc(example, KEPT_LIST)).toContain('answers @customers/domain/Customer.shape.json[]  from rows');
   });
 });
 
@@ -79,7 +79,7 @@ describe('describe: a graph whose taken value is guarded', () => {
   it('opens the nodes with the guard, since a taken value has no authored node to move aside', () => {
     expect(said()).toContain(`    guard for ${CALLS}, when ${RULE}:`);
     expect(said()).toContain(
-      '        in:ok  maps in through guard:@features/monitor/data/write-csv.graph.json#in, element by element  (guard)',
+      '        in:ok  maps in through guard:@features/customers/data/write-csv.graph.json#in, element by element  (guard)',
     );
   });
 
@@ -106,13 +106,13 @@ describe('describe: a graph with nothing to guard', () => {
  * reader would go looking for a rule the guard tests and the line never named; and each refusal must say whose
  * it is, or a reader could not tell `row:violated` from `row:violated:2`.
  */
-const SECOND = '@features/monitor/domain/an-entry-has-a-method.invariant.json';
+const SECOND = '@features/customers/domain/an-entry-has-a-method.invariant.json';
 const { load: two, dir: twoDir } = loadedWith({
-  'features/monitor/domain/an-entry-has-a-method.invariant.json': {
+  'features/customers/domain/an-entry-has-a-method.invariant.json': {
     $schema: schemaUrl('invariant'),
     label: 'An entry has a method',
     description: 'A second rule over the same shape, unproved at the same sites, so one guard stands for both.',
-    holds: { on: '@monitor/domain/Entry.shape.json', when: 'len(method) > 0' },
+    holds: { on: '@customers/domain/Customer.shape.json', when: 'len(method) > 0' },
   },
 });
 afterAll(() => rmSync(twoDir, { recursive: true, force: true }));
@@ -140,7 +140,7 @@ describe('describe: a site two invariants are unproved at', () => {
     expect(said).toContain("        row:violated:2  refuses 'invariant' for 'An entry names a call'  (guard)");
     // and the graph answers with either refusal, since it refuses with whichever the guard routed to
     expect(said).toContain(
-      'answers @monitor/domain/Entry.shape.json  from row | row:violated | row:violated:2 | missing',
+      'answers @customers/domain/Customer.shape.json  from row | row:violated | row:violated:2 | missing',
     );
   });
 

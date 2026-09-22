@@ -229,21 +229,21 @@ describe('graph', () => {
 
 describe('invariant', () => {
   const access = (requires: unknown) => ({
-    over: ['@features/monitor/domain/monitor.port.json#record'],
+    over: ['@features/customers/domain/customer.port.json#register'],
     requires,
   });
-  const holds = { on: '@features/monitor/domain/Entry.shape.json', when: 'len(url) > 0' };
+  const holds = { on: '@features/customers/domain/Customer.shape.json', when: 'len(url) > 0' };
   const form = (body: Record<string, unknown>) => {
     const { holds: _baseline, ...envelope } = doc('invariant');
     return { ...envelope, ...body };
   };
 
   it('the access form: operations, and the policy or the proofs every reaching trigger must carry', () => {
-    expect(refused(form({ access: access({ policy: '@access/edge/can-record.policy.json' }) }))).toEqual([]);
+    expect(refused(form({ access: access({ policy: '@access/edge/can-register.policy.json' }) }))).toEqual([]);
     expect(refused(form({ access: access({ proves: ['request.principal'] }) }))).toEqual([]);
     expect(
       refused(
-        form({ access: access({ policy: '@access/edge/can-record.policy.json', proves: ['request.session.id'] }) }),
+        form({ access: access({ policy: '@access/edge/can-register.policy.json', proves: ['request.session.id'] }) }),
       ),
     ).toEqual([]);
   });

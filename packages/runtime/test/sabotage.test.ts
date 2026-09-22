@@ -8,92 +8,94 @@ import { relocate, sabotage } from './example-harness.js';
 describe('sabotage: graphs, layers and triggers', () => {
   it('G003 a deep path that does not exist', () => {
     expect(
-      sabotage('features/monitor/domain/record-entry.graph.json', graph => {
+      sabotage('features/customers/domain/register-customer.graph.json', graph => {
         graph.nodes[0].in.url = '{{in.urrl}}';
       }),
     ).toContain('G003');
   });
   it('G004 an optional read feeding a required input', () => {
     expect(
-      sabotage('features/monitor/domain/list-entries.graph.json', graph => {
+      sabotage('features/customers/domain/list-customers.graph.json', graph => {
         graph.nodes[0].rules[0].when = 'true == true';
       }),
     ).toContain('G004');
   });
   it('G005 a required input left unwired', () => {
     expect(
-      sabotage('features/monitor/domain/record-entry.graph.json', graph => {
+      sabotage('features/customers/domain/register-customer.graph.json', graph => {
         delete graph.nodes[0].in.url;
       }),
     ).toContain('G005');
   });
   it('G008 a node nobody reads', () => {
     expect(
-      sabotage('features/monitor/domain/digest.graph.json', graph => {
+      sabotage('features/customers/domain/digest.graph.json', graph => {
         graph.out.from = 'all';
-        graph.out.type = '@monitor/domain/Entry.shape.json[]';
+        graph.out.type = '@customers/domain/Customer.shape.json[]';
       }),
     ).toContain('G008');
   });
   it('G010 a second out candidate that is never routed', () => {
     expect(
-      sabotage('features/monitor/domain/digest.graph.json', graph => {
+      sabotage('features/customers/domain/digest.graph.json', graph => {
         graph.out.from = ['joined', 'all'];
       }),
     ).toContain('G010');
   });
   it('L002 an effect run from a domain graph', () => {
     expect(
-      sabotage('features/monitor/domain/digest.graph.json', graph => {
+      sabotage('features/customers/domain/digest.graph.json', graph => {
         graph.nodes[0].run = '@http/http.port.json#request';
-        graph.nodes[0].in = { connection: '@connections/monitor-api.connection.json', method: 'GET', path: '/x' };
+        graph.nodes[0].in = { connection: '@connections/customers-api.connection.json', method: 'GET', path: '/x' };
       }),
     ).toContain('L002');
   });
   it('D008 a port outside the domain layer', () => {
-    expect(relocate('features/monitor/domain/monitor.port.json', 'features/monitor/edge/monitor.port.json')).toContain(
-      'D008',
-    );
+    expect(
+      relocate('features/customers/domain/customer.port.json', 'features/customers/edge/customer.port.json'),
+    ).toContain('D008');
   });
   it('D008 a trigger outside the edge layer', () => {
     expect(
-      relocate('features/monitor/edge/digest.trigger.json', 'features/monitor/domain/digest.trigger.json'),
+      relocate('features/customers/edge/digest.trigger.json', 'features/customers/domain/digest.trigger.json'),
     ).toContain('D008');
   });
   it('D008 a document in a feature but in no layer at all', () => {
-    expect(relocate('features/monitor/domain/Entry.shape.json', 'features/monitor/Entry.shape.json')).toContain('D008');
+    expect(
+      relocate('features/customers/domain/Customer.shape.json', 'features/customers/Customer.shape.json'),
+    ).toContain('D008');
   });
   it('D008 a connection outside connections/', () => {
     expect(
-      relocate('connections/monitor-api.connection.json', 'features/monitor/data/monitor-api.connection.json'),
+      relocate('connections/customers-api.connection.json', 'features/customers/data/customers-api.connection.json'),
     ).toContain('D008');
   });
   it('D008 a shape whose declared layer contradicts the directory it sits in', () => {
     expect(
-      sabotage('features/monitor/domain/Entry.shape.json', shape => {
+      sabotage('features/customers/domain/Customer.shape.json', shape => {
         shape.layer = 'edge';
       }),
     ).toContain('D008');
   });
   it('L006 a trigger that fires a native operation instead of a domain port', () => {
     expect(
-      sabotage('features/monitor/edge/digest.trigger.json', trigger => {
+      sabotage('features/customers/edge/digest.trigger.json', trigger => {
         trigger.fire.run = '@std/list.port.json#count';
       }),
     ).toContain('L006');
   });
   it('L007 a domain graph that only forwards its input to one port operation', () => {
     expect(
-      sabotage('features/monitor/domain/record-entry.graph.json', graph => {
+      sabotage('features/customers/domain/register-customer.graph.json', graph => {
         // strip what earns its place: the constant it injects, so it becomes a pass-through
         delete graph.constants;
-        graph.in = '@monitor/domain/EntryRef.shape.json';
-        graph.out = { type: '@monitor/domain/Entry.shape.json', from: 'recorded' };
+        graph.in = '@customers/domain/CustomerRef.shape.json';
+        graph.out = { type: '@customers/domain/Customer.shape.json', from: 'recorded' };
         graph.nodes = [
           {
             type: '@wilanis/node/run.schema.json',
             id: 'recorded',
-            run: '@monitor/domain/monitor.port.json#get',
+            run: '@customers/domain/customer.port.json#get',
             in: { id: '{{in.id}}' },
           },
         ];
@@ -102,35 +104,35 @@ describe('sabotage: graphs, layers and triggers', () => {
   });
   it('L003 an effect the feature does not allow', () => {
     expect(
-      sabotage('features/monitor/feature.json', feature => {
+      sabotage('features/customers/feature.json', feature => {
         feature.effects = [];
       }),
     ).toContain('L003');
   });
   it('T002 a trigger whose edge shape does not fit the graph', () => {
     expect(
-      sabotage('features/monitor/edge/RecordRequest.shape.json', shape => {
+      sabotage('features/customers/edge/RegisterRequest.shape.json', shape => {
         delete shape.fields.url;
       }),
     ).toContain('T002');
   });
   it('T005 a refusal reason the trigger can reach but does not map', () => {
     expect(
-      sabotage('features/monitor/edge/get-entry.trigger.json', trigger => {
+      sabotage('features/customers/edge/get-customer.trigger.json', trigger => {
         delete trigger.settings.response.refusals.missing;
       }),
     ).toEqual(['T005']);
   });
   it('T005 a reason reached only through a map, from the batch delete', () => {
     expect(
-      sabotage('features/monitor/edge/delete-entries.trigger.json', trigger => {
+      sabotage('features/customers/edge/delete-customers.trigger.json', trigger => {
         delete trigger.settings.response.refusals.missing;
       }),
     ).toEqual(['T005']);
   });
   it('T006 a mapped reason nothing the trigger fires refuses with', () => {
     expect(
-      sabotage('features/monitor/edge/get-entry.trigger.json', trigger => {
+      sabotage('features/customers/edge/get-customer.trigger.json', trigger => {
         trigger.settings.response.refusals.teapot = 418;
       }),
     ).toEqual(['T006']);
@@ -139,42 +141,42 @@ describe('sabotage: graphs, layers and triggers', () => {
     // the mapping that named it is not dead, though: reasons are gathered across profiles, and under
     // local the same operation is met by a graph over the store, which still refuses with the word
     expect(
-      sabotage('features/monitor/data/get-row.graph.json', graph => {
+      sabotage('features/customers/data/get-row.graph.json', graph => {
         graph.nodes.find((node: any) => node.id === 'missing').in.reason = '{{asked.status}}';
       }).sort(),
     ).toEqual(['P001']);
   });
   it('G005 a refusal without a reason', () => {
     expect(
-      sabotage('features/monitor/data/get-row.graph.json', graph => {
+      sabotage('features/customers/data/get-row.graph.json', graph => {
         delete graph.nodes.find((node: any) => node.id === 'missing').in.reason;
       }).sort(),
     ).toEqual(['G005']);
   });
   it('G006 an input the operation does not declare', () => {
     expect(
-      sabotage('features/monitor/data/list-rows.graph.json', graph => {
+      sabotage('features/customers/data/list-rows.graph.json', graph => {
         graph.nodes[0].in.query = { a: 'b' };
       }),
     ).toContain('G006');
   });
   it('P001 a static field given a read', () => {
     expect(
-      sabotage('features/monitor/data/list-rows-by-method.graph.json', graph => {
+      sabotage('features/customers/data/list-rows-by-tier.graph.json', graph => {
         graph.nodes[0].in.method = '{{in.method}}';
       }),
     ).toContain('P001');
   });
   it('G003 a read of a node that does not exist', () => {
     expect(
-      sabotage('features/monitor/data/list-rows.graph.json', graph => {
+      sabotage('features/customers/data/list-rows.graph.json', graph => {
         graph.nodes[2].in.value = '{{asked2.body}}';
       }),
     ).toContain('G003');
   });
   it('T003 a route placeholder the route does not declare', () => {
     expect(
-      sabotage('features/monitor/edge/get-entry.trigger.json', trigger => {
+      sabotage('features/customers/edge/get-customer.trigger.json', trigger => {
         trigger.settings.route = '/monitor/{entry}';
       }),
     ).toContain('T003');

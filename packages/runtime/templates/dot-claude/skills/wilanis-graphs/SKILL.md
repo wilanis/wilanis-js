@@ -35,7 +35,7 @@ write, its own check of the write's answer, and its own refusal.
 7. `out.from` names every leaf: each `make` and each `refuse`.
 
 The graph below flips an entry's `method` between `GET` and `POST` over the store the example tree keeps
-(`@monitor/data/entries.store.json`, collection `entries`, of `@monitor/domain/Entry.shape.json`, keyed by
+(`@customers/data/customers.store.json`, collection `entries`, of `@customers/domain/Customer.shape.json`, keyed by
 `id`). It checks clean and every branch rehearses. For a boolean field, the second switch reads
 `{{read.record.pinned}}` and its rule is `pinned`.
 
@@ -43,9 +43,9 @@ The graph below flips an entry's `method` between `GET` and `POST` over the stor
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "description": "Flip one entry's method between GET and POST: read it, decide on what was read, write on one branch, answer what was written.",
-  "in": "@monitor/domain/EntryRef.shape.json",
+  "in": "@customers/domain/CustomerRef.shape.json",
   "out": {
-    "type": "@monitor/domain/Entry.shape.json",
+    "type": "@customers/domain/Customer.shape.json",
     "from": ["posted", "got", "missing", "goneBeforePost", "goneBeforeGet"]
   },
   "nodes": [
@@ -53,7 +53,7 @@ The graph below flips an entry's `method` between `GET` and `POST` over the stor
       "type": "@wilanis/node/run.schema.json",
       "id": "read",
       "run": "@storage/store.port.json#get",
-      "in": { "store": "@monitor/data/entries.store.json", "collection": "entries", "key": "{{in.id}}" }
+      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "key": "{{in.id}}" }
     },
     {
       "type": "@wilanis/node/switch.schema.json",
@@ -73,13 +73,13 @@ The graph below flips an entry's `method` between `GET` and `POST` over the stor
       "type": "@wilanis/node/run.schema.json",
       "id": "toPost",
       "run": "@storage/store.port.json#patch",
-      "in": { "store": "@monitor/data/entries.store.json", "collection": "entries", "key": "{{in.id}}", "changes": { "method": "POST" } }
+      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "key": "{{in.id}}", "changes": { "method": "POST" } }
     },
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "toGet",
       "run": "@storage/store.port.json#patch",
-      "in": { "store": "@monitor/data/entries.store.json", "collection": "entries", "key": "{{in.id}}", "changes": { "method": "GET" } }
+      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "key": "{{in.id}}", "changes": { "method": "GET" } }
     },
     {
       "type": "@wilanis/node/switch.schema.json",
@@ -99,31 +99,31 @@ The graph below flips an entry's `method` between `GET` and `POST` over the stor
       "type": "@wilanis/node/run.schema.json",
       "id": "posted",
       "run": "@std/object.port.json#make",
-      "in": { "value": "{{toPost.record}}", "type": "@monitor/domain/Entry.shape.json" }
+      "in": { "value": "{{toPost.record}}", "type": "@customers/domain/Customer.shape.json" }
     },
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "got",
       "run": "@std/object.port.json#make",
-      "in": { "value": "{{toGet.record}}", "type": "@monitor/domain/Entry.shape.json" }
+      "in": { "value": "{{toGet.record}}", "type": "@customers/domain/Customer.shape.json" }
     },
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "missing",
       "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@monitor/domain/Entry.shape.json" }
+      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" }
     },
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "goneBeforePost",
       "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "entry {{in.id}} vanished before the write", "type": "@monitor/domain/Entry.shape.json" }
+      "in": { "reason": "missing", "message": "entry {{in.id}} vanished before the write", "type": "@customers/domain/Customer.shape.json" }
     },
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "goneBeforeGet",
       "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "entry {{in.id}} vanished before the write", "type": "@monitor/domain/Entry.shape.json" }
+      "in": { "reason": "missing", "message": "entry {{in.id}} vanished before the write", "type": "@customers/domain/Customer.shape.json" }
     }
   ]
 }
