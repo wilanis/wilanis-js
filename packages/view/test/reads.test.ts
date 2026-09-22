@@ -78,7 +78,7 @@ function requestOf(docs: Record<string, unknown>, graph: string): VNode {
   }
 }
 
-/** A second resolvers document of the monitor feature, so one graph of it can read two. */
+/** A second resolvers document of the customers feature, so one graph of it can read two. */
 const MORE = {
   $schema: `${SCHEMAS}/resolvers.schema.json`,
   label: 'More context',
@@ -104,7 +104,7 @@ const forwards = (reads: Record<string, string>, headers: Record<string, string>
         body: '{{in}}',
         connection: '@connections/customers-api.connection.json',
         method: 'POST',
-        path: '/monitor',
+        path: '/customers',
         headers,
         consumes: 'application/json',
         produces: 'application/json',

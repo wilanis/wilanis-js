@@ -129,7 +129,7 @@ function treeKeeping(): string {
   });
   write('features/customers/feature.json', {
     $schema: '@wilanis/feature.schema.json',
-    description: 'what the monitor observes',
+    description: 'who the registry keeps',
   });
   write('features/customers/domain/Customer.shape.json', {
     $schema: '@wilanis/shape.schema.json',

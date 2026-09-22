@@ -45,7 +45,7 @@ describe('an engine that keeps nothing between processes has nothing to migrate'
       {},
       {
         by: 'rfontes@build-1',
-        tree: 'monitor',
+        tree: 'customers',
       },
     );
     expect(applied).toBeUndefined();

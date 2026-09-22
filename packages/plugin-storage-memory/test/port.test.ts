@@ -51,7 +51,7 @@ function treeServing(): string {
   });
   write('features/customers/feature.json', {
     $schema: '@wilanis/feature.schema.json',
-    description: 'what the monitor observes',
+    description: 'who the registry keeps',
     exports: ['@features/customers/domain/entries.port.json', '@features/customers/domain/Customer.shape.json'],
     effects: ['@storage/store.port.json#put', '@storage/store.port.json#get', '@storage/store.port.json#count'],
   });

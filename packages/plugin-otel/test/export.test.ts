@@ -111,7 +111,7 @@ function trace(correlation?: string): Trace {
 
 /** The tree's settings for a collector, at the level a case wants. */
 const settings = (url: string, extra: Record<string, unknown> = {}) => ({
-  plugins: { [ROOT]: { endpoint: url, service: 'monitor', ...extra } },
+  plugins: { [ROOT]: { endpoint: url, service: 'customers', ...extra } },
 });
 
 describe('spans reach a collector', () => {
@@ -120,7 +120,7 @@ describe('spans reach a collector', () => {
     const server = serving();
     const { answer } = await exporting({ serving: server.serving, ...settings(open.url) });
 
-    expect(answer).toEqual({ endpoint: open.url, service: 'monitor' });
+    expect(answer).toEqual({ endpoint: open.url, service: 'customers' });
     expect(server.listening()).toBe(1);
 
     server.observed(trace());
@@ -143,7 +143,7 @@ describe('spans reach a collector', () => {
     expect(asked.parentSpanId).toBe(operation.spanId);
 
     // the service the tree is called by -- OTLP groups a batch by resource, so every span carries it
-    expect(new Set(open.services())).toEqual(new Set(['monitor']));
+    expect(new Set(open.services())).toEqual(new Set(['customers']));
     expect(attributesOf(asked)['wilanis.connection']).toBe('@connections/customers-api.connection.json');
     expect(attributesOf(asked)['http.response.status_code']).toBe(500);
     expect(attributesOf(root)['wilanis.trigger']).toBe('@customers/edge/get-customer.trigger.json');

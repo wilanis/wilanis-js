@@ -75,7 +75,7 @@ export function treeServing(): string {
   });
   write('features/customers/feature.json', {
     $schema: '@wilanis/feature.schema.json',
-    description: 'what the monitor keeps',
+    description: 'what the registry keeps',
     exports: ['@features/customers/domain/entries.port.json', ENTRY],
     effects: ['@storage/store.port.json#put', '@storage/store.port.json#remove'],
   });

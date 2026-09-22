@@ -1,5 +1,5 @@
 /**
- * What `wilanis map` draws under a profile. The example's monitor port has three bindings -- the REST upstream, the
+ * What `wilanis map` draws under a profile. The example's customer port has three bindings -- the REST upstream, the
  * in-memory store and PostgreSQL -- and a profile chooses one, as `rehearse` chooses it. Without a profile the map
  * draws every binding and says the port needs one; under a profile it draws the chosen binding alone, and never
  * the `??` line, since there is nothing left to choose. What the other profiles' bindings run is then named after
@@ -35,7 +35,7 @@ const { load: planted, dir: plantedDir } = loadedWith({
 });
 afterAll(() => rmSync(plantedDir, { recursive: true, force: true }));
 const DELETE = '@features/customers/edge/delete-customer.trigger.json  (@http/http.trigger-kind.json)';
-/** Fires a domain graph that calls the monitor port again, which is where a binding has to be chosen mid-walk. */
+/** Fires a domain graph that calls the customer port again, which is where a binding has to be chosen mid-walk. */
 const DIGEST = '@features/customers/edge/digest.trigger.json  (@cli/cli.trigger-kind.json)';
 const CHOOSE = 'has 3 bindings';
 /** The lines the map draws under one trigger, up to the next. */

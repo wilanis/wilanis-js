@@ -31,7 +31,7 @@ async function said(error: unknown): Promise<string[]> {
   const logs: string[] = [];
   const exporter = new Exporter({
     sends: refusing(error),
-    configured: { endpoint: 'http://localhost:4318/v1/traces', service: 'monitor', headers: {}, level: 'summary' },
+    configured: { endpoint: 'http://localhost:4318/v1/traces', service: 'customers', headers: {}, level: 'summary' },
     log: line => logs.push(line),
   });
   exporter.take(trace());

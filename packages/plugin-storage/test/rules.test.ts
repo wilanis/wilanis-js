@@ -289,11 +289,11 @@ describe('the scope a document wrote', () => {
     const found = scoped(docs => {
       docs['features/customers/domain/customer.port.json'] = {
         $schema: '@wilanis/port.schema.json',
-        description: 'what the monitor answers about what it kept',
+        description: 'what the registry answers about what it kept',
         layer: 'domain',
         operations: { listed: { description: 'every entry', accepts: {}, answers: { type: `${SHAPE}[]` } } },
       };
-      docs['features/customers/data/monitor.binding.json'] = {
+      docs['features/customers/data/customers.binding.json'] = {
         $schema: '@wilanis/binding.schema.json',
         description: 'the registry over the customers it keeps',
         port: '@features/customers/domain/customer.port.json',
@@ -307,7 +307,7 @@ describe('the scope a document wrote', () => {
     });
     expect(found).toHaveLength(1);
     expect(found[0].at).toBe('operations/listed/in/scope');
-    expect(found[0].file).toBe('@features/customers/data/monitor.binding.json');
+    expect(found[0].file).toBe('@features/customers/data/customers.binding.json');
   });
 
   it('a site over a scoped collection that writes no scope is refused nothing here', () => {

@@ -206,7 +206,7 @@ describe.skipIf(!url)('one plan, one transaction', () => {
     expect(history[0]?.targets).toEqual(['m_entries']);
     expect(history[0]?.steps?.m_entries).toEqual(['add note  string, optional']);
     expect(history[0]?.by).toBe('rfontes@build-1');
-    expect(history[0]?.tree).toBe('monitor');
+    expect(history[0]?.tree).toBe('customers');
     expect(history[1]?.steps?.m_entries).toEqual(['create collection m_entries']);
     expect(history[0]?.id).toBeGreaterThan(history[1]?.id ?? 0);
   });
