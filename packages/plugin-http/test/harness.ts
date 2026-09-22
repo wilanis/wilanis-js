@@ -181,13 +181,13 @@ async function answerFor(
   return collection(request, url, body, upstream.rows);
 }
 
-/** A fake mockapi: rows under /api/v1/customers, and "Not found" for anything else. */
+/** A fake mockapi: rows under /api/v1/customer, and "Not found" for anything else. */
 export function fakeUpstream(upstream: Upstream): Server {
   return createServer(async (request: IncomingMessage, response: ServerResponse) => {
     let body = '';
     for await (const chunk of request) body += chunk;
     const url = new URL(request.url ?? '/', 'http://local');
-    const route = /^\/api\/v1\/customers(?:\/([^/]+))?$/.exec(url.pathname);
+    const route = /^\/api\/v1\/customer(?:\/([^/]+))?$/.exec(url.pathname);
     const answer = await answerFor({ request, url, body, route }, upstream);
     response.writeHead(answer.status, { 'content-type': 'application/json' });
     response.end(JSON.stringify(answer.value));

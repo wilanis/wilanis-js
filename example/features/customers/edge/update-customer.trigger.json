@@ -7,7 +7,7 @@
     "method": "PUT",
     "consumes": "application/json",
     "produces": "application/json",
-    "body": "@customers/edge/UpdateRequest.shape.json",
+    "body": "@customers/edge/UpdateBody.shape.json",
     "response": {
       "refusals": {
         "missing": 404,

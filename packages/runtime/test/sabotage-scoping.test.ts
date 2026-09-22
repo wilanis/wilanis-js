@@ -46,11 +46,11 @@ describe('sabotage: how a store is scoped', () => {
     );
   });
   it('B008 points at the startup step that reaches the scoped collection', () => {
-    // step 1 is listAll, bound to the graph that finds over customers: a startup step runs before anything is
+    // step 2 is listAll, bound to the graph that finds over customers: a startup step runs before anything is
     // received, so a scoped collection is unreachable from it by construction
-    expect(scopedPointing()).toContain('B008 @project.json#startup/1/run');
+    expect(scopedPointing()).toContain('B008 @project.json#startup/2/run');
     expect(scopedSaying()).toContain(
-      "B008 startup step 1: @features/customers/data/customers.store.json reads request.session.attributes.tenant, but a startup step runs before anything is received (profile 'local')",
+      "B008 startup step 2: @features/customers/data/customers.store.json reads request.session.attributes.tenant, but a startup step runs before anything is received (profile 'local')",
     );
   });
   it('C012 a scope that is a literal, an interpolation, or a field of a read', () => {

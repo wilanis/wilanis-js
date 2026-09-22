@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Repaired customer",
+  "layer": "core",
+  "description": "What a repair answers: which customer it was, and whether this run is what made them whole. A tree that talks to storage it did not seed says so once, at startup, rather than letting every read discover it.",
+  "fields": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "written": {
+      "type": "boolean",
+      "description": "true when this run gave the record an address and a tier, false when it already had both"
+    }
+  }
+}

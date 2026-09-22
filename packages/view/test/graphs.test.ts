@@ -33,7 +33,7 @@ describe('the view model of a graph', () => {
       literal: '"GET"',
       static: true,
     });
-    expect(asked.inputs.find(port => port.name === 'path')).toMatchObject({ text: '/customers/{{in.id}}' });
+    expect(asked.inputs.find(port => port.name === 'path')).toMatchObject({ text: '/customer/{{in.id}}' });
     expect(asked.inputs.find(port => port.name === 'body')).toMatchObject({ missing: true, required: false });
     // a literal that names a document carries the canonical path, so the page can label and link it
     expect(asked.inputs.find(port => port.name === 'returns')).toMatchObject({

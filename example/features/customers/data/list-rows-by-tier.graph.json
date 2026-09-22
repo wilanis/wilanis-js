@@ -19,7 +19,7 @@
       "in": {
         "connection": "@connections/customers-api.connection.json",
         "method": "GET",
-        "path": "/customers?tier={{in.tier}}",
+        "path": "/customer?tier={{in.tier}}",
         "produces": "application/json",
         "returns": "@customers/edge/CustomerRow.shape.json[]"
       }

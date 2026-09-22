@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "Nothing stands unvouched for",
+  "description": "Data graph behind customer.listRaw where the customers are kept rather than fetched: a store holds only what this tree wrote, and this tree writes whole customers, so nothing predates what a customer means here. It reads no store and answers an empty walk, which is what makes the backfill a step every profile can run and only one profile does work in.",
+  "out": {
+    "type": "@customers/domain/RawCustomer.shape.json[]",
+    "from": "none"
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "none",
+      "label": "No record stands unvouched for",
+      "run": "@std/list.port.json#slice",
+      "in": {
+        "list": "{{const.nothing}}",
+        "from": 0,
+        "to": 0,
+        "type": "@customers/domain/RawCustomer.shape.json[]"
+      }
+    }
+  ],
+  "constants": {
+    "nothing": {
+      "type": "@customers/domain/RawCustomer.shape.json[]",
+      "value": [],
+      "description": "the empty walk: a store has nothing that predates what a customer means here"
+    }
+  }
+}
