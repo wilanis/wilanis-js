@@ -3,57 +3,21 @@
 **A language for programs made of effects, written as JSON documents, with a compiler that judges the whole
 tree before anything runs.** You describe the shapes, the contracts between the parts, how data flows through
 them, what may enter and what gates it. The compiler reads every file and proves they fit together. A small
-engine runs what it approved, and everything that touches the world -- a route, a command, a file, a database
--- is a plugin behind a port the tree declares. The language never learns what HTTP is.
+engine runs what it approved, and everything that touches the world (a route, a command, a clock, a file, a
+database) is a plugin behind a port the tree declares. The language never learns what HTTP is.
 
-The example in this repository is a customer registry: a REST resource over a rate-limited upstream, CSV
-import and export, sign-in against two directories, sessions, and role-based policies over every write. Three
-of its files are invariants -- *a customer is reachable*, *writes are for registrars*, *the session is the
-caller's* -- rules stated once that the checker holds the whole tree to. **Every file in it is a JSON
-document, and there is no JavaScript at all.**
-`wilanis check example` says how many documents that is.
+The example in this repository is a customer registry: routes, commands and a nightly job over one port, CSV
+import and export, sign-in against two directories, sessions, and role-based policies over every write.
+**Every one of its documents is JSON, and there is no JavaScript at all.** It is drawn, document by document,
+at [wilanis.dev](https://wilanis.dev).
 
 *Pre-1.0 and moving. Nothing is on npm yet, so clone and build to try it. See [Status](#status).*
 
-## What this is not
+## One port, three ways in
 
-**Not a framework.** Express, Rails and NestJS call your code at the points they define, and what they call is
-still code, with everything code can do. Here there is no code to call. The documents are the program, the
-expression language cannot loop, call or reach a socket, and what the language cannot say goes behind a port
-in a plugin, held to what the port declares. That is the boundary of a language, not an extension point.
-
-**Not a workflow engine.** Step Functions, Airflow and Temporal run a graph you hand them, written as JSON,
-as YAML or as code; what it touches is the runtime's business at the moment it touches it. Here a graph is
-one document kind among a dozen, and the point is what the compiler does with all of them at once: that a
-route answers a shape its graph can produce, that the port behind it is met by a binding, that every reason
-the graphs and policies behind it can refuse with is given an answer, and that none is answered which they
-cannot reach -- one judgement over the whole tree, before anything starts. An invariant is what that buys
-you: a rule an author states once, in one file, and the checker holds at every place it applies, including
-the route written a year later by someone who never read it.
-
-**Not a low-code tool.** n8n, Node-RED and Zapier are a canvas first and files second. Here the files are the
-source. They are diffed, reviewed and merged like any others, and the viewer is read-only: it draws a tree
-and grants it nothing. No editor owns the truth.
-
-**Not a configuration language.** Dhall, CUE, Jsonnet and Pkl make configuration safe to write and generate.
-Nothing is generated here. The documents are the program, and what the checker knows about them is a
-service: layers, ports, policies, effects and the types that flow between them.
-
-**Not JSON for its own sake.** The format is the least interesting decision -- JSON because every editor,
-schema, diff and model already reads it. What is worth having is the checker, and it would judge the same
-tree written any other way.
-
-**Not this code.** wilanis is a language, and what a language is, its specification says: here, the document
-kinds and their schemas, the rules the checker judges by, each with its code, and the promises the runtime
-keeps -- what a tree starts is declared, a guard stands before any graph, a rule stated once holds everywhere.
-This repository is the reference implementation of that specification, in TypeScript, which is why it is
-called `wilanis-js`. An implementation in another language that makes the same judgement over the same tree is
-wilanis. A fork that changes what a schema means or what a rule refuses is another language, and owes its
-documents another `$schema`. Today the specification is the RFCs under [`docs/rfcs/`](docs/rfcs/README.md)
-and the example with its sabotaged variants, which say for every rule what breaks it and what code it answers;
-a document of its own comes once this definition has settled.
-
-## A route is one file
+The domain of the example is a port, `customer.port.json`, and the operations it declares. How each is met is
+a binding's business, chosen per profile, so the same documents run against memory, PostgreSQL or a fake. What
+reaches an operation is a trigger, and a trigger is one file. Three of them, from the example:
 
 ```json
 {
@@ -83,61 +47,54 @@ a document of its own comes once this definition has settled.
 ```
 
 A GET on `/customers/{id}`, open to anyone because it names no policy. It takes an `IdRequest` and answers a
-`CustomerView`, both declared in files of their own. It runs the `get` operation of the customer port with the
-id from the URL. If that operation refuses with `missing`, the client gets a 404; with `upstream`, a 502; with
-`invariant` -- the word a guard the compiler lowers refuses with, where an invariant of the tree could not be
-proved of the value a graph made -- a 500.
-
-The file never says *how* `get` works. In the same example a command-line trigger fires that same operation,
-under the same policies, and neither the engine nor the compiler knows what HTTP is.
-
-## What it does is a graph
-
-Behind the port, one file per operation. Two nodes of the one behind `get`: the decision, and one of the
-outcomes it routes to.
+`CustomerView`, both declared in files of their own, and runs `get` with the id from the URL. When the
+operation refuses, the reason becomes the status this file maps it to, and the checker refuses a mapping for
+a reason nothing behind the route can produce.
 
 ```json
 {
-  "type": "@wilanis/node/switch.schema.json",
-  "id": "route",
-  "label": "What did the API say?",
-  "in": {
-    "status": "{{asked.status}}",
-    "body": "{{asked.body}}"
+  "label": "digest",
+  "kind": "@cli/cli.trigger-kind.json",
+  "settings": {
+    "command": "digest"
   },
-  "rules": [
-    { "when": "status == 404", "to": "missing" },
-    { "when": "status == 200 && has(body)", "to": "row" }
-  ],
-  "else": "failed"
-},
-{
-  "type": "@wilanis/node/run.schema.json",
-  "id": "missing",
-  "label": "No such customer",
-  "run": "@std/outcome.port.json#refuse",
-  "in": {
-    "reason": "missing",
-    "message": "no customer {{in.id}}",
-    "type": "@customers/domain/Customer.shape.json"
+  "out": "@customers/edge/DigestView.shape.json",
+  "fire": {
+    "run": "@customers/domain/customer.port.json#digest"
   }
 }
 ```
 
-One request, one decision, a declared outcome per branch. A 404 from the API is not an exception here, it is
-a case you named. Anything you did not name goes to `failed`, and the checker will not accept a switch
-without an `else`.
+`wilanis run @customers/edge/digest.trigger.json example` prints the digest: the count, and one line per
+customer.
 
-![The same graph, drawn by wilanis-view](docs/viewer-get-row.png)
+```json
+{
+  "label": "nightly digest",
+  "kind": "@schedule/schedule.trigger-kind.json",
+  "settings": {
+    "cron": "0 3 * * *",
+    "timezone": "UTC"
+  },
+  "out": "@customers/edge/DigestView.shape.json",
+  "fire": {
+    "run": "@customers/domain/customer.port.json#digest"
+  }
+}
+```
 
-Every document of the example is at **[wilanis.dev](https://wilanis.dev)**, drawn the same way: the routes,
-the graphs behind them, the policies over each write, and what every reference points at, in both
-directions. That page is this viewer with its answers written out as files, so nothing runs there and
-nothing is installed here.
+At three in the morning, the same digest, logged by the scheduler. Nobody is calling, so no policy and
+nothing to answer.
 
-## The compiler reads it before it runs
+None of the three names a graph, and none knows how `get` or `digest` is met. A trigger's kind is granted by
+a plugin (`@http`, `@cli`, `@schedule`), the compiler judges the trigger's settings by what that kind
+declares, and the engine sees a fired operation and nothing else. A queue or a file drop would be another
+kind from another plugin, with no change to the port or to the language. `wilanis ls example trigger` lists
+every way into the example, and `wilanis map example` draws what each one reaches.
 
-Rename an operation in the port and forget the route that calls it:
+## The compiler reads it first
+
+Point the route at an operation the port does not have:
 
 ```
 R001  @features/customers/edge/get-customer.trigger.json#fire/run
@@ -145,16 +102,14 @@ R001  @features/customers/edge/get-customer.trigger.json#fire/run
     → wilanis ls port
 ```
 
-The file, the path inside it, what is wrong, and the command that shows the fix. Every reference, every
-input, every output, every effect a feature reaches: judged across the whole tree at once, not one file at a
-time.
+The file, the path inside it, what is wrong, and the command that shows the fix. Every reference, input,
+output and effect is judged across the whole tree at once, not one file at a time. Every rule the checker
+holds a tree to, and every code it refuses with, is in [`docs/model.md`](docs/model.md).
 
-## A rule you state once
-
-The example gates every write of the customers feature with the same policy, trigger by trigger. Nothing in
-those files says that this is a rule rather than six coincidences: a new route firing `customer.update` and
-forgetting the policy would check clean, and the write would be public. An invariant says the rule out loud,
-in a file of its own:
+A rule an author states once is held the same way. The example gates every write with the registrar policy,
+trigger by trigger, and nothing in those files says it is a rule rather than six coincidences: a new route
+firing `update` and forgetting the policy would check clean, and the write would be public. An invariant says
+the rule out loud, in a file of its own:
 
 ```json
 {
@@ -188,82 +143,18 @@ I001  @features/customers/edge/import-customers.trigger.json#policies
 ```
 
 Reaching is transitive, so the route that forgets the gate is caught whether it fires a covered operation
-itself or a domain graph calls one two ports down; where it did not fire it directly, the refusal names the
-operation it was reached through. The route an agent adds next month is held to the rule nobody remembered
-to repeat.
+itself or a domain graph calls one two ports down. The route someone adds next year is held to the rule
+nobody remembered to repeat.
 
-[M06 on the roadmap](docs/roadmap.md#m06-the-checker-knows-the-rule), *The checker knows the rule*, is the
-demo this grows into: the second form, a rule over a shape's fields, proved where the documents settle it and
-guarded where only a run can.
+## Every branch, before you ship
 
-## Every branch runs before you ship
-
-`wilanis rehearse` runs every route and command with the network stubbed. For each switch it works out which
-inputs reach each rule, and runs that branch too:
-
-```
-features/customers/data/get-row  switch 'route'  3/3 branches
-  ok  when status == 404               refused on purpose at 'missing' as missing: "no customer golf"
-  ok  when status == 200 && has(body)  answered from 'row'
-  ok  anything else                    refused on purpose at 'failed' as upstream: "the customer API answered 500"
-```
-
-It ends by saying every branch settled, or which did not. A rule that no input can satisfy is reported as
-`NEVER RUN`: dead logic, or a hole in your routing, found
-without writing a test. `wilanis fuzz` writes runs out as scenarios, files of their own, and `wilanis regress`
-replays them and compares node by node, so an edit that changes what the service does says so before it
-ships.
-
-## See what a request did
-
-Every run already leaves a complete record, so nothing is instrumented by an author and no document mentions
-tracing. `--trace` says that record out loud, one span per thing that happened:
-
-```
-$ wilanis run @hello/edge/hello-gated.trigger.json example --trace
-trace 01a0aab5-fdc3-7bb7-86b8-a41015399289  fire @features/hello/edge/hello-gated.trigger.json → refused: otp  2ms
-  identify (@auth)                                            0ms  ok  principal=no session=no
-  policy @features/access/edge/otp-verified.policy.json       1ms  challenged: otp  policy.outcome=challenged
-    @features/access/domain/require-otp.graph.json            0ms  refused: otp
-      decide switch → otp                                     0ms  ok  selected=otp
-      otp @std/outcome.port.json#refuse                       0ms  refused: otp  effect=false
-```
-
-Who was identified, which policy stopped the call, which switch rule it took and how long each took, in the
-tree's own words: the paths in a span are the paths in the documents. `--trace=json` prints the same tree as
-one object per run for a log shipper, and a span never carries a value unless you ask for `--level full`.
-
-To send the same spans to an OpenTelemetry collector, a project adds the exporter to what it starts, exactly
-as it adds the listener: a step in `project.json` naming `@otel/exporter.port.json#export`, which the example
-carries beside the one that opens the HTTP port. Delete that step and nothing is exported: no runtime decides
-on its own that a tree should phone home. The example marks it `"required": false`, so it still starts with
-no collector listening — the step subscribes and says where it would send, and what it then cannot send is
-said once in the log rather than delaying the run whose trace it was.
-
-## There is no code in a document
-
-A document names operations and routes between them. The only place it states a condition is a switch
-rule, and this grammar is the whole of what a rule may say:
-
-```
-expr    := or
-or      := and ('||' and)*
-and     := unary ('&&' unary)*
-unary   := '!' unary | cmp
-cmp     := primary (('==' | '!=' | '<' | '<=' | '>' | '>=' | 'in') primary)?
-primary := number | string | true | false | path | 'has' '(' path ')' | 'len' '(' expr ')' | '(' expr ')'
-```
-
-No calls, no arithmetic, no assignment, no loops, and nothing that reaches a file or a socket. Every rule is
-typed against that node's inputs before it runs, and a read through a value that may be missing is refused
-unless a `has()` on the left of the same `&&` proved it present: `has(principal) && 'registrar' in
-principal.roles` reads what it proved, and dropping the `has()` is a refusal with the file and the path in
-it.
-
-That is a limit, on purpose. When a tree needs something the language cannot say, the answer is never a
-bigger expression: it is a plugin -- an npm package that ships its ports and kinds as JSON documents and
-implements one handler each, in TypeScript. Code lives there, behind a contract the checker holds it to,
-and a graph reaches it only through a port its feature declares.
+`wilanis rehearse` runs every trigger with the network stubbed and, for each switch, works out which inputs
+reach each rule and runs that branch too. A rule no input can satisfy is reported as never run: dead logic,
+or a hole in the routing, found without writing a test. `wilanis fuzz` writes runs out as scenarios and
+`wilanis regress` replays them node by node, so an edit that changes what the tree does says so before it
+ships. Every run leaves a complete record, and `--trace` says it out loud in the tree's own words: the paths in
+a span are the paths in the documents. [`docs/demo.md`](docs/demo.md) is each of those commands with the
+output it answered, and [wilanis.dev/demo/](https://wilanis.dev/demo/) is one such run, kept.
 
 ## Why this suits code a model writes
 
@@ -293,46 +184,18 @@ npx wilanis start example --profile local      # serve it on :8099, customers ke
 
 [`example/README.md`](example/README.md) walks through what it serves and who may do what.
 
-## The words
+## The rest
 
-| Word | What it is |
-|---|---|
-| **Shape** | A type: named fields, required unless said otherwise. An `edge` shape is what the outside world sends; a `core` shape is yours. |
-| **Port** | A contract: operations with what they accept and return. |
-| **Binding** | How a port is met: the graph, or the delegation, behind each operation. Swap it and the same code runs against a different store, or a fake. |
-| **Graph** | A data flow: nodes that run an operation, route on a condition, or fan out over a list. A node runs when its inputs are ready. |
-| **Trigger** | An entry point: an HTTP route, a command, whatever a plugin offers. It names the operation to fire and the policies that gate it. |
-| **Policy** | A gate on a trigger. It allows by answering, or refuses with a reason. A trigger with no policies is public. |
-| **Invariant** | A rule stated once that the whole tree is held to. An `access` invariant names domain operations and says what must gate every way in that reaches them, however many ports deep. A `holds` invariant states a rule over a core shape's fields, proved wherever the documents settle it and guarded wherever only a run can. |
-| **Connection** | Where an effect goes and how it is paced: an address, credentials read from secrets, a throttle. A graph names the connection, never the address. |
-| **Store** | What a feature keeps: collections of a shape, each keyed by one of its fields, behind a connection. It says what no two records may repeat and what refers to what; the compiler judges a filter or a write against that, and swapping the connection swaps memory for a database with no other change. |
-| **Profile** | Which binding meets which port, chosen per environment, so the same documents run against a fake or the real thing. |
-| **Feature** | A directory with `edge/`, `domain/` and `data/` inside. The directory is the layer, and the checker reads it off the path. |
-| **Plugin** | An npm package that ships JSON documents and one handler per operation. It is the only place code lives. |
+[`docs/model.md`](docs/model.md) is the reference: every document kind and what it means, every rule and its
+refusal code, `project.json`, and what a tree starts. [`docs/compared.md`](docs/compared.md) says what wilanis
+is not, against the frameworks, workflow engines and configuration languages it is taken for.
+[`docs/roadmap.md`](docs/roadmap.md) is the plan, one demo per milestone, and each draws on RFCs under
+[`docs/rfcs/`](docs/rfcs/README.md), written and accepted before anything is built.
 
-[`docs/model.md`](docs/model.md) is the full reference: every rule, every refusal code, `project.json`, and
-what a tree starts.
-
-## What is here
-
-| Package | |
-|---|---|
-| [`@wilanis/engine`](packages/engine) | The kernel: stateless, clockless, and it imports nothing |
-| [`@wilanis/core`](packages/core) | The document language: schemas, model, type system, loader |
-| [`@wilanis/compiler`](packages/compiler) | Judges a loaded tree, and lowers its graphs to engine specs |
-| [`@wilanis/runtime`](packages/runtime) | Embedder, `rehearse`, `fuzz`, `regress`, startup, and the `wilanis` CLI |
-| [`@wilanis/plugin-http`](packages/plugin-http) | Routes, outbound requests, connections, body codecs |
-| [`@wilanis/plugin-blob`](packages/plugin-blob) | Stored files read as CSV rows or text, and written back |
-| [`@wilanis/plugin-reload`](packages/plugin-reload) | Serve the tree again when it changes, without closing the port |
-| [`@wilanis/plugin-auth`](packages/plugin-auth) | The guard: tokens, sessions with typed attributes, one-time challenges |
-| [`@wilanis/plugin-storage`](packages/plugin-storage) | Records of a shape behind one port; an engine plugin says how they are kept |
-| [`@wilanis/plugin-storage-memory`](packages/plugin-storage-memory) | An engine for that port: records in a Map, for as long as the process runs |
-| [`@wilanis/plugin-storage-postgres`](packages/plugin-storage-postgres) | An engine for that port: records in PostgreSQL tables, through Kysely |
-| [`@wilanis/view`](packages/view) | The viewer. Read-only: it grants nothing and runs nothing |
-| [`@wilanis/access`](libraries/access) | Not code but a tree to include: sign-in, sessions and policies, in pure JSON |
-
-Dependencies point one way, engine ← core ← compiler ← runtime, and a plugin depends on core and engine
-only. A project installs the runtime, the plugins it uses, and the trees it includes.
+The code is under [`packages/`](packages), one package per directory and a README in each, and
+[`libraries/`](libraries) holds trees to include, pure JSON with tests of their own. Dependencies point one
+way, engine to core to compiler to runtime, and a plugin depends on core and engine only; [`CLAUDE.md`](CLAUDE.md)
+is the map. A project installs the runtime, the plugins it uses, and the trees it includes.
 
 ## Status
 
@@ -340,23 +203,12 @@ Pre-1.0. Everything above runs today. Nothing is published to npm yet, on purpos
 accepted RFC that changes a schema has landed or been withdrawn, so the schemas are final before they are
 frozen.
 
-[`docs/demo.md`](docs/demo.md) is the demo as a script: the route written a year later, in five beats, each command with the output it answered.
-[wilanis.dev](https://wilanis.dev/) serves the example drawn by the viewer at [/example/](https://wilanis.dev/example/), the demo as a record of one run at [/demo/](https://wilanis.dev/demo/), and the arena at [/arena/](https://wilanis.dev/arena/).
-
-[`docs/roadmap.md`](docs/roadmap.md) is the plan, and each milestone is a demo: customers in a real database,
-sessions shared across instances, a request drawn as a trace, work moved off the request, one command that
-deploys it, tenants that cannot leak into each other, an agent repairing a broken tree. Each draws on RFCs under [`docs/rfcs/`](docs/rfcs/README.md),
-written and accepted before anything is built.
-
 ## Contributing
 
-[`CONTRIBUTING.md`](CONTRIBUTING.md) says how work flows, from an RFC to an issue to a pull request, and
-[`CLAUDE.md`](CLAUDE.md) is the map of the code. Issues labelled `good first issue` need no prior knowledge
-of it.
-
-A plugin is the place to start if you want to add something the language cannot say: an npm package that
-ships its ports and kinds as JSON documents and implements one handler each. The checker holds it to what it
-declares.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) says how work flows, from an RFC to an issue to a pull request. Issues
+labelled `good first issue` need no prior knowledge of the code. A plugin is the place to start if you want
+to add something the language cannot say: an npm package that ships its ports and kinds as JSON documents and
+implements one handler each. The checker holds it to what it declares.
 
 ## License
 
