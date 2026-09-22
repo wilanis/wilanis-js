@@ -26,12 +26,12 @@ const shape = (label: string, fields: Record<string, unknown>) => ({
   fields,
 });
 
-/** A note of an entry, and a counted thing keyed by a number, so a reference has something to get wrong. */
+/** A note of a customer, and a counted thing keyed by a number, so a reference has something to get wrong. */
 const SHAPES = {
   'features/customers/domain/Note.shape.json': shape('Note', {
     id: { type: 'string' },
-    entryId: { type: 'string' },
-    byId: { type: 'string', required: false, description: 'the entry this note answers, where it answers one' },
+    customerId: { type: 'string' },
+    byId: { type: 'string', required: false, description: 'the customer this note answers, where it answers one' },
     tags: { type: 'string[]' },
     text: { type: 'string' },
   }),
@@ -46,8 +46,8 @@ const SHAPES = {
   }),
   'features/customers/domain/Renamed.shape.json': shape('Renamed', {
     id: { type: 'string' },
-    url: { type: 'string' },
-    agent: { type: 'string' },
+    email: { type: 'string' },
+    tier: { type: 'string' },
   }),
 };
 
@@ -72,8 +72,8 @@ const keeping = (collections: Record<string, unknown>, reads?: Record<string, st
   ...(reads ? TENANCY : {}),
   'features/customers/data/planted.store.json': {
     $schema: schemaUrl('store'),
-    label: 'Entries',
-    description: 'The rows recorded so far, and the notes hung off them.',
+    label: 'Customers',
+    description: 'The rows registered so far, and the notes hung off them.',
     connection: KEPT,
     ...(reads ? { reads } : {}),
     collections,
@@ -104,14 +104,14 @@ describe('sabotage: what a store holds its records to', () => {
   it('passes check when every constraint names a field the shape has, and means what it can mean', () => {
     expect(
       codesOf({
-        rows: entry({ unique: [['url', 'method']], defaults: { agent: 'unknown' } }),
-        notes: notes({ refs: { entryId: { collection: 'rows', onRemove: 'refuse' } } }),
+        rows: entry({ unique: [['email']], defaults: { tier: 'bronze' } }),
+        notes: notes({ refs: { customerId: { collection: 'rows', onRemove: 'refuse' } } }),
       }),
     ).toEqual([]);
   });
 
   it('C003 a constraint naming a field the shape does not have, pointing at the constraint that named it', () => {
-    expect(pointingAt({ rows: entry({ unique: [['urrl']] }) })).toEqual(at('C003', 'rows/unique/0'));
+    expect(pointingAt({ rows: entry({ unique: [['emaill']] }) })).toEqual(at('C003', 'rows/unique/0'));
     expect(pointingAt({ rows: entry({ defaults: { nope: 1 } }) })).toEqual(at('C003', 'rows/defaults/nope'));
     expect(pointingAt({ rows: entry({ refs: { nope: { collection: 'rows' } } }) })).toEqual(
       at('C003', 'rows/refs/nope'),
@@ -119,24 +119,26 @@ describe('sabotage: what a store holds its records to', () => {
   });
 
   it('C004 a default the field would not accept, or one given for the key', () => {
-    expect(pointingAt({ rows: entry({ defaults: { agent: 7 } }) })).toEqual(at('C004', 'rows/defaults/agent'));
+    expect(pointingAt({ rows: entry({ defaults: { tier: 7 } }) })).toEqual(at('C004', 'rows/defaults/tier'));
     expect(pointingAt({ rows: entry({ defaults: { id: 'x' } }) })).toEqual(at('C004', 'rows/defaults/id'));
-    expect(codesOf({ rows: entry({ defaults: { agent: 'unknown' } }) })).toEqual([]);
+    expect(codesOf({ rows: entry({ defaults: { tier: 'bronze' } }) })).toEqual([]);
   });
 
   it("the example's own unique and defaults are judged where they are written", () => {
-    const kept = '@features/customers/data/customers.store.json#collections/entries';
+    const kept = '@features/customers/data/customers.store.json#collections/customers';
     const breaking = (edit: (collection: any) => void) =>
-      sabotagePointing('features/customers/data/customers.store.json', doc => edit(doc.collections.entries));
+      sabotagePointing('features/customers/data/customers.store.json', doc => edit(doc.collections.customers));
 
-    expect(breaking(entries => entries.unique.push(['urrl']))).toEqual([`C003 ${kept}/unique/1`]);
-    expect(breaking(entries => (entries.defaults.agent = 7))).toEqual([`C004 ${kept}/defaults/agent`]);
-    expect(breaking(entries => (entries.defaults.id = entries.defaults.agent))).toEqual([`C004 ${kept}/defaults/id`]);
+    expect(breaking(customers => customers.unique.push(['emaill']))).toEqual([`C003 ${kept}/unique/1`]);
+    expect(breaking(customers => (customers.defaults.tier = 7))).toEqual([`C004 ${kept}/defaults/tier`]);
+    expect(breaking(customers => (customers.defaults.id = customers.defaults.tier))).toEqual([
+      `C004 ${kept}/defaults/id`,
+    ]);
   });
 
   it('C005 a reference to a collection this store does not declare', () => {
-    const broken = { rows: entry(), notes: notes({ refs: { entryId: { collection: 'nowhere' } } }) };
-    expect(pointingAt(broken)).toEqual(at('C005', 'notes/refs/entryId'));
+    const broken = { rows: entry(), notes: notes({ refs: { customerId: { collection: 'nowhere' } } }) };
+    expect(pointingAt(broken)).toEqual(at('C005', 'notes/refs/customerId'));
   });
 
   it('a view keeps no records, so it is judged as one and never as a collection that does', () => {
@@ -149,16 +151,16 @@ describe('sabotage: what a store holds its records to', () => {
     // and a reference names something with a key to hold, which a view has not
     expect(
       pointingAt(
-        { rows: scoped, everyRow: view, notes: notes({ refs: { entryId: { collection: 'everyRow' } } }) },
+        { rows: scoped, everyRow: view, notes: notes({ refs: { customerId: { collection: 'everyRow' } } }) },
         READS,
       ),
-    ).toEqual(at('C005', 'notes/refs/entryId'));
+    ).toEqual(at('C005', 'notes/refs/customerId'));
   });
 
   it('C006 a reference of one type to records keyed by another', () => {
-    const broken = { counted, notes: notes({ refs: { entryId: { collection: 'counted' } } }) };
-    expect(pointingAt(broken)).toEqual(at('C006', 'notes/refs/entryId'));
-    expect(codesOf({ rows: entry(), notes: notes({ refs: { entryId: { collection: 'rows' } } }) })).toEqual([]);
+    const broken = { counted, notes: notes({ refs: { customerId: { collection: 'counted' } } }) };
+    expect(pointingAt(broken)).toEqual(at('C006', 'notes/refs/customerId'));
+    expect(codesOf({ rows: entry(), notes: notes({ refs: { customerId: { collection: 'rows' } } }) })).toEqual([]);
   });
 
   it('a reference on a field that may be absent is an ordinary nullable one, and passes', () => {
@@ -175,7 +177,7 @@ describe('sabotage: what a store holds its records to', () => {
   });
 
   it("a constraint naming one field twice is the schema's to refuse, so C007 never has to", () => {
-    expect(codesOf({ rows: entry({ unique: [['url', 'url']] }) })).toEqual(['D001']);
+    expect(codesOf({ rows: entry({ unique: [['email', 'email']] }) })).toEqual(['D001']);
   });
 
   it('C008 a constraint over a field an engine holds no value of: bytes, a shape or a list', () => {
@@ -195,21 +197,21 @@ describe('sabotage: what a store holds its records to', () => {
   });
 
   it('C010 a renamed keyed by a field the shape does not have: there is nothing to rename to', () => {
-    expect(pointingAt({ rows: entry({ renamed: { nope: 'ua' } }) })).toEqual(at('C010', 'rows/renamed/nope'));
+    expect(pointingAt({ rows: entry({ renamed: { nope: 'emailAddress' } }) })).toEqual(at('C010', 'rows/renamed/nope'));
   });
 
   it('C010 a renamed whose value is a field of the shape still, so nothing was renamed', () => {
-    const both = { of: '@customers/domain/Renamed.shape.json', key: 'id', renamed: { agent: 'url' } };
-    expect(pointingAt({ rows: both })).toEqual(at('C010', 'rows/renamed/agent'));
+    const both = { of: '@customers/domain/Renamed.shape.json', key: 'id', renamed: { tier: 'email' } };
+    expect(pointingAt({ rows: both })).toEqual(at('C010', 'rows/renamed/tier'));
   });
 
   it('C010 one name under two keys: one column cannot become two', () => {
-    const twice = { of: '@customers/domain/Renamed.shape.json', key: 'id', renamed: { url: 'ua', agent: 'ua' } };
-    expect(pointingAt({ rows: twice })).toEqual(at('C010', 'rows/renamed/agent'));
+    const twice = { of: '@customers/domain/Renamed.shape.json', key: 'id', renamed: { email: 'addr', tier: 'addr' } };
+    expect(pointingAt({ rows: twice })).toEqual(at('C010', 'rows/renamed/tier'));
   });
 
   it('a renamed naming the key passes: a key is a column like any other, and renaming it loses nothing', () => {
-    expect(codesOf({ rows: entry({ renamed: { id: 'rowId' }, defaults: { agent: 'unknown' } }) })).toEqual([]);
+    expect(codesOf({ rows: entry({ renamed: { id: 'rowId' }, defaults: { tier: 'bronze' } }) })).toEqual([]);
   });
 
   it("C011 a was equal to the collection's own name, which was never renamed", () => {
@@ -222,8 +224,8 @@ describe('sabotage: what a store holds its records to', () => {
   });
 
   it('C011 a was naming a collection of another store on the same connection: (connection, name) is a table', () => {
-    // the example's own store keeps `entries` on this connection, so no collection here was ever called that
-    expect(pointingAt({ rows: entry({ was: 'entries' }) })).toEqual(at('C011', 'rows/was'));
+    // the example's own store keeps `customers` on this connection, so no collection here was ever called that
+    expect(pointingAt({ rows: entry({ was: 'customers' }) })).toEqual(at('C011', 'rows/was'));
   });
 
   it('a was naming nothing this connection keeps passes: that is what a rename says', () => {
@@ -235,7 +237,7 @@ describe('sabotage: what a store holds its records to', () => {
     expect(pointingAt(missing)).toEqual(at('R001', 'rows/of'));
     const referring = {
       rows: { of: '@customers/domain/Nowhere.shape.json', key: 'id' },
-      notes: notes({ refs: { entryId: { collection: 'rows' } } }),
+      notes: notes({ refs: { customerId: { collection: 'rows' } } }),
     };
     expect(pointingAt(referring)).toEqual(at('R001', 'rows/of'));
   });

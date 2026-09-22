@@ -50,7 +50,7 @@
       "run": "@std/outcome.port.json#refuse",
       "in": {
         "reason": "forbidden",
-        "message": "recording customers takes the registrar role",
+        "message": "registering customers takes the registrar role",
         "type": "@access/domain/Grant.shape.json"
       }
     },
