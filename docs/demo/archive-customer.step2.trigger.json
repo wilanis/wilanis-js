@@ -1,10 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
-  "label": "POST /monitor/{id}/archive",
-  "description": "Pasted over features/customers/edge/archive-entry.trigger.json in beat 3 of docs/demo.md: the route with its shapes and refusals filled in as the T002 and T005 hints said, and still no policy, so one refusal is left, I001.",
+  "label": "POST /customers/{id}/archive",
+  "description": "Pasted over features/customers/edge/archive-customer.trigger.json in beat 3 of docs/demo.md: the route with its shapes and refusals filled in as the T002 and T005 hints said, and still no policy, so one refusal is left, I001.",
   "kind": "@http/http.trigger-kind.json",
   "settings": {
-    "route": "/monitor/{id}/archive",
+    "route": "/customers/{id}/archive",
     "method": "POST",
     "produces": "application/json",
     "response": {

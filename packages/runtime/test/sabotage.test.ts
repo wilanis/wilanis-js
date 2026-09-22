@@ -9,7 +9,7 @@ describe('sabotage: graphs, layers and triggers', () => {
   it('G003 a deep path that does not exist', () => {
     expect(
       sabotage('features/customers/domain/register-customer.graph.json', graph => {
-        graph.nodes[0].in.url = '{{in.urrl}}';
+        graph.nodes[0].in.email = '{{in.emaill}}';
       }),
     ).toContain('G003');
   });
@@ -23,7 +23,7 @@ describe('sabotage: graphs, layers and triggers', () => {
   it('G005 a required input left unwired', () => {
     expect(
       sabotage('features/customers/domain/register-customer.graph.json', graph => {
-        delete graph.nodes[0].in.url;
+        delete graph.nodes[0].in.email;
       }),
     ).toContain('G005');
   });
@@ -112,7 +112,7 @@ describe('sabotage: graphs, layers and triggers', () => {
   it('T002 a trigger whose edge shape does not fit the graph', () => {
     expect(
       sabotage('features/customers/edge/RegisterRequest.shape.json', shape => {
-        delete shape.fields.url;
+        delete shape.fields.email;
       }),
     ).toContain('T002');
   });
@@ -163,7 +163,7 @@ describe('sabotage: graphs, layers and triggers', () => {
   it('P001 a static field given a read', () => {
     expect(
       sabotage('features/customers/data/list-rows-by-tier.graph.json', graph => {
-        graph.nodes[0].in.method = '{{in.method}}';
+        graph.nodes[0].in.method = '{{in.tier}}';
       }),
     ).toContain('P001');
   });
@@ -177,7 +177,7 @@ describe('sabotage: graphs, layers and triggers', () => {
   it('T003 a route placeholder the route does not declare', () => {
     expect(
       sabotage('features/customers/edge/get-customer.trigger.json', trigger => {
-        trigger.settings.route = '/monitor/{entry}';
+        trigger.settings.route = '/customers/{customer}';
       }),
     ).toContain('T003');
   });

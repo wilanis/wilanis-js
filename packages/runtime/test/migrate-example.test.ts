@@ -26,12 +26,12 @@ describe("the example's migration plan", () => {
         declaredOfStore(declaring, of => scope.types.shape(of)),
         marksOfStore(declaring),
       ).steps;
-      // both collections are created, and the unique the entries declare is written over the rows there are
+      // both collections are created, and the unique the customers declare is written over the rows there are
       // none of: an empty database loses nothing, so the whole plan is additive and needs no permission
       expect(
         steps.map(step => `${step.do} ${step.target}`),
         path,
-      ).toEqual(['create entries', 'create latest', 'unique entries']);
+      ).toEqual(['create customers', 'create latest', 'unique customers']);
       // nothing is renamed, dropped or retyped: `renamed` says what a database holding rows would do, and a
       // fresh one has no `ua` to rename -- which is the stale-mark line the third command of the walk prints
       expect(

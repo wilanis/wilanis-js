@@ -318,7 +318,7 @@ the policy. No document validates a token and no graph checks access, so an agen
 whose fifth row is not an entry: the URL is empty.
 
 ```
-cat $DEMO/entries.bad.csv
+cat $DEMO/customers.bad.csv
 ```
 
 ```
@@ -334,7 +334,7 @@ https://api.example.com/customers,GET
 
 ```
 curl -s -X POST localhost:8099/monitor.csv -H 'content-type: text/csv' -H "authorization: Bearer $TOKEN" \
-  --data-binary @$DEMO/entries.bad.csv -w '  [%{http_code}]\n'
+  --data-binary @$DEMO/customers.bad.csv -w '  [%{http_code}]\n'
 curl -s localhost:8099/monitor -w '  [%{http_code}]\n'
 ```
 
@@ -364,7 +364,7 @@ half-written store. Under `live` the same operation is bound to a graph without 
 **The PostgreSQL swap.** `--profile production` binds the monitor port to a store in PostgreSQL; not one
 route, policy, shape or business graph differs from `local`, and beat 1 judged it with everything else.
 `npx wilanis migrate . --profile production` prints what the database would have to do and does nothing until
-`--apply`. It needs a PostgreSQL, its URL in `MONITOR_DATABASE_URL`, and [`example/README.md`](../example/README.md#changing-the-shape-and-the-plan-that-follows) as the script.
+`--apply`. It needs a PostgreSQL, its URL in `CUSTOMERS_DATABASE_URL`, and [`example/README.md`](../example/README.md#changing-the-shape-and-the-plan-that-follows) as the script.
 
 **The edit that never reaches the serving tree.** With `start` still running, paste the beat-3 file back
 over the route (`cp $DEMO/archive-entry.step2.trigger.json features/customers/edge/archive-entry.trigger.json`):
@@ -386,9 +386,9 @@ bash docs/demo/reset.sh /tmp/wilanis-demo
 # the example, copied to /tmp/wilanis-demo; its node_modules link to /Users/you/wilanis-js
 cd /tmp/wilanis-demo
 export DEMO=/Users/you/wilanis-js/docs/demo
-export MONITOR_JWT_SECRET=PNa6n0D3hZ87EO9x60t+aGb7CeEowsPbzyL/EtFNT0Y=
+export CUSTOMERS_JWT_SECRET=PNa6n0D3hZ87EO9x60t+aGb7CeEowsPbzyL/EtFNT0Y=
 # until #304 lands, start reads every profile's secrets although local never reaches PostgreSQL
-export MONITOR_DATABASE_URL=postgres://unused
+export CUSTOMERS_DATABASE_URL=postgres://unused
 ```
 
 The JWT secret is what the tree signs its tokens with, generated fresh each run with `openssl rand`. The
@@ -396,4 +396,4 @@ database URL is a placeholder, never dialled: today `start` reads every profile'
 one, so `local` asks for a URL it will not use. #302, #303 and #304 change that; when they land, the last two lines go.
 
 The prepared files are `docs/demo/archive-entry.step2.trigger.json` and `.step3.trigger.json` (beat 3) and
-`docs/demo/entries.bad.csv` (beat 5); each JSON file says in its `description` which beat pastes it.
+`docs/demo/customers.bad.csv` (beat 5); each JSON file says in its `description` which beat pastes it.

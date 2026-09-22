@@ -19,7 +19,7 @@
       "in": {
         "connection": "@connections/customers-api.connection.json",
         "method": "GET",
-        "path": "/customers?method={{in.tier}}",
+        "path": "/customers?tier={{in.tier}}",
         "produces": "application/json",
         "returns": "@customers/edge/CustomerRow.shape.json[]"
       }
@@ -57,7 +57,7 @@
       "run": "@std/outcome.port.json#refuse",
       "in": {
         "reason": "upstream",
-        "message": "the monitor API answered {{asked.status}}",
+        "message": "the customer API answered {{asked.status}}",
         "type": "@customers/domain/Customer.shape.json[]"
       }
     }

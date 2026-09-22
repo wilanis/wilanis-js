@@ -22,7 +22,7 @@ const edge = (view: DocView, ends: { from: string; fromPort: string; to: string;
 describe('the view model of the example', () => {
   it('lists every document, sorted by kind then path, with no refusals', async () => {
     const idx = indexOf(await loadProject(EXAMPLE));
-    expect(idx.project).toBe('monitor');
+    expect(idx.project).toBe('customers');
     expect(idx.refusals).toEqual([]);
     expect(idx.docs.map(doc => doc.kind)).toEqual(
       idx.docs
@@ -43,7 +43,7 @@ describe('the view model of the example', () => {
     expect(idx.docs.find(doc => doc.path === GET_ROW)?.label).toBe('Get a row');
     expect(idx.docs.find(doc => doc.path === '@http/http.port.json')?.label).toBe('HTTP');
     const seen = await view('@features/customers/domain/Customer.shape.json');
-    expect(seen.label).toBe('Entry');
+    expect(seen.label).toBe('Customer');
     expect(seen.refs).toEqual([]);
     expect(seen.callers.find(caller => caller.path === GET_ROW)?.label).toBe('Get a row');
   });
@@ -64,7 +64,7 @@ describe('the view model of the example', () => {
     expect(seen.fires).toMatchObject({
       op: '@features/customers/domain/customer.port.json#get',
       opName: 'get',
-      portLabel: 'Entry storage',
+      portLabel: 'Customer storage',
       native: false,
       // the first binding by path; the REST one is still there, one along
       implementation: '@features/customers/data/kept-get-postgres.graph.json',
@@ -74,7 +74,7 @@ describe('the view model of the example', () => {
     const graph = await view(GET_ROW);
     expect(graph.callers).toContainEqual({
       path: '@features/customers/edge/get-customer.trigger.json',
-      label: 'GET /monitor/{id}',
+      label: 'GET /customers/{id}',
       kind: 'trigger',
       at: '/fire/run',
       via: '@features/customers/domain/customer.port.json#get',
@@ -146,14 +146,15 @@ describe('the view model of the example', () => {
   });
 
   it('a map with bind shows each bound input as read from the element, never as missing; an input typed by a bound variable shows the bound type', async () => {
-    // the map that binds url and method moved into record-all when the import was split around its transaction
+    // the map that binds the draft's fields moved into register-all when the import was split around its transaction
     const recorded = (await view('@features/customers/domain/register-all.graph.json')).graph!.nodes.find(
       node => node.id === 'recorded',
     )!;
     expect(recorded.inputs.map(port => [port.name, port.bound, port.missing])).toEqual([
       ['over', undefined, undefined],
-      ['url', 'url', undefined],
-      ['method', 'method', undefined],
+      ['name', 'name', undefined],
+      ['email', 'email', undefined],
+      ['tier', 'tier', undefined],
     ]);
     const remove = (await view('@features/customers/domain/remove-customers.graph.json')).graph!.nodes.find(
       node => node.id === 'removed',
@@ -204,7 +205,7 @@ describe('the view model of the example', () => {
       },
       {
         path: '@features/customers/data/customers-store.binding.json',
-        label: 'Monitor over a store',
+        label: 'Customers over a store',
         operations: expect.objectContaining({
           get: { graph: '@features/customers/data/kept-get.graph.json', graphLabel: 'Get what is kept' },
         }),

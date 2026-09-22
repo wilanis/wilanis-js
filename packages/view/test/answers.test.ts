@@ -30,18 +30,18 @@ describe('how the viewer says a refusal is answered', () => {
         reason: 'missing',
         answer: 404,
         from: [
-          { graph: GET_ROW, graphLabel: 'Get a row', node: 'missing', nodeLabel: 'No such entry' },
+          { graph: GET_ROW, graphLabel: 'Get a row', node: 'missing', nodeLabel: 'No such customer' },
           {
             graph: '@features/customers/data/kept-get.graph.json',
             graphLabel: 'Get what is kept',
             node: 'missing',
-            nodeLabel: 'No such entry',
+            nodeLabel: 'No such customer',
           },
           {
             graph: '@features/customers/data/kept-get-postgres.graph.json',
             graphLabel: 'Get what is kept',
             node: 'missing',
-            nodeLabel: 'No such entry',
+            nodeLabel: 'No such customer',
           },
         ],
       },
@@ -51,7 +51,7 @@ describe('how the viewer says a refusal is answered', () => {
         from: [{ graph: GET_ROW, graphLabel: 'Get a row', node: 'failed', nodeLabel: 'Unexpected answer' }],
       },
       // no node writes this one down: it is the guard the compiler lowers where the field invariant could not
-      // be proved of the entry `row` makes, and the viewer names the site it stands at like any other refusal
+      // be proved of the customer `row` makes, and the viewer names the site it stands at like any other refusal
       {
         reason: 'invariant',
         answer: 500,
@@ -90,7 +90,7 @@ describe('how the viewer says a refusal is answered', () => {
     expect(missing.answeredBy).toEqual([
       {
         trigger: '@features/customers/edge/get-customer.trigger.json',
-        triggerLabel: 'GET /monitor/{id}',
+        triggerLabel: 'GET /customers/{id}',
         maps: true,
         answer: 404,
       },
@@ -103,7 +103,7 @@ describe('how the viewer says a refusal is answered', () => {
       expect.arrayContaining([
         {
           trigger: '@features/customers/edge/list-customers.trigger.json',
-          triggerLabel: 'GET /monitor',
+          triggerLabel: 'GET /customers',
           maps: true,
           answer: 502,
         },

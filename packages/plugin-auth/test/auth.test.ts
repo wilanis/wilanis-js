@@ -33,20 +33,20 @@ let key: { privateKey: KeyLike; jwk: Record<string, unknown> };
 const rows: Record<string, unknown>[] = [];
 
 beforeAll(async () => {
-  process.env.MONITOR_JWT_SECRET = SECRET;
+  process.env.CUSTOMERS_JWT_SECRET = SECRET;
   // every connection's secrets are substituted whatever the profile, and the example now has one over a
   // database; nothing here dials it, so any well-formed URL will do
-  process.env.MONITOR_DATABASE_URL = 'postgres://monitor:monitor@localhost:5432/monitor';
+  process.env.CUSTOMERS_DATABASE_URL = 'postgres://customers:customers@localhost:5432/customers';
   const upstream: Server = fakeUpstream(rows);
   stopUpstream = await listening(upstream, UPSTREAM);
   key = await issuerKey();
   const base = `http://localhost:${ISSUER}`;
   stopIssuer = await listening(fakeIssuer(base, key), ISSUER);
-  // the customers are an OIDC issuer here; the employees stay the directory written in the connection
+  // the account holders are an OIDC issuer here; the employees stay the directory written in the connection
   dir = localCopy({
-    'connections/customers.connection.json': connection => {
+    'connections/people.connection.json': connection => {
       connection.kind = '@auth/oidc.connection-kind.json';
-      connection.settings = { issuer: base, clientId: 'monitor', clientSecret: 'shh' };
+      connection.settings = { issuer: base, clientId: 'customers', clientSecret: 'shh' };
     },
   });
   const load = loadTree(dir, PLUGINS, INCLUDES);
@@ -77,17 +77,17 @@ describe('signing in: two directories, one issuer', () => {
     const claims = JSON.parse(Buffer.from(answer.body.accessToken.split('.')[1], 'base64url').toString());
     expect(claims).toMatchObject({
       sub: 'bo',
-      iss: 'monitor',
-      aud: 'monitor-api',
+      iss: 'customers',
+      aud: 'customers-api',
       realm: 'employee',
-      roles: ['recorder'],
+      roles: ['registrar'],
     });
   });
   it("a customer signs in against the OIDC issuer and gets our token, never the issuer's, realm customer", async () => {
     const answer = await signIn('auth-customers', 'dee', 'dee-pass');
     expect(answer.status).toBe(200);
     const claims = JSON.parse(Buffer.from(answer.body.accessToken.split('.')[1], 'base64url').toString());
-    expect(claims).toMatchObject({ sub: 'okta|dee', iss: 'monitor', realm: 'customer', roles: ['customer', 'beta'] });
+    expect(claims).toMatchObject({ sub: 'okta|dee', iss: 'customers', realm: 'customer', roles: ['customer', 'beta'] });
   });
   it('a wrong password is 401 as bad_credentials, from either directory, and the caller cannot tell them apart', async () => {
     expect(await signIn('auth-employees', 'bo', 'nope').then(answer => [answer.status, answer.body])).toEqual([
@@ -109,10 +109,10 @@ describe('signing in: two directories, one issuer', () => {
   });
 });
 
-describe("policies over the monitor's writes", () => {
-  const entry = { url: 'https://gated.example/', method: 'GET' };
+describe("policies over the registry's writes", () => {
+  const customer = { name: 'Gated', email: 'gated@example.com', tier: 'bronze' };
   const post = (init: Parameters<typeof call>[1]) =>
-    call('/monitor', { method: 'POST', body: JSON.stringify(entry), ...init });
+    call('/customers', { method: 'POST', body: JSON.stringify(customer), ...init });
   it('no token: 401 as anonymous', async () => {
     expect(await post({}).then(answer => [answer.status, answer.body.reason])).toEqual([401, 'anonymous']);
   });
@@ -121,11 +121,11 @@ describe("policies over the monitor's writes", () => {
     expect(answer.status).toBe(401);
     expect(answer.body.reason).toBe('invalid_credential');
     expect(answer.body.message).toContain('does not verify');
-    const forged = await new SignJWT({ realm: 'employee', roles: ['recorder'], sid: 'x' })
+    const forged = await new SignJWT({ realm: 'employee', roles: ['registrar'], sid: 'x' })
       .setProtectedHeader({ alg: 'HS256' })
       .setSubject('bo')
-      .setIssuer('monitor')
-      .setAudience('monitor-api')
+      .setIssuer('customers')
+      .setAudience('customers-api')
       .setExpirationTime('5m')
       .sign(new TextEncoder().encode('another-key-another-key-another-key'));
     expect((await post({ token: forged })).body.reason).toBe('invalid_credential');
@@ -139,16 +139,16 @@ describe("policies over the monitor's writes", () => {
       { reason: 'forbidden', message: 'this is for employees' },
     ]);
   });
-  it('an employee without the recorder role is 403 as forbidden by the second policy', async () => {
+  it('an employee without the registrar role is 403 as forbidden by the second policy', async () => {
     const {
       body: { accessToken },
     } = await signIn('auth-employees', 'cy', 'cy-pass');
     expect(await post({ token: accessToken }).then(answer => [answer.status, answer.body])).toEqual([
       403,
-      { reason: 'forbidden', message: 'recording entries takes the recorder role' },
+      { reason: 'forbidden', message: 'recording customers takes the registrar role' },
     ]);
   });
-  it('an employee with the role records, by header or by cookie', async () => {
+  it('an employee with the role registers, by header or by cookie', async () => {
     const {
       body: { accessToken },
     } = await signIn('auth-employees', 'bo', 'bo-pass');
@@ -156,7 +156,7 @@ describe("policies over the monitor's writes", () => {
     expect((await post({ cookie: `session=${accessToken}` })).status).toBe(201);
   });
   it('public reads stay public', async () => {
-    expect((await call('/monitor')).status).toBe(200);
+    expect((await call('/customers')).status).toBe(200);
   });
 });
 

@@ -103,7 +103,7 @@ npm install @wilanis/access @wilanis/plugin-auth @wilanis/plugin-http
 
 This directory is a complete tree: `features/access-dev` binds `identity.port.json` to the directories written in
 `connections/`, and `@auth/state.port.json` to files under `.wilanis/auth` (bo / bo-pass holds `registrar`, cy / cy-pass only `viewer`, ana / ana-pass is a customer), so
-`wilanis check .`, `wilanis rehearse .` and `wilanis start .` work here with `MONITOR_JWT_SECRET` set. A host
+`wilanis check .`, `wilanis rehearse .` and `wilanis start .` work here with `CUSTOMERS_JWT_SECRET` set. A host
 that includes `["access"]` gets none of that: the dev feature and the connections stay behind.
 
 Part of [wilanis](https://github.com/wilanis/wilanis-js). Apache-2.0.

@@ -46,7 +46,7 @@ describe('sabotage: how a store is scoped', () => {
     );
   });
   it('B008 points at the startup step that reaches the scoped collection', () => {
-    // step 1 is listAll, bound to the graph that finds over entries: a startup step runs before anything is
+    // step 1 is listAll, bound to the graph that finds over customers: a startup step runs before anything is
     // received, so a scoped collection is unreachable from it by construction
     expect(scopedPointing()).toContain('B008 @project.json#startup/1/run');
     expect(scopedSaying()).toContain(
@@ -55,35 +55,35 @@ describe('sabotage: how a store is scoped', () => {
   });
   it('C012 a scope that is a literal, an interpolation, or a field of a read', () => {
     for (const value of ['acme', '{{tenant}}-eu', 'in {{tenant}}', '{{tenant.id}}', '{{in.tenant}}'])
-      expect(scopedCodes({ [STORE]: store => (store.collections.entries.scoped.tenant = value) })).toContain('C012');
+      expect(scopedCodes({ [STORE]: store => (store.collections.customers.scoped.tenant = value) })).toContain('C012');
   });
   it('C012 says a literal is not a read, and writes the two entries that would make one', () => {
-    expect(scopedSaying({ [STORE]: store => (store.collections.entries.scoped.tenant = 'acme') })).toContain(
+    expect(scopedSaying({ [STORE]: store => (store.collections.customers.scoped.tenant = 'acme') })).toContain(
       "C012 'acme' is not a read; a scope is exactly one resolver the store binds under reads",
     );
-    expect(scopedHinting({ [STORE]: store => (store.collections.entries.scoped.tenant = 'acme') })).toContain(
+    expect(scopedHinting({ [STORE]: store => (store.collections.customers.scoped.tenant = 'acme') })).toContain(
       'C012 write "scoped": { "tenant": "{{tenant}}" } and bind tenant: "reads": { "tenant": "@<feature>/edge/<file>.resolvers.json#tenant" }',
     );
   });
   it('C012 a scope reading a name the store does not bind', () => {
-    expect(scopedPointing({ [STORE]: store => (store.collections.entries.scoped.tenant = '{{agent}}') })).toContain(
-      'C012 @features/customers/data/customers.store.json#collections/entries/scoped/tenant',
+    expect(scopedPointing({ [STORE]: store => (store.collections.customers.scoped.tenant = '{{agent}}') })).toContain(
+      'C012 @features/customers/data/customers.store.json#collections/customers/scoped/tenant',
     );
-    expect(scopedSaying({ [STORE]: store => (store.collections.entries.scoped.tenant = '{{agent}}') })).toContain(
+    expect(scopedSaying({ [STORE]: store => (store.collections.customers.scoped.tenant = '{{agent}}') })).toContain(
       "C012 'agent' is not a read this store binds (reads: tenant)",
     );
   });
   it('C012 a scope naming a field of the collection shape', () => {
-    // url is a field of Entry: a scope is a column the store keeps beside the record, never the record's own,
+    // email is a field of Customer: a scope is a column the store keeps beside the record, never the record's own,
     // since a field is written by whatever made it and could have come from the caller
     expect(
       scopedSaying({
         [STORE]: store => {
-          store.collections.entries.scoped = { url: '{{tenant}}' };
+          store.collections.customers.scoped = { email: '{{tenant}}' };
         },
       }),
     ).toContain(
-      "C012 'url' is a field of @customers/domain/Customer.shape.json, and a scope is a column the store keeps beside the record",
+      "C012 'email' is a field of @customers/domain/Customer.shape.json, and a scope is a column the store keeps beside the record",
     );
   });
   it('C012 a scope whose resolver is not required', () => {
@@ -115,10 +115,10 @@ describe('sabotage: how a store is scoped', () => {
       scopedPointing({
         [STORE]: store => {
           store.reads.owner = '@customers/edge/request.resolvers.json#agent';
-          store.collections.entries.scoped.owner = '{{owner}}';
+          store.collections.customers.scoped.owner = '{{owner}}';
         },
       }),
-    ).toContain('C012 @features/customers/data/customers.store.json#collections/entries/scoped/owner');
+    ).toContain('C012 @features/customers/data/customers.store.json#collections/customers/scoped/owner');
   });
   it('P004 a reads entry naming no resolver of the document it names', () => {
     expect(
@@ -149,27 +149,30 @@ describe('sabotage: how a store is scoped', () => {
   it('C013 a view of a collection this store does not declare', () => {
     const broken = {
       [STORE]: (store: any) => {
-        store.collections.everyEntry = { view: 'nope', behind: '@access/edge/employees-only.policy.json' };
+        store.collections.everyCustomer = { view: 'nope', behind: '@access/edge/employees-only.policy.json' };
       },
     };
     expect(scopedCodes(broken)).toContain('C013');
     expect(scopedSaying(broken)).toContain(
-      "C013 'nope' is not a collection of this store (collections: entries, latest, everyEntry)",
+      "C013 'nope' is not a collection of this store (collections: customers, latest, everyCustomer)",
     );
     expect(scopedPointing(broken)).toContain(
-      'C013 @features/customers/data/customers.store.json#collections/everyEntry/view',
+      'C013 @features/customers/data/customers.store.json#collections/everyCustomer/view',
     );
   });
   it('C013 a view of a view', () => {
     const broken = {
       [STORE]: (store: any) => {
-        store.collections.everyEntry = { view: 'entries', behind: '@access/edge/employees-only.policy.json' };
-        store.collections.everyEntryToo = { view: 'everyEntry', behind: '@access/edge/employees-only.policy.json' };
+        store.collections.everyCustomer = { view: 'customers', behind: '@access/edge/employees-only.policy.json' };
+        store.collections.everyCustomerToo = {
+          view: 'everyCustomer',
+          behind: '@access/edge/employees-only.policy.json',
+        };
       },
     };
     expect(scopedCodes(broken)).toContain('C013');
     expect(scopedSaying(broken)).toContain(
-      "C013 'everyEntry' is itself a view of 'entries', and a view sees a collection of records",
+      "C013 'everyCustomer' is itself a view of 'customers', and a view sees a collection of records",
     );
   });
   it('C013 a view of a collection that declares no scope', () => {
@@ -191,18 +194,18 @@ describe('sabotage: how a store is scoped', () => {
     expect(
       scopedPointing({
         [STORE]: store => {
-          store.collections.everyEntry = { view: 'entries', behind: '@access/edge/nope.policy.json' };
+          store.collections.everyCustomer = { view: 'customers', behind: '@access/edge/nope.policy.json' };
         },
       }),
-    ).toContain('R001 @features/customers/data/customers.store.json#collections/everyEntry/behind');
+    ).toContain('R001 @features/customers/data/customers.store.json#collections/everyCustomer/behind');
   });
   it('a view of a scoped collection, behind a policy, is refused nothing of its own', () => {
     // nothing here reads it yet -- A0n2 is step 3's -- so what a well-formed view earns is A006 and B008 and
     // no more: the view declares no scope, and the collection it views is scoped as before
     const codes = scopedCodes({
       [STORE]: store => {
-        store.collections.everyEntry = {
-          view: 'entries',
+        store.collections.everyCustomer = {
+          view: 'customers',
           behind: '@access/edge/employees-only.policy.json',
           description: 'the same rows, every tenant',
         };
@@ -212,7 +215,7 @@ describe('sabotage: how a store is scoped', () => {
   });
   it('X214 a scope written by hand on the site the compiler fills: the M12 demo, refused', () => {
     // "the agent added the filter by hand" is the one thing a scope makes unwriteable: the store says how
-    // entries are scoped, the compiler carries it to every site, and a document that repeats it is refused
+    // customers are scoped, the compiler carries it to every site, and a document that repeats it is refused
     const broken = {
       [GET]: (graph: any) => {
         graph.nodes[0].in.scope = { tenant: '{{in.id}}' };
@@ -221,25 +224,25 @@ describe('sabotage: how a store is scoped', () => {
     expect(scopedCodes(broken)).toContain('X214');
     expect(scopedPointing(broken)).toContain('X214 @features/customers/data/kept-get.graph.json#nodes/asked/in/scope');
     expect(scopedSaying(broken)).toContain(
-      "X214 scope is the store's: 'entries' is scoped by tenant ← {{tenant}} of @customers/data/customers.store.json, and the compiler puts it here",
+      "X214 scope is the store's: 'customers' is scoped by tenant ← {{tenant}} of @customers/data/customers.store.json, and the compiler puts it here",
     );
     expect(scopedHinting(broken)).toContain(
-      'X214 drop "scope": to change how \'entries\' is scoped, change @customers/data/customers.store.json',
+      'X214 drop "scope": to change how \'customers\' is scoped, change @customers/data/customers.store.json',
     );
   });
   it('X214 a scope on the find over a view, which sees every row whatever a site says', () => {
     const broken = {
       [STORE]: (store: any) => {
-        store.collections.everyEntry = { view: 'entries', behind: '@access/edge/employees-only.policy.json' };
+        store.collections.everyCustomer = { view: 'customers', behind: '@access/edge/employees-only.policy.json' };
       },
       [LIST]: (graph: any) => {
-        graph.nodes[0].in.collection = 'everyEntry';
+        graph.nodes[0].in.collection = 'everyCustomer';
         graph.nodes[0].in.scope = { tenant: 'acme' };
       },
     };
     expect(scopedCodes(broken)).toContain('X214');
-    expect(scopedSaying(broken)).toContain("X214 'everyEntry' is a view of 'entries', and a view sees every row");
-    expect(scopedHinting(broken)).toContain('X214 drop "scope": read \'entries\' where a scope is meant');
+    expect(scopedSaying(broken)).toContain("X214 'everyCustomer' is a view of 'customers', and a view sees every row");
+    expect(scopedHinting(broken)).toContain('X214 drop "scope": read \'customers\' where a scope is meant');
   });
   it('X214 a scope on newKey, which mints a key across every scope and takes none', () => {
     // a key is global: one tenant is never handed a key another already holds, so there is no scope to mint
@@ -255,7 +258,7 @@ describe('sabotage: how a store is scoped', () => {
     );
   });
   it("X208 a where naming the scope column: a scope is the store's column, never a field to filter on", () => {
-    // the column is not a field of Entry, so the filter names something the shape does not have -- which is
+    // the column is not a field of Customer, so the filter names something the shape does not have -- which is
     // what X208 already says, and is why a scope needs no filter rule of its own
     const broken = {
       [LIST]: (graph: any) => {

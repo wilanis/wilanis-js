@@ -18,8 +18,8 @@ import { EXAMPLE, INCLUDES, loadedWith, PLUGINS } from './example-harness.js';
 
 const example = loadTree(EXAMPLE, PLUGINS, INCLUDES);
 
-const CALLS = "'An entry names a call' (@features/customers/domain/a-customer-is-reachable.invariant.json)";
-const RULE = "(len(url) > 0 && (method != 'DELETE' || has(agent)))";
+const CALLS = "'A customer is reachable' (@features/customers/domain/a-customer-is-reachable.invariant.json)";
+const RULE = "(len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note)))";
 
 const KEPT_GET = '@customers/data/kept-get.graph.json';
 const KEPT_LIST = '@customers/data/kept-list.graph.json';
@@ -106,13 +106,13 @@ describe('describe: a graph with nothing to guard', () => {
  * reader would go looking for a rule the guard tests and the line never named; and each refusal must say whose
  * it is, or a reader could not tell `row:violated` from `row:violated:2`.
  */
-const SECOND = '@features/customers/domain/an-entry-has-a-method.invariant.json';
+const SECOND = '@features/customers/domain/a-customer-has-an-id.invariant.json';
 const { load: two, dir: twoDir } = loadedWith({
-  'features/customers/domain/an-entry-has-a-method.invariant.json': {
+  'features/customers/domain/a-customer-has-an-id.invariant.json': {
     $schema: schemaUrl('invariant'),
-    label: 'An entry has a method',
+    label: 'A customer has an id',
     description: 'A second rule over the same shape, unproved at the same sites, so one guard stands for both.',
-    holds: { on: '@customers/domain/Customer.shape.json', when: 'len(method) > 0' },
+    holds: { on: '@customers/domain/Customer.shape.json', when: 'len(id) > 0' },
   },
 });
 afterAll(() => rmSync(twoDir, { recursive: true, force: true }));
@@ -123,7 +123,7 @@ describe('describe: a site two invariants are unproved at', () => {
     // and the switch's own predicate read the same way round, so a reader can match one to the other
     const said = describeDoc(two, KEPT_GET);
     expect(said).toContain(
-      `    guard for 'An entry has a method' (${SECOND}) and ${CALLS}, when (len(method) > 0) && ${RULE}:`,
+      `    guard for 'A customer has an id' (${SECOND}) and ${CALLS}, when (len(id) > 0) && ${RULE}:`,
     );
   });
 
@@ -136,8 +136,8 @@ describe('describe: a site two invariants are unproved at', () => {
 
   it('says which invariant each refusal is for, in the order the header names them', () => {
     const said = describeDoc(two, KEPT_GET);
-    expect(said).toContain("        row:violated  refuses 'invariant' for 'An entry has a method'  (guard)");
-    expect(said).toContain("        row:violated:2  refuses 'invariant' for 'An entry names a call'  (guard)");
+    expect(said).toContain("        row:violated  refuses 'invariant' for 'A customer has an id'  (guard)");
+    expect(said).toContain("        row:violated:2  refuses 'invariant' for 'A customer is reachable'  (guard)");
     // and the graph answers with either refusal, since it refuses with whichever the guard routed to
     expect(said).toContain(
       'answers @customers/domain/Customer.shape.json  from row | row:violated | row:violated:2 | missing',

@@ -33,7 +33,7 @@ describe('the view model of a graph', () => {
       literal: '"GET"',
       static: true,
     });
-    expect(asked.inputs.find(port => port.name === 'path')).toMatchObject({ text: '/monitor/{{in.id}}' });
+    expect(asked.inputs.find(port => port.name === 'path')).toMatchObject({ text: '/customers/{{in.id}}' });
     expect(asked.inputs.find(port => port.name === 'body')).toMatchObject({ missing: true, required: false });
     // a literal that names a document carries the canonical path, so the page can label and link it
     expect(asked.inputs.find(port => port.name === 'returns')).toMatchObject({
@@ -114,12 +114,12 @@ describe('the view model of a graph', () => {
   });
 
   it('says a membership rule in words, so every operator of the grammar draws', async () => {
-    // 'recorder' in principal.roles used to crash the view: the page 500'd on the graph behind every write
+    // 'registrar' in principal.roles used to crash the view: the page 500'd on the graph behind every write
     const seen = await view('@features/access/domain/require-registrar.graph.json');
     const rule = seen.graph!.nodes.find(node =>
       node.says?.some(line => line.parts.some(part => part.text === ' is among ')),
     );
-    expect(rule?.label).toBe('if principal exists and "recorder" is among principal \u203a roles');
+    expect(rule?.label).toBe('if principal exists and "registrar" is among principal \u203a roles');
   });
 
   it('shows the out node as the fields it answers, fed by each candidate in order', async () => {
@@ -129,9 +129,11 @@ describe('the view model of a graph', () => {
     expect(out.type).toBe('@features/customers/domain/Customer.shape.json');
     expect(out.fields!.map(port => [port.name, port.type, port.required])).toEqual([
       ['id', 'string', true],
-      ['url', 'string', true],
-      ['method', 'string', true],
-      ['agent', 'string', false],
+      ['name', 'string', true],
+      ['email', 'string', true],
+      ['tier', 'string', true],
+      ['registrar', 'string', false],
+      ['active', 'boolean', false],
       ['note', 'string', false],
     ]);
     expect(edge(seen, { from: 'row', fromPort: '', to: 'out', toPort: '' })).toMatchObject({
@@ -144,7 +146,7 @@ describe('the view model of a graph', () => {
     });
     // one candidate needs no ordinal: nothing else could have answered
     const single = await view('@features/customers/domain/register-customer.graph.json');
-    expect(edge(single, { from: 'recorded', fromPort: '', to: 'out', toPort: '' })?.label).toBeUndefined();
+    expect(edge(single, { from: 'registered', fromPort: '', to: 'out', toPort: '' })?.label).toBeUndefined();
   });
 
   it('names who calls a graph: the binding that binds it, and the trigger that fires the port operation, via it', async () => {
@@ -157,7 +159,7 @@ describe('the view model of a graph', () => {
     });
     expect(seen.callers).toContainEqual({
       path: '@features/customers/edge/get-customer.trigger.json',
-      label: 'GET /monitor/{id}',
+      label: 'GET /customers/{id}',
       kind: 'trigger',
       at: '/fire/run',
       via: '@features/customers/domain/customer.port.json#get',
@@ -171,9 +173,9 @@ describe('the view model of a graph', () => {
     const ByMethod = '@features/customers/data/list-rows-by-tier.graph.json';
     expect(byMethod.target).toEqual({
       op: '@features/customers/domain/customer.port.json#listByTier',
-      opName: 'listByMethod',
+      opName: 'listByTier',
       port: '@features/customers/domain/customer.port.json',
-      portLabel: 'Entry storage',
+      portLabel: 'Customer storage',
       native: false,
       // the port has three bindings now, and the viewer names both: which one answers is the profile's
       bindings: [
@@ -181,7 +183,7 @@ describe('the view model of a graph', () => {
           path: '@features/customers/data/customers-postgres.binding.json',
           label: 'PostgreSQL storage',
           graph: '@features/customers/data/kept-list-by-tier-postgres.graph.json',
-          graphLabel: 'List what is kept, by method',
+          graphLabel: 'List what is kept, by tier',
         },
         {
           path: '@features/customers/data/customers-rest.binding.json',
@@ -191,9 +193,9 @@ describe('the view model of a graph', () => {
         },
         {
           path: '@features/customers/data/customers-store.binding.json',
-          label: 'Monitor over a store',
+          label: 'Customers over a store',
           graph: '@features/customers/data/kept-list-by-tier.graph.json',
-          graphLabel: 'List what is kept, by method',
+          graphLabel: 'List what is kept, by tier',
         },
       ],
       // the first binding by path, which is what the page offers before a reader picks a profile
@@ -231,6 +233,6 @@ describe('the view model of a graph', () => {
     expect(asked.outputs.map(port => port.name)).toEqual(['', 'status', 'headers', 'body']);
     const other = await view('@features/customers/domain/register-customer.graph.json');
     const input = other.graph!.nodes.find(node => node.id === 'in')!;
-    expect(input.outputs.map(port => port.name)).toEqual(['', 'url', 'method']);
+    expect(input.outputs.map(port => port.name)).toEqual(['', 'name', 'email', 'tier']);
   });
 });

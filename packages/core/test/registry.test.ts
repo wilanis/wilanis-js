@@ -6,7 +6,7 @@ describe('splitRef', () => {
   it('splits a port reference into the document and the operation it addresses', () => {
     expect(splitRef('@features/customers/domain/customer.port.json#register')).toEqual({
       path: '@features/customers/domain/customer.port.json',
-      op: 'record',
+      op: 'register',
     });
     expect(splitRef('@std/object.port.json#make')).toEqual({ path: '@std/object.port.json', op: 'make' });
   });

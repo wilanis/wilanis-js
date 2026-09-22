@@ -1,9 +1,9 @@
 /**
  * A write that repeats a `unique` the store declares is a conflict with what is kept, not a fault of the
- * upstream. `customers.store.json` says `unique: [["url", "method"]]`; `put` honours it and hands back
- * `violated` naming the constraint, and `store-and-latest` routes on that to refuse as `conflict`, which the
- * two write routes map to 409. Before the branch existed the same import read as `502 upstream`, saying the
- * store had broken when it had done exactly what the document asked (issue #484).
+ * upstream. `customers.store.json` says `unique: [["email"]]`; `put` honours it and hands back `violated`
+ * naming the constraint, and `store-and-latest` routes on that to refuse as `conflict`, which the two write
+ * routes map to 409. Before the branch existed the same import read as `502 upstream`, saying the store had
+ * broken when it had done exactly what the document asked (issue #484).
  *
  * The tree is the example served under `local`, over its own port, and the calls go over HTTP: the status is
  * the route's and the message is the graph's, so both are read where the caller reads them. The store is the
@@ -40,24 +40,25 @@ function localCopy(): string {
 /** A response as a case reads it: the status and the JSON body. */
 const answered = async (response: Response) => ({ status: response.status, body: await response.json() });
 
-/** One request to the served tree, as the recorder. */
+/** One request to the served tree, as the registrar. */
 const call = (path: string, init: RequestInit & { type?: string } = {}) =>
   fetch(`http://localhost:${PORT}${path}`, {
     ...init,
     headers: { 'content-type': init.type ?? 'application/json', authorization: `Bearer ${token}` },
   }).then(answered);
 
-/** POST /monitor.csv with these rows under the header the route reads. */
+/** POST /customers.csv with these rows under the header the route reads. */
 const imported = (rows: string[]) =>
-  call('/monitor.csv', { method: 'POST', type: 'text/csv', body: `url,method\n${rows.join('\n')}\n` });
+  call('/customers.csv', { method: 'POST', type: 'text/csv', body: `name,email,tier\n${rows.join('\n')}\n` });
 
-/** The urls the store holds, read through the tree's own route. */
-const kept = async () => (await call('/monitor')).body.map((entry: { url: string }) => entry.url).sort() as string[];
+/** The addresses the store holds, read through the tree's own route. */
+const kept = async () =>
+  (await call('/customers')).body.map((customer: { email: string }) => customer.email).sort() as string[];
 
 beforeAll(async () => {
-  process.env.MONITOR_JWT_SECRET = 'a-secret-of-thirty-two-bytes-or-more!';
+  process.env.CUSTOMERS_JWT_SECRET = 'a-secret-of-thirty-two-bytes-or-more!';
   // every connection's secrets are substituted whatever the profile; nothing here dials this one
-  process.env.MONITOR_DATABASE_URL = 'postgres://monitor:monitor@localhost:5432/monitor';
+  process.env.CUSTOMERS_DATABASE_URL = 'postgres://customers:customers@localhost:5432/customers';
   dir = localCopy();
   const load = loadTree(dir, PLUGINS, INCLUDES);
   expect(checkTree(load).items).toEqual([]);
@@ -74,42 +75,40 @@ afterAll(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-describe('importing a call the store already records', () => {
-  it('a single row is recorded and answers 201, as before', async () => {
-    const answer = await imported(['https://one.example/,GET']);
+describe('registering a customer the store already keeps', () => {
+  it('a single row is registered and answers 201, as before', async () => {
+    const answer = await imported(['Ada,ada@one.example,bronze']);
     expect(answer.status).toBe(201);
-    expect(answer.body).toEqual([
-      { id: expect.any(String), url: 'https://one.example/', method: 'GET', agent: 'wilanis-example/0.1.0' },
-    ]);
+    expect(answer.body).toEqual([{ id: expect.any(String), name: 'Ada', email: 'ada@one.example', tier: 'bronze' }]);
   });
 
-  it('two rows of one (url, method) answer 409 as conflict, naming the unique they repeat, and record nothing', async () => {
-    const answer = await imported(['https://twice.example/,GET', 'https://twice.example/,GET']);
+  it('two rows of one email answer 409 as conflict, naming the unique they repeat, and register nothing', async () => {
+    const answer = await imported(['Bo,bo@twice.example,silver', 'Bo again,bo@twice.example,gold']);
     expect(answer).toEqual({
       status: 409,
       body: {
         reason: 'conflict',
-        message: 'an entry already records GET https://twice.example/ (unique [url, method])',
+        message: 'a customer already uses bo@twice.example (unique [email])',
       },
     });
     // the import is one transaction: the first row went with the second, and the earlier import stayed
-    expect(await kept()).toEqual(['https://one.example/']);
+    expect(await kept()).toEqual(['ada@one.example']);
   });
 
-  it('the same url under another method is another call, and is recorded', async () => {
-    const answer = await imported(['https://one.example/,POST']);
+  it('another address is another customer, and is registered', async () => {
+    const answer = await imported(['Cy,cy@one.example,silver']);
     expect(answer.status).toBe(201);
-    expect(await kept()).toEqual(['https://one.example/', 'https://one.example/']);
+    expect(await kept()).toEqual(['ada@one.example', 'cy@one.example']);
   });
 
-  it('POST /monitor of a call already recorded is the same conflict, since one graph is behind both routes', async () => {
-    const answer = await call('/monitor', {
+  it('POST /customers of an address already kept is the same conflict, since one graph is behind both routes', async () => {
+    const answer = await call('/customers', {
       method: 'POST',
-      body: JSON.stringify({ url: 'https://one.example/', method: 'GET' }),
+      body: JSON.stringify({ name: 'Ada again', email: 'ada@one.example', tier: 'bronze' }),
     });
     expect(answer).toEqual({
       status: 409,
-      body: { reason: 'conflict', message: 'an entry already records GET https://one.example/ (unique [url, method])' },
+      body: { reason: 'conflict', message: 'a customer already uses ada@one.example (unique [email])' },
     });
   });
 });

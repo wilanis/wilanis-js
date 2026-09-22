@@ -7,7 +7,7 @@ The tree is a finished copy: a git repository whose first commit is the baseline
 whether `wilanis check` passes; what the rehearsal says the access rule holds at; the one new trigger's
 method, route, policies, refusal map and `out`; whether the access invariant's `over` gained the operation
 the trigger fires and whether any invariant's `when` or `requires` changed; whether `CustomerView` gained
-`pinned`; which bindings meet the new operation; the files added and changed. When <gate.txt> is given the
+`active`; which bindings meet the new operation; the files added and changed. When <gate.txt> is given the
 gate is run again with the trigger's verb and route, its output kept there, and its verdict is a fact too.
 """
 import json
@@ -18,7 +18,7 @@ import sys
 
 ACCESS_RULE = 'features/customers/domain/writes-are-for-registrars.invariant.json'
 VIEW = 'features/customers/edge/CustomerView.shape.json'
-HOLDS = re.compile(r'Writes are for recorders\s+holds at (\d+) trigger\(s\)')
+HOLDS = re.compile(r'Writes are for registrars\s+holds at (\d+) trigger\(s\)')
 
 
 def sh(tree, *args, env=None):
@@ -147,7 +147,7 @@ def tree_facts(tree):
 
 def gate(tree, method, route, out):
     """Run the gate again with the trigger's verb and route, keep what it printed, and answer its verdict line."""
-    text = sh(tree, 'bash', 'accept.sh', method or 'POST', route or '/monitor/{id}/pin')
+    text = sh(tree, 'bash', 'accept.sh', method or 'POST', route or '/customers/{id}/active')
     with open(out, 'w', encoding='utf8') as f:
         f.write(text)
     last = [l for l in text.strip().split('\n') if l.startswith(('ACCEPTED', 'REJECTED'))]
@@ -164,7 +164,7 @@ def main(tree, out, gate_out=None):
         **tree_facts(tree),
         'trigger': trigger,
         'invariant': invariant_facts(tree, base, trigger.get('fires')),
-        'view_has_pinned': 'pinned' in read_json(tree, VIEW).get('fields', {}),
+        'view_has_active': 'active' in read_json(tree, VIEW).get('fields', {}),
         'bindings': bindings_facts(tree, trigger.get('fires')),
         'files_added': added,
         'files_changed': changed,
