@@ -86,7 +86,8 @@ export function scopeValues(scope: Scope | undefined): Record<string, unknown> {
  * It is the index and not a comment or a naming convention because the index has to be there anyway -- the
  * RFC asks for `(tenant, id)` so a scoped `get` is one index read -- and a fact already written is a better
  * record than a second one kept beside it. The key is in that index too and is taken out again here: it is a
- * field of the shape and was never a scope column.
+ * field of the shape and was never a scope column. They come back in the index's order, which is the scope's,
+ * since a scoped unique is named by its columns in that order.
  */
 export async function scopeColumnsOf(
   db: Kysely<never>,
@@ -102,6 +103,7 @@ export async function scopeColumnsOf(
     join pg_attribute a on a.attrelid = c.oid and a.attnum = any(i.indkey)
     where n.nspname = ${where.schema} and c.relname = ${where.table}
       and ic.relname = ${scopedIndexName(at.name)}
+    order by array_position(i.indkey::smallint[], a.attnum)
   `.execute(db)) as { rows: { column_name: string }[] };
   const columns = new Set(found.rows.map(one => one.column_name));
   columns.delete(folded(at.key));
@@ -176,13 +178,50 @@ const kept = new Map<string, Set<string>>();
 /** What a table is remembered under: the connection it is on and the table it is, which name it uniquely. */
 const memoOf = (at: At, where: Where) => `${at.connection}/${where.schema}.${where.table}`;
 
+/** The columns a table has, by name, or nothing at all where there is no such table yet. */
+async function namesOf(db: Kysely<never>, where: Where): Promise<Set<string> | undefined> {
+  const found = await columnsOf(db, where.schema, where.table);
+  return found && new Set(found.map(column => column.column_name));
+}
+
+/** The scope's columns a table lacks, with the value that says what type each is kept in. */
+const lacking = (wanted: [string, string | number][], has: Set<string>) =>
+  wanted.filter(([column]) => !has.has(folded(column)));
+
+/**
+ * Work that changes a table's definition, run holding the table alone: in a transaction of its own, or in the
+ * caller's where it runs inside one (`lasting` false), and behind an `access exclusive` lock either way. Two
+ * first writes racing each other then take turns, and a failure half way through undoes the whole of it, so
+ * a table is never left with the column and without the scoped uniques that go with it.
+ */
+async function holding<T>(db: Kysely<never>, where: Where, work: (db: Kysely<never>) => Promise<T>): Promise<T> {
+  const locked = async (on: Kysely<never>) => {
+    await sql`lock table ${sql.ref(where.schema)}.${sql.ref(where.table)} in access exclusive mode`.execute(on);
+    return work(on);
+  };
+  if (!where.lasting) return locked(db);
+  return db.transaction().execute(trx => locked(trx as never));
+}
+
+/**
+ * The scope added under the lock, from the columns as they are once it is held rather than as they were
+ * before: a caller that waited for it finds what the one ahead of it made, and adds only what is still missing.
+ */
+async function addUnderLock(db: Kysely<never>, where: Where, at: At, scope: Scope | undefined): Promise<boolean> {
+  const has = (await namesOf(db, where)) ?? new Set<string>();
+  const missing = lacking(Object.entries(scope ?? {}), has);
+  if (missing.length) await addScope(db, where, at, { missing, columns: scopeColumns(scope) });
+  return missing.length > 0;
+}
+
 /**
  * The table made ready to keep this scope: the columns it lacks added, every declared `unique` recreated
  * within the scope, and the key indexed behind it. It answers whether anything was made.
  *
  * It does nothing at all for a table already known to keep every column the scope names, which is every call
  * after the first -- so a scoped write costs one catalog read per table per load of the tree, and nothing
- * after that. The statements that follow carry the predicate whether or not this made anything.
+ * after that. Only a table that lacks a column is locked, and it is read again once the lock is held. The
+ * statements that follow carry the predicate whether or not this made anything.
  */
 export async function ensureScope(db: Kysely<never>, where: Where, at: At, scope: Scope | undefined): Promise<boolean> {
   const wanted = Object.entries(scope ?? {});
@@ -190,13 +229,11 @@ export async function ensureScope(db: Kysely<never>, where: Where, at: At, scope
   const memo = memoOf(at, where);
   const known = kept.get(memo);
   if (known && wanted.every(([column]) => known.has(folded(column)))) return false;
-  const found = await columnsOf(db, where.schema, where.table);
-  if (!found) return false; // no table yet: `ensure` makes one, and the scope is added the first time it is written
-  const has = new Set(found.map(column => column.column_name));
-  const missing = wanted.filter(([column]) => !has.has(folded(column)));
-  if (missing.length) await addScope(db, where, at, { missing, columns: scopeColumns(scope) });
+  const has = await namesOf(db, where);
+  if (!has) return false; // no table yet: `ensure` makes one, and the scope is added the first time it is written
+  const made = lacking(wanted, has).length > 0 && (await holding(db, where, on => addUnderLock(on, where, at, scope)));
   if (where.lasting) kept.set(memo, new Set([...has, ...scopeColumns(scope)]));
-  return missing.length > 0;
+  return made;
 }
 
 /**

@@ -119,11 +119,22 @@ async function constraints(db: Kysely<never>, schema: string): Promise<Set<strin
 }
 
 /**
+ * The constraint one declared `unique` is created as: over its fields alone on an unscoped table, and with the
+ * scope columns in front of them on a scoped one, under the name `rescopeUniques` gives it. A unique declared
+ * after the table gained its scope is then held within one tenant exactly as one declared before it is.
+ */
+function uniqueOf(at: At, scoped: string[], fields: string[]): { name: string; over: string[] } {
+  if (!scoped.length) return { name: uniqueName(at.name, fields), over: fields.map(folded) };
+  return { name: scopedUniqueName(at.name, scoped, fields), over: [...scoped, ...fields.map(folded)] };
+}
+
+/**
  * Add the uniques and the foreign keys a collection declares and the schema does not hold yet.
  *
  * `scoped` is the columns this table keeps as a scope. Where there are any, the collection's uniques are held
  * within the scope (RFC 0015) and a bare one would hold across every tenant at once -- so a declaration whose
- * scoped constraint is already there is skipped rather than created a second time in the unscoped spelling.
+ * scoped constraint is already there is skipped rather than created a second time in the unscoped spelling,
+ * and a new one is created scoped.
  */
 async function addConstraints(
   db: Kysely<never>,
@@ -134,9 +145,9 @@ async function addConstraints(
   const table = sql`${sql.ref(schema)}.${sql.ref(folded(at.name))}`;
   let made = 0;
   for (const fields of at.unique) {
-    const name = uniqueName(at.name, fields);
-    if (held.has(name) || held.has(scopedUniqueName(at.name, scoped, fields))) continue;
-    const columns = sql.join(fields.map(field => sql.ref(folded(field))));
+    if (held.has(uniqueName(at.name, fields)) || held.has(scopedUniqueName(at.name, scoped, fields))) continue;
+    const { name, over } = uniqueOf(at, scoped, fields);
+    const columns = sql.join(over.map(column => sql.ref(column)));
     await sql`alter table ${table} add constraint ${sql.ref(name)} unique (${columns})`.execute(db);
     held.add(name);
     made += 1;
