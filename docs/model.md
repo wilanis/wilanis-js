@@ -49,7 +49,7 @@ the rest; `has(x)` in a rule proves `x` present for the routed node. Reconvergen
 
 ## One way in
 
-A node's `in` gives every value an operation takes, in one grammar: a literal as written, or `{{asked.status}}`
+A node's `in` gives every value an operation takes, in one grammar: a literal as written, or `{{fetched.status}}`
 to read another node, the graph's `in`, a constant (`{{const.initial}}`) or a resolver. Embedded in text it
 interpolates (`"/tasks/{{in.id}}"`). A key that is not an identifier is quoted in brackets:
 `{{request.headers['user-agent']}}`. A contract marks the fields that must be literals `static` (a connection,
