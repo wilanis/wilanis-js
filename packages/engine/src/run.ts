@@ -6,7 +6,8 @@
  */
 import { type Plan, planOf, targetsOf } from './plan.js';
 import { redactEach, redactValue } from './redact.js';
-import { nodeRefs, PSEUDO, readAll, readPath, readSource, rootPaths, sourcesOf } from './sources.js';
+import { answered, type Ending, initialReport, noteRefusal, reportOf } from './report.js';
+import { nodeRefs, PSEUDO, readAll, readPath, readSource } from './sources.js';
 import type {
   Handlers,
   KCall,
@@ -19,7 +20,7 @@ import type {
   RunContext,
   RunOptions,
 } from './spec.js';
-import { isRefusal, Refusal } from './spec.js';
+import { Refusal } from './spec.js';
 
 /** What one element of a map came to: its value, or the error (and the reason, when it refused). */
 type ElementResult =
@@ -32,13 +33,6 @@ interface MapSite {
   node: KMap;
   broadcast: Record<string, unknown>;
   items: NodeReport[];
-}
-
-/** A handler that refused on purpose leaves its reason (and detail) on the report; a fault leaves neither. */
-function noteRefusal(report: NodeReport, error: unknown): void {
-  if (!isRefusal(error)) return;
-  report.reason = error.reason;
-  if (error.detail) report.detail = error.detail;
 }
 
 /** What one element's handler takes: the broadcast inputs, and the element under `item` or through `bind`. */
@@ -79,7 +73,8 @@ export class Run {
   /** What every stamp of this run is read from: the clock given, or `Date.now`. */
   private readonly clock: () => number;
   private readonly startedAt: number;
-  private failed = false;
+  /** How the run ended before quiescence, once it has; the first ending stands. */
+  private ending: Ending | undefined;
   private running = 0;
   private wake: (() => void) | undefined;
 
@@ -93,7 +88,7 @@ export class Run {
     this.clock = opts.clock ?? Date.now;
     this.startedAt = this.clock();
     for (const [key, value] of Object.entries(opts.initial ?? {})) this.values.set(key, value);
-    for (const id of Object.keys(spec.nodes)) this.reports[id] = this.initialReport(id);
+    for (const id of Object.keys(spec.nodes)) this.reports[id] = initialReport(this.values, id);
   }
 
   /** Fire everything ready, wait for any settle, repeat until quiescence; then answer. */
@@ -110,29 +105,24 @@ export class Run {
       });
       this.wake = undefined;
     }
-    return this.report();
+    const { spec, reports: nodes, values, ending } = this;
+    return reportOf({ spec, nodes, values, ending, startedAt: this.startedAt, endedAt: this.clock() });
   }
 
   // ---- readiness ----------------------------------------------------------------------------------
-
-  /** A node whose value was pre-supplied is seeded, never executed: that is replay. */
-  private initialReport(id: string): NodeReport {
-    return this.values.has(id) ? { status: 'seeded', out: this.values.get(id) } : { status: 'pending' };
-  }
 
   private status(id: string) {
     return this.reports[id].status;
   }
 
   private settled(id: string): boolean {
-    const status = this.status(id);
-    return status === 'done' || status === 'seeded';
+    return answered(this.reports[id]);
   }
 
   /** A pending node runs once every dependency settled, its router chose it, and every root it reads is supplied. */
   private isReady(id: string): boolean {
     return (
-      !this.failed &&
+      !this.ending &&
       this.status(id) === 'pending' &&
       this.dependenciesSettled(id) &&
       this.routedTo(id) &&
@@ -190,7 +180,7 @@ export class Run {
     report.status = 'failed';
     report.error = (error as Error).message;
     noteRefusal(report, error);
-    this.failed = true;
+    this.ending ??= 'failed';
     for (const id of Object.keys(this.spec.nodes))
       if (this.status(id) === 'pending') this.reports[id].status = 'cancelled';
   }
@@ -214,7 +204,7 @@ export class Run {
   private async runCall(id: string, node: KCall, report: NodeReport): Promise<void> {
     const inputs = readAll(node.in, this.values);
     report.in = redactValue(inputs, node.redact?.in) as Record<string, unknown>;
-    const out = await this.invoke(node.handler, inputs, this.contextFor([...this.root, id], report));
+    const out = await this.invoke(node.handler, inputs, this.contextFor(node, [...this.root, id], report));
     this.finish(id, report, out, redactValue(out, node.redact?.out));
   }
 
@@ -224,7 +214,7 @@ export class Run {
     const broadcast = readAll(node.in, this.values);
     report.in = { ...broadcast, over };
     // one report per element; an element supplied in initial as '<id>.<index>' is seeded and never runs
-    const items = over.map((_, index) => this.initialReport(`${id}.${index}`));
+    const items = over.map((_, index) => initialReport(this.values, `${id}.${index}`));
     report.items = items;
     const site: MapSite = { id, node, broadcast, items };
     // every element settles before the node does, whatever happened to the others
@@ -242,7 +232,7 @@ export class Run {
     element.startedAt = this.clock();
     element.handler = site.node.handler;
     element.in = redactValue(inputs, site.node.redact?.in) as Record<string, unknown>;
-    const ctx = this.contextFor([...this.root, site.id, String(index)], element);
+    const ctx = this.contextFor(site.node, [...this.root, site.id, String(index)], element);
     try {
       const value = await this.invoke(site.node.handler, inputs, ctx);
       element.out = redactValue(value, site.node.redact?.out);
@@ -258,12 +248,19 @@ export class Run {
     }
   }
 
-  /** What a handler sees: where it runs, the request, the embedder's env, and where to hang a nested report. */
-  private contextFor(nodePath: string[], report: NodeReport): RunContext {
+  /**
+   * What a handler sees: where it runs and the site it was tagged with, the request, the embedder's env, and the
+   * two doors into its own report -- where to hang a nested run, and where to record a try that did not stand.
+   */
+  private contextFor(node: KCall | KMap, nodePath: string[], report: NodeReport): RunContext {
     return {
       nodePath,
+      ...(node.site !== undefined ? { site: node.site } : {}),
       attach: sub => {
         report.sub = sub;
+      },
+      attempted: attempt => {
+        report.attempts = [...(report.attempts ?? []), attempt];
       },
       stubs: this.opts.stubs,
       request: this.values.get('request'),
@@ -280,29 +277,5 @@ export class Run {
     const fn = this.handlers[handler];
     if (!fn) throw new Error(`no handler '${handler}'`);
     return fn({ in: inputs, ctx });
-  }
-
-  // ---- the report ---------------------------------------------------------------------------------
-
-  /** At quiescence: failed; or done with the first settled output candidate; or blocked on what was never supplied. */
-  private report(): Report {
-    const base = { graph: this.spec.name, nodes: this.reports, startedAt: this.startedAt, endedAt: this.clock() };
-    if (this.failed) return { ...base, status: 'failed' };
-    if (!this.spec.output) return { ...base, status: 'done' };
-    const answer = this.spec.output.find(id => this.settled(id));
-    if (answer !== undefined) return { ...base, status: 'done', output: this.reports[answer].out };
-    return { ...base, status: 'blocked', needs: this.needs() };
-  }
-
-  /** The root paths pending nodes read that were never supplied, sorted. */
-  private needs(): string[] {
-    const pending = Object.keys(this.spec.nodes).filter(id => this.status(id) === 'pending');
-    const paths = pending.flatMap(id => sourcesOf(this.spec.nodes[id]).flatMap(source => rootPaths(source)));
-    return [...new Set(paths.filter(path => this.unsupplied(path)))].sort();
-  }
-
-  private unsupplied(path: string): boolean {
-    const root = path.split('.')[0];
-    return PSEUDO.has(root) && !this.values.has(root);
   }
 }
