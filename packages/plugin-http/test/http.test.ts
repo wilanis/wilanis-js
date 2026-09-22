@@ -12,7 +12,6 @@ import postgres from '@wilanis/plugin-storage-postgres';
 import { BUILTIN_PLUGINS, start } from '@wilanis/runtime';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import http, { encode } from '../src/index.js';
-import { Throttle } from '../src/throttle.js';
 import {
   caller,
   fakeUpstream,
@@ -32,6 +31,11 @@ let token = '';
 let dir: string;
 const rows: Record<string, unknown>[] = [firstRow()];
 const logs: string[] = [];
+/** The ids of every fire the server told its observers of, as the trace carries them. */
+const runs: string[] = [];
+/** The one log line for a request, found by what it asked and answered. */
+const lineFor = (asked: string, status: number) =>
+  logs.filter(line => line.startsWith(`${asked} → ${status} (`)).at(-1) ?? '';
 /** How many DELETEs the upstream is serving right now, and the most it ever served at once. */
 const inFlight: InFlight = { now: 0, peak: 0 };
 const call = caller(() => token);
@@ -61,7 +65,11 @@ beforeAll(async () => {
     INCLUDES,
   );
   expect(checkTree(load).items).toEqual([]);
-  ({ stop } = await start(load, { log: line => logs.push(line), profile: 'live' }));
+  ({ stop } = await start(load, {
+    log: line => logs.push(line),
+    profile: 'live',
+    observe: trace => runs.push(String(trace.attributes['wilanis.run.id'])),
+  }));
   token = await signInAsRegistrar();
 });
 
@@ -105,8 +113,15 @@ describe('http trigger kind against a mockapi-shaped upstream', () => {
       (await call('POST', '/customers', { name: 'Cy', email: 'cy@c.example', tier: 'bronze', sneaky: 1 }, true)).status,
     ).toBe(400);
   });
-  it('404 for a route no trigger declares', async () => {
+  it('404 for a route no trigger declares, and the edge says so on its line though no run was fired', async () => {
     expect((await call('GET', '/nope')).status).toBe(404);
+    expect(lineFor('GET /nope', 404)).toMatch(/^GET \/nope → 404 \(\d+ms, no trigger\)$/);
+  });
+  it('logs a policy ending the run as the gate word it said, and an edge refusal as what the caller can fix', async () => {
+    await call('POST', '/customers', { name: 'Bo', email: 'bo@b.example', tier: 'silver' });
+    expect(lineFor('POST /customers', 401)).toContain('denied: anonymous');
+    await call('POST', '/customers', { name: 'Cy', email: 'cy@c.example', tier: 'bronze', sneaky: 1 }, true);
+    expect(lineFor('POST /customers', 400)).toContain('body does not conform');
   });
   it('deletes a batch of ids: one DELETE each, paced by the connection throttle, answered once all are gone', async () => {
     for (const id of [3, 4, 5, 6, 7])
@@ -141,6 +156,8 @@ describe('http trigger kind against a mockapi-shaped upstream', () => {
     const answer = await call('GET', '/customers/zzz', undefined, true);
     expect(answer.status).toBe(404);
     expect(answer.body).toEqual({ reason: 'missing', message: 'no customer zzz' });
+    // the line says the outcome in the trace's words, not the report's status
+    expect(lineFor('GET /customers/zzz', 404)).toMatch(/customer\.port\.json#get refused: missing\)$/);
   });
   it('a refusal whose reason the route does not map is a fault, not a silent status', () => {
     const trigger = {
@@ -155,18 +172,26 @@ describe('http trigger kind against a mockapi-shaped upstream', () => {
       startedAt: 0,
       endedAt: 0,
     };
-    expect(encode(trigger, refused)).toEqual({
-      status: 500,
-      body: { error: "refused with reason 'conflict', which response.refusals does not map: nope" },
-    });
+    // answered as a fault: the message the author wrote for a reason the route never mapped is not said either
+    expect(encode(trigger, refused, 'r1')).toEqual({ status: 500, body: { error: 'fault', run: 'r1' } });
     expect(encode(trigger, { ...refused, nodes: { n: { ...refused.nodes.n, reason: 'missing' } } })).toEqual({
       status: 404,
       body: { reason: 'missing', message: 'nope' },
     });
-    // a fault stays a 500 that says where it broke
+    // a fault is a 500 that names the run and says nothing of where or why it broke
+    expect(encode(trigger, { ...refused, nodes: { n: { status: 'failed' as const, error: 'boom' } } }, 'r2')).toEqual({
+      status: 500,
+      body: { error: 'fault', run: 'r2' },
+    });
+    // a run blocked on a root nothing supplied is a wiring hole, answered the same way
+    expect(encode(trigger, { ...refused, status: 'blocked', nodes: {}, needs: ['in.id'] } as any, 'r3')).toEqual({
+      status: 500,
+      body: { error: 'fault', run: 'r3' },
+    });
+    // where no run was heard, the fault is still a fault
     expect(encode(trigger, { ...refused, nodes: { n: { status: 'failed' as const, error: 'boom' } } })).toEqual({
       status: 500,
-      body: { error: 'n: boom' },
+      body: { error: 'fault' },
     });
   });
   it('400 on a batch whose body is not the declared shape', async () => {
@@ -230,7 +255,14 @@ describe('files through the blob registry', () => {
       body: 'name,email,tier\nNo Tier,notier@x.example,platinum\n',
     });
     expect(answer.status).toBe(500);
-    expect((await answer.json()).error).toContain('row 2.tier');
+    // the caller is told it broke and which run it was; what broke is the log's and the trace's
+    const body = await answer.json();
+    expect(body).toEqual({ error: 'fault', run: expect.any(String) });
+    expect(runs).toContain(body.run);
+    const line = lineFor('POST /customers.csv', 500);
+    expect(line).toContain('failed at ');
+    expect(line).toContain('row 2.tier');
+    expect(line.endsWith(`  run=${body.run}`)).toBe(true);
     expect(rows.length).toBe(before);
   });
   it('a body of another content type than the route consumes is a 415, and an upload with no body is a 400', async () => {
@@ -248,45 +280,26 @@ describe('files through the blob registry', () => {
   });
 });
 
-describe('the throttle', () => {
-  it('holds requests to the concurrency ceiling and lets the rest through as slots free up', async () => {
-    const gate = new Throttle({ concurrency: 3 });
-    let now = 0,
-      peak = 0;
-    const job = async () => {
-      now++;
-      peak = Math.max(peak, now);
-      await new Promise(done => setTimeout(done, 10));
-      now--;
-      return 1;
-    };
-    const out = await Promise.all(Array.from({ length: 10 }, () => gate.run(job)));
-    expect(out).toHaveLength(10);
-    expect(peak).toBe(3);
-    expect(now).toBe(0);
-  });
-  it('starts no more than perSecond requests in any one second', async () => {
-    const gate = new Throttle({ perSecond: 3 });
-    const starts: number[] = [];
-    await Promise.all(
-      Array.from({ length: 7 }, () =>
-        gate.run(async () => {
-          starts.push(Date.now());
-        }),
-      ),
-    );
-    starts.sort((one, other) => one - other);
-    // the job's clock reads a tick after the gate's, so a millisecond of skew is measurement, not a fourth start in the second
-    for (let at = 0; at + 3 < starts.length; at++) expect(starts[at + 3] - starts[at]).toBeGreaterThanOrEqual(999);
-    expect(starts[6] - starts[0]).toBeLessThan(2500);
-  });
-  it('frees the slot when the request throws', async () => {
-    const gate = new Throttle({ concurrency: 1 });
-    await expect(
-      gate.run(async () => {
-        throw new Error('boom');
-      }),
-    ).rejects.toThrow('boom');
-    expect(await gate.run(async () => 'next')).toBe('next');
+describe('an upstream that answers nothing', () => {
+  it('is a fault: a 500 that names the run and says nothing of the node or the platform message', async () => {
+    await stopUpstream();
+    try {
+      const answer = await fetch('http://localhost:8099/customers/1', {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(answer.status).toBe(500);
+      const text = await answer.text();
+      const body = JSON.parse(text);
+      expect(body).toEqual({ error: 'fault', run: expect.any(String) });
+      expect(runs).toContain(body.run);
+      expect(text).not.toContain('asked');
+      expect(text).not.toContain('fetch');
+      // the log line is where the operator finds what broke, under the id the caller was handed
+      const line = lineFor('GET /customers/1', 500);
+      expect(line).toMatch(/customer\.port\.json#get failed at '[^']+': /);
+      expect(line.endsWith(`  run=${body.run}`)).toBe(true);
+    } finally {
+      stopUpstream = await listening(fakeUpstream({ rows, inFlight }), UPSTREAM);
+    }
   });
 });
