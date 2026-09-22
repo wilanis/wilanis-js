@@ -130,7 +130,9 @@ Last on purpose: 1.0 is cut only when every accepted RFC that changes a schema h
 so the schemas are final before they are frozen, and nothing is published to npm before that. Then: every
 package on npm; in an empty directory, install, init, and an agent session produce a tree that passes check
 and rehearse; the security model is published and the `schemas-v1` tag is cut. Draws on RFC 0008 and
-RFC 0020, and on RFC 0034, the one word for what a kind hands, which must land before the schemas freeze.
+RFC 0020, and on RFC 0034, the one word for what a kind hands, which must land before the schemas freeze, as must
+RFC 0035, the whole record before the write, whose one schema change lets a port operation's `accepts` name a shape;
+its rules correct the write graphs M06 demonstrated.
 
 ## Unscheduled
 
