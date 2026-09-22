@@ -258,7 +258,7 @@ the environment; `reset.sh` generated it, and it is the only thing this demo nee
 npm run start -- --profile local
 ```
 
-It ends with `startup 7/7 Listen: ok`. In a second terminal, three calls. No token:
+It ends with `startup 8/8 Listen: ok`. In a second terminal, three calls. No token:
 
 ```
 curl -s -X POST localhost:8099/customers/x/archive -w '  [%{http_code}]\n'
