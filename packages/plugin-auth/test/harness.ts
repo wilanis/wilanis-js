@@ -44,9 +44,19 @@ export const INCLUDES: ResolvedInclude[] = [
   },
 ];
 
-export const PORT = 8093;
-export const UPSTREAM = 54325;
-export const ISSUER = 54326;
+/**
+ * The ports these tests listen on, spaced apart per vitest worker. Vitest runs test files in parallel workers,
+ * so two files that bind the same fixed port race: whichever listens second answers EADDRINUSE, the `beforeAll`
+ * that was starting a fake issuer never finishes, and the run fails with a hook timeout and a `stop` that was
+ * never assigned. Which file loses is a matter of scheduling, so it fails on CI and not on a developer's
+ * machine. `VITEST_POOL_ID` is the worker's own number, so a band per worker is a band nothing else binds --
+ * the ports stay readable and fixed within a run, and no two workers ever ask for the same one.
+ */
+const BAND = (Number(process.env.VITEST_POOL_ID ?? 0) % 32) * 16;
+
+export const PORT = 8093 + BAND;
+export const UPSTREAM = 54325 + BAND;
+export const ISSUER = 54326 + BAND;
 export const SECRET = 'a-secret-of-thirty-two-bytes-or-more!';
 
 export type Edit = (doc: any) => void;

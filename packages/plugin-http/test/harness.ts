@@ -20,7 +20,13 @@ export const INCLUDES: ResolvedInclude[] = [
   },
 ];
 
-export const UPSTREAM = 54322;
+/**
+ * The port the fake upstream listens on, spaced apart per vitest worker and clear of the band
+ * `plugin-auth`'s harness uses. Vitest runs test files in parallel workers, so a fixed port is one two files
+ * can ask for at once: the second gets EADDRINUSE, and a `beforeAll` that was starting a server fails the
+ * whole file with a hook timeout. Which one loses is scheduling, so it bites CI rather than a local run.
+ */
+export const UPSTREAM = 54900 + (Number(process.env.VITEST_POOL_ID ?? 0) % 32) * 16;
 export const SECRET = 'secret-secret-secret-secret-secret-1';
 const SCHEMAS = 'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/';
 
