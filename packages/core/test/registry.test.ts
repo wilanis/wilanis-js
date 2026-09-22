@@ -1,6 +1,6 @@
 /** What `#` addresses in a reference: an operation of a port, or a resolver of a resolvers document. */
 import { describe, expect, it } from 'vitest';
-import { splitOp, splitRef } from '../src/registry.js';
+import { splitRef } from '../src/registry.js';
 
 describe('splitRef', () => {
   it('splits a port reference into the document and the operation it addresses', () => {
@@ -25,9 +25,5 @@ describe('splitRef', () => {
   });
   it('answers a bare path with an empty name, which is how a caller asks for the document alone', () => {
     expect(splitRef('@a/b.port.json#')).toEqual({ path: '@a/b.port.json', op: '' });
-  });
-  it('still answers as splitOp, the name its callers use until they are renamed', () => {
-    expect(splitOp).toBe(splitRef);
-    expect(splitOp('@a/b.port.json#op')).toEqual({ path: '@a/b.port.json', op: 'op' });
   });
 });

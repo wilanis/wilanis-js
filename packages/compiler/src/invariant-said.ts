@@ -17,7 +17,7 @@
  * `unjudged` rather than unmet, so that no consumer sends a reader to an I001 that was never emitted.
  */
 import type { AccessInvariant, InvariantDoc, Loaded, PolicyDoc, Scope, TriggerDoc } from '@wilanis/core';
-import { policyPath, splitOp } from '@wilanis/core';
+import { policyPath, splitRef } from '@wilanis/core';
 import { provesFaultIn } from './check/access.js';
 import { atOrBelow } from './check/typing.js';
 import { operationsReachable } from './refusals.js';
@@ -139,7 +139,7 @@ function metBy(policies: Loaded<PolicyDoc>[], requires: AccessInvariant['require
 /** Every operation `over` names, with the port each belongs to, in the order the document writes them. */
 function coversOf(access: AccessInvariant, scope: Scope): Covered[] {
   return access.over.map(opRef => {
-    const { path, op } = splitOp(opRef);
+    const { path, op } = splitRef(opRef);
     const port = scope.canon(path);
     return { op: `${port}#${op}`, opName: op, port, portLabel: scope.get('port', port)?.doc.label };
   });

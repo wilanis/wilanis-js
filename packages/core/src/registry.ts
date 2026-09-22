@@ -104,6 +104,3 @@ export function splitRef(ref: string): { path: string; op: string } {
   const hash = ref.lastIndexOf('#');
   return { path: ref.slice(0, hash), op: ref.slice(hash + 1) };
 }
-
-/** `splitRef` under the name its callers still use; they are renamed with the compiler in RFC 0029 step 2. */
-export const splitOp = splitRef;

@@ -16,7 +16,7 @@ import {
   type RefusalList,
   type Scope,
   STRING,
-  splitOp,
+  splitRef,
   type Type,
   TypeError_,
   type TypeSpec,
@@ -197,7 +197,7 @@ export class Judge {
 
   /** path#operation with the path made canonical. */
   canonOp(opRef: string): string {
-    const { path, op } = splitOp(opRef);
+    const { path, op } = splitRef(opRef);
     return `${this.scope.canon(path)}#${op}`;
   }
 

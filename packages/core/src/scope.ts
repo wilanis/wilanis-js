@@ -16,7 +16,7 @@ import type {
   ProjectDoc,
   TriggerKindDoc,
 } from './model.js';
-import { type Loaded, type Registry, splitOp } from './registry.js';
+import { type Loaded, type Registry, splitRef } from './registry.js';
 import type { Resolves } from './resolves.js';
 import { PLACEHOLDER, splitPath, TEMPLATE, WHOLE_TEMPLATE } from './templates.js';
 import { type Read, STRING, type Type, TypeResolver, UNKNOWN } from './types.js';
@@ -92,7 +92,7 @@ export class Scope {
 
   /** The operation a path#operation names. */
   op(opRef: string): OpHit | string {
-    const { path, op: opName } = splitOp(opRef);
+    const { path, op: opName } = splitRef(opRef);
     if (!path || !opName) return `'${opRef}' is not path#operation`;
     const port = this.get('port', path);
     if (!port) return `unknown port '${path}'`;
