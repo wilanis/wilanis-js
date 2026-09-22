@@ -1,8 +1,8 @@
 /**
  * The example's atomic graphs against a real store: what RFC 0004's Motivation is about, answered rather
- * than argued. Import a CSV whose fifth row is not an entry and the store holds nothing -- not the four rows
- * the map had already written before the fifth refused. Import a clean one and every row is there, with the
- * latest call of each method beside it.
+ * than argued. Import a CSV whose fifth row is not a customer and the store holds nothing -- not the four
+ * rows the map had already written before the fifth refused. Import a clean one and every row is there, with
+ * the latest registration of each tier beside it.
  *
  * Nothing here is a stand-in. The tree is the example, loaded under `local` so `@storage-memory` keeps the
  * records, and every operation is fired through the `Embedder` the way a startup step is -- the path a served
@@ -25,9 +25,9 @@ import { INCLUDES, PLUGINS } from './example-harness.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 
-/** One entry as the store keeps it, with the id dropped: what a case can write down. */
-const calls = (rows: unknown): { url: string; method: string }[] =>
-  (rows as { url: string; method: string }[]).map(row => ({ url: row.url, method: row.method }));
+/** One customer as the store keeps them, with the id dropped: what a case can write down. */
+const people = (rows: unknown): { email: string; tier: string }[] =>
+  (rows as { email: string; tier: string }[]).map(row => ({ email: row.email, tier: row.tier }));
 
 /**
  * The example, served under one profile: its plugins registered by `postLoad`, a blob scope for the file,
@@ -42,7 +42,7 @@ async function serving(profile = 'local') {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-atomic-e2e-'));
 
   /**
-   * Fire one operation of the monitor port, with what it accepts, and answer the whole report. `at` is the
+   * Fire one operation of the customer port, with what it accepts, and answer the whole report. `at` is the
    * place this call takes in the order they were made here -- these are not the project's steps, so the index
    * is this harness's own, and it is counted rather than defaulted so no record claims a position it has not.
    */
@@ -52,7 +52,7 @@ async function serving(profile = 'local') {
 
   /** The CSV as the route would hand it: bytes in the registry, a handle in the graph. */
   const upload = (text: string): Promise<BlobHandle> =>
-    blobs.put(text, { contentType: 'text/csv', filename: 'entries.csv' });
+    blobs.put(text, { contentType: 'text/csv', filename: 'customers.csv' });
 
   const stop = async () => {
     await blobs.release();
@@ -70,12 +70,12 @@ afterEach(async () => {
 });
 
 /** A CSV of drafts, header included, as the route receives one. */
-const csv = (rows: string[]) => `url,method\n${rows.join('\n')}\n`;
+const csv = (rows: string[]) => `name,email,tier\n${rows.join('\n')}\n`;
 const FOUR = [
-  'https://a.example/,GET',
-  'https://b.example/,POST',
-  'https://c.example/,PUT',
-  'https://d.example/,PATCH',
+  'Ada,a@example.com,bronze',
+  'Bo,b@example.com,silver',
+  'Cy,c@example.com,bronze',
+  'Di,d@example.com,silver',
 ];
 
 describe('importing a CSV into a store, all of it or none of it', () => {
@@ -84,26 +84,26 @@ describe('importing a CSV into a store, all of it or none of it', () => {
     close = tree.stop;
     const imported = await tree.run('import', { file: await tree.upload(csv(FOUR)) });
     expect(imported.status).toBe('done');
-    // the answer is the entries, and the store holds exactly them. Delete the `atomic` from record-all and
-    // this case fails with one row rather than four: the map fires the four writes at once, and without one
-    // transaction to share they are four views of the store that overwrite one another. What the flag buys
-    // here is not only the rollback below but the batch landing at all.
+    // the answer is the customers, and the store holds exactly them. Delete the `atomic` from register-all
+    // and this case fails with one row rather than four: the map fires the four writes at once, and without
+    // one transaction to share they are four views of the store that overwrite one another. What the flag
+    // buys here is not only the rollback below but the batch landing at all.
     const kept = await tree.run('listAll');
     expect(kept.status).toBe('done');
-    expect(calls(kept.output).sort((one, other) => one.url.localeCompare(other.url))).toEqual([
-      { url: 'https://a.example/', method: 'GET' },
-      { url: 'https://b.example/', method: 'POST' },
-      { url: 'https://c.example/', method: 'PUT' },
-      { url: 'https://d.example/', method: 'PATCH' },
+    expect(people(kept.output).sort((one, other) => one.email.localeCompare(other.email))).toEqual([
+      { email: 'a@example.com', tier: 'bronze' },
+      { email: 'b@example.com', tier: 'silver' },
+      { email: 'c@example.com', tier: 'bronze' },
+      { email: 'd@example.com', tier: 'silver' },
     ]);
   });
 
   it('leaves the store exactly as it was when a row partway through refuses', async () => {
     const tree = await serving();
     close = tree.stop;
-    // the fifth row repeats the first call, which the entries collection declares unique: the write is
+    // the fifth row repeats the first address, which the customers collection declares unique: the write is
     // refused, and the four rows the map had already written go with it
-    const five = csv([...FOUR, 'https://a.example/,GET']);
+    const five = csv([...FOUR, 'Ada again,a@example.com,bronze']);
     const imported = await tree.run('import', { file: await tree.upload(five) });
     expect(imported.status).toBe('failed');
     const kept = await tree.run('listAll');
@@ -118,9 +118,9 @@ describe('importing a CSV into a store, all of it or none of it', () => {
     // reached the store to undo. (A fault *inside* the transaction is proved over a fake transactional
     // plugin in atomic.test.ts, where a handler can be told to throw; nothing the memory engine does on a
     // valid record faults.)
-    const bad = await tree.run('import', { file: await tree.upload(csv([...FOUR, 'https://e.example/,FLY'])) });
+    const bad = await tree.run('import', { file: await tree.upload(csv([...FOUR, 'Ed,e@example.com,platinum'])) });
     expect(bad.status).toBe('failed');
-    expect(String(bad.nodes.op?.error)).toContain('not in "GET" | "POST"');
+    expect(String(bad.nodes.op?.error)).toContain('not in "bronze" | "silver"');
     const kept = await tree.run('listAll');
     expect(kept.output).toEqual([]);
   });
@@ -130,10 +130,10 @@ describe('importing a CSV into a store, all of it or none of it', () => {
     close = tree.stop;
     await tree.run('import', { file: await tree.upload(csv(FOUR)) });
     // a second import that refuses must leave the first one's rows alone: the transaction is the run's
-    const broken = await tree.run('import', { file: await tree.upload(csv(['https://a.example/,GET'])) });
+    const broken = await tree.run('import', { file: await tree.upload(csv(['Ada again,a@example.com,bronze'])) });
     expect(broken.status).toBe('failed');
     const kept = await tree.run('listAll');
-    expect(calls(kept.output)).toHaveLength(4);
+    expect(people(kept.output)).toHaveLength(4);
   });
 });
 
@@ -141,11 +141,11 @@ describe('two atomic graphs running at once', () => {
   it('do not see each other’s uncommitted rows, so one refusing leaves the other whole', async () => {
     const tree = await serving();
     close = tree.stop;
-    // both imports run against the same store at the same time. The second repeats a call within itself,
+    // both imports run against the same store at the same time. The second repeats an address within itself,
     // so its transaction rolls back; the first must keep every row it wrote, having never read the other's.
     const good = tree.run('import', { file: await tree.upload(csv(FOUR)) });
     const bad = tree.run('import', {
-      file: await tree.upload(csv(['https://z.example/,GET', 'https://z.example/,GET'])),
+      file: await tree.upload(csv(['Zoe,z@example.com,bronze', 'Zoe again,z@example.com,silver'])),
     });
     const [first, second] = await Promise.all([good, bad]);
     expect(first.status).toBe('done');
@@ -153,32 +153,32 @@ describe('two atomic graphs running at once', () => {
     // the four rows of the import that answered, and nothing of the one that did not
     const kept = await tree.run('listAll');
     expect(
-      calls(kept.output)
-        .map(one => one.url)
+      people(kept.output)
+        .map(one => one.email)
         .sort(),
-    ).toEqual(['https://a.example/', 'https://b.example/', 'https://c.example/', 'https://d.example/']);
+    ).toEqual(['a@example.com', 'b@example.com', 'c@example.com', 'd@example.com']);
   });
 });
 
-describe('recording an entry and its method’s latest, both or neither', () => {
-  it('writes the entry and the latest of its method together', async () => {
+describe('registering a customer and their tier’s latest, both or neither', () => {
+  it('writes the customer and the latest of their tier together', async () => {
     const tree = await serving();
     close = tree.stop;
-    const recorded = await tree.run('submit', { url: 'https://a.example/', method: 'GET' });
-    expect(recorded.status).toBe('done');
+    const registered = await tree.run('submit', { name: 'Ada', email: 'a@example.com', tier: 'bronze' });
+    expect(registered.status).toBe('done');
     const kept = await tree.run('listAll');
-    expect(calls(kept.output)).toEqual([{ url: 'https://a.example/', method: 'GET' }]);
+    expect(people(kept.output)).toEqual([{ email: 'a@example.com', tier: 'bronze' }]);
   });
 
-  it('leaves neither behind when the entry cannot be written', async () => {
+  it('leaves neither behind when the customer cannot be written', async () => {
     const tree = await serving();
     close = tree.stop;
-    await tree.run('submit', { url: 'https://a.example/', method: 'GET' });
-    // the same call again: unique [url, method] refuses the entry, so the latest row it would have updated
-    // is rolled back with it and the store still holds the one entry
-    const again = await tree.run('submit', { url: 'https://a.example/', method: 'GET' });
+    await tree.run('submit', { name: 'Ada', email: 'a@example.com', tier: 'bronze' });
+    // the same address again: unique [email] refuses the customer, so the latest row it would have updated
+    // is rolled back with it and the store still holds the one customer
+    const again = await tree.run('submit', { name: 'Ada again', email: 'a@example.com', tier: 'silver' });
     expect(again.status).toBe('failed');
     const kept = await tree.run('listAll');
-    expect(calls(kept.output)).toHaveLength(1);
+    expect(people(kept.output)).toHaveLength(1);
   });
 });

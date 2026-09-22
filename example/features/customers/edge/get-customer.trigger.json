@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
   "label": "GET /customers/{id}",
-  "description": "GET /customers/{id} \u2192 the customer; 404 { reason: missing, message: `no customer {id}` } when there is none, 502 as upstream when the monitor API broke.",
+  "description": "GET /customers/{id} \u2192 the customer; 404 { reason: missing, message: `no customer {id}` } when there is none, 502 as upstream when the customer API broke.",
   "settings": {
     "route": "/customers/{id}",
     "method": "GET",

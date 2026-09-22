@@ -17,8 +17,8 @@ describe('the reach of a profile', () => {
     const live = reach('live');
     expect(via(live, '@http/http.port.json#request')).toEqual(['@connections/customers-api.connection.json']);
     expect(via(live, '@auth/identity.port.json#verify')).toEqual([
-      '@connections/customers.connection.json',
       '@connections/employees.connection.json',
+      '@connections/people.connection.json',
     ]);
     for (const key of ['@auth/token.port.json#issue', '@auth/token.port.json#refresh']) {
       expect(keys(live)).toContain(key);
@@ -33,7 +33,7 @@ describe('the reach of a profile', () => {
     expect([...keys(live)].some(key => key.startsWith('@std/'))).toBe(false);
     expect(live.connections).toEqual([
       '@connections/customers-api.connection.json',
-      '@connections/customers.connection.json',
+      '@connections/people.connection.json',
       '@connections/employees.connection.json',
     ]);
     // and each site says where it was reached from and through, for the message that names it
@@ -47,17 +47,17 @@ describe('the reach of a profile', () => {
 
   it('reads the database secret under production alone, and the token secret everywhere', () => {
     // the reason this walk exists: `start` will refuse the variables the profile reaches and no other, where
-    // today it refuses every declared one -- MONITOR_DATABASE_URL on a laptop that keeps its entries in memory
+    // today it refuses every declared one -- CUSTOMERS_DATABASE_URL on a laptop that keeps its customers in memory
     const said = (profile: string) =>
       reach(profile)
         .secrets.map(one => `${one.variable} (${one.key}, read by ${one.readBy})`)
         .sort();
-    expect(said('local')).toEqual(['MONITOR_JWT_SECRET (jwt, read by @auth settings)']);
+    expect(said('local')).toEqual(['CUSTOMERS_JWT_SECRET (jwt, read by @auth settings)']);
     expect(said('production')).toEqual([
-      'MONITOR_DATABASE_URL (entriesDatabase, read by @connections/customers-postgres.connection.json)',
-      'MONITOR_JWT_SECRET (jwt, read by @auth settings)',
+      'CUSTOMERS_DATABASE_URL (customersDatabase, read by @connections/customers-postgres.connection.json)',
+      'CUSTOMERS_JWT_SECRET (jwt, read by @auth settings)',
     ]);
-    // because the connection behind the entries is what the binding changes
+    // because the connection behind the customers is what the binding changes
     expect(reach('local').connections).toContain('@connections/customers.connection.json');
     expect(reach('production').connections).toContain('@connections/customers-postgres.connection.json');
     expect(reach('local').connections).not.toContain('@connections/customers-postgres.connection.json');

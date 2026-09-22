@@ -1,0 +1,6 @@
+name,email,tier
+Ada Lovelace,ada@example.com,bronze
+Grace Hopper,grace@example.com,silver
+Alan Turing,alan@example.com,bronze
+Edsger Dijkstra,edsger@example.com,silver
+Barbara Liskov,,silver

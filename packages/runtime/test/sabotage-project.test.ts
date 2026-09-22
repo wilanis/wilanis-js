@@ -151,35 +151,35 @@ describe('sabotage: a store names a connection and the shapes it keeps', () => {
   const keeping = (feature: string, of: string, connection = kept) => ({
     [`features/${feature}/data/planted.store.json`]: {
       $schema: schemaUrl('store'),
-      label: 'Entries',
-      description: 'The entries recorded so far.',
+      label: 'Customers',
+      description: 'The customers registered so far.',
       connection,
-      collections: { entries: { of, key: 'id' } },
+      collections: { customers: { of, key: 'id' } },
     },
   });
 
   it('passes check when the connection and the shape are both there and both visible', () => {
-    expect(plantedAll(keeping('monitor', '@customers/domain/Customer.shape.json'))).toEqual([]);
+    expect(plantedAll(keeping('customers', '@customers/domain/Customer.shape.json'))).toEqual([]);
   });
 
   it('R001 a connection the tree does not have', () => {
-    const broken = keeping('monitor', '@customers/domain/Customer.shape.json', '@connections/nope.connection.json');
+    const broken = keeping('customers', '@customers/domain/Customer.shape.json', '@connections/nope.connection.json');
     expect(plantedAll(broken)).toContain('R001');
   });
 
   it('R001 a collection over a shape the tree does not have', () => {
-    expect(plantedAll(keeping('monitor', '@customers/domain/Nope.shape.json'))).toContain('R001');
+    expect(plantedAll(keeping('customers', '@customers/domain/Nope.shape.json'))).toContain('R001');
   });
 
-  /** The store in a feature that depends on the monitor, so what the monitor exports is the only question left. */
+  /** The store in a feature that depends on customers, so what that feature exports is the only question left. */
   const dependingOn = (of: string) =>
     plantedEditing(keeping('hello', of), 'features/hello/feature.json', feature => {
-      feature.dependsOn = [...feature.dependsOn, 'monitor'];
+      feature.dependsOn = [...feature.dependsOn, 'customers'];
     });
 
   it("L005 a collection over another feature's shape that feature does not export", () => {
-    // the monitor exports Entry and its port, and nothing else: CustomerRecord is its own business.
-    // hello is made to depend on the monitor first, or visibility would refuse at the dependency
+    // customers exports Customer and its port, and nothing else: CustomerRecord is its own business.
+    // hello is made to depend on customers first, or visibility would refuse at the dependency
     // and never reach the export -- which would pass for a reason this case is not about
     expect(dependingOn('@customers/domain/CustomerRecord.shape.json')).toContain('L005');
     expect(dependingOn('@customers/domain/Customer.shape.json')).toEqual([]);

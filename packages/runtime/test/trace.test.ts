@@ -22,7 +22,7 @@ import {
 } from '../src/index.js';
 import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
-const GET_ENTRY = '@customers/edge/get-customer.trigger.json';
+const GET_CUSTOMER = '@customers/edge/get-customer.trigger.json';
 
 /** Every span of a trace, depth first, so a case can say which ones a run left and in what order. */
 function spansOf(trace: Trace): Trace[] {
@@ -53,15 +53,15 @@ async function fire(
   return { ran: heard[0], scope: emb.scope };
 }
 
-/** The trace of one fire of `GET /monitor/{id}`, with the upstream stubbed to whatever a case wants it to say. */
-async function getEntry(status: number, level: 'summary' | 'full' = 'full'): Promise<Trace> {
-  const { ran, scope } = await fire(GET_ENTRY, {
+/** The trace of one fire of `GET /customers/{id}`, with the upstream stubbed to whatever a case wants it to say. */
+async function getCustomer(status: number, level: 'summary' | 'full' = 'full'): Promise<Trace> {
+  const { ran, scope } = await fire(GET_CUSTOMER, {
     input: { id: 'golf' },
     request: { params: { id: 'golf' }, headers: {} },
     stubs: {
       'op.asked': {
         status,
-        body: status === 200 ? { id: 'golf', url: 'https://a.example/', method: 'GET' } : undefined,
+        body: status === 200 ? { id: 'golf', name: 'Ada', email: 'ada@example.com', tier: 'bronze' } : undefined,
       },
     },
   });
@@ -70,7 +70,7 @@ async function getEntry(status: number, level: 'summary' | 'full' = 'full'): Pro
 
 describe('one fire, said as spans', () => {
   it('nests the fire, the port operation, the binding, the graph and every node that ran', async () => {
-    const trace = await getEntry(500);
+    const trace = await getCustomer(500);
 
     expect(spansOf(trace).map(one => one.name)).toEqual([
       'fire @features/customers/edge/get-customer.trigger.json',
@@ -86,7 +86,7 @@ describe('one fire, said as spans', () => {
   });
 
   it('says how the run ended, in the tree’s own word for it, at every level of the nesting', async () => {
-    const trace = await getEntry(500);
+    const trace = await getCustomer(500);
     const statuses = Object.fromEntries(spansOf(trace).map(one => [one.name.split(' ')[0], one.status]));
 
     // the reason is the author's own -- "upstream" is a word get-row.graph.json declared, not the engine's
@@ -100,7 +100,7 @@ describe('one fire, said as spans', () => {
   });
 
   it('carries the run id, the trigger and its kind on the root span', async () => {
-    const trace = await getEntry(500);
+    const trace = await getCustomer(500);
 
     expect(trace.attributes['wilanis.trigger']).toBe('@features/customers/edge/get-customer.trigger.json');
     expect(trace.attributes['wilanis.kind']).toBe('@http/http.trigger-kind.json');
@@ -111,7 +111,7 @@ describe('one fire, said as spans', () => {
 
   it("reads the caller's own trace off the path the trigger's kind declares", async () => {
     const parent = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
-    const { ran, scope } = await fire(GET_ENTRY, {
+    const { ran, scope } = await fire(GET_CUSTOMER, {
       input: { id: 'golf' },
       request: { params: { id: 'golf' }, headers: { traceparent: parent } },
       stubs: { 'op.asked': { status: 500 } },
@@ -122,7 +122,7 @@ describe('one fire, said as spans', () => {
   });
 
   it('gives every node span the address a refusal prints, so a span and a refusal join on one pair', async () => {
-    const trace = await getEntry(500);
+    const trace = await getCustomer(500);
     const graph = spanNamed(trace, '@features/customers/data/get-row.graph.json');
     const asked = spanNamed(trace, 'asked');
 
@@ -133,7 +133,7 @@ describe('one fire, said as spans', () => {
   });
 
   it("reads the connection and the HTTP status out of the node's own in and out", async () => {
-    const asked = spanNamed(await getEntry(500), 'asked');
+    const asked = spanNamed(await getCustomer(500), 'asked');
 
     // the engine knows nothing of connections or of HTTP; these two are read here, where the tree's words are
     expect(asked?.attributes['wilanis.connection']).toBe('@connections/customers-api.connection.json');
@@ -143,7 +143,7 @@ describe('one fire, said as spans', () => {
   });
 
   it('says what a switch routed to, and names the branch in the span so a reader sees the route taken', async () => {
-    const route = spanNamed(await getEntry(404), 'route');
+    const route = spanNamed(await getCustomer(404), 'route');
 
     expect(route?.name).toBe('route switch → missing');
     expect(route?.attributes['wilanis.selected']).toBe('missing');
@@ -151,7 +151,7 @@ describe('one fire, said as spans', () => {
   });
 
   it('a run that answered says so, and the graph under it says so too', async () => {
-    const trace = await getEntry(200);
+    const trace = await getCustomer(200);
 
     expect(trace.status).toBe('ok');
     expect(spanNamed(trace, '@features/customers/data/get-row.graph.json')?.status).toBe('ok');
@@ -159,13 +159,13 @@ describe('one fire, said as spans', () => {
   });
 
   it('stamps every span from the run’s own clock, so a span never ends before it started', async () => {
-    for (const span of spansOf(await getEntry(500))) expect(span.endedAt).toBeGreaterThanOrEqual(span.startedAt);
+    for (const span of spansOf(await getCustomer(500))) expect(span.endedAt).toBeGreaterThanOrEqual(span.startedAt);
   });
 });
 
 describe('what a level lets a span carry', () => {
   it('summary carries status, timing and what ran -- and never a value', async () => {
-    const trace = atLevel(await getEntry(500), 'summary');
+    const trace = atLevel(await getCustomer(500), 'summary');
     const asked = spanNamed(trace, 'asked');
 
     expect(asked?.attributes['wilanis.in']).toBeUndefined();
@@ -177,7 +177,7 @@ describe('what a level lets a span carry', () => {
   });
 
   it('summary never carries a message: a reason is a declared word, a message is prose', async () => {
-    const trace = atLevel(await getEntry(500), 'summary');
+    const trace = atLevel(await getCustomer(500), 'summary');
     const refused = spanNamed(trace, 'failed');
 
     // the status still says the reason the author declared, which is a closed set and cannot leak
@@ -186,17 +186,17 @@ describe('what a level lets a span carry', () => {
   });
 
   it("full adds the report's already-redacted in and out, and the node's message", async () => {
-    const trace = await getEntry(500);
+    const trace = await getCustomer(500);
     const asked = spanNamed(trace, 'asked');
     const refused = spanNamed(trace, 'failed');
 
-    expect(JSON.parse(String(asked?.attributes['wilanis.in'])).path).toBe('/monitor/golf');
+    expect(JSON.parse(String(asked?.attributes['wilanis.in'])).path).toBe('/customers/golf');
     expect(JSON.parse(String(asked?.attributes['wilanis.out'])).status).toBe(500);
-    expect(refused?.attributes['wilanis.error']).toBe('the monitor API answered 500');
+    expect(refused?.attributes['wilanis.error']).toBe('the customer API answered 500');
   });
 
   it('summary drops the branches nothing took; full keeps them', async () => {
-    const full = await getEntry(500);
+    const full = await getCustomer(500);
     const summary = atLevel(full, 'summary');
 
     expect(spansOf(full).map(one => one.name)).toContain('row');
@@ -207,7 +207,7 @@ describe('what a level lets a span carry', () => {
     // a challenge's detail is the one thing a report carries that no span may: it is how to answer a
     // challenge, not what a run did, and neither level is a place for it
     for (const level of ['summary', 'full'] as const) {
-      const trace = atLevel(await getEntry(500), level);
+      const trace = atLevel(await getCustomer(500), level);
       const said = JSON.stringify(trace);
       expect(said).not.toContain('wilanis.detail');
       expect(said).not.toContain('"detail"');
@@ -217,21 +217,21 @@ describe('what a level lets a span carry', () => {
 
 describe('a run written out', () => {
   it('prints the run, then one line per span, indented by how deep it ran', async () => {
-    const text = traceText(atLevel(await getEntry(500), 'summary'));
+    const text = traceText(atLevel(await getCustomer(500), 'summary'));
     const lines = text.split('\n');
 
     expect(lines[0]).toMatch(
-      /^trace [0-9a-f-]{36}\s+fire @features\/monitor\/edge\/get-entry\.trigger\.json → refused: upstream\s+\d+ms$/,
+      /^trace [0-9a-f-]{36}\s+fire @features\/customers\/edge\/get-customer\.trigger\.json → refused: upstream\s+\d+ms$/,
     );
-    expect(lines[1]).toMatch(/^ {2}@features\/monitor\/domain\/monitor\.port\.json#get\b/);
-    expect(lines[2]).toMatch(/^ {4}binding @features\/monitor\/data\/monitor-rest\.binding\.json#get\b/);
+    expect(lines[1]).toMatch(/^ {2}@features\/customers\/domain\/customer\.port\.json#get\b/);
+    expect(lines[2]).toMatch(/^ {4}binding @features\/customers\/data\/customers-rest\.binding\.json#get\b/);
     expect(lines.some(line => /^ {8}asked @http\/http\.port\.json#request\s+\d+ms {2}ok\b/.test(line))).toBe(true);
     // the reason the author declared is on the line, where a reader of a terminal looks first
     expect(text).toContain('refused: upstream');
   });
 
   it('prints the whole span tree as one object, so nothing the text form shows is missing from the json', async () => {
-    const trace = atLevel(await getEntry(500), 'summary');
+    const trace = atLevel(await getCustomer(500), 'summary');
     const parsed = JSON.parse(traceJson(trace)) as Trace;
 
     expect(parsed).toEqual(trace);
@@ -263,7 +263,7 @@ describe('a startup step, said as spans', () => {
 
 describe('the record and the trace are two things', () => {
   it('leaves the record untouched: traceOf reads and never writes', async () => {
-    const { ran, scope } = await fire(GET_ENTRY, {
+    const { ran, scope } = await fire(GET_CUSTOMER, {
       input: { id: 'golf' },
       request: { params: { id: 'golf' }, headers: {} },
       stubs: { 'op.asked': { status: 500 } },

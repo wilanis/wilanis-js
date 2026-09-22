@@ -1,7 +1,7 @@
 # The arena: three agents, one gate
 
 Three models are each given the same one-paragraph task in identical copies of the example, unsupervised:
-add an operation that toggles an optional boolean `pinned` on an entry, expose it over HTTP, validate it with
+add an operation that toggles the optional boolean `active` on a customer, expose it over HTTP, validate it with
 curl. Beside the task sits an acceptance test the reviewer wrote first, `accept.sh`, and the agent is told its
 work is done when the test prints ACCEPTED. When all three have stopped, the reviewer's steps run over each
 finished tree and one page is written: what each tree says, what the reviewer noted, what it cost, the gate's
@@ -43,14 +43,14 @@ keeps; it ends in a `result` line with the CLI's own cost, which the page shows 
 | --- | --- |
 | `run.sh` | The one command: `run-one.sh` for each of haiku, sonnet, opus in parallel, then `render.py`. |
 | `run-one.sh <model>` | What `run.sh` is made of: `setup.sh`, the agent through `claude -p` in the copy, then `review.sh`. |
-| `setup.sh <name> <port>` | One copy of `example/` under `.runs/<name>`: `node_modules` linked, `pinned` added to `Customer.shape.json` and `CustomerRow.shape.json`, the http port set, `wilanis init` run, the skill and the Stop hook planted, `accept.sh` copied, and one git commit as the baseline. |
+| `setup.sh <name> <port>` | One copy of `example/` under `.runs/<name>`: `node_modules` linked, the http port set, `wilanis init` run, the skill and the Stop hook planted, `accept.sh` copied, and one git commit as the baseline. |
 | `accept.sh <METHOD> <ROUTE>` | The gate, committed into each copy. Criteria numbered, each printing PASS or FAIL with expected and actual, ending ACCEPTED or REJECTED (exit 0 or 1). Criterion 3 reports the access rule's `holds at N trigger(s)` without judging it. It kills only what listens on its own port. |
 | `prompt.md` | The prompt as sent, with `<arena>`, `<model>` and `<port>` filled in by `run-one.sh` and nothing else varying between models. |
 | `scenario.json` | The page's title, thesis, the invariant as the example ships it, and the paragraphs that introduce each section. |
 | `review.sh <runs> <model>` | The reviewer's steps over one finished tree: `parse.py`, `facts.py` (which runs the gate again), `validate.sh`. |
 | `parse.py <transcript> <tree> <out.json>` | The transcript to metrics and a timeline: wall clock, turns, tool calls by name, tokens by kind (each API message counted once), cost at list price from the one price table at the top of the file, check rounds and the codes seen, file rewrites, churn from git against the baseline. Writes the agent's final report beside the JSON. Reads the CLI's stream and the session-file spelling alike. |
-| `facts.py <tree> <out.json> [gate.txt]` | What the reviewer read by hand the first time, derived from the tree: does it check, what the rehearsal says the rule holds at, the new trigger's verb, route, policies, refusal map and `out`, whether the access rule's `over` gained the fired operation and whether any invariant's `when` or `requires` changed, whether `CustomerView` gained `pinned`, which bindings meet the operation, files added and changed; and the gate's verdict, run again with the trigger's own verb and route. |
-| `validate.sh <tree> <METHOD> <ROUTE> <out.txt>` | The same nine curls against each result: sign in, wait for the reload, record two entries, toggle, read back, refuse, list. |
+| `facts.py <tree> <out.json> [gate.txt]` | What the reviewer read by hand the first time, derived from the tree: does it check, what the rehearsal says the rule holds at, the new trigger's verb, route, policies, refusal map and `out`, whether the access rule's `over` gained the fired operation and whether any invariant's `when` or `requires` changed, whether `CustomerView` gained `active`, which bindings meet the operation, files added and changed; and the gate's verdict, run again with the trigger's own verb and route. |
+| `validate.sh <tree> <METHOD> <ROUTE> <out.txt>` | The same nine curls against each result: sign in, wait for the reload, register two customers, toggle, read back, refuse, list. |
 | `render.py <runs> <out.html>` | One static page, inline CSS, dark mode, phone width, no script. |
 | `tables.py` | The rows of the page's three tables: the facts, the reviewer's notes, the metrics. |
 | `render-from.sh <dir> [out.html]` | The reviewer's steps and the page again from saved material (`<dir>/<model>/` trees and `<dir>/<model>.jsonl` transcripts), calling no model. |
@@ -82,7 +82,7 @@ haiku: claude exited 143 (see docs/demo/arena/.runs/haiku.claude.log)
 haiku: the agent stopped; reviewing
 review haiku: parse
 review haiku: facts and the gate
-review haiku: the nine curls against POST /monitor/{id}/pin
+review haiku: the nine curls against POST /customers/{id}/active
 review haiku: REJECTED  15 of 17 criteria fail
 ```
 
@@ -96,7 +96,7 @@ curls of 10 s each); the budget is now 300 s and every path of the hook answers 
 ## The confounds, and how the harness avoids them
 
 **The reload a sign-in causes (#490).** Signing in writes the session under the tree's `.wilanis/`, the
-reload watcher sees it, and the tree is reloaded with an empty memory store: every entry recorded before the
+reload watcher sees it, and the tree is reloaded with an empty memory store: every customer registered before the
 reload lands is gone. `accept.sh` and `validate.sh` both sign in first, then wait for the `reload:` line in
 the server's log before recording anything, and say so in a comment naming the issue. When #490 lands the wait
 finds no line and times out harmlessly.

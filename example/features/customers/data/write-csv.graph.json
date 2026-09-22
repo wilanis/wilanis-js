@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Write CSV",
-  "description": "Data graph behind customer.toCsv: the customers written as monitor.csv into the blob registry; the graph answers the handle, and the route streams the file.",
+  "description": "Data graph behind customer.toCsv: the customers written as customers.csv into the blob registry; the graph answers the handle, and the route streams the file.",
   "in": "@customers/domain/Customer.shape.json[]",
   "out": {
     "type": "blob",
@@ -16,7 +16,7 @@
       "in": {
         "rows": "{{in}}",
         "type": "@customers/domain/Customer.shape.json",
-        "filename": "monitor.csv"
+        "filename": "customers.csv"
       }
     }
   ]

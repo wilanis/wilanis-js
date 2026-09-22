@@ -50,7 +50,7 @@
     }
   ],
   "secrets": {
-    "jwt": "MONITOR_JWT_SECRET"
+    "jwt": "CUSTOMERS_JWT_SECRET"
   },
   "startup": [
     {

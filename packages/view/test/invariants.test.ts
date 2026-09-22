@@ -29,8 +29,8 @@ const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 const PAGE = fileURLToPath(new URL('../client/index.html', import.meta.url));
 const WRITES = '@features/customers/domain/writes-are-for-registrars.invariant.json';
 const SESSION = '@features/directories/domain/the-session-is-the-callers.invariant.json';
-const CAN_RECORD = '@features/access/edge/can-register.policy.json';
-const MONITOR = '@features/customers/domain/customer.port.json';
+const CAN_REGISTER = '@features/access/edge/can-register.policy.json';
+const CUSTOMER_PORT = '@features/customers/domain/customer.port.json';
 const PLANTED = 'a-customer-is-reachable.invariant.json';
 
 /**
@@ -72,7 +72,7 @@ const access = async (path: string): Promise<VAccessInvariant> => {
 };
 
 /**
- * The view of a field invariant over the example's Entry shape: the example carries none until RFC 0007 step 4
+ * The view of a field invariant over the example's Customer shape: the example carries none until RFC 0007 step 4
  * puts one there, so the tree is copied, the document written in, and the copy removed again. The plugins and
  * the include are handed in, since a copy resolves neither, and the copy never outlives the answer.
  */
@@ -82,8 +82,8 @@ const holds = (when: string): VHoldsInvariant => {
     cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
     const doc = {
       $schema: '@wilanis/invariant.schema.json',
-      label: 'An entry names a call',
-      description: 'A URL is never empty, and a deletion always says who asked for it.',
+      label: 'A customer is reachable',
+      description: 'A name and an address are never empty, and a gold account always carries its note.',
       holds: { on: '@customers/domain/Customer.shape.json', when },
     };
     writeFileSync(join(dir, 'features/customers/domain', PLANTED), JSON.stringify(doc, null, 2));
@@ -98,8 +98,8 @@ const holds = (when: string): VHoldsInvariant => {
 describe('the view of an access invariant', () => {
   it('names what must gate every way in: the policy, by the canonical path and the label a page shows', async () => {
     const seen = await access(WRITES);
-    expect(seen.policy).toBe(CAN_RECORD);
-    expect(seen.policyLabel).toBe('Can record');
+    expect(seen.policy).toBe(CAN_REGISTER);
+    expect(seen.policyLabel).toBe('Can register');
     expect(seen.proves).toBeUndefined();
   });
 
@@ -112,7 +112,7 @@ describe('the view of an access invariant', () => {
   it('covers each operation by the port that declares it, so a click lands on the contract', async () => {
     const seen = await access(WRITES);
     expect(seen.covers.map(one => one.opName)).toEqual([
-      'record',
+      'register',
       'update',
       'remove',
       'removeMany',
@@ -120,10 +120,10 @@ describe('the view of an access invariant', () => {
       'import',
     ]);
     expect(seen.covers[0]).toEqual({
-      op: `${MONITOR}#record`,
-      opName: 'record',
-      port: MONITOR,
-      portLabel: 'Entry storage',
+      op: `${CUSTOMER_PORT}#register`,
+      opName: 'register',
+      port: CUSTOMER_PORT,
+      portLabel: 'Customer storage',
     });
   });
 
@@ -131,23 +131,23 @@ describe('the view of an access invariant', () => {
     const seen = await access(WRITES);
     const direct = seen.reached.filter(one => !one.through);
     expect(direct.map(one => [one.triggerLabel, one.op.split('#')[1]])).toEqual([
-      ['DELETE /monitor', 'removeMany'],
-      ['DELETE /monitor/{id}', 'remove'],
-      ['POST /monitor.csv', 'import'],
-      ['POST /monitor', 'submit'],
-      ['PUT /monitor/{id}', 'update'],
+      ['DELETE /customers/{id}', 'remove'],
+      ['DELETE /customers', 'removeMany'],
+      ['POST /customers.csv', 'import'],
+      ['POST /customers', 'submit'],
+      ['PUT /customers/{id}', 'update'],
     ]);
-    for (const one of seen.reached) expect(one.satisfiedBy).toEqual([{ path: CAN_RECORD, label: 'Can record' }]);
+    for (const one of seen.reached) expect(one.satisfiedBy).toEqual([{ path: CAN_REGISTER, label: 'Can register' }]);
   });
 
   it('follows the walk transitively, and says the operation a trigger was reached through', async () => {
     const seen = await access(WRITES);
-    // the RFC's own case: POST /monitor.csv fires #import, whose graph records every row, so it reaches
-    // #record without naming it -- which is exactly why a domain graph cannot route around an invariant
-    const csv = seen.reached.filter(one => one.triggerLabel === 'POST /monitor.csv');
+    // the RFC's own case: POST /customers.csv fires #import, whose graph registers every row, so it reaches
+    // #register without naming it -- which is exactly why a domain graph cannot route around an invariant
+    const csv = seen.reached.filter(one => one.triggerLabel === 'POST /customers.csv');
     expect(csv.map(one => [one.op.split('#')[1], one.through?.split('#')[1]])).toEqual([
-      ['record', 'submit'],
-      ['submit', 'recordAll'],
+      ['register', 'submit'],
+      ['submit', 'registerAll'],
       ['import', undefined],
     ]);
   });
@@ -197,20 +197,20 @@ describe('the view of a field invariant', () => {
   it('names the shape, the rule as written, and the fields its roots may be', () => {
     // the example carries no holds invariant until RFC 0007 step 4 puts one there, so this copies the tree
     // and writes one: the page has to draw both forms, and the form it draws is read from a loaded document
-    const seen = holds("len(url) > 0 && (method != 'DELETE' || has(agent))");
+    const seen = holds("len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))");
     expect(seen.form).toBe('holds');
     expect(seen.on).toBe('@features/customers/domain/Customer.shape.json');
-    expect(seen.onLabel).toBe('Entry');
-    expect(seen.when).toBe("len(url) > 0 && (method != 'DELETE' || has(agent))");
+    expect(seen.onLabel).toBe('Customer');
+    expect(seen.when).toBe("len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))");
     // the roots a reader is told they may name are the shape's own fields, read from the shape and not the rule
-    expect(seen.fields).toEqual(['id', 'url', 'method', 'agent', 'note']);
+    expect(seen.fields).toEqual(['id', 'name', 'email', 'tier', 'registrar', 'active', 'note']);
   });
 
   it('tables every site of the shape, read from the compiler and never worked out here', () => {
-    const seen = holds('len(url) > 0');
+    const seen = holds('len(name) > 0');
     expect(Object.keys(seen).sort()).toEqual(['fields', 'form', 'on', 'onLabel', 'sites', 'when']);
     // the sites are `sitesOf`'s, which is what the checker judges (I005) and the compiler guards by: thirteen
-    // places a value of Entry comes into being in the example, twelve nodes that make one and one graph that
+    // places a value of Customer comes into being in the example, twelve nodes that make one and one graph that
     // takes a list. The viewer counts none of them itself; it asks the one function that already knows.
     expect(seen.sites.length).toBe(13);
     expect(seen.sites.filter(site => site.kind === 'taken').map(site => [site.graph, site.node, site.arity])).toEqual([

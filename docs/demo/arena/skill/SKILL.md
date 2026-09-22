@@ -40,7 +40,7 @@ One field of one record changes after the record is read. The nodes, in the orde
    without a record (G009: a node has one router, so each branch refuses through its own node).
 8. `out.from` lists every node that can answer: the two rows and the three refusals.
 
-The same graph over this tree's store, with `pinned` as the flag:
+The same graph over this tree's store, with `active` as the flag:
 
 ```json
 {
@@ -51,15 +51,15 @@ The same graph over this tree's store, with `pinned` as the flag:
   "out": { "type": "@customers/domain/Customer.shape.json", "from": ["setRow", "unsetRow", "missing", "vanishedOnSet", "vanishedOnUnset"] },
   "nodes": [
     { "type": "@wilanis/node/run.schema.json", "id": "asked", "label": "Read the record", "run": "@storage/store.port.json#get",
-      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "key": "{{in.id}}" } },
+      "in": { "store": "@customers/data/customers.store.json", "collection": "customers", "key": "{{in.id}}" } },
     { "type": "@wilanis/node/switch.schema.json", "id": "found", "label": "Is it kept?", "in": { "record": "{{asked.record}}" },
       "rules": [{ "when": "has(record)", "to": "wasSet" }], "else": "missing" },
-    { "type": "@wilanis/node/switch.schema.json", "id": "wasSet", "label": "Is it set now?", "in": { "flag": "{{asked.record.pinned}}" },
+    { "type": "@wilanis/node/switch.schema.json", "id": "wasSet", "label": "Is it set now?", "in": { "flag": "{{asked.record.active}}" },
       "rules": [{ "when": "has(flag) && flag", "to": "unset" }], "else": "set" },
     { "type": "@wilanis/node/run.schema.json", "id": "set", "label": "Set it", "run": "@storage/store.port.json#patch",
-      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "key": "{{in.id}}", "changes": { "pinned": true } } },
+      "in": { "store": "@customers/data/customers.store.json", "collection": "customers", "key": "{{in.id}}", "changes": { "active": true } } },
     { "type": "@wilanis/node/run.schema.json", "id": "unset", "label": "Unset it", "run": "@storage/store.port.json#patch",
-      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "key": "{{in.id}}", "changes": { "pinned": false } } },
+      "in": { "store": "@customers/data/customers.store.json", "collection": "customers", "key": "{{in.id}}", "changes": { "active": false } } },
     { "type": "@wilanis/node/switch.schema.json", "id": "setRoute", "label": "Still there?", "in": { "record": "{{set.record}}" },
       "rules": [{ "when": "has(record)", "to": "setRow" }], "else": "vanishedOnSet" },
     { "type": "@wilanis/node/switch.schema.json", "id": "unsetRoute", "label": "Still there?", "in": { "record": "{{unset.record}}" },
@@ -68,12 +68,12 @@ The same graph over this tree's store, with `pinned` as the flag:
       "in": { "value": "{{set.record}}", "type": "@customers/domain/Customer.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "unsetRow", "label": "The record, unset", "run": "@std/object.port.json#make",
       "in": { "value": "{{unset.record}}", "type": "@customers/domain/Customer.shape.json" } },
-    { "type": "@wilanis/node/run.schema.json", "id": "missing", "label": "No such entry", "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" } },
+    { "type": "@wilanis/node/run.schema.json", "id": "missing", "label": "No such customer", "run": "@std/outcome.port.json#refuse",
+      "in": { "reason": "missing", "message": "no customer {{in.id}}", "type": "@customers/domain/Customer.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "vanishedOnSet", "label": "Gone before the write", "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" } },
+      "in": { "reason": "missing", "message": "no customer {{in.id}}", "type": "@customers/domain/Customer.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "vanishedOnUnset", "label": "Gone before the write", "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" } }
+      "in": { "reason": "missing", "message": "no customer {{in.id}}", "type": "@customers/domain/Customer.shape.json" } }
   ]
 }
 ```

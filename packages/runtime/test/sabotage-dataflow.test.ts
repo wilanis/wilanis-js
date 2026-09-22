@@ -11,8 +11,8 @@ import { sabotageHinting, sabotagePointing } from './example-harness.js';
 
 const GRAPH = 'features/customers/data/kept-update.graph.json';
 const STORE = '@storage/store.port.json';
-const ENTRIES = '@customers/data/customers.store.json';
-const ENTRY = '@customers/domain/Customer.shape.json';
+const STORE_DOC = '@customers/data/customers.store.json';
+const CUSTOMER = '@customers/domain/Customer.shape.json';
 
 const run = (id: string, op: string, input: Record<string, unknown>) => ({
   type: '@wilanis/node/run.schema.json',
@@ -27,20 +27,20 @@ const decide = (id: string, rules: { when: string; to: string }[], otherwise: st
   rules,
   else: otherwise,
 });
-const get = run('get', `${STORE}#get`, { store: ENTRIES, collection: 'entries', key: '{{in.id}}' });
-/** One write of the toggle: the caller's fields, and the agent standing in for the flag the example has not. */
-const patch = (id: string, agent: string) =>
+const get = run('get', `${STORE}#get`, { store: STORE_DOC, collection: 'customers', key: '{{in.id}}' });
+/** One write of the toggle: the caller's fields, and the note standing in for the flag the example has not. */
+const patch = (id: string, note: string) =>
   run(id, `${STORE}#patch`, {
-    store: ENTRIES,
-    collection: 'entries',
+    store: STORE_DOC,
+    collection: 'customers',
     key: '{{in.id}}',
-    changes: { url: '{{in.url}}', method: '{{in.method}}', agent },
+    changes: { name: '{{in.name}}', email: '{{in.email}}', tier: '{{in.tier}}', note },
   });
-const make = (value: string) => run('row', '@std/object.port.json#make', { value, type: ENTRY });
+const make = (value: string) => run('row', '@std/object.port.json#make', { value, type: CUSTOMER });
 const missing = run('missing', '@std/outcome.port.json#refuse', {
   reason: 'missing',
-  message: 'no entry {{in.id}}',
-  type: ENTRY,
+  message: 'no customer {{in.id}}',
+  type: CUSTOMER,
 });
 
 /** kept-update rewritten as the toggle from the issue: both writes beside the switch, their answers ORed. */

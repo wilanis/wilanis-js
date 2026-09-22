@@ -232,7 +232,10 @@ describe('invariant', () => {
     over: ['@features/customers/domain/customer.port.json#register'],
     requires,
   });
-  const holds = { on: '@features/customers/domain/Customer.shape.json', when: 'len(url) > 0' };
+  const holds = {
+    on: '@features/customers/domain/Customer.shape.json',
+    when: "len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))",
+  };
   const form = (body: Record<string, unknown>) => {
     const { holds: _baseline, ...envelope } = doc('invariant');
     return { ...envelope, ...body };
@@ -250,7 +253,7 @@ describe('invariant', () => {
 
   it('the field form: a shape, and a rule over its fields', () => {
     expect(refused(form({ holds }))).toEqual([]);
-    expect(refused(form({ label: 'An entry names a call', holds }))).toEqual([]);
+    expect(refused(form({ label: 'A customer is reachable', holds }))).toEqual([]);
   });
 
   it('a document is exactly one of the two forms: both is refused, and neither', () => {

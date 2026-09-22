@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# One copy of the example for one model: the pinned field, its own port, what `wilanis init` writes, the
-# graph-idiom skill, the Stop hook, the gate, and a git commit as the baseline every diff is measured against.
+# One copy of the example for one model: its own port, what `wilanis init` writes, the graph-idiom skill,
+# the Stop hook, the gate, and a git commit as the baseline every diff is measured against.
 #
 #   bash docs/demo/arena/setup.sh <name> <port>        writes docs/demo/arena/.runs/<name>
 #
@@ -20,20 +20,14 @@ copy_example() {
   ln -s "$REPO/node_modules" "$DIR/node_modules"
 }
 
-# The task's premise: Entry and the REST row carry an optional boolean `pinned`; the tree listens on its own port.
-plant_pinned_and_port() {
+# The tree listens on a port of its own, so three copies can serve at once.
+set_port() {
   node -e '
 const fs = require("fs");
 const read = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
 const write = (p, d) => fs.writeFileSync(p, JSON.stringify(d, null, 2) + "\n");
 const port = Number(process.argv[1]);
-let d = read("features/customers/domain/Customer.shape.json");
-d.fields.pinned = { type: "boolean", required: false, description: "whether a reader pinned this entry to the top of the digest" };
-write("features/customers/domain/Customer.shape.json", d);
-d = read("features/customers/edge/CustomerRow.shape.json");
-d.fields.pinned = { type: "boolean", required: false };
-write("features/customers/edge/CustomerRow.shape.json", d);
-d = read("project.json");
+const d = read("project.json");
 d.plugins.find((p) => p.use === "@http").settings.port = port;
 write("project.json", d);
 fs.writeFileSync("README.md", fs.readFileSync("README.md", "utf8").split(":8099").join(":" + port));
@@ -66,12 +60,12 @@ commit_baseline() {
   printf 'node_modules\n.wilanis/\nscenarios/\n' > .gitignore
   git init -q
   git add -A
-  git -c user.name=arena -c user.email=arena@example.invalid commit -q -m "The example, with a pinned flag on Entry, the agent files and the acceptance test"
+  git -c user.name=arena -c user.email=arena@example.invalid commit -q -m "The example, the agent files and the acceptance test"
 }
 
 copy_example
 cd "$DIR"
-plant_pinned_and_port
+set_port
 plant_agent_files
 cp "$HERE/accept.sh" accept.sh
 npx wilanis check .

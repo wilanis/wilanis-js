@@ -1,8 +1,8 @@
 /**
- * An invariant sabotaged, in both its forms. The example's access invariants say that every write of the monitor
- * is gated by the recorder policy and that nothing touches a session without a principal proved, so breaking a
+ * An invariant sabotaged, in both its forms. The example's access invariants say that every write of the registry
+ * is gated by the registrar policy and that nothing touches a session without a principal proved, so breaking a
  * trigger, the invariant's own references, or what it constrains is what the I family answers. Its field
- * invariant says an entry always names the call it observed, so breaking the rule itself (I004), or writing a
+ * invariant says a customer is always reachable, so breaking the rule itself (I004), or writing a
  * value that contradicts it where every read is a literal (I005), is what the site rules answer.
  */
 import { describe, expect, it } from 'vitest';
@@ -10,11 +10,11 @@ import { sabotage, sabotageSaying } from './example-harness.js';
 
 const WRITES = 'features/customers/domain/writes-are-for-registrars.invariant.json';
 const SESSIONS = 'features/directories/domain/the-session-is-the-callers.invariant.json';
-const CALLS = 'features/customers/domain/a-customer-is-reachable.invariant.json';
-/** The graph whose `row` node makes an entry: where a literal value is written to contradict the rule. */
+const REACHABLE = 'features/customers/domain/a-customer-is-reachable.invariant.json';
+/** The graph whose `row` node makes a customer: where a literal value is written to contradict the rule. */
 const STORED = 'features/customers/data/store-and-latest.graph.json';
 /**
- * What a tree answers once nothing of `Entry` is guarded any more: the eight triggers of the monitor that map
+ * What a tree answers once nothing of `Customer` is guarded any more: the eight triggers of the registry that map
  * `invariant` reach no guard, and T006 refuses each for mapping a reason it cannot be answered with. A rule
  * that guards nothing takes its reason with it, which is the whole of what makes the word honest.
  */
@@ -35,7 +35,7 @@ describe('sabotage: invariants, the access form', () => {
         trigger.policies.pop();
       }).filter(one => one.startsWith('I001')),
     ).toEqual([
-      "I001 trigger reaches @features/customers/domain/customer.port.json#import, which 'Writes are for recorders' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy",
+      "I001 trigger reaches @features/customers/domain/customer.port.json#import, which 'Writes are for registrars' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy",
     ]);
   });
 
@@ -85,44 +85,46 @@ describe('sabotage: invariants, the access form', () => {
 describe('sabotage: invariants, the field form', () => {
   it('I004 a rule whose root is not a field of the shape', () => {
     expect(
-      sabotageSaying(CALLS, invariant => {
+      sabotageSaying(REACHABLE, invariant => {
         invariant.holds.when = 'quantity >= 0';
       }),
-    ).toEqual(["I004 'quantity' is not an input of this node (inputs: id, url, method, agent, note)"]);
+    ).toEqual([
+      "I004 'quantity' is not an input of this node (inputs: id, name, email, tier, registrar, active, note)",
+    ]);
   });
 
   it('I004 a rule that does not type against the fields it names', () => {
     expect(
-      sabotage(CALLS, invariant => {
-        invariant.holds.when = 'url > 3';
+      sabotage(REACHABLE, invariant => {
+        invariant.holds.when = 'email > 3';
       }),
     ).toEqual(['I004']);
   });
 
   it('I004 a rule that does not parse, and one that is not a boolean', () => {
     expect(
-      sabotage(CALLS, invariant => {
-        invariant.holds.when = 'len(url) >';
+      sabotage(REACHABLE, invariant => {
+        invariant.holds.when = 'len(email) >';
       }),
     ).toEqual(['I004']);
     expect(
-      sabotage(CALLS, invariant => {
-        invariant.holds.when = 'len(url)';
+      sabotage(REACHABLE, invariant => {
+        invariant.holds.when = 'len(email)';
       }),
     ).toEqual(['I004']);
   });
 
   it('I002 holds.on naming an edge shape, and R001 naming no shape at all', () => {
-    // pointing the rule at another shape guards nothing of Entry any more, so every trigger that mapped the
+    // pointing the rule at another shape guards nothing of Customer any more, so every trigger that mapped the
     // guard's reason now maps one it cannot reach (T006). That is the price the RFC names: the reason and the
     // guard stand or fall together, and the eight mappings the example carries say so.
     expect(
-      sabotage(CALLS, invariant => {
+      sabotage(REACHABLE, invariant => {
         invariant.holds.on = '@customers/edge/CustomerView.shape.json';
       }),
     ).toEqual([...UNGUARDED, 'I002']);
     expect(
-      sabotage(CALLS, invariant => {
+      sabotage(REACHABLE, invariant => {
         invariant.holds.on = '@customers/domain/Nope.shape.json';
       }),
     ).toEqual([...UNGUARDED, 'R001']);
@@ -130,9 +132,9 @@ describe('sabotage: invariants, the field form', () => {
 
   it('I003 a rule over a core shape no graph makes or takes', () => {
     expect(
-      sabotage(CALLS, invariant => {
+      sabotage(REACHABLE, invariant => {
         invariant.holds.on = '@customers/domain/TierLatest.shape.json';
-        invariant.holds.when = 'len(url) > 0';
+        invariant.holds.when = 'len(tier) > 0';
       }),
     ).toEqual([...UNGUARDED, 'I003']);
   });
@@ -148,25 +150,31 @@ describe('sabotage: invariants, the field form', () => {
   it('I005 a site whose every read is literal and contradicts the rule', () => {
     expect(
       sabotageSaying(STORED, graph => {
-        graph.nodes[4].in.value = { id: 'x', url: '', method: 'GET' };
+        graph.nodes[4].in.value = { id: 'x', name: 'Ada', email: '', tier: 'bronze' };
       }).filter(one => one.startsWith('I005')),
     ).toEqual([
-      "I005 the value 'row' makes contradicts 'An entry names a call' " +
+      "I005 the value 'row' makes contradicts 'A customer is reachable' " +
         '(@features/customers/domain/a-customer-is-reachable.invariant.json): ' +
-        "'len(url) > 0 && (method != 'DELETE' || has(agent))' is false where url = \"\"",
+        "'len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))' is false where email = \"\"",
     ]);
   });
 
-  it('I005 a literal deletion that says nothing about who asked, and none where it does', () => {
-    const deleting = (rest: Record<string, unknown>) => ({ id: 'x', url: 'https://x', method: 'DELETE', ...rest });
+  it('I005 a literal gold account that carries no note, and none where it does', () => {
+    const gold = (rest: Record<string, unknown>) => ({
+      id: 'x',
+      name: 'Ada',
+      email: 'ada@x.test',
+      tier: 'gold',
+      ...rest,
+    });
     expect(
       sabotage(STORED, graph => {
-        graph.nodes[4].in.value = deleting({});
+        graph.nodes[4].in.value = gold({});
       }),
     ).toEqual(['I005']);
     expect(
       sabotage(STORED, graph => {
-        graph.nodes[4].in.value = deleting({ agent: 'someone' });
+        graph.nodes[4].in.value = gold({ note: 'signed by the board' });
       }),
     ).toEqual([]);
   });

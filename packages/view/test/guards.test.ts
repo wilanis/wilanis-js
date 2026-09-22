@@ -7,7 +7,7 @@
  * The viewer judges neither. `guardsOf` says which sites the compiler guarded and `heldAt` how each conjunct of
  * a rule was established at a site -- the same answers the checker (I005), the lowering and the rehearsal read
  * -- so a badge and the guard in the spec cannot say different things. These cases hold the mapping honest, and
- * the example's own `an-entry-names-a-call` is what a guarded node is read against.
+ * the example's own `a-customer-is-reachable` is what a guarded node is read against.
  */
 import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -32,8 +32,8 @@ import { viewOf } from '../src/index.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 const PAGE = fileURLToPath(new URL('../client/index.html', import.meta.url));
-const ENTRY = '@customers/domain/Customer.shape.json';
-const CALLS = '@features/customers/domain/a-customer-is-reachable.invariant.json';
+const CUSTOMER = '@customers/domain/Customer.shape.json';
+const REACHABLE = '@features/customers/domain/a-customer-is-reachable.invariant.json';
 const KEPT_GET = '@features/customers/data/kept-get.graph.json';
 const WRITE_CSV = '@features/customers/data/write-csv.graph.json';
 const PLANTED = '@features/customers/data/proving.graph.json';
@@ -91,13 +91,13 @@ const graph = (nodes: unknown[], rest: Record<string, unknown> = {}) => ({
   ...rest,
   nodes,
 });
-/** A node that makes an entry out of `value`, the shape of a made site. */
+/** A node that makes a customer out of `value`, the shape of a made site. */
 const makes = (id: string, value: unknown) => ({
   type: '@wilanis/node/run.schema.json',
   id,
   label: id,
   run: '@std/object.port.json#make',
-  in: { value, type: ENTRY },
+  in: { value, type: CUSTOMER },
 });
 /** A node that reads a row from the store, so a site has something to be routed on. */
 const reads = (id: string) => ({
@@ -105,7 +105,7 @@ const reads = (id: string) => ({
   id,
   label: id,
   run: '@storage/store.port.json#get',
-  in: { store: '@customers/data/customers.store.json', collection: 'entries', key: 'k' },
+  in: { store: '@customers/data/customers.store.json', collection: 'customers', key: 'k' },
 });
 /** A refusal for a switch's else branch to land on, so every node is reachable. */
 const refuses = (id: string) => ({
@@ -113,10 +113,10 @@ const refuses = (id: string) => ({
   id,
   label: id,
   run: '@std/outcome.port.json#refuse',
-  in: { reason: 'missing', message: 'no row', type: ENTRY },
+  in: { reason: 'missing', message: 'no row', type: CUSTOMER },
 });
 
-/** The nodes of the planted graph, as the view marked them: what each carries about the invariant over Entry. */
+/** The nodes of the planted graph, as the view marked them: what each carries about the invariant over Customer. */
 const markedIn = (nodes: unknown[], rest: Record<string, unknown>): Map<string, VNode> => {
   const file = 'features/customers/data/proving.graph.json';
   return planted({ [file]: graph(nodes, rest) }, load => {
@@ -129,7 +129,7 @@ const markedIn = (nodes: unknown[], rest: Record<string, unknown>): Map<string, 
 describe('the canvas marks a node the compiler guarded', () => {
   it('names the invariant, so the badge says which rule the node is held to', async () => {
     const node = await nodeOf(KEPT_GET, 'row');
-    expect(node.guarded?.by).toEqual([{ path: CALLS, label: 'An entry names a call' }]);
+    expect(node.guarded?.by).toEqual([{ path: REACHABLE, label: 'A customer is reachable' }]);
     // the node's own document says nothing about any of this: the guard is the compiler's, not the author's
     expect(JSON.stringify(node.op)).toBe('"@std/object.port.json#make"');
   });
@@ -137,16 +137,16 @@ describe('the canvas marks a node the compiler guarded', () => {
   it('carries the rule as the guard tests it, which is what the switch the compiler wrote asks', () => {
     // one guard per site, not one per invariant: the rule is every unproved rule bracketed and conjoined, so a
     // reader who opens the badge sees the condition the graph actually runs and not a rule reassembled here
-    const marked = markedIn([makes('row', '{{in}}')], { in: ENTRY, out: { type: ENTRY, from: 'row' } });
-    expect(marked.get('in')?.guarded?.when).toBe("(len(url) > 0 && (method != 'DELETE' || has(agent)))");
+    const marked = markedIn([makes('row', '{{in}}')], { in: CUSTOMER, out: { type: CUSTOMER, from: 'row' } });
+    expect(marked.get('in')?.guarded?.when).toBe("(len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note)))");
   });
 
   it('marks the graph that takes a value, at `in`, and says a list is judged element by element', async () => {
-    // write-csv takes `Entry[]`: the value is the caller's, so nothing in the graph establishes it and the
+    // write-csv takes `Customer[]`: the value is the caller's, so nothing in the graph establishes it and the
     // guard stands at `in`, running once per element of the list
     const node = await nodeOf(WRITE_CSV, 'in');
     expect(node.guarded?.arity).toBe('list');
-    expect(node.guarded?.by.map(one => one.label)).toEqual(['An entry names a call']);
+    expect(node.guarded?.by.map(one => one.label)).toEqual(['A customer is reachable']);
   });
 
   it('marks nothing on a node that is no site of the shape at all', async () => {
@@ -158,15 +158,15 @@ describe('the canvas marks a node the compiler guarded', () => {
 
 describe('the canvas marks a node whose rule is proved', () => {
   it('says the value was written out in literals, and guards it nowhere', () => {
-    const nodes = [makes('row', { id: 'a', url: 'https://x', method: 'GET', agent: 'a' })];
-    const marked = markedIn(nodes, { out: { type: ENTRY, from: 'row' } });
+    const nodes = [makes('row', { id: 'a', name: 'Ada', email: 'ada@x.test', tier: 'bronze' })];
+    const marked = markedIn(nodes, { out: { type: CUSTOMER, from: 'row' } });
     expect(marked.get('row')?.guarded).toBeUndefined();
     expect(marked.get('row')?.proved?.by).toEqual([
       {
-        path: CALLS,
-        label: 'An entry names a call',
-        when: "len(url) > 0 && (method != 'DELETE' || has(agent))",
-        held: [{ by: 'literal' }, { by: 'literal' }],
+        path: REACHABLE,
+        label: 'A customer is reachable',
+        when: "len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))",
+        held: [{ by: 'literal' }, { by: 'literal' }, { by: 'literal' }],
       },
     ]);
   });
@@ -179,14 +179,17 @@ describe('the canvas marks a node whose rule is proved', () => {
         id: 'route',
         label: 'route',
         in: { row: '{{asked.record}}' },
-        rules: [{ when: "len(row.url) > 0 && (row.method != 'DELETE' || has(row.agent))", to: 'row' }],
+        rules: [
+          { when: "len(row.name) > 0 && len(row.email) > 0 && (row.tier != 'gold' || has(row.note))", to: 'row' },
+        ],
         else: 'gone',
       },
       makes('row', '{{asked.record}}'),
       refuses('gone'),
     ];
-    const marked = markedIn(nodes, { out: { type: ENTRY, from: ['row', 'gone'] } });
+    const marked = markedIn(nodes, { out: { type: CUSTOMER, from: ['row', 'gone'] } });
     expect(marked.get('row')?.proved?.by[0].held).toEqual([
+      { by: 'narrowed', switch: 'route' },
       { by: 'narrowed', switch: 'route' },
       { by: 'narrowed', switch: 'route' },
     ]);
@@ -194,10 +197,11 @@ describe('the canvas marks a node whose rule is proved', () => {
 
   it('names the node a value was read whole from, since the rule was judged where that value was made', () => {
     const nodes = [reads('asked'), makes('first', '{{asked.record}}'), makes('row', '{{first}}')];
-    const marked = markedIn(nodes, { out: { type: ENTRY, from: 'row' } });
+    const marked = markedIn(nodes, { out: { type: CUSTOMER, from: 'row' } });
     // `first` is itself a site and is guarded; `row` reads it whole, so the rule held or was guarded there
-    expect(marked.get('first')?.guarded?.by.map(one => one.label)).toEqual(['An entry names a call']);
+    expect(marked.get('first')?.guarded?.by.map(one => one.label)).toEqual(['A customer is reachable']);
     expect(marked.get('row')?.proved?.by[0].held).toEqual([
+      { by: 'through', node: 'first' },
       { by: 'through', node: 'first' },
       { by: 'through', node: 'first' },
     ]);
@@ -206,9 +210,10 @@ describe('the canvas marks a node whose rule is proved', () => {
   it('marks a node as one or the other and never both, since a guard stands for every rule unproved there', () => {
     // `in` is guarded, since nothing in the graph establishes the caller's value; `row` reads it whole, so the
     // rule was judged where that value came into being and this site proves through it
-    const marked = markedIn([makes('row', '{{in}}')], { in: ENTRY, out: { type: ENTRY, from: 'row' } });
+    const marked = markedIn([makes('row', '{{in}}')], { in: CUSTOMER, out: { type: CUSTOMER, from: 'row' } });
     expect(marked.get('in')?.guarded).toBeDefined();
     expect(marked.get('row')?.proved?.by[0].held).toEqual([
+      { by: 'through', node: 'in' },
       { by: 'through', node: 'in' },
       { by: 'through', node: 'in' },
     ]);
@@ -219,7 +224,7 @@ describe('the canvas marks a node whose rule is proved', () => {
 describe('the invariant page tables every site', () => {
   it('says how each site of the shape stands, in the order the compiler walks them', () => {
     const marked = planted({}, load => {
-      const seen = viewOf(load, CALLS)?.invariant;
+      const seen = viewOf(load, REACHABLE)?.invariant;
       if (seen?.form !== 'holds') throw new Error('the example invariant is not a field invariant');
       return seen as VHoldsInvariant;
     });
@@ -237,14 +242,18 @@ describe('the invariant page tables every site', () => {
 
   it('carries how a proved site was proved, so the table can say it without working it out again', () => {
     const file = 'features/customers/data/proving.graph.json';
-    const nodes = [makes('row', { id: 'a', url: 'https://x', method: 'GET', agent: 'a' })];
-    const seen = planted({ [file]: graph(nodes, { out: { type: ENTRY, from: 'row' } }) }, load => {
-      const found = viewOf(load, CALLS)?.invariant;
+    const nodes = [makes('row', { id: 'a', name: 'Ada', email: 'ada@x.test', tier: 'bronze' })];
+    const seen = planted({ [file]: graph(nodes, { out: { type: CUSTOMER, from: 'row' } }) }, load => {
+      const found = viewOf(load, REACHABLE)?.invariant;
       if (found?.form !== 'holds') throw new Error('the example invariant is not a field invariant');
       return found as VHoldsInvariant;
     });
     const site = seen.sites.find(one => one.graph === PLANTED);
-    expect(site).toMatchObject({ node: 'row', kind: 'made', held: [{ by: 'literal' }, { by: 'literal' }] });
+    expect(site).toMatchObject({
+      node: 'row',
+      kind: 'made',
+      held: [{ by: 'literal' }, { by: 'literal' }, { by: 'literal' }],
+    });
     expect(seen.sites.length).toBe(14);
   });
 });

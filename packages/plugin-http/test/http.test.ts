@@ -41,10 +41,10 @@ const call = caller(() => token);
 
 beforeAll(async () => {
   stopUpstream = await listening(fakeUpstream({ rows, inFlight }), UPSTREAM);
-  process.env.MONITOR_JWT_SECRET = SECRET;
+  process.env.CUSTOMERS_JWT_SECRET = SECRET;
   // every connection's secrets are substituted whatever the profile, and the example now has one over a
   // database; nothing here dials it, so any well-formed URL will do
-  process.env.MONITOR_DATABASE_URL = 'postgres://monitor:monitor@localhost:5432/monitor';
+  process.env.CUSTOMERS_DATABASE_URL = 'postgres://monitor:monitor@localhost:5432/monitor';
   dir = localCopy();
   // a copy outside the workspace cannot resolve plugins[].from through node_modules, so the plugins are handed in
   const load = loadTree(

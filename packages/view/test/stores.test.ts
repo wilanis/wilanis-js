@@ -22,7 +22,7 @@ describe('the view of a store', () => {
   it('names the connection and the engine kind behind it, each by a path the page can link', async () => {
     const store = (await view(STORE)).store;
     expect(store?.connection).toBe('@connections/customers.connection.json');
-    expect(store?.connectionLabel).toBe('Entries');
+    expect(store?.connectionLabel).toBe('Customers');
     expect(store?.kind).toBe('@storage-memory/memory.connection-kind.json');
     expect(store?.kindLabel).toBe('Records in memory');
   });
@@ -34,21 +34,21 @@ describe('the view of a store', () => {
   });
 
   it("gives each collection's key its type, read from the shape the collection names", async () => {
-    // latest is keyed by the method it records, which is the one field identifying one of its rows
-    expect((await view(STORE)).store?.keyTypes).toEqual({ entries: 'string', latest: 'string' });
+    // latest is keyed by the tier it records, which is the one field identifying one of its rows
+    expect((await view(STORE)).store?.keyTypes).toEqual({ customers: 'string', latest: 'string' });
   });
 
   it('lists every call run against it: the document, the node, the operation and the collection', async () => {
     const calls = (await view(STORE)).store?.calls ?? [];
     expect(calls.map(call => `${call.file}#${call.where} ${call.op} ${call.collection}`)).toEqual([
-      '@features/customers/data/kept-get.graph.json#asked get entries',
-      '@features/customers/data/kept-list-by-tier.graph.json#rows find entries',
-      '@features/customers/data/kept-list.graph.json#rows find entries',
-      '@features/customers/data/kept-remove.graph.json#asked remove entries',
-      '@features/customers/data/kept-update.graph.json#asked patch entries',
+      '@features/customers/data/kept-get.graph.json#asked get customers',
+      '@features/customers/data/kept-list-by-tier.graph.json#rows find customers',
+      '@features/customers/data/kept-list.graph.json#rows find customers',
+      '@features/customers/data/kept-remove.graph.json#asked remove customers',
+      '@features/customers/data/kept-update.graph.json#asked patch customers',
       // the atomic graph writes twice, to two collections, and both writes are listed against the store
-      '@features/customers/data/store-and-latest.graph.json#key newKey entries',
-      '@features/customers/data/store-and-latest.graph.json#stored put entries',
+      '@features/customers/data/store-and-latest.graph.json#key newKey customers',
+      '@features/customers/data/store-and-latest.graph.json#stored put customers',
       '@features/customers/data/store-and-latest.graph.json#latest put latest',
     ]);
     expect(calls[0].label).toBe('Get what is kept');
@@ -65,8 +65,8 @@ describe('the view of a node that reaches a store', () => {
     const node = graph.graph?.nodes.find(one => one.id === 'asked');
     expect(node?.keeps).toEqual({
       store: STORE,
-      label: 'Entries',
-      collection: 'entries',
+      label: 'Customers',
+      collection: 'customers',
       of: '@features/customers/domain/Customer.shape.json',
       op: 'get',
     });
