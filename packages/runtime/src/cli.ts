@@ -42,7 +42,9 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
   wilanis new      <kind> <name|path> [root] [--layer edge|data] [--port word] [--run word#op] [--kind k]
                    [--of shape] [--over word#op] [--on shape]
                    graph, read-decide-write: --store <store> --collection <name> --read-then patch|put|remove
-                   [--branch <id>:<when> ...]   one write per branch, each routed to by its when; repeat the flag
+                   [--branch <id>:<when> ...] [--type shape]   one write per branch, each routed to by its when;
+                   repeat the flag. Its ids name what each node holds: the shape (--type, else the store's), the
+                   write, the branch
                    kinds: project feature shape port graph binding store trigger policy resolvers invariant
   wilanis init     [root]                          write CLAUDE.md and agent hooks into a tree
   wilanis stop-hook [root]                         the Stop hook: judge the tree, answer the harness on stdout

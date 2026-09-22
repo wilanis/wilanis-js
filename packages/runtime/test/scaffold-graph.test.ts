@@ -50,40 +50,41 @@ describe('wilanis new graph --store: read, decide, write', () => {
       'read-then': 'patch',
       branch: 'noted:has(record) && !has(record.note)\nrenoted:has(record)',
     });
+    // every id says what its node holds: the store's collection is of Customer, the branches are the author's
     expect(shapeOf(doc)).toEqual([
-      'asked run',
-      'route switch',
+      'storedCustomer run',
+      'whichWrite switch',
       'noted run',
-      'notedRoute switch',
-      'notedRow run',
-      'notedMissing run',
+      'stillThereAfterNoted switch',
+      'notedCustomer run',
+      'goneBeforeNoted run',
       'renoted run',
-      'renotedRoute switch',
-      'renotedRow run',
-      'renotedMissing run',
-      'missing run',
+      'stillThereAfterRenoted switch',
+      'renotedCustomer run',
+      'goneBeforeRenoted run',
+      'noCustomer run',
     ]);
     // the read is by the key the graph takes, and the decision routes on what it answered
     const nodes = doc.nodes as Record<string, unknown>[];
     expect(nodes[0]).toMatchObject({ run: '@storage/store.port.json#get', in: { ...STORE, key: '{{in.id}}' } });
     expect(nodes[1]).toMatchObject({
-      in: { record: '{{asked.record}}' },
+      in: { record: '{{storedCustomer.record}}' },
       rules: [
         { when: 'has(record) && !has(record.note)', to: 'noted' },
         { when: 'has(record)', to: 'renoted' },
       ],
-      else: 'missing',
+      else: 'noCustomer',
     });
     // each write routes on what it answered, so a record gone between the read and the write is a case, not a fault
     expect(nodes[3]).toMatchObject({
       in: { record: '{{noted.record}}' },
-      rules: [{ when: 'has(record)', to: 'notedRow' }],
-      else: 'notedMissing',
+      rules: [{ when: 'has(record)', to: 'notedCustomer' }],
+      else: 'goneBeforeNoted',
     });
     // every node that can answer is a candidate, in the order the branches were named
     expect(doc.out).toEqual({
       type: 'TODO',
-      from: ['notedRow', 'notedMissing', 'renotedRow', 'renotedMissing', 'missing'],
+      from: ['notedCustomer', 'goneBeforeNoted', 'renotedCustomer', 'goneBeforeRenoted', 'noCustomer'],
     });
     rmSync(dir, { recursive: true, force: true });
   });
@@ -100,7 +101,7 @@ describe('wilanis new graph --store: read, decide, write', () => {
   it('checks clean for each write --read-then names, since each answers the record the same way', () => {
     for (const [write, changes] of [
       ['remove', {}],
-      ['put', { '"record": "TODO"': '"record": "{{asked.record}}"' }],
+      ['put', { '"record": "TODO"': '"record": "{{storedCustomer.record}}"' }],
     ] as [string, Record<string, string>][]) {
       const { dir, file, doc } = scaffolded(`probe-${write}`, {
         'read-then': write,
@@ -118,21 +119,48 @@ describe('wilanis new graph --store: read, decide, write', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('scaffolds one branch to rename where none was named, and refuses a --branch that is not <id>:<when>', () => {
+  it('scaffolds one branch named for its write where none was named, and refuses a --branch that is not <id>:<when>', () => {
     const { dir, doc } = scaffolded('one-branch', { 'read-then': 'patch' });
     expect(shapeOf(doc)).toEqual([
-      'asked run',
-      'route switch',
-      'changed run',
-      'changedRoute switch',
-      'changedRow run',
-      'changedMissing run',
-      'missing run',
+      'storedCustomer run',
+      'whichWrite switch',
+      'patched run',
+      'stillThereAfterPatched switch',
+      'patchedCustomer run',
+      'goneBeforePatched run',
+      'noCustomer run',
     ]);
+    for (const [write, written] of [
+      ['put', 'replaced'],
+      ['remove', 'removed'],
+    ]) {
+      const { dir: other, doc: named } = scaffolded(`one-${write}`, { 'read-then': write });
+      expect((named.nodes as { id: string }[])[2].id).toBe(written);
+      rmSync(other, { recursive: true, force: true });
+    }
     expect(() => scaffold(dir, 'graph', 'features/customers/bad', { ...STORE, branch: 'noWhen' })).toThrow(
       "--branch 'noWhen' is not <id>:<when>",
     );
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('names the ids after --type where it is given, and after the record where nothing names a shape', () => {
+    // --type is the answer's shape, so it also fills every type the scaffold would otherwise leave TODO
+    const typed = scaffolded('typed', { 'read-then': 'remove', type: '@customers/domain/TierLatest.shape.json' });
+    expect(shapeOf(typed.doc).filter(one => one.endsWith('run'))).toEqual([
+      'storedTierLatest run',
+      'removed run',
+      'removedTierLatest run',
+      'goneBeforeRemoved run',
+      'noTierLatest run',
+    ]);
+    expect(typed.doc.out).toMatchObject({ type: '@customers/domain/TierLatest.shape.json' });
+    rmSync(typed.dir, { recursive: true, force: true });
+    // a store the tree does not have says nothing of its collection, so the ids fall back to the record
+    const bare = scaffolded('bare', { 'read-then': 'patch', store: '@features/nowhere/data/nothing.store.json' });
+    expect(shapeOf(bare.doc)[0]).toBe('storedRecord run');
+    expect(shapeOf(bare.doc).at(-1)).toBe('noRecord run');
+    rmSync(bare.dir, { recursive: true, force: true });
   });
 
   it('leaves a graph named with no store what it was: one node to replace', () => {
@@ -141,7 +169,7 @@ describe('wilanis new graph --store: read, decide, write', () => {
     const [file] = scaffold(dir, 'graph', 'features/customers/greet', {});
     expect(file).toBe('features/customers/domain/greet.graph.json');
     const doc = JSON.parse(readFileSync(join(dir, file), 'utf8')) as Record<string, unknown>;
-    expect(shapeOf(doc)).toEqual(['first run']);
+    expect(shapeOf(doc)).toEqual(['greeting run']);
     rmSync(dir, { recursive: true, force: true });
   });
 });
