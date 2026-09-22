@@ -13,9 +13,8 @@
  * Every case keeps its records in a collection of its own and prepares it with `ensure` itself, so the whole
  * suite runs against one database without the cases reaching each other.
  */
-import { parseWhere } from '@wilanis/plugin-storage';
-import { cases, SHAPE, scopeCases } from '@wilanis/plugin-storage/suite';
-import { afterAll, describe, expect, it } from 'vitest';
+import { cases, scopeCases } from '@wilanis/plugin-storage/suite';
+import { afterAll, describe, it } from 'vitest';
 import { PostgresEngine } from '../src/engine.js';
 import { closePools } from '../src/pool.js';
 
@@ -40,70 +39,9 @@ describe.skipIf(!url)('what every engine answers alike', () => {
  * The scope cases, which this engine answers as the memory one does: the column beside the record, the
  * predicate on every statement, and a `unique` that holds within a scope rather than across every one. They
  * are the same list both engines run, which is what makes "two tenants never see each other's rows" one
- * promise and not two.
+ * promise and not two. Two of them began as this engine's own: a statement that carries the filter and the
+ * predicate at once, and a scoped read of a table nothing has written yet, before its scope column exists.
  */
 describe.skipIf(!url)('what an engine that keeps scopes answers', () => {
   for (const one of scopeCases) it(one.name, () => one.run(subject));
-});
-
-/**
- * The one thing about a scope that is this engine's alone: a statement carries the filter and the predicate
- * together. The shared suite asks for a filter without a scope and a scope without a filter, since that is
- * what an engine keeping records in a Map can get wrong; here the two are compiled into one `where`, and a
- * count that answered the filter and forgot the predicate would pass every case above.
- */
-describe.skipIf(!url)('a statement carries the filter and the scope at once', () => {
-  const at = {
-    ...subject.connection,
-    name: 'both_narrow',
-    shape: SHAPE,
-    key: 'id',
-    unique: [],
-    refs: [],
-    referenced: [],
-    defaults: {},
-  };
-  const one = (id: string, method: string) => ({ id, url: `https://x/${id}`, method, hits: 1, ok: true });
-
-  it('count and find narrow by the where and by the scope together', async () => {
-    await subject.engine.ensure([at]);
-    for (const record of await subject.engine.find(at, {})) await subject.engine.remove(at, record.id);
-    await subject.engine.put(at, one('a', 'GET'), { replace: true, scope: { tenant: 'acme' } });
-    await subject.engine.put(at, one('b', 'POST'), { replace: true, scope: { tenant: 'acme' } });
-    await subject.engine.put(at, one('c', 'GET'), { replace: true, scope: { tenant: 'globex' } });
-
-    const get = parseWhere({ method: 'GET' }, SHAPE);
-    expect(await subject.engine.count(at, get, { tenant: 'acme' })).toBe(1);
-    expect(await subject.engine.count(at, get, undefined)).toBe(2);
-    expect(await subject.engine.count(at, undefined, { tenant: 'acme' })).toBe(2);
-    const found = await subject.engine.find(at, { where: get, scope: { tenant: 'acme' } });
-    expect(found.map(record => record.id)).toEqual(['a']);
-  });
-});
-
-/**
- * A scoped read of a table nothing has written yet. `ensure` creates the table from the declaration, and a
- * scope column is not part of one -- so the column arrives with the first scoped write and not before. Every
- * statement here carries the predicate, so a read that ran before that write would name a column the table
- * does not have and fail on it, where the memory engine answers nothing at all. An empty tenant's listing is
- * the first request a fresh deployment answers, so it is the first thing this has to get right.
- */
-describe.skipIf(!url)('a scoped read of a table nothing has written yet', () => {
-  const at = {
-    ...subject.connection,
-    name: 'read_before_write',
-    shape: SHAPE,
-    key: 'id',
-    unique: [],
-    refs: [],
-    referenced: [],
-    defaults: {},
-  };
-
-  it('find, get and count under a scope answer empty rather than failing', async () => {
-    await subject.engine.ensure([at]);
-    expect(await subject.engine.find(at, { scope: { tenant: 'acme' } })).toEqual([]);
-    expect((await subject.engine.get(at, 'a', { tenant: 'acme' })).record).toBeUndefined();
-    expect(await subject.engine.count(at, undefined, { tenant: 'acme' })).toBe(0);
-  });
 });
