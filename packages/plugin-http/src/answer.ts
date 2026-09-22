@@ -121,40 +121,42 @@ function statusFor(settings: HttpSettings, report: Report): number {
  * A refusal -- the graph ending on purpose, a policy denying, the guard refusing a credential -- answered as
  * `{ reason, message }` plus whatever detail it carries (a challenge's id and how to answer it), with the status the
  * trigger maps that reason to. T005 has already made sure every reachable reason is mapped, so a reason without one can
- * only mean the tree changed under a running server, and is answered as a fault.
+ * only mean the tree changed under a running server, and is answered as a fault; the log line names the reason.
  */
-function encodeRefusal(settings: HttpSettings, refused: { reason: string; message: string; detail?: unknown }) {
+function encodeRefusal(
+  settings: HttpSettings,
+  refused: Extract<Outcome, { kind: 'refused' }>,
+  run: string | undefined,
+): Encoded {
   const status = settings.response?.refusals?.[refused.reason];
-  if (status !== undefined)
-    return {
-      status,
-      body: { reason: refused.reason, message: refused.message, ...((refused.detail as object) ?? {}) },
-    };
-  return {
-    status: 500,
-    body: {
-      error: `refused with reason '${refused.reason}', which response.refusals does not map: ${refused.message}`,
-    },
-  };
-}
-
-/** What went wrong, for a run that did not finish: the node that broke, or the roots a run that could not start needs. */
-function encodeTrouble(outcome: Extract<Outcome, { kind: 'faulted' | 'blocked' }>) {
-  if (outcome.kind === 'faulted')
-    return { status: 500, body: { error: outcome.at ? `${outcome.at}: ${outcome.error}` : 'failed' } };
-  return { status: 500, body: { error: `blocked: needs ${outcome.needs.join(', ')}` } };
+  if (status === undefined) return fault(run);
+  return { status, body: { reason: refused.reason, message: refused.message, ...(refused.detail ?? {}) } };
 }
 
 /**
- * How a report is answered on the wire. An answer takes the status the response block chooses from it, and sets
- * the cookies response.cookies takes from it. A fault (a node that broke) and a blocked run are 500 with what
- * went wrong.
+ * A fault's answer: that the run broke and which run it was, and nothing of what broke. What broke is a plugin's or
+ * the platform's prose, written for nobody -- `fetch failed`, a connection string -- so it goes to the log and the
+ * trace, and the caller is handed the id an operator finds it by. A run blocked on a root nothing supplied is
+ * answered the same way: it is a wiring hole, not something the caller can fix.
  */
-export function encode(trigger: TriggerDoc, report: Report): { status: number; body: unknown; cookies?: string[] } {
+export const fault = (run: string | undefined): Encoded => ({
+  status: 500,
+  body: { error: 'fault', ...(run ? { run } : {}) },
+});
+
+/** What a report is answered with: a status, a body, and the cookies it sets. */
+export type Encoded = { status: number; body: unknown; cookies?: string[] };
+
+/**
+ * How a report is answered on the wire. An answer takes the status the response block chooses from it, and sets
+ * the cookies response.cookies takes from it. A fault (a node that broke) and a blocked run are 500 with the id of
+ * the run, where the listener heard it, and nothing of what went wrong.
+ */
+export function encode(trigger: TriggerDoc, report: Report, run?: string): Encoded {
   const settings = trigger.settings as unknown as HttpSettings;
   const outcome = outcomeOf(report);
-  if (outcome.kind === 'refused') return encodeRefusal(settings, outcome);
-  if (outcome.kind !== 'answered') return encodeTrouble(outcome);
+  if (outcome.kind === 'refused') return encodeRefusal(settings, outcome, run);
+  if (outcome.kind !== 'answered') return fault(run);
   const { headers, body } = cookiesOf(settings, report.output);
   return { status: statusFor(settings, report), body, ...(headers.length ? { cookies: headers } : {}) };
 }

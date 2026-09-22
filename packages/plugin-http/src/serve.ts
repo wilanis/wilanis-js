@@ -7,9 +7,10 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { BlobStore, Hold, Serving, TriggerDoc } from '@wilanis/core';
 import type { Handler, Report } from '@wilanis/engine';
-import { compileRoute, encode, type HttpSettings, parseCookies } from './answer.js';
+import { compileRoute, encode, fault, type HttpSettings, parseCookies } from './answer.js';
 import { json, mediaType } from './codecs.js';
 import { doc, ROOT } from './paths.js';
+import { type Heard, hear, heardIn, lineOf, outcomeWords } from './said.js';
 
 /** What a tree hands a held operation. */
 type ServeEnv = { serving?: Serving; hold?: Hold; plugins?: Record<string, Record<string, unknown>> };
@@ -159,30 +160,74 @@ async function requestOf(
   };
 }
 
+/** An answer of the edge's own, before any run: what the caller can fix, said on the log line as it was answered. */
+const edge = (answer: Answer): Answer & { why: string } => ({
+  ...answer,
+  why: String((answer.body as { error?: unknown } | undefined)?.error ?? answer.status),
+});
+
+/** The answer of a run the route fired, and the line's words for it: the outcome, and the run a fault names. */
+function answerOfRun(route: Route, report: Report, heard: Heard): Answer & { why: string; run?: string } {
+  const encoded = encode(route.trigger, report, heard.run);
+  const mapped = (reason: string) => route.settings.response?.refusals?.[reason] !== undefined;
+  const faulted = (encoded.body as { error?: unknown } | undefined)?.error === 'fault';
+  return {
+    ...encoded,
+    produces: route.settings.produces ?? 'application/json',
+    why: `${route.trigger.fire.run} ${outcomeWords(report, heard, mapped)}`,
+    ...(faulted && heard.run ? { run: heard.run } : {}),
+  };
+}
+
 /** What one request is answered with: the route fires, gated by the runtime, and its report is encoded. */
 async function answerFor(
   incoming: IncomingMessage,
   writer: Writer & { scope: BlobStore },
-): Promise<Answer & { report?: Report; fired?: string }> {
+  heard: Heard,
+): Promise<Answer & { why: string; run?: string }> {
   const url = new URL(incoming.url ?? '/', 'http://local');
   const route = routesOf(writer.serving).find(
     one => one.settings.method === incoming.method && one.re.test(url.pathname),
   );
-  if (!route) return { status: 404, body: { error: `no trigger for ${incoming.method} ${url.pathname}` } };
+  if (!route)
+    return { status: 404, body: { error: `no trigger for ${incoming.method} ${url.pathname}` }, why: 'no trigger' };
   const produces = route.settings.produces ?? 'application/json';
   const read = await requestOf(incoming, url, route, writer);
-  if ('refuse' in read) return { ...read.refuse, produces };
+  if ('refuse' in read) return edge({ ...read.refuse, produces });
   const built = writer.serving.inputFor(route.trigger, read.request);
-  if ('error' in built) return { status: 400, body: { error: built.error }, produces };
+  if ('error' in built)
+    return edge({ status: 400, body: { error: `input does not conform: ${built.error}` }, produces });
   // the runtime gates the run: the guard identifies the caller and the trigger's policies decide before the operation fires
-  const report = await writer.serving.fire({
-    trigger: route.trigger,
-    input: built.input,
-    request: read.request,
-    blobs: writer.scope,
-  });
-  const encoded = encode(route.trigger, report);
-  return { ...encoded, produces, report, fired: route.trigger.fire.run };
+  const report = await heardIn(heard, () =>
+    writer.serving.fire({ trigger: route.trigger, input: built.input, request: read.request, blobs: writer.scope }),
+  );
+  return answerOfRun(route, report, heard);
+}
+
+/**
+ * Answer one request and say it on one line. The runtime itself throwing inside a request -- a codec's `encode`
+ * breaking, a blob gone from the registry while the answer streams -- is answered as a fault of the run, and its
+ * message goes to the line, never to the caller.
+ */
+async function answerRequest(incoming: IncomingMessage, response: ServerResponse, serving: Serving) {
+  const started = Date.now();
+  const asked = `${incoming.method} ${new URL(incoming.url ?? '/', 'http://local').pathname}`;
+  // one blob scope per request: what the body's codec and the graph store through it is released once answered
+  const scope = serving.blobs.scope();
+  const writer = { serving, scope };
+  const heard: Heard = {};
+  try {
+    const answer = await answerFor(incoming, writer, heard);
+    serving.log(lineOf(asked, answer.status, Date.now() - started, answer));
+    await write(response, writer, answer);
+  } catch (error) {
+    const why = `error: ${(error as Error).message}`;
+    serving.log(lineOf(asked, 500, Date.now() - started, { why, run: heard.run }));
+    if (!response.headersSent) await write(response, writer, fault(heard.run));
+    else response.destroy();
+  } finally {
+    await scope.release();
+  }
 }
 
 /**
@@ -200,27 +245,7 @@ export const listen: Handler = async ({ in: input, ctx }) => {
   const settings = env.plugins?.[ROOT] ?? {};
   const port = Number(input.port ?? settings.port ?? 8080);
 
-  const server = createServer(async (incoming, response) => {
-    const started = Date.now();
-    // one blob scope per request: what the body's codec and the graph store through it is released once answered
-    const scope = serving.blobs.scope();
-    const writer = { serving, scope };
-    try {
-      const answer = await answerFor(incoming, writer);
-      if (answer.report)
-        log(
-          `${incoming.method} ${new URL(incoming.url ?? '/', 'http://local').pathname} → ${answer.status} (${Date.now() - started}ms, ${answer.fired} ${answer.report.status})`,
-        );
-      await write(response, writer, answer);
-    } catch (error) {
-      log(`error: ${(error as Error).message}`);
-      if (!response.headersSent)
-        await write(response, writer, { status: 500, body: { error: (error as Error).message } });
-      else response.destroy();
-    } finally {
-      await scope.release();
-    }
-  });
+  const server = createServer((incoming, response) => answerRequest(incoming, response, serving));
 
   await new Promise<void>((ok, fail) => {
     server.once('error', fail);
@@ -229,10 +254,21 @@ export const listen: Handler = async ({ in: input, ctx }) => {
       ok();
     });
   });
+  // every fire tells its observers which run it was; the request that fired it is told, so a fault can name it
+  const unhear = hear(serving);
   const routes = routesOf(serving);
   log(
     `http: listening on :${port} -- ${routes.map(one => `${one.settings.method} ${one.settings.route} → ${one.trigger.fire.run}`).join(', ')}`,
   );
-  env.hold({ label: `http :${port}`, stop: () => new Promise<void>(ok => server.close(() => ok())) });
+  env.hold({
+    label: `http :${port}`,
+    stop: () =>
+      new Promise<void>(ok =>
+        server.close(() => {
+          unhear();
+          ok();
+        }),
+      ),
+  });
   return { port, routes: routes.length };
 };
