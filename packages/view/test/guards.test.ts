@@ -128,7 +128,7 @@ const markedIn = (nodes: unknown[], rest: Record<string, unknown>): Map<string, 
 
 describe('the canvas marks a node the compiler guarded', () => {
   it('names the invariant, so the badge says which rule the node is held to', async () => {
-    const node = await nodeOf(KEPT_GET, 'row');
+    const node = await nodeOf(KEPT_GET, 'customer');
     expect(node.guarded?.by).toEqual([{ path: REACHABLE, label: 'A customer is reachable' }]);
     // the node's own document says nothing about any of this: the guard is the compiler's, not the author's
     expect(JSON.stringify(node.op)).toBe('"@std/object.port.json#make"');
@@ -150,7 +150,7 @@ describe('the canvas marks a node the compiler guarded', () => {
   });
 
   it('marks nothing on a node that is no site of the shape at all', async () => {
-    const node = await nodeOf(KEPT_GET, 'asked');
+    const node = await nodeOf(KEPT_GET, 'storedCustomer');
     expect(node.guarded).toBeUndefined();
     expect(node.proved).toBeUndefined();
   });
@@ -234,7 +234,7 @@ describe('the invariant page tables every site', () => {
     expect(marked.sites[0]).toEqual({
       graph: '@features/customers/data/kept-get-postgres.graph.json',
       graphLabel: 'Get what is kept',
-      node: 'row',
+      node: 'customer',
       kind: 'made',
       arity: 'one',
     });

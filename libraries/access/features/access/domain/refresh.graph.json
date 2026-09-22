@@ -22,7 +22,7 @@
     },
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "route",
+      "id": "wasGood",
       "label": "Was it good?",
       "in": {
         "refreshed": "{{traded.refreshed}}",

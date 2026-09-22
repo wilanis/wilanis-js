@@ -7,13 +7,13 @@
     "type": "@access/domain/Grant.shape.json",
     "from": [
       "granted",
-      "otp"
+      "noCode"
     ]
   },
   "nodes": [
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "decide",
+      "id": "codeAnswered",
       "label": "Was a code answered?",
       "in": {
         "challenge": "{{in.challenge}}"
@@ -24,7 +24,7 @@
           "to": "granted"
         }
       ],
-      "else": "otp"
+      "else": "noCode"
     },
     {
       "type": "@wilanis/node/run.schema.json",
@@ -40,7 +40,7 @@
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "otp",
+      "id": "noCode",
       "label": "No code answered",
       "run": "@std/outcome.port.json#refuse",
       "in": {

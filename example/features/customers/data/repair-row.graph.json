@@ -8,13 +8,13 @@
     "from": [
       "whole",
       "written",
-      "failed"
+      "upstreamFailed"
     ]
   },
   "nodes": [
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "route",
+      "id": "isWhole",
       "label": "Does it already say who it is?",
       "in": {
         "email": "{{in.email}}",
@@ -70,7 +70,7 @@
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "asked",
+      "id": "putBack",
       "label": "PUT it back",
       "run": "@http/http.port.json#request",
       "in": {
@@ -85,11 +85,11 @@
     },
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "wrote",
+      "id": "outcome",
       "label": "Did the API take it?",
       "in": {
-        "status": "{{asked.status}}",
-        "body": "{{asked.body}}"
+        "status": "{{putBack.status}}",
+        "body": "{{putBack.body}}"
       },
       "rules": [
         {
@@ -97,7 +97,7 @@
           "to": "written"
         }
       ],
-      "else": "failed"
+      "else": "upstreamFailed"
     },
     {
       "type": "@wilanis/node/run.schema.json",
@@ -115,12 +115,12 @@
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "failed",
+      "id": "upstreamFailed",
       "label": "Unexpected answer",
       "run": "@std/outcome.port.json#refuse",
       "in": {
         "reason": "upstream",
-        "message": "the customer API answered {{asked.status}} repairing {{in.id}}",
+        "message": "the customer API answered {{putBack.status}} repairing {{in.id}}",
         "type": "@customers/domain/Repaired.shape.json"
       }
     }

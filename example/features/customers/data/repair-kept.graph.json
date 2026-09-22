@@ -13,7 +13,7 @@
   "nodes": [
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "route",
+      "id": "isWhole",
       "label": "Does it already say who it is?",
       "in": {
         "email": "{{in.email}}",

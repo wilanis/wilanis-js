@@ -83,7 +83,7 @@ async function getCustomer(status: number, level: 'summary' | 'full' = 'full'): 
     input: { id: 'golf' },
     request: { params: { id: 'golf' }, headers: signedIn() },
     stubs: {
-      'op.asked': {
+      'op.fetched': {
         status,
         body: status === 200 ? { id: 'golf', name: 'Ada', email: 'ada@example.com', tier: 'bronze' } : undefined,
       },
@@ -102,17 +102,17 @@ describe('one fire, said as spans', () => {
       'identify (@auth)',
       'policy @features/access/edge/signed-in.policy.json',
       '@features/access/domain/require-signed-in.graph.json',
-      'decide switch → granted',
+      'anyoneThere switch → granted',
       'granted @std/object.port.json#make',
       'anonymous',
       '@features/customers/domain/customer.port.json#get',
       'binding @features/customers/data/customers-rest.binding.json#get',
       '@features/customers/data/get-row.graph.json',
-      'asked @http/http.port.json#request',
-      'route switch → failed',
-      'row',
-      'missing',
-      'failed @std/outcome.port.json#refuse',
+      'fetched @http/http.port.json#request',
+      'outcome switch → upstreamFailed',
+      'customer',
+      'noCustomer',
+      'upstreamFailed @std/outcome.port.json#refuse',
     ]);
   });
 
@@ -123,11 +123,11 @@ describe('one fire, said as spans', () => {
     // the reason is the author's own -- "upstream" is a word get-row.graph.json declared, not the engine's
     expect(trace.status).toBe('refused: upstream');
     expect(statuses['@features/customers/data/get-row.graph.json']).toBe('refused: upstream');
-    expect(statuses.asked).toBe('ok');
-    expect(statuses.failed).toBe('refused: upstream');
+    expect(statuses.fetched).toBe('ok');
+    expect(statuses.upstreamFailed).toBe('refused: upstream');
     // the branches nothing took are there, so a reader sees what did not run as well as what did
-    expect(statuses.row).toBe('cancelled');
-    expect(statuses.missing).toBe('cancelled');
+    expect(statuses.customer).toBe('cancelled');
+    expect(statuses.noCustomer).toBe('cancelled');
   });
 
   it('carries the run id, the trigger and its kind on the root span', async () => {
@@ -145,7 +145,7 @@ describe('one fire, said as spans', () => {
     const { ran, scope } = await fire(GET_CUSTOMER, {
       input: { id: 'golf' },
       request: { params: { id: 'golf' }, headers: signedIn({ traceparent: parent }) },
-      stubs: { 'op.asked': { status: 500 } },
+      stubs: { 'op.fetched': { status: 500 } },
     });
 
     // @http/http.trigger-kind.json says `correlation: headers.traceparent`, and nothing else had to
@@ -155,30 +155,30 @@ describe('one fire, said as spans', () => {
   it('gives every node span the address a refusal prints, so a span and a refusal join on one pair', async () => {
     const trace = await getCustomer(500);
     const graph = spanNamed(trace, '@features/customers/data/get-row.graph.json');
-    const asked = spanNamed(trace, 'asked');
+    const fetched = spanNamed(trace, 'fetched');
 
     // the graph span names the file, the node span names the place inside it: `file` and `at`, as a refusal has
     expect(graph?.attributes['wilanis.graph']).toBe('@features/customers/data/get-row.graph.json');
-    expect(asked?.attributes['wilanis.at']).toBe('nodes/asked');
-    expect(asked?.attributes['wilanis.node']).toBe('asked');
+    expect(fetched?.attributes['wilanis.at']).toBe('nodes/fetched');
+    expect(fetched?.attributes['wilanis.node']).toBe('fetched');
   });
 
   it("reads the connection and the HTTP status out of the node's own in and out", async () => {
-    const asked = spanNamed(await getCustomer(500), 'asked');
+    const fetched = spanNamed(await getCustomer(500), 'fetched');
 
     // the engine knows nothing of connections or of HTTP; these two are read here, where the tree's words are
-    expect(asked?.attributes['wilanis.connection']).toBe('@connections/customers-api.connection.json');
-    expect(asked?.attributes['http.response.status_code']).toBe(500);
+    expect(fetched?.attributes['wilanis.connection']).toBe('@connections/customers-api.connection.json');
+    expect(fetched?.attributes['http.response.status_code']).toBe(500);
     // and the node is an effect, because the operation it ran is not declared pure
-    expect(asked?.attributes['wilanis.effect']).toBe(true);
+    expect(fetched?.attributes['wilanis.effect']).toBe(true);
   });
 
   it('says what a switch routed to, and names the branch in the span so a reader sees the route taken', async () => {
-    const route = spanNamed(await getCustomer(404), 'route');
+    const outcome = spanNamed(await getCustomer(404), 'outcome');
 
-    expect(route?.name).toBe('route switch → missing');
-    expect(route?.attributes['wilanis.selected']).toBe('missing');
-    expect(route?.status).toBe('ok');
+    expect(outcome?.name).toBe('outcome switch → noCustomer');
+    expect(outcome?.attributes['wilanis.selected']).toBe('noCustomer');
+    expect(outcome?.status).toBe('ok');
   });
 
   it('a run that answered says so, and the graph under it says so too', async () => {
@@ -186,7 +186,7 @@ describe('one fire, said as spans', () => {
 
     expect(trace.status).toBe('ok');
     expect(spanNamed(trace, '@features/customers/data/get-row.graph.json')?.status).toBe('ok');
-    expect(spanNamed(trace, 'row')?.status).toBe('ok');
+    expect(spanNamed(trace, 'customer')?.status).toBe('ok');
   });
 
   it('stamps every span from the run’s own clock, so a span never ends before it started', async () => {
@@ -197,19 +197,19 @@ describe('one fire, said as spans', () => {
 describe('what a level lets a span carry', () => {
   it('summary carries status, timing and what ran -- and never a value', async () => {
     const trace = atLevel(await getCustomer(500), 'summary');
-    const asked = spanNamed(trace, 'asked');
+    const fetched = spanNamed(trace, 'fetched');
 
-    expect(asked?.attributes['wilanis.in']).toBeUndefined();
-    expect(asked?.attributes['wilanis.out']).toBeUndefined();
+    expect(fetched?.attributes['wilanis.in']).toBeUndefined();
+    expect(fetched?.attributes['wilanis.out']).toBeUndefined();
     // what a reader searches on is still there: the address, the connection, the status
-    expect(asked?.attributes['wilanis.at']).toBe('nodes/asked');
-    expect(asked?.attributes['wilanis.connection']).toBe('@connections/customers-api.connection.json');
-    expect(asked?.attributes['http.response.status_code']).toBe(500);
+    expect(fetched?.attributes['wilanis.at']).toBe('nodes/fetched');
+    expect(fetched?.attributes['wilanis.connection']).toBe('@connections/customers-api.connection.json');
+    expect(fetched?.attributes['http.response.status_code']).toBe(500);
   });
 
   it('summary never carries a message: a reason is a declared word, a message is prose', async () => {
     const trace = atLevel(await getCustomer(500), 'summary');
-    const refused = spanNamed(trace, 'failed');
+    const refused = spanNamed(trace, 'upstreamFailed');
 
     // the status still says the reason the author declared, which is a closed set and cannot leak
     expect(refused?.status).toBe('refused: upstream');
@@ -218,11 +218,11 @@ describe('what a level lets a span carry', () => {
 
   it("full adds the report's already-redacted in and out, and the node's message", async () => {
     const trace = await getCustomer(500);
-    const asked = spanNamed(trace, 'asked');
-    const refused = spanNamed(trace, 'failed');
+    const fetched = spanNamed(trace, 'fetched');
+    const refused = spanNamed(trace, 'upstreamFailed');
 
-    expect(JSON.parse(String(asked?.attributes['wilanis.in'])).path).toBe('/customer/golf');
-    expect(JSON.parse(String(asked?.attributes['wilanis.out'])).status).toBe(500);
+    expect(JSON.parse(String(fetched?.attributes['wilanis.in'])).path).toBe('/customer/golf');
+    expect(JSON.parse(String(fetched?.attributes['wilanis.out'])).status).toBe(500);
     expect(refused?.attributes['wilanis.error']).toBe('the customer API answered 500');
   });
 
@@ -230,8 +230,8 @@ describe('what a level lets a span carry', () => {
     const full = await getCustomer(500);
     const summary = atLevel(full, 'summary');
 
-    expect(spansOf(full).map(one => one.name)).toContain('row');
-    expect(spansOf(summary).map(one => one.name)).not.toContain('row');
+    expect(spansOf(full).map(one => one.name)).toContain('customer');
+    expect(spansOf(summary).map(one => one.name)).not.toContain('customer');
   });
 
   it('a detail never enters a trace, at either level', async () => {
@@ -263,7 +263,7 @@ describe('a run written out', () => {
     expect(lines[operation + 1]).toMatch(
       /^ {4}binding @features\/customers\/data\/customers-rest\.binding\.json#get\b/,
     );
-    expect(lines.some(line => /^ {8}asked @http\/http\.port\.json#request\s+\d+ms {2}ok\b/.test(line))).toBe(true);
+    expect(lines.some(line => /^ {8}fetched @http\/http\.port\.json#request\s+\d+ms {2}ok\b/.test(line))).toBe(true);
     // the reason the author declared is on the line, where a reader of a terminal looks first
     expect(text).toContain('refused: upstream');
   });
@@ -304,7 +304,7 @@ describe('the record and the trace are two things', () => {
     const { ran, scope } = await fire(GET_CUSTOMER, {
       input: { id: 'golf' },
       request: { params: { id: 'golf' }, headers: signedIn() },
-      stubs: { 'op.asked': { status: 500 } },
+      stubs: { 'op.fetched': { status: 500 } },
     });
     const before = JSON.stringify(ran);
 

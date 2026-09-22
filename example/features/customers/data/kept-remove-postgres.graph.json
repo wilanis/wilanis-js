@@ -6,14 +6,14 @@
   "out": {
     "type": "@customers/domain/Customer.shape.json",
     "from": [
-      "row",
-      "missing"
+      "customer",
+      "noCustomer"
     ]
   },
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "asked",
+      "id": "gone",
       "label": "Remove the record",
       "run": "@storage/store.port.json#remove",
       "in": {
@@ -24,32 +24,32 @@
     },
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "route",
+      "id": "wasThere",
       "label": "Was it there?",
       "in": {
-        "record": "{{asked.record}}"
+        "record": "{{gone.record}}"
       },
       "rules": [
         {
           "when": "has(record)",
-          "to": "row"
+          "to": "customer"
         }
       ],
-      "else": "missing"
+      "else": "noCustomer"
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "row",
+      "id": "customer",
       "label": "The record",
       "run": "@std/object.port.json#make",
       "in": {
-        "value": "{{asked.record}}",
+        "value": "{{gone.record}}",
         "type": "@customers/domain/Customer.shape.json"
       }
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "missing",
+      "id": "noCustomer",
       "label": "No such customer",
       "run": "@std/outcome.port.json#refuse",
       "in": {

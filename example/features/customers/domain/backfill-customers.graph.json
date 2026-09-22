@@ -9,7 +9,7 @@
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "rows",
+      "id": "rawCustomers",
       "label": "Read them as they stand",
       "run": "@customers/domain/customer.port.json#listRaw"
     },
@@ -19,7 +19,7 @@
       "label": "Make each one whole",
       "description": "customer.repair once per row; the element is the row itself, and the connection paces the writes",
       "run": "@customers/domain/customer.port.json#repair",
-      "over": "{{rows}}",
+      "over": "{{rawCustomers}}",
       "bind": {
         "id": "id",
         "name": "name",

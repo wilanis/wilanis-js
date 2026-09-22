@@ -153,7 +153,7 @@ describe('sabotage: invariants, the field form', () => {
         graph.nodes[4].in.value = { id: 'x', name: 'Ada', email: '', tier: 'bronze' };
       }).filter(one => one.startsWith('I005')),
     ).toEqual([
-      "I005 the value 'row' makes contradicts 'A customer is reachable' " +
+      "I005 the value 'customer' makes contradicts 'A customer is reachable' " +
         '(@features/customers/domain/a-customer-is-reachable.invariant.json): ' +
         "'len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))' is false where email = \"\"",
     ]);

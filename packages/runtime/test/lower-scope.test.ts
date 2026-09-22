@@ -28,12 +28,12 @@ const plainNodesOf = (graph: string) =>
 
 describe('the scope the lowering fills, which no document writes', () => {
   it('carries the store read to a site over a scoped collection, and adds no node for it', () => {
-    // `asked` is written with a store, a collection and a key and nothing else; the scope is the compiler's,
+    // `storedCustomer` is written with a store, a collection and a key and nothing else; the scope is the compiler's,
     // and it is exactly what lowerRef makes of {{tenant}} on a graph
     const nodes = nodesOf('@features/customers/data/kept-get.graph.json');
-    expect(nodes.asked.in.scope).toEqual({ object: { tenant } });
+    expect(nodes.storedCustomer.in.scope).toEqual({ object: { tenant } });
     // the site's own inputs are untouched beside it
-    expect(nodes.asked.in.key).toEqual({ ref: 'in', path: ['id'] });
+    expect(nodes.storedCustomer.in.key).toEqual({ ref: 'in', path: ['id'] });
     // and not one node more than the same graph lowers to unscoped: a scope is a source, never a step
     const plain = plainNodesOf('@features/customers/data/kept-get.graph.json');
     expect(Object.keys(nodes).sort()).toEqual(Object.keys(plain).sort());
@@ -49,15 +49,15 @@ describe('the scope the lowering fills, which no document writes', () => {
   });
   it('carries none to the find over a view, which sees every row of the collection it views', () => {
     // the digest's graph: the one site of the example that reads across tenants, and no scope is put on it
-    expect(nodesOf('@features/customers/data/kept-list-every.graph.json').rows.in.scope).toBeUndefined();
+    expect(nodesOf('@features/customers/data/kept-list-every.graph.json').customers.in.scope).toBeUndefined();
   });
   it('carries none where nothing is scoped, so a tree that scopes nothing lowers as it did', () => {
     // the example with both stores unscoped: the same graph, and no scope on its site
-    expect(plainNodesOf('@features/customers/data/kept-get.graph.json').asked.in.scope).toBeUndefined();
+    expect(plainNodesOf('@features/customers/data/kept-get.graph.json').storedCustomer.in.scope).toBeUndefined();
   });
   it('carries the production store read to the postgres graphs, as the local one to its own', () => {
     // two stores, one resolver: each profile's site is scoped by the store it names, filled from the one read
-    expect(nodesOf('@features/customers/data/kept-get-postgres.graph.json').asked.in.scope).toEqual({
+    expect(nodesOf('@features/customers/data/kept-get-postgres.graph.json').storedCustomer.in.scope).toEqual({
       object: { tenant },
     });
   });

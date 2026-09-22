@@ -5,14 +5,14 @@
   "out": {
     "type": "@customers/edge/RawRow.shape.json[]",
     "from": [
-      "rows",
-      "failed"
+      "rawRows",
+      "upstreamFailed"
     ]
   },
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "asked",
+      "id": "fetched",
       "label": "GET the rows",
       "run": "@http/http.port.json#request",
       "in": {
@@ -25,38 +25,38 @@
     },
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "route",
+      "id": "outcome",
       "label": "What did the API say?",
       "in": {
-        "status": "{{asked.status}}",
-        "body": "{{asked.body}}"
+        "status": "{{fetched.status}}",
+        "body": "{{fetched.body}}"
       },
       "rules": [
         {
           "when": "status == 200 && has(body)",
-          "to": "rows"
+          "to": "rawRows"
         }
       ],
-      "else": "failed"
+      "else": "upstreamFailed"
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "rows",
+      "id": "rawRows",
       "label": "The rows",
       "run": "@std/object.port.json#make",
       "in": {
-        "value": "{{asked.body}}",
+        "value": "{{fetched.body}}",
         "type": "@customers/edge/RawRow.shape.json[]"
       }
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "failed",
+      "id": "upstreamFailed",
       "label": "Unexpected answer",
       "run": "@std/outcome.port.json#refuse",
       "in": {
         "reason": "upstream",
-        "message": "the customer API answered {{asked.status}}",
+        "message": "the customer API answered {{fetched.status}}",
         "type": "@customers/edge/RawRow.shape.json[]"
       }
     }

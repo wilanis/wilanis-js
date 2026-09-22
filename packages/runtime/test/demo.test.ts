@@ -141,7 +141,7 @@ describe('beat 4, no test was written: the rehearsal', () => {
     const text = run.lines.join('\n');
     expect(run.ok, text).toBe(true);
     const header = run.lines.findIndex(line =>
-      /^features\/access\/domain\/require-registrar {2}switch 'decide' {2}3\/3 branches/.test(line),
+      /^features\/access\/domain\/require-registrar {2}switch 'isRegistrar' {2}3\/3 branches/.test(line),
     );
     expect(header, text).toBeGreaterThanOrEqual(0);
     // the columns are padded for a reader; what each says is the claim

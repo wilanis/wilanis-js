@@ -6,15 +6,15 @@
   "out": {
     "type": "@customers/domain/Customer.shape.json",
     "from": [
-      "row",
-      "missing",
-      "failed"
+      "customer",
+      "noCustomer",
+      "upstreamFailed"
     ]
   },
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "asked",
+      "id": "updated",
       "label": "PUT the row",
       "run": "@http/http.port.json#request",
       "in": {
@@ -33,37 +33,37 @@
     },
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "route",
+      "id": "outcome",
       "label": "What did the API say?",
       "in": {
-        "status": "{{asked.status}}",
-        "body": "{{asked.body}}"
+        "status": "{{updated.status}}",
+        "body": "{{updated.body}}"
       },
       "rules": [
         {
           "when": "status == 404",
-          "to": "missing"
+          "to": "noCustomer"
         },
         {
           "when": "status == 200 && has(body)",
-          "to": "row"
+          "to": "customer"
         }
       ],
-      "else": "failed"
+      "else": "upstreamFailed"
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "row",
+      "id": "customer",
       "label": "The updated row",
       "run": "@std/object.port.json#make",
       "in": {
-        "value": "{{asked.body}}",
+        "value": "{{updated.body}}",
         "type": "@customers/edge/CustomerRow.shape.json"
       }
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "missing",
+      "id": "noCustomer",
       "label": "No such customer",
       "run": "@std/outcome.port.json#refuse",
       "in": {
@@ -74,12 +74,12 @@
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "failed",
+      "id": "upstreamFailed",
       "label": "Unexpected answer",
       "run": "@std/outcome.port.json#refuse",
       "in": {
         "reason": "upstream",
-        "message": "the customer API answered {{asked.status}}",
+        "message": "the customer API answered {{updated.status}}",
         "type": "@customers/domain/Customer.shape.json"
       }
     }

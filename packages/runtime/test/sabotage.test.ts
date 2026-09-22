@@ -142,14 +142,14 @@ describe('sabotage: graphs, layers and triggers', () => {
     // local the same operation is met by a graph over the store, which still refuses with the word
     expect(
       sabotage('features/customers/data/get-row.graph.json', graph => {
-        graph.nodes.find((node: any) => node.id === 'missing').in.reason = '{{asked.status}}';
+        graph.nodes.find((node: any) => node.id === 'noCustomer').in.reason = '{{fetched.status}}';
       }).sort(),
     ).toEqual(['P001']);
   });
   it('G005 a refusal without a reason', () => {
     expect(
       sabotage('features/customers/data/get-row.graph.json', graph => {
-        delete graph.nodes.find((node: any) => node.id === 'missing').in.reason;
+        delete graph.nodes.find((node: any) => node.id === 'noCustomer').in.reason;
       }).sort(),
     ).toEqual(['G005']);
   });
@@ -170,7 +170,7 @@ describe('sabotage: graphs, layers and triggers', () => {
   it('G003 a read of a node that does not exist', () => {
     expect(
       sabotage('features/customers/data/list-rows.graph.json', graph => {
-        graph.nodes[2].in.value = '{{asked2.body}}';
+        graph.nodes[2].in.value = '{{fetched2.body}}';
       }),
     ).toContain('G003');
   });

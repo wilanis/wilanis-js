@@ -145,12 +145,12 @@ describe('sabotage: the reads a document takes from the request', () => {
     ).toContain('P005');
   });
   it('P006 a read named like a node of the graph', () => {
-    // {{row}} would be ambiguous: the resolver and the node both answer to it, and the order the roots are
+    // {{customer}} would be ambiguous: the resolver and the node both answer to it, and the order the roots are
     // tried in would decide it silently. The name is refused instead (RFC 0029)
     expect(
       sabotage('features/customers/data/create-row.graph.json', graph => {
-        graph.reads = { row: '@customers/edge/request.resolvers.json#agent' };
-        graph.nodes[0].in.headers['x-forwarded-user-agent'] = '{{row}}';
+        graph.reads = { customer: '@customers/edge/request.resolvers.json#agent' };
+        graph.nodes[0].in.headers['x-forwarded-user-agent'] = '{{customer}}';
       }),
     ).toContain('P006');
   });

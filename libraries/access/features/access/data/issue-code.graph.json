@@ -13,7 +13,7 @@
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "asked",
+      "id": "issued",
       "label": "Give it a code",
       "run": "@auth/challenge.port.json#issue",
       "in": {
@@ -22,13 +22,13 @@
     },
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "route",
+      "id": "wasThere",
       "label": "Was there a challenge?",
       "in": {
-        "issued": "{{asked.issued}}",
-        "id": "{{asked.id}}",
-        "code": "{{asked.code}}",
-        "expiresAt": "{{asked.expiresAt}}"
+        "issued": "{{issued.issued}}",
+        "id": "{{issued.id}}",
+        "code": "{{issued.code}}",
+        "expiresAt": "{{issued.expiresAt}}"
       },
       "rules": [
         {
@@ -45,9 +45,9 @@
       "run": "@std/object.port.json#make",
       "in": {
         "value": {
-          "id": "{{asked.id}}",
-          "code": "{{asked.code}}",
-          "expiresAt": "{{asked.expiresAt}}"
+          "id": "{{issued.id}}",
+          "code": "{{issued.code}}",
+          "expiresAt": "{{issued.expiresAt}}"
         },
         "type": "@access/domain/IssuedCode.shape.json"
       }

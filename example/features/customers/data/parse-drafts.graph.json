@@ -5,12 +5,12 @@
   "in": "blob",
   "out": {
     "type": "@customers/domain/CustomerDraft.shape.json[]",
-    "from": "rows"
+    "from": "drafts"
   },
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "rows",
+      "id": "drafts",
       "label": "Read the rows",
       "run": "@blob/csv.port.json#parse",
       "in": {

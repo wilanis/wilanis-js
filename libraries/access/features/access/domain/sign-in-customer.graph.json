@@ -31,7 +31,7 @@
     },
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "route",
+      "id": "verdict",
       "label": "What did the directory say?",
       "in": {
         "status": "{{checked.status}}",

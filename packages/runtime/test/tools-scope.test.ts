@@ -94,7 +94,7 @@ describe('wilanis describe and map: the scope a store keeps its rows under', () 
 
   it('prints the scope a storage node carries under it, which the graph document does not write', () => {
     const said = linesOf('@customers/data/kept-get.graph.json');
-    const node = said.indexOf('    asked  @storage/store.port.json#get');
+    const node = said.indexOf('    storedCustomer  @storage/store.port.json#get');
     expect(said[node + 1]).toBe('        scope tenant ← {{tenant}} of @features/customers/data/customers.store.json');
   });
 

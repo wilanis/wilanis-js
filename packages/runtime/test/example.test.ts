@@ -34,9 +34,9 @@ describe('the example tree', () => {
     const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'live' });
     const text = run.lines.join('\n');
     // list-rows is reached from two triggers (the listing and the digest), and is one decision even so
-    expect(text.match(/list-rows {2}switch 'route'/g)).toHaveLength(1);
+    expect(text.match(/list-rows {2}switch 'outcome'/g)).toHaveLength(1);
     // delete-row is reached directly by the single delete and once per element by the batch delete's map
-    expect(text.match(/delete-row {2}switch 'route'/g)).toHaveLength(1);
+    expect(text.match(/delete-row {2}switch 'outcome'/g)).toHaveLength(1);
     // the sixteenth decision is the guard over the CSV export's list of customers, whose nested spec the walk
     // opens by name; the fifteen the tree's authors wrote are unchanged
     expect(text).toMatch(/every branch settled -- 42 branch\(es\), 17 decision\(s\), 16 graph\(s\)/);
@@ -45,9 +45,9 @@ describe('the example tree', () => {
     const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'live' });
     const text = run.lines.join('\n');
     // the six data graphs each answer on one branch and refuse on purpose on the others
-    expect(text.match(/refused on purpose at 'failed' as upstream/g)).toHaveLength(6);
+    expect(text.match(/refused on purpose at 'upstreamFailed' as upstream/g)).toHaveLength(6);
     // the three graphs behind an id declare what a missing id means, and say so in one word the trigger maps
-    expect(text.match(/refused on purpose at 'missing' as missing: "no customer /g)).toHaveLength(3);
+    expect(text.match(/refused on purpose at 'noCustomer' as missing: "no customer /g)).toHaveLength(3);
     // every branch that answers names the node it answered from, never a bare status word: the registry's eight,
     // the access feature's, and the `in:ok` of the guard over the CSV export's list
     expect(text.match(/answered from '/g)).toHaveLength(20);
@@ -81,7 +81,7 @@ describe('the example tree', () => {
       const text = run.lines.join('\n');
       // the batch delete reaches the delete-row decision through its map, and every branch of it settles
       expect(text).toMatch(
-        /delete-row {2}switch 'route' {2}3\/3 branches {2}\[via delete-customer, delete-customers\]/,
+        /delete-row {2}switch 'outcome' {2}3\/3 branches {2}\[via delete-customer, delete-customers\]/,
       );
     }
   });
@@ -236,10 +236,10 @@ describe('branch rehearsal', () => {
 
   it('reports a rule an earlier rule already covers', async () => {
     const lines = await withEdit('features/customers/data/list-rows.graph.json', graph => {
-      const route = graph.nodes.find((node: any) => node.id === 'route');
+      const route = graph.nodes.find((node: any) => node.id === 'outcome');
       route.rules = [
-        { when: 'status >= 200', to: 'rows' },
-        { when: 'status == 200 && has(body)', to: 'rows' },
+        { when: 'status >= 200', to: 'customers' },
+        { when: 'status == 200 && has(body)', to: 'customers' },
       ];
     });
     expect(lines.join('\n')).toMatch(/NEVER RUN/);
@@ -247,8 +247,8 @@ describe('branch rehearsal', () => {
 
   it('reports a rule that contradicts itself', async () => {
     const lines = await withEdit('features/customers/data/list-rows.graph.json', graph => {
-      const route = graph.nodes.find((node: any) => node.id === 'route');
-      route.rules = [{ when: 'status > 500 && status < 200', to: 'rows' }];
+      const route = graph.nodes.find((node: any) => node.id === 'outcome');
+      route.rules = [{ when: 'status > 500 && status < 200', to: 'customers' }];
     });
     expect(lines.join('\n')).toMatch(/NEVER RUN/);
   });
@@ -257,11 +257,11 @@ describe('branch rehearsal', () => {
     // store-and-latest is the example's own: it writes the customer and its tier's latest, and says so
     const lines = await withEdit('features/customers/data/store-and-latest.graph.json', () => {}, 'local');
     const text = lines.join('\n');
-    expect(text).toMatch(/features\/customers\/data\/store-and-latest {2}\(atomic\) {2}switch 'route'/);
+    expect(text).toMatch(/features\/customers\/data\/store-and-latest {2}\(atomic\) {2}switch 'bothWritten'/);
     // the branch that answers routes to the node the guard moved aside to, since the field invariant over
-    // Customer is not proved at 'row' and the compiler lowers a switch between it and what reads it
-    expect(text).toMatch(/when has\(record\) && has\(mark\) {2}answered from 'row:made'$/m);
-    expect(text).toMatch(/refused on purpose at 'failed' as upstream: "[^"]*", rolled back$/m);
+    // Customer is not proved at 'customer' and the compiler lowers a switch between it and what reads it
+    expect(text).toMatch(/when has\(record\) && has\(mark\) {2}answered from 'customer:made'$/m);
+    expect(text).toMatch(/refused on purpose at 'nothingWritten' as upstream: "[^"]*", rolled back$/m);
     // and the line names no reasons: describe says those
     expect(text).not.toMatch(/\(atomic\)[^\n]*rolls back/);
   });
@@ -273,7 +273,7 @@ describe('branch rehearsal', () => {
     // atomicity is a property of the run, not of the routing: the solver walks the same branches either way
     expect(before).not.toContain('(atomic)');
     expect(before).not.toContain('rolled back');
-    // two decisions of this one graph: its own `route`, and the `row:check` the guard over Customer lowered
+    // two decisions of this one graph: its own `bothWritten`, and the `customer:check` the guard over Customer lowered
     expect(after.match(/\(atomic\)/g)).toHaveLength(2);
     expect(after.replace(/ {2}\(atomic\)/g, '').replace(/, rolled back/g, '')).toBe(before);
   });
@@ -287,7 +287,7 @@ describe('branch rehearsal', () => {
     expect(run.ok, run.lines.join('\n')).toBe(true);
     expect(run.lines.join('\n')).toMatch(/hello\/domain\/greeting\.port\.json#hello {2}\(no branches\)/);
     // and `(atomic)` is the other word such a line can carry, said where the graph behind a decision says so
-    expect(run.lines.join('\n')).toMatch(/store-and-latest {2}\(atomic\) {2}switch 'route'/);
+    expect(run.lines.join('\n')).toMatch(/store-and-latest {2}\(atomic\) {2}switch 'bothWritten'/);
   });
 });
 

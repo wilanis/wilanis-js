@@ -5,13 +5,13 @@
   "out": {
     "type": "@customers/domain/Customer.shape.json[]",
     "from": [
-      "rows"
+      "customers"
     ]
   },
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "rows",
+      "id": "customers",
       "label": "Read every customer",
       "run": "@storage/store.port.json#find",
       "in": {

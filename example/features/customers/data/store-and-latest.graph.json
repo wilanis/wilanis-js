@@ -7,9 +7,9 @@
   "out": {
     "type": "@customers/domain/Customer.shape.json",
     "from": [
-      "row",
+      "customer",
       "repeated",
-      "failed"
+      "nothingWritten"
     ]
   },
   "nodes": [
@@ -58,7 +58,7 @@
     },
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "route",
+      "id": "bothWritten",
       "label": "Were both written, or did a constraint stop the customer?",
       "in": {
         "record": "{{stored.record}}",
@@ -72,14 +72,14 @@
         },
         {
           "when": "has(record) && has(mark)",
-          "to": "row"
+          "to": "customer"
         }
       ],
-      "else": "failed"
+      "else": "nothingWritten"
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "row",
+      "id": "customer",
       "label": "The customer",
       "run": "@std/object.port.json#make",
       "in": {
@@ -101,7 +101,7 @@
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "failed",
+      "id": "nothingWritten",
       "label": "Nothing was written",
       "description": "The store answered neither a record nor a violated constraint, which no engine promises to do; the transaction rolls back, so neither write survives this refusal.",
       "run": "@std/outcome.port.json#refuse",

@@ -148,7 +148,7 @@ describe('describe: the engine behind a store', () => {
 
   it('names every graph that runs an operation against it, with the operation and the collection', () => {
     expect(said()).toContain('run against by (the operation each runs):');
-    expect(said()).toContain('    @features/customers/data/kept-get.graph.json#asked  get (customers)');
+    expect(said()).toContain('    @features/customers/data/kept-get.graph.json#storedCustomer  get (customers)');
     expect(said()).toContain('    @features/customers/data/store-and-latest.graph.json#key  newKey (customers)');
     expect(said()).toContain('    @features/customers/data/store-and-latest.graph.json#stored  put (customers)');
     expect(said()).toContain('    @features/customers/data/store-and-latest.graph.json#latest  put (latest)');
@@ -193,10 +193,10 @@ describe('map: where a node lands', () => {
   it('ends a store call at the records, naming the store, the collection and the operation', () => {
     // the customers are kept per tenant, so a call over them says what it is scoped by
     expect(lines()).toContain(
-      `      asked @storage/store.port.json#get  (effect) → store ${KEPT} customers (get), scoped by tenant`,
+      `      storedCustomer @storage/store.port.json#get  (effect) → store ${KEPT} customers (get), scoped by tenant`,
     );
     expect(lines()).toContain(
-      `      asked @storage/store.port.json#remove  (effect) → store ${KEPT} customers (remove), scoped by tenant`,
+      `      gone @storage/store.port.json#remove  (effect) → store ${KEPT} customers (remove), scoped by tenant`,
     );
   });
 

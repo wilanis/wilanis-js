@@ -50,14 +50,14 @@ describe('a rehearsed data graph', () => {
     composeBeforeTheWrite(dir);
     const run = await rehearse(loadTree(dir, PLUGINS, INCLUDES), { seed: 1, profile: 'local' });
     rmSync(dir, { recursive: true, force: true });
-    const head = "features/customers/data/store-and-latest  (atomic)  switch 'route'  3/3 branches";
+    const head = "features/customers/data/store-and-latest  (atomic)  switch 'bothWritten'  3/3 branches";
     const at = run.lines.indexOf(head);
     expect(at, run.lines.join('\n')).toBeGreaterThanOrEqual(0);
     // every branch settles where its rule points, the node that composes the record from `in` among them
     expect(run.lines.slice(at + 1, at + 4)).toEqual([
       expect.stringMatching(/^ {2}ok {2}when has\(violated\) +refused on purpose at 'repeated' as conflict/),
-      expect.stringMatching(/^ {2}ok {2}when has\(record\) && has\(mark\) +answered from 'row:made'$/),
-      expect.stringMatching(/^ {2}ok {2}anything else +refused on purpose at 'failed' as upstream/),
+      expect.stringMatching(/^ {2}ok {2}when has\(record\) && has\(mark\) +answered from 'customer:made'$/),
+      expect.stringMatching(/^ {2}ok {2}anything else +refused on purpose at 'nothingWritten' as upstream/),
     ]);
     expect(run.ok).toBe(true);
   });
