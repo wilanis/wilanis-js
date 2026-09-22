@@ -1,7 +1,8 @@
 /**
  * What every engine must answer about a scope: that a row belongs to the scope it was written under, that no
  * key crosses one, that a key is nevertheless global, that a `unique` holds within a scope and not across it,
- * and that a view -- a read with no scope -- sees every row.
+ * that a view -- a read with no scope -- sees every row, that a filter and a scope narrow one read together,
+ * and that a scope nothing has been written under yet reads as empty.
  *
  * These are the cases the whole of RFC 0015 rests on at run time. The checker proves that every site over a
  * scoped collection carries a scope, and the handlers prove the scope fits the collection's words; that two
@@ -10,7 +11,7 @@
  * for the reason `suite-transactions.ts` is: one file, one thing an engine is asked to be.
  */
 import { strict as assert } from 'node:assert';
-import { ACME, type Case, entry, foundIn, GLOBEX, scoped } from './suite-fixture.js';
+import { ACME, type Case, entry, foundIn, GLOBEX, ids, scoped, where } from './suite-fixture.js';
 
 /** What a store does with a scope: written, read back within it, and never across it. */
 export const scopeCases: Case[] = [
@@ -87,6 +88,30 @@ export const scopeCases: Case[] = [
       assert.deepEqual(await foundIn(subject, where_, both), ['a']);
       assert.deepEqual(await foundIn(subject, where_, { tenant: 'acme', owner: 'grace' }), []);
       assert.deepEqual(await foundIn(subject, where_, { tenant: 'globex', owner: 'ada' }), []);
+    },
+  },
+  {
+    name: 'a filter and a scope narrow one read together: neither the other scope nor the other rows answer',
+    async run(subject) {
+      const where_ = await scoped(subject, 'scope_filter');
+      await subject.engine.put(where_, entry('a', 'https://one.example/a', 'GET'), { replace: true, scope: ACME });
+      await subject.engine.put(where_, entry('b', 'https://one.example/b', 'POST'), { replace: true, scope: ACME });
+      await subject.engine.put(where_, entry('c', 'https://two.example/c', 'GET'), { replace: true, scope: GLOBEX });
+      const get = where({ method: 'GET' });
+      assert.deepEqual(ids(await subject.engine.find(where_, { where: get, scope: ACME })), ['a']);
+      assert.equal(await subject.engine.count(where_, get, ACME), 1);
+      assert.deepEqual(ids(await subject.engine.find(where_, { where: where({ method: 'POST' }), scope: GLOBEX })), []);
+      assert.equal(await subject.engine.count(where_, get, undefined), 2);
+    },
+  },
+  {
+    name: 'a scoped read before any write answers empty: find, get and count under a scope find nothing',
+    async run(subject) {
+      const where_ = await scoped(subject, 'scope_unwritten');
+      assert.deepEqual(await foundIn(subject, where_, ACME), []);
+      assert.equal((await subject.engine.get(where_, 'a', ACME)).record, undefined);
+      assert.equal(await subject.engine.count(where_, undefined, ACME), 0);
+      assert.equal(await subject.engine.count(where_, where({ method: 'GET' }), ACME), 0);
     },
   },
 ];
