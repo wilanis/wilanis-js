@@ -1,0 +1,1469 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Three agents, one gate</title>
+<style>
+:root { color-scheme: light dark; --bg:#fff; --fg:#1a1a1a; --mute:#5c5c5c; --line:#d9d9d9; --pre:#f4f4f2; --mark:#8a3b00; --good:#1e6b34; --bad:#8a1c1c; --warn:#7a5a00; }
+@media (prefers-color-scheme: dark) { :root { --bg:#131313; --fg:#e6e6e6; --mute:#a0a0a0; --line:#333; --pre:#1d1d1d; --mark:#f0a35b; --good:#7fd19a; --bad:#f08a8a; --warn:#e6c35a; } }
+* { box-sizing: border-box; } html { background: var(--bg); color: var(--fg); }
+body { margin: 0 auto; padding: 1rem 16px 3rem; max-width: 72rem; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+h1 { font-size: 1.8rem; line-height: 1.2; margin: 1rem 0 .5rem; }
+h2 { font-size: 1.3rem; margin: 2.5rem 0 .5rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
+h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--mute); margin: 1.4rem 0 .3rem; }
+p { margin: .5rem 0; }
+pre { margin: .5rem 0; padding: .7rem .9rem; background: var(--pre); border: 1px solid var(--line); border-radius: 4px; overflow-x: auto; font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+pre b { color: var(--mark); }
+code { font: 90% ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+table { border-collapse: collapse; width: 100%; margin: .5rem 0 1rem; font-size: .95rem; }
+th, td { text-align: left; vertical-align: top; padding: .4rem .6rem; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+thead th { font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--mute); }
+tbody th { font-weight: 500; color: var(--mute); width: 26%; }
+td.good { color: var(--good); } td.bad { color: var(--bad); } td.warn { color: var(--warn); }
+.cols { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 1rem; }
+@media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+.col h3 { margin-top: .5rem; }
+.say { margin: .6rem 0; padding: .3rem .6rem; border-left: 3px solid var(--line); font-size: .92rem; white-space: pre-wrap; }
+.call { font-size: .85rem; margin: .15rem 0; } .call .n { color: var(--mute); display: inline-block; min-width: 2em; } .call .tool { font-weight: 600; }
+details { margin: .3rem 0; } summary { cursor: pointer; color: var(--mute); font-size: .85rem; }
+details.refused summary { color: var(--mark); }
+.timeline { max-height: 40rem; overflow: auto; border: 1px solid var(--line); border-radius: 4px; padding: .5rem .8rem; }
+footer { margin-top: 3rem; color: var(--mute); font-size: .9rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+</style></head><body>
+<h1>Three agents, one gate</h1>
+<p>Three models are each given the same one-paragraph task in identical copies of the example, unsupervised: add an operation that toggles a boolean on a customer and expose it over HTTP. Beside the task sits an acceptance test the reviewer wrote first, accept.sh, and the agent is told its work is done when the test prints PASS on every criterion. The test asserts what the endpoint must do and what the checker and the rehearsal must say; it never asserts how the tree is written. One thing it reports without judging: the tree&#x27;s access rule, Writes are for registrars, names its write operations one by one, and the toggle is a write the rule does not name. Whether a toggle is a write the rule should cover is each agent&#x27;s to decide, and the gate accepts either answer. This page records what each did, what each decided, what it cost, and the gate&#x27;s own verdict on each result, run again by the reviewer.</p>
+<h3>The rule already in the tree, which the gate reports on and does not judge</h3>
+<pre>{
+  &quot;$schema&quot;: &quot;https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/invariant.schema.json&quot;,
+  &quot;label&quot;: &quot;Writes are for registrars&quot;,
+  &quot;description&quot;: &quot;Every trigger that can change a customer attaches the registrar policy. Reads stay public. Without this the six write triggers are six coincidences: a new route firing customer.update and forgetting the policy would check clean, and the write would be public.&quot;,
+  &quot;access&quot;: {
+    &quot;over&quot;: [
+      &quot;@customers/domain/customer.port.json#register&quot;,
+      &quot;@customers/domain/customer.port.json#update&quot;,
+      &quot;@customers/domain/customer.port.json#remove&quot;,
+      &quot;@customers/domain/customer.port.json#removeMany&quot;,
+      &quot;@customers/domain/customer.port.json#submit&quot;,
+      &quot;@customers/domain/customer.port.json#import&quot;
+    ],
+    &quot;requires&quot;: {
+      &quot;policy&quot;: &quot;@access/edge/can-register.policy.json&quot;
+    }
+  }
+}</pre>
+<p>Before the run, each copy gained a port of its own, the CLAUDE.md and hooks that `wilanis init` writes for a consumer tree, the graph-idiom skill and the Stop hook this harness carries provisionally (issues #494 and #495), a hook that keeps the agent inside its copy, the acceptance test, and a git commit as the baseline every diff below is measured against. The `active` flag the task toggles is a field of `Customer` as the example ships it, so nothing was planted. `wilanis check` passed on every copy and the gate rejected every copy on the criteria about the endpoint and nothing else. The rule above is the one already in the tree; nothing was added to it.</p>
+<h3>The prompt, identical for the three, except the directory and the port</h3>
+<details><summary>Show the prompt</summary><pre>This is an unsupervised run. Nobody will answer a question, so do not ask one: decide, act, and report what you decided and why.
+
+You are working in a wilanis project at &lt;arena&gt;/&lt;model&gt;. It is a registry of customers: records with a name, an email address and a tier, kept in a store, served over HTTP with sign-in and policies. Everything in it is JSON documents; there is no code to write. Read its CLAUDE.md and README.md first; they say how the language works and what commands exist. Work only inside that directory. The wilanis packages under its node_modules are installed software: use them through the `wilanis` command (`npx wilanis ...` from inside the directory, or the npm scripts in package.json), do not read or change their sources.
+
+## The task
+
+Customers have an optional boolean field `active`. Add an operation that toggles it: calling it on a customer whose `active` is false or missing sets it to true, and calling it on a customer whose `active` is true sets it to false. Expose the operation as an HTTP endpoint on the running tree, and validate it with curl.
+
+## The gate
+
+`accept.sh` in the directory is the acceptance test, written by the reviewer. Your work is done when
+`bash accept.sh &lt;METHOD&gt; &#x27;&lt;ROUTE&gt;&#x27;` (your endpoint&#x27;s verb and route, the route with the literal `{id}`)
+prints PASS for every criterion and ends with ACCEPTED. Read it before you start: every criterion says
+what the endpoint must do. Do not edit it. Run it as often as you like.
+
+## How to run and validate
+
+- `npm run check` judges the whole tree. `npm run rehearse -- --profile local` runs every trigger and every branch with effects stubbed.
+- The tree serves under the `local` profile, in memory, on port &lt;port&gt;. Start it in the background with:
+  `CUSTOMERS_JWT_SECRET=arena-secret CUSTOMERS_DATABASE_URL=postgres://unused npm run start -- --profile local &gt; /tmp/arena-&lt;model&gt;.log 2&gt;&amp;1 &amp;`
+  and read the log for `Listen: ok`. Stop it with `kill $(lsof -ti tcp:&lt;port&gt;)` when you are done, never with `pkill` or any kill by name, since other trees serve on this machine; make sure nothing you started is still running when you finish. Never leave the directory: no `cd` out of it, no command on a path outside it.
+- The README says who can sign in and how (`bo`, `cy`, `ana`) and shows the curl calls for registering a customer and for signing in. Use `sed` rather than `jq` to pull a token out of a response; `jq` may not be installed.
+- Validate with curl every behaviour you consider part of the operation, including what happens when the toggle should not go through, and paste the exact commands and responses in your report.
+
+## The report
+
+When finished, report in this order: what you added or changed, file by file; every decision you had to make that the task did not settle for you, what you chose and why; the full output of your final `bash accept.sh ...` run; the curl commands you ran beyond it and their exact responses; and anything you left undone.
+</pre></details>
+<h3>The gate, accept.sh, committed in each copy before the agent arrived</h3>
+<details><summary>Show the acceptance test</summary><pre>#!/usr/bin/env bash
+# The gate. Your work is accepted when every criterion below prints PASS.
+#
+#   bash accept.sh &lt;METHOD&gt; &lt;ROUTE&gt;        e.g.  bash accept.sh POST &#x27;/customers/{id}/active&#x27;
+#
+# METHOD and ROUTE are the endpoint you expose; ROUTE contains the literal {id}. The script judges the
+# tree the way a reviewer would: it runs the checker and the rehearsal, reads what they say, starts the
+# tree under the local profile, and drives the endpoint with curl. It never reads your documents to see
+# how you did it, except to confirm that no rule a human wrote has changed in what it states.
+# Do not edit this file. Read it: every criterion says what the endpoint must do.
+set -uo pipefail
+METHOD=${1:?METHOD}; ROUTE=${2:?ROUTE, with the literal id placeholder in braces}
+cd &quot;$(dirname &quot;$0&quot;)&quot;
+PORT=$(node -e &#x27;const p=require(&quot;./project.json&quot;);process.stdout.write(String(p.plugins.find(x=&gt;x.use===&quot;@http&quot;).settings.port))&#x27;)
+BASE=$(git rev-list --max-parents=0 HEAD)
+H=&quot;http://localhost:$PORT&quot;
+LOG=$(mktemp -t accept)
+pass=0; fail=0
+ok()   { pass=$((pass+1)); printf &#x27;PASS  %s\n&#x27; &quot;$1&quot;; }
+bad()  { fail=$((fail+1)); printf &#x27;FAIL  %s\n      expected: %s\n      got:      %s\n&#x27; &quot;$1&quot; &quot;$2&quot; &quot;$(printf &#x27;%s&#x27; &quot;$3&quot; | head -c 300)&quot;; }
+check() { # check &lt;name&gt; &lt;expected-description&gt; &lt;actual&gt; &lt;grep-pattern&gt;
+  if printf &#x27;%s&#x27; &quot;$3&quot; | grep -qE -- &quot;$4&quot;; then ok &quot;$1&quot;; else bad &quot;$1&quot; &quot;$2&quot; &quot;$3&quot;; fi
+}
+status() { curl -s -g -o /dev/null -w &#x27;%{http_code}&#x27; &quot;$@&quot;; }
+body()   { curl -s -g --max-time 10 &quot;$@&quot;; }
+
+echo &quot;== The tree at rest&quot;
+CHECK=$(npx wilanis check . 2&gt;&amp;1 | tail -3)
+check &quot;1 wilanis check passes&quot; &quot;ok: N documents&quot; &quot;$CHECK&quot; &#x27;^ok: [0-9]+ documents&#x27;
+REH=$(npx wilanis rehearse . --profile local 2&gt;&amp;1)
+check &quot;2 every rehearsed branch settles&quot; &quot;every branch settled&quot; &quot;$(printf &#x27;%s&#x27; &quot;$REH&quot; | grep -E &#x27;every branch settled|NEVER RUN|BROKE|BLOCKED&#x27; | head -3)&quot; &#x27;every branch settled&#x27;
+printf &#x27;INFO  3 the rehearsal says: %s  (the rule held at 5 triggers before your change; this line is reported, not judged)\n&#x27; &quot;$(printf &#x27;%s&#x27; &quot;$REH&quot; | grep &#x27;Writes are for registrars&#x27; | sed &#x27;s/^ *//&#x27;)&quot;
+for inv in features/customers/domain/a-customer-is-reachable.invariant.json; do
+  before=$(git show &quot;$BASE:$inv&quot; | node -e &#x27;let s=&quot;&quot;;process.stdin.on(&quot;data&quot;,d=&gt;s+=d).on(&quot;end&quot;,()=&gt;process.stdout.write(JSON.parse(s).holds.when))&#x27;)
+  after=$(node -e &#x27;process.stdout.write(require(&quot;./&#x27;&quot;$inv&quot;&#x27;&quot;).holds.when)&#x27;)
+  check &quot;4 the rule in $(basename &quot;$inv&quot; .invariant.json) states what it stated&quot; &quot;$before&quot; &quot;$after&quot; &quot;^$(printf &#x27;%s&#x27; &quot;$before&quot; | sed &#x27;s/[][\.*^$|()+?{}\\]/\\&amp;/g&#x27;)\$&quot;
+done
+before=$(git show &quot;$BASE:features/customers/domain/writes-are-for-registrars.invariant.json&quot; | node -e &#x27;let s=&quot;&quot;;process.stdin.on(&quot;data&quot;,d=&gt;s+=d).on(&quot;end&quot;,()=&gt;process.stdout.write(JSON.parse(s).access.requires.policy))&#x27;)
+after=$(node -e &#x27;process.stdout.write(require(&quot;./features/customers/domain/writes-are-for-registrars.invariant.json&quot;).access.requires.policy)&#x27;)
+check &quot;5 the access rule still requires the same policy&quot; &quot;$before&quot; &quot;$after&quot; &quot;^$(printf &#x27;%s&#x27; &quot;$before&quot; | sed &#x27;s/[][\.*^$|()+?{}\\]/\\&amp;/g&#x27;)\$&quot;
+
+echo &quot;== The tree serving&quot;
+# stop whatever listens on this tree&#x27;s port and nothing else: other trees on this machine are not ours to kill
+for pid in $(lsof -ti tcp:$PORT 2&gt;/dev/null); do kill &quot;$pid&quot; 2&gt;/dev/null; done; sleep 1
+CUSTOMERS_JWT_SECRET=accept-secret CUSTOMERS_DATABASE_URL=postgres://unused npx wilanis start . --profile local &gt; &quot;$LOG&quot; 2&gt;&amp;1 &amp;
+PID=$!
+for i in $(seq 1 30); do grep -q &quot;Listen: ok&quot; &quot;$LOG&quot; &amp;&amp; break; sleep 1; done
+check &quot;6 the tree starts and listens&quot; &quot;startup 7/7 Listen: ok&quot; &quot;$(grep -E &#x27;Listen: ok|refused|missing&#x27; &quot;$LOG&quot; | head -2)&quot; &#x27;Listen: ok&#x27;
+tok() { body -X POST $H/api/v1/auth-employees -H &#x27;content-type: application/json&#x27; -d &quot;{\&quot;username\&quot;:\&quot;$1\&quot;,\&quot;password\&quot;:\&quot;$1-pass\&quot;}&quot; | sed -n &#x27;s/.*&quot;accessToken&quot;:&quot;\([^&quot;]*\)&quot;.*/\1/p&#x27;; }
+BO=$(tok bo); CY=$(tok cy)
+# signing in writes the session under .wilanis/ and the reload watcher sees it (wilanis-js#490); wait for
+# both reloads, one per sign-in, before recording, or the memory store starts over under the calls below
+for i in $(seq 1 8); do [ &quot;$(grep -c &#x27;^reload: [0-9]&#x27; &quot;$LOG&quot;)&quot; -ge 2 ] &amp;&amp; break; sleep 1; done; sleep 1
+R() { printf &#x27;%s&#x27; &quot;$ROUTE&quot; | sed &quot;s/{id}/$1/&quot;; }
+REC1=$(body -X POST $H/customers -H &quot;authorization: Bearer $BO&quot; -H &#x27;content-type: application/json&#x27; -d &#x27;{&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;}&#x27; -w &#x27;  [%{http_code}]&#x27;)
+REC2=$(body -X POST $H/customers -H &quot;authorization: Bearer $BO&quot; -H &#x27;content-type: application/json&#x27; -d &#x27;{&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;bronze&quot;}&#x27; -w &#x27;  [%{http_code}]&#x27;)
+ADAID=$(printf &#x27;%s&#x27; &quot;$REC1&quot; | sed -n &#x27;s/.*&quot;id&quot;:&quot;\([^&quot;]*\)&quot;.*/\1/p&#x27;); GRACEID=$(printf &#x27;%s&#x27; &quot;$REC2&quot; | sed -n &#x27;s/.*&quot;id&quot;:&quot;\([^&quot;]*\)&quot;.*/\1/p&#x27;)
+check &quot;7 two customers registered as bo, one silver and one bronze&quot; &quot;two 201 answers with ids&quot; &quot;$REC1 // $REC2&quot; &#x27;^\{&quot;id&quot;:&quot;[^&quot;]+&quot;.*\[201\] // \{&quot;id&quot;:&quot;[^&quot;]+&quot;.*\[201\]$&#x27;
+
+echo &quot;== The endpoint&quot;
+r=$(body -X &quot;$METHOD&quot; &quot;$H$(R &quot;$ADAID&quot;)&quot; -H &quot;authorization: Bearer $BO&quot; -w &#x27;  [%{http_code}]&#x27;)
+check &quot;8 toggling a silver customer as bo answers 200 and shows active true&quot; &#x27;{&quot;id&quot;:...,&quot;active&quot;:true}  [200]&#x27; &quot;$r&quot; &#x27;&quot;active&quot;:true.*\[200\]$&#x27;
+r=$(body -X &quot;$METHOD&quot; &quot;$H$(R &quot;$ADAID&quot;)&quot; -H &quot;authorization: Bearer $BO&quot; -w &#x27;  [%{http_code}]&#x27;)
+check &quot;9 toggling them again answers 200 and shows active false&quot; &#x27;{&quot;id&quot;:...,&quot;active&quot;:false}  [200]&#x27; &quot;$r&quot; &#x27;&quot;active&quot;:false.*\[200\]$&#x27;
+r=$(body &quot;$H/customers/$ADAID&quot; -w &#x27;  [%{http_code}]&#x27;)
+check &quot;10 reading the customer back shows their active field&quot; &#x27;{&quot;id&quot;:...,&quot;active&quot;:false}  [200]&#x27; &quot;$r&quot; &#x27;&quot;active&quot;:false.*\[200\]$&#x27;
+r=$(body -X &quot;$METHOD&quot; &quot;$H$(R &quot;$GRACEID&quot;)&quot; -H &quot;authorization: Bearer $BO&quot; -w &#x27;  [%{http_code}]&#x27;)
+check &quot;11 toggling the bronze customer as bo answers 200 and shows active true&quot; &#x27;{&quot;id&quot;:...,&quot;tier&quot;:&quot;bronze&quot;,...,&quot;active&quot;:true}  [200]&#x27; &quot;$r&quot; &#x27;&quot;active&quot;:true.*\[200\]$&#x27;
+r=$(body &quot;$H/customers/$GRACEID&quot; -w &#x27;  [%{http_code}]&#x27;)
+check &quot;12 the bronze customer reads back active&quot; &#x27;{&quot;id&quot;:...,&quot;active&quot;:true}  [200]&#x27; &quot;$r&quot; &#x27;&quot;active&quot;:true.*\[200\]$&#x27;
+r=$(body &quot;$H/customers&quot; -w &#x27;  [%{http_code}]&#x27;)
+check &quot;13 the list still answers 200 with both customers&quot; &#x27;[{...},{...}]  [200]&#x27; &quot;$r&quot; &quot;$ADAID.*$GRACEID.*\[200\]$|$GRACEID.*$ADAID.*\[200\]$&quot;
+r=$(body -X &quot;$METHOD&quot; &quot;$H$(R &quot;$ADAID&quot;)&quot; -H &quot;authorization: Bearer $CY&quot; -w &#x27;  [%{http_code}]&#x27;)
+check &quot;14 cy, an employee without the registrar role, is refused 403 forbidden&quot; &#x27;{&quot;reason&quot;:&quot;forbidden&quot;,...}  [403]&#x27; &quot;$r&quot; &#x27;&quot;reason&quot;:&quot;forbidden&quot;.*\[403\]$&#x27;
+r=$(body -X &quot;$METHOD&quot; &quot;$H$(R &quot;$ADAID&quot;)&quot; -w &#x27;  [%{http_code}]&#x27;)
+check &quot;15 no token is refused 401 anonymous&quot; &#x27;{&quot;reason&quot;:&quot;anonymous&quot;,...}  [401]&#x27; &quot;$r&quot; &#x27;&quot;reason&quot;:&quot;anonymous&quot;.*\[401\]$&#x27;
+r=$(body -X &quot;$METHOD&quot; &quot;$H$(R nope)&quot; -H &quot;authorization: Bearer $BO&quot; -w &#x27;  [%{http_code}]&#x27;)
+check &quot;16 an unknown id is refused 404 missing&quot; &#x27;{&quot;reason&quot;:&quot;missing&quot;,...}  [404]&#x27; &quot;$r&quot; &#x27;&quot;reason&quot;:&quot;missing&quot;.*\[404\]$&#x27;
+r=$(body -X &quot;$METHOD&quot; &quot;$H$(R &quot;$ADAID&quot;)&quot; -H &quot;authorization: Bearer $BO&quot; -w &#x27;  [%{http_code}]&#x27;)
+check &quot;17 a third toggle activates the silver customer again&quot; &#x27;{&quot;id&quot;:...,&quot;active&quot;:true}  [200]&#x27; &quot;$r&quot; &#x27;&quot;active&quot;:true.*\[200\]$&#x27;
+r=$(body &quot;$H/customers.csv&quot; -H &quot;authorization: Bearer $BO&quot;)
+check &quot;18 the export carries the flag: the silver customer&#x27;s row ends in true&quot; &quot;$ADAID,...,true&quot; &quot;$(printf &#x27;%s&#x27; &quot;$r&quot; | grep &quot;$ADAID&quot;)&quot; &quot;^$ADAID,.*,true\s*$&quot;
+
+kill $PID 2&gt;/dev/null; wait $PID 2&gt;/dev/null
+echo &quot;== Verdict&quot;
+if [ &quot;$fail&quot; -eq 0 ]; then echo &quot;ACCEPTED  $pass criteria pass&quot;; exit 0; else echo &quot;REJECTED  $fail of $((pass+fail)) criteria fail&quot;; exit 1; fi
+</pre></details>
+<h2>What each tree says, read by facts.py</h2>
+<p>Every cell is derived from the finished tree against its baseline commit by facts.py: the checker and the rehearsal run again, the new trigger&#x27;s document read, the invariants compared with what the baseline held, the gate run again with the trigger&#x27;s own verb and route. Green is what the tree wanted, red is not; a cell with no colour is a decision the task left to the agent and the gate accepts either way.</p>
+<table class="facts"><thead><tr><th>Read from the tree against its baseline</th><th>Claude Haiku 4.5</th><th>Claude Sonnet 5</th><th>Claude Opus 5</th></tr></thead><tbody>
+<tr><th>Did the gate accept the work, run again by the reviewer</th><td class="good">ACCEPTED  17 criteria pass</td><td class="good">ACCEPTED  17 criteria pass</td><td class="good">ACCEPTED  17 criteria pass</td></tr>
+<tr><th>Does wilanis check pass</th><td class="good">ok: 198 documents</td><td class="good">ok: 198 documents</td><td class="good">ok: 198 documents</td></tr>
+<tr><th>Does every rehearsed branch settle</th><td class="good">yes</td><td class="good">yes</td><td class="good">yes</td></tr>
+<tr><th>The rehearsal&#x27;s Writes are for registrars holds at</th><td class="">6 trigger(s), from 5</td><td class="">6 trigger(s), from 5</td><td class="">6 trigger(s), from 5</td></tr>
+<tr><th>The new trigger</th><td class="">POST /customers/{id}/active</td><td class="">POST /customers/{id}/active</td><td class="">POST /customers/{id}/active</td></tr>
+<tr><th>Policies it attaches, in order</th><td class="">employees-only, can-register</td><td class="">employees-only, can-register</td><td class="">employees-only, can-register</td></tr>
+<tr><th>Its refusal map</th><td class="">missing 404, upstream 502, anonymous 401, invalid_credential 401, forbidden 403, invariant 500</td><td class="">missing 404, upstream 502, anonymous 401, invalid_credential 401, forbidden 403, invariant 500</td><td class="">missing 404, upstream 502, anonymous 401, invalid_credential 401, forbidden 403, invariant 500</td></tr>
+<tr><th>Its out</th><td class="">CustomerView</td><td class="">CustomerView</td><td class="">CustomerView</td></tr>
+<tr><th>The operation it fires</th><td class="">customer.port.json#toggle</td><td class="">customer.port.json#toggleActive</td><td class="">customer.port.json#toggleActive</td></tr>
+<tr><th>Did the access rule&#x27;s over gain that operation</th><td class="">yes: @features/customers/domain/customer.port.json#toggle</td><td class="">yes: @features/customers/domain/customer.port.json#toggleActive</td><td class="">yes: @features/customers/domain/customer.port.json#toggleActive</td></tr>
+<tr><th>Did any invariant&#x27;s when or requires change</th><td class="good">none</td><td class="good">none</td><td class="good">none</td></tr>
+<tr><th>Did CustomerView gain active, so a client can see what it toggled</th><td class="good">yes</td><td class="good">yes</td><td class="good">yes</td></tr>
+<tr><th>Bindings of the port that meet the operation</th><td class="good">3 of 3</td><td class="good">3 of 3</td><td class="good">3 of 3</td></tr>
+<tr><th>Files added</th><td class="">features/customers/data/kept-toggle-postgres.graph.json
+features/customers/data/kept-toggle.graph.json
+features/customers/data/rest-toggle.graph.json
+features/customers/edge/toggle-customer.trigger.json</td><td class="">features/customers/data/toggle-active-kept-postgres.graph.json
+features/customers/data/toggle-active-kept.graph.json
+features/customers/data/toggle-active-row.graph.json
+features/customers/edge/toggle-active-customer.trigger.json</td><td class="">features/customers/data/toggle-active-postgres.graph.json
+features/customers/data/toggle-active-row.graph.json
+features/customers/data/toggle-active.graph.json
+features/customers/edge/toggle-active.trigger.json</td></tr>
+<tr><th>Files changed</th><td class="">features/customers/data/customers-postgres.binding.json
+features/customers/data/customers-rest.binding.json
+features/customers/data/customers-store.binding.json
+features/customers/domain/Customer.shape.json
+features/customers/domain/customer.port.json
+features/customers/domain/writes-are-for-registrars.invariant.json</td><td class="">features/customers/data/customers-postgres.binding.json
+features/customers/data/customers-rest.binding.json
+features/customers/data/customers-store.binding.json
+features/customers/domain/Customer.shape.json
+features/customers/domain/customer.port.json
+features/customers/domain/writes-are-for-registrars.invariant.json</td><td class="">README.md
+features/customers/data/customers-postgres.binding.json
+features/customers/data/customers-rest.binding.json
+features/customers/data/customers-store.binding.json
+features/customers/domain/Customer.shape.json
+features/customers/domain/customer.port.json
+features/customers/domain/writes-are-for-registrars.invariant.json
+features/customers/edge/IdRequest.shape.json</td></tr>
+</tbody></table>
+<h2>Metrics</h2>
+<p>Measured from each transcript (timestamps and token usage as the API reported them, each API message counted once), from <code>git</code> in each copy against the committed baseline, and from the check results the agent read. Cost is at API list price from the table at the top of <code>parse.py</code>: input, output, cache write at 1.25× input, cache read at 0.1× input.</p>
+<table class="metrics"><thead><tr><th></th><th>Claude Haiku 4.5</th><th>Claude Sonnet 5</th><th>Claude Opus 5</th></tr></thead><tbody>
+<tr><th>Wall clock</th><td class="">7 min 26 s</td><td class="">5 min 54 s</td><td class="">6 min 30 s</td></tr>
+<tr><th>Tool calls</th><td class="">96</td><td class="">43</td><td class="">28</td></tr>
+<tr><th>  of which Bash / Read / Edit / Write</th><td class="">24 / 27 / 40 / 5</td><td class="">28 / 4 / 7 / 3</td><td class="">27 / 0 / 0 / 0</td></tr>
+<tr><th>Assistant turns with text</th><td class="">18</td><td class="">14</td><td class="">9</td></tr>
+<tr><th>Check rounds with refusals</th><td class="">9</td><td class="">0</td><td class="">0</td></tr>
+<tr><th>Refusals seen, total</th><td class="">81</td><td class="">0</td><td class="">0</td></tr>
+<tr><th>Distinct refusal codes met</th><td class="">D001 G008 G009 L001 L007 R001 T005 T006 X211</td><td class="">–</td><td class="">–</td></tr>
+<tr><th>Gate verdicts seen, in order</th><td class="">REJECTED  1 of 17 criteria fail
+ACCEPTED  17 criteria pass</td><td class="">REJECTED  1 of 17 criteria fail
+ACCEPTED  17 criteria pass</td><td class="">ACCEPTED  17 criteria pass
+ACCEPTED  17 criteria pass</td></tr>
+<tr><th>Stops blocked by the hook</th><td class="">0</td><td class="">0</td><td class="">0</td></tr>
+<tr><th>Files added / changed</th><td class="">4 / 6</td><td class="">4 / 6</td><td class="">4 / 8</td></tr>
+<tr><th>Lines in new files</th><td class="">583</td><td class="">616</td><td class="">615</td></tr>
+<tr><th>Diff against the baseline</th><td class="">6 files changed, 26 insertions(+), 7 deletions(-)</td><td class="">10 files changed, 640 insertions(+), 5 deletions(-)</td><td class="">12 files changed, 668 insertions(+), 13 deletions(-)</td></tr>
+<tr><th>Rewrites of one file through Edit or Write, max (0 when files were written from the shell)</th><td class="">13</td><td class="">1</td><td class="">0</td></tr>
+<tr><th>Output tokens</th><td class="">56k</td><td class="">30k</td><td class="">25k</td></tr>
+<tr><th>Input tokens, uncached</th><td class="">777</td><td class="">88</td><td class="">54</td></tr>
+<tr><th>Cache writes / reads</th><td class="">118k / 8535k</td><td class="">104k / 4250k</td><td class="">93k / 2244k</td></tr>
+<tr><th>Cost at API list price</th><td class="">$1.28 (the CLI said $1.37)</td><td class="">$1.41 (the CLI said $1.57)</td><td class="">$2.33 (the CLI said $2.68)</td></tr>
+</tbody></table>
+<h2>The gate's verdict, run again by the reviewer on each finished tree</h2>
+<div class="cols" style="--n:3"><div class="col"><h3>Claude Haiku 4.5</h3><pre>== The tree at rest
+PASS  1 wilanis check passes
+PASS  2 every rehearsed branch settles
+INFO  3 the rehearsal says: Writes are for registrars  holds at 6 trigger(s)  (the rule held at 5 triggers before your change; this line is reported, not judged)
+PASS  4 the rule in a-customer-is-reachable states what it stated
+PASS  5 the access rule still requires the same policy
+== The tree serving
+PASS  6 the tree starts and listens
+PASS  7 two customers registered as bo, one silver and one bronze
+== The endpoint
+PASS  8 toggling a silver customer as bo answers 200 and shows active true
+PASS  9 toggling them again answers 200 and shows active false
+PASS  10 reading the customer back shows their active field
+PASS  11 toggling the bronze customer as bo answers 200 and shows active true
+PASS  12 the bronze customer reads back active
+PASS  13 the list still answers 200 with both customers
+PASS  14 cy, an employee without the registrar role, is refused 403 forbidden
+PASS  15 no token is refused 401 anonymous
+PASS  16 an unknown id is refused 404 missing
+PASS  17 a third toggle activates the silver customer again
+PASS  18 the export carries the flag: the silver customer&#x27;s row ends in true
+== Verdict
+ACCEPTED  17 criteria pass
+</pre></div><div class="col"><h3>Claude Sonnet 5</h3><pre>== The tree at rest
+PASS  1 wilanis check passes
+PASS  2 every rehearsed branch settles
+INFO  3 the rehearsal says: Writes are for registrars  holds at 6 trigger(s)  (the rule held at 5 triggers before your change; this line is reported, not judged)
+PASS  4 the rule in a-customer-is-reachable states what it stated
+PASS  5 the access rule still requires the same policy
+== The tree serving
+PASS  6 the tree starts and listens
+PASS  7 two customers registered as bo, one silver and one bronze
+== The endpoint
+PASS  8 toggling a silver customer as bo answers 200 and shows active true
+PASS  9 toggling them again answers 200 and shows active false
+PASS  10 reading the customer back shows their active field
+PASS  11 toggling the bronze customer as bo answers 200 and shows active true
+PASS  12 the bronze customer reads back active
+PASS  13 the list still answers 200 with both customers
+PASS  14 cy, an employee without the registrar role, is refused 403 forbidden
+PASS  15 no token is refused 401 anonymous
+PASS  16 an unknown id is refused 404 missing
+PASS  17 a third toggle activates the silver customer again
+PASS  18 the export carries the flag: the silver customer&#x27;s row ends in true
+== Verdict
+ACCEPTED  17 criteria pass
+</pre></div><div class="col"><h3>Claude Opus 5</h3><pre>== The tree at rest
+PASS  1 wilanis check passes
+PASS  2 every rehearsed branch settles
+INFO  3 the rehearsal says: Writes are for registrars  holds at 6 trigger(s)  (the rule held at 5 triggers before your change; this line is reported, not judged)
+PASS  4 the rule in a-customer-is-reachable states what it stated
+PASS  5 the access rule still requires the same policy
+== The tree serving
+PASS  6 the tree starts and listens
+PASS  7 two customers registered as bo, one silver and one bronze
+== The endpoint
+PASS  8 toggling a silver customer as bo answers 200 and shows active true
+PASS  9 toggling them again answers 200 and shows active false
+PASS  10 reading the customer back shows their active field
+PASS  11 toggling the bronze customer as bo answers 200 and shows active true
+PASS  12 the bronze customer reads back active
+PASS  13 the list still answers 200 with both customers
+PASS  14 cy, an employee without the registrar role, is refused 403 forbidden
+PASS  15 no token is refused 401 anonymous
+PASS  16 an unknown id is refused 404 missing
+PASS  17 a third toggle activates the silver customer again
+PASS  18 the export carries the flag: the silver customer&#x27;s row ends in true
+== Verdict
+ACCEPTED  17 criteria pass
+</pre></div></div>
+<h2>The same nine curls against each result, beside the gate</h2>
+<p>Run by the reviewer after each agent had stopped, against a fresh start of each tree: sign in as bo and cy, wait for the reload the sign-in causes (#490), register one silver and one bronze customer as bo, then the same nine calls in the same order with the same bodies. Tokens are masked in the commands shown. A tree that does not check does not start, so every curl below then answers [000].</p>
+<div class="cols" style="--n:3"><div class="col"><h3>Claude Haiku 4.5</h3><pre>## git churn
+ 6 files changed, 26 insertions(+), 7 deletions(-)
+ M features/customers/data/customers-postgres.binding.json
+ M features/customers/data/customers-rest.binding.json
+ M features/customers/data/customers-store.binding.json
+ M features/customers/domain/Customer.shape.json
+ M features/customers/domain/customer.port.json
+ M features/customers/domain/writes-are-for-registrars.invariant.json
+?? features/customers/data/kept-toggle-postgres.graph.json
+?? features/customers/data/kept-toggle.graph.json
+?? features/customers/data/rest-toggle.graph.json
+?? features/customers/edge/toggle-customer.trigger.json
+## check
+ok: 198 documents
+## rehearse (tail)
+every branch settled -- 57 branch(es), 26 decision(s), 17 graph(s).
+3 invariant(s) declared:
+  A customer is reachable  proved at 0 site(s), guarded at 18
+  Writes are for registrars  holds at 6 trigger(s)
+  The session is the caller&#x27;s  holds at 3 trigger(s)
+&quot;refused on purpose&quot; is a refuse node the graph declares: a designed outcome with a reason the trigger maps, not a fault. Effects are stubbed, so no request left this process.
+## the new route in map
+@features/customers/edge/toggle-customer.trigger.json  (@http/http.trigger-kind.json)
+  gated by @features/access/edge/employees-only.policy.json → @access/domain/access.port.json#requireEmployee  given token
+  gated by @features/access/edge/can-register.policy.json → @access/domain/access.port.json#requireRegistrar
+  holds  @features/customers/domain/writes-are-for-registrars.invariant.json  through @features/access/edge/can-register.policy.json
+  @customers/domain/customer.port.json#toggle
+    @features/customers/data/kept-toggle.graph.json
+      asked @storage/store.port.json#get  (effect) → store @features/customers/data/customers.store.json customers (get)
+      checkExists [switch → checkActive | missing]
+      checkActive [switch → deactivate | activate]
+      activate @storage/store.port.json#patch  (effect) → store @features/customers/data/customers.store.json customers (patch)
+      checkActivate [switch → activateResult | failActivate]
+      activateResult @std/object.port.json#make
+      deactivate @storage/store.port.json#patch  (effect) → store @features/customers/data/customers.store.json customers (patch)
+      checkDeactivate [switch → deactivateResult | failDeactivate]
+      deactivateResult @std/object.port.json#make
+--
+unreached under local  @features/customers/data/kept-toggle-postgres.graph.json  bound by @features/customers/data/customers-postgres.binding.json
+unreached under local  @features/customers/data/kept-update-postgres.graph.json  bound by @features/customers/data/customers-postgres.binding.json
+unreached under local  @features/customers/data/rest-toggle.graph.json  bound by @features/customers/data/customers-rest.binding.json
+unreached under local  @features/customers/data/update-row.graph.json  bound by @features/customers/data/customers-rest.binding.json
+## start
+startup 1/8 Prepare the customer store: ok
+startup 2/8 Make the customers whole: ok
+startup 3/8 Reach the customer store: ok
+startup 4/8 Reach the guard&#x27;s memory: ok
+startup 5/8 Watch for changes: ok
+startup 6/8 Keep the schedule: ok
+startup 7/8 Export traces: ok
+http: listening on :8111 -- DELETE /customers/{id} → @customers/domain/customer.port.json#remove, DELETE /customers → @customers/domain/cust
+startup 8/8 Listen: ok
+## reload lines so far
+reload: watching /Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku -- an edit is served once it passes wilanis check
+registered silver customer 9b23bef1-557d-40dc-9db5-af374c763563 and bronze customer 4a624ab3-ac07-4a39-b2d4-db988c769a8d as bo
+### 1 toggle a silver customer as bo (expect active true)
+$ curl -X POST http://localhost:8111/customers/9b23bef1-557d-40dc-9db5-af374c763563/active -H authorization: Bearer $BO
+{&quot;id&quot;:&quot;9b23bef1-557d-40dc-9db5-af374c763563&quot;,&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:true}  [200]
+### 2 toggle them again as bo (expect active false)
+$ curl -X POST http://localhost:8111/customers/9b23bef1-557d-40dc-9db5-af374c763563/active -H authorization: Bearer $BO
+{&quot;id&quot;:&quot;9b23bef1-557d-40dc-9db5-af374c763563&quot;,&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:false}  [200]
+### 3 read it back
+$ curl http://localhost:8111/customers/9b23bef1-557d-40dc-9db5-af374c763563
+{&quot;id&quot;:&quot;9b23bef1-557d-40dc-9db5-af374c763563&quot;,&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:false}  [200]
+### 4 toggle a bronze customer as bo
+$ curl -X POST http://localhost:8111/customers/4a624ab3-ac07-4a39-b2d4-db988c769a8d/active -H authorization: Bearer $BO
+{&quot;id&quot;:&quot;4a624ab3-ac07-4a39-b2d4-db988c769a8d&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;bronze&quot;,&quot;active&quot;:true}  [200]
+### 5 read the bronze customer back (was anything written?)
+$ curl http://localhost:8111/customers/4a624ab3-ac07-4a39-b2d4-db988c769a8d
+{&quot;id&quot;:&quot;4a624ab3-ac07-4a39-b2d4-db988c769a8d&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;bronze&quot;,&quot;active&quot;:true}  [200]
+### 6 toggle as cy, a viewer without the registrar role
+$ curl -X POST http://localhost:8111/customers/9b23bef1-557d-40dc-9db5-af374c763563/active -H authorization: Bearer $CY
+{&quot;reason&quot;:&quot;forbidden&quot;,&quot;message&quot;:&quot;registering customers takes the registrar role&quot;}  [403]
+### 7 toggle with no token
+$ curl -X POST http://localhost:8111/customers/9b23bef1-557d-40dc-9db5-af374c763563/active
+{&quot;reason&quot;:&quot;anonymous&quot;,&quot;message&quot;:&quot;sign in first: no token was presented&quot;}  [401]
+### 8 toggle a customer that does not exist
+$ curl -X POST http://localhost:8111/customers/nope/active -H authorization: Bearer $BO
+{&quot;reason&quot;:&quot;missing&quot;,&quot;message&quot;:&quot;no customer nope&quot;}  [404]
+### 9 list: which customers are active now
+$ curl http://localhost:8111/customers
+[{&quot;id&quot;:&quot;9b23bef1-557d-40dc-9db5-af374c763563&quot;,&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:false},{&quot;id&quot;:&quot;4a624ab3-ac07-4a39-b2d4-db988c769a8d&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;bronze&quot;,&quot;active&quot;:true}]  [200]
+## log tail
+POST /api/v1/auth-employees → 200 (24ms, @access/domain/access.port.json#signInEmployee done)
+POST /customers → 201 (4ms, @customers/domain/customer.port.json#submit done)
+POST /customers → 201 (1ms, @customers/domain/customer.port.json#submit done)
+POST /customers/9b23bef1-557d-40dc-9db5-af374c763563/active → 200 (1ms, @customers/domain/customer.port.json#toggle done)
+POST /customers/9b23bef1-557d-40dc-9db5-af374c763563/active → 200 (1ms, @customers/domain/customer.port.json#toggle done)
+GET /customers/9b23bef1-557d-40dc-9db5-af374c763563 → 200 (1ms, @customers/domain/customer.port.json#get done)
+POST /customers/4a624ab3-ac07-4a39-b2d4-db988c769a8d/active → 200 (1ms, @customers/domain/customer.port.json#toggle done)
+GET /customers/4a624ab3-ac07-4a39-b2d4-db988c769a8d → 200 (0ms, @customers/domain/customer.port.json#get done)
+POST /customers/9b23bef1-557d-40dc-9db5-af374c763563/active → 403 (1ms, @customers/domain/customer.port.json#toggle failed)
+POST /customers/9b23bef1-557d-40dc-9db5-af374c763563/active → 401 (1ms, @customers/domain/customer.port.json#toggle failed)
+POST /customers/nope/active → 404 (1ms, @customers/domain/customer.port.json#toggle failed)
+GET /customers → 200 (2ms, @customers/domain/customer.port.json#list done)
+## invariant files touched?
+features/customers/domain/writes-are-for-registrars.invariant.json
+</pre></div><div class="col"><h3>Claude Sonnet 5</h3><pre>## git churn
+ 10 files changed, 640 insertions(+), 5 deletions(-)
+## check
+ok: 198 documents
+## rehearse (tail)
+every branch settled -- 57 branch(es), 26 decision(s), 17 graph(s).
+3 invariant(s) declared:
+  A customer is reachable  proved at 0 site(s), guarded at 18
+  Writes are for registrars  holds at 6 trigger(s)
+  The session is the caller&#x27;s  holds at 3 trigger(s)
+&quot;refused on purpose&quot; is a refuse node the graph declares: a designed outcome with a reason the trigger maps, not a fault. Effects are stubbed, so no request left this process.
+## the new route in map
+@features/customers/edge/toggle-active-customer.trigger.json  (@http/http.trigger-kind.json)
+  gated by @features/access/edge/employees-only.policy.json → @access/domain/access.port.json#requireEmployee  given token
+  gated by @features/access/edge/can-register.policy.json → @access/domain/access.port.json#requireRegistrar
+  holds  @features/customers/domain/writes-are-for-registrars.invariant.json  through @features/access/edge/can-register.policy.json
+  @customers/domain/customer.port.json#toggleActive
+    @features/customers/data/toggle-active-kept.graph.json
+      asked @storage/store.port.json#get  (effect) → store @features/customers/data/customers.store.json customers (get)
+      found [switch → wasSet | missing]
+      wasSet [switch → unset | set]
+      set @storage/store.port.json#patch  (effect) → store @features/customers/data/customers.store.json customers (patch)
+      unset @storage/store.port.json#patch  (effect) → store @features/customers/data/customers.store.json customers (patch)
+      setRoute [switch → setRow | vanishedOnSet]
+--
+unreached under local  @features/customers/data/toggle-active-kept-postgres.graph.json  bound by @features/customers/data/customers-postgres.binding.json
+unreached under local  @features/customers/data/toggle-active-row.graph.json  bound by @features/customers/data/customers-rest.binding.json
+unreached under local  @features/customers/data/update-row.graph.json  bound by @features/customers/data/customers-rest.binding.json
+## start
+startup 1/8 Prepare the customer store: ok
+startup 2/8 Make the customers whole: ok
+startup 3/8 Reach the customer store: ok
+startup 4/8 Reach the guard&#x27;s memory: ok
+startup 5/8 Watch for changes: ok
+startup 6/8 Keep the schedule: ok
+startup 7/8 Export traces: ok
+http: listening on :8112 -- DELETE /customers/{id} → @customers/domain/customer.port.json#remove, DELETE /customers → @customers/domain/cust
+startup 8/8 Listen: ok
+## reload lines so far
+reload: watching /Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/sonnet -- an edit is served once it passes wilanis check
+registered silver customer 117ad31a-6aa5-4124-be70-6feb3515c96d and bronze customer 42567c40-5a96-426e-9314-b5f6b4a84db9 as bo
+### 1 toggle a silver customer as bo (expect active true)
+$ curl -X POST http://localhost:8112/customers/117ad31a-6aa5-4124-be70-6feb3515c96d/active -H authorization: Bearer $BO
+{&quot;id&quot;:&quot;117ad31a-6aa5-4124-be70-6feb3515c96d&quot;,&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:true}  [200]
+### 2 toggle them again as bo (expect active false)
+$ curl -X POST http://localhost:8112/customers/117ad31a-6aa5-4124-be70-6feb3515c96d/active -H authorization: Bearer $BO
+{&quot;id&quot;:&quot;117ad31a-6aa5-4124-be70-6feb3515c96d&quot;,&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:false}  [200]
+### 3 read it back
+$ curl http://localhost:8112/customers/117ad31a-6aa5-4124-be70-6feb3515c96d
+{&quot;id&quot;:&quot;117ad31a-6aa5-4124-be70-6feb3515c96d&quot;,&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:false}  [200]
+### 4 toggle a bronze customer as bo
+$ curl -X POST http://localhost:8112/customers/42567c40-5a96-426e-9314-b5f6b4a84db9/active -H authorization: Bearer $BO
+{&quot;id&quot;:&quot;42567c40-5a96-426e-9314-b5f6b4a84db9&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;bronze&quot;,&quot;active&quot;:true}  [200]
+### 5 read the bronze customer back (was anything written?)
+$ curl http://localhost:8112/customers/42567c40-5a96-426e-9314-b5f6b4a84db9
+{&quot;id&quot;:&quot;42567c40-5a96-426e-9314-b5f6b4a84db9&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;bronze&quot;,&quot;active&quot;:true}  [200]
+### 6 toggle as cy, a viewer without the registrar role
+$ curl -X POST http://localhost:8112/customers/117ad31a-6aa5-4124-be70-6feb3515c96d/active -H authorization: Bearer $CY
+{&quot;reason&quot;:&quot;forbidden&quot;,&quot;message&quot;:&quot;registering customers takes the registrar role&quot;}  [403]
+### 7 toggle with no token
+$ curl -X POST http://localhost:8112/customers/117ad31a-6aa5-4124-be70-6feb3515c96d/active
+{&quot;reason&quot;:&quot;anonymous&quot;,&quot;message&quot;:&quot;sign in first: no token was presented&quot;}  [401]
+### 8 toggle a customer that does not exist
+$ curl -X POST http://localhost:8112/customers/nope/active -H authorization: Bearer $BO
+{&quot;reason&quot;:&quot;missing&quot;,&quot;message&quot;:&quot;no customer nope&quot;}  [404]
+### 9 list: which customers are active now
+$ curl http://localhost:8112/customers
+[{&quot;id&quot;:&quot;117ad31a-6aa5-4124-be70-6feb3515c96d&quot;,&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:false},{&quot;id&quot;:&quot;42567c40-5a96-426e-9314-b5f6b4a84db9&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;bronze&quot;,&quot;active&quot;:true}]  [200]
+## log tail
+POST /api/v1/auth-employees → 200 (23ms, @access/domain/access.port.json#signInEmployee done)
+POST /customers → 201 (3ms, @customers/domain/customer.port.json#submit done)
+POST /customers → 201 (2ms, @customers/domain/customer.port.json#submit done)
+POST /customers/117ad31a-6aa5-4124-be70-6feb3515c96d/active → 200 (1ms, @customers/domain/customer.port.json#toggleActive done)
+POST /customers/117ad31a-6aa5-4124-be70-6feb3515c96d/active → 200 (1ms, @customers/domain/customer.port.json#toggleActive done)
+GET /customers/117ad31a-6aa5-4124-be70-6feb3515c96d → 200 (1ms, @customers/domain/customer.port.json#get done)
+POST /customers/42567c40-5a96-426e-9314-b5f6b4a84db9/active → 200 (1ms, @customers/domain/customer.port.json#toggleActive done)
+GET /customers/42567c40-5a96-426e-9314-b5f6b4a84db9 → 200 (1ms, @customers/domain/customer.port.json#get done)
+POST /customers/117ad31a-6aa5-4124-be70-6feb3515c96d/active → 403 (1ms, @customers/domain/customer.port.json#toggleActive failed)
+POST /customers/117ad31a-6aa5-4124-be70-6feb3515c96d/active → 401 (1ms, @customers/domain/customer.port.json#toggleActive failed)
+POST /customers/nope/active → 404 (1ms, @customers/domain/customer.port.json#toggleActive failed)
+GET /customers → 200 (1ms, @customers/domain/customer.port.json#list done)
+## invariant files touched?
+features/customers/domain/writes-are-for-registrars.invariant.json
+</pre></div><div class="col"><h3>Claude Opus 5</h3><pre>## git churn
+ 12 files changed, 668 insertions(+), 13 deletions(-)
+## check
+ok: 198 documents
+## rehearse (tail)
+every branch settled -- 57 branch(es), 26 decision(s), 17 graph(s).
+3 invariant(s) declared:
+  A customer is reachable  proved at 0 site(s), guarded at 18
+  Writes are for registrars  holds at 6 trigger(s)
+  The session is the caller&#x27;s  holds at 3 trigger(s)
+&quot;refused on purpose&quot; is a refuse node the graph declares: a designed outcome with a reason the trigger maps, not a fault. Effects are stubbed, so no request left this process.
+## the new route in map
+@features/customers/edge/toggle-active.trigger.json  (@http/http.trigger-kind.json)
+  gated by @features/access/edge/employees-only.policy.json → @access/domain/access.port.json#requireEmployee  given token
+  gated by @features/access/edge/can-register.policy.json → @access/domain/access.port.json#requireRegistrar
+  holds  @features/customers/domain/writes-are-for-registrars.invariant.json  through @features/access/edge/can-register.policy.json
+  @customers/domain/customer.port.json#toggleActive
+    @features/customers/data/toggle-active.graph.json
+      asked @storage/store.port.json#get  (effect) → store @features/customers/data/customers.store.json customers (get)
+      found [switch → wasActive | missing]
+      wasActive [switch → close | open]
+      open @storage/store.port.json#patch  (effect) → store @features/customers/data/customers.store.json customers (patch)
+      close @storage/store.port.json#patch  (effect) → store @features/customers/data/customers.store.json customers (patch)
+      setRoute [switch → setRow | vanishedOnSet]
+      unsetRoute [switch → unsetRow | vanishedOnUnset]
+      setRow @std/object.port.json#make
+      unsetRow @std/object.port.json#make
+--
+unreached under local  @features/customers/data/toggle-active-postgres.graph.json  bound by @features/customers/data/customers-postgres.binding.json
+unreached under local  @features/customers/data/toggle-active-row.graph.json  bound by @features/customers/data/customers-rest.binding.json
+unreached under local  @features/customers/data/update-row.graph.json  bound by @features/customers/data/customers-rest.binding.json
+## start
+startup 1/8 Prepare the customer store: ok
+startup 2/8 Make the customers whole: ok
+startup 3/8 Reach the customer store: ok
+startup 4/8 Reach the guard&#x27;s memory: ok
+startup 5/8 Watch for changes: ok
+startup 6/8 Keep the schedule: ok
+startup 7/8 Export traces: ok
+http: listening on :8113 -- DELETE /customers/{id} → @customers/domain/customer.port.json#remove, DELETE /customers → @customers/domain/cust
+startup 8/8 Listen: ok
+## reload lines so far
+reload: watching /Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/opus -- an edit is served once it passes wilanis check
+registered silver customer 4302c704-9604-46a6-b945-4d435600fafe and bronze customer f65b1a2a-3359-4911-ba79-0bbf41bf30ff as bo
+### 1 toggle a silver customer as bo (expect active true)
+$ curl -X POST http://localhost:8113/customers/4302c704-9604-46a6-b945-4d435600fafe/active -H authorization: Bearer $BO
+{&quot;id&quot;:&quot;4302c704-9604-46a6-b945-4d435600fafe&quot;,&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:true}  [200]
+### 2 toggle them again as bo (expect active false)
+$ curl -X POST http://localhost:8113/customers/4302c704-9604-46a6-b945-4d435600fafe/active -H authorization: Bearer $BO
+{&quot;id&quot;:&quot;4302c704-9604-46a6-b945-4d435600fafe&quot;,&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:false}  [200]
+### 3 read it back
+$ curl http://localhost:8113/customers/4302c704-9604-46a6-b945-4d435600fafe
+{&quot;id&quot;:&quot;4302c704-9604-46a6-b945-4d435600fafe&quot;,&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:false}  [200]
+### 4 toggle a bronze customer as bo
+$ curl -X POST http://localhost:8113/customers/f65b1a2a-3359-4911-ba79-0bbf41bf30ff/active -H authorization: Bearer $BO
+{&quot;id&quot;:&quot;f65b1a2a-3359-4911-ba79-0bbf41bf30ff&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;bronze&quot;,&quot;active&quot;:true}  [200]
+### 5 read the bronze customer back (was anything written?)
+$ curl http://localhost:8113/customers/f65b1a2a-3359-4911-ba79-0bbf41bf30ff
+{&quot;id&quot;:&quot;f65b1a2a-3359-4911-ba79-0bbf41bf30ff&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;bronze&quot;,&quot;active&quot;:true}  [200]
+### 6 toggle as cy, a viewer without the registrar role
+$ curl -X POST http://localhost:8113/customers/4302c704-9604-46a6-b945-4d435600fafe/active -H authorization: Bearer $CY
+{&quot;reason&quot;:&quot;forbidden&quot;,&quot;message&quot;:&quot;registering customers takes the registrar role&quot;}  [403]
+### 7 toggle with no token
+$ curl -X POST http://localhost:8113/customers/4302c704-9604-46a6-b945-4d435600fafe/active
+{&quot;reason&quot;:&quot;anonymous&quot;,&quot;message&quot;:&quot;sign in first: no token was presented&quot;}  [401]
+### 8 toggle a customer that does not exist
+$ curl -X POST http://localhost:8113/customers/nope/active -H authorization: Bearer $BO
+{&quot;reason&quot;:&quot;missing&quot;,&quot;message&quot;:&quot;no customer nope&quot;}  [404]
+### 9 list: which customers are active now
+$ curl http://localhost:8113/customers
+[{&quot;id&quot;:&quot;4302c704-9604-46a6-b945-4d435600fafe&quot;,&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:false},{&quot;id&quot;:&quot;f65b1a2a-3359-4911-ba79-0bbf41bf30ff&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;bronze&quot;,&quot;active&quot;:true}]  [200]
+## log tail
+POST /api/v1/auth-employees → 200 (23ms, @access/domain/access.port.json#signInEmployee done)
+POST /customers → 201 (3ms, @customers/domain/customer.port.json#submit done)
+POST /customers → 201 (1ms, @customers/domain/customer.port.json#submit done)
+POST /customers/4302c704-9604-46a6-b945-4d435600fafe/active → 200 (1ms, @customers/domain/customer.port.json#toggleActive done)
+POST /customers/4302c704-9604-46a6-b945-4d435600fafe/active → 200 (2ms, @customers/domain/customer.port.json#toggleActive done)
+GET /customers/4302c704-9604-46a6-b945-4d435600fafe → 200 (1ms, @customers/domain/customer.port.json#get done)
+POST /customers/f65b1a2a-3359-4911-ba79-0bbf41bf30ff/active → 200 (1ms, @customers/domain/customer.port.json#toggleActive done)
+GET /customers/f65b1a2a-3359-4911-ba79-0bbf41bf30ff → 200 (0ms, @customers/domain/customer.port.json#get done)
+POST /customers/4302c704-9604-46a6-b945-4d435600fafe/active → 403 (1ms, @customers/domain/customer.port.json#toggleActive failed)
+POST /customers/4302c704-9604-46a6-b945-4d435600fafe/active → 401 (0ms, @customers/domain/customer.port.json#toggleActive failed)
+POST /customers/nope/active → 404 (1ms, @customers/domain/customer.port.json#toggleActive failed)
+GET /customers → 200 (2ms, @customers/domain/customer.port.json#list done)
+## invariant files touched?
+features/customers/domain/writes-are-for-registrars.invariant.json
+</pre></div></div>
+<h2>What each did, call by call</h2>
+<p>Every tool call in order, the agent's own words between them, and each check that refused, expandable. Nothing is edited; long outputs are cut at 1200 characters.</p>
+<div class="cols" style="--n:3"><div class="col"><h3>Claude Haiku 4.5</h3><div class="timeline"><div class="say">I&#x27;ll start by reading the acceptance test to understand the exact requirements.</div>
+<div class="call"><span class="n">1</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/accept.sh</code></div>
+<div class="say">Now let me read the README to understand the project structure.</div>
+<div class="call"><span class="n">2</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/README.md</code></div>
+<div class="say">Let me examine the Customer shape and related domain files.</div>
+<div class="call"><span class="n">3</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain</code></div>
+<div class="call"><span class="n">4</span> <span class="tool">Bash</span> <code>find /Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain -type f | head -20</code></div>
+<div class="call"><span class="n">5</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/Customer.shape.json</code></div>
+<div class="call"><span class="n">6</span> <span class="tool">Bash</span> <code>find /Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/edge -type f | sort</code></div>
+<div class="call"><span class="n">7</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/edge/update-customer.trigger.json</code></div>
+<div class="call"><span class="n">8</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/edge/delete-customer.trigger.json</code></div>
+<div class="call"><span class="n">9</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/edge/IdRequest.shape.json</code></div>
+<div class="call"><span class="n">10</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/edge/CustomerView.shape.json</code></div>
+<div class="call"><span class="n">11</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/customer.port.json</code></div>
+<div class="call"><span class="n">12</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/customer.port.json</code></div>
+<div class="call"><span class="n">13</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/register-customer.graph.json</code></div>
+<div class="call"><span class="n">14</span> <span class="tool">Bash</span> <code>find /Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data -type f | sort</code></div>
+<div class="call"><span class="n">15</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/customers-store.binding.json</code></div>
+<div class="call"><span class="n">16</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-update.graph.json</code></div>
+<div class="call"><span class="n">17</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/CustomerUpdate.shape.json</code></div>
+<div class="call"><span class="n">18</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/demo/arena/.runs/haiku/features/customers/domain/export-customers.graph.json</code></div>
+<div class="call"><span class="n">19</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/export-customers.graph.json</code></div>
+<div class="call"><span class="n">20</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/write-csv.graph.json</code></div>
+<div class="say">Now I&#x27;ll implement the toggle functionality. Let me start by adding the `toggle` operation to the customer port.</div>
+<div class="call"><span class="n">21</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/customer.port.json</code></div>
+<div class="say">Now I&#x27;ll create the domain graph for toggling a customer&#x27;s active status.</div>
+<div class="call"><span class="n">22</span> <span class="tool">Write</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/toggle-customer.graph.json</code></div>
+<div class="say">Let me fix the domain graph - it should be simpler and call the toggle operation directly:</div>
+<div class="call"><span class="n">23</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/toggle-customer.graph.json</code></div>
+<div class="say">Now I&#x27;ll create the HTTP trigger for the toggle endpoint:</div>
+<div class="call"><span class="n">24</span> <span class="tool">Write</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/edge/toggle-customer.trigger.json</code></div>
+<div class="call"><span class="n">25</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-get.graph.json</code></div>
+<div class="say">Now I&#x27;ll create the data layer graphs for toggling. Let me start with the store version:</div>
+<div class="call"><span class="n">26</span> <span class="tool">Write</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle.graph.json</code></div>
+<div class="call"><span class="n">27</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/CustomerRef.shape.json</code></div>
+<div class="call"><span class="n">28</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/customers-rest.binding.json</code></div>
+<div class="call"><span class="n">29</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/update-row.graph.json</code></div>
+<div class="call"><span class="n">30</span> <span class="tool">Write</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/rest-toggle.graph.json</code></div>
+<div class="call"><span class="n">31</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-update-postgres.graph.json</code></div>
+<div class="call"><span class="n">32</span> <span class="tool">Write</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle-postgres.graph.json</code></div>
+<div class="call"><span class="n">33</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/customers-store.binding.json</code></div>
+<div class="call"><span class="n">34</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/customers-rest.binding.json</code></div>
+<div class="call"><span class="n">35</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/customers-postgres.binding.json</code></div>
+<div class="call"><span class="n">36</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/customers-postgres.binding.json</code></div>
+<div class="call"><span class="n">37</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/writes-are-for-registrars.invariant.json</code></div>
+<div class="call"><span class="n">38</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/writes-are-for-registrars.invariant.json</code></div>
+<div class="call"><span class="n">39</span> <span class="tool">Bash</span> <code>npm run check 2&gt;&amp;1 | tail -20</code></div>
+<details class="refused"><summary>↳ 6 refusal line(s): L007 L001 R001 T006 X211 X211</summary><pre><b>L007</b>  @features/customers/domain/toggle-customer.graph.json
+    graph only forwards its input to &#x27;@customers/domain/customer.port.json#toggle&#x27;
+    → it adds no rule of its own; fire @customers/domain/customer.port.json#toggle from the trigger and delete this graph
+<b>L001</b>  @features/customers/domain/toggle-customer.graph.json#in
+    in names edge shape &#x27;@customers/edge/IdRequest.shape.json&#x27; from the core layer
+    → core speaks core shapes; a trigger or binding translates edge to core
+<b>R001</b>  @features/customers/data/customers-rest.binding.json#operations/toggle/graph
+    unknown graph &#x27;@customers/data/rest-toggle.graph.json&#x27;
+    → wilanis ls graph
+<b>T006</b>  @features/customers/edge/toggle-customer.trigger.json#settings/response/refusals/upstream
+    settings.response.refusals maps reason &#x27;upstream&#x27;, but nothing this trigger fires, gates on or identifies with refuses with it
+    → remove it, or spell the reason the way the graph does
+<b>X211</b>  @features/customers/data/kept-toggle-postgres.graph.json#nodes/patch/in/changes/active
+    where a patch changes &#x27;active&#x27;, active: expected boolean
+    → active is boolean
+<b>X211</b>  @features/customers/data/kept-toggle.graph.json#nodes/patch/in/changes/active …</pre></details>
+<div class="say">Let me fix these issues. First, I&#x27;ll update the trigger to fire the port operation directly without the domain graph:</div>
+<div class="call"><span class="n">40</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/edge/toggle-customer.trigger.json</code></div>
+<div class="call"><span class="n">41</span> <span class="tool">Bash</span> <code>ls -la /Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/*toggle* 2&gt;&amp;1</code></div>
+<div class="call"><span class="n">42</span> <span class="tool">Bash</span> <code>rm /Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/toggle-customer.graph.json</code></div>
+<div class="say">Let me fix the boolean type issues in the toggle graphs. I&#x27;ll refactor them to use switches to compute the toggled value:</div>
+<div class="call"><span class="n">43</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle.graph.json</code></div>
+<div class="say">Let me simplify the toggle graph - both patches should run and I&#x27;ll pick one at the output:</div>
+<div class="call"><span class="n">44</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle.graph.json</code></div>
+<div class="call"><span class="n">45</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle-postgres.graph.json</code></div>
+<div class="call"><span class="n">46</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/rest-toggle.graph.json</code></div>
+<div class="call"><span class="n">47</span> <span class="tool">Bash</span> <code>npm run check 2&gt;&amp;1 | tail -30</code></div>
+<details class="refused"><summary>↳ 9 refusal line(s): D001 D001 D001 D001 R001 R001 R001 T006 T006</summary><pre>→ see https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json
+<b>D001</b>  features/customers/data/rest-toggle.graph.json#nodes/check-deactivate/id
+    must match &quot;^[a-z][A-Za-z0-9_]*$&quot; -- A field, input, operation, resolver or node identifier.
+    → see https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json
+<b>D001</b>  features/customers/data/rest-toggle.graph.json#nodes/check-deactivate/rules/0/to
+    must match &quot;^[a-z][A-Za-z0-9_]*$&quot; -- A field, input, operation, resolver or node identifier.
+    → see https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json
+<b>D001</b>  features/customers/data/rest-toggle.graph.json#nodes/activate-ok/id
+    must match &quot;^[a-z][A-Za-z0-9_]*$&quot; -- A field, input, operation, resolver or node identifier.
+    → see https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json
+<b>D001</b>  features/customers/data/rest-toggle.graph.json#nodes/deactivate-ok/id
+    must match &quot;^[a-z][A-Za-z0-9_]*$&quot; -- A field, input, operation, resolver or node identifier.
+    → see https://raw.githubusercontent.com/wilanis/wilanis-js/main/ …</pre></details>
+<div class="say">Let me fix the node ID naming issues (hyphens not allowed in IDs):</div>
+<div class="call"><span class="n">48</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle.graph.json</code></div>
+<div class="call"><span class="n">49</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle-postgres.graph.json</code></div>
+<div class="call"><span class="n">50</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/rest-toggle.graph.json</code></div>
+<div class="call"><span class="n">51</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/rest-toggle.graph.json</code></div>
+<div class="call"><span class="n">52</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/rest-toggle.graph.json</code></div>
+<div class="say">Let me build the project to compile the JSON files:</div>
+<div class="call"><span class="n">53</span> <span class="tool">Bash</span> <code>npm run build 2&gt;&amp;1 | grep -E &quot;(tsc|error)&quot; | head -20</code></div>
+<div class="call"><span class="n">54</span> <span class="tool">Bash</span> <code>npm run 2&gt;&amp;1 | grep -E &quot;^\s+(check|rehearse|start)&quot;</code></div>
+<div class="call"><span class="n">55</span> <span class="tool">Bash</span> <code>npm run check 2&gt;&amp;1 | grep -A 1 &quot;refusal&quot;</code></div>
+<details class="refused"><summary>↳ 2 refusal line(s): T005 T006</summary><pre><b>T005</b>  @features/customers/edge/toggle-customer.trigger.json#settings/response/refusals
+    @features/customers/data/rest-toggle.graph.json may refuse with reason &#x27;upstream&#x27;, which settings.response.refusals does not map
+    → add &quot;upstream&quot; under settings.response.refusals: how this trigger answers that outcome
+<b>T006</b>  @features/customers/edge/toggle-customer.trigger.json#settings/response/refusals/invariant
+    settings.response.refusals maps reason &#x27;invariant&#x27;, but nothing this trigger fires, gates on or identifies with refuses with it
+    → remove it, or spell the reason the way the graph does
+--
+12 refusal(s)</pre></details>
+<div class="call"><span class="n">56</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/edge/update-customer.trigger.json</code></div>
+<div class="call"><span class="n">57</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/a-customer-is-reachable.invariant.json</code></div>
+<div class="call"><span class="n">58</span> <span class="tool">Bash</span> <code>grep -l &quot;invariant&quot; /Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/*.graph.json</code></div>
+<div class="call"><span class="n">59</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/edge/toggle-customer.trigger.json</code></div>
+<div class="call"><span class="n">60</span> <span class="tool">Bash</span> <code>npm run check 2&gt;&amp;1 | tail -5</code></div>
+<details class="refused"><summary>↳ 1 refusal line(s): G009</summary><pre><b>G009</b>  @features/customers/data/rest-toggle.graph.json#nodes/checkDeactivate
+    node &#x27;failed&#x27; is routed by both &#x27;checkActivate&#x27; and &#x27;checkDeactivate&#x27;
+    → a node has one router
+
+10 refusal(s)</pre></details>
+<div class="call"><span class="n">61</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/rest-toggle.graph.json</code></div>
+<div class="call"><span class="n">62</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/rest-toggle.graph.json</code></div>
+<div class="call"><span class="n">63</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/rest-toggle.graph.json</code></div>
+<div class="call"><span class="n">64</span> <span class="tool">Bash</span> <code>npm run check 2&gt;&amp;1 | tail -10</code></div>
+<details class="refused"><summary>↳ 2 refusal line(s): G008 G009</summary><pre>node &#x27;activate&#x27; is read by nothing
+    → wire its result into another node, or name it in out.from
+<b>G008</b>  @features/customers/data/kept-toggle.graph.json#nodes/deactivate
+    node &#x27;deactivate&#x27; is read by nothing
+    → wire its result into another node, or name it in out.from
+<b>G009</b>  @features/customers/data/rest-toggle.graph.json#nodes/checkGet
+    routes to unknown node &#x27;failed&#x27;
+    → name a node declared under nodes, or add it
+
+9 refusal(s)</pre></details>
+<div class="call"><span class="n">65</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/rest-toggle.graph.json</code></div>
+<div class="call"><span class="n">66</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/rest-toggle.graph.json</code></div>
+<div class="call"><span class="n">67</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/rest-toggle.graph.json</code></div>
+<div class="say">Let me fix the kept-toggle graphs to handle dataflow correctly. Both activate and deactivate will run, but we use reconvergence to pick the right one:</div>
+<div class="call"><span class="n">68</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle.graph.json</code></div>
+<div class="call"><span class="n">69</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle-postgres.graph.json</code></div>
+<div class="say">Let me simplify by having the activate/deactivate operations directly produce the output, with proper typing:</div>
+<div class="call"><span class="n">70</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle.graph.json</code></div>
+<div class="call"><span class="n">71</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle-postgres.graph.json</code></div>
+<div class="call"><span class="n">72</span> <span class="tool">Bash</span> <code>npm run check 2&gt;&amp;1 | tail -5</code></div>
+<details class="refused"><summary>↳ 1 refusal line(s): T005</summary><pre><b>T005</b>  @features/customers/edge/toggle-customer.trigger.json#settings/response/refusals
+    @features/customers/data/kept-toggle.graph.json may refuse with reason &#x27;invariant&#x27;, which settings.response.refusals does not map
+    → add &quot;invariant&quot; under settings.response.refusals: how this trigger answers that outcome
+
+5 refusal(s)</pre></details>
+<div class="call"><span class="n">73</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/edge/toggle-customer.trigger.json</code></div>
+<div class="call"><span class="n">74</span> <span class="tool">Bash</span> <code>npm run check 2&gt;&amp;1 | tail -3</code></div>
+<div class="call"><span class="n">75</span> <span class="tool">Bash</span> <code>npm run check 2&gt;&amp;1 | grep -B 2 &quot;4 refusal&quot;</code></div>
+<div class="call"><span class="n">76</span> <span class="tool">Bash</span> <code>npm run check 2&gt;&amp;1 | grep -E &quot;^[A-Z][0-9]+&quot; | head -10</code></div>
+<details class="refused"><summary>↳ 4 refusal line(s): G004 G004 G004 G004</summary><pre><b>G004</b>  @features/customers/data/kept-toggle-postgres.graph.json#nodes/activateResult/in/value
+<b>G004</b>  @features/customers/data/kept-toggle-postgres.graph.json#nodes/deactivateResult/in/value
+<b>G004</b>  @features/customers/data/kept-toggle.graph.json#nodes/activateResult/in/value
+<b>G004</b>  @features/customers/data/kept-toggle.graph.json#nodes/deactivateResult/in/value</pre></details>
+<div class="call"><span class="n">77</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle.graph.json</code></div>
+<div class="call"><span class="n">78</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle.graph.json</code></div>
+<div class="call"><span class="n">79</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle.graph.json</code></div>
+<div class="call"><span class="n">80</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle-postgres.graph.json</code></div>
+<div class="call"><span class="n">81</span> <span class="tool">Bash</span> <code>npm run check 2&gt;&amp;1 | tail -3</code></div>
+<div class="call"><span class="n">82</span> <span class="tool">Bash</span> <code>npm run check 2&gt;&amp;1 | grep &quot;^G009&quot;</code></div>
+<details class="refused"><summary>↳ 4 refusal line(s): G009 G009 G009 G009</summary><pre><b>G009</b>  @features/customers/data/kept-toggle-postgres.graph.json#nodes/checkActivate
+<b>G009</b>  @features/customers/data/kept-toggle-postgres.graph.json#nodes/checkDeactivate
+<b>G009</b>  @features/customers/data/kept-toggle.graph.json#nodes/checkActivate
+<b>G009</b>  @features/customers/data/kept-toggle.graph.json#nodes/checkDeactivate</pre></details>
+<div class="say">Actually, let me simplify this by directly using the patch results without checks. Since patch always succeeds (it doesn&#x27;t refuse with any reason other than possibly a system error), I can just map the record directly:</div>
+<div class="call"><span class="n">83</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle.graph.json</code></div>
+<div class="call"><span class="n">84</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle.graph.json</code></div>
+<div class="call"><span class="n">85</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle.graph.json</code></div>
+<div class="call"><span class="n">86</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle.graph.json</code></div>
+<div class="call"><span class="n">87</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle.graph.json</code></div>
+<div class="call"><span class="n">88</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle-postgres.graph.json</code></div>
+<div class="call"><span class="n">89</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle-postgres.graph.json</code></div>
+<div class="call"><span class="n">90</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/data/kept-toggle-postgres.graph.json</code></div>
+<div class="call"><span class="n">91</span> <span class="tool">Bash</span> <code>npm run check 2&gt;&amp;1 | tail -3</code></div>
+<div class="call"><span class="n">92</span> <span class="tool">Bash</span> <code>npm run rehearse -- --profile local 2&gt;&amp;1 | tail -10</code></div>
+<div class="call"><span class="n">93</span> <span class="tool">Bash</span> <code>bash accept.sh POST &#x27;/customers/{id}/active&#x27; 2&gt;&amp;1</code></div>
+<div class="say">Looking at the test failure, the issue is that the CSV export includes all Customer fields including the optional `note` field which appears after `active`. The test expects the row to end with `true` (the active value), but we get `true,` (with a trailing comma for the empty note field).
+
+The solution is to reorder the Customer shape so that `active` comes after `note`. Let me fix that:</div>
+<div class="call"><span class="n">94</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/haiku/features/customers/domain/Customer.shape.json</code></div>
+<div class="call"><span class="n">95</span> <span class="tool">Bash</span> <code>npm run check 2&gt;&amp;1 | tail -1</code></div>
+<div class="call"><span class="n">96</span> <span class="tool">Bash</span> <code>bash accept.sh POST &#x27;/customers/{id}/active&#x27; 2&gt;&amp;1</code></div>
+<div class="say">Excellent! All acceptance tests pass. Let me create a summary of the work completed.
+
+## Summary
+
+I&#x27;ve successfully implemented the customer account toggle feature for the wilanis demo project. Here&#x27;s what was added:
+
+### Files Added or Modified
+
+**New Files Created:**
+1. `/features/customers/edge/toggle-customer.trigger.json` - HTTP POST trigger at `/customers/{id}/active`
+2. `/features/customers/data/kept-toggle.graph.json` - Data layer implementation for store binding
+3. `/features/customers/data/kept-toggle-postgres.graph.json` - Data layer implementation for postgres binding
+4. `/features/customers/data/rest-toggle.graph.json` - Data layer implementation for REST API binding
+
+**Modified Files:**
+1. `/features/customers/domain/customer.port.json` - Added `toggle` operation
+2. `/features/customers/domain/Customer.shape.json` - Reordered fields so `active` appears last (for CSV export)
+3. `/features/customers/domain/writes-are-for-registrars.invariant.json` - Added toggle to operations requiring registrar policy
+4. `/features/customers/data/customers-store.binding.json` - Added toggle operation binding
+5. `/features/customers/data/customers-rest.binding.json` - Added toggle operation binding
+6. `/features/customers/data/customers-postgres.binding.json` - Added toggle operation binding
+
+### Key Decisions
+
+1. **HTTP Method**: Chose POST rather than PATCH, as POST is more suitable for action endpoints that change state.
+
+2. **Operation Design**: Created a single `toggle` operation that only requires a customer ID. The operation intelligently determines the new state (absent/false → true, true → false) at the data layer.
+
+3. **Field Ordering**: Reordered the Customer shape to place `active` as the last field, ensuring CSV exports end with the active flag value for proper test validation.
+
+4. **Error Handling**: The endpoint maps all relevant refusals:
+   - 404 for missing customers
+   - 401 for anonymous callers
+   - 403 for forbidden (non-registrar employees)
+   - 502 for upstream API failures (REST profile)
+   - 500 for invariant violations
+
+5. **Access Control**: Toggle requires the same registrar policy (`can-register`) as other write operations, enforced through the `writes-are-for-registrars` invariant.
+
+### Test Results
+
+All 17 acceptance criteria pass:
+- Criteria 1-5: Schema/compiler checks pass
+- Criterion 6: Server starts and listens
+- Criterion 7: Test customers register successfully
+- Criteria 8-13: Toggle endpoint works, toggling switches active between true/false, read-back confirms state, list still works
+- Criteria 14-16: Access control enforced (non-registrar refused 403, no token refused 401, missing customer 404)
+- Criterion 17: Multiple toggles work correctly
+- Criterion 18: CSV export includes active field properly</div></div></div><div class="col"><h3>Claude Sonnet 5</h3><div class="timeline"><div class="call"><span class="n">1</span> <span class="tool">Bash</span> <code>cat README.md &amp;&amp; echo ---ACCEPT--- &amp;&amp; cat accept.sh</code></div>
+<div class="call"><span class="n">2</span> <span class="tool">Read</span> <code>/Users/rfontes/.claude/projects/-Users-rfontes-dev-wilanis-js-docs-demo-arena--runs-sonnet/00346a47-cc51-4ffd-a614-e5a5f2c10fee/tool-results/b02jr7v6r.txt</code></div>
+<div class="call"><span class="n">3</span> <span class="tool">Bash</span> <code>find features/customers -type f | sort</code></div>
+<div class="call"><span class="n">4</span> <span class="tool">Bash</span> <code>for f in features/customers/edge/update-customer.trigger.json features/customers/edge/UpdateRequest.shape.json features/customers/edge/UpdateBody.shape.json features/customers/domain/Customer.shape.json features/customers/domain/CustomerUpdate.shape.json; do echo &quot;== $f ==&quot;; cat &quot;$f&quot;; echo; done</code></div>
+<div class="call"><span class="n">5</span> <span class="tool">Bash</span> <code>for f in features/customers/edge/CustomerView.shape.json features/customers/edge/get-customer.trigger.json features/customers/edge/IdRequest.shape.json features/customers/data/customers-store.binding.json; do echo &quot;== $f ==&quot;; cat &quot;$f&quot;; echo; done</code></div>
+<div class="call"><span class="n">6</span> <span class="tool">Bash</span> <code>for f in features/customers/data/kept-update.graph.json features/customers/data/kept-get.graph.json features/customers/data/update-row.graph.json features/customers/data/get-row.graph.json; do echo &quot;== $f ==&quot;; cat &quot;$f&quot;; echo; done</code></div>
+<div class="call"><span class="n">7</span> <span class="tool">Bash</span> <code>cat features/customers/data/customers-rest.binding.json</code></div>
+<div class="call"><span class="n">8</span> <span class="tool">Skill</span> <code>{&quot;skill&quot;: &quot;wilanis-graphs&quot;}</code></div>
+<div class="call"><span class="n">9</span> <span class="tool">Bash</span> <code>cat features/customers/data/customers-postgres.binding.json &amp;&amp; echo ---STORE--- &amp;&amp; cat features/customers/data/customers-postgres.store.json &amp;&amp; echo ---KEPTUPDATEPG--- &amp;&amp; cat features/customers/data/kept-update-postgres.graph.json &amp;&amp; echo ---STORELOCAL--- &amp;&amp; cat features/customers/data/customers.sto</code></div>
+<div class="call"><span class="n">10</span> <span class="tool">Bash</span> <code>cat features/customers/edge/CustomerRow.shape.json &amp;&amp; echo ---CREATEROW--- &amp;&amp; cat features/customers/data/create-row.graph.json &amp;&amp; echo ---CustomerRef--- &amp;&amp; cat features/customers/domain/CustomerRef.shape.json</code></div>
+<div class="call"><span class="n">11</span> <span class="tool">Bash</span> <code>cat features/customers/domain/writes-are-for-registrars.invariant.json &amp;&amp; echo ---ACR--- &amp;&amp; cat features/customers/domain/a-customer-is-reachable.invariant.json</code></div>
+<div class="call"><span class="n">12</span> <span class="tool">Bash</span> <code>find . -path ./node_modules -prune -o -name &#x27;http.port.json&#x27; -print 2&gt;/dev/null; find node_modules/@wilanis/plugin-http -name &#x27;http.port.json&#x27; | xargs cat</code></div>
+<div class="call"><span class="n">13</span> <span class="tool">Bash</span> <code>find node_modules/@wilanis/plugin-http -iname &#x27;*.json&#x27; | head -30 &amp;&amp; echo --- &amp;&amp; npx wilanis describe @http/http.port.json . 2&gt;&amp;1 | head -80</code></div>
+<div class="call"><span class="n">14</span> <span class="tool">Bash</span> <code>cat features/customers/edge/delete-customer.trigger.json</code></div>
+<div class="call"><span class="n">15</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/sonnet/features/customers/domain/customer.port.json</code></div>
+<div class="say">Now let&#x27;s add the `toggleActive` operation to the port.</div>
+<div class="call"><span class="n">16</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/sonnet/features/customers/domain/customer.port.json</code></div>
+<div class="say">Now the local store graph, following the skill&#x27;s read-decide-write shape exactly:</div>
+<div class="call"><span class="n">17</span> <span class="tool">Write</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/sonnet/features/customers/data/toggle-active-kept.graph.json</code></div>
+<div class="say">Now the postgres analog:</div>
+<div class="call"><span class="n">18</span> <span class="tool">Bash</span> <code>sed \
+  -e &#x27;s#&quot;customers.store.json#&quot;customers-postgres.store.json#g&#x27; \
+  -e &#x27;s#under the local profile: read the record#behind the same operation as @customers/data/toggle-active-kept.graph.json, against the store kept in PostgreSQL: read the record#&#x27; \
+  features/customers/data/toggle-active-kept.</code></div>
+<div class="call"><span class="n">19</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/sonnet/features/customers/data/toggle-active-kept-postgres.graph.json</code></div>
+<div class="call"><span class="n">20</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/sonnet/features/customers/data/toggle-active-kept-postgres.graph.json</code></div>
+<div class="say">Now the REST (live) graph, over `http.port.json#request` with a GET then PUT:</div>
+<div class="call"><span class="n">21</span> <span class="tool">Write</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/sonnet/features/customers/data/toggle-active-row.graph.json</code></div>
+<div class="say">Now wire it into the three bindings:</div>
+<div class="call"><span class="n">22</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/sonnet/features/customers/data/customers-store.binding.json</code></div>
+<div class="call"><span class="n">23</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/sonnet/features/customers/data/customers-postgres.binding.json</code></div>
+<div class="call"><span class="n">24</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/sonnet/features/customers/data/customers-rest.binding.json</code></div>
+<div class="say">Now the trigger, and add the operation to the access invariant:</div>
+<div class="call"><span class="n">25</span> <span class="tool">Write</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/sonnet/features/customers/edge/toggle-active-customer.trigger.json</code></div>
+<div class="call"><span class="n">26</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/sonnet/features/customers/domain/writes-are-for-registrars.invariant.json</code></div>
+<div class="call"><span class="n">27</span> <span class="tool">Bash</span> <code>cat features/customers/data/write-csv.graph.json</code></div>
+<div class="call"><span class="n">28</span> <span class="tool">Bash</span> <code>npm run check 2&gt;&amp;1 | tail -60</code></div>
+<div class="say">Check passes. Now the rehearsal:</div>
+<div class="call"><span class="n">29</span> <span class="tool">Bash</span> <code>npm run rehearse -- --profile local 2&gt;&amp;1 | tail -80</code></div>
+<div class="say">Every branch settled, and &quot;Writes are for registrars&quot; holds at 6 triggers now (was 5 before). Let&#x27;s run the acceptance gate.</div>
+<div class="call"><span class="n">30</span> <span class="tool">Bash</span> <code>bash accept.sh POST &#x27;/customers/{id}/active&#x27; 2&gt;&amp;1 | tail -40</code></div>
+<div class="call"><span class="n">31</span> <span class="tool">Bash</span> <code>git log --oneline -- features/customers/domain/Customer.shape.json &amp;&amp; git diff --stat</code></div>
+<div class="call"><span class="n">32</span> <span class="tool">Read</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/sonnet/features/customers/domain/Customer.shape.json</code></div>
+<div class="say">This is a CSV column-order issue: the CSV writer emits fields in declaration order, and `note` (an empty trailing column for non-gold customers) sits after `active`. I&#x27;ll move `active` to be the last field so its value is what an exported row ends with.</div>
+<div class="call"><span class="n">33</span> <span class="tool">Edit</span> <code>/Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/sonnet/features/customers/domain/Customer.shape.json</code></div>
+<div class="say">Let&#x27;s re-verify check/rehearse still pass and rerun the gate.</div>
+<div class="call"><span class="n">34</span> <span class="tool">Bash</span> <code>npm run check 2&gt;&amp;1 | tail -10 &amp;&amp; bash accept.sh POST &#x27;/customers/{id}/active&#x27; 2&gt;&amp;1 | tail -25</code></div>
+<div class="say">All 17 criteria pass, ACCEPTED. Now let&#x27;s do my own manual curl validation against a fresh server start, per the task instructions, including edge cases beyond what accept.sh checks (e.g. re-toggling repeatedly, the `live`/rest binding isn&#x27;t runnable here since it&#x27;s a live profile, but I can at least confirm local behavior thoroughly and check `npx wilanis describe` on the new port operation).</div>
+<div class="call"><span class="n">35</span> <span class="tool">Bash</span> <code>lsof -ti tcp:8112 &amp;&amp; echo &quot;something still listening&quot; || echo &quot;port free&quot;</code></div>
+<div class="call"><span class="n">36</span> <span class="tool">Bash</span> <code>CUSTOMERS_JWT_SECRET=arena-secret CUSTOMERS_DATABASE_URL=postgres://unused npm run start -- --profile local &gt; /tmp/arena-sonnet.log 2&gt;&amp;1 &amp;
+disown
+for i in $(seq 1 30); do grep -q &quot;Listen: ok&quot; /tmp/arena-sonnet.log &amp;&amp; break; sleep 1; done
+tail -20 /tmp/arena-sonnet.log</code></div>
+<div class="say">Server is up and lists the new route. Let&#x27;s exercise it manually, including edge cases beyond the gate: a gold-tier customer (to check the reachability invariant interacts fine with toggling), double-toggle idempotence, and preferences round trip isn&#x27;t touched.</div>
+<div class="call"><span class="n">37</span> <span class="tool">Bash</span> <code>sleep 2
+BO=$(curl -s -X POST localhost:8112/api/v1/auth-employees -H &#x27;content-type: application/json&#x27; -d &#x27;{&quot;username&quot;:&quot;bo&quot;,&quot;password&quot;:&quot;bo-pass&quot;}&#x27; | sed -n &#x27;s/.*&quot;accessToken&quot;:&quot;\([^&quot;]*\)&quot;.*/\1/p&#x27;)
+echo &quot;BO token: ${BO:0:20}...&quot;
+echo &quot;-- register a gold customer with a note --&quot;
+GOLD=$(curl -s -X POST l</code></div>
+<div class="call"><span class="n">38</span> <span class="tool">Bash</span> <code>cat features/customers/edge/RegisterRequest.shape.json</code></div>
+<div class="call"><span class="n">39</span> <span class="tool">Bash</span> <code>BO=$(curl -s -X POST localhost:8112/api/v1/auth-employees -H &#x27;content-type: application/json&#x27; -d &#x27;{&quot;username&quot;:&quot;bo&quot;,&quot;password&quot;:&quot;bo-pass&quot;}&#x27; | sed -n &#x27;s/.*&quot;accessToken&quot;:&quot;\([^&quot;]*\)&quot;.*/\1/p&#x27;)
+echo &quot;-- register Marie, gold, no note (invariant requires a note only for gold; expect a refusal) --&quot;
+curl -s -w</code></div>
+<div class="say">All behaves correctly, including the invariant refusal (500) on the gold/no-note case I deliberately tried. Let&#x27;s shut the server down cleanly.</div>
+<div class="call"><span class="n">40</span> <span class="tool">Bash</span> <code>kill $(lsof -ti tcp:8112) 2&gt;/dev/null; sleep 1; lsof -ti tcp:8112 &amp;&amp; echo &quot;still up&quot; || echo &quot;port free&quot;</code></div>
+<div class="call"><span class="n">41</span> <span class="tool">Bash</span> <code>git status --short</code></div>
+<div class="call"><span class="n">42</span> <span class="tool">Bash</span> <code>git remote -v &amp;&amp; git rev-parse --show-toplevel &amp;&amp; git branch -vv</code></div>
+<div class="call"><span class="n">43</span> <span class="tool">Bash</span> <code>git add features/customers &amp;&amp; git commit -m &quot;$(cat &lt;&lt;&#x27;EOF&#x27;
+Add a toggleActive operation and its endpoint
+
+Customer already carried an optional active field; nothing flipped it. Add
+customer.port.json#toggleActive (read, decide from the current value, write
+the other one), bind it in all three profil</code></div>
+<div class="say">Committed locally (no remote is configured for this repo, so there&#x27;s nothing to push).
+
+## Report
+
+### What I added or changed
+
+- **`features/customers/domain/customer.port.json`** — added the `toggleActive` operation: accepts `id`, returns `Customer`, described as flipping `active` (false/absent → true, true → false), failing when there&#x27;s no such customer.
+- **`features/customers/domain/writes-are-for-registrars.invariant.json`** — added `customer.port.json#toggleActive` to the operations the access invariant covers, so no future route can reach it without the registrar policy.
+- **`features/customers/domain/Customer.shape.json`** — reordered fields so `active` is the last one (was before `note`).
+- **`features/customers/data/toggle-active-kept.graph.json`** (new) — the `local` (memory store) data graph: read the record, decide from its current `active`, patch the other value, remake the row (or refuse `missing` if it never existed or vanished between read and write).
+- **`features/customers/data/toggle-active-kept-postgres.graph.json`** (new) — the same graph, pointed at `customers-postgres.store.json`, for `production`.
+- **`features/customers/data/toggle-active-row.graph.json`** (new) — the `live` (REST API) data graph: GET the row, decide, PUT it back with the flipped value (carrying `name`/`email`/`tier` forward so the PUT doesn&#x27;t wipe them), with distinct refuse nodes for missing/upstream-failure on each side of the read and each side of the write.
+- **`features/customers/data/customers-store.binding.json`, `customers-postgres.binding.json`, `customers-rest.binding.json`** — wired `toggleActive` to the three graphs above.
+- **`features/customers/edge/toggle-active-customer.trigger.json`** (new) — `POST /customers/{id}/active`, same two policies (`employees-only`, `can-register`) and refusal mapping as the other write routes (`missing:404`, `upstream:502`, `anonymous:401`, `invalid_credential:401`, `forbidden:403`, `invariant:500`).
+
+### Decisions the task left to me
+
+- **Route and verb.** Chose `POST /customers/{id}/active`: the action isn&#x27;t a full replacement (PUT) or a resource creation, and there&#x27;s no request body, so POST-as-action over a sub-resource path fit best.
+- **Operation name.** `toggleActive`, matching the port&#x27;s existing verb-first naming (`listAll`, `removeMany`).
+- **All three profiles, not just `local`.** The task only asks me to validate against the running (`local`) tree, but `customer.port.json` is a contract every binding must meet (B001) and `npm run check` judges every profile at once. So I wrote the REST and PostgreSQL data graphs too, even though only the memory-store one is ever exercised by curl here.
+- **Shape used for `in`.** Reused `@customers/domain/CustomerRef.shape.json` (already used by `get`) rather than inventing a new one, since it&#x27;s exactly `{id}`.
+- **Gating.** Treated toggling as a write on par with update/remove: same two policies, added to the same invariant, rather than inventing a lighter-weight gate — the task gave no reason to treat it differently.
+- **Field reorder in `Customer.shape.json`.** Not asked for, but required: the CSV writer emits columns in field-declaration order, and with `active` declared before `note`, an export row for a non-gold customer (empty `note`) ended in a trailing comma rather than the flag. Moving `active` after `note` was the smallest fix; I didn&#x27;t touch `CustomerView.shape.json`/`CustomerRow.shape.json` since JSON field order there is cosmetic only.
+- **REST binding&#x27;s PUT body.** The upstream API&#x27;s PUT replaces the whole record, so I read the current row first and forwarded its `name`/`email`/`tier` back alongside the flipped `active`, rather than risk the mock API nulling fields on a partial body.
+
+### Final `bash accept.sh POST &#x27;/customers/{id}/active&#x27;`
+
+```
+== The tree at rest
+PASS  1 wilanis check passes
+PASS  2 every rehearsed branch settles
+INFO  3 the rehearsal says: Writes are for registrars  holds at 6 trigger(s)  (the rule held at 5 triggers before your change; this line is reported, not judged)
+PASS  4 the rule in a-customer-is-reachable states what it stated
+PASS  5 the access rule still requires the same policy
+== The tree serving
+PASS  6 the tree starts and listens
+PASS  7 two customers registered as bo, one silver and one bronze
+== The endpoint
+PASS  8 toggling a silver customer as bo answers 200 and shows active true
+PASS  9 toggling them again answers 200 and shows active false
+PASS  10 reading the customer back shows their active field
+PASS  11 toggling the bronze customer as bo answers 200 and shows active true
+PASS  12 the bronze customer reads back active
+PASS  13 the list still answers 200 with both customers
+PASS  14 cy, an employee without the registrar role, is refused 403 forbidden
+PASS  15 no token is refused 401 anonymous
+PASS  16 an unknown id is refused 404 missing
+PASS  17 a third toggle activates the silver customer again
+PASS  18 the export carries the flag: the silver customer&#x27;s row ends in true
+== Verdict
+ACCEPTED  17 criteria pass
+```
+
+### curl commands beyond the gate, and their responses
+
+```
+$ curl -s -X POST localhost:8112/api/v1/auth-employees -H &#x27;content-type: application/json&#x27; -d &#x27;{&quot;username&quot;:&quot;bo&quot;,&quot;password&quot;:&quot;bo-pass&quot;}&#x27;
+→ token used below as $BO
+
+$ curl -s -X POST localhost:8112/customers -H &quot;authorization: Bearer $BO&quot; -H &#x27;content-type: application/json&#x27; -d &#x27;{&quot;name&quot;:&quot;Marie Curie&quot;,&quot;email&quot;:&quot;marie@example.com&quot;,&quot;tier&quot;:&quot;gold&quot;}&#x27;
+{&quot;reason&quot;:&quot;invariant&quot;,&quot;message&quot;:&quot;&#x27;A customer is reachable&#x27; does not hold: len(name) &gt; 0 &amp;&amp; len(email) &gt; 0 &amp;&amp; (tier != &#x27;gold&#x27; || has(note))&quot;}  [500]
+# confirms toggling wasn&#x27;t what broke this -- registration itself is refused by the pre-existing invariant, since there&#x27;s no route to set a note
+
+$ curl -s -X POST localhost:8112/customers -H &quot;authorization: Bearer $BO&quot; -H &#x27;content-type: application/json&#x27; -d &#x27;{&quot;name&quot;:&quot;Marie Curie&quot;,&quot;email&quot;:&quot;marie@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;}&#x27;
+{&quot;id&quot;:&quot;14bb0916-6e6e-4417-a059-f0516b19011d&quot;,&quot;name&quot;:&quot;Marie Curie&quot;,&quot;email&quot;:&quot;marie@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;}
+
+$ curl -s -X POST localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active -H &quot;authorization: Bearer $BO&quot;
+{&quot;id&quot;:&quot;14bb0916-6e6e-4417-a059-f0516b19011d&quot;,&quot;name&quot;:&quot;Marie Curie&quot;,&quot;email&quot;:&quot;marie@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:true}  [200]
+
+$ curl -s -X POST localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active -H &quot;authorization: Bearer $BO&quot;
+{&quot;id&quot;:&quot;...&quot;,&quot;active&quot;:false}  [200]
+
+$ curl -s -X POST localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active -H &quot;authorization: Bearer $BO&quot;
+{&quot;id&quot;:&quot;...&quot;,&quot;active&quot;:true}  [200]
+
+$ curl -s localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d
+{&quot;id&quot;:&quot;...&quot;,&quot;active&quot;:true}  [200]
+
+$ curl -s localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active   # wrong method, GET instead of POST
+{&quot;error&quot;:&quot;no trigger for GET /customers/14bb0916-6e6e-4417-a059-f0516b19011d/active&quot;}  [404]
+
+$ curl -s -X POST localhost:8112/customers/does-not-exist/active -H &quot;authorization: Bearer $BO&quot;
+{&quot;reason&quot;:&quot;missing&quot;,&quot;message&quot;:&quot;no customer does-not-exist&quot;}  [404]
+
+$ curl -s -X POST localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active
+{&quot;reason&quot;:&quot;anonymous&quot;,&quot;message&quot;:&quot;sign in first: no token was presented&quot;}  [401]
+
+$ curl -s -X POST localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active -H &quot;authorization: Bearer $CY&quot;   # cy: viewer, not registrar
+{&quot;reason&quot;:&quot;forbidden&quot;,&quot;message&quot;:&quot;registering customers takes the registrar role&quot;}  [403]
+
+$ curl -s -X POST localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active -H &quot;authorization: Bearer $ANA&quot;  # ana: account holder, wrong realm
+{&quot;reason&quot;:&quot;forbidden&quot;,&quot;message&quot;:&quot;this is for employees&quot;}  [403]
+
+$ curl -s -X POST localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active -H &quot;authorization: Bearer garbage&quot;
+{&quot;reason&quot;:&quot;invalid_credential&quot;,&quot;message&quot;:&quot;the token does not verify: Invalid Compact JWS&quot;}  [401]
+
+$ curl -s localhost:8112/customers.csv -H &quot;authorization: Bearer $BO&quot; | grep 14bb0916
+14bb0916-6e6e-4417-a059-f0516b19011d,Marie Curie,marie@example.com,silver,wilanis-example/0.1.0,,true
+```
+
+The server was started with `CUSTOMERS_JWT_SECRET=arena-secret CUSTOMERS_DATABASE_URL=postgres://unused npm run start -- --profile local`, confirmed `Listen: ok`, and I killed it by PID afterward — port 8112 is free.
+
+### Left undone
+
+Nothing from the task. The REST (`live`) and PostgreSQL (`production`) bindings for `toggleActive` are only checked statically by `wilanis check` (which passes) — I didn&#x27;t run them against the live mock API or a real Postgres, since accept.sh and the task&#x27;s validation instructions only spin up `local`.</div></div></div><div class="col"><h3>Claude Opus 5</h3><div class="timeline"><div class="say">I&#x27;ll start by reading the project&#x27;s own docs and the acceptance test.</div>
+<div class="call"><span class="n">1</span> <span class="tool">Bash</span> <code>ls -la &amp;&amp; echo &quot;=== README ===&quot; &amp;&amp; cat README.md</code></div>
+<div class="call"><span class="n">2</span> <span class="tool">Bash</span> <code>cat accept.sh</code></div>
+<div class="say">Now the tree structure.</div>
+<div class="call"><span class="n">3</span> <span class="tool">Bash</span> <code>find features connections -type f | sort &amp;&amp; echo &quot;=== project.json ===&quot; &amp;&amp; cat project.json</code></div>
+<div class="call"><span class="n">4</span> <span class="tool">Bash</span> <code>cd /Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/opus/features/customers &amp;&amp; for f in domain/Customer.shape.json domain/CustomerRecord.shape.json domain/CustomerUpdate.shape.json edge/CustomerView.shape.json edge/CustomerRow.shape.json domain/writes-are-for-registrars.invariant.json domain/a-cu</code></div>
+<div class="call"><span class="n">5</span> <span class="tool">Bash</span> <code>for f in data/kept-get.graph.json data/kept-update.graph.json data/customers-store.binding.json data/customers.store.json data/write-csv.graph.json edge/update-customer.trigger.json edge/get-customer.trigger.json edge/request.resolvers.json; do echo &quot;=== $f ===&quot;; cat $f; done</code></div>
+<div class="call"><span class="n">6</span> <span class="tool">Bash</span> <code>cd /Users/rfontes/dev/wilanis-js/docs/demo/arena/.runs/opus &amp;&amp; for f in features/customers/data/customers-rest.binding.json features/customers/data/update-row.graph.json features/customers/data/get-row.graph.json features/customers/data/kept-update-postgres.graph.json features/customers/data/custome</code></div>
+<div class="call"><span class="n">7</span> <span class="tool">Bash</span> <code>npx wilanis describe @blob/csv.port.json 2&gt;&amp;1 | head -60</code></div>
+<div class="call"><span class="n">8</span> <span class="tool">Bash</span> <code>for f in features/customers/edge/register-customer.trigger.json features/customers/edge/IdRequest.shape.json features/customers/domain/CustomerRef.shape.json features/customers/domain/register-customer.graph.json features/customers/domain/list-customers.graph.json; do echo &quot;=== $f ===&quot;; cat $f; done</code></div>
+<div class="call"><span class="n">9</span> <span class="tool">Skill</span> <code>{&quot;skill&quot;: &quot;wilanis-graphs&quot;}</code></div>
+<div class="say">The skill gives the exact shape for this. Writing the documents now.</div>
+<div class="call"><span class="n">10</span> <span class="tool">Bash</span> <code>node -e &#x27;
+const fs=require(&quot;fs&quot;);
+const p=&quot;features/customers/domain/Customer.shape.json&quot;;
+const d=JSON.parse(fs.readFileSync(p,&quot;utf8&quot;));
+const f=d.fields; const active=f.active; delete f.active; f.active=active;
+active.description=&quot;whether the account is open for business; absent reads as inactive.</code></div>
+<div class="call"><span class="n">11</span> <span class="tool">Bash</span> <code>node -e &#x27;
+const fs=require(&quot;fs&quot;);
+const p=&quot;features/customers/domain/customer.port.json&quot;;
+const d=JSON.parse(fs.readFileSync(p,&quot;utf8&quot;));
+const ops=d.operations; const out={};
+for (const [k,v] of Object.entries(ops)) {
+  out[k]=v;
+  if (k===&quot;remove&quot;) out.toggleActive={
+    description:&quot;Open one custo</code></div>
+<div class="say">Now the three data graphs, one per profile&#x27;s storage.</div>
+<div class="call"><span class="n">12</span> <span class="tool">Bash</span> <code>node -e &#x27;
+const fs=require(&quot;fs&quot;);
+const store = (storePath, note) =&gt; ({
+  $schema: &quot;https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json&quot;,
+  label: &quot;Toggle what is kept&quot;,
+  description: &quot;Data graph behind customer.toggleActive over a store: read the recor</code></div>
+<div class="call"><span class="n">13</span> <span class="tool">Bash</span> <code>node -e &#x27;
+const fs=require(&quot;fs&quot;);
+const conn=&quot;@connections/customers-api.connection.json&quot;;
+const put=(id,label,value)=&gt;({ type:&quot;@wilanis/node/run.schema.json&quot;, id, label, run:&quot;@http/http.port.json#request&quot;,
+  in:{ body:{ active:value }, connection:conn, method:&quot;PUT&quot;, path:&quot;/customer/{{in.id}}&quot;, cons</code></div>
+<div class="say">Now the bindings, the invariant, and the trigger.</div>
+<div class="call"><span class="n">14</span> <span class="tool">Bash</span> <code>node -e &#x27;
+const fs=require(&quot;fs&quot;);
+const bind=(p,graph,description)=&gt;{
+  const d=JSON.parse(fs.readFileSync(p,&quot;utf8&quot;));
+  const out={};
+  for (const [k,v] of Object.entries(d.operations)) { out[k]=v; if (k===&quot;remove&quot;) out.toggleActive = description ? {description,graph} : {graph}; }
+  d.operations=ou</code></div>
+<div class="call"><span class="n">15</span> <span class="tool">Bash</span> <code>cat &gt; features/customers/edge/toggle-active.trigger.json &lt;&lt;&#x27;JSON&#x27;
+{
+  &quot;$schema&quot;: &quot;https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json&quot;,
+  &quot;label&quot;: &quot;POST /customers/{id}/active&quot;,
+  &quot;description&quot;: &quot;POST /customers/{id}/active: the id from the route, no b</code></div>
+<div class="call"><span class="n">16</span> <span class="tool">Bash</span> <code>npx wilanis rehearse . --profile local 2&gt;&amp;1 | tail -40</code></div>
+<div class="call"><span class="n">17</span> <span class="tool">Bash</span> <code>npx wilanis rehearse . --profile local 2&gt;&amp;1 | grep -A9 &#x27;toggle-active&#x27;</code></div>
+<div class="say">Every branch settles. Now start the tree and drive it.</div>
+<div class="call"><span class="n">18</span> <span class="tool">Bash</span> <code>for pid in $(lsof -ti tcp:8113 2&gt;/dev/null); do kill &quot;$pid&quot;; done; sleep 1; CUSTOMERS_JWT_SECRET=arena-secret CUSTOMERS_DATABASE_URL=postgres://unused npm run start -- --profile local &gt; /tmp/arena-opus.log 2&gt;&amp;1 &amp;
+sleep 12; grep -E &#x27;Listen: ok|refused|error&#x27; /tmp/arena-opus.log | head</code></div>
+<div class="call"><span class="n">19</span> <span class="tool">Bash</span> <code>H=http://localhost:8113
+tok() { curl -s -X POST $H/api/v1/auth-employees -H &#x27;content-type: application/json&#x27; -d &quot;{\&quot;username\&quot;:\&quot;$1\&quot;,\&quot;password\&quot;:\&quot;$1-pass\&quot;}&quot; | sed -n &#x27;s/.*&quot;accessToken&quot;:&quot;\([^&quot;]*\)&quot;.*/\1/p&#x27;; }
+BO=$(tok bo); CY=$(tok cy)
+sleep 4
+echo &quot;--- register&quot;
+R1=$(curl -s -X POST $H/customers</code></div>
+<div class="say">Everything behaves. Running the gate.</div>
+<div class="call"><span class="n">20</span> <span class="tool">Bash</span> <code>for pid in $(lsof -ti tcp:8113 2&gt;/dev/null); do kill &quot;$pid&quot;; done; sleep 1; bash accept.sh POST &#x27;/customers/{id}/active&#x27; 2&gt;&amp;1</code></div>
+<div class="say">Gate accepted. Now the README, then the extra validation.</div>
+<div class="call"><span class="n">21</span> <span class="tool">Bash</span> <code>node -e &#x27;
+const fs=require(&quot;fs&quot;); let r=fs.readFileSync(&quot;README.md&quot;,&quot;utf8&quot;);
+const sub=(a,b)=&gt;{ if(!r.includes(a)) { console.error(&quot;MISS: &quot;+a.slice(0,60)); process.exit(1);} r=r.split(a).join(b); };
+sub(&quot;# GET /customers[?tier=], POST /customers, GET|PUT|DELETE /customers/{id}, DELETE /customers, GE</code></div>
+<div class="call"><span class="n">22</span> <span class="tool">Bash</span> <code>node -e &#x27;
+const fs=require(&quot;fs&quot;); let r=fs.readFileSync(&quot;README.md&quot;,&quot;utf8&quot;);
+const anchor=&quot;## A rule about every customer&quot;;
+const para = `## Opening and closing an account\n\n\`POST /customers/{id}/active\` flips one customer&#x27;&quot;&#x27;&quot;&#x27;s \`active\`: an account that was closed -- or that never\ncarried the</code></div>
+<div class="call"><span class="n">23</span> <span class="tool">Bash</span> <code>for pid in $(lsof -ti tcp:8113 2&gt;/dev/null); do kill &quot;$pid&quot;; done; sleep 1; CUSTOMERS_JWT_SECRET=arena-secret CUSTOMERS_DATABASE_URL=postgres://unused npm run start -- --profile local &gt; /tmp/arena-opus.log 2&gt;&amp;1 &amp;
+sleep 12; grep -E &#x27;Listen: ok&#x27; /tmp/arena-opus.log</code></div>
+<div class="call"><span class="n">24</span> <span class="tool">Bash</span> <code>H=http://localhost:8113
+BO=$(curl -s -X POST $H/api/v1/auth-employees -H &#x27;content-type: application/json&#x27; -d &#x27;{&quot;username&quot;:&quot;bo&quot;,&quot;password&quot;:&quot;bo-pass&quot;}&#x27; | sed -n &#x27;s/.*&quot;accessToken&quot;:&quot;\([^&quot;]*\)&quot;.*/\1/p&#x27;)
+ANA=$(curl -s -X POST $H/api/v1/auth-customers -H &#x27;content-type: application/json&#x27; -d &#x27;{&quot;username&quot;:&quot;a</code></div>
+<div class="call"><span class="n">25</span> <span class="tool">Bash</span> <code>for p in live production; do echo &quot;== $p&quot;; npx wilanis rehearse . --profile $p 2&gt;&amp;1 | grep -E &#x27;toggle-active|every branch settled|NEVER RUN|BROKE|BLOCKED&#x27; | head -20; done</code></div>
+<div class="call"><span class="n">26</span> <span class="tool">Bash</span> <code>for pid in $(lsof -ti tcp:8113 2&gt;/dev/null); do kill &quot;$pid&quot;; done; sleep 1; bash accept.sh POST &#x27;/customers/{id}/active&#x27; 2&gt;&amp;1; echo &quot;--- listeners left on 8113:&quot;; lsof -ti tcp:8113 || echo none</code></div>
+<div class="call"><span class="n">27</span> <span class="tool">Bash</span> <code>git status --short &amp;&amp; git add -A &amp;&amp; git commit -q -F - &lt;&lt;&#x27;MSG&#x27; &amp;&amp; git log --oneline -1
+Toggle a customer&#x27;s active flag over a route
+
+POST /customers/{id}/active flips one customer&#x27;s active field: closed or
+absent becomes open, open becomes closed. The route sends nothing but the
+id, so the next valu</code></div>
+<div class="call"><span class="n">28</span> <span class="tool">Bash</span> <code>git remote -v &amp;&amp; git status -sb | head -1</code></div>
+<div class="say">Done and accepted. Nothing is left listening on 8113.
+
+## What I added or changed
+
+**New documents**
+
+`features/customers/edge/toggle-active.trigger.json` — `POST /customers/{id}/active`. No body; `in` is the existing `IdRequest` shape, `out` is `CustomerView`. It attaches `employees-only` (giving the guard the token from the authorization header or the session cookie) and `can-register`, and maps `missing` 404, `upstream` 502, `anonymous` 401, `invalid_credential` 401, `forbidden` 403, `invariant` 500. It fires `customer.port.json#toggleActive`.
+
+`features/customers/data/toggle-active.graph.json` — the data graph behind the operation over a store (local profile). Read the record with `#get`, switch on `has(record)`, switch on `has(flag) &amp;&amp; flag` over `{{asked.record.active}}`, then one `#patch` per branch as that switch&#x27;s `to`, each followed by its own switch and its own `object.make`; three refuse nodes (`missing`, and one per branch for a record that goes between the read and the write), all eight answers listed in `out.from`.
+
+`features/customers/data/toggle-active-postgres.graph.json` — the same graph over `customers-postgres.store.json`, as every other kept-* graph in this tree is duplicated per store.
+
+`features/customers/data/toggle-active-row.graph.json` — the REST version (live profile): GET the row, decide from what it says, PUT the other value on that branch. Two calls, because the upstream API has no operation that flips a field. 404 on either call is `missing`, anything unexpected is `upstream`.
+
+**Changed documents**
+
+`features/customers/domain/customer.port.json` — added `toggleActive`, accepting `id`, returning `Customer`.
+
+The three bindings (`customers-store`, `customers-postgres`, `customers-rest`) — each names its own graph for `toggleActive`, so every profile meets it.
+
+`features/customers/domain/writes-are-for-registrars.invariant.json` — `toggleActive` added to `over`. The rule now holds at 6 triggers instead of 5. `requires.policy` is untouched.
+
+`features/customers/domain/Customer.shape.json` — `active` moved to be the last field (see the decisions below).
+
+`features/customers/edge/IdRequest.shape.json` — description extended to mention the new route; no field change.
+
+`README.md` — a new section &quot;Opening and closing an account&quot;, plus the route added to the start line, the write list, and the port&#x27;s operation list.
+
+## Decisions the task did not settle
+
+**Verb and route.** `POST /customers/{id}/active`. A toggle is not idempotent, so PUT would be a lie; a sub-resource keeps it off `/customers/{id}`, whose PUT already means &quot;replace who this customer is&quot;.
+
+**The route sends nothing but the id.** The alternative is a body carrying the value to set, but then it is not a toggle and two concurrent callers can disagree about what the next value is. Reading the flag and writing its opposite in one operation is the whole point, and it is why this is a port operation rather than a client convention over `update`.
+
+**One port operation, not two.** I considered `toggleActive` as a domain graph over a new `setActive(id, active)`, which would have put the flip rule in the domain layer. I dropped it: the flip is a read-decide-write over one record, which is exactly what `.claude/skills/wilanis-graphs/SKILL.md` writes out as a data graph, and the extra port operation would be a second public way to write the flag that the invariant would then also have to cover. A domain graph that only forwarded would have been refused as L007 anyway.
+
+**An absent `active` reads as closed**, so the first call opens the account. That is what the field&#x27;s own description says it means, and it is what criteria 8 and 11 require.
+
+**`active` is now the last field of `Customer`.** `@blob/csv.port.json#write` writes the shape&#x27;s fields in declared order, so with `active` before `note` the export ended each row with an empty `note` cell. Criterion 18 wants the row to end in the flag. Field order carries no rule, so moving the field was the one-line fix; the alternative was a separate CSV row shape and a mapping in `toCsv`, which is more machinery for a column order. The export header is now `id,name,email,tier,registrar,note,active`.
+
+**The REST binding&#x27;s toggle does a GET then a PUT with only `active` in the body**, relying on mockapi&#x27;s PUT merging. That profile is not exercised by the gate and I did not call the live API; if that API replaced rather than merged, the PUT would need the whole row. I have flagged it rather than changed the upstream contract.
+
+**The refusal on a record that vanishes between the read and the write** is `missing`, the same word as an unknown id, so a caller gets a 404 either way. Separate refuse nodes per branch, as G009 requires.
+
+## Final `bash accept.sh POST &#x27;/customers/{id}/active&#x27;`
+
+```
+== The tree at rest
+PASS  1 wilanis check passes
+PASS  2 every rehearsed branch settles
+INFO  3 the rehearsal says: Writes are for registrars  holds at 6 trigger(s)  (the rule held at 5 triggers before your change; this line is reported, not judged)
+PASS  4 the rule in a-customer-is-reachable states what it stated
+PASS  5 the access rule still requires the same policy
+== The tree serving
+PASS  6 the tree starts and listens
+PASS  7 two customers registered as bo, one silver and one bronze
+== The endpoint
+PASS  8 toggling a silver customer as bo answers 200 and shows active true
+PASS  9 toggling them again answers 200 and shows active false
+PASS  10 reading the customer back shows their active field
+PASS  11 toggling the bronze customer as bo answers 200 and shows active true
+PASS  12 the bronze customer reads back active
+PASS  13 the list still answers 200 with both customers
+PASS  14 cy, an employee without the registrar role, is refused 403 forbidden
+PASS  15 no token is refused 401 anonymous
+PASS  16 an unknown id is refused 404 missing
+PASS  17 a third toggle activates the silver customer again
+PASS  18 the export carries the flag: the silver customer&#x27;s row ends in true
+== Verdict
+ACCEPTED  17 criteria pass
+```
+
+## Curl beyond the gate
+
+With `H=http://localhost:8113`, `BO` from `/api/v1/auth-employees` as bo, `ANA` from `/api/v1/auth-customers` as ana, and `$ID` a registered customer.
+
+```
+curl -s -X POST $H/customers/$ID/active -H &quot;authorization: Bearer $ANA&quot; -w &#x27;  [%{http_code}]\n&#x27;
+{&quot;reason&quot;:&quot;forbidden&quot;,&quot;message&quot;:&quot;this is for employees&quot;}  [403]
+
+curl -s -X POST $H/customers/$ID/active -H &quot;authorization: Bearer not-a-token&quot; -w &#x27;  [%{http_code}]\n&#x27;
+{&quot;reason&quot;:&quot;invalid_credential&quot;,&quot;message&quot;:&quot;the token does not verify: Invalid Compact JWS&quot;}  [401]
+
+curl -s -X POST $H/customers/nope/active -w &#x27;  [%{http_code}]\n&#x27;
+{&quot;reason&quot;:&quot;anonymous&quot;,&quot;message&quot;:&quot;sign in first: no token was presented&quot;}  [401]
+```
+
+The gate runs before the graph, so an unknown id with no token is 401 and not 404.
+
+```
+curl -s -X POST $H/customers/$ID/active -H &quot;cookie: session=$BO&quot; -w &#x27;  [%{http_code}]\n&#x27;
+{&quot;id&quot;:&quot;689763b7-...&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;bronze&quot;,&quot;active&quot;:true}  [200]
+
+curl -s $H/customers/$ID/active -w &#x27;  [%{http_code}]\n&#x27;
+{&quot;error&quot;:&quot;no trigger for GET /customers/689763b7-.../active&quot;}  [404]
+```
+
+The toggle survives an unrelated update, and the flag shows in every read:
+
+```
+curl -s -X PUT $H/customers/$ID -H &quot;authorization: Bearer $BO&quot; -H &#x27;content-type: application/json&#x27; \
+  -d &#x27;{&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;}&#x27; -w &#x27;  [%{http_code}]\n&#x27;
+{&quot;id&quot;:&quot;689763b7-...&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:true}  [200]
+
+curl -s &quot;$H/customers?tier=silver&quot; -w &#x27;  [%{http_code}]\n&#x27;
+[{&quot;id&quot;:&quot;689763b7-...&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:true}]  [200]
+
+curl -s -X POST $H/customers/$ID/active -H &quot;authorization: Bearer $BO&quot; -w &#x27;  [%{http_code}]\n&#x27;
+{&quot;id&quot;:&quot;689763b7-...&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:false}  [200]
+
+curl -s $H/customers.csv
+id,name,email,tier,registrar,note,active
+689763b7-...,Grace Hopper,grace@example.com,silver,wilanis-example/0.1.0,,false
+```
+
+`npx wilanis rehearse . --profile live` and `--profile production` both report every branch settled, including the four switches of the REST graph and the four plus two guards of the postgres one, so all three bindings are walked and not only the one the gate runs.
+
+## Left undone
+
+The REST binding&#x27;s PUT with a partial body was never exercised against the real mockapi upstream; I only rehearsed it. There are no recorded scenarios in this tree, so there was nothing for `wilanis regress` to replay, and I wrote none. The change is committed on `main` as `0e368b5`; the repository has no remote, so there was nothing to push.</div></div></div></div>
+<h2>Each agent's own report</h2>
+<div class="cols" style="--n:3"><div class="col"><h3>Claude Haiku 4.5</h3><details><summary>Show the report</summary><pre>Excellent! All acceptance tests pass. Let me create a summary of the work completed.
+
+## Summary
+
+I&#x27;ve successfully implemented the customer account toggle feature for the wilanis demo project. Here&#x27;s what was added:
+
+### Files Added or Modified
+
+**New Files Created:**
+1. `/features/customers/edge/toggle-customer.trigger.json` - HTTP POST trigger at `/customers/{id}/active`
+2. `/features/customers/data/kept-toggle.graph.json` - Data layer implementation for store binding
+3. `/features/customers/data/kept-toggle-postgres.graph.json` - Data layer implementation for postgres binding
+4. `/features/customers/data/rest-toggle.graph.json` - Data layer implementation for REST API binding
+
+**Modified Files:**
+1. `/features/customers/domain/customer.port.json` - Added `toggle` operation
+2. `/features/customers/domain/Customer.shape.json` - Reordered fields so `active` appears last (for CSV export)
+3. `/features/customers/domain/writes-are-for-registrars.invariant.json` - Added toggle to operations requiring registrar policy
+4. `/features/customers/data/customers-store.binding.json` - Added toggle operation binding
+5. `/features/customers/data/customers-rest.binding.json` - Added toggle operation binding
+6. `/features/customers/data/customers-postgres.binding.json` - Added toggle operation binding
+
+### Key Decisions
+
+1. **HTTP Method**: Chose POST rather than PATCH, as POST is more suitable for action endpoints that change state.
+
+2. **Operation Design**: Created a single `toggle` operation that only requires a customer ID. The operation intelligently determines the new state (absent/false → true, true → false) at the data layer.
+
+3. **Field Ordering**: Reordered the Customer shape to place `active` as the last field, ensuring CSV exports end with the active flag value for proper test validation.
+
+4. **Error Handling**: The endpoint maps all relevant refusals:
+   - 404 for missing customers
+   - 401 for anonymous callers
+   - 403 for forbidden (non-registrar employees)
+   - 502 for upstream API failures (REST profile)
+   - 500 for invariant violations
+
+5. **Access Control**: Toggle requires the same registrar policy (`can-register`) as other write operations, enforced through the `writes-are-for-registrars` invariant.
+
+### Test Results
+
+All 17 acceptance criteria pass:
+- Criteria 1-5: Schema/compiler checks pass
+- Criterion 6: Server starts and listens
+- Criterion 7: Test customers register successfully
+- Criteria 8-13: Toggle endpoint works, toggling switches active between true/false, read-back confirms state, list still works
+- Criteria 14-16: Access control enforced (non-registrar refused 403, no token refused 401, missing customer 404)
+- Criterion 17: Multiple toggles work correctly
+- Criterion 18: CSV export includes active field properly
+</pre></details></div><div class="col"><h3>Claude Sonnet 5</h3><details><summary>Show the report</summary><pre>Committed locally (no remote is configured for this repo, so there&#x27;s nothing to push).
+
+## Report
+
+### What I added or changed
+
+- **`features/customers/domain/customer.port.json`** — added the `toggleActive` operation: accepts `id`, returns `Customer`, described as flipping `active` (false/absent → true, true → false), failing when there&#x27;s no such customer.
+- **`features/customers/domain/writes-are-for-registrars.invariant.json`** — added `customer.port.json#toggleActive` to the operations the access invariant covers, so no future route can reach it without the registrar policy.
+- **`features/customers/domain/Customer.shape.json`** — reordered fields so `active` is the last one (was before `note`).
+- **`features/customers/data/toggle-active-kept.graph.json`** (new) — the `local` (memory store) data graph: read the record, decide from its current `active`, patch the other value, remake the row (or refuse `missing` if it never existed or vanished between read and write).
+- **`features/customers/data/toggle-active-kept-postgres.graph.json`** (new) — the same graph, pointed at `customers-postgres.store.json`, for `production`.
+- **`features/customers/data/toggle-active-row.graph.json`** (new) — the `live` (REST API) data graph: GET the row, decide, PUT it back with the flipped value (carrying `name`/`email`/`tier` forward so the PUT doesn&#x27;t wipe them), with distinct refuse nodes for missing/upstream-failure on each side of the read and each side of the write.
+- **`features/customers/data/customers-store.binding.json`, `customers-postgres.binding.json`, `customers-rest.binding.json`** — wired `toggleActive` to the three graphs above.
+- **`features/customers/edge/toggle-active-customer.trigger.json`** (new) — `POST /customers/{id}/active`, same two policies (`employees-only`, `can-register`) and refusal mapping as the other write routes (`missing:404`, `upstream:502`, `anonymous:401`, `invalid_credential:401`, `forbidden:403`, `invariant:500`).
+
+### Decisions the task left to me
+
+- **Route and verb.** Chose `POST /customers/{id}/active`: the action isn&#x27;t a full replacement (PUT) or a resource creation, and there&#x27;s no request body, so POST-as-action over a sub-resource path fit best.
+- **Operation name.** `toggleActive`, matching the port&#x27;s existing verb-first naming (`listAll`, `removeMany`).
+- **All three profiles, not just `local`.** The task only asks me to validate against the running (`local`) tree, but `customer.port.json` is a contract every binding must meet (B001) and `npm run check` judges every profile at once. So I wrote the REST and PostgreSQL data graphs too, even though only the memory-store one is ever exercised by curl here.
+- **Shape used for `in`.** Reused `@customers/domain/CustomerRef.shape.json` (already used by `get`) rather than inventing a new one, since it&#x27;s exactly `{id}`.
+- **Gating.** Treated toggling as a write on par with update/remove: same two policies, added to the same invariant, rather than inventing a lighter-weight gate — the task gave no reason to treat it differently.
+- **Field reorder in `Customer.shape.json`.** Not asked for, but required: the CSV writer emits columns in field-declaration order, and with `active` declared before `note`, an export row for a non-gold customer (empty `note`) ended in a trailing comma rather than the flag. Moving `active` after `note` was the smallest fix; I didn&#x27;t touch `CustomerView.shape.json`/`CustomerRow.shape.json` since JSON field order there is cosmetic only.
+- **REST binding&#x27;s PUT body.** The upstream API&#x27;s PUT replaces the whole record, so I read the current row first and forwarded its `name`/`email`/`tier` back alongside the flipped `active`, rather than risk the mock API nulling fields on a partial body.
+
+### Final `bash accept.sh POST &#x27;/customers/{id}/active&#x27;`
+
+```
+== The tree at rest
+PASS  1 wilanis check passes
+PASS  2 every rehearsed branch settles
+INFO  3 the rehearsal says: Writes are for registrars  holds at 6 trigger(s)  (the rule held at 5 triggers before your change; this line is reported, not judged)
+PASS  4 the rule in a-customer-is-reachable states what it stated
+PASS  5 the access rule still requires the same policy
+== The tree serving
+PASS  6 the tree starts and listens
+PASS  7 two customers registered as bo, one silver and one bronze
+== The endpoint
+PASS  8 toggling a silver customer as bo answers 200 and shows active true
+PASS  9 toggling them again answers 200 and shows active false
+PASS  10 reading the customer back shows their active field
+PASS  11 toggling the bronze customer as bo answers 200 and shows active true
+PASS  12 the bronze customer reads back active
+PASS  13 the list still answers 200 with both customers
+PASS  14 cy, an employee without the registrar role, is refused 403 forbidden
+PASS  15 no token is refused 401 anonymous
+PASS  16 an unknown id is refused 404 missing
+PASS  17 a third toggle activates the silver customer again
+PASS  18 the export carries the flag: the silver customer&#x27;s row ends in true
+== Verdict
+ACCEPTED  17 criteria pass
+```
+
+### curl commands beyond the gate, and their responses
+
+```
+$ curl -s -X POST localhost:8112/api/v1/auth-employees -H &#x27;content-type: application/json&#x27; -d &#x27;{&quot;username&quot;:&quot;bo&quot;,&quot;password&quot;:&quot;bo-pass&quot;}&#x27;
+→ token used below as $BO
+
+$ curl -s -X POST localhost:8112/customers -H &quot;authorization: Bearer $BO&quot; -H &#x27;content-type: application/json&#x27; -d &#x27;{&quot;name&quot;:&quot;Marie Curie&quot;,&quot;email&quot;:&quot;marie@example.com&quot;,&quot;tier&quot;:&quot;gold&quot;}&#x27;
+{&quot;reason&quot;:&quot;invariant&quot;,&quot;message&quot;:&quot;&#x27;A customer is reachable&#x27; does not hold: len(name) &gt; 0 &amp;&amp; len(email) &gt; 0 &amp;&amp; (tier != &#x27;gold&#x27; || has(note))&quot;}  [500]
+# confirms toggling wasn&#x27;t what broke this -- registration itself is refused by the pre-existing invariant, since there&#x27;s no route to set a note
+
+$ curl -s -X POST localhost:8112/customers -H &quot;authorization: Bearer $BO&quot; -H &#x27;content-type: application/json&#x27; -d &#x27;{&quot;name&quot;:&quot;Marie Curie&quot;,&quot;email&quot;:&quot;marie@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;}&#x27;
+{&quot;id&quot;:&quot;14bb0916-6e6e-4417-a059-f0516b19011d&quot;,&quot;name&quot;:&quot;Marie Curie&quot;,&quot;email&quot;:&quot;marie@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;}
+
+$ curl -s -X POST localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active -H &quot;authorization: Bearer $BO&quot;
+{&quot;id&quot;:&quot;14bb0916-6e6e-4417-a059-f0516b19011d&quot;,&quot;name&quot;:&quot;Marie Curie&quot;,&quot;email&quot;:&quot;marie@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:true}  [200]
+
+$ curl -s -X POST localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active -H &quot;authorization: Bearer $BO&quot;
+{&quot;id&quot;:&quot;...&quot;,&quot;active&quot;:false}  [200]
+
+$ curl -s -X POST localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active -H &quot;authorization: Bearer $BO&quot;
+{&quot;id&quot;:&quot;...&quot;,&quot;active&quot;:true}  [200]
+
+$ curl -s localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d
+{&quot;id&quot;:&quot;...&quot;,&quot;active&quot;:true}  [200]
+
+$ curl -s localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active   # wrong method, GET instead of POST
+{&quot;error&quot;:&quot;no trigger for GET /customers/14bb0916-6e6e-4417-a059-f0516b19011d/active&quot;}  [404]
+
+$ curl -s -X POST localhost:8112/customers/does-not-exist/active -H &quot;authorization: Bearer $BO&quot;
+{&quot;reason&quot;:&quot;missing&quot;,&quot;message&quot;:&quot;no customer does-not-exist&quot;}  [404]
+
+$ curl -s -X POST localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active
+{&quot;reason&quot;:&quot;anonymous&quot;,&quot;message&quot;:&quot;sign in first: no token was presented&quot;}  [401]
+
+$ curl -s -X POST localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active -H &quot;authorization: Bearer $CY&quot;   # cy: viewer, not registrar
+{&quot;reason&quot;:&quot;forbidden&quot;,&quot;message&quot;:&quot;registering customers takes the registrar role&quot;}  [403]
+
+$ curl -s -X POST localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active -H &quot;authorization: Bearer $ANA&quot;  # ana: account holder, wrong realm
+{&quot;reason&quot;:&quot;forbidden&quot;,&quot;message&quot;:&quot;this is for employees&quot;}  [403]
+
+$ curl -s -X POST localhost:8112/customers/14bb0916-6e6e-4417-a059-f0516b19011d/active -H &quot;authorization: Bearer garbage&quot;
+{&quot;reason&quot;:&quot;invalid_credential&quot;,&quot;message&quot;:&quot;the token does not verify: Invalid Compact JWS&quot;}  [401]
+
+$ curl -s localhost:8112/customers.csv -H &quot;authorization: Bearer $BO&quot; | grep 14bb0916
+14bb0916-6e6e-4417-a059-f0516b19011d,Marie Curie,marie@example.com,silver,wilanis-example/0.1.0,,true
+```
+
+The server was started with `CUSTOMERS_JWT_SECRET=arena-secret CUSTOMERS_DATABASE_URL=postgres://unused npm run start -- --profile local`, confirmed `Listen: ok`, and I killed it by PID afterward — port 8112 is free.
+
+### Left undone
+
+Nothing from the task. The REST (`live`) and PostgreSQL (`production`) bindings for `toggleActive` are only checked statically by `wilanis check` (which passes) — I didn&#x27;t run them against the live mock API or a real Postgres, since accept.sh and the task&#x27;s validation instructions only spin up `local`.
+</pre></details></div><div class="col"><h3>Claude Opus 5</h3><details><summary>Show the report</summary><pre>Done and accepted. Nothing is left listening on 8113.
+
+## What I added or changed
+
+**New documents**
+
+`features/customers/edge/toggle-active.trigger.json` — `POST /customers/{id}/active`. No body; `in` is the existing `IdRequest` shape, `out` is `CustomerView`. It attaches `employees-only` (giving the guard the token from the authorization header or the session cookie) and `can-register`, and maps `missing` 404, `upstream` 502, `anonymous` 401, `invalid_credential` 401, `forbidden` 403, `invariant` 500. It fires `customer.port.json#toggleActive`.
+
+`features/customers/data/toggle-active.graph.json` — the data graph behind the operation over a store (local profile). Read the record with `#get`, switch on `has(record)`, switch on `has(flag) &amp;&amp; flag` over `{{asked.record.active}}`, then one `#patch` per branch as that switch&#x27;s `to`, each followed by its own switch and its own `object.make`; three refuse nodes (`missing`, and one per branch for a record that goes between the read and the write), all eight answers listed in `out.from`.
+
+`features/customers/data/toggle-active-postgres.graph.json` — the same graph over `customers-postgres.store.json`, as every other kept-* graph in this tree is duplicated per store.
+
+`features/customers/data/toggle-active-row.graph.json` — the REST version (live profile): GET the row, decide from what it says, PUT the other value on that branch. Two calls, because the upstream API has no operation that flips a field. 404 on either call is `missing`, anything unexpected is `upstream`.
+
+**Changed documents**
+
+`features/customers/domain/customer.port.json` — added `toggleActive`, accepting `id`, returning `Customer`.
+
+The three bindings (`customers-store`, `customers-postgres`, `customers-rest`) — each names its own graph for `toggleActive`, so every profile meets it.
+
+`features/customers/domain/writes-are-for-registrars.invariant.json` — `toggleActive` added to `over`. The rule now holds at 6 triggers instead of 5. `requires.policy` is untouched.
+
+`features/customers/domain/Customer.shape.json` — `active` moved to be the last field (see the decisions below).
+
+`features/customers/edge/IdRequest.shape.json` — description extended to mention the new route; no field change.
+
+`README.md` — a new section &quot;Opening and closing an account&quot;, plus the route added to the start line, the write list, and the port&#x27;s operation list.
+
+## Decisions the task did not settle
+
+**Verb and route.** `POST /customers/{id}/active`. A toggle is not idempotent, so PUT would be a lie; a sub-resource keeps it off `/customers/{id}`, whose PUT already means &quot;replace who this customer is&quot;.
+
+**The route sends nothing but the id.** The alternative is a body carrying the value to set, but then it is not a toggle and two concurrent callers can disagree about what the next value is. Reading the flag and writing its opposite in one operation is the whole point, and it is why this is a port operation rather than a client convention over `update`.
+
+**One port operation, not two.** I considered `toggleActive` as a domain graph over a new `setActive(id, active)`, which would have put the flip rule in the domain layer. I dropped it: the flip is a read-decide-write over one record, which is exactly what `.claude/skills/wilanis-graphs/SKILL.md` writes out as a data graph, and the extra port operation would be a second public way to write the flag that the invariant would then also have to cover. A domain graph that only forwarded would have been refused as L007 anyway.
+
+**An absent `active` reads as closed**, so the first call opens the account. That is what the field&#x27;s own description says it means, and it is what criteria 8 and 11 require.
+
+**`active` is now the last field of `Customer`.** `@blob/csv.port.json#write` writes the shape&#x27;s fields in declared order, so with `active` before `note` the export ended each row with an empty `note` cell. Criterion 18 wants the row to end in the flag. Field order carries no rule, so moving the field was the one-line fix; the alternative was a separate CSV row shape and a mapping in `toCsv`, which is more machinery for a column order. The export header is now `id,name,email,tier,registrar,note,active`.
+
+**The REST binding&#x27;s toggle does a GET then a PUT with only `active` in the body**, relying on mockapi&#x27;s PUT merging. That profile is not exercised by the gate and I did not call the live API; if that API replaced rather than merged, the PUT would need the whole row. I have flagged it rather than changed the upstream contract.
+
+**The refusal on a record that vanishes between the read and the write** is `missing`, the same word as an unknown id, so a caller gets a 404 either way. Separate refuse nodes per branch, as G009 requires.
+
+## Final `bash accept.sh POST &#x27;/customers/{id}/active&#x27;`
+
+```
+== The tree at rest
+PASS  1 wilanis check passes
+PASS  2 every rehearsed branch settles
+INFO  3 the rehearsal says: Writes are for registrars  holds at 6 trigger(s)  (the rule held at 5 triggers before your change; this line is reported, not judged)
+PASS  4 the rule in a-customer-is-reachable states what it stated
+PASS  5 the access rule still requires the same policy
+== The tree serving
+PASS  6 the tree starts and listens
+PASS  7 two customers registered as bo, one silver and one bronze
+== The endpoint
+PASS  8 toggling a silver customer as bo answers 200 and shows active true
+PASS  9 toggling them again answers 200 and shows active false
+PASS  10 reading the customer back shows their active field
+PASS  11 toggling the bronze customer as bo answers 200 and shows active true
+PASS  12 the bronze customer reads back active
+PASS  13 the list still answers 200 with both customers
+PASS  14 cy, an employee without the registrar role, is refused 403 forbidden
+PASS  15 no token is refused 401 anonymous
+PASS  16 an unknown id is refused 404 missing
+PASS  17 a third toggle activates the silver customer again
+PASS  18 the export carries the flag: the silver customer&#x27;s row ends in true
+== Verdict
+ACCEPTED  17 criteria pass
+```
+
+## Curl beyond the gate
+
+With `H=http://localhost:8113`, `BO` from `/api/v1/auth-employees` as bo, `ANA` from `/api/v1/auth-customers` as ana, and `$ID` a registered customer.
+
+```
+curl -s -X POST $H/customers/$ID/active -H &quot;authorization: Bearer $ANA&quot; -w &#x27;  [%{http_code}]\n&#x27;
+{&quot;reason&quot;:&quot;forbidden&quot;,&quot;message&quot;:&quot;this is for employees&quot;}  [403]
+
+curl -s -X POST $H/customers/$ID/active -H &quot;authorization: Bearer not-a-token&quot; -w &#x27;  [%{http_code}]\n&#x27;
+{&quot;reason&quot;:&quot;invalid_credential&quot;,&quot;message&quot;:&quot;the token does not verify: Invalid Compact JWS&quot;}  [401]
+
+curl -s -X POST $H/customers/nope/active -w &#x27;  [%{http_code}]\n&#x27;
+{&quot;reason&quot;:&quot;anonymous&quot;,&quot;message&quot;:&quot;sign in first: no token was presented&quot;}  [401]
+```
+
+The gate runs before the graph, so an unknown id with no token is 401 and not 404.
+
+```
+curl -s -X POST $H/customers/$ID/active -H &quot;cookie: session=$BO&quot; -w &#x27;  [%{http_code}]\n&#x27;
+{&quot;id&quot;:&quot;689763b7-...&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;bronze&quot;,&quot;active&quot;:true}  [200]
+
+curl -s $H/customers/$ID/active -w &#x27;  [%{http_code}]\n&#x27;
+{&quot;error&quot;:&quot;no trigger for GET /customers/689763b7-.../active&quot;}  [404]
+```
+
+The toggle survives an unrelated update, and the flag shows in every read:
+
+```
+curl -s -X PUT $H/customers/$ID -H &quot;authorization: Bearer $BO&quot; -H &#x27;content-type: application/json&#x27; \
+  -d &#x27;{&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;}&#x27; -w &#x27;  [%{http_code}]\n&#x27;
+{&quot;id&quot;:&quot;689763b7-...&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:true}  [200]
+
+curl -s &quot;$H/customers?tier=silver&quot; -w &#x27;  [%{http_code}]\n&#x27;
+[{&quot;id&quot;:&quot;689763b7-...&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:true}]  [200]
+
+curl -s -X POST $H/customers/$ID/active -H &quot;authorization: Bearer $BO&quot; -w &#x27;  [%{http_code}]\n&#x27;
+{&quot;id&quot;:&quot;689763b7-...&quot;,&quot;name&quot;:&quot;Grace Hopper&quot;,&quot;email&quot;:&quot;grace@example.com&quot;,&quot;tier&quot;:&quot;silver&quot;,&quot;active&quot;:false}  [200]
+
+curl -s $H/customers.csv
+id,name,email,tier,registrar,note,active
+689763b7-...,Grace Hopper,grace@example.com,silver,wilanis-example/0.1.0,,false
+```
+
+`npx wilanis rehearse . --profile live` and `--profile production` both report every branch settled, including the four switches of the REST graph and the four plus two guards of the postgres one, so all three bindings are walked and not only the one the gate runs.
+
+## Left undone
+
+The REST binding&#x27;s PUT with a partial body was never exercised against the real mockapi upstream; I only rehearsed it. There are no recorded scenarios in this tree, so there was nothing for `wilanis regress` to replay, and I wrote none. The change is committed on `main` as `0e368b5`; the repository has no remote, so there was nothing to push.
+</pre></details></div></div>
+<footer><p>Runs made on 2026-09-22 against the example of wilanis-js at <code>8de68b9</code>, each model through `claude -p` with the default effort, one attempt each, no retries, the copy as the working directory. Transcripts were reduced with parse.py, the facts derived with facts.py, the gate run again by the reviewer on each finished tree and the nine curls of validate.sh beside it. Cost is computed from the token counts the API reported, at list price. Regenerate this page with `bash docs/demo/arena/run.sh` from the repository root after `npm run build`; docs/demo/arena/README.md says the rest.</p></footer></body></html>
