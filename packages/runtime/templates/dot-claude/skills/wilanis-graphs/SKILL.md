@@ -37,7 +37,7 @@ write, its own check of the write's answer, and its own refusal.
 The graph below flips a customer's `tier` between `bronze` and `silver` over the store the example tree keeps
 (`@customers/data/customers.store.json`, collection `customers`, of `@customers/domain/Customer.shape.json`, keyed by
 `id`). It checks clean and every branch rehearses. For a boolean field, the second switch reads
-`{{read.record.active}}` and its rule is `active`.
+`{{current.record.active}}` and its rule is `active`.
 
 ```json
 {
@@ -46,70 +46,70 @@ The graph below flips a customer's `tier` between `bronze` and `silver` over the
   "in": "@customers/domain/CustomerRef.shape.json",
   "out": {
     "type": "@customers/domain/Customer.shape.json",
-    "from": ["silvered", "bronzed", "missing", "goneBeforeSilver", "goneBeforeBronze"]
+    "from": ["silverCustomer", "bronzeCustomer", "noCustomer", "goneBeforeSilver", "goneBeforeBronze"]
   },
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "read",
+      "id": "current",
       "run": "@storage/store.port.json#get",
       "in": { "store": "@customers/data/customers.store.json", "collection": "customers", "key": "{{in.id}}" }
     },
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "kept",
-      "in": { "record": "{{read.record}}" },
-      "rules": [{ "when": "has(record)", "to": "decide" }],
-      "else": "missing"
+      "id": "isKept",
+      "in": { "record": "{{current.record}}" },
+      "rules": [{ "when": "has(record)", "to": "isBronze" }],
+      "else": "noCustomer"
     },
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "decide",
-      "in": { "tier": "{{read.record.tier}}" },
-      "rules": [{ "when": "tier == 'bronze'", "to": "toSilver" }],
-      "else": "toBronze"
+      "id": "isBronze",
+      "in": { "tier": "{{current.record.tier}}" },
+      "rules": [{ "when": "tier == 'bronze'", "to": "silvered" }],
+      "else": "bronzed"
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "toSilver",
+      "id": "silvered",
       "run": "@storage/store.port.json#patch",
       "in": { "store": "@customers/data/customers.store.json", "collection": "customers", "key": "{{in.id}}", "changes": { "tier": "silver" } }
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "toBronze",
+      "id": "bronzed",
       "run": "@storage/store.port.json#patch",
       "in": { "store": "@customers/data/customers.store.json", "collection": "customers", "key": "{{in.id}}", "changes": { "tier": "bronze" } }
     },
     {
       "type": "@wilanis/node/switch.schema.json",
       "id": "stillThereAfterSilver",
-      "in": { "record": "{{toSilver.record}}" },
-      "rules": [{ "when": "has(record)", "to": "silvered" }],
+      "in": { "record": "{{silvered.record}}" },
+      "rules": [{ "when": "has(record)", "to": "silverCustomer" }],
       "else": "goneBeforeSilver"
     },
     {
       "type": "@wilanis/node/switch.schema.json",
       "id": "stillThereAfterBronze",
-      "in": { "record": "{{toBronze.record}}" },
-      "rules": [{ "when": "has(record)", "to": "bronzed" }],
+      "in": { "record": "{{bronzed.record}}" },
+      "rules": [{ "when": "has(record)", "to": "bronzeCustomer" }],
       "else": "goneBeforeBronze"
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "silvered",
+      "id": "silverCustomer",
       "run": "@std/object.port.json#make",
-      "in": { "value": "{{toSilver.record}}", "type": "@customers/domain/Customer.shape.json" }
+      "in": { "value": "{{silvered.record}}", "type": "@customers/domain/Customer.shape.json" }
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "bronzed",
+      "id": "bronzeCustomer",
       "run": "@std/object.port.json#make",
-      "in": { "value": "{{toBronze.record}}", "type": "@customers/domain/Customer.shape.json" }
+      "in": { "value": "{{bronzed.record}}", "type": "@customers/domain/Customer.shape.json" }
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "missing",
+      "id": "noCustomer",
       "run": "@std/outcome.port.json#refuse",
       "in": { "reason": "missing", "message": "no customer {{in.id}}", "type": "@customers/domain/Customer.shape.json" }
     },
@@ -129,7 +129,7 @@ The graph below flips a customer's `tier` between `bronze` and `silver` over the
 }
 ```
 
-Read `{{read.record.tier}}` is allowed in `decide` because `decide` is the `to` of a `has(record)` rule: a
+Read `{{current.record.tier}}` is allowed in `isBronze` because `isBronze` is the `to` of a `has(record)` rule: a
 switch rule `has(x)` proves `x` present for the node it routes to, and for nothing else. Read it from a
 node the switch does not route to and G004 says so.
 
@@ -150,7 +150,7 @@ then read its answer: a switch on `has(record)` over it, ending in a `make` name
 quiet it by adding the node to `out.from` while it still sits beside the switch: it would still run on
 every branch.
 
-**G009** `node 'missing' is routed by both 'kept' and 'stillThereAfterPost'`. A node has one router. Two
+**G009** `node 'noCustomer' is routed by both 'isKept' and 'stillThereAfterSilver'`. A node has one router. Two
 switches that both end in a refusal each need their own refusal node, with the same `reason` if the reason
 is the same.
 
