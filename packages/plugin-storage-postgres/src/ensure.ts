@@ -20,8 +20,9 @@ import type { At } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';
 import { columnOf, fieldsOf, folded, isJson as isJsonType } from './columns.js';
 import { type Column, columnsOf } from './inspect.js';
-import { refName, uniqueName } from './names.js';
+import { refName, scopedUniqueName, uniqueName } from './names.js';
 import type { Settings } from './pool.js';
+import { scopeColumnsOf } from './scoping.js';
 
 /** How much `ensure` made: what was created, never what was already there. */
 export interface Made {
@@ -117,13 +118,24 @@ async function constraints(db: Kysely<never>, schema: string): Promise<Set<strin
   return new Set(rows.rows.map(one => one.conname));
 }
 
-/** Add the uniques and the foreign keys a collection declares and the schema does not hold yet. */
-async function addConstraints(db: Kysely<never>, schema: string, at: At, held: Set<string>): Promise<number> {
+/**
+ * Add the uniques and the foreign keys a collection declares and the schema does not hold yet.
+ *
+ * `scoped` is the columns this table keeps as a scope. Where there are any, the collection's uniques are held
+ * within the scope (RFC 0015) and a bare one would hold across every tenant at once -- so a declaration whose
+ * scoped constraint is already there is skipped rather than created a second time in the unscoped spelling.
+ */
+async function addConstraints(
+  db: Kysely<never>,
+  where: { schema: string; at: At; scoped: string[] },
+  held: Set<string>,
+): Promise<number> {
+  const { schema, at, scoped } = where;
   const table = sql`${sql.ref(schema)}.${sql.ref(folded(at.name))}`;
   let made = 0;
   for (const fields of at.unique) {
     const name = uniqueName(at.name, fields);
-    if (held.has(name)) continue;
+    if (held.has(name) || held.has(scopedUniqueName(at.name, scoped, fields))) continue;
     const columns = sql.join(fields.map(field => sql.ref(folded(field))));
     await sql`alter table ${table} add constraint ${sql.ref(name)} unique (${columns})`.execute(db);
     held.add(name);
@@ -143,8 +155,14 @@ async function addConstraints(db: Kysely<never>, schema: string, at: At, held: S
   return made;
 }
 
-/** What the table already has, held against what the shape says: anything that would have to change is drift. */
-function judgeDrift(at: At, found: Map<string, Found>): void {
+/**
+ * What the table already has, held against what the shape says: anything that would have to change is drift.
+ *
+ * `kept` is the columns this engine holds as a scope (RFC 0015). They are `NOT NULL` and no field of the shape
+ * has one -- that is what a scope column is -- so without knowing them every scoped table would read as drift
+ * the moment `ensure` ran a second time over it.
+ */
+function judgeDrift(at: At, found: Map<string, Found>, kept: Set<string>): void {
   const table = folded(at.name);
   for (const field of fieldsOf(at.shape)) {
     const column = found.get(folded(field.name));
@@ -155,7 +173,7 @@ function judgeDrift(at: At, found: Map<string, Found>): void {
   }
   const declared = new Set(fieldsOf(at.shape).map(field => folded(field.name)));
   for (const [name, column] of found)
-    if (!declared.has(name) && column.is_nullable === 'NO')
+    if (!declared.has(name) && !kept.has(name) && column.is_nullable === 'NO')
       throw new Error(`drift: ${table}.${name} is a column no field of the shape has, and it is not null`);
 }
 
@@ -164,17 +182,22 @@ function judgeDrift(at: At, found: Map<string, Found>): void {
  * A table that is already there is judged for drift first, so nothing is added to a table that should not have
  * been touched at all.
  */
-async function ensureOne(db: Kysely<never>, schema: string, at: At): Promise<{ collections: number; columns: number }> {
+async function ensureOne(
+  db: Kysely<never>,
+  schema: string,
+  at: At,
+): Promise<{ collections: number; columns: number; scoped: string[] }> {
   const found = await existing(db, schema, folded(at.name));
-  if (!found) return { collections: 1, columns: await createTable(db, schema, at) };
-  judgeDrift(at, found);
+  if (!found) return { collections: 1, columns: await createTable(db, schema, at), scoped: [] };
+  const kept = await scopeColumnsOf(db, at, { schema, table: folded(at.name) });
+  judgeDrift(at, found, kept);
   let columns = 0;
   for (const field of fieldsOf(at.shape)) {
     if (found.has(folded(field.name))) continue;
     await addColumn(db, { schema, at }, field);
     columns += 1;
   }
-  return { collections: 0, columns };
+  return { collections: 0, columns, scoped: [...kept] };
 }
 
 /**
@@ -185,14 +208,17 @@ async function ensureOne(db: Kysely<never>, schema: string, at: At): Promise<{ c
 export async function ensureTables(db: Kysely<never>, collections: At[], _settings: Settings): Promise<Made> {
   const schema = schemaOf(collections[0]);
   const made: Made = { collections: 0, columns: 0, constraints: 0 };
+  const scoped = new Map<string, string[]>();
   await db.transaction().execute(async trx => {
     for (const at of collections) {
       const one = await ensureOne(trx as never, schema, at);
       made.collections += one.collections;
       made.columns += one.columns;
+      scoped.set(at.name, one.scoped);
     }
     const held = await constraints(trx as never, schema);
-    for (const at of collections) made.constraints += await addConstraints(trx as never, schema, at, held);
+    for (const at of collections)
+      made.constraints += await addConstraints(trx as never, { schema, at, scoped: scoped.get(at.name) ?? [] }, held);
   });
   return made;
 }

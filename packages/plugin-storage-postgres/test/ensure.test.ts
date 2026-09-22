@@ -16,6 +16,7 @@ import { sql } from 'kysely';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { PostgresEngine } from '../src/engine.js';
 import { closePools, poolFor } from '../src/pool.js';
+import { forgetScopes } from '../src/scoping.js';
 
 const url = process.env.WILANIS_TEST_POSTGRES_URL;
 const KIND = '@storage-postgres/postgres.connection-kind.json';
@@ -49,10 +50,15 @@ const at = (name: string, what: Partial<At> = {}): At => ({
   ...what,
 });
 
-/** Drop a table between cases, so each one starts from a database that has never seen it. */
+/**
+ * Drop a table between cases, so each one starts from a database that has never seen it. What the engine
+ * remembers about which tables keep a scope goes with it: that memo is knowledge about tables that are there,
+ * and a case that drops one has made it false.
+ */
 async function drop(name: string): Promise<void> {
   const { db } = poolFor(at(name), {});
   await sql`drop table if exists public.${sql.ref(name)} cascade`.execute(db);
+  forgetScopes();
 }
 
 afterAll(async () => {
@@ -123,5 +129,94 @@ describe.skipIf(!url)('what ensure makes, and what it refuses to change', () => 
     await engine.put(collection, { id: '2', url: 'https://x', hits: 1, tags: [] }, true);
     await expect(engine.ensure([at('e_uniq_bad', { unique: [['url']] })])).rejects.toThrow();
     expect(await engine.count(collection, undefined)).toBe(2);
+  });
+});
+
+/** One row of the shape this file's tables are made from, for a case that only needs the table to hold one. */
+const one = (id: string) => ({ id, url: `https://${id}`, hits: 1, tags: [] });
+
+/** What a table's catalog says: its columns, its unique constraints and its indexes, by name. */
+async function catalogOf(name: string): Promise<{ columns: Column[]; constraints: string[]; indexes: string[] }> {
+  const { db } = poolFor(at(name), {});
+  const columns = (await sql<Column>`
+    select column_name, data_type, is_nullable from information_schema.columns
+    where table_schema = 'public' and table_name = ${name} order by ordinal_position
+  `.execute(db)) as { rows: Column[] };
+  const held = (await sql<{ conname: string }>`
+    select c.conname from pg_constraint c join pg_class t on t.oid = c.conrelid
+    where t.relname = ${name} and c.contype = 'u'
+  `.execute(db)) as { rows: { conname: string }[] };
+  const indexes = (await sql<{ indexname: string }>`
+    select indexname from pg_indexes where schemaname = 'public' and tablename = ${name}
+  `.execute(db)) as { rows: { indexname: string }[] };
+  return {
+    columns: columns.rows,
+    constraints: held.rows.map(row => row.conname),
+    indexes: indexes.rows.map(row => row.indexname),
+  };
+}
+
+/** One column as `information_schema.columns` reports it, which is all these cases read back. */
+interface Column {
+  column_name: string;
+  data_type: string;
+  is_nullable: string;
+}
+
+/**
+ * What a scope costs a table (RFC 0015, step 7). The scope is not on the collection an engine is given: the
+ * contract hands it to an operation, so the table gains its column the first time one arrives -- under the
+ * same rule every other column is added by, additive on an empty table and `drift` on one with rows.
+ *
+ * A row written before the store declared a scope belongs to no tenant, and no declaration can say which one:
+ * giving it one would be inventing the answer to exactly the question a scope exists to ask. So it is refused,
+ * and RFC 0017's planner is where that migration is written.
+ */
+describe.skipIf(!url)('what a scope costs the table', () => {
+  beforeEach(async () => {
+    for (const name of ['e_scope', 'e_scope_rows', 'e_scope_again', 'e_scope_num']) await drop(name);
+  });
+
+  it('adds the column NOT NULL, the composite unique and the index over the scope and the key', async () => {
+    const collection = at('e_scope', { unique: [['url', 'hits']] });
+    await engine.ensure([collection]);
+    await engine.put(collection, one('1'), { replace: true, scope: { tenant: 'acme' } });
+
+    const { columns, constraints, indexes } = await catalogOf('e_scope');
+    expect(columns.find(column => column.column_name === 'tenant')).toEqual({
+      column_name: 'tenant',
+      data_type: 'text',
+      is_nullable: 'NO',
+    });
+    expect(constraints).toEqual(['wl_us_e_scope_tenant_url_hits']);
+    expect(indexes).toContain('wl_i_e_scope_scope');
+  });
+
+  it('a number scope is kept as double precision, as a number field of a shape is', async () => {
+    const collection = at('e_scope_num');
+    await engine.ensure([collection]);
+    await engine.put(collection, one('1'), { replace: true, scope: { owner: 7 } });
+    const { columns } = await catalogOf('e_scope_num');
+    expect(columns.find(column => column.column_name === 'owner')?.data_type).toBe('double precision');
+  });
+
+  it('refuses drift where the table holds rows and no scope column, and adds nothing', async () => {
+    const collection = at('e_scope_rows');
+    await engine.ensure([collection]);
+    await engine.put(collection, one('1'), { replace: true });
+    await expect(engine.put(collection, one('2'), { replace: true, scope: { tenant: 'acme' } })).rejects.toThrow(
+      /drift: e_scope_rows holds 1 row\(s\) and no 'tenant' column/,
+    );
+    const { columns } = await catalogOf('e_scope_rows');
+    expect(columns.map(column => column.column_name)).not.toContain('tenant');
+  });
+
+  it('a later ensure over a scoped table is content: a scope column is not a column the shape lost', async () => {
+    const collection = at('e_scope_again', { unique: [['url']] });
+    await engine.ensure([collection]);
+    await engine.put(collection, one('1'), { replace: true, scope: { tenant: 'acme' } });
+    expect(await engine.ensure([collection])).toEqual({ collections: 0, columns: 0, constraints: 0 });
+    // the unique is still the scoped one: a second ensure must not put the unscoped spelling back beside it
+    expect((await catalogOf('e_scope_again')).constraints).toEqual(['wl_us_e_scope_again_tenant_url']);
   });
 });
