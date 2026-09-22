@@ -1,6 +1,6 @@
 /**
- * What a guarded site lowers to (RFC 0007, step 5). The example's field invariant over `Entry` is proved at no
- * site of the monitor's data graphs, so each of them is compiled with a guard: the node that makes the entry
+ * What a guarded site lowers to (RFC 0007, step 5). The example's field invariant over `Customer` is proved at no
+ * site of the customer registry's data graphs, so each of them is compiled with a guard: the node that makes the customer
  * moves aside to `<id>:made`, a switch on the rule takes its place between it and everything downstream, and
  * the branch the rule did not hold on refuses with the one reserved word.
  *
@@ -38,13 +38,13 @@ const graphOf = (path: string) => {
 
 describe('lowering a guard', () => {
   it('finds the sites the checker could not prove, and only those', () => {
-    // every entry the monitor's data graphs make comes out of the store, which nothing narrows: all guarded
+    // every customer the registry's data graphs make comes out of the store, which nothing narrows: all guarded
     expect(hasGuard(scope, graphOf(KEPT_GET))).toBe(true);
     // the greeting names no shape an invariant holds over, so nothing of it is guarded
     expect(hasGuard(scope, graphOf(GREET))).toBe(false);
     const guards = guardsOf(scope, graphOf(KEPT_GET));
     expect(guards.map(one => [one.id, one.arity, one.site.kind])).toEqual([['row', 'one', 'made']]);
-    expect(guards[0].unproved.map(one => one.invariant.doc.label)).toEqual(['An entry names a call']);
+    expect(guards[0].unproved.map(one => one.invariant.doc.label)).toEqual(['A customer is reachable']);
   });
 
   it('puts the original node aside and the guard in its place, under the four ids the RFC names', () => {
@@ -67,12 +67,13 @@ describe('lowering a guard', () => {
     const check = specOf(KEPT_GET).nodes['row:check'] as KSwitch;
     expect(check.kind).toBe('switch');
     expect(check.in).toEqual({
-      url: { ref: 'row:made', path: ['url'] },
-      method: { ref: 'row:made', path: ['method'] },
-      agent: { ref: 'row:made', path: ['agent'] },
+      name: { ref: 'row:made', path: ['name'] },
+      email: { ref: 'row:made', path: ['email'] },
+      tier: { ref: 'row:made', path: ['tier'] },
+      note: { ref: 'row:made', path: ['note'] },
     });
     expect(check.rules.map(rule => [rule.label, rule.to])).toEqual([
-      ["(len(url) > 0 && (method != 'DELETE' || has(agent)))", 'row'],
+      ["(len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note)))", 'row'],
     ]);
     expect(check.else).toBe('row:violated');
   });
@@ -87,7 +88,8 @@ describe('lowering a guard', () => {
     expect(violated.handler).toBe('@std/outcome.port.json#refuse');
     expect(violated.in.reason).toEqual({ value: 'invariant' });
     expect(violated.in.message).toEqual({
-      value: "'An entry names a call' does not hold: len(url) > 0 && (method != 'DELETE' || has(agent))",
+      value:
+        "'A customer is reachable' does not hold: len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))",
     });
   });
 
@@ -118,7 +120,7 @@ describe('lowering a guard', () => {
 
   it('guards a taken value at in:ok, leaving the caller the graph was handed at in', () => {
     const spec = specOf(WRITE_CSV);
-    // write-csv takes Entry[], so its guard is a map over what the caller handed it
+    // write-csv takes Customer[], so its guard is a map over what the caller handed it
     expect(Object.keys(spec.nodes).sort()).toEqual(['file', 'in:ok']);
     expect(spec.nodes['in:ok']).toMatchObject({ kind: 'map', over: { ref: 'in', path: [] } });
     // and the node that reads {{in}} reads the judged value instead: that is what Roots.aliases renames
@@ -139,17 +141,17 @@ describe('lowering a guard', () => {
  * invariant but the last asks whether that invariant's own rule is what did not hold and routes to its own
  * refusal, and the last invariant's refusal is the `else`. So the first pair keeps `<id>:check` and
  * `<id>:violated`, a second rule adds `<id>:violated:2` and nothing else, and a value that satisfies one rule
- * and not the other is refused with that other's sentence alone. The second rule is `len(method) > 0`, which
+ * and not the other is refused with that other's sentence alone. The second rule is `len(id) > 0`, whose file
  * the registry holds before the example's own, so it is the first the switch asks about.
  */
-const METHOD_RULE = 'len(method) > 0';
-const CALL_RULE = "len(url) > 0 && (method != 'DELETE' || has(agent))";
+const ID_RULE = 'len(id) > 0';
+const REACH_RULE = "len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))";
 const two = loadedWith({
-  'features/customers/domain/an-entry-has-a-method.invariant.json': {
+  'features/customers/domain/a-customer-has-an-id.invariant.json': {
     $schema: schemaUrl('invariant'),
-    label: 'An entry has a method',
+    label: 'A customer has an id',
     description: 'A second rule over the same shape, unproved at the same sites, so one guard stands for both.',
-    holds: { on: '@customers/domain/Customer.shape.json', when: METHOD_RULE },
+    holds: { on: '@customers/domain/Customer.shape.json', when: ID_RULE },
   },
 });
 afterAll(() => rmSync(two.dir, { recursive: true, force: true }));
@@ -175,19 +177,19 @@ describe('lowering a guard two invariants are unproved at', () => {
   it('tests the conjunction first, then asks which rule failed, the last being what remains', () => {
     const check = spec().nodes['row:check'] as KSwitch;
     expect(check.rules.map(rule => [rule.label, rule.to])).toEqual([
-      [`(${METHOD_RULE}) && (${CALL_RULE})`, 'row'],
-      [`!(${METHOD_RULE})`, 'row:violated'],
+      [`(${ID_RULE}) && (${REACH_RULE})`, 'row'],
+      [`!(${ID_RULE})`, 'row:violated'],
     ]);
     expect(check.else).toBe('row:violated:2');
     // one input per root either rule reads, still read off the made value
-    expect(Object.keys(check.in).sort()).toEqual(['agent', 'method', 'url']);
+    expect(Object.keys(check.in).sort()).toEqual(['email', 'id', 'name', 'note', 'tier']);
   });
 
   it('gives each refusal the sentence of its own invariant and no other', () => {
     const first = spec().nodes['row:violated'] as KCall;
     const second = spec().nodes['row:violated:2'] as KCall;
-    expect(first.in.message).toEqual({ value: `'An entry has a method' does not hold: ${METHOD_RULE}` });
-    expect(second.in.message).toEqual({ value: `'An entry names a call' does not hold: ${CALL_RULE}` });
+    expect(first.in.message).toEqual({ value: `'A customer has an id' does not hold: ${ID_RULE}` });
+    expect(second.in.message).toEqual({ value: `'A customer is reachable' does not hold: ${REACH_RULE}` });
     for (const node of [first, second]) {
       expect(node.handler).toBe('@std/outcome.port.json#refuse');
       expect(node.in.reason).toEqual({ value: 'invariant' });
@@ -198,7 +200,7 @@ describe('lowering a guard two invariants are unproved at', () => {
     expect(spec().output).toEqual(['row', 'row:violated', 'row:violated:2', 'missing']);
   });
 
-  /** The graph run with the store's answer seeded, so the guard judges exactly the entry a case hands it. */
+  /** The graph run with the store's answer seeded, so the guard judges exactly the customer a case hands it. */
   const judged = async (record: Record<string, unknown>) => {
     const compiled = embedder.graph(KEPT_GET);
     const report = await runGraph(compiled, { initial: { in: { id: 'x' }, asked: { record } }, env: embedder.env });
@@ -206,32 +208,33 @@ describe('lowering a guard two invariants are unproved at', () => {
   };
 
   it('refuses a value that breaks one rule with that invariant alone, whichever of the two it is', async () => {
-    // the URL is fine and the method is empty: only the second invariant's rule fails
-    const noMethod = await judged({ id: 'x', url: 'https://x', method: '', agent: 'probe' });
-    expect(noMethod).toMatchObject({
+    // the customer is reachable and the id is empty: only the planted invariant's rule fails
+    const noId = await judged({ id: '', name: 'Ada', email: 'ada@example.com', tier: 'bronze' });
+    expect(noId).toMatchObject({
       kind: 'refused',
       reason: 'invariant',
       at: 'row:violated',
-      message: `'An entry has a method' does not hold: ${METHOD_RULE}`,
+      message: `'A customer has an id' does not hold: ${ID_RULE}`,
     });
-    // the method is fine and the URL is empty: only the example's own rule fails
-    const noUrl = await judged({ id: 'x', url: '', method: 'GET', agent: 'probe' });
-    expect(noUrl).toMatchObject({
+    // the id is there and the address is empty: only the example's own rule fails
+    const noEmail = await judged({ id: 'x', name: 'Ada', email: '', tier: 'bronze' });
+    expect(noEmail).toMatchObject({
       kind: 'refused',
       reason: 'invariant',
       at: 'row:violated:2',
-      message: `'An entry names a call' does not hold: ${CALL_RULE}`,
+      message: `'A customer is reachable' does not hold: ${REACH_RULE}`,
     });
-    for (const outcome of [noMethod, noUrl]) {
+    for (const outcome of [noId, noEmail]) {
       if (outcome.kind !== 'refused') throw new Error(outcome.kind);
       expect(outcome.message).not.toContain(';');
     }
   });
 
   it('names the first rule where both fail, and lets a value satisfying both through', async () => {
-    const both = await judged({ id: 'x', url: '', method: '', agent: 'probe' });
+    const both = await judged({ id: '', name: '', email: '', tier: 'bronze' });
     expect(both).toMatchObject({ kind: 'refused', at: 'row:violated' });
-    const fine = await judged({ id: 'x', url: 'https://x', method: 'GET', agent: 'probe' });
-    expect(fine).toMatchObject({ kind: 'answered', output: { id: 'x', url: 'https://x', method: 'GET' } });
+    const ok = { id: 'x', name: 'Ada', email: 'ada@example.com', tier: 'bronze' };
+    const fine = await judged(ok);
+    expect(fine).toMatchObject({ kind: 'answered', output: ok });
   });
 });

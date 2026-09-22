@@ -27,12 +27,11 @@ const SCHEMAS = 'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packa
 /** The row the fake upstream starts with. */
 export const firstRow = (): Record<string, unknown> => ({
   id: '1',
-  url: 'https://a.example/',
-  method: 'GET',
-  reponseStatus: 204,
-  ipv4: '10.0.0.1',
-  mac: '00:00:00:00:00:01',
-  agent: 'curl/8',
+  name: 'Ada',
+  email: 'ada@a.example',
+  tier: 'bronze',
+  active: true,
+  registrar: 'curl/8',
   createdAt: '2026-09-07',
 });
 
@@ -51,10 +50,10 @@ function writeUploadForm(dir: string) {
     join(dir, 'features/customers/edge/upload-form.trigger.json'),
     JSON.stringify({
       $schema: `${SCHEMAS}trigger.schema.json`,
-      description: 'POST /monitor/upload as a form',
+      description: 'POST /customers/upload as a form',
       kind: '@http/http.trigger-kind.json',
       settings: {
-        route: '/monitor/upload',
+        route: '/customers/upload',
         method: 'POST',
         consumes: 'multipart/form-data',
         produces: 'application/json',
@@ -75,7 +74,7 @@ function writeUploadForm(dir: string) {
       },
       in: '@features/customers/edge/CsvUpload.shape.json',
       out: '@features/customers/edge/CustomerView.shape.json[]',
-      // this route reaches monitor.import, so the writes invariant holds it to the recorder gate like every
+      // this route reaches customer.import, so the writes invariant holds it to the registrar gate like every
       // other write: a planted trigger is not exempt from a rule the tree states once
       policies: [
         {
@@ -91,7 +90,7 @@ function writeUploadForm(dir: string) {
 
 /**
  * The example, pointed at a fake mockapi on localhost. Its write routes are gated by the access feature's policies,
- * so the tests sign in as bo -- an employee holding the recorder role -- through the example's own route and
+ * so the tests sign in as bo -- an employee holding the registrar role -- through the example's own route and
  * present our token; nothing about access is edited.
  */
 export function localCopy(): string {
@@ -125,15 +124,13 @@ export interface InFlight {
 function newRow(body: string, rows: Record<string, unknown>[]) {
   return {
     createdAt: 'now',
-    ipv4: '127.0.0.1',
-    mac: '00:00:00:00:00:00',
-    reponseStatus: 200,
+    active: true,
     ...JSON.parse(body),
     id: String(rows.length + 1),
   };
 }
 
-/** The collection: POST adds a row, GET answers them all, filtered by ?method= when asked. */
+/** The collection: POST adds a row, GET answers them all, filtered by ?tier= when asked. */
 function collection(
   request: IncomingMessage,
   url: URL,
@@ -145,8 +142,8 @@ function collection(
     rows.push(row);
     return { status: 201, value: row };
   }
-  const method = url.searchParams.get('method');
-  return { status: 200, value: method ? rows.filter(row => row.method === method) : rows };
+  const tier = url.searchParams.get('tier');
+  return { status: 200, value: tier ? rows.filter(row => row.tier === tier) : rows };
 }
 
 /** One row: a DELETE removes it, slowly enough that concurrent deletes overlap so a throttle's ceiling shows. */
@@ -184,13 +181,13 @@ async function answerFor(
   return collection(request, url, body, upstream.rows);
 }
 
-/** A fake mockapi: rows under /api/v1/monitor, and "Not found" for anything else. */
+/** A fake mockapi: rows under /api/v1/customers, and "Not found" for anything else. */
 export function fakeUpstream(upstream: Upstream): Server {
   return createServer(async (request: IncomingMessage, response: ServerResponse) => {
     let body = '';
     for await (const chunk of request) body += chunk;
     const url = new URL(request.url ?? '/', 'http://local');
-    const route = /^\/api\/v1\/monitor(?:\/([^/]+))?$/.exec(url.pathname);
+    const route = /^\/api\/v1\/customers(?:\/([^/]+))?$/.exec(url.pathname);
     const answer = await answerFor({ request, url, body, route }, upstream);
     response.writeHead(answer.status, { 'content-type': 'application/json' });
     response.end(JSON.stringify(answer.value));
@@ -203,8 +200,8 @@ export const listening = async (server: Server, port: number) => {
   return () => new Promise<void>(done => server.close(() => done()));
 };
 
-/** Sign in as bo, an employee holding the recorder role, and answer the token. */
-export async function signInAsRecorder(): Promise<string> {
+/** Sign in as bo, an employee holding the registrar role, and answer the token. */
+export async function signInAsRegistrar(): Promise<string> {
   const answer = await fetch('http://localhost:8099/api/v1/auth-employees', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

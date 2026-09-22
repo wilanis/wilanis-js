@@ -36,7 +36,7 @@ export const minimal: Record<Kind, Record<string, unknown>> = {
   resolvers: { resolvers: { caller: { read: "request.headers['user-agent']" } } },
   store: {
     connection: '@connections/records.connection.json',
-    collections: { entries: { of: '@features/f/domain/Customer.shape.json', key: 'id' } },
+    collections: { customers: { of: '@features/f/domain/Customer.shape.json', key: 'id' } },
   },
   invariant: { holds: { on: '@features/f/domain/Customer.shape.json', when: 'true' } },
 };

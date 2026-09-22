@@ -6,8 +6,8 @@
  * thing `describe` and the viewer exist to avoid.
  *
  * The example's two access invariants are both exercised, since they take the two forms `requires` allows:
- * `writes-are-for-recorders` names the policy, `the-session-is-the-callers` names what must be proved. The
- * example carries one `holds` invariant beside them, `an-entry-names-a-call`, so the listing sees all three;
+ * `writes-are-for-registrars` names the policy, `the-session-is-the-callers` names what must be proved. The
+ * example carries one `holds` invariant beside them, `a-customer-is-reachable`, so the listing sees all three;
  * what `describe` says of the field form is still read off a planted one, since a case that plants its rule
  * says in the test what it expects to be told.
  */
@@ -28,9 +28,9 @@ const SIGNED_IN = '@features/access/edge/signed-in.policy.json';
 describe('ls: the invariants of a tree', () => {
   it('lists an invariant under its kind, as every other kind is listed', () => {
     expect(ls(example, 'invariant')).toEqual([
-      `invariant        ${SESSION}`,
       `invariant        ${CALLS}`,
       `invariant        ${WRITES}`,
+      `invariant        ${SESSION}`,
     ]);
   });
 
@@ -53,7 +53,7 @@ describe('describe: an access invariant that names the policy', () => {
   });
 
   it('names each trigger once, however many of the gated operations it reaches', () => {
-    // one trigger reaching three operations is one trigger. The five write triggers of the monitor feature,
+    // one trigger reaching three operations is one trigger. The five write triggers of the customers feature,
     // one line each; the reads are not reached and say nothing at all
     const rows = said()
       .split('\n')
@@ -82,10 +82,10 @@ describe('describe: an access invariant that names the policy', () => {
   });
 
   it("names an operation reached through another, which is the RFC's own reason for the rule", () => {
-    // POST /monitor/import fires #import, whose graph calls #record for every row: the trigger reaches
-    // #record transitively and the invariant holds it to the same gate, so a domain graph cannot route around it
+    // POST /customers/import fires #import, whose graph calls #register for every row: the trigger reaches
+    // #register transitively and the invariant holds it to the same gate, so a domain graph cannot route around it
     expect(said()).toContain(
-      '    @features/customers/edge/import-customers.trigger.json  #record (through #submit), #submit (through #recordAll), #import',
+      '    @features/customers/edge/import-customers.trigger.json  #register (through #submit), #submit (through #registerAll), #import',
     );
   });
 
@@ -99,10 +99,10 @@ describe('describe: an access invariant that names the policy', () => {
     const row = said()
       .split('\n')
       .filter(line => line.includes('import-customers.trigger.json'))[0];
-    // over writes record, update, remove, removeMany, submit, import; import-entries reaches three of them
+    // over writes register, update, remove, removeMany, submit, import; import-customers reaches three of them
     expect(row.slice(row.indexOf('  #') + 2).split(', ')).toEqual([
-      '#record (through #submit)',
-      '#submit (through #recordAll)',
+      '#register (through #submit)',
+      '#submit (through #registerAll)',
       '#import',
     ]);
   });
@@ -216,10 +216,10 @@ describe('describe: an invariant asking for what no trigger could give', () => {
  * for. The others are met and it is not, so nothing can be said once for all of them, and the row I001
  * refuses has to be the loud one on the page.
  */
-const DELETE_ENTRY = 'features/customers/edge/delete-customer.trigger.json';
-const ungated = JSON.parse(JSON.stringify(example.registry.get('trigger', `@${DELETE_ENTRY}`)?.doc));
+const DELETE_CUSTOMER = 'features/customers/edge/delete-customer.trigger.json';
+const ungated = JSON.parse(JSON.stringify(example.registry.get('trigger', `@${DELETE_CUSTOMER}`)?.doc));
 ungated.policies = [ungated.policies[0]]; // keep employees-only, drop can-register: the invariant asks for the latter
-const { load: partly, dir: partlyDir } = loadedWith({ [DELETE_ENTRY]: ungated });
+const { load: partly, dir: partlyDir } = loadedWith({ [DELETE_CUSTOMER]: ungated });
 afterAll(() => rmSync(partlyDir, { recursive: true, force: true }));
 
 describe('describe: one trigger meeting nothing among others that do', () => {
@@ -246,9 +246,12 @@ const HOLDS = '@features/customers/domain/a-customer-is-reachable.invariant.json
 const { load: planted, dir } = loadedWith({
   'features/customers/domain/a-customer-is-reachable.invariant.json': {
     $schema: schemaUrl('invariant'),
-    label: 'An entry names a call',
-    description: 'A URL is never empty, and a deletion always says who asked for it.',
-    holds: { on: '@customers/domain/Customer.shape.json', when: "len(url) > 0 && (method != 'DELETE' || has(ua))" },
+    label: 'A customer is reachable',
+    description: 'A name and an address are never empty, and a gold account always carries its note.',
+    holds: {
+      on: '@customers/domain/Customer.shape.json',
+      when: "len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))",
+    },
   },
 });
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -257,7 +260,7 @@ describe('describe: a field invariant', () => {
   it('says the shape every value of which is held to it, and the rule itself', () => {
     const said = describeDoc(planted, HOLDS);
     expect(said).toContain('holds: every value of @customers/domain/Customer.shape.json satisfies the rule');
-    expect(said).toContain("    when  len(url) > 0 && (method != 'DELETE' || has(ua))");
+    expect(said).toContain("    when  len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))");
   });
 
   it('says nothing about which sites are proved and which guarded, since nothing lowers a guard yet', () => {
@@ -271,7 +274,7 @@ describe('describe: a field invariant', () => {
 describe('describe: a shape an invariant is stated over', () => {
   it('says what its values are always held to, beside who writes them', () => {
     expect(describeDoc(planted, '@customers/domain/Customer.shape.json')).toContain(
-      `held to  'An entry names a call' (${HOLDS}): len(url) > 0 && (method != 'DELETE' || has(ua))`,
+      `held to  'A customer is reachable' (${HOLDS}): len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))`,
     );
   });
 

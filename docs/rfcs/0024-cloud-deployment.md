@@ -133,7 +133,7 @@ and `deploy/.env.example`, which holds names and never values:
 ```
 # every variable profile 'production' needs; fill these in and save as .env
 MONITOR_API_KEY=        # secrets.monitorKey, read by @connections/monitor-api-production.connection.json
-MONITOR_JWT_SECRET=     # secrets.jwt, read by @auth settings
+CUSTOMERS_JWT_SECRET=     # secrets.jwt, read by @auth settings
 ```
 
 **Why the healthcheck is a socket and not a route.** A tree opens its port because a startup step said so,
@@ -169,10 +169,10 @@ workloads:
     probe: { tcpSocket: { port: 8080 } }   # an httpGet here instead probes a route the tree declares
     env:
       - { name: MONITOR_API_KEY, secretKey: MONITOR_API_KEY }
-      - { name: MONITOR_JWT_SECRET, secretKey: MONITOR_JWT_SECRET }
+      - { name: CUSTOMERS_JWT_SECRET, secretKey: CUSTOMERS_JWT_SECRET }
 secret:
   existingSecret: ""                # created by the operator; the chart never holds a value
-  keys: [MONITOR_API_KEY, MONITOR_JWT_SECRET]
+  keys: [MONITOR_API_KEY, CUSTOMERS_JWT_SECRET]
 requires:
   - connection: "@connections/monitor-api-production.connection.json"
     kind: "@http/http.connection-kind.json"
@@ -224,7 +224,7 @@ $ npx wilanis-deploy example --profile production --target plan
       "holds": ["@http/server.port.json#listen"],
       "needs": [
         { "variable": "MONITOR_API_KEY", "key": "monitorKey", "readBy": ["@connections/monitor-api-production.connection.json"] },
-        { "variable": "MONITOR_JWT_SECRET", "key": "jwt", "readBy": ["@auth settings"] }
+        { "variable": "CUSTOMERS_JWT_SECRET", "key": "jwt", "readBy": ["@auth settings"] }
       ],
       "replicas": 1,
       "probe": { "tcp": 8080 }

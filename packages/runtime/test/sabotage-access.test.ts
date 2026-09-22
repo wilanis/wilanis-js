@@ -102,11 +102,11 @@ describe('sabotage: access, as the example attaches the included policies', () =
         .map(caller => caller.path)
         .sort(),
     ).toEqual([
-      '@connections/customers.connection.json',
-      '@connections/employees.connection.json',
+      '@connections/customers-api.connection.json',
       '@connections/customers-postgres.connection.json',
       '@connections/customers.connection.json',
-      '@connections/customers-api.connection.json',
+      '@connections/employees.connection.json',
+      '@connections/people.connection.json',
     ]);
   });
   it('the `in` operator: a role check in a switch rule, and a branch the rehearsal can steer both ways', async () => {
@@ -115,7 +115,7 @@ describe('sabotage: access, as the example attaches the included policies', () =
     const run = await rehearse(loadTree(dir, PLUGINS, INCLUDES), { seed: 5, profile: 'live' });
     rmSync(dir, { recursive: true, force: true });
     const lines = run.lines.filter(
-      line => line.includes("'recorder' in principal.roles") || line.includes('require-registrar'),
+      line => line.includes("'registrar' in principal.roles") || line.includes('require-registrar'),
     );
     expect(lines.some(line => line.includes("answered from 'granted'"))).toBe(true);
     expect(run.ok).toBe(true);

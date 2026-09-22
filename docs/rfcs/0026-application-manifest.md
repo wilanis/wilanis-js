@@ -145,7 +145,7 @@ $ npx wilanis manifest example
     { "path": "@connections/customers-api.connection.json", "kind": "@http/http.connection-kind.json", "settings": { "baseUrl": "https://6aa009e23e0d88d3d7e5525d.mockapi.io/api/v1", "throttle": { "concurrency": 4 }, "timeoutMs": 10000 }, "secrets": [] },
     { "path": "@connections/monitor-api-production.connection.json", "kind": "@http/http.connection-kind.json", "settings": { "baseUrl": "https://monitor.internal/api/v1", "headers": { "x-api-key": "{{secrets.monitorKey}}" }, "timeoutMs": 5000 }, "secrets": ["monitorKey"] }
   ],
-  "secrets": { "jwt": "MONITOR_JWT_SECRET", "monitorKey": "MONITOR_API_KEY" },
+  "secrets": { "jwt": "CUSTOMERS_JWT_SECRET", "monitorKey": "MONITOR_API_KEY" },
   "startup": [
     { "label": "Reach the entry store", "run": "@customers/domain/customer.port.json#listAll", "required": true, "profiles": null },
     { "label": "Watch for changes", "run": "@reload/watch.port.json#watch", "required": true, "profiles": ["live"] },
@@ -164,7 +164,7 @@ $ npx wilanis manifest example
       ],
       "holds": ["@http/server.port.json#listen", "@reload/watch.port.json#watch"],
       "starts": ["Reach the entry store", "Watch for changes", "Listen"],
-      "needs": [{ "variable": "MONITOR_JWT_SECRET", "key": "jwt", "readBy": ["@auth settings"] }],
+      "needs": [{ "variable": "CUSTOMERS_JWT_SECRET", "key": "jwt", "readBy": ["@auth settings"] }],
       "permits": null
     },
     "production": {
@@ -179,7 +179,7 @@ $ npx wilanis manifest example
       "starts": ["Reach the entry store", "Listen"],
       "needs": [
         { "variable": "MONITOR_API_KEY", "key": "monitorKey", "readBy": ["@connections/monitor-api-production.connection.json"] },
-        { "variable": "MONITOR_JWT_SECRET", "key": "jwt", "readBy": ["@auth settings"] }
+        { "variable": "CUSTOMERS_JWT_SECRET", "key": "jwt", "readBy": ["@auth settings"] }
       ],
       "permits": ["@auth/identity.port.json#verify", "@auth/token.port.json", "@blob/csv.port.json", "@connections/customers.connection.json", "@connections/employees.connection.json", "@connections/monitor-api-production.connection.json", "@http/http.port.json#request", "@http/server.port.json#listen"]
     }
@@ -217,7 +217,7 @@ $ npx wilanis manifest example --profile production | jq '.triggers[] | select(.
 "/monitor/{id}"
 $ npx wilanis manifest example --profile production | jq '.profiles.production.needs[].variable'
 "MONITOR_API_KEY"
-"MONITOR_JWT_SECRET"
+"CUSTOMERS_JWT_SECRET"
 $ npx wilanis manifest example > before.json; # edit; npx wilanis manifest example | diff before.json -
 ```
 
@@ -332,7 +332,7 @@ separately" RFC 0002 asks for (`0002:695`). `ir` follows RFC 0008: `v2` when the
   `startup` has three rows in declared order.
 - **Per profile** (after RFC 0013's steps 1 and 4): `profiles.live.reaches` holds `watch` and the test API;
   `profiles.production` does not hold `watch`, holds the stand-in and not `monitor-api`, `needs` holds
-  `MONITOR_API_KEY` and `MONITOR_JWT_SECRET`, `starts` has two labels; `permits` is `null` under `live` and the
+  `MONITOR_API_KEY` and `CUSTOMERS_JWT_SECRET`, `starts` has two labels; `permits` is `null` under `live` and the
   list under `production` (after RFC 0016's step 2).
 - **Determinism.** Two calls answer equal strings; a registry whose `all()` is reversed answers the same string;
   the string contains no timestamp and no value of any environment variable set for the test.

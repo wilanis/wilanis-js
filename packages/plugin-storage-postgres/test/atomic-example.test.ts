@@ -6,7 +6,7 @@
  *
  * It runs only where a database is named, as the rest of this package's cases do: set
  * `WILANIS_TEST_POSTGRES_URL` and it runs, leave it unset and it is skipped. The example itself reads the URL
- * from `MONITOR_DATABASE_URL`, so the case hands its own along under that name and puts back whatever was
+ * from `CUSTOMERS_DATABASE_URL`, so the case hands its own along under that name and puts back whatever was
  * there, and it prepares the store first the way the tree's own startup step does.
  *
  * The plugins come from the example through `resolvePlugins`, never from imports here: this package is one
@@ -27,8 +27,8 @@ afterAll(async () => {
 
 describe.skipIf(!url)('the example, importing into PostgreSQL under one transaction', () => {
   it('keeps the rows of an import that answered and none of one that rolled back, run at once', async () => {
-    const was = process.env.MONITOR_DATABASE_URL;
-    process.env.MONITOR_DATABASE_URL = url;
+    const was = process.env.CUSTOMERS_DATABASE_URL;
+    process.env.CUSTOMERS_DATABASE_URL = url;
     // the plugins and the included tree are resolved from the example itself rather than imported here:
     // a tree needs every plugin it names, and a leaf plugin package has no business depending on its siblings
     const { available } = await resolvePlugins(EXAMPLE);
@@ -59,8 +59,8 @@ describe.skipIf(!url)('the example, importing into PostgreSQL under one transact
     } finally {
       await scope.release();
       await down();
-      if (was === undefined) delete process.env.MONITOR_DATABASE_URL;
-      else process.env.MONITOR_DATABASE_URL = was;
+      if (was === undefined) delete process.env.CUSTOMERS_DATABASE_URL;
+      else process.env.CUSTOMERS_DATABASE_URL = was;
     }
   });
 });

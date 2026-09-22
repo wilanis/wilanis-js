@@ -178,7 +178,7 @@ describe('wilanis fuzz and regress', () => {
     // eighteen triggers -- the example's, the nightly digest among them, and the included access tree's -- two seeds each
     expect(written).toHaveLength(36);
     expect(readdirSync(join(dir, 'scenarios')).sort()).toEqual(written.map(one => one.split('/').pop()!).sort());
-    const sc = read(join(dir, 'scenarios', 'get-entry.1.scenario.json'));
+    const sc = read(join(dir, 'scenarios', 'get-customer.1.scenario.json'));
     expect(sc.trigger).toBe('@features/customers/edge/get-customer.trigger.json');
     expect(['done', 'failed']).toContain(sc.expect.status);
     // the scenarios are documents of the tree: they load, and they pass check
@@ -192,13 +192,13 @@ describe('wilanis fuzz and regress', () => {
     // a graph that changes is caught: the answering node under a new name is a node the scenario never saw
     const file = join(dir, 'features/customers/data/get-row.graph.json');
     const doc = read(file);
-    doc.nodes.find((node: any) => node.id === 'row').id = 'entry';
-    doc.nodes.find((node: any) => node.id === 'route').rules[1].to = 'entry';
-    doc.out.from = ['entry', 'missing', 'failed'];
+    doc.nodes.find((node: any) => node.id === 'row').id = 'customer';
+    doc.nodes.find((node: any) => node.id === 'route').rules[1].to = 'customer';
+    doc.out.from = ['customer', 'missing', 'failed'];
     writeFileSync(file, JSON.stringify(doc));
     const changed = await regress(loadTree(dir, PLUGINS, INCLUDES), { profile: 'live' });
     expect(changed.ok).toBe(false);
-    expect(changed.lines.some(line => line.includes('get-entry') && !line.endsWith(': same'))).toBe(true);
+    expect(changed.lines.some(line => line.includes('get-customer') && !line.endsWith(': same'))).toBe(true);
     expect(existsSync(join(dir, 'scenarios'))).toBe(true);
     rmSync(dir, { recursive: true, force: true });
   });
@@ -207,7 +207,7 @@ describe('wilanis fuzz and regress', () => {
     const dir = tmp();
     cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
     await fuzz(loadTree(dir, PLUGINS, INCLUDES), { runs: 1, profile: 'live' });
-    const sc = read(join(dir, 'scenarios', 'get-entry.1.scenario.json'));
+    const sc = read(join(dir, 'scenarios', 'get-customer.1.scenario.json'));
     // the fire runs whatever the profile's binding met the port with -- the graph is the thing a rebind changes
     expect(sc.expect.nodes.op.handler).toBe('graph:@features/customers/data/get-row.graph.json');
     // and under it, the operation each node ran, native or declared
@@ -223,7 +223,7 @@ describe('wilanis fuzz and regress', () => {
     expect((await regress(again, { profile: 'live' })).ok).toBe(true);
 
     // a node met by another graph is a change the recorded answer alone cannot name, and the diff names it
-    const scenario = join(dir, 'scenarios', 'get-entry.1.scenario.json');
+    const scenario = join(dir, 'scenarios', 'get-customer.1.scenario.json');
     const doc = read(scenario);
     doc.expect.nodes.op.handler = 'graph:@features/customers/data/kept-get.graph.json';
     writeFileSync(scenario, JSON.stringify(doc));

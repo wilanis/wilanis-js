@@ -6,10 +6,11 @@ them, what may enter and what gates it. The compiler reads every file and proves
 engine runs what it approved, and everything that touches the world -- a route, a command, a file, a database
 -- is a plugin behind a port the tree declares. The language never learns what HTTP is.
 
-The example in this repository serves a REST resource over a rate-limited upstream, CSV import and export,
-sign-in against two directories, sessions, and role-based policies over every write. Two of its files are
-invariants -- *writes are for recorders*, *the session is the caller's* -- rules stated once that the checker
-holds the whole tree to. **Every file in it is a JSON document, and there is no JavaScript at all.**
+The example in this repository is a customer registry: a REST resource over a rate-limited upstream, CSV
+import and export, sign-in against two directories, sessions, and role-based policies over every write. Three
+of its files are invariants -- *a customer is reachable*, *writes are for registrars*, *the session is the
+caller's* -- rules stated once that the checker holds the whole tree to. **Every file in it is a JSON
+document, and there is no JavaScript at all.**
 `wilanis check example` says how many documents that is.
 
 *Pre-1.0 and moving. Nothing is on npm yet, so clone and build to try it. See [Status](#status).*
@@ -56,25 +57,33 @@ a document of its own comes once this definition has settled.
 
 ```json
 {
-  "label": "GET /monitor/{id}",
-  "kind": "@http/http.trigger-kind.json",
+  "label": "GET /customers/{id}",
   "settings": {
-    "route": "/monitor/{id}",
+    "route": "/customers/{id}",
     "method": "GET",
     "produces": "application/json",
-    "response": { "refusals": { "missing": 404, "upstream": 502, "invariant": 500 } }
+    "response": {
+      "refusals": {
+        "missing": 404,
+        "upstream": 502,
+        "invariant": 500
+      }
+    }
   },
   "in": "@customers/edge/IdRequest.shape.json",
   "out": "@customers/edge/CustomerView.shape.json",
+  "kind": "@http/http.trigger-kind.json",
   "fire": {
     "run": "@customers/domain/customer.port.json#get",
-    "in": { "id": "{{request.params.id}}" }
+    "in": {
+      "id": "{{request.params.id}}"
+    }
   }
 }
 ```
 
-A GET on `/monitor/{id}`, open to anyone because it names no policy. It takes an `IdRequest` and answers an
-`CustomerView`, both declared in files of their own. It runs the `get` operation of the `monitor` port with the
+A GET on `/customers/{id}`, open to anyone because it names no policy. It takes an `IdRequest` and answers a
+`CustomerView`, both declared in files of their own. It runs the `get` operation of the customer port with the
 id from the URL. If that operation refuses with `missing`, the client gets a 404; with `upstream`, a 502; with
 `invariant` -- the word a guard the compiler lowers refuses with, where an invariant of the tree could not be
 proved of the value a graph made -- a 500.
@@ -89,9 +98,13 @@ outcomes it routes to.
 
 ```json
 {
-  "id": "route",
   "type": "@wilanis/node/switch.schema.json",
-  "in": { "status": "{{asked.status}}", "body": "{{asked.body}}" },
+  "id": "route",
+  "label": "What did the API say?",
+  "in": {
+    "status": "{{asked.status}}",
+    "body": "{{asked.body}}"
+  },
   "rules": [
     { "when": "status == 404", "to": "missing" },
     { "when": "status == 200 && has(body)", "to": "row" }
@@ -99,10 +112,15 @@ outcomes it routes to.
   "else": "failed"
 },
 {
-  "id": "missing",
   "type": "@wilanis/node/run.schema.json",
+  "id": "missing",
+  "label": "No such customer",
   "run": "@std/outcome.port.json#refuse",
-  "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" }
+  "in": {
+    "reason": "missing",
+    "message": "no customer {{in.id}}",
+    "type": "@customers/domain/Customer.shape.json"
+  }
 }
 ```
 
@@ -123,7 +141,7 @@ Rename an operation in the port and forget the route that calls it:
 
 ```
 R001  @features/customers/edge/get-customer.trigger.json#fire/run
-    port '@customers/domain/customer.port.json' has no operation 'fetch' (operations: listAll, listByMethod, get, ...)
+    port '@customers/domain/customer.port.json' has no operation 'fetch' (operations: listAll, listByTier, get, ...)
     → wilanis ls port
 ```
 
@@ -133,14 +151,14 @@ time.
 
 ## A rule you state once
 
-The example gates every write of the monitor feature with the same policy, trigger by trigger. Nothing in
-those files says that this is a rule rather than six coincidences: a new route firing `monitor.update` and
+The example gates every write of the customers feature with the same policy, trigger by trigger. Nothing in
+those files says that this is a rule rather than six coincidences: a new route firing `customer.update` and
 forgetting the policy would check clean, and the write would be public. An invariant says the rule out loud,
 in a file of its own:
 
 ```json
 {
-  "label": "Writes are for recorders",
+  "label": "Writes are for registrars",
   "access": {
     "over": [
       "@customers/domain/customer.port.json#register",
@@ -157,12 +175,12 @@ in a file of its own:
 }
 ```
 
-It names operations, never a role: what the gate decides is the policy's business. Drop the recorder policy
-from `POST /monitor.csv` and the tree no longer checks:
+It names operations, never a role: what the gate decides is the policy's business. Drop the registrar policy
+from `POST /customers.csv` and the tree no longer checks:
 
 ```
 I001  @features/customers/edge/import-customers.trigger.json#policies
-    trigger reaches @features/customers/domain/customer.port.json#import, which 'Writes are for recorders'
+    trigger reaches @features/customers/domain/customer.port.json#import, which 'Writes are for registrars'
     (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with
     @access/edge/can-register.policy.json, but attaches no such policy
     → attach "@access/edge/can-register.policy.json" under policies, or take
@@ -185,9 +203,9 @@ inputs reach each rule, and runs that branch too:
 
 ```
 features/customers/data/get-row  switch 'route'  3/3 branches
-  ok  when status == 404               refused on purpose at 'missing' as missing: "no entry golf"
+  ok  when status == 404               refused on purpose at 'missing' as missing: "no customer golf"
   ok  when status == 200 && has(body)  answered from 'row'
-  ok  anything else                    refused on purpose at 'failed' as upstream: "the monitor API answered 500"
+  ok  anything else                    refused on purpose at 'failed' as upstream: "the customer API answered 500"
 ```
 
 It ends by saying every branch settled, or which did not. A rule that no input can satisfy is reported as
@@ -238,7 +256,7 @@ primary := number | string | true | false | path | 'has' '(' path ')' | 'len' '(
 
 No calls, no arithmetic, no assignment, no loops, and nothing that reaches a file or a socket. Every rule is
 typed against that node's inputs before it runs, and a read through a value that may be missing is refused
-unless a `has()` on the left of the same `&&` proved it present: `has(principal) && 'recorder' in
+unless a `has()` on the left of the same `&&` proved it present: `has(principal) && 'registrar' in
 principal.roles` reads what it proved, and dropping the `has()` is a refusal with the file and the path in
 it.
 
@@ -269,8 +287,8 @@ npx wilanis check example          # is the tree consistent? (every profile at o
 npx wilanis rehearse example --profile local   # run every branch of every route and policy, network stubbed
 npx wilanis map example            # how does a request flow, and what gates it?
 npx wilanis-view example           # draw it, on http://127.0.0.1:4400/
-export MONITOR_JWT_SECRET=$(openssl rand -base64 32)
-npx wilanis start example --profile local      # serve it on :8099, entries kept in memory
+export CUSTOMERS_JWT_SECRET=$(openssl rand -base64 32)
+npx wilanis start example --profile local      # serve it on :8099, customers kept in memory
 ```
 
 [`example/README.md`](example/README.md) walks through what it serves and who may do what.
@@ -325,7 +343,7 @@ frozen.
 [`docs/demo.md`](docs/demo.md) is the demo as a script: the route written a year later, in five beats, each command with the output it answered.
 [wilanis.dev](https://wilanis.dev/) serves the example drawn by the viewer at [/example/](https://wilanis.dev/example/), the demo as a record of one run at [/demo/](https://wilanis.dev/demo/), and the arena at [/arena/](https://wilanis.dev/arena/).
 
-[`docs/roadmap.md`](docs/roadmap.md) is the plan, and each milestone is a demo: entries in a real database,
+[`docs/roadmap.md`](docs/roadmap.md) is the plan, and each milestone is a demo: customers in a real database,
 sessions shared across instances, a request drawn as a trace, work moved off the request, one command that
 deploys it, tenants that cannot leak into each other, an agent repairing a broken tree. Each draws on RFCs under [`docs/rfcs/`](docs/rfcs/README.md),
 written and accepted before anything is built.

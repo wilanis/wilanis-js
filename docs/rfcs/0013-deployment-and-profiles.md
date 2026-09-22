@@ -133,7 +133,7 @@ Not one document under `features/` changes: every data graph still says `"connec
 secret it reads is declared once, beside the one the tokens already read:
 
 ```json
-"secrets": { "jwt": "MONITOR_JWT_SECRET", "monitorKey": "MONITOR_API_KEY" }
+"secrets": { "jwt": "CUSTOMERS_JWT_SECRET", "monitorKey": "MONITOR_API_KEY" }
 ```
 
 The watcher is a startup step, and a step may say which profiles run it:
@@ -174,7 +174,7 @@ pool when the message prints:
 $ npx wilanis start example --profile production
 profile production
 missing secrets: MONITOR_API_KEY (monitorKey, read by @connections/monitor-api-production.connection.json),
-  MONITOR_JWT_SECRET (jwt, read by @auth settings); nothing is serving
+  CUSTOMERS_JWT_SECRET (jwt, read by @auth settings); nothing is serving
 ```
 
 Variables are named, values never. Then `postLoad`, then the profile's startup steps in order, then nothing:
@@ -195,7 +195,7 @@ profile production
             @blob/csv.port.json#parse, #write
   holds     @http/server.port.json#listen
   starts    Reach the entry store · Listen
-  needs     MONITOR_API_KEY (monitorKey) · MONITOR_JWT_SECRET (jwt)
+  needs     MONITOR_API_KEY (monitorKey) · CUSTOMERS_JWT_SECRET (jwt)
 ```
 
 ## Reference
@@ -329,7 +329,7 @@ Start, in `packages/runtime/test/startup.test.ts`, against a plugin whose `postL
   not run;
 - `WILANIS_PROFILE=production` → the log's first line is `profile production`; `--profile live` beside it wins;
 - `production` with `MONITOR_API_KEY` unset → throws naming `MONITOR_API_KEY` and the stand-in, and not
-  `MONITOR_JWT_SECRET` when that one is set; `postLoad` did not run;
+  `CUSTOMERS_JWT_SECRET` when that one is set; `postLoad` did not run;
 - `production` with a variable set only for a connection `live` alone reaches → starts;
 - `production` runs two steps and `live` three, by the log.
 

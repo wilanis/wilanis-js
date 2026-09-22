@@ -16,6 +16,11 @@
     "tier": {
       "type": "string"
     },
+    "registrar": {
+      "type": "string",
+      "required": false,
+      "description": "who registered this customer"
+    },
     "active": {
       "type": "boolean",
       "required": false,

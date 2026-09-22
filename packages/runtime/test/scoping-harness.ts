@@ -1,8 +1,8 @@
 /**
- * A copy of the example whose entries are kept per tenant, for the rules that judge how a store is scoped.
+ * A copy of the example whose customers are kept per tenant, for the rules that judge how a store is scoped.
  * The example does not scope its store yet -- that is RFC 0015's step 10 -- so every case here starts from a
- * tree that does: the session shape the guard's settings name gains the attribute, the monitor's one edge
- * document that reads the request gains the resolver, and the store binds the read and scopes `entries` by it.
+ * tree that does: the session shape the guard's settings name gains the attribute, the registry's one edge
+ * document that reads the request gains the resolver, and the store binds the read and scopes `customers` by it.
  * A case then breaks one of those three and reads what the tree answers.
  *
  * The included access tree is copied too, since the session shape lives there and a scope's whole claim is
@@ -19,7 +19,7 @@ import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 /** Where a document being edited lives: the example itself, or the access tree it includes. */
 export type Edits = Record<string, (doc: any) => void>;
 
-/** The store the monitor keeps its entries in, and the one edge document of that feature that reads the request. */
+/** The store the registry keeps its customers in, and the one edge document of that feature that reads the request. */
 export const STORE = 'features/customers/data/customers.store.json';
 export const RESOLVERS = 'features/customers/edge/request.resolvers.json';
 /** The session shape the guard's settings.session names, in the included access tree. */
@@ -45,7 +45,7 @@ function copyOf(from: string): string {
 }
 
 /**
- * What the example scopes its entries by, written into a copy: the attribute the sign-in would have put in
+ * What the example scopes its customers by, written into a copy: the attribute the sign-in would have put in
  * the session, the resolver that reads it back off what the guard hands, and the store binding that read and
  * scoping the collection by it. The attribute is declared optional in the shape and `required` on the
  * resolver, so the sign-in graphs of the access tree need no change and the read is still read as present.
@@ -63,7 +63,7 @@ function scope(example: string, access: string): void {
   });
   editing(example, STORE, store => {
     store.reads = { tenant: '@customers/edge/request.resolvers.json#tenant' };
-    store.collections.entries.scoped = { tenant: '{{tenant}}' };
+    store.collections.customers.scoped = { tenant: '{{tenant}}' };
   });
 }
 

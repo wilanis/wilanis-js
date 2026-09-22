@@ -210,11 +210,11 @@ describe('beats 4 and 5, live: the three writes, then all of it or none of it', 
     paste('archive-entry.step3.trigger.json');
     const tree = await serving({
       // the one secret the demo needs from outside the tree: what the tree signs its tokens with
-      MONITOR_JWT_SECRET: randomBytes(32).toString('base64'),
+      CUSTOMERS_JWT_SECRET: randomBytes(32).toString('base64'),
       // until #304 lands the start reads every profile's secrets although local never reaches PostgreSQL; the
       // script exports the same placeholder. Remove this line when #304 lands, and the beat asserts the
       // one-secret start the script describes.
-      MONITOR_DATABASE_URL: 'postgres://unused',
+      CUSTOMERS_DATABASE_URL: 'postgres://unused',
     });
     try {
       const archive = (id: string, token?: string) =>

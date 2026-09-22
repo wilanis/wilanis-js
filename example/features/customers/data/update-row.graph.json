@@ -79,7 +79,7 @@
       "run": "@std/outcome.port.json#refuse",
       "in": {
         "reason": "upstream",
-        "message": "the monitor API answered {{asked.status}}",
+        "message": "the customer API answered {{asked.status}}",
         "type": "@customers/domain/Customer.shape.json"
       }
     }

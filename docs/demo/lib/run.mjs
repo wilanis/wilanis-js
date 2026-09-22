@@ -16,9 +16,9 @@ export function resetCopy(repo, scratch) {
   symlinkSync(join(repo, "node_modules"), join(scratch, "node_modules"));
   return {
     ...process.env,
-    MONITOR_JWT_SECRET: randomBytes(32).toString("base64"),
+    CUSTOMERS_JWT_SECRET: randomBytes(32).toString("base64"),
     // until #304 lands, start reads every profile's secrets although local never reaches PostgreSQL
-    MONITOR_DATABASE_URL: "postgres://unused",
+    CUSTOMERS_DATABASE_URL: "postgres://unused",
   };
 }
 

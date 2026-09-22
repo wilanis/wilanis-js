@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
   "label": "GET /customers",
-  "description": "GET /customers[?method=] \u2192 the customers; 502 as upstream when the monitor API broke.",
+  "description": "GET /customers[?tier=] \u2192 the customers; 502 as upstream when the customer API broke.",
   "kind": "@http/http.trigger-kind.json",
   "settings": {
     "route": "/customers",

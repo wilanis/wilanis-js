@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The gate. Your work is accepted when every criterion below prints PASS.
 #
-#   bash accept.sh <METHOD> <ROUTE>        e.g.  bash accept.sh POST '/monitor/{id}/pin'
+#   bash accept.sh <METHOD> <ROUTE>        e.g.  bash accept.sh POST '/customers/{id}/active'
 #
 # METHOD and ROUTE are the endpoint you expose; ROUTE contains the literal {id}. The script judges the
 # tree the way a reviewer would: it runs the checker and the rehearsal, reads what they say, starts the
@@ -29,7 +29,7 @@ CHECK=$(npx wilanis check . 2>&1 | tail -3)
 check "1 wilanis check passes" "ok: N documents" "$CHECK" '^ok: [0-9]+ documents'
 REH=$(npx wilanis rehearse . --profile local 2>&1)
 check "2 every rehearsed branch settles" "every branch settled" "$(printf '%s' "$REH" | grep -E 'every branch settled|NEVER RUN|BROKE|BLOCKED' | head -3)" 'every branch settled'
-printf 'INFO  3 the rehearsal says: %s  (the rule held at 5 triggers before your change; this line is reported, not judged)\n' "$(printf '%s' "$REH" | grep 'Writes are for recorders' | sed 's/^ *//')"
+printf 'INFO  3 the rehearsal says: %s  (the rule held at 5 triggers before your change; this line is reported, not judged)\n' "$(printf '%s' "$REH" | grep 'Writes are for registrars' | sed 's/^ *//')"
 for inv in features/customers/domain/a-customer-is-reachable.invariant.json; do
   before=$(git show "$BASE:$inv" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).holds.when))')
   after=$(node -e 'process.stdout.write(require("./'"$inv"'").holds.when)')
@@ -42,7 +42,7 @@ check "5 the access rule still requires the same policy" "$before" "$after" "^$(
 echo "== The tree serving"
 # stop whatever listens on this tree's port and nothing else: other trees on this machine are not ours to kill
 for pid in $(lsof -ti tcp:$PORT 2>/dev/null); do kill "$pid" 2>/dev/null; done; sleep 1
-MONITOR_JWT_SECRET=accept-secret MONITOR_DATABASE_URL=postgres://unused npx wilanis start . --profile local > "$LOG" 2>&1 &
+CUSTOMERS_JWT_SECRET=accept-secret CUSTOMERS_DATABASE_URL=postgres://unused npx wilanis start . --profile local > "$LOG" 2>&1 &
 PID=$!
 for i in $(seq 1 30); do grep -q "Listen: ok" "$LOG" && break; sleep 1; done
 check "6 the tree starts and listens" "startup 7/7 Listen: ok" "$(grep -E 'Listen: ok|refused|missing' "$LOG" | head -2)" 'Listen: ok'
@@ -52,34 +52,34 @@ BO=$(tok bo); CY=$(tok cy)
 # both reloads, one per sign-in, before recording, or the memory store starts over under the calls below
 for i in $(seq 1 8); do [ "$(grep -c '^reload: [0-9]' "$LOG")" -ge 2 ] && break; sleep 1; done; sleep 1
 R() { printf '%s' "$ROUTE" | sed "s/{id}/$1/"; }
-REC1=$(body -X POST $H/monitor -H "authorization: Bearer $BO" -H 'content-type: application/json' -d '{"url":"https://api.example.com/orders","method":"GET"}' -w '  [%{http_code}]')
-REC2=$(body -X POST $H/monitor -H "authorization: Bearer $BO" -H 'content-type: application/json' -d '{"url":"https://api.example.com/orders","method":"POST"}' -w '  [%{http_code}]')
-GETID=$(printf '%s' "$REC1" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p'); POSTID=$(printf '%s' "$REC2" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
-check "7 two entries recorded as bo, one GET and one POST" "two 201 answers with ids" "$REC1 // $REC2" '^\{"id":"[^"]+".*\[201\] // \{"id":"[^"]+".*\[201\]$'
+REC1=$(body -X POST $H/customers -H "authorization: Bearer $BO" -H 'content-type: application/json' -d '{"name":"Ada Lovelace","email":"ada@example.com","tier":"silver"}' -w '  [%{http_code}]')
+REC2=$(body -X POST $H/customers -H "authorization: Bearer $BO" -H 'content-type: application/json' -d '{"name":"Grace Hopper","email":"grace@example.com","tier":"bronze"}' -w '  [%{http_code}]')
+ADAID=$(printf '%s' "$REC1" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p'); GRACEID=$(printf '%s' "$REC2" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+check "7 two customers registered as bo, one silver and one bronze" "two 201 answers with ids" "$REC1 // $REC2" '^\{"id":"[^"]+".*\[201\] // \{"id":"[^"]+".*\[201\]$'
 
 echo "== The endpoint"
-r=$(body -X "$METHOD" "$H$(R "$GETID")" -H "authorization: Bearer $BO" -w '  [%{http_code}]')
-check "8 toggling a GET entry as bo answers 200 and shows pinned true" '{"id":...,"pinned":true}  [200]' "$r" '"pinned":true.*\[200\]$'
-r=$(body -X "$METHOD" "$H$(R "$GETID")" -H "authorization: Bearer $BO" -w '  [%{http_code}]')
-check "9 toggling it again answers 200 and shows pinned false" '{"id":...,"pinned":false}  [200]' "$r" '"pinned":false.*\[200\]$'
-r=$(body "$H/monitor/$GETID" -w '  [%{http_code}]')
-check "10 reading the entry back shows its pinned field" '{"id":...,"pinned":false}  [200]' "$r" '"pinned":false.*\[200\]$'
-r=$(body -X "$METHOD" "$H$(R "$POSTID")" -H "authorization: Bearer $BO" -w '  [%{http_code}]')
-check "11 toggling the POST entry as bo answers 200 and shows pinned true" '{"id":...,"method":"POST",...,"pinned":true}  [200]' "$r" '"pinned":true.*\[200\]$'
-r=$(body "$H/monitor/$POSTID" -w '  [%{http_code}]')
-check "12 the POST entry reads back pinned" '{"id":...,"pinned":true}  [200]' "$r" '"pinned":true.*\[200\]$'
-r=$(body "$H/monitor" -w '  [%{http_code}]')
-check "13 the list still answers 200 with both entries" '[{...},{...}]  [200]' "$r" "$GETID.*$POSTID.*\[200\]$|$POSTID.*$GETID.*\[200\]$"
-r=$(body -X "$METHOD" "$H$(R "$GETID")" -H "authorization: Bearer $CY" -w '  [%{http_code}]')
-check "14 cy, an employee without the recorder role, is refused 403 forbidden" '{"reason":"forbidden",...}  [403]' "$r" '"reason":"forbidden".*\[403\]$'
-r=$(body -X "$METHOD" "$H$(R "$GETID")" -w '  [%{http_code}]')
+r=$(body -X "$METHOD" "$H$(R "$ADAID")" -H "authorization: Bearer $BO" -w '  [%{http_code}]')
+check "8 toggling a silver customer as bo answers 200 and shows active true" '{"id":...,"active":true}  [200]' "$r" '"active":true.*\[200\]$'
+r=$(body -X "$METHOD" "$H$(R "$ADAID")" -H "authorization: Bearer $BO" -w '  [%{http_code}]')
+check "9 toggling them again answers 200 and shows active false" '{"id":...,"active":false}  [200]' "$r" '"active":false.*\[200\]$'
+r=$(body "$H/customers/$ADAID" -w '  [%{http_code}]')
+check "10 reading the customer back shows their active field" '{"id":...,"active":false}  [200]' "$r" '"active":false.*\[200\]$'
+r=$(body -X "$METHOD" "$H$(R "$GRACEID")" -H "authorization: Bearer $BO" -w '  [%{http_code}]')
+check "11 toggling the bronze customer as bo answers 200 and shows active true" '{"id":...,"tier":"bronze",...,"active":true}  [200]' "$r" '"active":true.*\[200\]$'
+r=$(body "$H/customers/$GRACEID" -w '  [%{http_code}]')
+check "12 the bronze customer reads back active" '{"id":...,"active":true}  [200]' "$r" '"active":true.*\[200\]$'
+r=$(body "$H/customers" -w '  [%{http_code}]')
+check "13 the list still answers 200 with both customers" '[{...},{...}]  [200]' "$r" "$ADAID.*$GRACEID.*\[200\]$|$GRACEID.*$ADAID.*\[200\]$"
+r=$(body -X "$METHOD" "$H$(R "$ADAID")" -H "authorization: Bearer $CY" -w '  [%{http_code}]')
+check "14 cy, an employee without the registrar role, is refused 403 forbidden" '{"reason":"forbidden",...}  [403]' "$r" '"reason":"forbidden".*\[403\]$'
+r=$(body -X "$METHOD" "$H$(R "$ADAID")" -w '  [%{http_code}]')
 check "15 no token is refused 401 anonymous" '{"reason":"anonymous",...}  [401]' "$r" '"reason":"anonymous".*\[401\]$'
 r=$(body -X "$METHOD" "$H$(R nope)" -H "authorization: Bearer $BO" -w '  [%{http_code}]')
 check "16 an unknown id is refused 404 missing" '{"reason":"missing",...}  [404]' "$r" '"reason":"missing".*\[404\]$'
-r=$(body -X "$METHOD" "$H$(R "$GETID")" -H "authorization: Bearer $BO" -w '  [%{http_code}]')
-check "17 a third toggle pins the GET entry again" '{"id":...,"pinned":true}  [200]' "$r" '"pinned":true.*\[200\]$'
-r=$(body "$H/monitor.csv" -H "authorization: Bearer $BO")
-check "18 the export carries the pin: the GET entry's row ends in true" "$GETID,...,true" "$(printf '%s' "$r" | grep "$GETID")" "^$GETID,.*,true\s*$"
+r=$(body -X "$METHOD" "$H$(R "$ADAID")" -H "authorization: Bearer $BO" -w '  [%{http_code}]')
+check "17 a third toggle activates the silver customer again" '{"id":...,"active":true}  [200]' "$r" '"active":true.*\[200\]$'
+r=$(body "$H/customers.csv" -H "authorization: Bearer $BO")
+check "18 the export carries the flag: the silver customer's row ends in true" "$ADAID,...,true" "$(printf '%s' "$r" | grep "$ADAID")" "^$ADAID,.*,true\s*$"
 
 kill $PID 2>/dev/null; wait $PID 2>/dev/null
 echo "== Verdict"

@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/project.schema.json",
-  "label": "Monitor",
-  "name": "monitor",
-  "description": "A monitor of observed HTTP calls: the routes talk to a REST API (mockapi.io); customers are imported from and exported to CSV files through the blob registry. Reads are public; writes are for signed-in employees holding the registrar role, identified by our own token, issued by the included access tree (@wilanis/access) at /api/v1/auth-employees against a directory this project binds (customers sign in at /api/v1/auth-customers and hold a token too, but no write). Preferences live in the session. A command-line greeting is gated by a one-time code. Plugins come from npm packages named by \"from\".",
+  "label": "Customers",
+  "name": "customers",
+  "description": "A registry of customers: the routes talk to a REST API (mockapi.io); customers are imported from and exported to CSV files through the blob registry. Reads are public; writes are for signed-in employees holding the registrar role, identified by our own token, issued by the included access tree (@wilanis/access) at /api/v1/auth-employees against a directory this project binds (account holders sign in at /api/v1/auth-customers and hold a token too, but no write). Preferences live in the session. A command-line greeting is gated by a one-time code. Plugins come from npm packages named by \"from\".",
   "aliases": {
     "@customers": "@features/customers",
     "@hello": "@features/hello"
@@ -42,8 +42,8 @@
       "from": "@wilanis/plugin-auth",
       "settings": {
         "tokens": {
-          "issuer": "monitor",
-          "audience": "monitor-api",
+          "issuer": "customers",
+          "audience": "customers-api",
           "secret": "{{secrets.jwt}}",
           "accessTtl": 900,
           "refreshTtl": 604800
@@ -79,7 +79,7 @@
       "from": "@wilanis/plugin-otel",
       "settings": {
         "endpoint": "http://localhost:4318/v1/traces",
-        "service": "monitor"
+        "service": "customers"
       }
     }
   ],
@@ -93,8 +93,8 @@
     }
   ],
   "secrets": {
-    "jwt": "MONITOR_JWT_SECRET",
-    "customersDatabase": "MONITOR_DATABASE_URL"
+    "jwt": "CUSTOMERS_JWT_SECRET",
+    "customersDatabase": "CUSTOMERS_DATABASE_URL"
   },
   "startup": [
     {
@@ -142,7 +142,7 @@
   ],
   "profiles": {
     "live": {
-      "description": "The real monitor API, and the directories written in the connections. A production profile binds identity.port.json to a binding whose connections are an OIDC issuer and LDAP; nothing else changes.",
+      "description": "The real customer API, and the directories written in the connections. A production profile binds identity.port.json to a binding whose connections are an OIDC issuer and LDAP; nothing else changes.",
       "bindings": {
         "@customers/domain/customer.port.json": "@customers/data/customers-rest.binding.json",
         "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",

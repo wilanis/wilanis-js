@@ -12,7 +12,7 @@ describe('the example tree', () => {
   it('passes check', () => {
     expect(codes(EXAMPLE)).toEqual([]);
   });
-  it('keeps its entries under the local profile, and every branch of that still settles', async () => {
+  it('keeps its customers under the local profile, and every branch of that still settles', async () => {
     // the same routes, the same policies, the same domain graphs: only the binding differs, which is
     // what a port is for. Nothing here reaches a network, so this is the milestone's demo in one line.
     const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'local' });
@@ -36,7 +36,7 @@ describe('the example tree', () => {
     expect(text.match(/list-rows {2}switch 'route'/g)).toHaveLength(1);
     // delete-row is reached directly by the single delete and once per element by the batch delete's map
     expect(text.match(/delete-row {2}switch 'route'/g)).toHaveLength(1);
-    // the sixteenth decision is the guard over the CSV export's list of entries, whose nested spec the walk
+    // the sixteenth decision is the guard over the CSV export's list of customers, whose nested spec the walk
     // opens by name; the fifteen the tree's authors wrote are unchanged
     expect(text).toMatch(/every branch settled -- 39 branch\(es\), 16 decision\(s\), 16 graph\(s\)/);
   });
@@ -46,8 +46,8 @@ describe('the example tree', () => {
     // the six data graphs each answer on one branch and refuse on purpose on the others
     expect(text.match(/refused on purpose at 'failed' as upstream/g)).toHaveLength(6);
     // the three graphs behind an id declare what a missing id means, and say so in one word the trigger maps
-    expect(text.match(/refused on purpose at 'missing' as missing: "no entry /g)).toHaveLength(3);
-    // every branch that answers names the node it answered from, never a bare status word: the monitor's eight,
+    expect(text.match(/refused on purpose at 'missing' as missing: "no customer /g)).toHaveLength(3);
+    // every branch that answers names the node it answered from, never a bare status word: the registry's eight,
     // the access feature's, and the `in:ok` of the guard over the CSV export's list
     expect(text.match(/answered from '/g)).toHaveLength(17);
     // the rule is shown as a condition, not as a bare expression next to a node id
@@ -77,7 +77,9 @@ describe('the example tree', () => {
       const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed, verbose: true, profile: 'live' });
       const text = run.lines.join('\n');
       // the batch delete reaches the delete-row decision through its map, and every branch of it settles
-      expect(text).toMatch(/delete-row {2}switch 'route' {2}3\/3 branches {2}\[via delete-entries, delete-entry\]/);
+      expect(text).toMatch(
+        /delete-row {2}switch 'route' {2}3\/3 branches {2}\[via delete-customer, delete-customers\]/,
+      );
     }
   });
   it('loads its plugin packages through project.json → plugins[].from', async () => {
@@ -110,8 +112,8 @@ describe('the collection a call site is over, and the scope edge that follows it
     // nothing here knows the word `store`: the port says that its `store` input names a document keyed by
     // its `collection` input (`collections[collection].of`), and that is what is read
     expect(
-      site('@storage/store.port.json#get', { store: '@customers/data/customers.store.json', collection: 'entries' }),
-    ).toEqual({ store: '@features/customers/data/customers.store.json', collection: 'entries' });
+      site('@storage/store.port.json#get', { store: '@customers/data/customers.store.json', collection: 'customers' }),
+    ).toEqual({ store: '@features/customers/data/customers.store.json', collection: 'customers' });
     expect(
       site('@storage/store.port.json#find', { store: '@customers/data/customers.store.json', collection: 'latest' }),
     ).toEqual({ store: '@features/customers/data/customers.store.json', collection: 'latest' });
@@ -119,8 +121,11 @@ describe('the collection a call site is over, and the scope edge that follows it
   it('answers a site of an operation that binds no type, since the address is the port and not the operation', () => {
     // count resolves nothing -- it answers a number -- and is over a collection all the same
     expect(
-      site('@storage/store.port.json#count', { store: '@customers/data/customers.store.json', collection: 'entries' }),
-    ).toEqual({ store: '@features/customers/data/customers.store.json', collection: 'entries' });
+      site('@storage/store.port.json#count', {
+        store: '@customers/data/customers.store.json',
+        collection: 'customers',
+      }),
+    ).toEqual({ store: '@features/customers/data/customers.store.json', collection: 'customers' });
   });
   it('answers nothing where a site is over no collection', () => {
     // an http request names no store; ensure names a store and no collection; a collection the store does
@@ -133,12 +138,12 @@ describe('the collection a call site is over, and the scope edge that follows it
       site('@storage/store.port.json#get', { store: '@customers/data/customers.store.json', collection: 'nope' }),
     ).toBeUndefined();
     expect(
-      site('@storage/store.port.json#get', { store: '@customers/data/nope.store.json', collection: 'entries' }),
+      site('@storage/store.port.json#get', { store: '@customers/data/nope.store.json', collection: 'customers' }),
     ).toBeUndefined();
   });
   it('answers nothing for a site whose store or collection is not written down', () => {
     // both inputs are static, so a call that does not write one names no collection the compiler can read
-    expect(site('@storage/store.port.json#get', { collection: 'entries' })).toBeUndefined();
+    expect(site('@storage/store.port.json#get', { collection: 'customers' })).toBeUndefined();
     expect(
       site('@storage/store.port.json#get', {
         store: '@customers/data/customers.store.json',
@@ -147,12 +152,12 @@ describe('the collection a call site is over, and the scope edge that follows it
     ).toBeUndefined();
   });
   it('every storage site the example reaches names a collection, and none of them is scoped today', () => {
-    // the example keeps its entries unscoped until RFC 0015 step 10, so the edge adds nothing to this tree:
+    // the example keeps its customers unscoped until RFC 0015 step 10, so the edge adds nothing to this tree:
     // that it adds A006 and B008 the moment a collection is scoped is sabotage-scoping.test.ts
     const tree = scope();
     const sites = effectsOfGraph(tree, '@features/customers/data/kept-get.graph.json');
     const named = sites.map(one => collectionOf(tree, one)).filter(Boolean);
-    expect(named).toEqual([{ store: '@features/customers/data/customers.store.json', collection: 'entries' }]);
+    expect(named).toEqual([{ store: '@features/customers/data/customers.store.json', collection: 'customers' }]);
     expect(codes(EXAMPLE)).toEqual([]);
   });
 });
@@ -307,12 +312,12 @@ describe('branch rehearsal', () => {
   });
 
   it('marks an atomic graph and says which of its branches roll back', async () => {
-    // store-and-latest is the example's own: it writes the entry and its method's latest, and says so
+    // store-and-latest is the example's own: it writes the customer and its tier's latest, and says so
     const lines = await withEdit('features/customers/data/store-and-latest.graph.json', () => {}, 'local');
     const text = lines.join('\n');
-    expect(text).toMatch(/features\/monitor\/data\/store-and-latest {2}\(atomic\) {2}switch 'route'/);
+    expect(text).toMatch(/features\/customers\/data\/store-and-latest {2}\(atomic\) {2}switch 'route'/);
     // the branch that answers routes to the node the guard moved aside to, since the field invariant over
-    // Entry is not proved at 'row' and the compiler lowers a switch between it and what reads it
+    // Customer is not proved at 'row' and the compiler lowers a switch between it and what reads it
     expect(text).toMatch(/when has\(record\) && has\(mark\) {2}answered from 'row:made'$/m);
     expect(text).toMatch(/refused on purpose at 'failed' as upstream: "[^"]*", rolled back$/m);
     // and the line names no reasons: describe says those
@@ -326,7 +331,7 @@ describe('branch rehearsal', () => {
     // atomicity is a property of the run, not of the routing: the solver walks the same branches either way
     expect(before).not.toContain('(atomic)');
     expect(before).not.toContain('rolled back');
-    // two decisions of this one graph: its own `route`, and the `row:check` the guard over Entry lowered
+    // two decisions of this one graph: its own `route`, and the `row:check` the guard over Customer lowered
     expect(after.match(/\(atomic\)/g)).toHaveLength(2);
     expect(after.replace(/ {2}\(atomic\)/g, '').replace(/, rolled back/g, '')).toBe(before);
   });

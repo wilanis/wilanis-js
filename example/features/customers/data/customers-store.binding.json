@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/binding.schema.json",
-  "label": "Monitor over a store",
-  "description": "How the monitor port is met when the customers are kept rather than fetched: the six data graphs read and write one collection through @storage, and the business graphs are the same ones the REST binding uses -- which is the point of a port.",
+  "label": "Customers over a store",
+  "description": "How the customer port is met when the customers are kept rather than fetched: the six data graphs read and write one collection through @storage, and the business graphs are the same ones the REST binding uses -- which is the point of a port.",
   "port": "@customers/domain/customer.port.json",
   "operations": {
     "listAll": {

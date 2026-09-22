@@ -1,9 +1,9 @@
 /**
- * A copy of the example whose entries are kept per tenant, with a view across every tenant, for the pages that
+ * A copy of the example whose customers are kept per tenant, with a view across every tenant, for the pages that
  * draw a scope and a view (RFC 0015). The example does not scope its store yet -- that is RFC 0015's step 10 --
  * so every case here starts from a tree that does: the session shape the guard's settings name gains the
- * attribute, the monitor's one edge document that reads the request gains the resolver, and the store binds the
- * read, scopes `entries` by it and declares `everyEntry` as a view behind the employees-only policy.
+ * attribute, the registry's one edge document that reads the request gains the resolver, and the store binds the
+ * read, scopes `customers` by it and declares `everyCustomer` as a view behind the employees-only policy.
  *
  * This mirrors `packages/runtime/test/scoping-harness.ts`, which plants the same tree for the checker's rules.
  * It is a copy rather than an import because the two packages' tests do not share a directory, and because what
@@ -32,7 +32,7 @@ import { type DocView, viewOf } from '../src/index.js';
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 const ACCESS = fileURLToPath(new URL('../../../libraries/access', import.meta.url));
 
-/** The store the monitor keeps its entries in, and the one edge document of that feature that reads the request. */
+/** The store the registry keeps its customers in, and the one edge document of that feature that reads the request. */
 export const STORE_FILE = 'features/customers/data/customers.store.json';
 export const RESOLVERS_FILE = 'features/customers/edge/request.resolvers.json';
 /** The session shape the guard's settings.session names, in the included access tree. */
@@ -55,9 +55,9 @@ const PLUGINS: Record<string, PluginModule> = {
   '@otel': otel,
 };
 
-/** A view of the scoped entries, across every tenant, behind the policy the access tree declares for employees. */
+/** A view of the scoped customers, across every tenant, behind the policy the access tree declares for employees. */
 export const VIEW = {
-  view: 'entries',
+  view: 'customers',
   behind: '@access/edge/employees-only.policy.json',
   description: 'the same rows, every tenant',
 };
@@ -78,7 +78,7 @@ function copyOf(from: string): string {
 }
 
 /**
- * What the example scopes its entries by, written into a copy: the attribute the sign-in would have put in the
+ * What the example scopes its customers by, written into a copy: the attribute the sign-in would have put in the
  * session, the resolver that reads it back off what the guard hands, and the store binding that read and scoping
  * the collection by it. The attribute is declared optional in the shape and `required` on the resolver, so the
  * sign-in graphs of the access tree need no change and the read is still read as present.
@@ -92,12 +92,12 @@ function scope(example: string, access: string): void {
       label: "The caller's tenant",
       read: 'request.session.attributes.tenant',
       required: true,
-      description: 'written into the session at sign-in; every entry belongs to one',
+      description: 'written into the session at sign-in; every customer belongs to one',
     };
   });
   editing(example, STORE_FILE, store => {
     store.reads = { tenant: '@customers/edge/request.resolvers.json#tenant' };
-    store.collections.entries.scoped = { tenant: '{{tenant}}' };
+    store.collections.customers.scoped = { tenant: '{{tenant}}' };
   });
 }
 

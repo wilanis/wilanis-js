@@ -37,7 +37,7 @@ profile swaps is which binding meets `customer.port.json`, and through it which 
 behind. Draws on the PostgreSQL engine of RFC 0002 and `ensure` of RFC 0003.
 
 ```
-export MONITOR_DATABASE_URL=postgres://user:password@localhost:5432/monitor
+export CUSTOMERS_DATABASE_URL=postgres://user:password@localhost:5432/monitor
 npx wilanis start example --profile production
 startup 1/4 Prepare the entry store: ok
 ```

@@ -1,10 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
-  "label": "POST /monitor/{id}/archive",
-  "description": "Pasted over features/customers/edge/archive-entry.trigger.json at the end of beat 3 of docs/demo.md: the finished route. The recorder policy is attached and given the token as the A005 hint said, and the two ways a gated route can end, forbidden and anonymous, are mapped as the T005 hints said; invalid_credential comes with them, since a bad token is a way in too.",
+  "label": "POST /customers/{id}/archive",
+  "description": "Pasted over features/customers/edge/archive-customer.trigger.json at the end of beat 3 of docs/demo.md: the finished route. The registrar policy is attached and given the token as the A005 hint said, and the two ways a gated route can end, forbidden and anonymous, are mapped as the T005 hints said; invalid_credential comes with them, since a bad token is a way in too.",
   "kind": "@http/http.trigger-kind.json",
   "settings": {
-    "route": "/monitor/{id}/archive",
+    "route": "/customers/{id}/archive",
     "method": "POST",
     "produces": "application/json",
     "response": {

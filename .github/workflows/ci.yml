@@ -47,7 +47,7 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_PASSWORD: wilanis
-          POSTGRES_DB: monitor
+          POSTGRES_DB: customers
         ports:
           - 5432:5432
         options: >-
@@ -64,7 +64,7 @@ jobs:
       - run: npm ci
       - run: npm test
         env:
-          WILANIS_TEST_POSTGRES_URL: postgres://postgres:wilanis@127.0.0.1:5432/monitor
+          WILANIS_TEST_POSTGRES_URL: postgres://postgres:wilanis@127.0.0.1:5432/customers
       - name: the example checks and rehearses, under each of its profiles
         run: |
           npx wilanis check example
@@ -73,8 +73,8 @@ jobs:
           npx wilanis rehearse example --profile live
           npx wilanis rehearse example --profile production
         env:
-          MONITOR_JWT_SECRET: ci-only-not-a-secret
-          MONITOR_DATABASE_URL: postgres://postgres:wilanis@127.0.0.1:5432/monitor
+          CUSTOMERS_JWT_SECRET: ci-only-not-a-secret
+          CUSTOMERS_DATABASE_URL: postgres://postgres:wilanis@127.0.0.1:5432/customers
 
   fitness:
     name: fitness

@@ -15,7 +15,7 @@ import { Server, call, resetCopy, signIn, wilanis } from "./lib/run.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, "..", "..");
 const scratch = process.argv[2] ?? join(tmpdir().replace(/\/$/, ""), "wilanis-demo");
-const ROUTE = "features/customers/edge/archive-entry.trigger.json";
+const ROUTE = "features/customers/edge/archive-customer.trigger.json";
 const INVARIANTS = [
   "features/customers/domain/writes-are-for-registrars.invariant.json",
   "features/customers/domain/a-customer-is-reachable.invariant.json",
@@ -38,7 +38,7 @@ const read = (ctx, rel) => readFileSync(join(ctx.scratch, rel), "utf8").replace(
 const paste = (ctx, name) => copyFileSync(join(here, name), join(ctx.scratch, ROUTE));
 const check = (ctx) => wilanis(ctx, "check", ".").text;
 const CHECK = { text: "Then the whole tree is judged.", pre: "npx wilanis check ." };
-const RECORD = '{"url":"https://api.example.com/orders","method":"GET"}';
+const REGISTRATION = '{"name":"Ada Lovelace","email":"ada@example.com","tier":"bronze"}';
 
 function step0(ctx) {
   const title = "The tree and its two rules";
@@ -56,7 +56,7 @@ function step0(ctx) {
 
 function step1(ctx) {
   const title = "The agent scaffolds a route";
-  const made = wilanis(ctx, "new", "trigger", "features/customers/edge/archive-entry", ".", "--run", "@customers/domain/customer.port.json#remove", "--kind", "@http/http.trigger-kind.json").text;
+  const made = wilanis(ctx, "new", "trigger", "features/customers/edge/archive-customer", ".", "--run", "@customers/domain/customer.port.json#remove", "--kind", "@http/http.trigger-kind.json").text;
   const out = check(ctx);
   const want = ["T002", "T002", "T005", "T005", "T005", "I001"];
   assert(title, codesOf(out).join(" ") === want.join(" ") && out.endsWith("6 refusal(s)"), out, `check answers ${want.join(", ")} and 6 refusal(s)`);
@@ -65,7 +65,7 @@ function step1(ctx) {
     title,
     summary: `${codesOf(out).join(" ")}, 6 refusal(s)`,
     does: [
-      { text: "The task is one line: add a way to archive an entry. The agent finds the <code>remove</code> operation on the monitor port and scaffolds a route that fires it.", pre: `npx wilanis new trigger features/customers/edge/archive-entry . \\\n  --run '@customers/domain/customer.port.json#remove' --kind '@http/http.trigger-kind.json'\n${made}` },
+      { text: "The task is one line: add a way to archive a customer. The agent finds the <code>remove</code> operation on the customer port and scaffolds a route that fires it.", pre: `npx wilanis new trigger features/customers/edge/archive-customer . \\\n  --run '@customers/domain/customer.port.json#remove' --kind '@http/http.trigger-kind.json'\n${made}` },
       { text: `What it wrote, <code>${ROUTE}</code>:`, pre: read(ctx, ROUTE) },
       CHECK,
     ],
@@ -76,7 +76,7 @@ function step1(ctx) {
 
 function step2(ctx) {
   const title = "The agent follows the hints";
-  paste(ctx, "archive-entry.step2.trigger.json");
+  paste(ctx, "archive-customer.step2.trigger.json");
   const out = check(ctx);
   assert(title, codesOf(out).join(" ") === "I001" && out.endsWith("1 refusal(s)"), out, "check answers I001 alone and 1 refusal(s)");
   return {
@@ -119,7 +119,7 @@ function step3(ctx) {
 
 function step4(ctx) {
   const title = "The finished route";
-  paste(ctx, "archive-entry.step3.trigger.json");
+  paste(ctx, "archive-customer.step3.trigger.json");
   const out = check(ctx);
   assert(title, out === "ok: 186 documents", out, "check answers ok: 186 documents");
   return {
@@ -137,10 +137,10 @@ function step5(ctx) {
   const reh = wilanis(ctx, "rehearse", ".", "--profile", "local").text;
   const block = reh.match(/^features\/access\/domain\/require-registrar {2}switch 'decide' {2}3\/3 branches\n(?: .*\n?){3}/m)?.[0]?.trimEnd();
   const summary = reh.slice(reh.indexOf("every branch settled")).trimEnd();
-  assert(title, Boolean(block) && summary.includes("Writes are for recorders  holds at 6 trigger(s)"), reh, "rehearse shows require-registrar 3/3 branches and Writes are for recorders holds at 6 trigger(s)");
+  assert(title, Boolean(block) && summary.includes("Writes are for registrars  holds at 6 trigger(s)"), reh, "rehearse shows require-registrar 3/3 branches and Writes are for registrars holds at 6 trigger(s)");
   const map = wilanis(ctx, "map", ".", "--profile", "local").text;
-  const mapBlock = map.match(/^@features\/monitor\/edge\/archive-entry\.trigger\.json.*\n(?:[ \t].*\n?)*/m)?.[0]?.trimEnd();
-  assert(title, Boolean(mapBlock) && mapBlock.includes("holds  @features/customers/domain/writes-are-for-registrars.invariant.json"), map, "map's archive-entry block holds the invariant");
+  const mapBlock = map.match(/^@features\/customers\/edge\/archive-customer\.trigger\.json.*\n(?:[ \t].*\n?)*/m)?.[0]?.trimEnd();
+  assert(title, Boolean(mapBlock) && mapBlock.includes("holds  @features/customers/domain/writes-are-for-registrars.invariant.json"), map, "map's archive-customer block holds the invariant");
   return {
     number: 5,
     title,
@@ -153,7 +153,7 @@ function step5(ctx) {
       { pre: `${block}\n\n${summary}`, full: reh, label: "the whole rehearsal" },
       { pre: mapBlock, full: map, label: "the whole map" },
     ],
-    why: "This is the test suite the agent did not write. The three branches of the recorder decision each ran to a declared outcome, and the summary counts the new route among the six the invariant holds at, up from five before the agent began. The map says in one line what step 1 said as a refusal: the route holds the invariant, through the policy.",
+    why: "This is the test suite the agent did not write. The three branches of the registrar decision each ran to a declared outcome, and the summary counts the new route among the six the invariant holds at, up from five before the agent began. The map says in one line what step 1 said as a refusal: the route holds the invariant, through the policy.",
     note: "<code>map</code> today prints the graphs of all three bindings under <code>#remove</code> and <code>??</code> lines under nested domain calls although a profile was given (#481), and ends with 17 <code>orphan</code> lines for graphs the tree does reach (#488). Both are shown as printed.",
   };
 }
@@ -162,26 +162,26 @@ async function step6(ctx) {
   const title = "Live";
   ctx.server = new Server(ctx, join(ctx.scratch, "node_modules", ".bin", "wilanis"), ["start", ".", "--profile", "local"]);
   await ctx.server.waitFor(/startup 7\/7 Listen: ok/, 30_000);
-  const anon = await call("POST", "/monitor/x/archive");
+  const anon = await call("POST", "/customers/x/archive");
   assert(title, anon.status === 401 && anon.json?.reason === "anonymous", `${anon.status} ${anon.text}`, "no token answers 401 anonymous");
-  const cy = await call("POST", "/monitor/x/archive", { token: await signIn("cy", "cy-pass") });
+  const cy = await call("POST", "/customers/x/archive", { token: await signIn("cy", "cy-pass") });
   assert(title, cy.status === 403 && cy.json?.reason === "forbidden", `${cy.status} ${cy.text}`, "cy answers 403 forbidden");
   ctx.bo = await signIn("bo", "bo-pass");
-  const made = await call("POST", "/monitor", { token: ctx.bo, type: "application/json", body: RECORD });
-  assert(title, made.status === 201 && made.json?.id, `${made.status} ${made.text}`, "bo records an entry, 201");
-  const gone = await call("POST", `/monitor/${made.json.id}/archive`, { token: ctx.bo });
+  const made = await call("POST", "/customers", { token: ctx.bo, type: "application/json", body: REGISTRATION });
+  assert(title, made.status === 201 && made.json?.id, `${made.status} ${made.text}`, "bo registers a customer, 201");
+  const gone = await call("POST", `/customers/${made.json.id}/archive`, { token: ctx.bo });
   assert(title, gone.status === 200 && gone.json?.id === made.json.id, `${gone.status} ${gone.text}`, "bo archives it, 200 with the same id");
   const forbiddenLine = ctx.steps[5].answers[0].pre.split("\n").find((l) => l.includes("as forbidden:"));
   const signin = (who) => `TOKEN=$(curl -s -X POST localhost:8099/api/v1/auth-employees -H 'content-type: application/json' \\\n  -d '{"username":"${who}","password":"${who}-pass"}' | sed -n 's/.*"accessToken":"\\([^"]*\\)".*/\\1/p')`;
   return {
     number: 6,
     title,
-    summary: `${anon.status} anonymous, ${cy.status} forbidden, ${made.status} recorded, ${gone.status} archived`,
+    summary: `${anon.status} anonymous, ${cy.status} forbidden, ${made.status} registered, ${gone.status} archived`,
     does: [
       { text: "Serve it. The key the tree signs its tokens with is the one secret it reads from the environment, and the only thing this run needed from outside the tree.", pre: "npm run start -- --profile local" },
-      { text: "No token:", pre: "curl -s -X POST localhost:8099/monitor/x/archive" },
-      { text: "As cy, who holds the <code>viewer</code> group and not <code>recorder</code>:", pre: `${signin("cy")}\ncurl -s -X POST localhost:8099/monitor/x/archive -H "authorization: Bearer $TOKEN"` },
-      { text: "As bo, a recorder: record an entry, then archive it.", pre: `${signin("bo")}\ncurl -s -X POST localhost:8099/monitor -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \\\n  -d '${RECORD}'\ncurl -s -X POST localhost:8099/monitor/$ID/archive -H "authorization: Bearer $TOKEN"` },
+      { text: "No token:", pre: "curl -s -X POST localhost:8099/customers/x/archive" },
+      { text: "As cy, who holds the <code>viewer</code> group and not <code>registrar</code>:", pre: `${signin("cy")}\ncurl -s -X POST localhost:8099/customers/x/archive -H "authorization: Bearer $TOKEN"` },
+      { text: "As bo, a registrar: register a customer, then archive them.", pre: `${signin("bo")}\ncurl -s -X POST localhost:8099/customers -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \\\n  -d '${REGISTRATION}'\ncurl -s -X POST localhost:8099/customers/$ID/archive -H "authorization: Bearer $TOKEN"` },
     ],
     answers: [
       { pre: `${anon.status}  ${anon.text}` },
@@ -194,11 +194,11 @@ async function step6(ctx) {
 
 async function step7(ctx) {
   const title = "All of it or none of it";
-  const csv = readFileSync(join(here, "entries.bad.csv"), "utf8");
-  const imp = await call("POST", "/monitor.csv", { token: ctx.bo, type: "text/csv", body: csv });
-  assert(title, imp.status === 500 && imp.json?.reason === "invariant" && imp.json.message.includes("An entry names a call"), `${imp.status} ${imp.text}`, "the import answers 500 invariant naming An entry names a call");
-  const list = await call("GET", "/monitor");
-  assert(title, list.text === "[]", `${list.status} ${list.text}`, "GET /monitor answers []");
+  const csv = readFileSync(join(here, "customers.bad.csv"), "utf8");
+  const imp = await call("POST", "/customers.csv", { token: ctx.bo, type: "text/csv", body: csv });
+  assert(title, imp.status === 500 && imp.json?.reason === "invariant" && imp.json.message.includes("A customer is reachable"), `${imp.status} ${imp.text}`, "the import answers 500 invariant naming A customer is reachable");
+  const list = await call("GET", "/customers");
+  assert(title, list.text === "[]", `${list.status} ${list.text}`, "GET /customers answers []");
   const atomic = read(ctx, "features/customers/domain/register-all.graph.json").split("\n").find((l) => l.includes('"atomic"'));
   assert(title, Boolean(atomic), "no atomic line", "register-all.graph.json has an atomic line");
   return {
@@ -206,8 +206,8 @@ async function step7(ctx) {
     title,
     summary: `${imp.status} invariant, then []`,
     does: [
-      { text: "A file of five entries whose fifth row is not an entry: the URL is empty.", pre: csv.trimEnd() },
-      { text: "Import it as bo, then list.", pre: `curl -s -X POST localhost:8099/monitor.csv -H 'content-type: text/csv' -H "authorization: Bearer $TOKEN" \\\n  --data-binary @entries.bad.csv\ncurl -s localhost:8099/monitor` },
+      { text: "A file of five customers whose fifth row is not a customer: the address is empty.", pre: csv.trimEnd() },
+      { text: "Import it as bo, then list.", pre: `curl -s -X POST localhost:8099/customers.csv -H 'content-type: text/csv' -H "authorization: Bearer $TOKEN" \\\n  --data-binary @customers.bad.csv\ncurl -s localhost:8099/customers` },
     ],
     answers: [
       { pre: `${imp.status}  ${imp.text}\n${list.status}  ${list.text}` },
@@ -219,12 +219,12 @@ async function step7(ctx) {
 
 async function step8(ctx) {
   const title = "An edit that never reaches the serving tree";
-  paste(ctx, "archive-entry.step2.trigger.json");
+  paste(ctx, "archive-customer.step2.trigger.json");
   const refused = await ctx.server.waitFor(/reload refused, still serving the last good tree:\n.*I001.*\n(?: .*\n?){2}/, 15_000);
   assert(title, refused.includes("I001"), refused, "the reload is refused with I001");
-  const anon = await call("POST", "/monitor/x/archive");
+  const anon = await call("POST", "/customers/x/archive");
   assert(title, anon.status === 401, `${anon.status} ${anon.text}`, "the route still answers 401");
-  paste(ctx, "archive-entry.step3.trigger.json");
+  paste(ctx, "archive-customer.step3.trigger.json");
   const served = await ctx.server.waitFor(/reload: \d+ documents, serving the new tree/, 15_000);
   const how = await ctx.server.stop();
   assert(title, how.code !== null || how.signal === "SIGTERM", JSON.stringify(how), "the server exits on SIGTERM");
@@ -233,8 +233,8 @@ async function step8(ctx) {
     title,
     summary: `reload refused with I001, still 401; ${served}; exited`,
     does: [
-      { text: "With the server still running, the agent puts the step 2 file back over the route: the one without the policy.", pre: `cp archive-entry.step2.trigger.json ${ROUTE}` },
-      { text: "Then, with the finished file back in place:", pre: `cp archive-entry.step3.trigger.json ${ROUTE}` },
+      { text: "With the server still running, the agent puts the step 2 file back over the route: the one without the policy.", pre: `cp archive-customer.step2.trigger.json ${ROUTE}` },
+      { text: "Then, with the finished file back in place:", pre: `cp archive-customer.step3.trigger.json ${ROUTE}` },
     ],
     answers: [
       { text: "The server's log, and the route while the bad file sat on disk:", pre: `${refused.trimEnd()}\n\n${anon.status}  ${anon.text}`, codes: true },

@@ -143,7 +143,7 @@ async function bodyOf(request: { [Symbol.asyncIterator](): AsyncIterableIterator
   return body;
 }
 
-/** A mockapi-shaped upstream for the monitor's writes; it keeps the rows it was given. */
+/** A mockapi-shaped upstream for the registry's writes; it keeps the rows it was given. */
 export function fakeUpstream(rows: Record<string, unknown>[]): Server {
   return createServer(async (request, response) => {
     const body = await bodyOf(request);
@@ -185,7 +185,7 @@ function identityToken(base: string, privateKey: KeyLike) {
     .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
     .setSubject('okta|dee')
     .setIssuer(base)
-    .setAudience('monitor')
+    .setAudience('customers')
     .setIssuedAt()
     .setExpirationTime('5m')
     .sign(privateKey);
@@ -194,7 +194,7 @@ function identityToken(base: string, privateKey: KeyLike) {
 /** What the fake issuer's token endpoint answers to one password grant. */
 async function grantAnswer(base: string, privateKey: KeyLike, body: string) {
   const form = new URLSearchParams(body);
-  if (form.get('client_id') !== 'monitor' || form.get('client_secret') !== 'shh')
+  if (form.get('client_id') !== 'customers' || form.get('client_secret') !== 'shh')
     return { status: 401, value: { error: 'invalid_client' } };
   if (form.get('username') !== 'dee' || form.get('password') !== 'dee-pass')
     return { status: 400, value: { error: 'invalid_grant' } };
