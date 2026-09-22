@@ -122,7 +122,7 @@ export const step = (over: Partial<PlanStep> = {}): PlanStep => ({
 
 /** One connection's plan, against the entries connection unless the test says otherwise. */
 export const target = (steps: PlanStep[], over: Partial<PlanTarget> = {}): PlanTarget => ({
-  connection: '@connections/entries.connection.json',
+  connection: '@connections/customers.connection.json',
   engine: 'postgres, granted by @storage-postgres',
   steps,
   ...over,

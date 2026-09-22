@@ -7,7 +7,7 @@ import { type DocView, type SchemaView, siteOf, type TreeIndex, writeSite } from
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 const REPO = fileURLToPath(new URL('../../..', import.meta.url));
-const GET_ROW = '@features/monitor/data/get-row.graph.json';
+const GET_ROW = '@features/customers/data/get-row.graph.json';
 
 describe('a tree written out as a site', () => {
   it('answers the index, a view for every document, and the schemas', async () => {

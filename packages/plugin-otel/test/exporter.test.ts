@@ -10,11 +10,11 @@ import { Exporter, reasonOf, type Sends } from '../src/exporter.js';
 
 /** The trace of one run, small enough that what is said of its batch is the whole of the log. */
 const trace = (): Trace => ({
-  name: 'fire @monitor/edge/get-entry.trigger.json',
+  name: 'fire @customers/edge/get-customer.trigger.json',
   startedAt: 1_700_000_000_000,
   endedAt: 1_700_000_000_143,
   status: 'ok',
-  attributes: { 'wilanis.trigger': '@monitor/edge/get-entry.trigger.json' },
+  attributes: { 'wilanis.trigger': '@customers/edge/get-customer.trigger.json' },
   children: [],
 });
 

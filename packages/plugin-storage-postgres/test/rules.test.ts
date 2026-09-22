@@ -18,7 +18,7 @@ import postgres from '../src/index.js';
 
 const CONNECTION = '@connections/records.connection.json';
 const KIND = '@storage-postgres/postgres.connection-kind.json';
-const SHAPE = '@features/monitor/domain/Entry.shape.json';
+const SHAPE = '@features/customers/domain/Customer.shape.json';
 
 type Docs = Record<string, unknown>;
 
@@ -38,18 +38,18 @@ function tree(): Docs {
       kind: KIND,
       settings: { url: '{{secrets.database}}' },
     },
-    'features/monitor/feature.json': {
+    'features/customers/feature.json': {
       $schema: schemaRef('feature'),
       description: 'what the monitor observes',
       effects: ['@storage/store.port.json#get'],
     },
-    'features/monitor/domain/Entry.shape.json': {
+    'features/customers/domain/Customer.shape.json': {
       $schema: schemaRef('shape'),
       description: 'one observed call',
       layer: 'core',
       fields: { id: { type: 'string' }, url: { type: 'string' }, hits: { type: 'number' } },
     },
-    'features/monitor/data/entries.store.json': {
+    'features/customers/data/customers.store.json': {
       $schema: schemaRef('store'),
       description: 'the entries kept so far',
       connection: CONNECTION,
@@ -84,8 +84,8 @@ function editing(file: string, edit: (doc: any) => void): Docs {
   return docs;
 }
 
-const store = (edit: (doc: any) => void) => refusals(editing('features/monitor/data/entries.store.json', edit));
-const shape = (edit: (doc: any) => void) => refusals(editing('features/monitor/domain/Entry.shape.json', edit));
+const store = (edit: (doc: any) => void) => refusals(editing('features/customers/data/customers.store.json', edit));
+const shape = (edit: (doc: any) => void) => refusals(editing('features/customers/domain/Customer.shape.json', edit));
 
 describe('what this engine refuses before anything runs', () => {
   it('passes as it stands, so every case below fails for the reason it names', () => {
@@ -98,13 +98,16 @@ describe('what this engine refuses before anything runs', () => {
 
   it('X222 a key this engine cannot key by', () => {
     const codes = refusals({
-      ...editing('features/monitor/domain/Entry.shape.json', doc => (doc.fields.id = { type: 'boolean' })),
+      ...editing('features/customers/domain/Customer.shape.json', doc => (doc.fields.id = { type: 'boolean' })),
     });
     expect(codes).toEqual([['X222', 'collections/entries/key']]);
   });
 
   it('X222 a key the configured keyType cannot answer', () => {
-    const numbered = editing('features/monitor/domain/Entry.shape.json', doc => (doc.fields.id = { type: 'number' }));
+    const numbered = editing(
+      'features/customers/domain/Customer.shape.json',
+      doc => (doc.fields.id = { type: 'number' }),
+    );
     expect(refusals(numbered)).toEqual([['X222', 'collections/entries/key']]);
 
     const counted = { ...numbered } as Docs;

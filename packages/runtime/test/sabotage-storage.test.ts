@@ -17,7 +17,7 @@ import { schemaUrl } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { planted, plantedAll, plantedPointing, sabotage, sabotagePointing } from './example-harness.js';
 
-const KEPT = '@connections/entries.connection.json';
+const KEPT = '@connections/customers.connection.json';
 const shape = (label: string, fields: Record<string, unknown>) => ({
   $schema: schemaUrl('shape'),
   label,
@@ -28,23 +28,23 @@ const shape = (label: string, fields: Record<string, unknown>) => ({
 
 /** A note of an entry, and a counted thing keyed by a number, so a reference has something to get wrong. */
 const SHAPES = {
-  'features/monitor/domain/Note.shape.json': shape('Note', {
+  'features/customers/domain/Note.shape.json': shape('Note', {
     id: { type: 'string' },
     entryId: { type: 'string' },
     byId: { type: 'string', required: false, description: 'the entry this note answers, where it answers one' },
     tags: { type: 'string[]' },
     text: { type: 'string' },
   }),
-  'features/monitor/domain/Counted.shape.json': shape('Counted', {
+  'features/customers/domain/Counted.shape.json': shape('Counted', {
     n: { type: 'number' },
     label: { type: 'string' },
   }),
-  'features/monitor/domain/Upload.shape.json': shape('Upload', {
+  'features/customers/domain/Upload.shape.json': shape('Upload', {
     id: { type: 'string' },
     file: { type: 'blob' },
     tags: { type: 'string[]' },
   }),
-  'features/monitor/domain/Renamed.shape.json': shape('Renamed', {
+  'features/customers/domain/Renamed.shape.json': shape('Renamed', {
     id: { type: 'string' },
     url: { type: 'string' },
     agent: { type: 'string' },
@@ -57,20 +57,20 @@ const SHAPES = {
  * case scopes nothing, and binding a read no collection reads would be refused as an unused import (P005).
  */
 const TENANCY = {
-  'features/monitor/edge/tenancy.resolvers.json': {
+  'features/customers/edge/tenancy.resolvers.json': {
     $schema: schemaUrl('resolvers'),
     label: 'Tenancy',
     description: 'Which tenant the caller speaks for, as the sign-in wrote it into their session.',
     resolvers: { tenant: { read: 'request.session.attributes.displayName', required: true } },
   },
 };
-const READS = { tenant: '@monitor/edge/tenancy.resolvers.json#tenant' };
+const READS = { tenant: '@customers/edge/tenancy.resolvers.json#tenant' };
 
 /** The store the cases break: rows keyed by a string, notes referring to them, counted keyed by a number. */
 const keeping = (collections: Record<string, unknown>, reads?: Record<string, string>) => ({
   ...SHAPES,
   ...(reads ? TENANCY : {}),
-  'features/monitor/data/planted.store.json': {
+  'features/customers/data/planted.store.json': {
     $schema: schemaUrl('store'),
     label: 'Entries',
     description: 'The rows recorded so far, and the notes hung off them.',
@@ -81,23 +81,23 @@ const keeping = (collections: Record<string, unknown>, reads?: Record<string, st
 });
 
 const entry = (extra: Record<string, unknown> = {}) => ({
-  of: '@monitor/domain/Entry.shape.json',
+  of: '@customers/domain/Customer.shape.json',
   key: 'id',
   ...extra,
 });
 const notes = (extra: Record<string, unknown> = {}) => ({
-  of: '@monitor/domain/Note.shape.json',
+  of: '@customers/domain/Note.shape.json',
   key: 'id',
   ...extra,
 });
-const counted = { of: '@monitor/domain/Counted.shape.json', key: 'n' };
+const counted = { of: '@customers/domain/Counted.shape.json', key: 'n' };
 const codesOf = (collections: Record<string, unknown>, reads?: Record<string, string>) =>
   plantedAll(keeping(collections, reads));
 const pointingAt = (collections: Record<string, unknown>, reads?: Record<string, string>) =>
   plantedPointing(keeping(collections, reads));
 
 /** One refusal as a case expects it: the code, and the constraint of the planted store it points at. */
-const STORE = '@features/monitor/data/planted.store.json';
+const STORE = '@features/customers/data/planted.store.json';
 const at = (code: string, where: string) => [`${code} ${STORE}#collections/${where}`];
 
 describe('sabotage: what a store holds its records to', () => {
@@ -125,9 +125,9 @@ describe('sabotage: what a store holds its records to', () => {
   });
 
   it("the example's own unique and defaults are judged where they are written", () => {
-    const kept = '@features/monitor/data/entries.store.json#collections/entries';
+    const kept = '@features/customers/data/customers.store.json#collections/entries';
     const breaking = (edit: (collection: any) => void) =>
-      sabotagePointing('features/monitor/data/entries.store.json', doc => edit(doc.collections.entries));
+      sabotagePointing('features/customers/data/customers.store.json', doc => edit(doc.collections.entries));
 
     expect(breaking(entries => entries.unique.push(['urrl']))).toEqual([`C003 ${kept}/unique/1`]);
     expect(breaking(entries => (entries.defaults.agent = 7))).toEqual([`C004 ${kept}/defaults/agent`]);
@@ -180,7 +180,7 @@ describe('sabotage: what a store holds its records to', () => {
 
   it('C008 a constraint over a field an engine holds no value of: bytes, a shape or a list', () => {
     const uploads = (extra: Record<string, unknown>) => ({
-      of: '@monitor/domain/Upload.shape.json',
+      of: '@customers/domain/Upload.shape.json',
       key: 'id',
       ...extra,
     });
@@ -199,12 +199,12 @@ describe('sabotage: what a store holds its records to', () => {
   });
 
   it('C010 a renamed whose value is a field of the shape still, so nothing was renamed', () => {
-    const both = { of: '@monitor/domain/Renamed.shape.json', key: 'id', renamed: { agent: 'url' } };
+    const both = { of: '@customers/domain/Renamed.shape.json', key: 'id', renamed: { agent: 'url' } };
     expect(pointingAt({ rows: both })).toEqual(at('C010', 'rows/renamed/agent'));
   });
 
   it('C010 one name under two keys: one column cannot become two', () => {
-    const twice = { of: '@monitor/domain/Renamed.shape.json', key: 'id', renamed: { url: 'ua', agent: 'ua' } };
+    const twice = { of: '@customers/domain/Renamed.shape.json', key: 'id', renamed: { url: 'ua', agent: 'ua' } };
     expect(pointingAt({ rows: twice })).toEqual(at('C010', 'rows/renamed/agent'));
   });
 
@@ -231,10 +231,10 @@ describe('sabotage: what a store holds its records to', () => {
   });
 
   it('an unknown shape is R001 once, wherever else the collection is looked at', () => {
-    const missing = { rows: { of: '@monitor/domain/Nowhere.shape.json', key: 'id' } };
+    const missing = { rows: { of: '@customers/domain/Nowhere.shape.json', key: 'id' } };
     expect(pointingAt(missing)).toEqual(at('R001', 'rows/of'));
     const referring = {
-      rows: { of: '@monitor/domain/Nowhere.shape.json', key: 'id' },
+      rows: { of: '@customers/domain/Nowhere.shape.json', key: 'id' },
       notes: notes({ refs: { entryId: { collection: 'rows' } } }),
     };
     expect(pointingAt(referring)).toEqual(at('R001', 'rows/of'));
@@ -248,28 +248,28 @@ describe('sabotage: what a store holds its records to', () => {
  */
 describe('what a call may do to the records', () => {
   it('X211 a patch that changes the key: a key identifies, so it is never patched', () => {
-    const found = sabotage('features/monitor/data/kept-update.graph.json', doc => {
+    const found = sabotage('features/customers/data/kept-update.graph.json', doc => {
       doc.nodes[0].in.changes.id = 'other';
     });
     expect(found).toContain('X211');
   });
 
   it('X211 a patch that changes a field the shape does not have', () => {
-    const found = sabotage('features/monitor/data/kept-update.graph.json', doc => {
+    const found = sabotage('features/customers/data/kept-update.graph.json', doc => {
       doc.nodes[0].in.changes.nope = 'x';
     });
     expect(found).toContain('X211');
   });
 
   it('X211 a patch whose value the field would not accept', () => {
-    const found = sabotage('features/monitor/data/kept-update.graph.json', doc => {
+    const found = sabotage('features/customers/data/kept-update.graph.json', doc => {
       doc.nodes[0].in.changes.url = 7;
     });
     expect(found).toContain('X211');
   });
 
   it('X212 ensure run by a graph node: it prepares the engine once, before the port opens', () => {
-    const found = sabotage('features/monitor/data/kept-get.graph.json', doc => {
+    const found = sabotage('features/customers/data/kept-get.graph.json', doc => {
       doc.nodes[0].run = '@storage/storage.port.json#ensure';
     });
     expect(found).toContain('X212');
@@ -287,7 +287,7 @@ describe('what a call may do to the records', () => {
           id: 'asked',
           label: 'Read a record',
           run: '@storage/store.port.json#get',
-          in: { store: '@monitor/data/entries.store.json', collection: 'entries', key: 'x' },
+          in: { store: '@customers/data/customers.store.json', collection: 'entries', key: 'x' },
         },
       ],
     });

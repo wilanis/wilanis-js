@@ -43,7 +43,7 @@ afterAll(async () => {
 
 /** Fire one trigger the way `wilanis run` does, with a blob scope of this run's own. */
 const fire = async (name: string, input: Record<string, unknown>) => {
-  const path = `@features/monitor/edge/${name}.trigger.json`;
+  const path = `@features/customers/edge/${name}.trigger.json`;
   const found = tree.registry.get('trigger', tree.resolve(path));
   if (!found) throw new Error(`no trigger at '${path}'`);
   const blobs = emb.blobs.scope();

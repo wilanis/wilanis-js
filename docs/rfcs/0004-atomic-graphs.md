@@ -17,7 +17,7 @@ transaction underneath the storage plugin; wilanis knows *what* must be transact
 ## Motivation
 
 The example's `import` takes a CSV of drafts and records each row through `monitor.submit`, all at once
-(`example/features/monitor/domain/import-entries.graph.json` fans out through a `map`). When the fifth
+(`example/features/customers/domain/import-customers.graph.json` fans out through a `map`). When the fifth
 draft refuses, the first four are already stored. Today nothing in the tree can say "all of these or none":
 an author would have to write a graph that removes what it recorded, and remember every path that can fail.
 An agent writing the tree will not remember. Once RFC 0002 gives a tree a real store, this becomes the
@@ -47,14 +47,14 @@ transaction, since a file is not something a database can roll back; the recordi
   "label": "Record all drafts",
   "description": "Every draft recorded, or none: a draft that refuses rolls back the rows recorded before it.",
   "atomic": true,
-  "in": "@monitor/domain/EntryDraft.shape.json[]",
-  "out": { "type": "@monitor/domain/Entry.shape.json[]", "from": "recorded" },
+  "in": "@customers/domain/CustomerDraft.shape.json[]",
+  "out": { "type": "@customers/domain/Customer.shape.json[]", "from": "recorded" },
   "nodes": [
     {
       "type": "@wilanis/node/map.schema.json",
       "id": "recorded",
       "label": "Record each draft",
-      "run": "@monitor/domain/monitor.port.json#submit",
+      "run": "@customers/domain/customer.port.json#submit",
       "over": "{{in}}",
       "bind": { "url": "url", "method": "method", "ua": "ua" }
     }
@@ -65,7 +65,7 @@ transaction, since a file is not something a database can roll back; the recordi
 `record-all` is a domain graph: it names domain operations and knows nothing about the store. The
 transaction it declares spans whatever the profile's binding runs for `submit` -- with RFC 0002's storage
 binding, one `@storage/store.port.json#put` per draft, all on the connection that
-`@monitor/data/entries.store.json` names. The map
+`@customers/data/customers.store.json` names. The map
 still fans out in the graph; on the connection the writes are paced to one transaction, the way a
 `throttle` paces a map's requests against an HTTP connection today.
 
@@ -79,15 +79,15 @@ are in:
   "label": "Store an entry and its method's latest",
   "description": "The entry and the latest-call record of its method move together.",
   "atomic": true,
-  "in": "@monitor/domain/Entry.shape.json",
-  "out": { "type": "@monitor/domain/Entry.shape.json", "from": "answer" },
+  "in": "@customers/domain/Customer.shape.json",
+  "out": { "type": "@customers/domain/Customer.shape.json", "from": "answer" },
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "stored",
       "run": "@storage/store.port.json#put",
       "in": {
-        "store": "@monitor/data/entries.store.json",
+        "store": "@customers/data/customers.store.json",
         "collection": "entries",
         "record": "{{in}}"
       }
@@ -97,7 +97,7 @@ are in:
       "id": "latest",
       "run": "@storage/store.port.json#patch",
       "in": {
-        "store": "@monitor/data/entries.store.json",
+        "store": "@customers/data/customers.store.json",
         "collection": "latest",
         "key": "{{in.method}}",
         "changes": { "url": "{{in.url}}", "entry": "{{in.id}}" }
@@ -107,7 +107,7 @@ are in:
       "type": "@wilanis/node/run.schema.json",
       "id": "answer",
       "run": "@std/object.port.json#make",
-      "in": { "value": "{{stored.record}}", "type": "@monitor/domain/Entry.shape.json" }
+      "in": { "value": "{{stored.record}}", "type": "@customers/domain/Customer.shape.json" }
     }
   ]
 }
@@ -128,7 +128,7 @@ dependency on its answer:
 {
   "nodes": [
     { "type": "@wilanis/node/run.schema.json", "id": "recorded",
-      "run": "@monitor/domain/monitor.port.json#recordAll", "in": { "drafts": "{{in}}" } },
+      "run": "@customers/domain/customer.port.json#registerAll", "in": { "drafts": "{{in}}" } },
     { "type": "@wilanis/node/run.schema.json", "id": "notified",
       "run": "@mail/mail.port.json#send", "in": { "to": "{{in.who}}", "count": "{{recorded.length}}" } }
   ]
@@ -142,7 +142,7 @@ compensate. Ordering the effect after the commit is what replaces a rollback han
 Mark the wrong graph atomic and the checker says why it cannot be:
 
 ```
-L0n1  @features/monitor/domain/import-entries.graph.json#nodes/drafts
+L0n1  @features/customers/domain/import-customers.graph.json#nodes/drafts
     atomic graph reaches '@blob/csv.port.json#parse', which cannot take part in a transaction
     → read the file in the caller and make the graph that writes the store atomic instead
 ```
@@ -406,17 +406,17 @@ a transactional operation outside an atomic graph runs in its own implicit trans
 Sabotage tests in `packages/runtime/test/example.test.ts`, against the example once RFC 0002 has given it
 a storage-backed profile (names as RFC 0002 settles them):
 
-- C0n1: mark `@monitor/domain/monitor.port.json#record` `transactional` (a domain operation with neither a
+- C0n1: mark `@customers/domain/customer.port.json#register` `transactional` (a domain operation with neither a
   static `connection` nor a static `store`).
-- L0n1: add `"atomic": true` to `import-entries.graph.json`, which reaches `@blob/csv.port.json#parse`.
-- L0n1, domain: add `"atomic": true` to `record-entry.graph.json` under the `live` profile, whose binding
+- L0n1: add `"atomic": true` to `import-customers.graph.json`, which reaches `@blob/csv.port.json#parse`.
+- L0n1, domain: add `"atomic": true` to `register-customer.graph.json` under the `live` profile, whose binding
   reaches `@http/http.port.json#request`; the refusal names the profile.
 - L0n2: an atomic data graph with two `@storage` nodes on two store documents whose `connection` fields
   name different connections.
-- L0n3: `"atomic": true` on `list-entries.graph.json`, which reaches no write. (Decided otherwise during
+- L0n3: `"atomic": true` on `list-customers.graph.json`, which reaches no write. (Decided otherwise during
   implementation: a graph reaching only store reads is accepted -- see "Decided during implementation".
   What is tested instead is that a graph reaching nothing transactional at all, `parse-drafts`, refuses.)
-- G0n1: `"onItemFailure": "collect"` on the map in `record-all.graph.json`.
+- G0n1: `"onItemFailure": "collect"` on the map in `register-all.graph.json`.
 
 End to end, in `packages/plugin-storage/test` against `@wilanis/plugin-storage-memory`, and in `packages/runtime/test`
 through the example's storage profile:
@@ -448,8 +448,8 @@ through the example's storage profile:
    `@wilanis/plugin-storage-postgres`. Lands with or after RFC 0002's implementation.
 6. Rehearsal report: `(atomic)` and `rolled back`. `good first issue`.
 7. `describe`, `map`, the view model and the viewer page. `good first issue` for the viewer badge.
-8. The example: `record-all.graph.json` behind `import`, `store-and-latest.graph.json` behind `record`
-   with a `latest` collection added to `entries.store.json`, under the storage profile, and the README's
+8. The example: `register-all.graph.json` behind `import`, `store-and-latest.graph.json` behind `record`
+   with a `latest` collection added to `customers.store.json`, under the storage profile, and the README's
    paragraph on atomicity.
 
 ## Drawbacks and alternatives

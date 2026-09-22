@@ -34,8 +34,8 @@
     "requireEmployee": {
       "graph": "@access/domain/require-employee.graph.json"
     },
-    "requireRecorder": {
-      "graph": "@access/domain/require-recorder.graph.json"
+    "requireRegistrar": {
+      "graph": "@access/domain/require-registrar.graph.json"
     },
     "requireOtp": {
       "graph": "@access/domain/require-otp.graph.json"

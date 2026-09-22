@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Customer reference",
+  "layer": "core",
+  "description": "One customer, by id.",
+  "fields": {
+    "id": {
+      "type": "string"
+    }
+  }
+}

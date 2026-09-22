@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
 /** The example's two stores: the same collections over the memory connection and over the postgres one. */
-const STORES = ['@monitor/data/entries.store.json', '@monitor/data/entries-postgres.store.json'];
+const STORES = ['@customers/data/customers.store.json', '@customers/data/customers-postgres.store.json'];
 
 describe("the example's migration plan", () => {
   it('is every collection created, against a database that has recorded nothing', () => {

@@ -187,7 +187,7 @@ export function serving(triggers: TriggerDoc[], answering: () => Answering = () 
  */
 export function trigger(
   settings: Record<string, unknown>,
-  run = '@monitor/domain/monitor.port.json#digest',
+  run = '@customers/domain/customer.port.json#digest',
   at?: string,
 ): TriggerDoc {
   return {

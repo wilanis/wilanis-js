@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/invariant.schema.json",
+  "label": "Writes are for registrars",
+  "description": "Every trigger that can change a customer attaches the registrar policy. Reads stay public. Without this the six write triggers are six coincidences: a new route firing customer.update and forgetting the policy would check clean, and the write would be public.",
+  "access": {
+    "over": [
+      "@customers/domain/customer.port.json#register",
+      "@customers/domain/customer.port.json#update",
+      "@customers/domain/customer.port.json#remove",
+      "@customers/domain/customer.port.json#removeMany",
+      "@customers/domain/customer.port.json#submit",
+      "@customers/domain/customer.port.json#import"
+    ],
+    "requires": {
+      "policy": "@access/edge/can-register.policy.json"
+    }
+  }
+}

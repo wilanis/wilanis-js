@@ -22,21 +22,21 @@ const shape = (label: string, fields: Record<string, unknown>) => ({
   fields,
 });
 
-const STORE = '@features/monitor/data/entries.store.json';
+const STORE = '@features/customers/data/customers.store.json';
 const { load, dir } = loadedWith({
-  'features/monitor/domain/Note.shape.json': shape('Note', {
+  'features/customers/domain/Note.shape.json': shape('Note', {
     id: { type: 'string' },
     entryId: { type: 'string' },
     text: { type: 'string' },
   }),
-  'features/monitor/data/entries.store.json': {
+  'features/customers/data/customers.store.json': {
     $schema: schemaUrl('store'),
     label: 'Entries',
     description: 'The entries recorded so far, and the notes hung off them.',
     connection: '@connections/customers.connection.json',
     collections: {
       entries: {
-        of: '@monitor/domain/Entry.shape.json',
+        of: '@customers/domain/Customer.shape.json',
         key: 'id',
         unique: [['url', 'method'], ['ua']],
         defaults: { ua: 'unknown' },
@@ -45,7 +45,7 @@ const { load, dir } = loadedWith({
         description: 'one row per observed call',
       },
       notes: {
-        of: '@monitor/domain/Note.shape.json',
+        of: '@customers/domain/Note.shape.json',
         key: 'id',
         refs: { entryId: { collection: 'entries', onRemove: 'refuse' } },
       },
@@ -59,8 +59,8 @@ describe('describe: a store', () => {
 
   it('says the connection its records live behind, and every collection with the shape it holds', () => {
     expect(said()).toContain('connection  @connections/customers.connection.json');
-    expect(said()).toContain('  collection entries: @monitor/domain/Entry.shape.json');
-    expect(said()).toContain('  collection notes: @monitor/domain/Note.shape.json');
+    expect(said()).toContain('  collection entries: @customers/domain/Customer.shape.json');
+    expect(said()).toContain('  collection notes: @customers/domain/Note.shape.json');
   });
 
   it('gives each mark family one line, with its constraints in the order they were declared', () => {
@@ -103,26 +103,26 @@ describe('describe: a store', () => {
 
 describe('describe: a shape a store keeps', () => {
   it('says which collection holds it, beside who writes it', () => {
-    expect(describeDoc(load, '@monitor/domain/Entry.shape.json')).toContain(`held by  ${STORE}#entries`);
-    expect(describeDoc(load, '@monitor/domain/Note.shape.json')).toContain(`held by  ${STORE}#notes`);
+    expect(describeDoc(load, '@customers/domain/Customer.shape.json')).toContain(`held by  ${STORE}#entries`);
+    expect(describeDoc(load, '@customers/domain/Note.shape.json')).toContain(`held by  ${STORE}#notes`);
   });
 
   it('says nothing of the sort about a shape no store keeps', () => {
-    expect(describeDoc(load, '@monitor/domain/Digest.shape.json')).not.toContain('held by');
+    expect(describeDoc(load, '@customers/domain/Digest.shape.json')).not.toContain('held by');
   });
 });
 
 // ---- the example's own store, the one a reader meets -------------------------------------------------
 
 const example = loadTree(EXAMPLE, PLUGINS, INCLUDES);
-const KEPT = '@features/monitor/data/entries.store.json';
+const KEPT = '@features/customers/data/customers.store.json';
 
 describe('ls: the stores of a tree', () => {
   it('lists a store under its kind, as every other kind is listed', () => {
     // two, since the example keeps its entries in memory under one profile and in PostgreSQL under another,
     // and a profile swaps bindings rather than connections
     expect(ls(example, 'store')).toEqual([
-      'store            @features/monitor/data/entries-postgres.store.json',
+      'store            @features/customers/data/customers-postgres.store.json',
       `store            ${KEPT}`,
     ]);
   });
@@ -136,7 +136,7 @@ describe('describe: the engine behind a store', () => {
   const said = () => describeDoc(example, KEPT);
 
   it('says which connection kind keeps the records, and the plugin and package that grant it', () => {
-    expect(said()).toContain('connection  @connections/entries.connection.json');
+    expect(said()).toContain('connection  @connections/customers.connection.json');
     expect(said()).toContain(
       'engine      @storage-memory/memory.connection-kind.json  granted by @storage-memory (@wilanis/plugin-storage-memory)',
     );
@@ -148,10 +148,10 @@ describe('describe: the engine behind a store', () => {
 
   it('names every graph that runs an operation against it, with the operation and the collection', () => {
     expect(said()).toContain('run against by (the operation each runs):');
-    expect(said()).toContain('    @features/monitor/data/kept-get.graph.json#asked  get (entries)');
-    expect(said()).toContain('    @features/monitor/data/store-and-latest.graph.json#key  newKey (entries)');
-    expect(said()).toContain('    @features/monitor/data/store-and-latest.graph.json#stored  put (entries)');
-    expect(said()).toContain('    @features/monitor/data/store-and-latest.graph.json#latest  put (latest)');
+    expect(said()).toContain('    @features/customers/data/kept-get.graph.json#asked  get (entries)');
+    expect(said()).toContain('    @features/customers/data/store-and-latest.graph.json#key  newKey (entries)');
+    expect(said()).toContain('    @features/customers/data/store-and-latest.graph.json#stored  put (entries)');
+    expect(said()).toContain('    @features/customers/data/store-and-latest.graph.json#latest  put (latest)');
   });
 });
 

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "Remove what is kept",
+  "description": "Data graph behind customer.remove under the local profile: remove the record and answer the one that was removed, so the caller sees what it lost.",
+  "in": "@customers/domain/CustomerRef.shape.json",
+  "out": {
+    "type": "@customers/domain/Customer.shape.json",
+    "from": [
+      "row",
+      "missing"
+    ]
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "asked",
+      "label": "Remove the record",
+      "run": "@storage/store.port.json#remove",
+      "in": {
+        "store": "@customers/data/customers.store.json",
+        "collection": "customers",
+        "key": "{{in.id}}"
+      }
+    },
+    {
+      "type": "@wilanis/node/switch.schema.json",
+      "id": "route",
+      "label": "Was it there?",
+      "in": {
+        "record": "{{asked.record}}"
+      },
+      "rules": [
+        {
+          "when": "has(record)",
+          "to": "row"
+        }
+      ],
+      "else": "missing"
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "row",
+      "label": "The record",
+      "run": "@std/object.port.json#make",
+      "in": {
+        "value": "{{asked.record}}",
+        "type": "@customers/domain/Customer.shape.json"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "missing",
+      "label": "No such customer",
+      "run": "@std/outcome.port.json#refuse",
+      "in": {
+        "reason": "missing",
+        "message": "no customer {{in.id}}",
+        "type": "@customers/domain/Customer.shape.json"
+      }
+    }
+  ]
+}

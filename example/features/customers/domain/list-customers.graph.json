@@ -1,0 +1,45 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "List customers",
+  "description": "Domain graph behind GET /customers: narrowed when a tier is given, everything otherwise. The two branches reconverge at out.from.",
+  "in": "@customers/domain/TierFilter.shape.json",
+  "out": {
+    "type": "@customers/domain/Customer.shape.json[]",
+    "from": [
+      "byMethod",
+      "all"
+    ]
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/switch.schema.json",
+      "id": "route",
+      "label": "Is a tier given?",
+      "in": {
+        "tier": "{{in.tier}}"
+      },
+      "rules": [
+        {
+          "when": "has(tier)",
+          "to": "byMethod"
+        }
+      ],
+      "else": "all"
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "byMethod",
+      "label": "Customers of that tier",
+      "run": "@customers/domain/customer.port.json#listByTier",
+      "in": {
+        "tier": "{{in.tier}}"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "all",
+      "label": "Every customer",
+      "run": "@customers/domain/customer.port.json#listAll"
+    }
+  ]
+}

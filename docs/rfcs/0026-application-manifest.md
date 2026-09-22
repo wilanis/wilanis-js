@@ -97,16 +97,16 @@ $ npx wilanis manifest example
     { "name": "monitor", "included": null, "effects": ["@blob/csv.port.json#parse", "@blob/csv.port.json#write", "@http/http.port.json#request"] }
   ],
   "documents": [
-    { "path": "@features/monitor/edge/delete-entries.trigger.json", "kind": "trigger", "feature": "monitor", "layer": "edge", "included": null },
+    { "path": "@features/customers/edge/delete-customers.trigger.json", "kind": "trigger", "feature": "monitor", "layer": "edge", "included": null },
     ...
   ],
   "triggers": [
     {
-      "path": "@features/monitor/edge/delete-entries.trigger.json",
+      "path": "@features/customers/edge/delete-customers.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": { "method": "DELETE", "route": "/monitor" },
-      "fires": "@monitor/domain/monitor.port.json#removeMany",
-      "policies": ["@access/edge/employees-only.policy.json", "@access/edge/can-record.policy.json"],
+      "fires": "@customers/domain/customer.port.json#removeMany",
+      "policies": ["@access/edge/employees-only.policy.json", "@access/edge/can-register.policy.json"],
       "public": false,
       "included": null
     },
@@ -115,14 +115,14 @@ $ npx wilanis manifest example
   "ports": {
     "domain": [
       {
-        "path": "@monitor/domain/monitor.port.json",
+        "path": "@customers/domain/customer.port.json",
         "feature": "monitor",
         "operations": [
-          { "name": "list", "firedBy": ["@features/monitor/edge/list-entries.trigger.json"], "public": true },
-          { "name": "removeMany", "firedBy": ["@features/monitor/edge/delete-entries.trigger.json"], "public": false },
+          { "name": "list", "firedBy": ["@features/customers/edge/list-customers.trigger.json"], "public": true },
+          { "name": "removeMany", "firedBy": ["@features/customers/edge/delete-customers.trigger.json"], "public": false },
           ...
         ],
-        "bindings": ["@monitor/data/monitor-rest.binding.json"]
+        "bindings": ["@customers/data/customers-rest.binding.json"]
       }
     ],
     "native": [
@@ -139,15 +139,15 @@ $ npx wilanis manifest example
     ]
   },
   "policies": [
-    { "path": "@access/edge/employees-only.policy.json", "decides": "@access/domain/access.port.json#requireEmployee", "proves": ["request.principal", "request.session"], "gates": ["@features/monitor/edge/delete-entries.trigger.json", ...], "included": "@wilanis/access" }
+    { "path": "@access/edge/employees-only.policy.json", "decides": "@access/domain/access.port.json#requireEmployee", "proves": ["request.principal", "request.session"], "gates": ["@features/customers/edge/delete-customers.trigger.json", ...], "included": "@wilanis/access" }
   ],
   "connections": [
-    { "path": "@connections/monitor-api.connection.json", "kind": "@http/http.connection-kind.json", "settings": { "baseUrl": "https://6aa009e23e0d88d3d7e5525d.mockapi.io/api/v1", "throttle": { "concurrency": 4 }, "timeoutMs": 10000 }, "secrets": [] },
+    { "path": "@connections/customers-api.connection.json", "kind": "@http/http.connection-kind.json", "settings": { "baseUrl": "https://6aa009e23e0d88d3d7e5525d.mockapi.io/api/v1", "throttle": { "concurrency": 4 }, "timeoutMs": 10000 }, "secrets": [] },
     { "path": "@connections/monitor-api-production.connection.json", "kind": "@http/http.connection-kind.json", "settings": { "baseUrl": "https://monitor.internal/api/v1", "headers": { "x-api-key": "{{secrets.monitorKey}}" }, "timeoutMs": 5000 }, "secrets": ["monitorKey"] }
   ],
   "secrets": { "jwt": "MONITOR_JWT_SECRET", "monitorKey": "MONITOR_API_KEY" },
   "startup": [
-    { "label": "Reach the entry store", "run": "@monitor/domain/monitor.port.json#listAll", "required": true, "profiles": null },
+    { "label": "Reach the entry store", "run": "@customers/domain/customer.port.json#listAll", "required": true, "profiles": null },
     { "label": "Watch for changes", "run": "@reload/watch.port.json#watch", "required": true, "profiles": ["live"] },
     { "label": "Listen", "run": "@http/server.port.json#listen", "required": true, "profiles": null }
   ],
@@ -155,11 +155,11 @@ $ npx wilanis manifest example
     "live": {
       "default": true,
       "description": "The laptop: ...",
-      "bindings": { "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json", "@monitor/domain/monitor.port.json": "@monitor/data/monitor-rest.binding.json" },
+      "bindings": { "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json", "@customers/domain/customer.port.json": "@customers/data/customers-rest.binding.json" },
       "connections": {},
       "reaches": [
         { "operation": "@auth/identity.port.json#verify", "via": ["@connections/customers.connection.json", "@connections/employees.connection.json"] },
-        { "operation": "@http/http.port.json#request", "via": ["@connections/monitor-api.connection.json"] },
+        { "operation": "@http/http.port.json#request", "via": ["@connections/customers-api.connection.json"] },
         ...
       ],
       "holds": ["@http/server.port.json#listen", "@reload/watch.port.json#watch"],
@@ -170,7 +170,7 @@ $ npx wilanis manifest example
     "production": {
       "default": false,
       ...
-      "connections": { "@connections/monitor-api.connection.json": "@connections/monitor-api-production.connection.json" },
+      "connections": { "@connections/customers-api.connection.json": "@connections/monitor-api-production.connection.json" },
       "reaches": [
         { "operation": "@http/http.port.json#request", "via": ["@connections/monitor-api-production.connection.json"] },
         ...
@@ -326,9 +326,9 @@ separately" RFC 0002 asks for (`0002:695`). `ir` follows RFC 0008: `v2` when the
 
 - **Golden.** `manifestOf` of the example: `format` 1; `plugins` six rows with `@auth` `guard: true` and `@std` `from: null`;
   `includes` one row with `@wilanis/access` and its version; `documents` includes the access triggers marked
-  `included`; `delete-entries.trigger.json` has `public: false` and two policies in order, `list-entries` has
-  `public: true`; `monitor.port.json#removeMany` is `firedBy` the delete trigger and not public; `listen` has
-  `holds: true`; `monitor-api.connection.json`'s settings equal the document's and `secrets` is empty;
+  `included`; `delete-customers.trigger.json` has `public: false` and two policies in order, `list-entries` has
+  `public: true`; `customer.port.json#removeMany` is `firedBy` the delete trigger and not public; `listen` has
+  `holds: true`; `customers-api.connection.json`'s settings equal the document's and `secrets` is empty;
   `startup` has three rows in declared order.
 - **Per profile** (after RFC 0013's steps 1 and 4): `profiles.live.reaches` holds `watch` and the test API;
   `profiles.production` does not hold `watch`, holds the stand-in and not `monitor-api`, `needs` holds

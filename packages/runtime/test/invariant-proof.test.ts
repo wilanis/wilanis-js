@@ -13,9 +13,9 @@ import { Scope } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { loadedWith } from './example-harness.js';
 
-const ENTRY = '@monitor/domain/Entry.shape.json';
-const GRAPH = 'features/monitor/data/proving.graph.json';
-const PLANTED = '@features/monitor/data/proving.graph.json';
+const ENTRY = '@customers/domain/Customer.shape.json';
+const GRAPH = 'features/customers/data/proving.graph.json';
+const PLANTED = '@features/customers/data/proving.graph.json';
 
 /** A data graph of the example, written around whatever nodes a case needs. */
 const graph = (nodes: unknown[], rest: Record<string, unknown> = {}) => ({
@@ -41,7 +41,7 @@ const reads = (id: string) => ({
   id,
   label: id,
   run: '@storage/store.port.json#get',
-  in: { store: '@monitor/data/entries.store.json', collection: 'entries', key: 'k' },
+  in: { store: '@customers/data/customers.store.json', collection: 'entries', key: 'k' },
 });
 
 /** A switch routing to `to` when `when` holds of what `reads` answers. */
@@ -205,7 +205,7 @@ describe('the proof rules of a field invariant', () => {
       'through first',
       'through first',
     ]);
-    // reading one whole node that is NOT a site of this shape: `latest` makes a MethodLatest, and a rule about
+    // reading one whole node that is NOT a site of this shape: `latest` makes a TierLatest, and a rule about
     // an entry was never judged of it, so the read proves nothing and the site is guarded
     const elsewhere = [
       reads('asked'),
@@ -214,7 +214,7 @@ describe('the proof rules of a field invariant', () => {
         id: 'latest',
         label: 'latest',
         run: '@std/object.port.json#make',
-        in: { value: '{{asked.record}}', type: '@monitor/domain/MethodLatest.shape.json' },
+        in: { value: '{{asked.record}}', type: '@customers/domain/TierLatest.shape.json' },
       },
       makes('row', '{{latest}}'),
     ];

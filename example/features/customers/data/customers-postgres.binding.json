@@ -1,0 +1,68 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/binding.schema.json",
+  "label": "PostgreSQL storage",
+  "description": "What customer.port.json means under the production profile: the same business graphs, over the same declaration, kept in PostgreSQL. Only the store each data graph names differs from @customers/data/customers-store.binding.json, which is the one thing a profile cannot swap for itself yet.",
+  "port": "@customers/domain/customer.port.json",
+  "operations": {
+    "listAll": {
+      "graph": "@customers/data/kept-list-postgres.graph.json"
+    },
+    "listByTier": {
+      "graph": "@customers/data/kept-list-by-tier-postgres.graph.json"
+    },
+    "get": {
+      "graph": "@customers/data/kept-get-postgres.graph.json"
+    },
+    "register": {
+      "description": "The data graph that stores the customer and its method’s latest as one transaction.",
+      "graph": "@customers/data/store-and-latest-postgres.graph.json"
+    },
+    "update": {
+      "graph": "@customers/data/kept-update-postgres.graph.json"
+    },
+    "remove": {
+      "graph": "@customers/data/kept-remove-postgres.graph.json"
+    },
+    "removeMany": {
+      "description": "The business graph that fans one removal out per id and waits for all of them.",
+      "graph": "@customers/domain/remove-customers.graph.json"
+    },
+    "submit": {
+      "description": "The business graph that attributes and records.",
+      "graph": "@customers/domain/register-customer.graph.json"
+    },
+    "registerAll": {
+      "description": "The business graph that records the batch as one transaction: every draft or none.",
+      "graph": "@customers/domain/register-all.graph.json"
+    },
+    "list": {
+      "description": "The business graph that routes on the filter.",
+      "graph": "@customers/domain/list-customers.graph.json"
+    },
+    "digest": {
+      "description": "The business graph that composes the digest.",
+      "graph": "@customers/domain/digest.graph.json"
+    },
+    "parseDrafts": {
+      "graph": "@customers/data/parse-drafts.graph.json"
+    },
+    "toCsv": {
+      "graph": "@customers/data/write-csv.graph.json"
+    },
+    "import": {
+      "description": "The business graph that reads the file and submits each row.",
+      "graph": "@customers/domain/import-customers.graph.json"
+    },
+    "export": {
+      "description": "The business graph that lists and writes the file.",
+      "graph": "@customers/domain/export-customers.graph.json"
+    },
+    "prepare": {
+      "description": "Create the collections the store declares, and leave alone any that are there. The startup step names this operation, so what a tree prepares is what its project.json says it prepares.",
+      "run": "@storage/storage.port.json#ensure",
+      "in": {
+        "store": "@customers/data/customers-postgres.store.json"
+      }
+    }
+  }
+}

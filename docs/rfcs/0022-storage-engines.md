@@ -69,7 +69,7 @@ planner read. An author never writes them: they are in a plugin's `docs/`. An au
 `wilanis describe`.
 
 The example's entries live in memory under RFC 0002. To keep them across restarts, edit
-`example/connections/entries.connection.json`:
+`example/connections/customers.connection.json`:
 
 ```json
 {
@@ -112,7 +112,7 @@ The refusal an author meets when a declaration asks more than the engine gives. 
 `"unique": [["url", "meta"]]` where `meta` is a shape:
 
 ```
-C0nn  @features/monitor/data/entries.store.json#collections/entries/unique/0/1
+C0nn  @features/customers/data/customers.store.json#collections/entries/unique/0/1
     'meta' is a shape; @storage-mysql/mysql.connection-kind.json constrains unique over string, number, boolean
     → wilanis describe @storage-mysql/mysql.connection-kind.json
 ```
@@ -124,15 +124,15 @@ so.
 What `describe` shows for the connection, one line more than RFC 0002 gave it:
 
 ```
-$ wilanis describe @connections/entries.connection.json
+$ wilanis describe @connections/customers.connection.json
 connection  Entries
   kind          @storage-sqlite/sqlite.connection-kind.json  (granted by @storage-sqlite (@wilanis/plugin-storage-sqlite))
   capabilities  transactional DDL: yes; unique over: string, number, boolean; refs: yes
   settings      file  .wilanis/entries.sqlite
-  stores        @monitor/data/entries.store.json (entries, notes)
+  stores        @customers/data/customers.store.json (entries, notes)
 ```
 
-MySQL is the same story with a URL. `example/connections/entries.connection.json` under a tree that has one:
+MySQL is the same story with a URL. `example/connections/customers.connection.json` under a tree that has one:
 
 ```json
 {
@@ -425,7 +425,7 @@ do, and `validate.ts` joins them.
 IR v1 stays v1: no lowered form carries an engine, a kind or a capability. A tree's documents mean the same under
 every engine; only what `ensure` and `apply` do differs, and that is what an engine is.
 
-The example is unchanged in the repository: its `entries.connection.json` keeps the memory kind, so `npm test` needs
+The example is unchanged in the repository: its `customers.connection.json` keeps the memory kind, so `npm test` needs
 no native module and the tree behaves as RFC 0002 leaves it. The one-line swap under *Guide* is the example's README's
 to show, and the sqlite package's test tree is where the file engine runs in CI.
 

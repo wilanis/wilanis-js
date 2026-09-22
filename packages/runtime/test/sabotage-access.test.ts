@@ -10,44 +10,44 @@ import { codes, EXAMPLE, INCLUDES, PLUGINS, sabotage } from './example-harness.j
 describe('sabotage: access, as the example attaches the included policies', () => {
   it('A004 a credential the guard does not verify, one read where the kind hands nothing, and one no policy of the trigger reads', () => {
     expect(
-      sabotage('features/monitor/edge/record-entry.trigger.json', trigger => {
+      sabotage('features/customers/edge/register-customer.trigger.json', trigger => {
         trigger.policies[0].in = { badge: '{{request.headers.authorization}}' };
       }),
     ).toContain('A004');
     expect(
-      sabotage('features/monitor/edge/record-entry.trigger.json', trigger => {
+      sabotage('features/customers/edge/register-customer.trigger.json', trigger => {
         trigger.policies[0].in = { token: '{{request.flags.token}}' };
       }),
     ).toContain('A004');
     expect(
-      sabotage('features/monitor/edge/record-entry.trigger.json', trigger => {
+      sabotage('features/customers/edge/register-customer.trigger.json', trigger => {
         trigger.policies[0].in.challenge = { id: '{{request.query.cid}}', code: '{{request.query.code}}' };
       }),
     ).toEqual(['A004']);
   });
   it('A005 a policy reading the caller on a trigger that gives the guard nothing', () => {
     expect(
-      sabotage('features/monitor/edge/record-entry.trigger.json', trigger => {
-        trigger.policies = ['@access/edge/employees-only.policy.json', '@access/edge/can-record.policy.json'];
+      sabotage('features/customers/edge/register-customer.trigger.json', trigger => {
+        trigger.policies = ['@access/edge/employees-only.policy.json', '@access/edge/can-register.policy.json'];
         delete trigger.settings.response.refusals.invalid_credential;
       }),
     ).toEqual(['A005', 'A005']);
   });
   it("T005 a policy's reason the trigger does not map; T006 a mapped reason no policy reaches once the policy is gone", () => {
     expect(
-      sabotage('features/monitor/edge/record-entry.trigger.json', trigger => {
+      sabotage('features/customers/edge/register-customer.trigger.json', trigger => {
         delete trigger.settings.response.refusals.forbidden;
       }),
     ).toEqual(['T005']);
-    // dropping can-record leaves every reason still reached through employees-only, so the refusal table is
+    // dropping can-register leaves every reason still reached through employees-only, so the refusal table is
     // untouched; what answers is the invariant, which is the coincidence it exists to turn into a rule
     expect(
-      sabotage('features/monitor/edge/record-entry.trigger.json', trigger => {
+      sabotage('features/customers/edge/register-customer.trigger.json', trigger => {
         trigger.policies.pop();
       }),
     ).toEqual(['I001']);
     expect(
-      sabotage('features/monitor/edge/record-entry.trigger.json', trigger => {
+      sabotage('features/customers/edge/register-customer.trigger.json', trigger => {
         delete trigger.policies;
         delete trigger.settings.response.refusals.invalid_credential;
       }),
@@ -90,7 +90,9 @@ describe('sabotage: access, as the example attaches the included policies', () =
     const policy = load.registry.get('policy', load.resolve('@access/edge/signed-in.policy.json'));
     expect(policy?.included).toBe('@wilanis/access');
     expect(policy?.file).toContain('libraries/access/features/access/edge/signed-in.policy.json');
-    expect(load.registry.get('trigger', '@features/monitor/edge/record-entry.trigger.json')?.included).toBeUndefined();
+    expect(
+      load.registry.get('trigger', '@features/customers/edge/register-customer.trigger.json')?.included,
+    ).toBeUndefined();
     expect(describeDoc(load, '@access/edge/signed-in.policy.json')).toContain('included from  @wilanis/access');
     // the dev feature and the connections of the library stay behind
     expect(load.registry.get('feature', '@features/access-dev/feature.json')).toBeUndefined();
@@ -102,9 +104,9 @@ describe('sabotage: access, as the example attaches the included policies', () =
     ).toEqual([
       '@connections/customers.connection.json',
       '@connections/employees.connection.json',
-      '@connections/entries-postgres.connection.json',
-      '@connections/entries.connection.json',
-      '@connections/monitor-api.connection.json',
+      '@connections/customers-postgres.connection.json',
+      '@connections/customers.connection.json',
+      '@connections/customers-api.connection.json',
     ]);
   });
   it('the `in` operator: a role check in a switch rule, and a branch the rehearsal can steer both ways', async () => {
@@ -113,7 +115,7 @@ describe('sabotage: access, as the example attaches the included policies', () =
     const run = await rehearse(loadTree(dir, PLUGINS, INCLUDES), { seed: 5, profile: 'live' });
     rmSync(dir, { recursive: true, force: true });
     const lines = run.lines.filter(
-      line => line.includes("'recorder' in principal.roles") || line.includes('require-recorder'),
+      line => line.includes("'recorder' in principal.roles") || line.includes('require-registrar'),
     );
     expect(lines.some(line => line.includes("answered from 'granted'"))).toBe(true);
     expect(run.ok).toBe(true);

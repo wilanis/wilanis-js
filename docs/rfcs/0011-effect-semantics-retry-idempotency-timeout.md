@@ -23,7 +23,7 @@ An agent writes `charge payment`, `save order`, `send email` as three nodes and 
 not: the second can fail after the first succeeded, and a retry of the whole graph charges twice. Nothing in the
 tree today lets the checker see that, because the port document does not say what a repeated call does.
 
-The example already shows the smaller, everyday form of the same gap. `@monitor/data/get-row.graph.json` sends
+The example already shows the smaller, everyday form of the same gap. `@customers/data/get-row.graph.json` sends
 one `GET /monitor/{id}` to a REST upstream; when the network drops the request, `fetch` rejects, the node `asked`
 fails on a fault, and the route answers 500. Nothing says that a GET may be sent again, so nobody sends it
 again -- or worse, an author who wants resilience writes a second `asked` node routed from the first's failure,
@@ -75,11 +75,11 @@ The example's read of one entry, made resilient:
   "timeoutMs": 5000,
   "retry": { "times": 2, "backoffMs": 200, "when": "status >= 500" },
   "in": {
-    "connection": "@connections/monitor-api.connection.json",
+    "connection": "@connections/customers-api.connection.json",
     "method": "GET",
     "path": "/monitor/{{in.id}}",
     "produces": "application/json",
-    "returns": "@monitor/edge/EntryRow.shape.json"
+    "returns": "@customers/edge/CustomerRow.shape.json"
   }
 }
 ```
@@ -87,11 +87,11 @@ The example's read of one entry, made resilient:
 The checker accepts it because `@http/http.port.json#request` declares itself idempotent when
 `method == 'GET' || method == 'HEAD' || method == 'PUT' || method == 'DELETE'`, and `method` is the literal `GET`
 here. The connection's own `timeoutMs: 10000` still applies; the tighter of the two bounds a request. Write the
-same three lines on `asked` in `@monitor/data/create-row.graph.json`, whose method is `POST`, and the checker
+same three lines on `asked` in `@customers/data/create-row.graph.json`, whose method is `POST`, and the checker
 answers:
 
 ```
-G0n2  @features/monitor/data/create-row.graph.json#nodes/asked
+G0n2  @features/customers/data/create-row.graph.json#nodes/asked
     retry over '@http/http.port.json#request', which is not idempotent here: method is "POST"
     → a POST that failed may have been applied, so repeating it may record the entry twice; drop retry, or
       reach a store whose write carries a key
@@ -104,23 +104,23 @@ every request it reaches is a GET -- and bounds it:
 {
   "$schema": "@wilanis/binding.schema.json",
   "label": "REST storage",
-  "description": "monitor.port.json over the REST API: one data graph per operation, each a declared request plus the decision of what its status means.",
-  "port": "@monitor/domain/monitor.port.json",
+  "description": "customer.port.json over the REST API: one data graph per operation, each a declared request plus the decision of what its status means.",
+  "port": "@customers/domain/customer.port.json",
   "operations": {
-    "listAll": { "graph": "@monitor/data/list-rows.graph.json", "retry": { "times": 1 }, "timeoutMs": 8000 },
-    "get": { "graph": "@monitor/data/get-row.graph.json" }
+    "listAll": { "graph": "@customers/data/list-rows.graph.json", "retry": { "times": 1 }, "timeoutMs": 8000 },
+    "get": { "graph": "@customers/data/get-row.graph.json" }
   }
 }
 ```
 
-A domain graph writes neither word. `@monitor/domain/record-entry.graph.json` says that an entry is recorded
+A domain graph writes neither word. `@customers/domain/register-customer.graph.json` says that an entry is recorded
 with the recorder the domain chose; whether recording it is a POST to a flaky upstream or a row in a local store
 is the profile's business, and so is whether to try twice. Put `retry` on its node `recorded` and the checker
 says so:
 
 ```
-L0n1  @features/monitor/domain/record-entry.graph.json#nodes/recorded
-    domain graph declares retry on '@monitor/domain/monitor.port.json#record'
+L0n1  @features/customers/domain/register-customer.graph.json#nodes/recorded
+    domain graph declares retry on '@customers/domain/customer.port.json#register'
     → the domain says what is done, the data layer how: write retry in the binding that meets the operation,
       or in the data graph that runs the effect
 ```
@@ -132,7 +132,7 @@ A domain port may promise that an operation is idempotent, and the checker holds
   "description": "One entry by id. Fails when there is no such entry.",
   "idempotent": true,
   "accepts": { "id": { "type": "string" } },
-  "returns": "@monitor/domain/Entry.shape.json"
+  "returns": "@customers/domain/Customer.shape.json"
 }
 ```
 
@@ -428,13 +428,13 @@ Sabotage tests in `packages/runtime/test/example.test.ts` and `sabotage.test.ts`
 | Code | The edit |
 |---|---|
 | C0n1 | a fake plugin's port (under `docsDir`) whose operation declares `key: "nope"` with no such field; one declaring `idempotent: true` and `key`; one whose `idempotent` is `"method"` (a string, not boolean) |
-| C0n1 | `"key": "id"` on `@monitor/domain/monitor.port.json#get` |
-| L0n1 | `"retry": { "times": 1 }` on `recorded` in `record-entry.graph.json`; `"timeoutMs": 100` on `drafts` in `import-entries.graph.json` |
+| C0n1 | `"key": "id"` on `@customers/domain/customer.port.json#get` |
+| L0n1 | `"retry": { "times": 1 }` on `recorded` in `register-customer.graph.json`; `"timeoutMs": 100` on `drafts` in `import-customers.graph.json` |
 | G0n1 | `"retry": { "times": 1 }` on `row` in `get-row.graph.json` (`@std/object.port.json#make`, pure) |
 | G0n2 | `"retry": { "times": 1 }` on `asked` in `create-row.graph.json` (POST); on `asked` in `update-row.graph.json` with `method` changed to `"{{in.method}}"` (a read, so the expression cannot be judged); on the binding's `record` operation (its graph POSTs) |
 | G0n3 | `"when": "status"` on a retry over `asked` in `get-row.graph.json` (number, not boolean); `"when": "has(x)"` on a retry over a binding operation bound to `write-csv.graph.json` (answers a `blob`, not an object) |
-| B0n1 | `"idempotent": true` on `monitor.port.json#record`; the refusal names `live`, `monitor-rest.binding.json` and `asked` |
-| none | `"idempotent": true` on `monitor.port.json#get` and the retry of the guide's example on `asked` in `get-row.graph.json`: `codes(...)` is empty |
+| B0n1 | `"idempotent": true` on `customer.port.json#register`; the refusal names `live`, `customers-rest.binding.json` and `asked` |
+| none | `"idempotent": true` on `customer.port.json#get` and the retry of the guide's example on `asked` in `get-row.graph.json`: `codes(...)` is empty |
 
 Runtime, in `packages/runtime/test/attempts.test.ts` (new), with a fake plugin whose one effect is counted and
 scripted (fail the first n calls, hang, answer `{ status }`), registered beside `PLUGINS` from the harness:
@@ -492,7 +492,7 @@ Discoverability, in `packages/runtime/test/tools.test.ts`: `describe @http/http.
 8. **Discoverability** (`area:runtime`, `area:view`): `operationLine` and `nodeLines`; the view model and the
    viewer's badges. `good first issue`.
 9. **The example**: the guide's `timeoutMs` and `retry` on `asked` in `get-row.graph.json`, `retry` on the
-   binding's `listAll`, `idempotent: true` on `monitor.port.json#get`; a paragraph in `example/README.md` and one
+   binding's `listAll`, `idempotent: true` on `customer.port.json#get`; a paragraph in `example/README.md` and one
    in the root `README.md` beside "Every branch runs before you deploy".
 10. **G0n4** (`area:compiler`): blocked on RFC 0004's implementation (the atomic walk it judges against).
 11. **Trace rows** (`area:runtime`): blocked on RFC 0006's `trace.ts`.

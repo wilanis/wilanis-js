@@ -13,13 +13,13 @@ import { map } from '../src/index.js';
 import { EXAMPLE, INCLUDES, loadedWith, PLUGINS } from './example-harness.js';
 
 const example = loadTree(EXAMPLE, PLUGINS, INCLUDES);
-const POSTGRES = '@features/monitor/data/monitor-postgres.binding.json';
-const REST = '@features/monitor/data/monitor-rest.binding.json';
-const KEPT_REMOVE_POSTGRES = '@features/monitor/data/kept-remove-postgres.graph.json';
+const POSTGRES = '@features/customers/data/customers-postgres.binding.json';
+const REST = '@features/customers/data/customers-rest.binding.json';
+const KEPT_REMOVE_POSTGRES = '@features/customers/data/kept-remove-postgres.graph.json';
 /** A graph nothing binds: the one thing the map may call an orphan, planted in a copy of the example. */
-const NOBODY = '@features/monitor/data/nobody-reaches.graph.json';
+const NOBODY = '@features/customers/data/nobody-reaches.graph.json';
 const { load: planted, dir: plantedDir } = loadedWith({
-  'features/monitor/data/nobody-reaches.graph.json': {
+  'features/customers/data/nobody-reaches.graph.json': {
     $schema: schemaUrl('graph'),
     description: 'A graph no binding of any profile names, so nothing reaches it under any profile.',
     nodes: [
@@ -34,9 +34,9 @@ const { load: planted, dir: plantedDir } = loadedWith({
   },
 });
 afterAll(() => rmSync(plantedDir, { recursive: true, force: true }));
-const DELETE = '@features/monitor/edge/delete-entry.trigger.json  (@http/http.trigger-kind.json)';
+const DELETE = '@features/customers/edge/delete-customer.trigger.json  (@http/http.trigger-kind.json)';
 /** Fires a domain graph that calls the monitor port again, which is where a binding has to be chosen mid-walk. */
-const DIGEST = '@features/monitor/edge/digest.trigger.json  (@cli/cli.trigger-kind.json)';
+const DIGEST = '@features/customers/edge/digest.trigger.json  (@cli/cli.trigger-kind.json)';
 const CHOOSE = 'has 3 bindings';
 /** The lines the map draws under one trigger, up to the next. */
 function under(lines: string[], trigger: string): string[] {
@@ -57,7 +57,7 @@ describe('map under a profile', () => {
     // of the three bindings that meet the trigger's own operation with that graph, so three times over
     const digest = under(all, DIGEST);
     expect(
-      digest.filter(line => line.includes(`?? port '@features/monitor/domain/monitor.port.json' ${CHOOSE}`)),
+      digest.filter(line => line.includes(`?? port '@features/customers/domain/customer.port.json' ${CHOOSE}`)),
     ).toHaveLength(3);
     expect(digest.some(line => line.includes('.binding.json#listAll'))).toBe(false);
   });
@@ -71,9 +71,11 @@ describe('map under a profile', () => {
     expect(lines.some(line => line.includes('delete-row.graph.json'))).toBe(false);
     // a domain graph reaching the port mid-walk is met by the same profile's binding, and walked through it
     const digest = under(all, DIGEST);
-    expect(digest.some(line => line.includes('@features/monitor/data/monitor-store.binding.json#listAll'))).toBe(true);
+    expect(digest.some(line => line.includes('@features/customers/data/customers-store.binding.json#listAll'))).toBe(
+      true,
+    );
     expect(digest.some(line => line.includes('kept-list.graph.json'))).toBe(true);
-    expect(all.some(line => line.includes('monitor-postgres.binding.json#'))).toBe(false);
+    expect(all.some(line => line.includes('customers-postgres.binding.json#'))).toBe(false);
   });
 
   it('under production, the same trigger walks the postgres binding instead', () => {
@@ -85,7 +87,7 @@ describe('map under a profile', () => {
   it('names a graph only another profile runs as unreached under this one, bound by whoever runs it', () => {
     const lines = map(example, 'local');
     expect(lines).toContain(`unreached under local  ${KEPT_REMOVE_POSTGRES}  bound by ${POSTGRES}`);
-    expect(lines).toContain(`unreached under local  @features/monitor/data/delete-row.graph.json  bound by ${REST}`);
+    expect(lines).toContain(`unreached under local  @features/customers/data/delete-row.graph.json  bound by ${REST}`);
     // one line per graph the other profiles' bindings run, after the triggers and before any orphan
     const unreached = lines.filter(line => line.startsWith('unreached under local  '));
     expect(unreached).toHaveLength(6);

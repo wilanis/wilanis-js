@@ -90,14 +90,14 @@ collection says what every existing row receives (RFC 0003):
 "defaults": { "status": "observed" }
 ```
 
-The machine, `example/features/monitor/domain/review.machine.json`:
+The machine, `example/features/customers/domain/review.machine.json`:
 
 ```json
 {
   "$schema": "@wilanis/machine.schema.json",
   "label": "An entry's review",
   "description": "An entry is observed. Someone may flag it for a look; a flagged entry is resolved with a note saying what was found, or dismissed. A closed entry may be reopened. Nothing returns to observed.",
-  "over": "@monitor/domain/Entry.shape.json",
+  "over": "@customers/domain/Customer.shape.json",
   "state": "status",
   "initial": "observed",
   "transitions": {
@@ -112,7 +112,7 @@ The machine, `example/features/monitor/domain/review.machine.json`:
 `resolve`'s `when` is the class 3 invariant RFC 0007 could not state: a record may become resolved only carrying a
 note. It is written once, here, and holds at every graph that resolves an entry.
 
-Two operations join `monitor.port.json`: `flag`, taking `EntryRef` and answering `Entry`, and `review`, taking a new
+Two operations join `customer.port.json`: `flag`, taking `CustomerRef` and answering `Entry`, and `review`, taking a new
 core shape `EntryReview` (`id`, `status` with the same enum, optional `note`) and answering `Entry`. Their data graphs
 are ordinary. `flag-record.graph.json`:
 
@@ -121,21 +121,21 @@ are ordinary. `flag-record.graph.json`:
   "$schema": "@wilanis/graph.schema.json",
   "label": "Flag an entry",
   "description": "Data graph behind monitor.flag: read the entry, mark it flagged, put it back. Absent is the declared refusal.",
-  "in": "@monitor/domain/EntryRef.shape.json",
-  "out": { "type": "@monitor/domain/Entry.shape.json", "from": ["answer", "missing"] },
+  "in": "@customers/domain/CustomerRef.shape.json",
+  "out": { "type": "@customers/domain/Customer.shape.json", "from": ["answer", "missing"] },
   "nodes": [
     { "type": "@wilanis/node/run.schema.json", "id": "asked", "run": "@storage/store.port.json#get",
-      "in": { "store": "@monitor/data/entries.store.json", "collection": "entries", "key": "{{in.id}}" } },
+      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "key": "{{in.id}}" } },
     { "type": "@wilanis/node/switch.schema.json", "id": "route", "in": { "record": "{{asked.record}}" },
       "rules": [{ "when": "has(record)", "to": "entry" }], "else": "missing" },
     { "type": "@wilanis/node/run.schema.json", "id": "entry", "label": "Mark it flagged", "run": "@std/object.port.json#merge",
-      "in": { "base": "{{asked.record}}", "over": { "status": "flagged" }, "type": "@monitor/domain/Entry.shape.json" } },
+      "in": { "base": "{{asked.record}}", "over": { "status": "flagged" }, "type": "@customers/domain/Customer.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "stored", "run": "@storage/store.port.json#put",
-      "in": { "store": "@monitor/data/entries.store.json", "collection": "entries", "record": "{{entry}}" } },
+      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "record": "{{entry}}" } },
     { "type": "@wilanis/node/run.schema.json", "id": "answer", "run": "@std/object.port.json#make",
-      "in": { "value": "{{stored.record}}", "type": "@monitor/domain/Entry.shape.json" } },
+      "in": { "value": "{{stored.record}}", "type": "@customers/domain/Customer.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "missing", "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@monitor/domain/Entry.shape.json" } }
+      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" } }
   ]
 }
 ```
@@ -151,7 +151,7 @@ or `dismissed`, and to a refusal with reason `transition` when it is `flagged` a
 "refusals": { "missing": 404, "transition": 409, "anonymous": 401, "invalid_credential": 401, "forbidden": 403 }
 ```
 
-Leave it out and T005 says so, naming `@monitor/data/flag-record.graph.json#entry` as where `transition` is refused.
+Leave it out and T005 says so, naming `@customers/data/flag-record.graph.json#entry` as where `transition` is refused.
 
 `review-record.graph.json` is the same graph with `"over": { "status": "{{in.status}}", "note": "{{in.note}}" }`. The
 new state is the caller's, so the guard is the whole table: one rule per transition, `old.status` in its `from`,
@@ -177,9 +177,9 @@ is the graph a careful author would have written anyway.
 state, **proved by the literal**, no guard. Write `"status": "flagged"` there instead and `wilanis check` answers:
 
 ```
-M005  @features/monitor/data/create-record.graph.json#nodes/entry
-    a record of @monitor/domain/Entry.shape.json is born 'flagged', but 'An entry's review'
-    (@monitor/domain/review.machine.json) says an entry is born 'observed'
+M005  @features/customers/data/create-record.graph.json#nodes/entry
+    a record of @customers/domain/Customer.shape.json is born 'flagged', but 'An entry's review'
+    (@customers/domain/review.machine.json) says an entry is born 'observed'
     → write "status": "observed", or make this a move: read the record and merge the change
 ```
 
@@ -191,8 +191,8 @@ graph that puts `{{in}}` -- an `Entry` the caller handed over whole -- over an e
 whatever state the caller chose, and nothing in the graph knows what the record was:
 
 ```
-M006  @features/monitor/data/replace-record.graph.json#nodes/stored/in/record
-    puts a record of @monitor/domain/Entry.shape.json that was neither read from 'entries' nor made whole,
+M006  @features/customers/data/replace-record.graph.json#nodes/stored/in/record
+    puts a record of @customers/domain/Customer.shape.json that was neither read from 'entries' nor made whole,
     so 'An entry's review' cannot tell a birth from a move
     → read the record with #get and merge the change over it; or make the record whole, born 'observed', and put it with "replace": false
 ```
@@ -200,12 +200,12 @@ M006  @features/monitor/data/replace-record.graph.json#nodes/stored/in/record
 **The rehearsal** walks a guard as it walks every switch, and names each branch after its transition:
 
 ```
-features/monitor/data/flag-record  move 'entry' An entry's review  3/3 branches
+features/customers/data/flag-record  move 'entry' An entry's review  3/3 branches
   ok  flag       answered from 'entry'
   ok  reopen     answered from 'entry'
   ok  violated   refused on purpose at 'entry:violated' as transition: "'An entry's review' allows no move from 'flagged' to 'flagged'"
 
-features/monitor/data/review-record  move 'entry' An entry's review  5/5 branches
+features/customers/data/review-record  move 'entry' An entry's review  5/5 branches
   ok  flag       answered from 'entry'
   ok  resolve    answered from 'entry'
   ok  dismiss    answered from 'entry'
@@ -218,7 +218,7 @@ machines -- 1 declared: 'An entry's review' (4 transitions): born at 1 site (pro
 **The diagram** is what the viewer draws on the machine's page: the four states as boxes, `observed` marked as the
 start, an arrow per transition labelled with its name and its `when`, and under each arrow the graphs that perform it
 and whether each is proved or guarded. The graph page draws the lowering -- the guard as RFC 0007 draws one, with a
-badge naming the machine -- and the badge opens the diagram. `wilanis describe @monitor/domain/review.machine.json`
+badge naming the machine -- and the badge opens the diagram. `wilanis describe @customers/domain/review.machine.json`
 prints the same table.
 
 **Resources are scaffolding.** `wilanis new resource features/tickets/Ticket` writes into the `tickets` feature the
@@ -488,8 +488,8 @@ in place; after it, a breaking change goes to `schemas-v2` (RFC 0008).
 Sabotage tests in a new `packages/runtime/test/sabotage-machines.test.ts`, through `sabotage` and `codes` from
 `example-harness.ts`, once the example carries the machine, the two operations and the two triggers:
 
-- M001: `over: "@monitor/edge/EntryView.shape.json"`; `state: "url"` (a string without an enum); `state: "note"`
-  (optional); `over: "@monitor/domain/nope.shape.json"` → `['R001']`.
+- M001: `over: "@customers/edge/CustomerView.shape.json"`; `state: "url"` (a string without an enum); `state: "note"`
+  (optional); `over: "@customers/domain/nope.shape.json"` → `['R001']`.
 - M002: `initial: "new"`; `flag.from: ["seen"]`; `resolve.to: "closed"`.
 - M003: remove `flag` and `reopen` (nothing reaches `flagged`); `dismiss.from: ["observed", "dismissed"]`.
 - M004: `when: "has(new.quantity)"`; `when: "new.url > 3"`; `when: "len(new.url) >"`; `when: "new.status == 'resolved'"`.
@@ -509,7 +509,7 @@ Sabotage tests in a new `packages/runtime/test/sabotage-machines.test.ts`, throu
 - X2nn: `update-record.graph.json`'s `patch` with `"status": "flagged"` in `changes`.
 - D008: `relocate` the machine to `edge/` or `data/`.
 - T005/T006: drop `transition` from `flag-entry.trigger.json`'s refusal table → `['T005']`; map it on
-  `get-entry.trigger.json` → `['T006']`; write the narrowing switch into `flag-record.graph.json` and the mapping on
+  `get-customer.trigger.json` → `['T006']`; write the narrowing switch into `flag-record.graph.json` and the mapping on
   its trigger becomes `['T006']`, proving the guard is gone.
 
 Behaviour tests in `packages/runtime/test/example.test.ts` and `branches.test.ts`:
@@ -523,7 +523,7 @@ Behaviour tests in `packages/runtime/test/example.test.ts` and `branches.test.ts
 - Compiler: `flag-record`'s spec has `entry:made`, `entry:check` with two rules labelled `flag` and `reopen` in
   declaration order, `entry`, `entry:violated`, and `entry:violated` in `output`; `review-record`'s check has four
   rules in declaration order; `create-record`'s spec has none of them.
-- `describe` of the machine, of `Entry.shape.json` and of `flag-record.graph.json` print the lines above; `map` prints
+- `describe` of the machine, of `Customer.shape.json` and of `flag-record.graph.json` print the lines above; `map` prints
   `moves` under the two triggers.
 
 Scaffolds, in `packages/runtime/test/scaffolds.test.ts`: `new machine` over `Entry` and `status` writes the four-member

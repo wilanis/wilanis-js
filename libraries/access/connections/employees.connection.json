@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/connection.schema.json",
   "label": "Employee directory",
-  "description": "The employees, written in the connection: bo (password bo-pass, group recorder) may write entries; cy (password cy-pass, group viewer) may not. For running the access tree alone; a production profile points the same domain port at LDAP.",
+  "description": "The employees, written in the connection: bo (password bo-pass, group registrar) may write customers; cy (password cy-pass, group viewer) may not. For running the access tree alone; a production profile points the same domain port at LDAP.",
   "kind": "@auth/directory.connection-kind.json",
   "settings": {
     "users": [
@@ -10,7 +10,7 @@
         "passwordHash": "scrypt:c2FsdC1iby0wMDAwMDAwMQ:JtqRTYo_UPXAncXpIxTIsOiye-IOkOUeWKeLt81AZTA",
         "name": "Bo",
         "groups": [
-          "recorder"
+          "registrar"
         ]
       },
       {

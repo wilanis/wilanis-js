@@ -4,15 +4,15 @@ import { splitOp, splitRef } from '../src/registry.js';
 
 describe('splitRef', () => {
   it('splits a port reference into the document and the operation it addresses', () => {
-    expect(splitRef('@features/monitor/domain/monitor.port.json#record')).toEqual({
-      path: '@features/monitor/domain/monitor.port.json',
+    expect(splitRef('@features/customers/domain/customer.port.json#register')).toEqual({
+      path: '@features/customers/domain/customer.port.json',
       op: 'record',
     });
     expect(splitRef('@std/object.port.json#make')).toEqual({ path: '@std/object.port.json', op: 'make' });
   });
   it('splits a resolver reference the same way: the document, and the name within it', () => {
-    expect(splitRef('@monitor/edge/request.resolvers.json#agent')).toEqual({
-      path: '@monitor/edge/request.resolvers.json',
+    expect(splitRef('@customers/edge/request.resolvers.json#agent')).toEqual({
+      path: '@customers/edge/request.resolvers.json',
       op: 'agent',
     });
     expect(splitRef('@access/edge/session.resolvers.json#sid')).toEqual({

@@ -22,7 +22,7 @@ import {
 } from '../src/index.js';
 import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
-const GET_ENTRY = '@monitor/edge/get-entry.trigger.json';
+const GET_ENTRY = '@customers/edge/get-customer.trigger.json';
 
 /** Every span of a trace, depth first, so a case can say which ones a run left and in what order. */
 function spansOf(trace: Trace): Trace[] {
@@ -73,10 +73,10 @@ describe('one fire, said as spans', () => {
     const trace = await getEntry(500);
 
     expect(spansOf(trace).map(one => one.name)).toEqual([
-      'fire @features/monitor/edge/get-entry.trigger.json',
-      '@features/monitor/domain/monitor.port.json#get',
-      'binding @features/monitor/data/monitor-rest.binding.json#get',
-      '@features/monitor/data/get-row.graph.json',
+      'fire @features/customers/edge/get-customer.trigger.json',
+      '@features/customers/domain/customer.port.json#get',
+      'binding @features/customers/data/customers-rest.binding.json#get',
+      '@features/customers/data/get-row.graph.json',
       'asked @http/http.port.json#request',
       'route switch → failed',
       'row',
@@ -91,7 +91,7 @@ describe('one fire, said as spans', () => {
 
     // the reason is the author's own -- "upstream" is a word get-row.graph.json declared, not the engine's
     expect(trace.status).toBe('refused: upstream');
-    expect(statuses['@features/monitor/data/get-row.graph.json']).toBe('refused: upstream');
+    expect(statuses['@features/customers/data/get-row.graph.json']).toBe('refused: upstream');
     expect(statuses.asked).toBe('ok');
     expect(statuses.failed).toBe('refused: upstream');
     // the branches nothing took are there, so a reader sees what did not run as well as what did
@@ -102,7 +102,7 @@ describe('one fire, said as spans', () => {
   it('carries the run id, the trigger and its kind on the root span', async () => {
     const trace = await getEntry(500);
 
-    expect(trace.attributes['wilanis.trigger']).toBe('@features/monitor/edge/get-entry.trigger.json');
+    expect(trace.attributes['wilanis.trigger']).toBe('@features/customers/edge/get-customer.trigger.json');
     expect(trace.attributes['wilanis.kind']).toBe('@http/http.trigger-kind.json');
     expect(trace.attributes['wilanis.run.id']).toMatch(/^[0-9a-f-]{36}$/);
     // a request that carried no traceparent correlates nothing rather than an empty string
@@ -123,11 +123,11 @@ describe('one fire, said as spans', () => {
 
   it('gives every node span the address a refusal prints, so a span and a refusal join on one pair', async () => {
     const trace = await getEntry(500);
-    const graph = spanNamed(trace, '@features/monitor/data/get-row.graph.json');
+    const graph = spanNamed(trace, '@features/customers/data/get-row.graph.json');
     const asked = spanNamed(trace, 'asked');
 
     // the graph span names the file, the node span names the place inside it: `file` and `at`, as a refusal has
-    expect(graph?.attributes['wilanis.graph']).toBe('@features/monitor/data/get-row.graph.json');
+    expect(graph?.attributes['wilanis.graph']).toBe('@features/customers/data/get-row.graph.json');
     expect(asked?.attributes['wilanis.at']).toBe('nodes/asked');
     expect(asked?.attributes['wilanis.node']).toBe('asked');
   });
@@ -136,7 +136,7 @@ describe('one fire, said as spans', () => {
     const asked = spanNamed(await getEntry(500), 'asked');
 
     // the engine knows nothing of connections or of HTTP; these two are read here, where the tree's words are
-    expect(asked?.attributes['wilanis.connection']).toBe('@connections/monitor-api.connection.json');
+    expect(asked?.attributes['wilanis.connection']).toBe('@connections/customers-api.connection.json');
     expect(asked?.attributes['http.response.status_code']).toBe(500);
     // and the node is an effect, because the operation it ran is not declared pure
     expect(asked?.attributes['wilanis.effect']).toBe(true);
@@ -154,7 +154,7 @@ describe('one fire, said as spans', () => {
     const trace = await getEntry(200);
 
     expect(trace.status).toBe('ok');
-    expect(spanNamed(trace, '@features/monitor/data/get-row.graph.json')?.status).toBe('ok');
+    expect(spanNamed(trace, '@features/customers/data/get-row.graph.json')?.status).toBe('ok');
     expect(spanNamed(trace, 'row')?.status).toBe('ok');
   });
 
@@ -172,7 +172,7 @@ describe('what a level lets a span carry', () => {
     expect(asked?.attributes['wilanis.out']).toBeUndefined();
     // what a reader searches on is still there: the address, the connection, the status
     expect(asked?.attributes['wilanis.at']).toBe('nodes/asked');
-    expect(asked?.attributes['wilanis.connection']).toBe('@connections/monitor-api.connection.json');
+    expect(asked?.attributes['wilanis.connection']).toBe('@connections/customers-api.connection.json');
     expect(asked?.attributes['http.response.status_code']).toBe(500);
   });
 
@@ -247,12 +247,12 @@ describe('a startup step, said as spans', () => {
     const served = new Served({ load, emb }, () => {});
     emb.serve(Object.assign(served, { ran: (what: Ran) => heard.push(what) }));
 
-    await emb.startup({ run: '@monitor/domain/monitor.port.json#prepare', label: 'Prepare' }, { at: 0 });
+    await emb.startup({ run: '@customers/domain/customer.port.json#prepare', label: 'Prepare' }, { at: 0 });
     const trace = traceOf(heard[0] as Started, emb.scope);
 
     expect(trace.name).toBe('startup Prepare');
     expect(trace.attributes['wilanis.startup.at']).toBe(0);
-    expect(trace.attributes['wilanis.operation']).toBe('@features/monitor/domain/monitor.port.json#prepare');
+    expect(trace.attributes['wilanis.operation']).toBe('@features/customers/domain/customer.port.json#prepare');
     // a step is not a trigger: nothing here says it was one
     expect(trace.attributes['wilanis.trigger']).toBeUndefined();
     expect(trace.attributes['wilanis.kind']).toBeUndefined();
@@ -276,7 +276,7 @@ describe('the record and the trace are two things', () => {
     expect(JSON.stringify(ran)).toBe(before);
     // and the same record read twice says the same thing, since nothing about the walk is stateful
     expect(traceOf(ran, scope)).toEqual(traceOf(ran, scope));
-    expect((ran as Fired).trigger).toBe('@features/monitor/edge/get-entry.trigger.json');
+    expect((ran as Fired).trigger).toBe('@features/customers/edge/get-customer.trigger.json');
   });
 });
 
@@ -285,7 +285,7 @@ describe('a run that calls another port operation', () => {
     // export runs a business graph whose nodes call two more port operations; each of those lowers to a
     // single node called `op`, which names nothing an author wrote and must not reach a reader
     const { ran, scope } = await fire(
-      '@monitor/edge/export-entries.trigger.json',
+      '@customers/edge/export-customers.trigger.json',
       { input: undefined, request: { params: {}, headers: {} } },
       'local',
     );
@@ -295,9 +295,9 @@ describe('a run that calls another port operation', () => {
     // the claim here is what the spans are called, not how the run ended: nothing set the store's engine up,
     // so it faults, and a trace of a run that faulted names what it reached exactly as one that answered does
     // the call site, the binding that met it, and the graph inside it: three real names, no `op` between them
-    expect(names).toContain('all @features/monitor/data/monitor-store.binding.json#listAll');
-    expect(names).toContain('binding @features/monitor/data/monitor-store.binding.json#listAll');
-    expect(names).toContain('@features/monitor/data/kept-list.graph.json');
+    expect(names).toContain('all @features/customers/data/customers-store.binding.json#listAll');
+    expect(names).toContain('binding @features/customers/data/customers-store.binding.json#listAll');
+    expect(names).toContain('@features/customers/data/kept-list.graph.json');
     expect(names.filter(name => name.startsWith('op '))).toEqual([]);
     expect(names.filter(name => name.startsWith('op ('))).toEqual([]);
   });

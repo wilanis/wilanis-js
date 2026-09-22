@@ -8,11 +8,11 @@
 import { describe, expect, it } from 'vitest';
 import { sabotage, sabotageSaying } from './example-harness.js';
 
-const WRITES = 'features/monitor/domain/writes-are-for-recorders.invariant.json';
+const WRITES = 'features/customers/domain/writes-are-for-registrars.invariant.json';
 const SESSIONS = 'features/directories/domain/the-session-is-the-callers.invariant.json';
-const CALLS = 'features/monitor/domain/an-entry-names-a-call.invariant.json';
+const CALLS = 'features/customers/domain/a-customer-is-reachable.invariant.json';
 /** The graph whose `row` node makes an entry: where a literal value is written to contradict the rule. */
-const STORED = 'features/monitor/data/store-and-latest.graph.json';
+const STORED = 'features/customers/data/store-and-latest.graph.json';
 /**
  * What a tree answers once nothing of `Entry` is guarded any more: the eight triggers of the monitor that map
  * `invariant` reach no guard, and T006 refuses each for mapping a reason it cannot be answered with. A rule
@@ -23,7 +23,7 @@ const UNGUARDED = Array.from({ length: 8 }, () => 'T006');
 describe('sabotage: invariants, the access form', () => {
   it('I001 a trigger reaching a gated operation without the policy the invariant names', () => {
     expect(
-      sabotage('features/monitor/edge/delete-entry.trigger.json', trigger => {
+      sabotage('features/customers/edge/delete-customer.trigger.json', trigger => {
         trigger.policies.pop();
       }),
     ).toEqual(['I001']);
@@ -31,11 +31,11 @@ describe('sabotage: invariants, the access form', () => {
 
   it('I001 names the operation a trigger reached through when it did not fire it', () => {
     expect(
-      sabotageSaying('features/monitor/edge/import-entries.trigger.json', trigger => {
+      sabotageSaying('features/customers/edge/import-customers.trigger.json', trigger => {
         trigger.policies.pop();
       }).filter(one => one.startsWith('I001')),
     ).toEqual([
-      "I001 trigger reaches @features/monitor/domain/monitor.port.json#import, which 'Writes are for recorders' (@features/monitor/domain/writes-are-for-recorders.invariant.json) gates with @access/edge/can-record.policy.json, but attaches no such policy",
+      "I001 trigger reaches @features/customers/domain/customer.port.json#import, which 'Writes are for recorders' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy",
     ]);
   });
 
@@ -68,7 +68,7 @@ describe('sabotage: invariants, the access form', () => {
     ).toEqual(['R001']);
     expect(
       sabotage(WRITES, invariant => {
-        invariant.access.over = ['@monitor/domain/monitor.port.json#nope'];
+        invariant.access.over = ['@customers/domain/customer.port.json#nope'];
       }),
     ).toEqual(['R001', 'I003']);
   });
@@ -76,7 +76,7 @@ describe('sabotage: invariants, the access form', () => {
   it('I003 an invariant over an operation no trigger reaches', () => {
     expect(
       sabotage(WRITES, invariant => {
-        invariant.access.over = ['@monitor/domain/monitor.port.json#prepare'];
+        invariant.access.over = ['@customers/domain/customer.port.json#prepare'];
       }),
     ).toEqual(['I003']);
   });
@@ -118,12 +118,12 @@ describe('sabotage: invariants, the field form', () => {
     // guard stand or fall together, and the eight mappings the example carries say so.
     expect(
       sabotage(CALLS, invariant => {
-        invariant.holds.on = '@monitor/edge/EntryView.shape.json';
+        invariant.holds.on = '@customers/edge/CustomerView.shape.json';
       }),
     ).toEqual([...UNGUARDED, 'I002']);
     expect(
       sabotage(CALLS, invariant => {
-        invariant.holds.on = '@monitor/domain/Nope.shape.json';
+        invariant.holds.on = '@customers/domain/Nope.shape.json';
       }),
     ).toEqual([...UNGUARDED, 'R001']);
   });
@@ -131,7 +131,7 @@ describe('sabotage: invariants, the field form', () => {
   it('I003 a rule over a core shape no graph makes or takes', () => {
     expect(
       sabotage(CALLS, invariant => {
-        invariant.holds.on = '@monitor/domain/MethodLatest.shape.json';
+        invariant.holds.on = '@customers/domain/TierLatest.shape.json';
         invariant.holds.when = 'len(url) > 0';
       }),
     ).toEqual([...UNGUARDED, 'I003']);
@@ -152,7 +152,7 @@ describe('sabotage: invariants, the field form', () => {
       }).filter(one => one.startsWith('I005')),
     ).toEqual([
       "I005 the value 'row' makes contradicts 'An entry names a call' " +
-        '(@features/monitor/domain/an-entry-names-a-call.invariant.json): ' +
+        '(@features/customers/domain/a-customer-is-reachable.invariant.json): ' +
         "'len(url) > 0 && (method != 'DELETE' || has(agent))' is false where url = \"\"",
     ]);
   });

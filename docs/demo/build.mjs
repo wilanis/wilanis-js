@@ -15,10 +15,10 @@ import { Server, call, resetCopy, signIn, wilanis } from "./lib/run.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, "..", "..");
 const scratch = process.argv[2] ?? join(tmpdir().replace(/\/$/, ""), "wilanis-demo");
-const ROUTE = "features/monitor/edge/archive-entry.trigger.json";
+const ROUTE = "features/customers/edge/archive-entry.trigger.json";
 const INVARIANTS = [
-  "features/monitor/domain/writes-are-for-recorders.invariant.json",
-  "features/monitor/domain/an-entry-names-a-call.invariant.json",
+  "features/customers/domain/writes-are-for-registrars.invariant.json",
+  "features/customers/domain/a-customer-is-reachable.invariant.json",
 ];
 
 class Failed extends Error {
@@ -56,7 +56,7 @@ function step0(ctx) {
 
 function step1(ctx) {
   const title = "The agent scaffolds a route";
-  const made = wilanis(ctx, "new", "trigger", "features/monitor/edge/archive-entry", ".", "--run", "@monitor/domain/monitor.port.json#remove", "--kind", "@http/http.trigger-kind.json").text;
+  const made = wilanis(ctx, "new", "trigger", "features/customers/edge/archive-entry", ".", "--run", "@customers/domain/customer.port.json#remove", "--kind", "@http/http.trigger-kind.json").text;
   const out = check(ctx);
   const want = ["T002", "T002", "T005", "T005", "T005", "I001"];
   assert(title, codesOf(out).join(" ") === want.join(" ") && out.endsWith("6 refusal(s)"), out, `check answers ${want.join(", ")} and 6 refusal(s)`);
@@ -65,7 +65,7 @@ function step1(ctx) {
     title,
     summary: `${codesOf(out).join(" ")}, 6 refusal(s)`,
     does: [
-      { text: "The task is one line: add a way to archive an entry. The agent finds the <code>remove</code> operation on the monitor port and scaffolds a route that fires it.", pre: `npx wilanis new trigger features/monitor/edge/archive-entry . \\\n  --run '@monitor/domain/monitor.port.json#remove' --kind '@http/http.trigger-kind.json'\n${made}` },
+      { text: "The task is one line: add a way to archive an entry. The agent finds the <code>remove</code> operation on the monitor port and scaffolds a route that fires it.", pre: `npx wilanis new trigger features/customers/edge/archive-entry . \\\n  --run '@customers/domain/customer.port.json#remove' --kind '@http/http.trigger-kind.json'\n${made}` },
       { text: `What it wrote, <code>${ROUTE}</code>:`, pre: read(ctx, ROUTE) },
       CHECK,
     ],
@@ -99,7 +99,7 @@ function step3(ctx) {
   const edited = {};
   for (const [k, v] of Object.entries(doc)) {
     edited[k] = v;
-    if (k === "out") edited.policies = ["@access/edge/can-record.policy.json"];
+    if (k === "out") edited.policies = ["@access/edge/can-register.policy.json"];
   }
   writeFileSync(file, `${JSON.stringify(edited, null, 2)}\n`);
   const out = check(ctx);
@@ -109,7 +109,7 @@ function step3(ctx) {
     title,
     summary: "A005 T005 T005, 3 refusal(s)",
     does: [
-      { text: "The I001 hint said: attach <code>\"@access/edge/can-record.policy.json\"</code> under <code>policies</code>. The agent adds exactly that line.", pre: read(ctx, ROUTE) },
+      { text: "The I001 hint said: attach <code>\"@access/edge/can-register.policy.json\"</code> under <code>policies</code>. The agent adds exactly that line.", pre: read(ctx, ROUTE) },
       CHECK,
     ],
     answers: [{ pre: out, codes: true }],
@@ -135,16 +135,16 @@ function step4(ctx) {
 function step5(ctx) {
   const title = "Tests nobody wrote";
   const reh = wilanis(ctx, "rehearse", ".", "--profile", "local").text;
-  const block = reh.match(/^features\/access\/domain\/require-recorder {2}switch 'decide' {2}3\/3 branches\n(?: .*\n?){3}/m)?.[0]?.trimEnd();
+  const block = reh.match(/^features\/access\/domain\/require-registrar {2}switch 'decide' {2}3\/3 branches\n(?: .*\n?){3}/m)?.[0]?.trimEnd();
   const summary = reh.slice(reh.indexOf("every branch settled")).trimEnd();
-  assert(title, Boolean(block) && summary.includes("Writes are for recorders  holds at 6 trigger(s)"), reh, "rehearse shows require-recorder 3/3 branches and Writes are for recorders holds at 6 trigger(s)");
+  assert(title, Boolean(block) && summary.includes("Writes are for recorders  holds at 6 trigger(s)"), reh, "rehearse shows require-registrar 3/3 branches and Writes are for recorders holds at 6 trigger(s)");
   const map = wilanis(ctx, "map", ".", "--profile", "local").text;
   const mapBlock = map.match(/^@features\/monitor\/edge\/archive-entry\.trigger\.json.*\n(?:[ \t].*\n?)*/m)?.[0]?.trimEnd();
-  assert(title, Boolean(mapBlock) && mapBlock.includes("holds  @features/monitor/domain/writes-are-for-recorders.invariant.json"), map, "map's archive-entry block holds the invariant");
+  assert(title, Boolean(mapBlock) && mapBlock.includes("holds  @features/customers/domain/writes-are-for-registrars.invariant.json"), map, "map's archive-entry block holds the invariant");
   return {
     number: 5,
     title,
-    summary: "require-recorder 3/3 branches; holds at 6 trigger(s); map holds the invariant",
+    summary: "require-registrar 3/3 branches; holds at 6 trigger(s); map holds the invariant",
     does: [
       { text: "No test was written for the route. The rehearsal runs every route, every policy and every branch of every switch with the effects stubbed.", pre: "npx wilanis rehearse . --profile local" },
       { text: "Then the map: how a request flows, and what gates it.", pre: "npx wilanis map . --profile local" },
@@ -199,8 +199,8 @@ async function step7(ctx) {
   assert(title, imp.status === 500 && imp.json?.reason === "invariant" && imp.json.message.includes("An entry names a call"), `${imp.status} ${imp.text}`, "the import answers 500 invariant naming An entry names a call");
   const list = await call("GET", "/monitor");
   assert(title, list.text === "[]", `${list.status} ${list.text}`, "GET /monitor answers []");
-  const atomic = read(ctx, "features/monitor/domain/record-all.graph.json").split("\n").find((l) => l.includes('"atomic"'));
-  assert(title, Boolean(atomic), "no atomic line", "record-all.graph.json has an atomic line");
+  const atomic = read(ctx, "features/customers/domain/register-all.graph.json").split("\n").find((l) => l.includes('"atomic"'));
+  assert(title, Boolean(atomic), "no atomic line", "register-all.graph.json has an atomic line");
   return {
     number: 7,
     title,
@@ -211,7 +211,7 @@ async function step7(ctx) {
     ],
     answers: [
       { pre: `${imp.status}  ${imp.text}\n${list.status}  ${list.text}` },
-      { text: "The line in <code>features/monitor/domain/record-all.graph.json</code> that made it so:", pre: atomic.trim() },
+      { text: "The line in <code>features/customers/domain/register-all.graph.json</code> that made it so:", pre: atomic.trim() },
     ],
     why: "Four good rows went in before the fifth refused, and the store holds none of them. The 500 carries the second rule in its own words, and nobody wrote that message. The graph says one word, <code>atomic</code>, and the compiler refused to accept it anywhere the effects could not be one transaction, so the word is checked rather than trusted. An agent that writes a graph with that word gets the promise or a refusal, never a half-written store.",
   };

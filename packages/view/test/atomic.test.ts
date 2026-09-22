@@ -15,8 +15,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { type DocView, viewOf } from '../src/index.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
-const LATEST = '@features/monitor/data/store-and-latest.graph.json';
-const ALL = '@features/monitor/domain/record-all.graph.json';
+const LATEST = '@features/customers/data/store-and-latest.graph.json';
+const ALL = '@features/customers/domain/register-all.graph.json';
 
 let load: Awaited<ReturnType<typeof loadProject>>;
 beforeAll(async () => {
@@ -35,7 +35,7 @@ describe('the view model of an atomic data graph', () => {
     // for a unique the store answered violated; 'invariant' is beside 'upstream' because the guard the compiler
     // lowers at this graph's `row` refuses inside the transaction
     expect(view(LATEST).graph?.atomic).toEqual({
-      connections: ['@connections/entries.connection.json'],
+      connections: ['@connections/customers.connection.json'],
       rollsBackOn: ['conflict', 'invariant', 'upstream'],
     });
   });
@@ -50,7 +50,7 @@ describe('the view model of an atomic data graph', () => {
   });
 
   it('carries nothing on a graph that does not declare it, however many effects it reaches', () => {
-    const plain = view('@features/monitor/data/kept-update.graph.json').graph!;
+    const plain = view('@features/customers/data/kept-update.graph.json').graph!;
     expect(plain.atomic).toBeUndefined();
     expect(plain.nodes.every(node => node.participates === undefined)).toBe(true);
   });
@@ -69,8 +69,8 @@ describe('the view model of an atomic domain graph', () => {
     // local keeps the entries in memory and production in PostgreSQL: one graph, two connections, and a
     // reader chooses a profile before running
     expect(view(ALL).graph!.atomic?.connections).toEqual([
-      '@connections/entries-postgres.connection.json',
-      '@connections/entries.connection.json',
+      '@connections/customers-postgres.connection.json',
+      '@connections/customers.connection.json',
     ]);
   });
 });

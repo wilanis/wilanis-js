@@ -20,11 +20,11 @@ instrumentation.
 A request that answers 502 today leaves one line, written by the http listener in `packages/plugin-http/src/serve.ts`:
 
 ```
-GET /monitor/golf → 502 (143ms, @monitor/domain/monitor.port.json#get failed)
+GET /monitor/golf → 502 (143ms, @customers/domain/customer.port.json#get failed)
 ```
 
 The report behind it knows far more: that `asked` (the `http.request` node) took 131 of those 143 ms against
-`@connections/monitor-api.connection.json`, that `route` selected `failed`, that the refusal's reason was
+`@connections/customers-api.connection.json`, that `route` selected `failed`, that the refusal's reason was
 `upstream`. None of it can be seen while serving, none of it can be sent anywhere, and nothing correlates it
 with the caller's own trace id. An operator running a wilanis tree beside conventional services has less
 visibility into it than into the services, when the tree has more to say than any of them.
@@ -52,11 +52,11 @@ Running the example's `GET /monitor/{id}` with tracing on:
 $ npx wilanis start example --trace
 ...
 trace 01J8ZK5R9V3Q  GET /monitor/golf → 502  143ms
-  fire @monitor/edge/get-entry.trigger.json                    143ms  refused: upstream
-    @monitor/domain/monitor.port.json#get                       141ms  refused: upstream
-      binding @monitor/data/monitor.binding.json#get            141ms
-        get-row (@monitor/data/get-row.graph.json)              140ms  refused: upstream
-          asked   @http/http.port.json#request                  131ms  ok   connection=@connections/monitor-api.connection.json status=500
+  fire @customers/edge/get-customer.trigger.json                    143ms  refused: upstream
+    @customers/domain/customer.port.json#get                       141ms  refused: upstream
+      binding @customers/data/monitor.binding.json#get            141ms
+        get-row (@customers/data/get-row.graph.json)              140ms  refused: upstream
+          asked   @http/http.port.json#request                  131ms  ok   connection=@connections/customers-api.connection.json status=500
           route   switch → failed                                 0ms  ok
           failed  @std/outcome.port.json#refuse                   0ms  refused: upstream "the monitor API answered 500"
           missing                                                      cancelled
@@ -67,7 +67,7 @@ A gated trigger shows the gate:
 
 ```
 trace 01J8ZK6D2M7X  DELETE /monitor/golf → 403  9ms  correlation=00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
-  fire @monitor/edge/remove-entry.trigger.json                   9ms  denied: forbidden
+  fire @customers/edge/remove-entry.trigger.json                   9ms  denied: forbidden
     identify (@auth)                                             6ms  ok   principal=yes session=yes
     policy @access/edge/signed-in.policy.json                    1ms  allowed
     policy @access/edge/recorder-only.policy.json                1ms  denied: forbidden "the recorder role is required"
@@ -314,7 +314,7 @@ gains a member, which only plugins that hold something ever see. `@wilanis/plugi
 | the correlation is read from the kind's path | `packages/runtime/test/trace.test.ts` | send `traceparent`; expect it on the root span |
 | T0nn: a kind whose `correlation` names no context field | `packages/runtime/test/sabotage.test.ts` | copy the example with a sabotaged http kind under a fake plugin; expect T0nn |
 | X0nn: a bad endpoint | `packages/plugin-otel/test/rules.test.ts` | `endpoint: "collector"`; expect X0nn |
-| spans reach a collector | `packages/plugin-otel/test/export.test.ts` | start the example with `export` pointed at an in-process http server that captures OTLP/JSON; fire one route; expect a root span named `fire @monitor/edge/get-entry.trigger.json` with a child `asked @http/http.port.json#request` carrying `wilanis.connection` |
+| spans reach a collector | `packages/plugin-otel/test/export.test.ts` | start the example with `export` pointed at an in-process http server that captures OTLP/JSON; fire one route; expect a root span named `fire @customers/edge/get-customer.trigger.json` with a child `asked @http/http.port.json#request` carrying `wilanis.connection` |
 | `--trace=json` prints one object per run | `packages/runtime/test/tools.test.ts` | run a cli trigger; parse stderr |
 
 ## Implementation plan

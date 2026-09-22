@@ -35,56 +35,56 @@ export function tree(): Docs {
       ],
       startup: [{ label: 'Export traces', run: EXPORT }],
     },
-    'features/monitor/feature.json': {
+    'features/customers/feature.json': {
       $schema: schemaRef('feature'),
       description: 'what the monitor observes',
     },
-    'features/monitor/domain/Digest.shape.json': {
+    'features/customers/domain/Digest.shape.json': {
       $schema: schemaRef('shape'),
       description: 'what a digest says',
       layer: 'core',
       fields: { count: { type: 'number' } },
     },
-    'features/monitor/domain/monitor.port.json': {
+    'features/customers/domain/customer.port.json': {
       $schema: schemaRef('port'),
       description: 'what the monitor can be asked for',
       operations: {
-        digest: { description: 'the digest of what was seen', returns: '@features/monitor/domain/Digest.shape.json' },
+        digest: { description: 'the digest of what was seen', returns: '@features/customers/domain/Digest.shape.json' },
       },
     },
-    'features/monitor/data/digest.binding.json': {
+    'features/customers/data/digest.binding.json': {
       $schema: schemaRef('binding'),
       description: 'how the digest is made',
-      port: '@features/monitor/domain/monitor.port.json',
-      operations: { digest: { graph: '@features/monitor/data/count.graph.json' } },
+      port: '@features/customers/domain/customer.port.json',
+      operations: { digest: { graph: '@features/customers/data/count.graph.json' } },
     },
-    'features/monitor/data/count.graph.json': {
+    'features/customers/data/count.graph.json': {
       $schema: schemaRef('graph'),
       description: 'how many were seen',
-      out: { type: '@features/monitor/domain/Digest.shape.json', from: 'counted' },
+      out: { type: '@features/customers/domain/Digest.shape.json', from: 'counted' },
       nodes: [
         {
           id: 'counted',
           type: '@wilanis/node/run.schema.json',
           run: '@std/object.port.json#make',
-          in: { value: { count: 0 }, type: '@features/monitor/domain/Digest.shape.json' },
+          in: { value: { count: 0 }, type: '@features/customers/domain/Digest.shape.json' },
         },
       ],
     },
-    'features/monitor/edge/DigestView.shape.json': {
+    'features/customers/edge/DigestView.shape.json': {
       $schema: schemaRef('shape'),
       description: 'the digest as a caller sees it',
       layer: 'edge',
       fields: { count: { type: 'number' } },
     },
-    'features/monitor/edge/digest.trigger.json': {
+    'features/customers/edge/digest.trigger.json': {
       $schema: schemaRef('trigger'),
       label: 'digest',
       description: 'what a command line asks for, so a case can fire this tree for real',
       settings: { command: 'digest' },
-      out: '@features/monitor/edge/DigestView.shape.json',
+      out: '@features/customers/edge/DigestView.shape.json',
       kind: '@cli/cli.trigger-kind.json',
-      fire: { run: '@features/monitor/domain/monitor.port.json#digest' },
+      fire: { run: '@features/customers/domain/customer.port.json#digest' },
     },
   };
 }

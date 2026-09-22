@@ -16,13 +16,13 @@ import { describe, expect, it } from 'vitest';
 import { STORE_FILE, scopedView, VIEW } from './scoped-harness.js';
 
 const PAGE = fileURLToPath(new URL('../client/index.html', import.meta.url));
-const STORE = '@features/monitor/data/entries.store.json';
-const REQUEST_DOC = '@features/monitor/edge/request.resolvers.json';
+const STORE = '@features/customers/data/customers.store.json';
+const REQUEST_DOC = '@features/customers/edge/request.resolvers.json';
 const EMPLOYEES_ONLY = '@features/access/edge/employees-only.policy.json';
 
 describe('a scope, and the view across it', () => {
   it('a storage node over a scoped collection carries a scope badge naming the column and linking the store', () => {
-    const seen = scopedView('@features/monitor/data/kept-get.graph.json');
+    const seen = scopedView('@features/customers/data/kept-get.graph.json');
     const asked = seen.graph?.nodes.find(node => node.id === 'asked');
     // the node names the store and the collection, as before; what is new is the scope the compiler put there
     expect(asked?.keeps).toMatchObject({ store: STORE, collection: 'entries', op: 'get' });
@@ -42,7 +42,7 @@ describe('a scope, and the view across it', () => {
   });
 
   it('no node wrote the scope: it is absent over an unscoped collection and over newKey, which takes none', () => {
-    const nodes = scopedView('@features/monitor/data/store-and-latest.graph.json').graph?.nodes ?? [];
+    const nodes = scopedView('@features/customers/data/store-and-latest.graph.json').graph?.nodes ?? [];
     const keeping = nodes.filter(node => node.keeps);
     // the put over the scoped collection carries one; the put over `latest`, which declares no scope, does not
     expect(keeping.find(node => node.id === 'stored')?.keeps?.scope?.by[0].column).toBe('tenant');
@@ -103,14 +103,14 @@ describe('a scope, and the view across it', () => {
   });
 
   it("the trigger page's Gated by marks the policy a view it reaches requires", () => {
-    const seen = scopedView('@features/monitor/edge/list-entries.trigger.json', {
+    const seen = scopedView('@features/customers/edge/list-customers.trigger.json', {
       [STORE_FILE]: doc => {
         doc.collections.everyEntry = { ...VIEW };
       },
-      'features/monitor/data/kept-list.graph.json': doc => {
+      'features/customers/data/kept-list.graph.json': doc => {
         doc.nodes[0].in.collection = 'everyEntry';
       },
-      'features/monitor/edge/list-entries.trigger.json': doc => {
+      'features/customers/edge/list-customers.trigger.json': doc => {
         doc.policies = [EMPLOYEES_ONLY];
       },
     });
@@ -127,14 +127,14 @@ describe('a scope, and the view across it', () => {
 
   it('marks no policy where the trigger reaches the scoped collection rather than a view', () => {
     // the view is declared and this trigger reads the scoped collection: attaching a policy is still a choice
-    const seen = scopedView('@features/monitor/edge/record-entry.trigger.json', {
+    const seen = scopedView('@features/customers/edge/register-customer.trigger.json', {
       [STORE_FILE]: doc => {
         doc.collections.everyEntry = { ...VIEW };
       },
     });
     expect(seen.policies?.map(policy => policy.path)).toEqual([
       EMPLOYEES_ONLY,
-      '@features/access/edge/can-record.policy.json',
+      '@features/access/edge/can-register.policy.json',
     ]);
     for (const policy of seen.policies ?? []) expect(Object.keys(policy)).not.toContain('required');
   });

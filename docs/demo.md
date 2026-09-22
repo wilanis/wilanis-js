@@ -1,7 +1,7 @@
 # The route written a year later
 
 This is the demo as a script: one story, five beats, twenty minutes. The rule is
-`features/monitor/domain/writes-are-for-recorders.invariant.json`, stated once. The protagonist is an agent
+`features/customers/domain/writes-are-for-registrars.invariant.json`, stated once. The protagonist is an agent
 given a one-line task, *add a way to archive an entry*, that never read the rule. The compiler is the
 character who talks back, and the room wants the agent to get it wrong.
 
@@ -51,27 +51,27 @@ npx wilanis-view .     # http://127.0.0.1:4400/
 In the terminal, ask the tree what the rule reaches:
 
 ```
-npx wilanis describe @monitor/domain/writes-are-for-recorders.invariant.json .
+npx wilanis describe @customers/domain/writes-are-for-registrars.invariant.json .
 ```
 
 ```
 access: every trigger reaching these domain operations is gated
-    @monitor/domain/monitor.port.json#record
-    @monitor/domain/monitor.port.json#update
-    @monitor/domain/monitor.port.json#remove
-    @monitor/domain/monitor.port.json#removeMany
-    @monitor/domain/monitor.port.json#submit
-    @monitor/domain/monitor.port.json#import
-requires: attaches @access/edge/can-record.policy.json
-reached by (every one met by @features/access/edge/can-record.policy.json):
-    @features/monitor/edge/delete-entries.trigger.json  #remove (through #removeMany), #removeMany
-    @features/monitor/edge/delete-entry.trigger.json  #remove
-    @features/monitor/edge/import-entries.trigger.json  #record (through #submit), #submit (through #recordAll), #import
-    @features/monitor/edge/record-entry.trigger.json  #record (through #submit), #submit
-    @features/monitor/edge/update-entry.trigger.json  #update
+    @customers/domain/customer.port.json#register
+    @customers/domain/customer.port.json#update
+    @customers/domain/customer.port.json#remove
+    @customers/domain/customer.port.json#removeMany
+    @customers/domain/customer.port.json#submit
+    @customers/domain/customer.port.json#import
+requires: attaches @access/edge/can-register.policy.json
+reached by (every one met by @features/access/edge/can-register.policy.json):
+    @features/customers/edge/delete-customers.trigger.json  #remove (through #removeMany), #removeMany
+    @features/customers/edge/delete-customer.trigger.json  #remove
+    @features/customers/edge/import-customers.trigger.json  #record (through #submit), #submit (through #recordAll), #import
+    @features/customers/edge/register-customer.trigger.json  #record (through #submit), #submit
+    @features/customers/edge/update-customer.trigger.json  #update
 ```
 
-**Point at.** `reached by (every one met by @features/access/edge/can-record.policy.json)`: five routes reach
+**Point at.** `reached by (every one met by @features/access/edge/can-register.policy.json)`: five routes reach
 a write today, and the rule names none of them. It names six operations and one policy, and the checker
 works out who reaches what.
 
@@ -89,31 +89,31 @@ nothing asked it to.
 **Do.** Scaffold the route from the operation it fires, then check.
 
 ```
-npx wilanis new trigger features/monitor/edge/archive-entry . \
-  --run '@monitor/domain/monitor.port.json#remove' --kind '@http/http.trigger-kind.json'
+npx wilanis new trigger features/customers/edge/archive-entry . \
+  --run '@customers/domain/customer.port.json#remove' --kind '@http/http.trigger-kind.json'
 npx wilanis check .
 ```
 
 ```
-wrote features/monitor/edge/archive-entry.trigger.json
-T002  @features/monitor/edge/archive-entry.trigger.json#in
-    '@monitor/domain/monitor.port.json#remove' takes {id: string} but the trigger declares no in
-    → declare in on the trigger; wilanis describe @monitor/domain/monitor.port.json#remove shows what it takes
-T002  @features/monitor/edge/archive-entry.trigger.json#out
-    '@monitor/domain/monitor.port.json#remove' answers @features/monitor/domain/Entry.shape.json but the trigger declares no out
+wrote features/customers/edge/archive-entry.trigger.json
+T002  @features/customers/edge/archive-entry.trigger.json#in
+    '@customers/domain/customer.port.json#remove' takes {id: string} but the trigger declares no in
+    → declare in on the trigger; wilanis describe @customers/domain/customer.port.json#remove shows what it takes
+T002  @features/customers/edge/archive-entry.trigger.json#out
+    '@customers/domain/customer.port.json#remove' answers @features/customers/domain/Customer.shape.json but the trigger declares no out
     → declare out on the trigger, or fire an operation that answers nothing
-T005  @features/monitor/edge/archive-entry.trigger.json#settings/response/refusals
-    @features/monitor/data/delete-row.graph.json may refuse with reason 'missing', which settings.response.refusals does not map
+T005  @features/customers/edge/archive-entry.trigger.json#settings/response/refusals
+    @features/customers/data/delete-row.graph.json may refuse with reason 'missing', which settings.response.refusals does not map
     → add "missing" under settings.response.refusals: how this trigger answers that outcome
-T005  @features/monitor/edge/archive-entry.trigger.json#settings/response/refusals
-    @features/monitor/data/delete-row.graph.json may refuse with reason 'upstream', which settings.response.refusals does not map
+T005  @features/customers/edge/archive-entry.trigger.json#settings/response/refusals
+    @features/customers/data/delete-row.graph.json may refuse with reason 'upstream', which settings.response.refusals does not map
     → add "upstream" under settings.response.refusals: how this trigger answers that outcome
-T005  @features/monitor/edge/archive-entry.trigger.json#settings/response/refusals
-    @features/monitor/data/kept-remove.graph.json may refuse with reason 'invariant', which settings.response.refusals does not map
+T005  @features/customers/edge/archive-entry.trigger.json#settings/response/refusals
+    @features/customers/data/kept-remove.graph.json may refuse with reason 'invariant', which settings.response.refusals does not map
     → add "invariant" under settings.response.refusals: how this trigger answers that outcome
-I001  @features/monitor/edge/archive-entry.trigger.json#policies
-    trigger reaches @features/monitor/domain/monitor.port.json#remove, which 'Writes are for recorders' (@features/monitor/domain/writes-are-for-recorders.invariant.json) gates with @access/edge/can-record.policy.json, but attaches no such policy
-    → attach "@access/edge/can-record.policy.json" under policies, or take @features/monitor/domain/monitor.port.json#remove out of the invariant's over
+I001  @features/customers/edge/archive-entry.trigger.json#policies
+    trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for recorders' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy
+    → attach "@access/edge/can-register.policy.json" under policies, or take @features/customers/domain/customer.port.json#remove out of the invariant's over
 
 6 refusal(s)
 ```
@@ -121,7 +121,7 @@ I001  @features/monitor/edge/archive-entry.trigger.json#policies
 **Point at.** The last refusal. Read it aloud, whole, and land on its hint:
 
 ```
-    → attach "@access/edge/can-record.policy.json" under policies, or take @features/monitor/domain/monitor.port.json#remove out of the invariant's over
+    → attach "@access/edge/can-register.policy.json" under policies, or take @features/customers/domain/customer.port.json#remove out of the invariant's over
 ```
 
 The file the agent wrote a second ago, the rule it broke by its label, the file the rule lives in, and the
@@ -141,14 +141,14 @@ three reasons to statuses. It leaves the policy alone, since nothing yet told it
 **Do.** Paste the route with the shapes and the refusals filled in.
 
 ```
-cp $DEMO/archive-entry.step2.trigger.json features/monitor/edge/archive-entry.trigger.json
+cp $DEMO/archive-entry.step2.trigger.json features/customers/edge/archive-entry.trigger.json
 npx wilanis check .
 ```
 
 ```
-I001  @features/monitor/edge/archive-entry.trigger.json#policies
-    trigger reaches @features/monitor/domain/monitor.port.json#remove, which 'Writes are for recorders' (@features/monitor/domain/writes-are-for-recorders.invariant.json) gates with @access/edge/can-record.policy.json, but attaches no such policy
-    → attach "@access/edge/can-record.policy.json" under policies, or take @features/monitor/domain/monitor.port.json#remove out of the invariant's over
+I001  @features/customers/edge/archive-entry.trigger.json#policies
+    trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for recorders' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy
+    → attach "@access/edge/can-register.policy.json" under policies, or take @features/customers/domain/customer.port.json#remove out of the invariant's over
 
 1 refusal(s)
 ```
@@ -156,7 +156,7 @@ I001  @features/monitor/edge/archive-entry.trigger.json#policies
 One round took five refusals to zero. Now the agent does exactly what the last one says, and no more:
 
 ```json
-"policies": ["@access/edge/can-record.policy.json"],
+"policies": ["@access/edge/can-register.policy.json"],
 ```
 
 ```
@@ -164,14 +164,14 @@ npx wilanis check .
 ```
 
 ```
-A005  @features/monitor/edge/archive-entry.trigger.json#policies/0
-    policy '@features/access/edge/can-record.policy.json' reads request.principal, which the guard hands once it verified a token, but no attachment on this trigger gives one
-    → write { "policy": "@access/edge/can-record.policy.json", "in": { "token": "{{request.headers.authorization}}" } } -- the read is where this kind hands the credential
-T005  @features/monitor/edge/archive-entry.trigger.json#settings/response/refusals
-    @features/access/domain/require-recorder.graph.json may refuse with reason 'forbidden', which settings.response.refusals does not map
+A005  @features/customers/edge/archive-entry.trigger.json#policies/0
+    policy '@features/access/edge/can-register.policy.json' reads request.principal, which the guard hands once it verified a token, but no attachment on this trigger gives one
+    → write { "policy": "@access/edge/can-register.policy.json", "in": { "token": "{{request.headers.authorization}}" } } -- the read is where this kind hands the credential
+T005  @features/customers/edge/archive-entry.trigger.json#settings/response/refusals
+    @features/access/domain/require-registrar.graph.json may refuse with reason 'forbidden', which settings.response.refusals does not map
     → add "forbidden" under settings.response.refusals: how this trigger answers that outcome
-T005  @features/monitor/edge/archive-entry.trigger.json#settings/response/refusals
-    @features/access/domain/require-recorder.graph.json may refuse with reason 'anonymous', which settings.response.refusals does not map
+T005  @features/customers/edge/archive-entry.trigger.json#settings/response/refusals
+    @features/access/domain/require-registrar.graph.json may refuse with reason 'anonymous', which settings.response.refusals does not map
     → add "anonymous" under settings.response.refusals: how this trigger answers that outcome
 
 3 refusal(s)
@@ -186,7 +186,7 @@ Paste the finished route: the policy given the token as the hint wrote it, and 4
 `anonymous` and `invalid_credential`.
 
 ```
-cp $DEMO/archive-entry.step3.trigger.json features/monitor/edge/archive-entry.trigger.json
+cp $DEMO/archive-entry.step3.trigger.json features/customers/edge/archive-entry.trigger.json
 npx wilanis check .
 ```
 
@@ -214,7 +214,7 @@ npx wilanis rehearse . --profile local
 ```
 
 ```
-features/access/domain/require-recorder  switch 'decide'  3/3 branches
+features/access/domain/require-registrar  switch 'decide'  3/3 branches
   ok  when has(principal) && 'recorder' in principal.roles  answered from 'granted'
   ok  when has(principal)                                   refused on purpose at 'forbidden' as forbidden: "recording entries takes the recorder role"
   ok  anything else                                         refused on purpose at 'anonymous' as anonymous: "sign in first: no token was presented"
@@ -240,12 +240,12 @@ nested domain calls. This is the archive-entry block of a 2026-09-21 run with th
 bind left out; check it against the real output once #481 lands. -->
 
 ```
-@features/monitor/edge/archive-entry.trigger.json  (@http/http.trigger-kind.json)
-  gated by @features/access/edge/can-record.policy.json → @access/domain/access.port.json#requireRecorder  given token
-  holds  @features/monitor/domain/writes-are-for-recorders.invariant.json  through @features/access/edge/can-record.policy.json
-  @monitor/domain/monitor.port.json#remove
-    @features/monitor/data/kept-remove.graph.json
-      asked @storage/store.port.json#remove  (effect) → store @features/monitor/data/entries.store.json entries (remove)
+@features/customers/edge/archive-entry.trigger.json  (@http/http.trigger-kind.json)
+  gated by @features/access/edge/can-register.policy.json → @access/domain/access.port.json#requireRecorder  given token
+  holds  @features/customers/domain/writes-are-for-registrars.invariant.json  through @features/access/edge/can-register.policy.json
+  @customers/domain/customer.port.json#remove
+    @features/customers/data/kept-remove.graph.json
+      asked @storage/store.port.json#remove  (effect) → store @features/customers/data/customers.store.json entries (remove)
       route [switch → row | missing]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
@@ -307,7 +307,7 @@ The same branch, the same sentence. The rehearsal ran it with the effects stubbe
 the route mapped the reason to 403 in beat 3; the guard, the policy and the graph did the rest.
 
 **If asked.** *"Where is the role check? I want to read what the agent wrote."* The agent wrote none. One
-switch, in `features/access/domain/require-recorder.graph.json`: `has(principal) && 'recorder' in
+switch, in `features/access/domain/require-registrar.graph.json`: `has(principal) && 'recorder' in
 principal.roles`, the only place a condition can be written, and the rehearsal walked all three branches.
 The route never saw the token: the guard verified it before any graph ran and handed `request.principal` to
 the policy. No document validates a token and no graph checks access, so an agent cannot get that wrong.
@@ -344,8 +344,8 @@ curl -s localhost:8099/monitor -w '  [%{http_code}]\n'
 ```
 
 **Point at.** `[]`. Four good rows went in before the fifth refused, and the store holds none of them. The
-sentence in the 500 is the tree's other invariant, `an-entry-names-a-call.invariant.json`, in its own words;
-nobody wrote that message. Then open `features/monitor/domain/record-all.graph.json` and point at one line:
+sentence in the 500 is the tree's other invariant, `a-customer-is-reachable.invariant.json`, in its own words;
+nobody wrote that message. Then open `features/customers/domain/register-all.graph.json` and point at one line:
 
 ```json
 "atomic": true,
@@ -367,7 +367,7 @@ route, policy, shape or business graph differs from `local`, and beat 1 judged i
 `--apply`. It needs a PostgreSQL, its URL in `MONITOR_DATABASE_URL`, and [`example/README.md`](../example/README.md#changing-the-shape-and-the-plan-that-follows) as the script.
 
 **The edit that never reaches the serving tree.** With `start` still running, paste the beat-3 file back
-over the route (`cp $DEMO/archive-entry.step2.trigger.json features/monitor/edge/archive-entry.trigger.json`):
+over the route (`cp $DEMO/archive-entry.step2.trigger.json features/customers/edge/archive-entry.trigger.json`):
 the log prints `reload refused, still serving the last good tree:` with the I001 refusal, hint and all, while
 `curl` keeps answering 401, so an agent editing a live tree cannot make the write public for one request.
 Paste the finished file back and it prints `reload: 186 documents, serving the new tree`. It needs nothing

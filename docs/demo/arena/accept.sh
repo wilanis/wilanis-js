@@ -30,13 +30,13 @@ check "1 wilanis check passes" "ok: N documents" "$CHECK" '^ok: [0-9]+ documents
 REH=$(npx wilanis rehearse . --profile local 2>&1)
 check "2 every rehearsed branch settles" "every branch settled" "$(printf '%s' "$REH" | grep -E 'every branch settled|NEVER RUN|BROKE|BLOCKED' | head -3)" 'every branch settled'
 printf 'INFO  3 the rehearsal says: %s  (the rule held at 5 triggers before your change; this line is reported, not judged)\n' "$(printf '%s' "$REH" | grep 'Writes are for recorders' | sed 's/^ *//')"
-for inv in features/monitor/domain/an-entry-names-a-call.invariant.json; do
+for inv in features/customers/domain/a-customer-is-reachable.invariant.json; do
   before=$(git show "$BASE:$inv" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).holds.when))')
   after=$(node -e 'process.stdout.write(require("./'"$inv"'").holds.when)')
   check "4 the rule in $(basename "$inv" .invariant.json) states what it stated" "$before" "$after" "^$(printf '%s' "$before" | sed 's/[][\.*^$|()+?{}\\]/\\&/g')\$"
 done
-before=$(git show "$BASE:features/monitor/domain/writes-are-for-recorders.invariant.json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).access.requires.policy))')
-after=$(node -e 'process.stdout.write(require("./features/monitor/domain/writes-are-for-recorders.invariant.json").access.requires.policy)')
+before=$(git show "$BASE:features/customers/domain/writes-are-for-registrars.invariant.json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).access.requires.policy))')
+after=$(node -e 'process.stdout.write(require("./features/customers/domain/writes-are-for-registrars.invariant.json").access.requires.policy)')
 check "5 the access rule still requires the same policy" "$before" "$after" "^$(printf '%s' "$before" | sed 's/[][\.*^$|()+?{}\\]/\\&/g')\$"
 
 echo "== The tree serving"

@@ -15,7 +15,7 @@ const TENANT: Type = {
   fields: { tenant: { type: { kind: 'string' }, required: true } },
   open: false,
 };
-const TENANT_REF = '@monitor/domain/IdentityAttributes.shape.json';
+const TENANT_REF = '@customers/domain/IdentityAttributes.shape.json';
 
 /** The accounts the directory connection holds: one carrying a tenant, one saying nothing. */
 const USERS = [
@@ -60,7 +60,7 @@ describe('verify with a type: what the directory said, judged', () => {
 
   it('an account that says nothing fails the node: a directory the tree asks more of is misconfigured', async () => {
     await expect(directory({ username: 'bo', password: 'bo-pass', type: TENANT_REF })).rejects.toThrow(
-      /the directory's attributes are not @monitor\/domain\/IdentityAttributes\.shape\.json/,
+      /the directory's attributes are not @customers\/domain\/IdentityAttributes\.shape\.json/,
     );
   });
 
@@ -152,15 +152,15 @@ const shapeOf = (attribute: string) => ({
 });
 
 const scoping = (attribute: string) => ({
-  'features/monitor/edge/request.resolvers.json': (doc: any) => {
+  'features/customers/edge/request.resolvers.json': (doc: any) => {
     doc.resolvers[attribute] = {
       read: `request.session.attributes.${attribute}`,
       required: true,
       description: "the caller's tenant, written into the session at sign-in",
     };
   },
-  'features/monitor/data/entries.store.json': (doc: any) => {
-    doc.reads = { [attribute]: `@monitor/edge/request.resolvers.json#${attribute}` };
+  'features/customers/data/customers.store.json': (doc: any) => {
+    doc.reads = { [attribute]: `@customers/edge/request.resolvers.json#${attribute}` };
     doc.collections.entries.scoped = { [attribute]: `{{${attribute}}}` };
   },
 });

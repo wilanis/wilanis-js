@@ -28,7 +28,7 @@ The stub said the declaration side was built: `feature.json → effects` lists w
 refuses a data graph that runs anything else, and only the environment's side was missing. The first half is
 wrong in a way that matters. `feature.json → effects` is what a feature *allows* its data layer to reach: an
 upper bound, written by the feature's author, the same under every profile. It is not what the tree does
-under a profile. `example/features/monitor/feature.json` will list both `@http/http.port.json#request` and the
+under a profile. `example/features/customers/feature.json` will list both `@http/http.port.json#request` and the
 `@storage/store.port.json` operations once RFC 0002 lands, because the feature holds a REST binding and a
 storage binding and the profile chooses between them; comparing that list with a `production` that permits
 storage alone would refuse production for an `http.request` it never runs.
@@ -64,11 +64,11 @@ judges.
 "production": {
   "description": "Behind the load balancer: the same bindings, the real monitor API in place of the test one, nothing watched.",
   "bindings": {
-    "@monitor/domain/monitor.port.json": "@monitor/data/monitor-rest.binding.json",
+    "@customers/domain/customer.port.json": "@customers/data/customers-rest.binding.json",
     "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json"
   },
   "connections": {
-    "@connections/monitor-api.connection.json": "@connections/monitor-api-production.connection.json"
+    "@connections/customers-api.connection.json": "@connections/monitor-api-production.connection.json"
   },
   "permits": [
     "@http/http.port.json#request",
@@ -217,13 +217,13 @@ Sabotage, in `packages/runtime/test/sabotage-project.test.ts` (copies of the exa
 in as a `ResolvedInclude`), against the example's `production` profile of RFC 0013:
 
 - remove `"@http/http.port.json#request"` from `permits` → C0nn naming the operation, a monitor trigger,
-  `monitor-rest.binding.json` and `feature monitor`;
+  `customers-rest.binding.json` and `feature monitor`;
 - remove `"@connections/customers.connection.json"` → C0nn whose message ends `(feature access, included from
   @wilanis/access)` and whose hint's first clause names `includes[].features`;
 - add `"@reload/watch.port.json#watch"` → C0nn (dead: the step runs under `live` alone);
 - add `"@blob/text.port.json"` → C0nn (dead port: no operation of it is reached);
-- add `"@connections/monitor-api.connection.json"` beside the stand-in → C0nn (replaced under this profile);
-- add `"@monitor/domain/monitor.port.json"` → C0nn (a domain port); add `"@std/text.port.json#join"` → C0nn (pure);
+- add `"@connections/customers-api.connection.json"` beside the stand-in → C0nn (replaced under this profile);
+- add `"@customers/domain/customer.port.json"` → C0nn (a domain port); add `"@std/text.port.json#join"` → C0nn (pure);
 - add `"@http/http.port.json#fetch"` → R001; add `"@connections/nowhere.connection.json"` → R001;
 - give `live` a `permits` equal to what it reaches, watcher and test API included → passes; the same list on
   `production` → C0nn for the watcher and for the test API, proving the reach is per profile and resolves

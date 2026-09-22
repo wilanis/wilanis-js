@@ -92,7 +92,7 @@ def fact_rows(facts, models):
         ('The operation it fires', each(lambda x: (str(x['trigger'].get('fires') or '–').split('/')[-1], ''))),
         ("Did the access rule's over gain that operation", each(over)),
         ("Did any invariant's when or requires change", each(rules)),
-        ('Did EntryView gain pinned, so a client can see what it toggled', each(lambda x: yes_no(x['view_has_pinned']))),
+        ('Did CustomerView gain pinned, so a client can see what it toggled', each(lambda x: yes_no(x['view_has_pinned']))),
         ('Bindings of the port that meet the operation', each(bindings)),
         ('Files added', each(lambda x: ('\n'.join(x['files_added']) or 'none', ''))),
         ('Files changed', each(lambda x: ('\n'.join(x['files_changed']) or 'none', ''))),

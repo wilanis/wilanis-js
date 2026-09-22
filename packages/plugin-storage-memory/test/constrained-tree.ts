@@ -9,9 +9,9 @@ import { dirname, join } from 'node:path';
 import { edge } from './constrained-edge.js';
 
 const KIND = '@storage-memory/memory.connection-kind.json';
-const STORE = '@features/monitor/data/entries.store.json';
-const ENTRY = '@features/monitor/domain/Entry.shape.json';
-const NOTE = '@features/monitor/domain/Note.shape.json';
+const STORE = '@features/customers/data/customers.store.json';
+const ENTRY = '@features/customers/domain/Customer.shape.json';
+const NOTE = '@features/customers/domain/Note.shape.json';
 
 /** One run node, the three fields every one of them here has. */
 const node = (id: string, run: string, into: Record<string, unknown>) => ({
@@ -73,25 +73,25 @@ export function treeServing(): string {
     kind: KIND,
     settings: {},
   });
-  write('features/monitor/feature.json', {
+  write('features/customers/feature.json', {
     $schema: '@wilanis/feature.schema.json',
     description: 'what the monitor keeps',
-    exports: ['@features/monitor/domain/entries.port.json', ENTRY],
+    exports: ['@features/customers/domain/entries.port.json', ENTRY],
     effects: ['@storage/store.port.json#put', '@storage/store.port.json#remove'],
   });
-  write('features/monitor/domain/Entry.shape.json', {
+  write('features/customers/domain/Customer.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'one observed call',
     layer: 'core',
     fields: { id: { type: 'string' }, url: { type: 'string' }, method: { type: 'string' } },
   });
-  write('features/monitor/domain/Note.shape.json', {
+  write('features/customers/domain/Note.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'something written about one entry',
     layer: 'core',
     fields: { id: { type: 'string' }, entryId: { type: 'string' }, text: { type: 'string' } },
   });
-  write('features/monitor/data/entries.store.json', {
+  write('features/customers/data/customers.store.json', {
     $schema: '@wilanis/store.schema.json',
     description: 'the entries, and the notes that point at them',
     connection: '@connections/records.connection.json',
@@ -100,7 +100,7 @@ export function treeServing(): string {
       notes: { of: NOTE, key: 'id', refs: { entryId: { collection: 'entries' } } },
     },
   });
-  write('features/monitor/domain/Written.shape.json', {
+  write('features/customers/domain/Written.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'what a write answers: the record, or the constraint that stopped it',
     layer: 'core',
@@ -109,64 +109,64 @@ export function treeServing(): string {
       violated: { type: 'string', required: false },
     },
   });
-  write('features/monitor/domain/Noted.shape.json', {
+  write('features/customers/domain/Noted.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'what writing a note answers: the note, or the reference that stopped it',
     layer: 'core',
     fields: { record: { type: NOTE, required: false }, violated: { type: 'string', required: false } },
   });
-  write('features/monitor/domain/Gone.shape.json', {
+  write('features/customers/domain/Gone.shape.json', {
     $schema: '@wilanis/shape.schema.json',
     description: 'what a removal answers: whether it went, and what kept it where it did not',
     layer: 'core',
     fields: { removed: { type: 'boolean' }, referencedBy: { type: 'string', required: false } },
   });
-  write('features/monitor/domain/entries.port.json', {
+  write('features/customers/domain/entries.port.json', {
     $schema: '@wilanis/port.schema.json',
     description: 'what the domain needs of entry storage',
     operations: {
       record: {
         description: 'Keep one entry, or say which constraint stopped it.',
         accepts: { id: { type: 'string' }, url: { type: 'string' }, method: { type: 'string' } },
-        returns: '@features/monitor/domain/Written.shape.json',
+        returns: '@features/customers/domain/Written.shape.json',
       },
       note: {
         description: 'Keep one note about an entry, or say which constraint stopped it.',
         accepts: { id: { type: 'string' }, entryId: { type: 'string' }, text: { type: 'string' } },
-        returns: '@features/monitor/domain/Noted.shape.json',
+        returns: '@features/customers/domain/Noted.shape.json',
       },
       forget: {
         description: 'Remove one entry, or say what still references it.',
         accepts: { id: { type: 'string' } },
-        returns: '@features/monitor/domain/Gone.shape.json',
+        returns: '@features/customers/domain/Gone.shape.json',
       },
     },
   });
-  write('features/monitor/data/entries-memory.binding.json', {
+  write('features/customers/data/entries-memory.binding.json', {
     $schema: '@wilanis/binding.schema.json',
     description: 'the port over an @storage store',
-    port: '@features/monitor/domain/entries.port.json',
+    port: '@features/customers/domain/entries.port.json',
     operations: {
-      record: { graph: '@features/monitor/data/record-entry.graph.json' },
-      note: { graph: '@features/monitor/data/record-note.graph.json' },
-      forget: { graph: '@features/monitor/data/forget-entry.graph.json' },
+      record: { graph: '@features/customers/data/register-customer.graph.json' },
+      note: { graph: '@features/customers/data/record-note.graph.json' },
+      forget: { graph: '@features/customers/data/forget-entry.graph.json' },
     },
   });
 
   const kept = {
-    kept: { value: { record: '{{saved.record}}' }, type: '@features/monitor/domain/Written.shape.json' },
-    broke: { value: { violated: '{{saved.violated}}' }, type: '@features/monitor/domain/Written.shape.json' },
+    kept: { value: { record: '{{saved.record}}' }, type: '@features/customers/domain/Written.shape.json' },
+    broke: { value: { violated: '{{saved.violated}}' }, type: '@features/customers/domain/Written.shape.json' },
   };
   const noted = {
-    noted: { value: { record: '{{saved.record}}' }, type: '@features/monitor/domain/Noted.shape.json' },
-    broke: { value: { violated: '{{saved.violated}}' }, type: '@features/monitor/domain/Noted.shape.json' },
+    noted: { value: { record: '{{saved.record}}' }, type: '@features/customers/domain/Noted.shape.json' },
+    broke: { value: { violated: '{{saved.violated}}' }, type: '@features/customers/domain/Noted.shape.json' },
   };
   write(
-    'features/monitor/data/record-entry.graph.json',
+    'features/customers/data/register-customer.graph.json',
     routing({
       description: 'write the entry, and say which unique stopped it where one did',
       in: ENTRY,
-      out: '@features/monitor/domain/Written.shape.json',
+      out: '@features/customers/domain/Written.shape.json',
       from: ['kept', 'broke'],
       write: {
         id: 'saved',
@@ -184,11 +184,11 @@ export function treeServing(): string {
     }),
   );
   write(
-    'features/monitor/data/record-note.graph.json',
+    'features/customers/data/record-note.graph.json',
     routing({
       description: 'write the note, and say which reference stopped it where one did',
       in: NOTE,
-      out: '@features/monitor/domain/Noted.shape.json',
+      out: '@features/customers/domain/Noted.shape.json',
       from: ['noted', 'broke'],
       write: {
         id: 'saved',
@@ -206,11 +206,11 @@ export function treeServing(): string {
     }),
   );
   write(
-    'features/monitor/data/forget-entry.graph.json',
+    'features/customers/data/forget-entry.graph.json',
     routing({
       description: 'remove the entry, and say what still references it where something does',
-      in: '@features/monitor/edge/IdRequest.shape.json',
-      out: '@features/monitor/domain/Gone.shape.json',
+      in: '@features/customers/edge/IdRequest.shape.json',
+      out: '@features/customers/domain/Gone.shape.json',
       from: ['gone', 'held'],
       write: {
         id: 'saved',
@@ -221,10 +221,10 @@ export function treeServing(): string {
       rules: [{ when: 'has(referencedBy)', to: 'held' }],
       else: 'gone',
       answers: {
-        gone: { value: { removed: '{{saved.removed}}' }, type: '@features/monitor/domain/Gone.shape.json' },
+        gone: { value: { removed: '{{saved.removed}}' }, type: '@features/customers/domain/Gone.shape.json' },
         held: {
           value: { removed: '{{saved.removed}}', referencedBy: '{{saved.referencedBy}}' },
-          type: '@features/monitor/domain/Gone.shape.json',
+          type: '@features/customers/domain/Gone.shape.json',
         },
       },
     }),

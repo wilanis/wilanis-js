@@ -15,9 +15,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BUILTIN_PLUGINS, Embedder } from '../src/index.js';
 import { EXAMPLE, INCLUDES, loadedWith, PLUGINS } from './example-harness.js';
 
-const KEPT_GET = '@features/monitor/data/kept-get.graph.json';
-const WRITE_CSV = '@features/monitor/data/write-csv.graph.json';
-const KEPT_LIST = '@features/monitor/data/kept-list.graph.json';
+const KEPT_GET = '@features/customers/data/kept-get.graph.json';
+const WRITE_CSV = '@features/customers/data/write-csv.graph.json';
+const KEPT_LIST = '@features/customers/data/kept-list.graph.json';
 const GREET = '@features/hello/domain/greet.graph.json';
 
 let scope: Scope;
@@ -145,11 +145,11 @@ describe('lowering a guard', () => {
 const METHOD_RULE = 'len(method) > 0';
 const CALL_RULE = "len(url) > 0 && (method != 'DELETE' || has(agent))";
 const two = loadedWith({
-  'features/monitor/domain/an-entry-has-a-method.invariant.json': {
+  'features/customers/domain/an-entry-has-a-method.invariant.json': {
     $schema: schemaUrl('invariant'),
     label: 'An entry has a method',
     description: 'A second rule over the same shape, unproved at the same sites, so one guard stands for both.',
-    holds: { on: '@monitor/domain/Entry.shape.json', when: METHOD_RULE },
+    holds: { on: '@customers/domain/Customer.shape.json', when: METHOD_RULE },
   },
 });
 afterAll(() => rmSync(two.dir, { recursive: true, force: true }));

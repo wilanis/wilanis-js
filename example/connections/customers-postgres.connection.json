@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/connection.schema.json",
+  "label": "Customers in PostgreSQL",
+  "description": "Where the customers are kept under the production profile: a database that outlives the process. The URL carries the credentials, so it is a secret; the schema and the pool are facts about this one database, so they sit here rather than in the plugin's settings.",
+  "kind": "@storage-postgres/postgres.connection-kind.json",
+  "settings": {
+    "url": "{{secrets.customersDatabase}}"
+  }
+}

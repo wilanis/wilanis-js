@@ -7,7 +7,7 @@
     "@features/access/domain/identity.port.json",
     "@features/access/edge/signed-in.policy.json",
     "@features/access/edge/employees-only.policy.json",
-    "@features/access/edge/can-record.policy.json",
+    "@features/access/edge/can-register.policy.json",
     "@features/access/edge/otp-verified.policy.json"
   ],
   "effects": [

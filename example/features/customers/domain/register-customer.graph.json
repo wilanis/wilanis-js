@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "Register a customer",
+  "description": "Domain graph behind POST /customers: every customer registered through this API is attributed to this registrar; the domain decides that, not the client.",
+  "constants": {
+    "registrar": {
+      "type": "string",
+      "value": "wilanis-example/0.1.0",
+      "description": "the registrar every customer registered here carries"
+    }
+  },
+  "in": "@customers/domain/CustomerDraft.shape.json",
+  "out": {
+    "type": "@customers/domain/Customer.shape.json",
+    "from": "registered"
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "registered",
+      "label": "Store them",
+      "run": "@customers/domain/customer.port.json#register",
+      "in": {
+        "name": "{{in.name}}",
+        "email": "{{in.email}}",
+        "tier": "{{in.tier}}",
+        "registrar": "{{const.registrar}}"
+      }
+    }
+  ]
+}
