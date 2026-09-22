@@ -2,7 +2,7 @@
  * `wilanis new graph --store`: the read-decide-write shape, scaffolded. The claim is not that the JSON looks a
  * certain way but that it is the shape whole -- the ids and the routing in place -- and that filling in the
  * TODOs a tool cannot decide is the only work left: the scaffold, written into a copy of the example over its
- * entries store and given the shapes it answers, checks clean.
+ * customers store and given the shapes it answers, checks clean.
  */
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,14 +13,14 @@ import { describe, expect, it } from 'vitest';
 import { scaffold } from '../src/index.js';
 import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
-const STORE = { store: '@monitor/data/entries.store.json', collection: 'entries' };
-const ENTRY = '@monitor/domain/Entry.shape.json';
+const STORE = { store: '@customers/data/customers.store.json', collection: 'customers' };
+const CUSTOMER = '@customers/domain/Customer.shape.json';
 
 /** A copy of the example with one scaffolded graph in it, and the graph itself, read back. */
 function scaffolded(name: string, opts: Record<string, string>) {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-rdw-'));
   cpSync(EXAMPLE, dir, { recursive: true });
-  const [file] = scaffold(dir, 'graph', `features/monitor/${name}`, { ...STORE, ...opts });
+  const [file] = scaffold(dir, 'graph', `features/customers/${name}`, { ...STORE, ...opts });
   const doc = JSON.parse(readFileSync(join(dir, file), 'utf8')) as Record<string, unknown>;
   return { dir, file, doc };
 }
@@ -29,8 +29,8 @@ function scaffolded(name: string, opts: Record<string, string>) {
 function fill(dir: string, file: string, changes: Record<string, string>): string[] {
   const at = join(dir, file);
   const filled = readFileSync(at, 'utf8')
-    .replaceAll('"in": "TODO"', '"in": "@monitor/domain/EntryRef.shape.json"')
-    .replaceAll('"type": "TODO"', `"type": "${ENTRY}"`);
+    .replaceAll('"in": "TODO"', '"in": "@customers/domain/CustomerRef.shape.json"')
+    .replaceAll('"type": "TODO"', `"type": "${CUSTOMER}"`);
   writeFileSync(
     at,
     Object.entries(changes).reduce((text, [was, now]) => text.replaceAll(was, now), filled),
@@ -46,7 +46,7 @@ const shapeOf = (doc: Record<string, unknown>) =>
 
 describe('wilanis new graph --store: read, decide, write', () => {
   it('writes the shape whole: the read, the decision, and a write with its own routing per branch', () => {
-    const { dir, doc } = scaffolded('note-entry', {
+    const { dir, doc } = scaffolded('note-customer', {
       'read-then': 'patch',
       branch: 'noted:has(record) && !has(record.note)\nrenoted:has(record)',
     });
@@ -89,7 +89,7 @@ describe('wilanis new graph --store: read, decide, write', () => {
   });
 
   it('checks clean against the example once the TODOs are filled', () => {
-    const { dir, file } = scaffolded('note-entry', {
+    const { dir, file } = scaffolded('note-customer', {
       'read-then': 'patch',
       branch: 'noted:has(record) && !has(record.note)\nrenoted:has(record)',
     });
@@ -114,7 +114,7 @@ describe('wilanis new graph --store: read, decide, write', () => {
 
   it('is a data graph whatever --layer says, since it reaches a store', () => {
     const { dir, file } = scaffolded('elsewhere', { 'read-then': 'patch', layer: 'domain' });
-    expect(file).toBe('features/monitor/data/elsewhere.graph.json');
+    expect(file).toBe('features/customers/data/elsewhere.graph.json');
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -129,7 +129,7 @@ describe('wilanis new graph --store: read, decide, write', () => {
       'changedMissing run',
       'missing run',
     ]);
-    expect(() => scaffold(dir, 'graph', 'features/monitor/bad', { ...STORE, branch: 'noWhen' })).toThrow(
+    expect(() => scaffold(dir, 'graph', 'features/customers/bad', { ...STORE, branch: 'noWhen' })).toThrow(
       "--branch 'noWhen' is not <id>:<when>",
     );
     rmSync(dir, { recursive: true, force: true });
@@ -138,8 +138,8 @@ describe('wilanis new graph --store: read, decide, write', () => {
   it('leaves a graph named with no store what it was: one node to replace', () => {
     const dir = mkdtempSync(join(tmpdir(), 'wilanis-rdw-'));
     cpSync(EXAMPLE, dir, { recursive: true });
-    const [file] = scaffold(dir, 'graph', 'features/monitor/greet', {});
-    expect(file).toBe('features/monitor/domain/greet.graph.json');
+    const [file] = scaffold(dir, 'graph', 'features/customers/greet', {});
+    expect(file).toBe('features/customers/domain/greet.graph.json');
     const doc = JSON.parse(readFileSync(join(dir, file), 'utf8')) as Record<string, unknown>;
     expect(shapeOf(doc)).toEqual(['first run']);
     rmSync(dir, { recursive: true, force: true });
