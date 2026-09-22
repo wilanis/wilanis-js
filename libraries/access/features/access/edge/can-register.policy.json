@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/policy.schema.json",
-  "label": "Can record",
+  "label": "Can register",
   "description": "A caller holding the registrar role: the directory's group, written into the token at sign-in.",
   "decide": {
     "run": "@access/domain/access.port.json#requireRegistrar",
