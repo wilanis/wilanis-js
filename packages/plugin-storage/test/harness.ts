@@ -1,5 +1,5 @@
 /**
- * A tree small enough to break one way at a time: a feature that keeps entries behind a connection, and a
+ * A tree small enough to break one way at a time: a feature that keeps customers behind a connection, and a
  * data graph that reads them. Every case copies it, edits one document, and answers the refusal codes.
  *
  * The engine here grants a storage connection kind and nothing else -- `@storage` judges a store against the
@@ -74,12 +74,12 @@ export const PLUGINS: Record<string, PluginModule> = {
 /** One document of the tree, by the path it sits at. */
 export type Docs = Record<string, unknown>;
 
-/** The tree as it stands when nothing is broken: it keeps entries, and one graph reads one. */
+/** The tree as it stands when nothing is broken: it keeps customers, and one graph reads one. */
 export function tree(): Docs {
   return {
     'project.json': {
       $schema: schemaRef('project'),
-      description: 'a tree that keeps what it observes',
+      description: 'a tree that keeps who it serves',
       name: 'kept',
       plugins: [{ use: '@std' }, { use: '@storage' }, { use: ENGINE }, { use: '@fake-upstream' }],
     },
@@ -91,43 +91,43 @@ export function tree(): Docs {
     },
     'features/customers/feature.json': {
       $schema: schemaRef('feature'),
-      description: 'what the monitor observes',
+      description: 'who the registry keeps',
       effects: ['@storage/store.port.json#find'],
     },
     'features/customers/domain/Customer.shape.json': {
       $schema: schemaRef('shape'),
-      description: 'one observed call',
+      description: 'one customer',
       layer: 'core',
       fields: {
         id: { type: 'string' },
-        url: { type: 'string' },
-        hits: { type: 'number' },
-        ok: { type: 'boolean' },
+        email: { type: 'string' },
+        orders: { type: 'number' },
+        active: { type: 'boolean' },
         tags: { type: 'string[]' },
-        ua: { type: 'string', required: false },
+        note: { type: 'string', required: false },
       },
     },
     'features/customers/domain/Ref.shape.json': {
       $schema: schemaRef('shape'),
-      description: 'which entries are wanted: one id, the urls to match, and whether the tags matter',
+      description: 'which customers are wanted: one id, the addresses to match, and whether the tags matter',
       layer: 'core',
-      fields: { id: { type: 'string' }, urls: { type: 'string[]' }, tagged: { type: 'boolean' } },
+      fields: { id: { type: 'string' }, emails: { type: 'string[]' }, tagged: { type: 'boolean' } },
     },
     'features/customers/edge/CustomerRow.shape.json': {
       $schema: schemaRef('shape'),
-      description: 'an entry as the world sends it',
+      description: 'a customer as the world sends it',
       layer: 'edge',
-      fields: { id: { type: 'string' }, url: { type: 'string' } },
+      fields: { id: { type: 'string' }, email: { type: 'string' } },
     },
     'features/customers/data/customers.store.json': {
       $schema: schemaRef('store'),
-      description: 'the entries kept so far',
+      description: 'the customers kept so far',
       connection: CONNECTION,
-      collections: { entries: { of: SHAPE, key: 'id' } },
+      collections: { customers: { of: SHAPE, key: 'id' } },
     },
-    'features/customers/data/read-entry.graph.json': {
+    'features/customers/data/read-customer.graph.json': {
       $schema: schemaRef('graph'),
-      description: 'one entry by its id',
+      description: 'one customer by its id',
       in: '@features/customers/domain/Ref.shape.json',
       out: { type: `${SHAPE}[]`, from: ['asked'] },
       nodes: [
@@ -137,8 +137,8 @@ export function tree(): Docs {
           run: '@storage/store.port.json#find',
           in: {
             store: STORE,
-            collection: 'entries',
-            where: { id: '{{in.id}}', url: { in: '{{in.urls}}' }, tags: { has: '{{in.tagged}}' } },
+            collection: 'customers',
+            where: { id: '{{in.id}}', email: { in: '{{in.emails}}' }, tags: { has: '{{in.tagged}}' } },
           },
         },
       ],

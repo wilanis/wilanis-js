@@ -48,19 +48,19 @@ const PLUGINS = {
   '@otel': otel,
 };
 
-/** The view of the scoped entries, across every tenant, behind the policy the access tree declares. */
+/** The view of the scoped customers, across every tenant, behind the policy the access tree declares. */
 const VIEW = {
-  view: 'entries',
+  view: 'customers',
   behind: '@access/edge/employees-only.policy.json',
   description: 'the same rows, every tenant’s: the digest, for employees',
 };
 /** A copy whose digest reads that view, since a view is reached only where a graph names it. */
 const VIEWED: Edits = {
   'features/customers/data/customers.store.json': (store: any) => {
-    store.collections.everyEntry = { ...VIEW };
+    store.collections.everyCustomer = { ...VIEW };
   },
   'features/customers/data/kept-list.graph.json': (graph: any) => {
-    graph.nodes[0].in.collection = 'everyEntry';
+    graph.nodes[0].in.collection = 'everyCustomer';
   },
 };
 /** The sign-in writing the attribute the scope reads, so the store can name where the value was decided. */
@@ -79,7 +79,7 @@ describe('wilanis describe and map: the scope a store keeps its rows under', () 
     expect(lines).toContain(
       '    tenant ← @customers/edge/request.resolvers.json#tenant  (request.session.attributes.tenant, required)',
     );
-    expect(lines.indexOf('reads:')).toBeLessThan(lines.findIndex(line => line.startsWith('  collection entries')));
+    expect(lines.indexOf('reads:')).toBeLessThan(lines.findIndex(line => line.startsWith('  collection customers')));
   });
 
   it('names the column, the read that fills it, and how many triggers guarantee that read', () => {
@@ -103,26 +103,26 @@ describe('wilanis describe and map: the scope a store keeps its rows under', () 
 
   it("says a scoped collection's unique constraints hold within the scope", () => {
     // two tenants may record the same call: the engine puts the scope columns into every constraint
-    expect(storeSaid()).toContain('    unique      [url, method]  (within the scope)');
+    expect(storeSaid()).toContain('    unique      [email]  (within the scope)');
   });
 
   it('leaves an unscoped store reading exactly as it did before scoping existed', () => {
     const said = describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@customers/data/customers.store.json');
-    expect(said).toContain('    unique      [url, method]\n');
+    expect(said).toContain('    unique      [email]\n');
     expect(said).not.toContain('scoped by');
     expect(said).not.toContain('reads:');
   });
 
   it('says of a view whose rows it sees and the policy every trigger reaching it attaches, on one line', () => {
     expect(storeSaid(VIEWED)).toContain(
-      '  collection everyEntry: view of entries, behind @access/edge/employees-only.policy.json',
+      '  collection everyCustomer: view of customers, behind @access/edge/employees-only.policy.json',
     );
   });
 
   it('tells a reader of the resolvers document that a store binds the read, and what it scopes', () => {
     const said = scopedTree(load => describeDoc(load, '@customers/edge/request.resolvers.json'));
     expect(said).toContain(
-      '        used by @features/customers/data/customers.store.json as {{tenant}}  (scopes entries)',
+      '        used by @features/customers/data/customers.store.json as {{tenant}}  (scopes customers)',
     );
   });
 
@@ -151,19 +151,19 @@ describe('wilanis describe and map: the scope a store keeps its rows under', () 
         doc.policies = ['@access/edge/employees-only.policy.json'];
       },
     });
-    expect(said).toContain('reaches everyEntry (a view) behind @access/edge/employees-only.policy.json: attached');
+    expect(said).toContain('reaches everyCustomer (a view) behind @access/edge/employees-only.policy.json: attached');
   });
 
   it('says so where a trigger reaches a view and attaches no such policy, naming the rule that refuses it', () => {
     const said = scopedTree(load => describeDoc(load, '@customers/edge/digest.trigger.json'), VIEWED);
     expect(said).toContain(
-      'reaches everyEntry (a view) behind @access/edge/employees-only.policy.json: not attached -- wilanis check refuses this (A008)',
+      'reaches everyCustomer (a view) behind @access/edge/employees-only.policy.json: not attached -- wilanis check refuses this (A008)',
     );
   });
 
   it('marks a scoped storage line of the map, so a reader sees whose rows a run ends at', () => {
     const lines = scopedTree(load => map(load));
-    expect(lines.some(line => line.includes('entries (get), scoped by tenant'))).toBe(true);
+    expect(lines.some(line => line.includes('customers (get), scoped by tenant'))).toBe(true);
   });
 
   it('marks no map line over an unscoped collection', () => {
