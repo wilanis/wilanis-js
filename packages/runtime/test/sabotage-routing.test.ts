@@ -8,10 +8,10 @@
 import { describe, expect, it } from 'vitest';
 import { sabotage, sabotageHinting, sabotagePointing, sabotageSaying } from './example-harness.js';
 
-const GRAPH = 'features/monitor/data/kept-update.graph.json';
+const GRAPH = 'features/customers/data/kept-update.graph.json';
 const STORE = '@storage/store.port.json';
-const ENTRIES = '@monitor/data/entries.store.json';
-const ENTRY = '@monitor/domain/Entry.shape.json';
+const CUSTOMERS = '@customers/data/customers.store.json';
+const CUSTOMER = '@customers/domain/Customer.shape.json';
 
 const run = (id: string, op: string, input: Record<string, unknown>) => ({
   type: '@wilanis/node/run.schema.json',
@@ -31,57 +31,52 @@ const decide = (
   rules,
   else: otherwise,
 });
-const get = run('get', `${STORE}#get`, { store: ENTRIES, collection: 'entries', key: '{{in.id}}' });
-/** One write of the toggle: the caller's fields, and the agent standing in for the flag the example has not. */
-const patch = (id: string, agent: string) =>
+const get = run('get', `${STORE}#get`, { store: CUSTOMERS, collection: 'customers', key: '{{in.id}}' });
+/** One write of the toggle: the caller's fields, and the flag this write sets. */
+const patch = (id: string, active: boolean) =>
   run(id, `${STORE}#patch`, {
-    store: ENTRIES,
-    collection: 'entries',
+    store: CUSTOMERS,
+    collection: 'customers',
     key: '{{in.id}}',
-    changes: { url: '{{in.url}}', method: '{{in.method}}', agent },
+    changes: { name: '{{in.name}}', email: '{{in.email}}', tier: '{{in.tier}}', active },
   });
-const make = (id: string, value: string) => run(id, '@std/object.port.json#make', { value, type: ENTRY });
+const make = (id: string, value: string) => run(id, '@std/object.port.json#make', { value, type: CUSTOMER });
 const refuse = (id: string) =>
-  run(id, '@std/outcome.port.json#refuse', { reason: 'missing', message: `no entry {{in.id}}`, type: ENTRY });
+  run(id, '@std/outcome.port.json#refuse', { reason: 'missing', message: `no customer {{in.id}}`, type: CUSTOMER });
 /** Is the write's record there? The check each branch makes of its own patch. */
 const checkOf = (id: string, write: string, row: string, gone: string) =>
   decide(id, { record: `{{${write}.record}}` }, [{ when: 'has(record)', to: row }], gone);
 
 /** What both spellings of the toggle share: read, decide on presence, decide on the flag, check each write. */
-const shared = (pinned: string, unpinned: string) => ({
+const shared = (active: string, inactive: string) => ({
   before: [
     get,
     decide('check', { record: '{{get.record}}' }, [{ when: 'has(record)', to: 'decide' }], 'missing'),
-    decide(
-      'decide',
-      { agent: '{{get.record.agent}}' },
-      [{ when: "has(agent) && agent == 'pinned'", to: unpinned }],
-      pinned,
-    ),
+    decide('decide', { active: '{{get.record.active}}' }, [{ when: 'has(active) && active', to: inactive }], active),
   ],
   after: [
-    checkOf('checkPin', 'pin', 'rowPinned', 'missingAfterPin'),
-    checkOf('checkUnpin', 'unpin', 'rowUnpinned', 'missingAfterUnpin'),
-    make('rowPinned', '{{pin.record}}'),
-    make('rowUnpinned', '{{unpin.record}}'),
+    checkOf('checkActivate', 'activate', 'rowActive', 'missingAfterActivate'),
+    checkOf('checkDeactivate', 'deactivate', 'rowInactive', 'missingAfterDeactivate'),
+    make('rowActive', '{{activate.record}}'),
+    make('rowInactive', '{{deactivate.record}}'),
     refuse('missing'),
-    refuse('missingAfterPin'),
-    refuse('missingAfterUnpin'),
+    refuse('missingAfterActivate'),
+    refuse('missingAfterDeactivate'),
   ],
-  from: ['rowPinned', 'rowUnpinned', 'missing', 'missingAfterPin', 'missingAfterUnpin'],
+  from: ['rowActive', 'rowInactive', 'missing', 'missingAfterActivate', 'missingAfterDeactivate'],
 });
 
 /** The issue's toggle: the flag switch routes to each branch's check, and both writes sit beside it. */
 const toggle = (graph: any) => {
-  const { before, after, from } = shared('checkPin', 'checkUnpin');
-  graph.nodes = [...before, patch('pin', 'pinned'), patch('unpin', 'unpinned'), ...after];
+  const { before, after, from } = shared('checkActivate', 'checkDeactivate');
+  graph.nodes = [...before, patch('activate', true), patch('deactivate', false), ...after];
   graph.out.from = from;
 };
 
 /** The same toggle as the other agents wrote it: the flag switch routes to the write, and the check reads it. */
 const routedToggle = (graph: any) => {
-  const { before, after, from } = shared('pin', 'unpin');
-  graph.nodes = [...before, patch('pin', 'pinned'), patch('unpin', 'unpinned'), ...after];
+  const { before, after, from } = shared('activate', 'deactivate');
+  graph.nodes = [...before, patch('activate', true), patch('deactivate', false), ...after];
   graph.out.from = from;
 };
 
@@ -90,7 +85,7 @@ const checkedEverywhere = (graph: any) => {
   graph.nodes = [
     get,
     decide('check', { record: '{{get.record}}' }, [{ when: 'has(record)', to: 'wasThere' }], 'wasNot'),
-    patch('stamp', 'seen'),
+    patch('stamp', true),
     checkOf('wasThere', 'stamp', 'row', 'missingAfterStamp'),
     checkOf('wasNot', 'stamp', 'rowAnyway', 'missing'),
     make('row', '{{stamp.record}}'),
@@ -110,19 +105,25 @@ describe('sabotage: an effect no switch routes, read under one branch', () => {
   });
 
   it('G015 points at each write where it sits', () => {
-    expect(sabotagePointing(GRAPH, toggle)).toEqual([`G015 @${GRAPH}#nodes/pin`, `G015 @${GRAPH}#nodes/unpin`]);
+    expect(sabotagePointing(GRAPH, toggle)).toEqual([
+      `G015 @${GRAPH}#nodes/activate`,
+      `G015 @${GRAPH}#nodes/deactivate`,
+    ]);
   });
 
   it('G015 says the write runs on every branch and names where its answer enters one', () => {
-    // rowPinned reads pin too, but sits behind checkPin: the check is where the answer enters the branch
+    // rowActive reads activate too, but sits behind checkActivate: the check is where the answer enters the branch
     expect(sabotageSaying(GRAPH, toggle)).toEqual([
-      "G015 effect 'pin' runs on every branch, but its answer is read only under 'checkPin'",
-      "G015 effect 'unpin' runs on every branch, but its answer is read only under 'checkUnpin'",
+      "G015 effect 'activate' runs on every branch, but its answer is read only under 'checkActivate'",
+      "G015 effect 'deactivate' runs on every branch, but its answer is read only under 'checkDeactivate'",
     ]);
   });
 
   it('G015 hints the edit: make the write the to of the rule that leads to its reader', () => {
-    expect(sabotageHinting(GRAPH, toggle)).toEqual([HINT('pin', 'checkPin'), HINT('unpin', 'checkUnpin')]);
+    expect(sabotageHinting(GRAPH, toggle)).toEqual([
+      HINT('activate', 'checkActivate'),
+      HINT('deactivate', 'checkDeactivate'),
+    ]);
   });
 
   it('is silent once each write is the to of the rule whose branch reads it', () => {
@@ -138,6 +139,6 @@ describe('sabotage: an effect no switch routes, read under one branch', () => {
   });
 
   it('leaves an effect nothing reads to G008', () => {
-    expect(sabotage(GRAPH, graph => graph.nodes.push(patch('spare', 'spare')))).toEqual(['G008']);
+    expect(sabotage(GRAPH, graph => graph.nodes.push(patch('spare', true)))).toEqual(['G008']);
   });
 });
