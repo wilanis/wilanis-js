@@ -72,7 +72,7 @@ describe('a tree that asks to be scheduled', () => {
       expect(fired).toBe(true);
       const line = logs.find(one => one.includes('→ done')) as string;
       // a schedule is named by the canonical path of the trigger that declares it, through Serving.pathOf
-      expect(line).toMatch(/^schedule @features\/monitor\/edge\/digest\.trigger\.json /);
+      expect(line).toMatch(/^schedule @features\/customers\/edge\/digest\.trigger\.json /);
       expect(line).toMatch(/\dZ → done \(\d+ms\)/);
     } finally {
       await served.stop();
@@ -92,7 +92,7 @@ describe('a tree that asks to be scheduled', () => {
       const judged = await until(() => logs.some(line => line.includes('→ failed')));
       expect(judged).toBe(true);
       const line = logs.find(one => one.includes('→ failed')) as string;
-      expect(line).toMatch(/^schedule @features\/monitor\/edge\/digest\.trigger\.json /);
+      expect(line).toMatch(/^schedule @features\/customers\/edge\/digest\.trigger\.json /);
       expect(line).toMatch(/→ failed \(\d+ms\)$/);
       expect(logs.some(one => one.includes('→ done'))).toBe(false); // it never counted as done
     } finally {
