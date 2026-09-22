@@ -156,6 +156,20 @@ async function catalogOf(name: string): Promise<{ columns: Column[]; constraints
   };
 }
 
+/** Until this many sessions are waiting for a lock on the table: the moment a race has lined up behind one. */
+async function waitingOn(name: string, sessions: number): Promise<void> {
+  const { db } = poolFor(at(name), {});
+  for (let tries = 0; tries < 200; tries += 1) {
+    const waiting = (await sql<{ n: string }>`
+      select count(*) as n from pg_locks l join pg_class c on c.oid = l.relation
+      where c.relname = ${name} and not l.granted
+    `.execute(db)) as { rows: { n: string }[] };
+    if (Number(waiting.rows[0]?.n) >= sessions) return;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  throw new Error(`${sessions} session(s) never came to wait on ${name}`);
+}
+
 /** One column as `information_schema.columns` reports it, which is all these cases read back. */
 interface Column {
   column_name: string;
@@ -174,7 +188,8 @@ interface Column {
  */
 describe.skipIf(!url)('what a scope costs the table', () => {
   beforeEach(async () => {
-    for (const name of ['e_scope', 'e_scope_rows', 'e_scope_again', 'e_scope_num']) await drop(name);
+    for (const name of ['e_scope', 'e_scope_rows', 'e_scope_again', 'e_scope_num', 'e_scope_late', 'e_scope_race'])
+      await drop(name);
   });
 
   it('adds the column NOT NULL, the composite unique and the index over the scope and the key', async () => {
@@ -218,5 +233,41 @@ describe.skipIf(!url)('what a scope costs the table', () => {
     expect(await engine.ensure([collection])).toEqual({ collections: 0, columns: 0, constraints: 0 });
     // the unique is still the scoped one: a second ensure must not put the unscoped spelling back beside it
     expect((await catalogOf('e_scope_again')).constraints).toEqual(['wl_us_e_scope_again_tenant_url']);
+  });
+
+  it('a unique declared after the table is scoped holds within one tenant, and not across them', async () => {
+    const before = at('e_scope_late');
+    await engine.ensure([before]);
+    await engine.put(before, one('1'), { replace: true, scope: { tenant: 'acme' } });
+
+    const after = at('e_scope_late', { unique: [['url']] });
+    expect((await engine.ensure([after])).constraints).toBe(1);
+    expect((await catalogOf('e_scope_late')).constraints).toEqual(['wl_us_e_scope_late_tenant_url']);
+
+    const same = { url: 'https://same', hits: 1, tags: [] };
+    const acme = await engine.put(after, { id: '2', ...same }, { replace: true, scope: { tenant: 'acme' } });
+    const beta = await engine.put(after, { id: '3', ...same }, { replace: true, scope: { tenant: 'beta' } });
+    expect([acme.violated, beta.violated]).toEqual([undefined, undefined]);
+    const again = await engine.put(after, { id: '4', ...same }, { replace: true, scope: { tenant: 'acme' } });
+    expect(again.violated).toBeDefined();
+  });
+
+  it('first scoped writes racing each other all land, and the column is added once', async () => {
+    const collection = at('e_scope_race', { unique: [['url']] });
+    await engine.ensure([collection]);
+    // a share lock held elsewhere lets every writer read the catalog, and none alter the table, until it goes
+    const { db } = poolFor(collection, {});
+    const holder = await db.startTransaction().execute();
+    await sql`lock table public.e_scope_race in share mode`.execute(holder);
+    const racing = ['1', '2', '3', '4'].map(id =>
+      engine.put(collection, one(id), { replace: true, scope: { tenant: `t${id}` } }),
+    );
+    await waitingOn('e_scope_race', racing.length);
+    await holder.rollback().execute();
+
+    const written = await Promise.all(racing);
+    expect(written.every(answer => answer.violated === undefined)).toBe(true);
+    expect(await engine.count(collection, undefined, { tenant: 't1' })).toBe(1);
+    expect((await catalogOf('e_scope_race')).constraints).toEqual(['wl_us_e_scope_race_tenant_url']);
   });
 });
