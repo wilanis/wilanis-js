@@ -101,7 +101,7 @@ describe('the rehearsal reports a guard', () => {
     // every one of them walks both branches, a list's exactly as a single value's
     for (const line of guards) expect(line).toContain('2/2 branches');
     // while the summary counts every site the checker could not prove, over the tree rather than the profile
-    expect(stated(run.lines)).toContain('  A customer is reachable  proved at 0 site(s), guarded at 13');
+    expect(stated(run.lines)).toContain('  A customer is reachable  proved at 0 site(s), guarded at 14');
   });
 
   it("labels a list guard's branches holds and violated, as a guard of arity one's are", async () => {
@@ -123,17 +123,18 @@ describe('the rehearsal reports a guard', () => {
     expect(said).toContain('  Writes are for registrars  holds at 5 trigger(s)');
     expect(said).toContain("  The session is the caller's  holds at 3 trigger(s)");
     // and the field form counts its sites: every site of Customer in the example is one the checker could not prove
-    expect(said).toContain('  A customer is reachable  proved at 0 site(s), guarded at 13');
+    expect(said).toContain('  A customer is reachable  proved at 0 site(s), guarded at 14');
   });
 
   it('counts the same invariants under a profile that reaches almost none of the guarded sites', async () => {
     // an invariant is stated over the tree, not over a profile: the sites are the same however the tree is bound
     const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'live' });
     expect(run.ok).toBe(true);
-    expect(stated(run.lines)).toContain('  A customer is reachable  proved at 0 site(s), guarded at 13');
-    // while the walk reaches only the one guard this profile binds -- the CSV export, whose graph every profile
-    // shares -- which is the difference between what a tree states and what one profile's run can exercise
-    expect(run.lines.filter(line => line.includes(" guard '"))).toHaveLength(1);
+    expect(stated(run.lines)).toContain('  A customer is reachable  proved at 0 site(s), guarded at 14');
+    // while the walk reaches only the two guards this profile binds -- the CSV export, whose graph every profile
+    // shares, and the tier listing's empty answer -- which is the difference between what a tree states and what
+    // one profile's run can exercise
+    expect(run.lines.filter(line => line.includes(" guard '"))).toHaveLength(2);
   });
 
   /**
@@ -199,7 +200,7 @@ describe('the rehearsal reports a guard', () => {
       const said = stated((await rehearse(load, { seed: 1, profile: 'local' })).lines);
       const line = said.find(one => one.includes('A customer is reachable'));
       // one more site than the example has, and it is the proved one: the other thirteen still carry a guard
-      expect(line).toBe('  A customer is reachable  proved at 1 site(s), guarded at 13');
+      expect(line).toBe('  A customer is reachable  proved at 1 site(s), guarded at 14');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

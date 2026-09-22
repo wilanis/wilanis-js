@@ -1,12 +1,13 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "List rows by method",
-  "description": "Data graph behind customer.listByTier: one GET with the API's own filter, the rows when it answered 200, a failure otherwise.",
+  "description": "Data graph behind customer.listByTier: one GET narrowed by the tier, the rows when it answered 200. This API answers 404 to a filter that matches nothing rather than an empty list, so that is read as 'none of them', not as a fault: a tier no customer holds is an empty listing, and only an unexpected status refuses.",
   "in": "@customers/domain/Tier.shape.json",
   "out": {
     "type": "@customers/domain/Customer.shape.json[]",
     "from": [
       "rows",
+      "none",
       "failed"
     ]
   },
@@ -36,6 +37,10 @@
         {
           "when": "status == 200 && has(body)",
           "to": "rows"
+        },
+        {
+          "when": "status == 404",
+          "to": "none"
         }
       ],
       "else": "failed"
@@ -52,6 +57,19 @@
     },
     {
       "type": "@wilanis/node/run.schema.json",
+      "id": "none",
+      "label": "No customer holds that tier",
+      "description": "This API says 404 where it means an empty collection; the domain says an empty listing.",
+      "run": "@std/list.port.json#slice",
+      "in": {
+        "list": "{{const.nothing}}",
+        "from": 0,
+        "to": 0,
+        "type": "@customers/domain/Customer.shape.json[]"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
       "id": "failed",
       "label": "Unexpected answer",
       "run": "@std/outcome.port.json#refuse",
@@ -61,5 +79,12 @@
         "type": "@customers/domain/Customer.shape.json[]"
       }
     }
-  ]
+  ],
+  "constants": {
+    "nothing": {
+      "type": "@customers/domain/Customer.shape.json[]",
+      "value": [],
+      "description": "the empty listing a tier nobody holds answers"
+    }
+  }
 }
