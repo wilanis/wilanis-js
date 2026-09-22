@@ -27,22 +27,22 @@ const spansOf = (trace: Trace): Trace[] => [trace, ...trace.children.flatMap(spa
 /** The one span with exactly this name. */
 const named = (trace: Trace, name: string): Trace | undefined => spansOf(trace).find(one => one.name === name);
 
-/** get-row's run, whose `asked` is whatever a case says it was: a GET that answered 200 on its last try. */
-function getRow(asked: Partial<NodeReport> = {}, status: Report['status'] = 'done'): Report {
+/** get-row's run, whose `fetched` is whatever a case says it was: a GET that answered 200 on its last try. */
+function getRow(fetched: Partial<NodeReport> = {}, status: Report['status'] = 'done'): Report {
   return {
     graph: GET_ROW,
     status,
     startedAt: 100,
     endedAt: 190,
     nodes: {
-      asked: {
+      fetched: {
         status: 'done',
         handler: HTTP,
         in: { connection: '@connections/customers-api.connection.json', method: 'GET' },
         out: { status: 200 },
         startedAt: 100,
         endedAt: 180,
-        ...asked,
+        ...fetched,
       },
     },
   };
@@ -70,7 +70,7 @@ const step = (answer: Report): Started => ({
   endedAt: answer.endedAt,
 });
 
-/** Two tries of `asked` that did not stand before the third that did, each with its own stamps. */
+/** Two tries of `fetched` that did not stand before the third that did, each with its own stamps. */
 const TWO_FAILED = [
   { startedAt: 100, endedAt: 110, error: 'fetch failed' },
   { startedAt: 130, endedAt: 150, error: 'timed out after 20ms' },
@@ -79,36 +79,36 @@ const TWO_FAILED = [
 describe('a node that was tried again', () => {
   it('carries each try that did not stand as a child span, in order, with its own stamps', () => {
     const trace = traceOf(step(bound(getRow({ attempts: TWO_FAILED }))), scope, { level: 'full' });
-    const asked = named(trace, `asked ${HTTP}`);
+    const fetched = named(trace, `fetched ${HTTP}`);
 
-    expect(asked?.children.map(one => [one.name, one.status, one.startedAt, one.endedAt])).toEqual([
-      ['asked try 1', 'failed', 100, 110],
-      ['asked try 2', 'failed', 130, 150],
+    expect(fetched?.children.map(one => [one.name, one.status, one.startedAt, one.endedAt])).toEqual([
+      ['fetched try 1', 'failed', 100, 110],
+      ['fetched try 2', 'failed', 130, 150],
     ]);
     // the node's own span is the node, spanning every try, and ends as the try that stood did
-    expect([asked?.status, asked?.startedAt, asked?.endedAt]).toEqual(['ok', 100, 180]);
-    expect(asked?.attributes['wilanis.attempts']).toBe(2);
-    expect(asked?.attributes['http.response.status_code']).toBe(200);
+    expect([fetched?.status, fetched?.startedAt, fetched?.endedAt]).toEqual(['ok', 100, 180]);
+    expect(fetched?.attributes['wilanis.attempts']).toBe(2);
+    expect(fetched?.attributes['http.response.status_code']).toBe(200);
   });
 
   it('gives a try the address its node has, so a try and a refusal join on the same pair', () => {
     const trace = traceOf(step(bound(getRow({ attempts: TWO_FAILED }))), scope);
-    const first = named(trace, 'asked try 1');
+    const first = named(trace, 'fetched try 1');
 
-    expect(first?.attributes['wilanis.node']).toBe('asked');
-    expect(first?.attributes['wilanis.at']).toBe('nodes/asked');
+    expect(first?.attributes['wilanis.node']).toBe('fetched');
+    expect(first?.attributes['wilanis.at']).toBe('nodes/fetched');
   });
 
   it("carries a try's error at full only, since it is a message like a node's", () => {
     const full = traceOf(step(bound(getRow({ attempts: TWO_FAILED }))), scope, { level: 'full' });
     const summary = traceOf(step(bound(getRow({ attempts: TWO_FAILED }))), scope);
 
-    expect(named(full, 'asked try 2')?.attributes['wilanis.error']).toBe('timed out after 20ms');
-    expect(named(summary, 'asked try 2')?.attributes['wilanis.error']).toBeUndefined();
+    expect(named(full, 'fetched try 2')?.attributes['wilanis.error']).toBe('timed out after 20ms');
+    expect(named(summary, 'fetched try 2')?.attributes['wilanis.error']).toBeUndefined();
     // and narrowing a full trace drops it the same way, so an exporter holding one never sends it
-    expect(named(atLevel(full, 'summary'), 'asked try 2')?.attributes['wilanis.error']).toBeUndefined();
+    expect(named(atLevel(full, 'summary'), 'fetched try 2')?.attributes['wilanis.error']).toBeUndefined();
     // how many tries it took is not a value: summary says it
-    expect(named(summary, `asked ${HTTP}`)?.attributes['wilanis.attempts']).toBe(2);
+    expect(named(summary, `fetched ${HTTP}`)?.attributes['wilanis.attempts']).toBe(2);
   });
 
   it('says the tries of a map per element, on the element that took them', () => {
@@ -157,7 +157,7 @@ describe('a binding operation that retried its graph', () => {
     expect(first?.attributes['wilanis.at']).toBe('operations/get');
     // the try that broke says what broke in it, the way any nested run does
     expect(first?.children.map(one => one.name)).toEqual([GET_ROW]);
-    expect(first?.children[0].children.map(one => [one.name, one.status])).toEqual([[`asked ${HTTP}`, 'failed']]);
+    expect(first?.children[0].children.map(one => [one.name, one.status])).toEqual([[`fetched ${HTTP}`, 'failed']]);
   });
 
   it('says how often on the policy span too, where the operation a policy fires retried its graph', () => {
@@ -196,7 +196,7 @@ describe('a node that ran once', () => {
   it('prints its tries as lines of their own, indented under the node', () => {
     const text = traceText(traceOf(step(bound(getRow({ attempts: TWO_FAILED }))), scope));
 
-    expect(text).toMatch(/\n {6}asked @http\/http\.port\.json#request .*attempts=2/);
-    expect(text).toMatch(/\n {8}asked try 1 +10ms {2}failed/);
+    expect(text).toMatch(/\n {6}fetched @http\/http\.port\.json#request .*attempts=2/);
+    expect(text).toMatch(/\n {8}fetched try 1 +10ms {2}failed/);
   });
 });
