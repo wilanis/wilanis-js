@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "Backfill the customers",
+  "description": "Domain graph behind customer.backfill: read every record as it stands and make each one whole, the connection pacing the writes. A record that already says who it is is answered untouched, so running this twice writes nothing the second time. It exists because one profile talks to a public API seeded with rows that predate what a customer means here.",
+  "out": {
+    "type": "@customers/domain/Repaired.shape.json[]",
+    "from": "repaired"
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "rows",
+      "label": "Read them as they stand",
+      "run": "@customers/domain/customer.port.json#listRaw"
+    },
+    {
+      "type": "@wilanis/node/map.schema.json",
+      "id": "repaired",
+      "label": "Make each one whole",
+      "description": "customer.repair once per row; the element is the row itself, and the connection paces the writes",
+      "run": "@customers/domain/customer.port.json#repair",
+      "over": "{{rows}}",
+      "bind": {
+        "id": "id",
+        "name": "name",
+        "email": "email",
+        "tier": "tier"
+      }
+    }
+  ]
+}

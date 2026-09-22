@@ -1,0 +1,128 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "Repair one row",
+  "description": "One row of the customer API made whole: a row the API was seeded with carries a name and nothing else this tree promises, so an address is derived from its id and a tier is given. A row that already carries both is answered as it stands and nothing is written.",
+  "in": "@customers/domain/RawCustomer.shape.json",
+  "out": {
+    "type": "@customers/domain/Repaired.shape.json",
+    "from": [
+      "whole",
+      "written",
+      "failed"
+    ]
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/switch.schema.json",
+      "id": "route",
+      "label": "Does it already say who it is?",
+      "in": {
+        "email": "{{in.email}}",
+        "tier": "{{in.tier}}"
+      },
+      "rules": [
+        {
+          "when": "has(email) && has(tier)",
+          "to": "whole"
+        }
+      ],
+      "else": "address"
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "whole",
+      "label": "Already whole",
+      "run": "@std/object.port.json#make",
+      "in": {
+        "value": {
+          "id": "{{in.id}}",
+          "name": "{{in.name}}",
+          "written": false
+        },
+        "type": "@customers/domain/Repaired.shape.json"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "address",
+      "label": "An address derived from the id",
+      "run": "@std/text.port.json#fill",
+      "in": {
+        "values": {
+          "id": "{{in.id}}"
+        },
+        "template": "customer-{id}@example.invalid"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "filled",
+      "label": "The row with an address and a tier",
+      "run": "@std/object.port.json#merge",
+      "in": {
+        "base": "{{in}}",
+        "over": {
+          "email": "{{address}}",
+          "tier": "bronze"
+        },
+        "type": "@customers/edge/RawRow.shape.json"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "asked",
+      "label": "PUT it back",
+      "run": "@http/http.port.json#request",
+      "in": {
+        "connection": "@connections/customers-api.connection.json",
+        "method": "PUT",
+        "path": "/customer/{{in.id}}",
+        "body": "{{filled}}",
+        "consumes": "application/json",
+        "produces": "application/json",
+        "returns": "@customers/edge/RawRow.shape.json"
+      }
+    },
+    {
+      "type": "@wilanis/node/switch.schema.json",
+      "id": "wrote",
+      "label": "Did the API take it?",
+      "in": {
+        "status": "{{asked.status}}",
+        "body": "{{asked.body}}"
+      },
+      "rules": [
+        {
+          "when": "status == 200 && has(body)",
+          "to": "written"
+        }
+      ],
+      "else": "failed"
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "written",
+      "label": "Made whole by this run",
+      "run": "@std/object.port.json#make",
+      "in": {
+        "value": {
+          "id": "{{in.id}}",
+          "name": "{{in.name}}",
+          "written": true
+        },
+        "type": "@customers/domain/Repaired.shape.json"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "failed",
+      "label": "Unexpected answer",
+      "run": "@std/outcome.port.json#refuse",
+      "in": {
+        "reason": "upstream",
+        "message": "the customer API answered {{asked.status}} repairing {{in.id}}",
+        "type": "@customers/domain/Repaired.shape.json"
+      }
+    }
+  ]
+}

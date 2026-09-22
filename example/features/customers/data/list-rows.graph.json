@@ -18,7 +18,7 @@
       "in": {
         "connection": "@connections/customers-api.connection.json",
         "method": "GET",
-        "path": "/customers",
+        "path": "/customer",
         "produces": "application/json",
         "returns": "@customers/edge/CustomerRow.shape.json[]"
       }

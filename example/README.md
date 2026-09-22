@@ -319,14 +319,20 @@ whose kind declares `leases`, and one of them would take each tick.
 
 `project.json → startup` says what this tree starts, in order, and nothing else runs. `customer.port.json#prepare`
 makes storage ready once: over a store it creates the collections the store declares, over the REST API it
-reads the collection once. `customer.port.json#listAll` then reads the customers, so a tree whose storage is
-unreachable refuses to serve rather than answering every route with a fault. `@auth/state.port.json#getSession`
+reads the collection once. `customer.port.json#backfill` then makes whole every record that predates what a
+customer means here -- the REST API is a public one, seeded with rows that carry a name and nothing else this
+tree promises, so the step reads them through `RawCustomer`, gives each an address and a tier, and writes it
+back. A record that already says who it is is left alone, so a second start writes nothing; the connection's
+throttle paces the writes at three a second. Under a store there is nothing to repair and the step passes
+over an empty walk, which is what lets one step serve every profile. `customer.port.json#listAll` then reads
+the customers, so a tree whose storage is unreachable refuses to serve rather than answering every route with
+a fault. `@auth/state.port.json#getSession`
 does the same for the guard's memory. `@reload/watch.port.json#watch` serves the tree again whenever a
 document changes, without closing the port. `@schedule/scheduler.port.json#run` keeps the schedule above.
 `@otel/exporter.port.json#export` sends every run as spans to a collector on :4318; it is the one step marked
 `"required": false`, since no collector is running when you clone this, and what it cannot send is said once
 in the log rather than delaying the run. `@http/server.port.json#listen` opens :8099 -- **delete that step
-and nothing listens**, since no runtime opens a port merely because http triggers exist. The first two are
+and nothing listens**, since no runtime opens a port merely because http triggers exist. The first three are
 domain port operations, so whichever binding the profile chose is what gets checked; the last four are
 `holds` operations, which a plugin grants and the runtime stops when the process ends.
 `wilanis describe @http/server.port.json` says which plugin grants it.

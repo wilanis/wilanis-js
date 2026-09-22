@@ -1,0 +1,35 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "API row, as it stands",
+  "layer": "edge",
+  "description": "A record of the customer API before this tree has vouched for it: only the id and the name are promised, because a row the API was seeded with carries no address and no tier. It is what the backfill reads, and nothing else: every other site reads CustomerRow, which promises what a customer is.",
+  "fields": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string",
+      "required": false
+    },
+    "tier": {
+      "type": "string",
+      "required": false
+    },
+    "active": {
+      "type": "boolean",
+      "required": false
+    },
+    "note": {
+      "type": "string",
+      "required": false
+    },
+    "createdAt": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "open": true
+}

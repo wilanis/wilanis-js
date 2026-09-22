@@ -42,7 +42,7 @@ const paste = (name: string) => copyFileSync(join(DEMO, name), join(dir, ROUTE))
 describe('beat 1, the hook: the tree as it ships, and what the rule reaches', () => {
   it('checks ok at 185 documents, and describe computes the five routes the rule reaches', () => {
     expect(refusalsAt(dir)).toEqual([]);
-    expect(documents()).toBe(185);
+    expect(documents()).toBe(194);
     const said = describeDoc(load(), '@customers/domain/writes-are-for-registrars.invariant.json').split('\n');
     expect(said).toContain('access: every trigger reaching these domain operations is gated');
     expect(said).toContain(`requires: attaches ${POLICY}`);
@@ -123,7 +123,7 @@ describe('beat 3, following the hints', () => {
   it('the finished route yields ok, at 186 documents', () => {
     paste('archive-customer.step3.trigger.json');
     expect(refusalsAt(dir)).toEqual([]);
-    expect(documents()).toBe(186);
+    expect(documents()).toBe(195);
   });
 });
 

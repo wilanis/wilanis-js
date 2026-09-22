@@ -1,0 +1,57 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "Nothing to repair",
+  "description": "Data graph behind customer.repair where the customers are kept rather than fetched: a store holds what this tree wrote, and this tree writes whole customers, so the record is answered as it stands and nothing is written. The operation exists because one profile talks to storage it did not seed; a profile that did is still held to the same contract.",
+  "in": "@customers/domain/RawCustomer.shape.json",
+  "out": {
+    "type": "@customers/domain/Repaired.shape.json",
+    "from": [
+      "whole",
+      "incomplete"
+    ]
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/switch.schema.json",
+      "id": "route",
+      "label": "Does it already say who it is?",
+      "in": {
+        "email": "{{in.email}}",
+        "tier": "{{in.tier}}"
+      },
+      "rules": [
+        {
+          "when": "has(email) && has(tier)",
+          "to": "whole"
+        }
+      ],
+      "else": "incomplete"
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "whole",
+      "label": "Already whole, as every kept record is",
+      "run": "@std/object.port.json#make",
+      "in": {
+        "value": {
+          "id": "{{in.id}}",
+          "name": "{{in.name}}",
+          "written": false
+        },
+        "type": "@customers/domain/Repaired.shape.json"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "incomplete",
+      "label": "A kept record that says nothing",
+      "description": "A store holds what this tree wrote, and this tree writes whole customers, so a record missing an address or a tier is a fault of the store rather than a row to repair.",
+      "run": "@std/outcome.port.json#refuse",
+      "in": {
+        "reason": "upstream",
+        "message": "the store holds {{in.id}} with no address or no tier",
+        "type": "@customers/domain/Repaired.shape.json"
+      }
+    }
+  ]
+}

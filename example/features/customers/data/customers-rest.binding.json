@@ -62,9 +62,19 @@
       "in": {
         "connection": "@connections/customers-api.connection.json",
         "method": "GET",
-        "path": "/customers",
+        "path": "/customer",
         "produces": "application/json"
       }
+    },
+    "repair": {
+      "graph": "@customers/data/repair-row.graph.json"
+    },
+    "backfill": {
+      "description": "The business graph that reads every record as it stands and repairs each one.",
+      "graph": "@customers/domain/backfill-customers.graph.json"
+    },
+    "listRaw": {
+      "graph": "@customers/data/list-raw-rows.graph.json"
     }
   }
 }
