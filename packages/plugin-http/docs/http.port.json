@@ -5,6 +5,7 @@
   "operations": {
     "request": {
       "description": "Send one request against a connection, paced by the connection's throttle when it declares one. The connection, method, content types and result type are static, declared where the statement is written; path, headers and body may read what any value may.",
+      "idempotent": "method == 'GET' || method == 'HEAD' || method == 'PUT' || method == 'DELETE'",
       "accepts": {
         "connection": {
           "type": "string",
