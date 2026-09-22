@@ -8,11 +8,11 @@
  * graph its author wrote, so the walk has to know, at every step, which of those things it descended into.
  *
  * That is the whole of this module: resolving a node's handler to the spec behind it, and a dotted path to the
- * graph -- and the guarded site -- it belongs to. `rehearse.ts` beside it walks and runs; nothing here runs
- * anything or reads a report.
+ * graph -- and the guarded site -- it belongs to, and to the type its node declares it answers. `rehearse.ts`
+ * beside it walks and runs; nothing here runs anything or reads a report.
  */
 import { guardSpecAt } from '@wilanis/compiler';
-import type { BindingDoc, Loaded, TriggerDoc } from '@wilanis/core';
+import { type BindingDoc, hasVars, type Loaded, type Operation, type TriggerDoc, type Type } from '@wilanis/core';
 import type { Embedder } from './embed.js';
 
 /** A lowered spec as this walk reads one: its nodes by id, whatever each of them turns out to be. */
@@ -68,6 +68,56 @@ export function specBehind(emb: Embedder, handler: string): Spec | undefined {
   if (guardSpecAt(handler)) return emb.guardSpec(handler);
   const ref = bindingGraph(emb, handler);
   return ref ? { nodes: { op: { kind: 'call', handler: `graph:${ref}` } } } : undefined;
+}
+
+/**
+ * The operation a handler meets: the port operation behind a binding's, or the one it names itself. A graph
+ * reached by `graph:` answers its own `out` instead, so it names none.
+ */
+function operationOf(emb: Embedder, handler: string): Operation | undefined {
+  const hash = handler.lastIndexOf('#');
+  const binding = hash < 0 ? undefined : emb.scope.get('binding', handler.slice(0, hash))?.doc;
+  const hit = emb.scope.op(binding ? `${binding.port}#${handler.slice(hash + 1)}` : handler);
+  return typeof hit === 'string' ? undefined : hit.op;
+}
+
+/** What a handler declares it answers, where the declaration is closed: no type variable a call site binds. */
+function answeredBy(emb: Embedder, handler: string): Type | undefined {
+  try {
+    const spec = handler.startsWith('graph:')
+      ? emb.scope.get('graph', handler.slice('graph:'.length))?.doc.out?.type
+      : operationOf(emb, handler)?.returns;
+    const type = spec ? emb.scope.types.spec(spec) : undefined;
+    return type && !hasVars(type) ? type : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The type the node at a dotted path declares it answers, read off the spec rather than off a run: what a
+ * rehearsal needs to build a value for a node no stub recorded -- a call into a graph, whose answer the kernel
+ * never generates. A map's element index is a segment of the path and no node of the spec. Nothing for a map
+ * itself, a switch, or a node whose operation leaves its type to the call site.
+ */
+export function declaredAt(emb: Embedder, root: Spec, nodePath: string): Type | undefined {
+  const node = nodeAt(emb, root, nodePath.split('.'));
+  return node && node.kind !== 'map' && typeof node.handler === 'string' ? answeredBy(emb, node.handler) : undefined;
+}
+
+/** A node of a lowered spec, as far as a walk down a path reads one. */
+type SpecNode = { kind?: string; handler?: unknown };
+
+/** The node a dotted path ends at: the spec behind each call stepped into, and a map's element index stepped over. */
+function nodeAt(emb: Embedder, root: Spec, segments: string[]): SpecNode | undefined {
+  let spec: Spec | undefined = root;
+  for (let at = 0; spec && at < segments.length; at++) {
+    const node = spec.nodes?.[segments[at]] as SpecNode | undefined;
+    if (!node || at === segments.length - 1) return node;
+    if (node.kind === 'map') at++;
+    spec = typeof node.handler === 'string' ? specBehind(emb, node.handler) : undefined;
+  }
+  return undefined;
 }
 
 /** The handler one node of a spec names, when it names one at all. */
