@@ -9,6 +9,7 @@
 import type { On } from '@wilanis/plugin-storage';
 import { Kysely, PostgresDialect } from 'kysely';
 import pg from 'pg';
+import { forgetScopes } from './scoping.js';
 
 /** What the plugin was configured with, as `plugin.json` describes it. */
 export interface Settings {
@@ -59,9 +60,14 @@ export function poolFor(at: On, settings: Settings): { db: Kysely<never>; schema
   return opened;
 }
 
-/** Destroy every pool this plugin opened, and forget them: what `postLoad` hands back as its teardown. */
+/**
+ * Destroy every pool this plugin opened, and forget them: what `postLoad` hands back as its teardown. What
+ * the scope memo holds goes with them, since it is knowledge about the databases those pools reached and the
+ * next load of the tree may reach others.
+ */
 export async function closePools(): Promise<void> {
   const open = [...pools.values()];
   pools.clear();
+  forgetScopes();
   await Promise.all(open.map(one => one.db.destroy()));
 }

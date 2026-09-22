@@ -21,11 +21,13 @@ import type {
   Query,
   Record_,
   Recording,
+  Scope,
   Step,
   Transaction,
   Where,
+  Written,
 } from '@wilanis/plugin-storage';
-import type { Kysely } from 'kysely';
+import type { Kysely, OnConflictBuilder } from 'kysely';
 import { applyPlan } from './apply.js';
 import { attempts } from './casts.js';
 import { fieldsOf, folded, isJson } from './columns.js';
@@ -33,9 +35,10 @@ import { countFor } from './counting.js';
 import { ensureTables } from './ensure.js';
 import { conditionOf, orderingsOf } from './filter.js';
 import { inspectTable } from './inspect.js';
-import { refName, uniqueName } from './names.js';
+import { refName, scopedUniqueName, uniqueName } from './names.js';
 import { poolFor, type Settings } from './pool.js';
 import { currentOf, ensureRecord, historyOf } from './record.js';
+import { ensureScope, scopeColumns, scopeValues, within } from './scoping.js';
 
 /** What a row becomes on its way back out: the record the shape describes, or the reason it is not one. */
 function record(row: Record<string, unknown> | undefined, at: At): Record_ | undefined {
@@ -99,29 +102,34 @@ export class PostgresEngine implements Engine {
   ) {}
 
   /** The database this collection lives in, and the table it is, qualified by the connection's schema. */
-  private db(at: At): { db: Kysely<never>; table: string } {
+  private db(at: At): { db: Kysely<never>; table: string; schema: string } {
     const { db, schema } = poolFor(at, this.settings);
-    return { db: this.on ?? db, table: `${schema}.${folded(at.name)}` };
+    return { db: this.on ?? db, table: `${schema}.${folded(at.name)}`, schema };
   }
 
-  /** A select of every column of the collection, filtered as the caller asked. */
-  private selecting(at: At, where: Where | undefined) {
+  /**
+   * A select of every column of the collection, filtered as the caller asked and narrowed to the scope. A
+   * scope adds one equality per column it names; no scope adds nothing at all, which is how a view -- and a
+   * collection that keeps no scope -- sees every row.
+   */
+  private selecting(at: At, where: Where | undefined, scope: Scope | undefined) {
     const { db, table } = this.db(at);
     const query = db.selectFrom(table as never).select(columns(at) as never);
-    return where ? query.where(eb => conditionOf(eb as never, where, at.shape) as never) : query;
+    const filtered = where ? query.where(eb => conditionOf(eb as never, where, at.shape) as never) : query;
+    return filtered.where(eb => within(eb as never, scope) as never);
   }
 
-  /** The record under that key, or `record` absent where the collection holds none. */
-  async get(at: At, key: unknown) {
-    const found = await this.selecting(at, undefined)
+  /** The record under that key within the scope, or `record` absent where the collection holds none. */
+  async get(at: At, key: unknown, scope?: Scope) {
+    const found = await this.selecting(at, undefined, scope)
       .where(folded(at.key) as never, '=', key as never)
       .executeTakeFirst();
     return { record: record(found as Record<string, unknown> | undefined, at) };
   }
 
-  /** Every record the query matches, in the order asked for and cut to the page asked for. */
+  /** Every record of the scope the query matches, in the order asked for and cut to the page asked for. */
   async find(at: At, query: Query) {
-    let select = this.selecting(at, query.where);
+    let select = this.selecting(at, query.where, query.scope);
     for (const one of orderingsOf(query.order, at.shape))
       select = select.orderBy(folded(one.by) as never, one.dir) as never;
     if (query.limit !== undefined) select = select.limit(query.limit) as never;
@@ -130,11 +138,12 @@ export class PostgresEngine implements Engine {
     return rows.map(one => record(one, at) as Record_);
   }
 
-  /** How many records the filter matches. */
-  async count(at: At, where: Where | undefined) {
+  /** How many records of the scope the filter matches. */
+  async count(at: At, where: Where | undefined, scope?: Scope) {
     const { db, table } = this.db(at);
     let query = db.selectFrom(table as never).select(eb => eb.fn.countAll().as('n'));
     if (where) query = query.where(eb => conditionOf(eb as never, where, at.shape) as never) as never;
+    query = query.where(eb => within(eb as never, scope) as never) as never;
     const answer = (await query.executeTakeFirst()) as { n: string | number } | undefined;
     return Number(answer?.n ?? 0);
   }
@@ -144,58 +153,76 @@ export class PostgresEngine implements Engine {
    * violation comes back as an error this engine turns into the `violated` the port promises -- a constraint
    * is answered, not thrown, and which one answered is read off the constraint's own name.
    *
-   * It reads `replace` off the `Put` the contract now takes and does nothing yet with its `scope`: the
-   * column, the composite unique, the index and the predicate on every statement are RFC 0015 step 7's, and
-   * this signature is only what keeps the contract met until that step writes them.
+   * The scope columns are written beside the record, whatever the record says -- it cannot say anything,
+   * since they are not its fields. A key already held under another scope is a `conflict` even with
+   * `replace`: the upsert's update is itself narrowed to the scope, so the row of another one is not touched
+   * and nothing comes back, which is the key being global to the collection said in SQL.
    */
-  async put(at: At, given: Record_, { replace }: Put) {
-    const { db, table } = this.db(at);
-    const values = row(given, at);
+  async put(at: At, given: Record_, { replace, scope }: Put) {
+    const { db, table, schema } = this.db(at);
+    await ensureScope(db, { schema, table: folded(at.name), lasting: !this.on }, at, scope);
+    const values = { ...row(given, at), ...scopeValues(scope) };
     const key = folded(at.key);
     try {
-      const insert = db.insertInto(table as never).values(values as never);
-      const written = replace
-        ? await insert
-            .onConflict(oc => oc.column(key as never).doUpdateSet(values as never))
-            .returning(columns(at) as never)
-            .executeTakeFirst()
-        : await insert
-            .onConflict(oc => oc.column(key as never).doNothing())
-            .returning(columns(at) as never)
-            .executeTakeFirst();
+      const written = await db
+        .insertInto(table as never)
+        .values(values as never)
+        .onConflict(oc =>
+          replace ? this.replacing(oc as never, at, values, scope) : oc.column(key as never).doNothing(),
+        )
+        .returning(columns(at) as never)
+        .executeTakeFirst();
       if (!written) return { conflict: true };
       return { record: record(written as Record<string, unknown>, at), conflict: false };
     } catch (error) {
-      const violated = violation(error, at);
+      const violated = violation(error, at, scope);
       if (violated) return { conflict: false, violated };
       throw error;
     }
   }
 
-  /** The record after the change, or `record` absent where the collection holds none under that key. */
-  async patch(at: At, key: unknown, changes: Record_) {
-    const { db, table } = this.db(at);
-    const values = changed(changes, at);
-    if (!Object.keys(values).length) return this.get(at, key);
-    const written = await db
-      .updateTable(table as never)
-      .set(values as never)
-      .where(folded(at.key) as never, '=', key as never)
-      .returning(columns(at) as never)
-      .executeTakeFirst();
-    return { record: record(written as Record<string, unknown> | undefined, at) };
+  /**
+   * The `do update` of a replacing put, narrowed to the scope it is written under. Without a scope it
+   * replaces whatever is under the key; with one it replaces only the row of that scope, so a key another
+   * scope holds falls through the conflict untouched and `put` answers it as the conflict it is.
+   */
+  private replacing(oc: OnConflictBuilder<never, never>, at: At, values: Record<string, unknown>, scope?: Scope) {
+    const update = oc.column(folded(at.key) as never).doUpdateSet(values as never);
+    const table = folded(at.name);
+    return scopeColumns(scope).length ? update.where(eb => within(eb as never, scope, table) as never) : update;
   }
 
   /**
-   * Remove the record under that key and answer it. A record another table still references is kept by the
-   * database's own foreign key, and the refusal comes back as the `referencedBy` the port promises.
+   * The record after the change, or `record` absent where the collection holds none under that key within
+   * the scope. A scope column is never among the changes -- it is not a field of the shape -- so the row
+   * stays under the scope it was written with.
    */
-  async remove(at: At, key: unknown) {
+  async patch(at: At, key: unknown, changes: Record_, written?: Written) {
+    const { db, table } = this.db(at);
+    const values = changed(changes, at);
+    if (!Object.keys(values).length) return this.get(at, key, written?.scope);
+    const after = await db
+      .updateTable(table as never)
+      .set(values as never)
+      .where(folded(at.key) as never, '=', key as never)
+      .where(eb => within(eb as never, written?.scope) as never)
+      .returning(columns(at) as never)
+      .executeTakeFirst();
+    return { record: record(after as Record<string, unknown> | undefined, at) };
+  }
+
+  /**
+   * Remove the record under that key within the scope and answer it. A record another table still references
+   * is kept by the database's own foreign key, and the refusal comes back as the `referencedBy` the port
+   * promises; a key of another scope matches nothing, so a remove of it removes nothing.
+   */
+  async remove(at: At, key: unknown, scope?: Scope) {
     const { db, table } = this.db(at);
     try {
       const gone = await db
         .deleteFrom(table as never)
         .where(folded(at.key) as never, '=', key as never)
+        .where(eb => within(eb as never, scope) as never)
         .returning(columns(at) as never)
         .executeTakeFirst();
       const before = record(gone as Record<string, unknown> | undefined, at);
@@ -203,7 +230,7 @@ export class PostgresEngine implements Engine {
     } catch (error) {
       const referencedBy = violation(error, at);
       if (!referencedBy) throw error;
-      return { record: (await this.get(at, key)).record, removed: false, referencedBy };
+      return { record: (await this.get(at, key, scope)).record, removed: false, referencedBy };
     }
   }
 
@@ -325,12 +352,19 @@ export class PostgresEngine implements Engine {
  * The constraint a database error names, spelled the way the store declares it, or nothing where the error is
  * not a constraint at all. Postgres names the constraint it broke, and `ensure` names every constraint it
  * creates after the declaration, so the round trip is what lets a violation be answered rather than thrown.
+ *
+ * A scoped collection holds the same `unique` under a name of its own, since the constraint is over the scope
+ * columns and the declared fields together; both spellings are read back as the one declaration the store
+ * wrote, so a graph is told which `unique` it repeated and never which columns the database put in front of it.
  */
-function violation(error: unknown, at: At): string | undefined {
+function violation(error: unknown, at: At, scope?: Scope): string | undefined {
   const code = (error as { code?: string }).code;
   const constraint = (error as { constraint?: string }).constraint ?? '';
+  const columns = scopeColumns(scope);
   if (code === '23505') {
-    const fields = at.unique.find(one => constraint === uniqueName(at.name, one));
+    const fields = at.unique.find(
+      one => constraint === uniqueName(at.name, one) || constraint === scopedUniqueName(at.name, columns, one),
+    );
     return fields ? `unique [${fields.join(', ')}]` : `unique [${at.key}]`;
   }
   if (code !== '23503') return undefined;

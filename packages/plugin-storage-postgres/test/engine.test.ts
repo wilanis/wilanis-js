@@ -13,7 +13,7 @@
  * Every case keeps its records in a collection of its own and prepares it with `ensure` itself, so the whole
  * suite runs against one database without the cases reaching each other.
  */
-import { cases } from '@wilanis/plugin-storage/suite';
+import { cases, scopeCases } from '@wilanis/plugin-storage/suite';
 import { afterAll, describe, it } from 'vitest';
 import { PostgresEngine } from '../src/engine.js';
 import { closePools } from '../src/pool.js';
@@ -33,4 +33,14 @@ afterAll(async () => {
 
 describe.skipIf(!url)('what every engine answers alike', () => {
   for (const one of cases) it(one.name, () => one.run(subject));
+});
+
+/**
+ * The scope cases, which this engine answers as the memory one does: the column beside the record, the
+ * predicate on every statement, and a `unique` that holds within a scope rather than across every one. They
+ * are the same list both engines run, which is what makes "two tenants never see each other's rows" one
+ * promise and not two.
+ */
+describe.skipIf(!url)('what an engine that keeps scopes answers', () => {
+  for (const one of scopeCases) it(one.name, () => one.run(subject));
 });
