@@ -9,10 +9,10 @@
 import { describe, expect, it } from 'vitest';
 import { sabotageHinting, sabotagePointing } from './example-harness.js';
 
-const GRAPH = 'features/monitor/data/kept-update.graph.json';
+const GRAPH = 'features/customers/data/kept-update.graph.json';
 const STORE = '@storage/store.port.json';
-const ENTRIES = '@monitor/data/entries.store.json';
-const ENTRY = '@monitor/domain/Entry.shape.json';
+const ENTRIES = '@customers/data/customers.store.json';
+const ENTRY = '@customers/domain/Customer.shape.json';
 
 const run = (id: string, op: string, input: Record<string, unknown>) => ({
   type: '@wilanis/node/run.schema.json',
@@ -85,7 +85,7 @@ describe('sabotage: a graph written as control flow', () => {
     // a made value nobody reads sits beside the switch too, but it has no effect to misplace
     const spare = run('spare', '@std/object.port.json#make', {
       value: { id: '{{in.id}}' },
-      type: '@monitor/domain/EntryRef.shape.json',
+      type: '@customers/domain/CustomerRef.shape.json',
     });
     expect(sabotageHinting(GRAPH, graph => graph.nodes.push(spare))).toEqual([G008_OLD]);
   });

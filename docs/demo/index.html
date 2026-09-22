@@ -35,34 +35,34 @@ a { color: inherit; }
 <p class="thesis">An agent given a one-line task writes a route fast and plausibly; what it lacks is the rule it never read and the consequence it cannot see. In this tree the rules are two sentences a human wrote once, in files of their own, and the compiler holds every document to them before anything runs, answering each miss with a code, the file, the path inside it, and the edit that fixes it. This page is the record of one real run: an agent adds a write route to the example, and every output below is what the tree printed.</p>
 <div class="pair">
 <figure>
-<figcaption><code>features/monitor/domain/writes-are-for-recorders.invariant.json</code> &mdash; caught at <a href="#step-1">step 1</a></figcaption>
+<figcaption><code>features/customers/domain/writes-are-for-registrars.invariant.json</code> &mdash; caught at <a href="#step-1">step 1</a></figcaption>
 <pre>{
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/invariant.schema.json",
   "label": "Writes are for recorders",
   "description": "Every trigger that can change an entry attaches the recorder policy. Reads stay public. Without this the six write triggers are six coincidences: a new route firing monitor.update and forgetting the policy would check clean, and the write would be public.",
   "access": {
     "over": [
-      "@monitor/domain/monitor.port.json#record",
-      "@monitor/domain/monitor.port.json#update",
-      "@monitor/domain/monitor.port.json#remove",
-      "@monitor/domain/monitor.port.json#removeMany",
-      "@monitor/domain/monitor.port.json#submit",
-      "@monitor/domain/monitor.port.json#import"
+      "@customers/domain/customer.port.json#register",
+      "@customers/domain/customer.port.json#update",
+      "@customers/domain/customer.port.json#remove",
+      "@customers/domain/customer.port.json#removeMany",
+      "@customers/domain/customer.port.json#submit",
+      "@customers/domain/customer.port.json#import"
     ],
     "requires": {
-      "policy": "@access/edge/can-record.policy.json"
+      "policy": "@access/edge/can-register.policy.json"
     }
   }
 }</pre>
 </figure>
 <figure>
-<figcaption><code>features/monitor/domain/an-entry-names-a-call.invariant.json</code> &mdash; caught at <a href="#step-7">step 7</a></figcaption>
+<figcaption><code>features/customers/domain/a-customer-is-reachable.invariant.json</code> &mdash; caught at <a href="#step-7">step 7</a></figcaption>
 <pre>{
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/invariant.schema.json",
   "label": "An entry names a call",
   "description": "An entry always names the call it observed: a URL is never empty, and a deletion always says which agent asked for it. Every graph that makes or takes an entry is held to this, wherever the value comes from.",
   "holds": {
-    "on": "@monitor/domain/Entry.shape.json",
+    "on": "@customers/domain/Customer.shape.json",
     "when": "len(url) &gt; 0 &amp;&amp; (method != 'DELETE' || has(agent))"
   }
 }</pre>
@@ -85,10 +85,10 @@ a { color: inherit; }
 <h2><span class="n">1</span> The agent scaffolds a route</h2>
 <h3>What the agent does</h3>
 <p>The task is one line: add a way to archive an entry. The agent finds the <code>remove</code> operation on the monitor port and scaffolds a route that fires it.</p>
-<pre>npx wilanis new trigger features/monitor/edge/archive-entry . \
-  --run '@monitor/domain/monitor.port.json#remove' --kind '@http/http.trigger-kind.json'
-wrote features/monitor/edge/archive-entry.trigger.json</pre>
-<p>What it wrote, <code>features/monitor/edge/archive-entry.trigger.json</code>:</p>
+<pre>npx wilanis new trigger features/customers/edge/archive-entry . \
+  --run '@customers/domain/customer.port.json#remove' --kind '@http/http.trigger-kind.json'
+wrote features/customers/edge/archive-entry.trigger.json</pre>
+<p>What it wrote, <code>features/customers/edge/archive-entry.trigger.json</code>:</p>
 <pre>{
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
   "description": "TODO",
@@ -99,30 +99,30 @@ wrote features/monitor/edge/archive-entry.trigger.json</pre>
     "produces": "application/json"
   },
   "fire": {
-    "run": "@monitor/domain/monitor.port.json#remove"
+    "run": "@customers/domain/customer.port.json#remove"
   }
 }</pre>
 <p>Then the whole tree is judged.</p>
 <pre>npx wilanis check .</pre>
 <h3>What the tree answers</h3>
-<pre><b>T002</b>  @features/monitor/edge/archive-entry.trigger.json#in
-    '@monitor/domain/monitor.port.json#remove' takes {id: string} but the trigger declares no in
-    → declare in on the trigger; wilanis describe @monitor/domain/monitor.port.json#remove shows what it takes
-<b>T002</b>  @features/monitor/edge/archive-entry.trigger.json#out
-    '@monitor/domain/monitor.port.json#remove' answers @features/monitor/domain/Entry.shape.json but the trigger declares no out
+<pre><b>T002</b>  @features/customers/edge/archive-entry.trigger.json#in
+    '@customers/domain/customer.port.json#remove' takes {id: string} but the trigger declares no in
+    → declare in on the trigger; wilanis describe @customers/domain/customer.port.json#remove shows what it takes
+<b>T002</b>  @features/customers/edge/archive-entry.trigger.json#out
+    '@customers/domain/customer.port.json#remove' answers @features/customers/domain/Customer.shape.json but the trigger declares no out
     → declare out on the trigger, or fire an operation that answers nothing
-<b>T005</b>  @features/monitor/edge/archive-entry.trigger.json#settings/response/refusals
-    @features/monitor/data/delete-row.graph.json may refuse with reason 'missing', which settings.response.refusals does not map
+<b>T005</b>  @features/customers/edge/archive-entry.trigger.json#settings/response/refusals
+    @features/customers/data/delete-row.graph.json may refuse with reason 'missing', which settings.response.refusals does not map
     → add "missing" under settings.response.refusals: how this trigger answers that outcome
-<b>T005</b>  @features/monitor/edge/archive-entry.trigger.json#settings/response/refusals
-    @features/monitor/data/delete-row.graph.json may refuse with reason 'upstream', which settings.response.refusals does not map
+<b>T005</b>  @features/customers/edge/archive-entry.trigger.json#settings/response/refusals
+    @features/customers/data/delete-row.graph.json may refuse with reason 'upstream', which settings.response.refusals does not map
     → add "upstream" under settings.response.refusals: how this trigger answers that outcome
-<b>T005</b>  @features/monitor/edge/archive-entry.trigger.json#settings/response/refusals
-    @features/monitor/data/kept-remove.graph.json may refuse with reason 'invariant', which settings.response.refusals does not map
+<b>T005</b>  @features/customers/edge/archive-entry.trigger.json#settings/response/refusals
+    @features/customers/data/kept-remove.graph.json may refuse with reason 'invariant', which settings.response.refusals does not map
     → add "invariant" under settings.response.refusals: how this trigger answers that outcome
-<b>I001</b>  @features/monitor/edge/archive-entry.trigger.json#policies
-    trigger reaches @features/monitor/domain/monitor.port.json#remove, which 'Writes are for recorders' (@features/monitor/domain/writes-are-for-recorders.invariant.json) gates with @access/edge/can-record.policy.json, but attaches no such policy
-    → attach "@access/edge/can-record.policy.json" under policies, or take @features/monitor/domain/monitor.port.json#remove out of the invariant's over
+<b>I001</b>  @features/customers/edge/archive-entry.trigger.json#policies
+    trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for recorders' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy
+    → attach "@access/edge/can-register.policy.json" under policies, or take @features/customers/domain/customer.port.json#remove out of the invariant's over
 
 6 refusal(s)</pre>
 <h3>Why it matters when an agent writes it</h3>
@@ -136,7 +136,7 @@ wrote features/monitor/edge/archive-entry.trigger.json</pre>
 <pre>{
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
   "label": "POST /monitor/{id}/archive",
-  "description": "Pasted over features/monitor/edge/archive-entry.trigger.json in beat 3 of docs/demo.md: the route with its shapes and refusals filled in as the T002 and T005 hints said, and still no policy, so one refusal is left, I001.",
+  "description": "Pasted over features/customers/edge/archive-entry.trigger.json in beat 3 of docs/demo.md: the route with its shapes and refusals filled in as the T002 and T005 hints said, and still no policy, so one refusal is left, I001.",
   "kind": "@http/http.trigger-kind.json",
   "settings": {
     "route": "/monitor/{id}/archive",
@@ -150,10 +150,10 @@ wrote features/monitor/edge/archive-entry.trigger.json</pre>
       }
     }
   },
-  "in": "@monitor/edge/IdRequest.shape.json",
-  "out": "@monitor/edge/EntryView.shape.json",
+  "in": "@customers/edge/IdRequest.shape.json",
+  "out": "@customers/edge/CustomerView.shape.json",
   "fire": {
-    "run": "@monitor/domain/monitor.port.json#remove",
+    "run": "@customers/domain/customer.port.json#remove",
     "in": {
       "id": "{{request.params.id}}"
     }
@@ -162,9 +162,9 @@ wrote features/monitor/edge/archive-entry.trigger.json</pre>
 <p>Then the whole tree is judged.</p>
 <pre>npx wilanis check .</pre>
 <h3>What the tree answers</h3>
-<pre><b>I001</b>  @features/monitor/edge/archive-entry.trigger.json#policies
-    trigger reaches @features/monitor/domain/monitor.port.json#remove, which 'Writes are for recorders' (@features/monitor/domain/writes-are-for-recorders.invariant.json) gates with @access/edge/can-record.policy.json, but attaches no such policy
-    → attach "@access/edge/can-record.policy.json" under policies, or take @features/monitor/domain/monitor.port.json#remove out of the invariant's over
+<pre><b>I001</b>  @features/customers/edge/archive-entry.trigger.json#policies
+    trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for recorders' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy
+    → attach "@access/edge/can-register.policy.json" under policies, or take @features/customers/domain/customer.port.json#remove out of the invariant's over
 
 1 refusal(s)</pre>
 <h3>Why it matters when an agent writes it</h3>
@@ -174,11 +174,11 @@ wrote features/monitor/edge/archive-entry.trigger.json</pre>
 <section id="step-3">
 <h2><span class="n">3</span> The agent does what the hint says, and no more</h2>
 <h3>What the agent does</h3>
-<p>The I001 hint said: attach <code>"@access/edge/can-record.policy.json"</code> under <code>policies</code>. The agent adds exactly that line.</p>
+<p>The I001 hint said: attach <code>"@access/edge/can-register.policy.json"</code> under <code>policies</code>. The agent adds exactly that line.</p>
 <pre>{
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
   "label": "POST /monitor/{id}/archive",
-  "description": "Pasted over features/monitor/edge/archive-entry.trigger.json in beat 3 of docs/demo.md: the route with its shapes and refusals filled in as the T002 and T005 hints said, and still no policy, so one refusal is left, I001.",
+  "description": "Pasted over features/customers/edge/archive-entry.trigger.json in beat 3 of docs/demo.md: the route with its shapes and refusals filled in as the T002 and T005 hints said, and still no policy, so one refusal is left, I001.",
   "kind": "@http/http.trigger-kind.json",
   "settings": {
     "route": "/monitor/{id}/archive",
@@ -192,13 +192,13 @@ wrote features/monitor/edge/archive-entry.trigger.json</pre>
       }
     }
   },
-  "in": "@monitor/edge/IdRequest.shape.json",
-  "out": "@monitor/edge/EntryView.shape.json",
+  "in": "@customers/edge/IdRequest.shape.json",
+  "out": "@customers/edge/CustomerView.shape.json",
   "policies": [
-    "@access/edge/can-record.policy.json"
+    "@access/edge/can-register.policy.json"
   ],
   "fire": {
-    "run": "@monitor/domain/monitor.port.json#remove",
+    "run": "@customers/domain/customer.port.json#remove",
     "in": {
       "id": "{{request.params.id}}"
     }
@@ -207,14 +207,14 @@ wrote features/monitor/edge/archive-entry.trigger.json</pre>
 <p>Then the whole tree is judged.</p>
 <pre>npx wilanis check .</pre>
 <h3>What the tree answers</h3>
-<pre><b>A005</b>  @features/monitor/edge/archive-entry.trigger.json#policies/0
-    policy '@features/access/edge/can-record.policy.json' reads request.principal, which the guard hands once it verified a token, but no attachment on this trigger gives one
-    → write { "policy": "@access/edge/can-record.policy.json", "in": { "token": "{{request.headers.authorization}}" } } -- the read is where this kind hands the credential
-<b>T005</b>  @features/monitor/edge/archive-entry.trigger.json#settings/response/refusals
-    @features/access/domain/require-recorder.graph.json may refuse with reason 'forbidden', which settings.response.refusals does not map
+<pre><b>A005</b>  @features/customers/edge/archive-entry.trigger.json#policies/0
+    policy '@features/access/edge/can-register.policy.json' reads request.principal, which the guard hands once it verified a token, but no attachment on this trigger gives one
+    → write { "policy": "@access/edge/can-register.policy.json", "in": { "token": "{{request.headers.authorization}}" } } -- the read is where this kind hands the credential
+<b>T005</b>  @features/customers/edge/archive-entry.trigger.json#settings/response/refusals
+    @features/access/domain/require-registrar.graph.json may refuse with reason 'forbidden', which settings.response.refusals does not map
     → add "forbidden" under settings.response.refusals: how this trigger answers that outcome
-<b>T005</b>  @features/monitor/edge/archive-entry.trigger.json#settings/response/refusals
-    @features/access/domain/require-recorder.graph.json may refuse with reason 'anonymous', which settings.response.refusals does not map
+<b>T005</b>  @features/customers/edge/archive-entry.trigger.json#settings/response/refusals
+    @features/access/domain/require-registrar.graph.json may refuse with reason 'anonymous', which settings.response.refusals does not map
     → add "anonymous" under settings.response.refusals: how this trigger answers that outcome
 
 3 refusal(s)</pre>
@@ -229,7 +229,7 @@ wrote features/monitor/edge/archive-entry.trigger.json</pre>
 <pre>{
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
   "label": "POST /monitor/{id}/archive",
-  "description": "Pasted over features/monitor/edge/archive-entry.trigger.json at the end of beat 3 of docs/demo.md: the finished route. The recorder policy is attached and given the token as the A005 hint said, and the two ways a gated route can end, forbidden and anonymous, are mapped as the T005 hints said; invalid_credential comes with them, since a bad token is a way in too.",
+  "description": "Pasted over features/customers/edge/archive-entry.trigger.json at the end of beat 3 of docs/demo.md: the finished route. The recorder policy is attached and given the token as the A005 hint said, and the two ways a gated route can end, forbidden and anonymous, are mapped as the T005 hints said; invalid_credential comes with them, since a bad token is a way in too.",
   "kind": "@http/http.trigger-kind.json",
   "settings": {
     "route": "/monitor/{id}/archive",
@@ -246,18 +246,18 @@ wrote features/monitor/edge/archive-entry.trigger.json</pre>
       }
     }
   },
-  "in": "@monitor/edge/IdRequest.shape.json",
-  "out": "@monitor/edge/EntryView.shape.json",
+  "in": "@customers/edge/IdRequest.shape.json",
+  "out": "@customers/edge/CustomerView.shape.json",
   "policies": [
     {
-      "policy": "@access/edge/can-record.policy.json",
+      "policy": "@access/edge/can-register.policy.json",
       "in": {
         "token": "{{request.headers.authorization}}"
       }
     }
   ],
   "fire": {
-    "run": "@monitor/domain/monitor.port.json#remove",
+    "run": "@customers/domain/customer.port.json#remove",
     "in": {
       "id": "{{request.params.id}}"
     }
@@ -279,7 +279,7 @@ wrote features/monitor/edge/archive-entry.trigger.json</pre>
 <p>Then the map: how a request flows, and what gates it.</p>
 <pre>npx wilanis map . --profile local</pre>
 <h3>What the tree answers</h3>
-<pre>features/access/domain/require-recorder  switch 'decide'  3/3 branches
+<pre>features/access/domain/require-registrar  switch 'decide'  3/3 branches
   ok  when has(principal) &amp;&amp; 'recorder' in principal.roles  answered from 'granted'
   ok  when has(principal)                                   refused on purpose at 'forbidden' as forbidden: "recording entries takes the recorder role"
   ok  anything else                                         refused on purpose at 'anonymous' as anonymous: "sign in first: no token was presented"
@@ -298,40 +298,40 @@ access/domain/access.port.json#savePreferences  (no branches)
   answers
 access/domain/access.port.json#signOut  (no branches)
   answers
-features/monitor/data/kept-remove  switch 'route'  2/2 branches
+features/customers/data/kept-remove  switch 'route'  2/2 branches
   ok  when has(record)  answered from 'row:made'
   ok  anything else     refused on purpose at 'missing' as missing: "no entry hotel403"
-features/monitor/data/kept-remove  guard 'row:check' An entry names a call  2/2 branches
+features/customers/data/kept-remove  guard 'row:check' An entry names a call  2/2 branches
   ok  holds     answered from 'row'
   ok  violated  refused on purpose at 'row:violated' as invariant: "'An entry names a call' does not hold: len(url) &gt; 0 &amp;&amp; (method != 'DELETE' || has(agent))"
-features/monitor/data/kept-list  guard 'in:check' An entry names a call  2/2 branches
+features/customers/data/kept-list  guard 'in:check' An entry names a call  2/2 branches
   ok  holds     answered from 'in:ok'
   ok  violated  refused on purpose at 'in:violated' as invariant: "'An entry names a call' does not hold: len(url) &gt; 0 &amp;&amp; (method != 'DELETE' || has(agent))"
-features/monitor/data/write-csv  guard 'in:check' An entry names a call  2/2 branches
+features/customers/data/write-csv  guard 'in:check' An entry names a call  2/2 branches
   ok  holds     answered from 'in:ok'
   ok  violated  refused on purpose at 'in:violated' as invariant: "'An entry names a call' does not hold: len(url) &gt; 0 &amp;&amp; (method != 'DELETE' || has(agent))"
-features/monitor/data/kept-get  switch 'route'  2/2 branches
+features/customers/data/kept-get  switch 'route'  2/2 branches
   ok  when has(record)  answered from 'row:made'
   ok  anything else     refused on purpose at 'missing' as missing: "no entry hotel403"
-features/monitor/data/kept-get  guard 'row:check' An entry names a call  2/2 branches
+features/customers/data/kept-get  guard 'row:check' An entry names a call  2/2 branches
   ok  holds     answered from 'row'
   ok  violated  refused on purpose at 'row:violated' as invariant: "'An entry names a call' does not hold: len(url) &gt; 0 &amp;&amp; (method != 'DELETE' || has(agent))"
-features/monitor/data/store-and-latest  (atomic)  switch 'route'  2/2 branches
+features/customers/data/store-and-latest  (atomic)  switch 'route'  2/2 branches
   ok  when has(record) &amp;&amp; has(mark)  answered from 'row:made'
   ok  anything else                  refused on purpose at 'failed' as upstream: "the store answered no record for ", rolled back
-features/monitor/data/store-and-latest  (atomic)  guard 'row:check' An entry names a call  2/2 branches
+features/customers/data/store-and-latest  (atomic)  guard 'row:check' An entry names a call  2/2 branches
   ok  holds     refused on purpose at 'row' as upstream: "the store answered no record for ", rolled back
   ok  violated  refused on purpose at 'row:violated' as upstream: "the store answered no record for ", rolled back
-features/monitor/domain/list-entries  switch 'route'  2/2 branches
+features/customers/domain/list-entries  switch 'route'  2/2 branches
   ok  when has(method)  answered from 'byMethod'
   ok  anything else     answered from 'all'
-features/monitor/data/kept-list-by-method  guard 'in:check' An entry names a call  2/2 branches
+features/customers/data/kept-list-by-method  guard 'in:check' An entry names a call  2/2 branches
   ok  holds     answered from 'in:ok'
   ok  violated  refused on purpose at 'in:violated' as invariant: "'An entry names a call' does not hold: len(url) &gt; 0 &amp;&amp; (method != 'DELETE' || has(agent))"
-features/monitor/data/kept-update  switch 'route'  2/2 branches
+features/customers/data/kept-update  switch 'route'  2/2 branches
   ok  when has(record)  answered from 'row:made'
   ok  anything else     refused on purpose at 'missing' as missing: "no entry hotel403"
-features/monitor/data/kept-update  guard 'row:check' An entry names a call  2/2 branches
+features/customers/data/kept-update  guard 'row:check' An entry names a call  2/2 branches
   ok  holds     answered from 'row'
   ok  violated  refused on purpose at 'row:violated' as invariant: "'An entry names a call' does not hold: len(url) &gt; 0 &amp;&amp; (method != 'DELETE' || has(agent))"
 features/access/domain/sign-in-customer  switch 'route'  3/3 branches
@@ -348,7 +348,7 @@ features/access/data/issue-code  switch 'route'  2/2 branches
 features/access/domain/refresh  switch 'route'  2/2 branches
   ok  when refreshed == true &amp;&amp; has(tokens)  answered from 'renewed'
   ok  anything else                          refused on purpose at 'invalid' as invalid_refresh: "the refresh token is unknown, spent or expired"
-features/access/domain/require-recorder  switch 'decide'  3/3 branches
+features/access/domain/require-registrar  switch 'decide'  3/3 branches
   ok  when has(principal) &amp;&amp; 'recorder' in principal.roles  answered from 'granted'
   ok  when has(principal)                                   refused on purpose at 'forbidden' as forbidden: "recording entries takes the recorder role"
   ok  anything else                                         refused on purpose at 'anonymous' as anonymous: "sign in first: no token was presented"
@@ -369,23 +369,23 @@ every branch settled -- 44 branch(es), 20 decision(s), 16 graph(s).
   An entry names a call  proved at 0 site(s), guarded at 13
   Writes are for recorders  holds at 6 trigger(s)
 "refused on purpose" is a refuse node the graph declares: a designed outcome with a reason the trigger maps, not a fault. Effects are stubbed, so no request left this process.</pre></details>
-<pre>@features/monitor/edge/archive-entry.trigger.json  (@http/http.trigger-kind.json)
-  gated by @features/access/edge/can-record.policy.json → @access/domain/access.port.json#requireRecorder  given token
-  holds  @features/monitor/domain/writes-are-for-recorders.invariant.json  through @features/access/edge/can-record.policy.json
-  @monitor/domain/monitor.port.json#remove
-    @features/monitor/data/kept-remove-postgres.graph.json
-      asked @storage/store.port.json#remove  (effect) → store @features/monitor/data/entries-postgres.store.json entries (remove)
+<pre>@features/customers/edge/archive-entry.trigger.json  (@http/http.trigger-kind.json)
+  gated by @features/access/edge/can-register.policy.json → @access/domain/access.port.json#requireRecorder  given token
+  holds  @features/customers/domain/writes-are-for-registrars.invariant.json  through @features/access/edge/can-register.policy.json
+  @customers/domain/customer.port.json#remove
+    @features/customers/data/kept-remove-postgres.graph.json
+      asked @storage/store.port.json#remove  (effect) → store @features/customers/data/customers-postgres.store.json entries (remove)
       route [switch → row | missing]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
-    @features/monitor/data/delete-row.graph.json
+    @features/customers/data/delete-row.graph.json
       asked @http/http.port.json#request  (effect)
       route [switch → missing | row | failed]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
       failed @std/outcome.port.json#refuse
-    @features/monitor/data/kept-remove.graph.json
-      asked @storage/store.port.json#remove  (effect) → store @features/monitor/data/entries.store.json entries (remove)
+    @features/customers/data/kept-remove.graph.json
+      asked @storage/store.port.json#remove  (effect) → store @features/customers/data/customers.store.json entries (remove)
       route [switch → row | missing]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse</pre>
@@ -395,214 +395,214 @@ every branch settled -- 44 branch(es), 20 decision(s), 16 graph(s).
     @features/hello/domain/greet.graph.json
       said @std/text.port.json#fill
       greeting @std/object.port.json#make
-@features/monitor/edge/archive-entry.trigger.json  (@http/http.trigger-kind.json)
-  gated by @features/access/edge/can-record.policy.json → @access/domain/access.port.json#requireRecorder  given token
-  holds  @features/monitor/domain/writes-are-for-recorders.invariant.json  through @features/access/edge/can-record.policy.json
-  @monitor/domain/monitor.port.json#remove
-    @features/monitor/data/kept-remove-postgres.graph.json
-      asked @storage/store.port.json#remove  (effect) → store @features/monitor/data/entries-postgres.store.json entries (remove)
+@features/customers/edge/archive-entry.trigger.json  (@http/http.trigger-kind.json)
+  gated by @features/access/edge/can-register.policy.json → @access/domain/access.port.json#requireRecorder  given token
+  holds  @features/customers/domain/writes-are-for-registrars.invariant.json  through @features/access/edge/can-register.policy.json
+  @customers/domain/customer.port.json#remove
+    @features/customers/data/kept-remove-postgres.graph.json
+      asked @storage/store.port.json#remove  (effect) → store @features/customers/data/customers-postgres.store.json entries (remove)
       route [switch → row | missing]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
-    @features/monitor/data/delete-row.graph.json
+    @features/customers/data/delete-row.graph.json
       asked @http/http.port.json#request  (effect)
       route [switch → missing | row | failed]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
       failed @std/outcome.port.json#refuse
-    @features/monitor/data/kept-remove.graph.json
-      asked @storage/store.port.json#remove  (effect) → store @features/monitor/data/entries.store.json entries (remove)
+    @features/customers/data/kept-remove.graph.json
+      asked @storage/store.port.json#remove  (effect) → store @features/customers/data/customers.store.json entries (remove)
       route [switch → row | missing]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
-@features/monitor/edge/delete-entries.trigger.json  (@http/http.trigger-kind.json)
+@features/customers/edge/delete-customers.trigger.json  (@http/http.trigger-kind.json)
   gated by @features/access/edge/employees-only.policy.json → @access/domain/access.port.json#requireEmployee  given token
-  gated by @features/access/edge/can-record.policy.json → @access/domain/access.port.json#requireRecorder
-  holds  @features/monitor/domain/writes-are-for-recorders.invariant.json  through @features/access/edge/can-record.policy.json
-  @monitor/domain/monitor.port.json#removeMany
-    @features/monitor/domain/remove-entries.graph.json
-      removed @monitor/domain/monitor.port.json#remove
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-    @features/monitor/domain/remove-entries.graph.json
-      removed @monitor/domain/monitor.port.json#remove
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-    @features/monitor/domain/remove-entries.graph.json
-      removed @monitor/domain/monitor.port.json#remove
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-@features/monitor/edge/delete-entry.trigger.json  (@http/http.trigger-kind.json)
+  gated by @features/access/edge/can-register.policy.json → @access/domain/access.port.json#requireRecorder
+  holds  @features/customers/domain/writes-are-for-registrars.invariant.json  through @features/access/edge/can-register.policy.json
+  @customers/domain/customer.port.json#removeMany
+    @features/customers/domain/remove-customers.graph.json
+      removed @customers/domain/customer.port.json#remove
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+    @features/customers/domain/remove-customers.graph.json
+      removed @customers/domain/customer.port.json#remove
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+    @features/customers/domain/remove-customers.graph.json
+      removed @customers/domain/customer.port.json#remove
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+@features/customers/edge/delete-customer.trigger.json  (@http/http.trigger-kind.json)
   gated by @features/access/edge/employees-only.policy.json → @access/domain/access.port.json#requireEmployee  given token
-  gated by @features/access/edge/can-record.policy.json → @access/domain/access.port.json#requireRecorder
-  holds  @features/monitor/domain/writes-are-for-recorders.invariant.json  through @features/access/edge/can-record.policy.json
-  @monitor/domain/monitor.port.json#remove
-    @features/monitor/data/kept-remove-postgres.graph.json
-      asked @storage/store.port.json#remove  (effect) → store @features/monitor/data/entries-postgres.store.json entries (remove)
+  gated by @features/access/edge/can-register.policy.json → @access/domain/access.port.json#requireRecorder
+  holds  @features/customers/domain/writes-are-for-registrars.invariant.json  through @features/access/edge/can-register.policy.json
+  @customers/domain/customer.port.json#remove
+    @features/customers/data/kept-remove-postgres.graph.json
+      asked @storage/store.port.json#remove  (effect) → store @features/customers/data/customers-postgres.store.json entries (remove)
       route [switch → row | missing]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
-    @features/monitor/data/delete-row.graph.json
+    @features/customers/data/delete-row.graph.json
       asked @http/http.port.json#request  (effect)
       route [switch → missing | row | failed]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
       failed @std/outcome.port.json#refuse
-    @features/monitor/data/kept-remove.graph.json
-      asked @storage/store.port.json#remove  (effect) → store @features/monitor/data/entries.store.json entries (remove)
+    @features/customers/data/kept-remove.graph.json
+      asked @storage/store.port.json#remove  (effect) → store @features/customers/data/customers.store.json entries (remove)
       route [switch → row | missing]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
-@features/monitor/edge/digest.trigger.json  (@cli/cli.trigger-kind.json)
-  @monitor/domain/monitor.port.json#digest
-    @features/monitor/domain/digest.graph.json
-      all @monitor/domain/monitor.port.json#listAll
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
+@features/customers/edge/digest.trigger.json  (@cli/cli.trigger-kind.json)
+  @customers/domain/customer.port.json#digest
+    @features/customers/domain/digest.graph.json
+      all @customers/domain/customer.port.json#listAll
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
       lines @std/text.port.json#fill
       joined @std/text.port.json#join
       count @std/list.port.json#count
       digest @std/object.port.json#make
-    @features/monitor/domain/digest.graph.json
-      all @monitor/domain/monitor.port.json#listAll
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
+    @features/customers/domain/digest.graph.json
+      all @customers/domain/customer.port.json#listAll
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
       lines @std/text.port.json#fill
       joined @std/text.port.json#join
       count @std/list.port.json#count
       digest @std/object.port.json#make
-    @features/monitor/domain/digest.graph.json
-      all @monitor/domain/monitor.port.json#listAll
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
+    @features/customers/domain/digest.graph.json
+      all @customers/domain/customer.port.json#listAll
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
       lines @std/text.port.json#fill
       joined @std/text.port.json#join
       count @std/list.port.json#count
       digest @std/object.port.json#make
-@features/monitor/edge/export-entries.trigger.json  (@http/http.trigger-kind.json)
-  @monitor/domain/monitor.port.json#export
-    @features/monitor/domain/export-entries.graph.json
-      all @monitor/domain/monitor.port.json#listAll
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-      file @monitor/domain/monitor.port.json#toCsv
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-    @features/monitor/domain/export-entries.graph.json
-      all @monitor/domain/monitor.port.json#listAll
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-      file @monitor/domain/monitor.port.json#toCsv
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-    @features/monitor/domain/export-entries.graph.json
-      all @monitor/domain/monitor.port.json#listAll
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-      file @monitor/domain/monitor.port.json#toCsv
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-@features/monitor/edge/get-entry.trigger.json  (@http/http.trigger-kind.json)
-  @monitor/domain/monitor.port.json#get
-    @features/monitor/data/kept-get-postgres.graph.json
-      asked @storage/store.port.json#get  (effect) → store @features/monitor/data/entries-postgres.store.json entries (get)
+@features/customers/edge/export-customers.trigger.json  (@http/http.trigger-kind.json)
+  @customers/domain/customer.port.json#export
+    @features/customers/domain/export-customers.graph.json
+      all @customers/domain/customer.port.json#listAll
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+      file @customers/domain/customer.port.json#toCsv
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+    @features/customers/domain/export-customers.graph.json
+      all @customers/domain/customer.port.json#listAll
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+      file @customers/domain/customer.port.json#toCsv
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+    @features/customers/domain/export-customers.graph.json
+      all @customers/domain/customer.port.json#listAll
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+      file @customers/domain/customer.port.json#toCsv
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+@features/customers/edge/get-customer.trigger.json  (@http/http.trigger-kind.json)
+  @customers/domain/customer.port.json#get
+    @features/customers/data/kept-get-postgres.graph.json
+      asked @storage/store.port.json#get  (effect) → store @features/customers/data/customers-postgres.store.json entries (get)
       route [switch → row | missing]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
-    @features/monitor/data/get-row.graph.json
+    @features/customers/data/get-row.graph.json
       asked @http/http.port.json#request  (effect)
       route [switch → missing | row | failed]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
       failed @std/outcome.port.json#refuse
-    @features/monitor/data/kept-get.graph.json
-      asked @storage/store.port.json#get  (effect) → store @features/monitor/data/entries.store.json entries (get)
+    @features/customers/data/kept-get.graph.json
+      asked @storage/store.port.json#get  (effect) → store @features/customers/data/customers.store.json entries (get)
       route [switch → row | missing]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
-@features/monitor/edge/import-entries.trigger.json  (@http/http.trigger-kind.json)
+@features/customers/edge/import-customers.trigger.json  (@http/http.trigger-kind.json)
   gated by @features/access/edge/employees-only.policy.json → @access/domain/access.port.json#requireEmployee  given token
-  gated by @features/access/edge/can-record.policy.json → @access/domain/access.port.json#requireRecorder
-  holds  @features/monitor/domain/writes-are-for-recorders.invariant.json  through @features/access/edge/can-record.policy.json
-  @monitor/domain/monitor.port.json#import
-    @features/monitor/domain/import-entries.graph.json
-      drafts @monitor/domain/monitor.port.json#parseDrafts
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-      recorded @monitor/domain/monitor.port.json#recordAll
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-    @features/monitor/domain/import-entries.graph.json
-      drafts @monitor/domain/monitor.port.json#parseDrafts
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-      recorded @monitor/domain/monitor.port.json#recordAll
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-    @features/monitor/domain/import-entries.graph.json
-      drafts @monitor/domain/monitor.port.json#parseDrafts
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-      recorded @monitor/domain/monitor.port.json#recordAll
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-@features/monitor/edge/list-entries.trigger.json  (@http/http.trigger-kind.json)
-  @monitor/domain/monitor.port.json#list
-    @features/monitor/domain/list-entries.graph.json
+  gated by @features/access/edge/can-register.policy.json → @access/domain/access.port.json#requireRecorder
+  holds  @features/customers/domain/writes-are-for-registrars.invariant.json  through @features/access/edge/can-register.policy.json
+  @customers/domain/customer.port.json#import
+    @features/customers/domain/import-customers.graph.json
+      drafts @customers/domain/customer.port.json#parseDrafts
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+      recorded @customers/domain/customer.port.json#registerAll
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+    @features/customers/domain/import-customers.graph.json
+      drafts @customers/domain/customer.port.json#parseDrafts
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+      recorded @customers/domain/customer.port.json#registerAll
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+    @features/customers/domain/import-customers.graph.json
+      drafts @customers/domain/customer.port.json#parseDrafts
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+      recorded @customers/domain/customer.port.json#registerAll
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+@features/customers/edge/list-customers.trigger.json  (@http/http.trigger-kind.json)
+  @customers/domain/customer.port.json#list
+    @features/customers/domain/list-customers.graph.json
       route [switch → byMethod | all]
-      byMethod @monitor/domain/monitor.port.json#listByMethod
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-      all @monitor/domain/monitor.port.json#listAll
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-    @features/monitor/domain/list-entries.graph.json
+      byMethod @customers/domain/customer.port.json#listByTier
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+      all @customers/domain/customer.port.json#listAll
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+    @features/customers/domain/list-customers.graph.json
       route [switch → byMethod | all]
-      byMethod @monitor/domain/monitor.port.json#listByMethod
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-      all @monitor/domain/monitor.port.json#listAll
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-    @features/monitor/domain/list-entries.graph.json
+      byMethod @customers/domain/customer.port.json#listByTier
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+      all @customers/domain/customer.port.json#listAll
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+    @features/customers/domain/list-customers.graph.json
       route [switch → byMethod | all]
-      byMethod @monitor/domain/monitor.port.json#listByMethod
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-      all @monitor/domain/monitor.port.json#listAll
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-@features/monitor/edge/nightly-digest.trigger.json  (@schedule/schedule.trigger-kind.json)
-  @monitor/domain/monitor.port.json#digest
-    @features/monitor/domain/digest.graph.json
-      all @monitor/domain/monitor.port.json#listAll
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
+      byMethod @customers/domain/customer.port.json#listByTier
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+      all @customers/domain/customer.port.json#listAll
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+@features/customers/edge/nightly-digest.trigger.json  (@schedule/schedule.trigger-kind.json)
+  @customers/domain/customer.port.json#digest
+    @features/customers/domain/digest.graph.json
+      all @customers/domain/customer.port.json#listAll
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
       lines @std/text.port.json#fill
       joined @std/text.port.json#join
       count @std/list.port.json#count
       digest @std/object.port.json#make
-    @features/monitor/domain/digest.graph.json
-      all @monitor/domain/monitor.port.json#listAll
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
+    @features/customers/domain/digest.graph.json
+      all @customers/domain/customer.port.json#listAll
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
       lines @std/text.port.json#fill
       joined @std/text.port.json#join
       count @std/list.port.json#count
       digest @std/object.port.json#make
-    @features/monitor/domain/digest.graph.json
-      all @monitor/domain/monitor.port.json#listAll
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
+    @features/customers/domain/digest.graph.json
+      all @customers/domain/customer.port.json#listAll
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
       lines @std/text.port.json#fill
       joined @std/text.port.json#join
       count @std/list.port.json#count
       digest @std/object.port.json#make
-@features/monitor/edge/record-entry.trigger.json  (@http/http.trigger-kind.json)
+@features/customers/edge/register-customer.trigger.json  (@http/http.trigger-kind.json)
   gated by @features/access/edge/employees-only.policy.json → @access/domain/access.port.json#requireEmployee  given token
-  gated by @features/access/edge/can-record.policy.json → @access/domain/access.port.json#requireRecorder
-  holds  @features/monitor/domain/writes-are-for-recorders.invariant.json  through @features/access/edge/can-record.policy.json
-  @monitor/domain/monitor.port.json#submit
-    @features/monitor/domain/record-entry.graph.json
-      recorded @monitor/domain/monitor.port.json#record
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-    @features/monitor/domain/record-entry.graph.json
-      recorded @monitor/domain/monitor.port.json#record
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-    @features/monitor/domain/record-entry.graph.json
-      recorded @monitor/domain/monitor.port.json#record
-        ?? port '@features/monitor/domain/monitor.port.json' has 3 bindings (@features/monitor/data/monitor-postgres.binding.json, @features/monitor/data/monitor-rest.binding.json, @features/monitor/data/monitor-store.binding.json) -- choose one in a project profile
-@features/monitor/edge/update-entry.trigger.json  (@http/http.trigger-kind.json)
+  gated by @features/access/edge/can-register.policy.json → @access/domain/access.port.json#requireRecorder
+  holds  @features/customers/domain/writes-are-for-registrars.invariant.json  through @features/access/edge/can-register.policy.json
+  @customers/domain/customer.port.json#submit
+    @features/customers/domain/register-customer.graph.json
+      recorded @customers/domain/customer.port.json#register
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+    @features/customers/domain/register-customer.graph.json
+      recorded @customers/domain/customer.port.json#register
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+    @features/customers/domain/register-customer.graph.json
+      recorded @customers/domain/customer.port.json#register
+        ?? port '@features/customers/domain/customer.port.json' has 3 bindings (@features/customers/data/customers-postgres.binding.json, @features/customers/data/customers-rest.binding.json, @features/customers/data/customers-store.binding.json) -- choose one in a project profile
+@features/customers/edge/update-customer.trigger.json  (@http/http.trigger-kind.json)
   gated by @features/access/edge/employees-only.policy.json → @access/domain/access.port.json#requireEmployee  given token
-  gated by @features/access/edge/can-record.policy.json → @access/domain/access.port.json#requireRecorder
-  holds  @features/monitor/domain/writes-are-for-recorders.invariant.json  through @features/access/edge/can-record.policy.json
-  @monitor/domain/monitor.port.json#update
-    @features/monitor/data/kept-update-postgres.graph.json
-      asked @storage/store.port.json#patch  (effect) → store @features/monitor/data/entries-postgres.store.json entries (patch)
+  gated by @features/access/edge/can-register.policy.json → @access/domain/access.port.json#requireRecorder
+  holds  @features/customers/domain/writes-are-for-registrars.invariant.json  through @features/access/edge/can-register.policy.json
+  @customers/domain/customer.port.json#update
+    @features/customers/data/kept-update-postgres.graph.json
+      asked @storage/store.port.json#patch  (effect) → store @features/customers/data/customers-postgres.store.json entries (patch)
       route [switch → row | missing]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
-    @features/monitor/data/update-row.graph.json
+    @features/customers/data/update-row.graph.json
       asked @http/http.port.json#request  (effect)
       route [switch → missing | row | failed]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
       failed @std/outcome.port.json#refuse
-    @features/monitor/data/kept-update.graph.json
-      asked @storage/store.port.json#patch  (effect) → store @features/monitor/data/entries.store.json entries (patch)
+    @features/customers/data/kept-update.graph.json
+      asked @storage/store.port.json#patch  (effect) → store @features/customers/data/customers.store.json entries (patch)
       route [switch → row | missing]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
@@ -659,22 +659,22 @@ every branch settled -- 44 branch(es), 20 decision(s), 16 graph(s).
   @access/domain/access.port.json#signOut
     @features/access/data/end-session.graph.json
       ended @auth/session.port.json#end  (effect)
-orphan  @features/monitor/data/create-row.graph.json
-orphan  @features/monitor/data/kept-list-by-method-postgres.graph.json
-orphan  @features/monitor/data/kept-list-by-method.graph.json
-orphan  @features/monitor/data/kept-list-postgres.graph.json
-orphan  @features/monitor/data/kept-list.graph.json
-orphan  @features/monitor/data/list-rows-by-method.graph.json
-orphan  @features/monitor/data/list-rows.graph.json
-orphan  @features/monitor/data/parse-drafts.graph.json
-orphan  @features/monitor/data/store-and-latest-postgres.graph.json
-orphan  @features/monitor/data/store-and-latest.graph.json
-orphan  @features/monitor/data/write-csv.graph.json
-orphan  @features/monitor/domain/record-all.graph.json
-orphan  @features/monitor/domain/record-each.graph.json
+orphan  @features/customers/data/create-row.graph.json
+orphan  @features/customers/data/kept-list-by-tier-postgres.graph.json
+orphan  @features/customers/data/kept-list-by-tier.graph.json
+orphan  @features/customers/data/kept-list-postgres.graph.json
+orphan  @features/customers/data/kept-list.graph.json
+orphan  @features/customers/data/list-rows-by-tier.graph.json
+orphan  @features/customers/data/list-rows.graph.json
+orphan  @features/customers/data/parse-drafts.graph.json
+orphan  @features/customers/data/store-and-latest-postgres.graph.json
+orphan  @features/customers/data/store-and-latest.graph.json
+orphan  @features/customers/data/write-csv.graph.json
+orphan  @features/customers/domain/register-all.graph.json
+orphan  @features/customers/domain/register-each.graph.json
 orphan  @features/access/domain/require-employee.graph.json
 orphan  @features/access/domain/require-otp.graph.json
-orphan  @features/access/domain/require-recorder.graph.json
+orphan  @features/access/domain/require-registrar.graph.json
 orphan  @features/access/domain/require-signed-in.graph.json</pre></details>
 <h3>Why it matters when an agent writes it</h3>
 <p>This is the test suite the agent did not write. The three branches of the recorder decision each ran to a declared outcome, and the summary counts the new route among the six the invariant holds at, up from five before the agent began. The map says in one line what step 1 said as a refusal: the route holds the invariant, through the policy.</p>
@@ -726,7 +726,7 @@ curl -s localhost:8099/monitor</pre>
 <h3>What the tree answers</h3>
 <pre>500  {"reason":"invariant","message":"'An entry names a call' does not hold: len(url) &gt; 0 &amp;&amp; (method != 'DELETE' || has(agent))"}
 200  []</pre>
-<p>The line in <code>features/monitor/domain/record-all.graph.json</code> that made it so:</p>
+<p>The line in <code>features/customers/domain/register-all.graph.json</code> that made it so:</p>
 <pre>"atomic": true,</pre>
 <h3>Why it matters when an agent writes it</h3>
 <p>Four good rows went in before the fifth refused, and the store holds none of them. The 500 carries the second rule in its own words, and nobody wrote that message. The graph says one word, <code>atomic</code>, and the compiler refused to accept it anywhere the effects could not be one transaction, so the word is checked rather than trusted. An agent that writes a graph with that word gets the promise or a refusal, never a half-written store.</p>
@@ -736,15 +736,15 @@ curl -s localhost:8099/monitor</pre>
 <h2><span class="n">8</span> An edit that never reaches the serving tree</h2>
 <h3>What the agent does</h3>
 <p>With the server still running, the agent puts the step 2 file back over the route: the one without the policy.</p>
-<pre>cp archive-entry.step2.trigger.json features/monitor/edge/archive-entry.trigger.json</pre>
+<pre>cp archive-entry.step2.trigger.json features/customers/edge/archive-entry.trigger.json</pre>
 <p>Then, with the finished file back in place:</p>
-<pre>cp archive-entry.step3.trigger.json features/monitor/edge/archive-entry.trigger.json</pre>
+<pre>cp archive-entry.step3.trigger.json features/customers/edge/archive-entry.trigger.json</pre>
 <h3>What the tree answers</h3>
 <p>The server's log, and the route while the bad file sat on disk:</p>
 <pre>reload refused, still serving the last good tree:
-<b>I001</b>  @features/monitor/edge/archive-entry.trigger.json#policies
-    trigger reaches @features/monitor/domain/monitor.port.json#remove, which 'Writes are for recorders' (@features/monitor/domain/writes-are-for-recorders.invariant.json) gates with @access/edge/can-record.policy.json, but attaches no such policy
-    → attach "@access/edge/can-record.policy.json" under policies, or take @features/monitor/domain/monitor.port.json#remove out of the invariant's over
+<b>I001</b>  @features/customers/edge/archive-entry.trigger.json#policies
+    trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for recorders' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy
+    → attach "@access/edge/can-register.policy.json" under policies, or take @features/customers/domain/customer.port.json#remove out of the invariant's over
 
 401  {"reason":"anonymous","message":"sign in first: no token was presented"}</pre>
 <pre>reload: 186 documents, serving the new tree</pre>

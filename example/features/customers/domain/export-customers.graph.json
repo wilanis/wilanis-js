@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "Export customers",
+  "description": "Domain graph behind GET /customers.csv: every customer, written as one CSV file.",
+  "out": {
+    "type": "blob",
+    "from": "file"
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "all",
+      "label": "Every customer",
+      "run": "@customers/domain/customer.port.json#listAll"
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "file",
+      "label": "As a file",
+      "run": "@customers/domain/customer.port.json#toCsv",
+      "in": {
+        "customers": "{{all}}"
+      }
+    }
+  ]
+}

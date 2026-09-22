@@ -81,10 +81,10 @@ entry. The shape changes in `domain/`, and the store in `data/` says the one thi
   "$schema": "@wilanis/store.schema.json",
   "label": "Entries",
   "description": "Observed calls, one row each; a url is observed once per method. A note is a field of the entry.",
-  "connection": "@connections/entries.connection.json",
+  "connection": "@connections/customers.connection.json",
   "collections": {
     "entries": {
-      "of": "@monitor/domain/Entry.shape.json",
+      "of": "@customers/domain/Customer.shape.json",
       "key": "id",
       "unique": [["url", "method"]],
       "defaults": { "agent": "unknown" },
@@ -101,7 +101,7 @@ current name, as every mark is (RFC 0003).
 
 ```
 $ wilanis migrate example --profile production
-plan for @connections/entries.connection.json  (postgres, granted by @storage-postgres)
+plan for @connections/customers.connection.json  (postgres, granted by @storage-postgres)
   entries
     rename   ua → agent                                     transformative
     add      note  text, optional                           additive
@@ -116,7 +116,7 @@ third, saying so; to drop the table the operator names it:
 
 ```
 $ wilanis migrate example --profile production --apply --allow-destructive notes
-plan for @connections/entries.connection.json  (postgres, granted by @storage-postgres)
+plan for @connections/customers.connection.json  (postgres, granted by @storage-postgres)
   entries
     rename   ua → agent                                     transformative   applied
     add      note  text, optional                           additive         applied
@@ -130,10 +130,10 @@ The next run finds nothing to do, and one thing to say:
 
 ```
 $ wilanis migrate example --profile production
-plan for @connections/entries.connection.json  (postgres, granted by @storage-postgres)
+plan for @connections/customers.connection.json  (postgres, granted by @storage-postgres)
   entries
     up to date; renamed.agent has been applied
-      → remove "renamed": { "agent": "ua" } from @monitor/data/entries.store.json
+      → remove "renamed": { "agent": "ua" } from @customers/data/customers.store.json
 
 nothing to apply
 ```
@@ -162,7 +162,7 @@ what changes is that it computes the same plan and applies it when every step is
 
 ```
 startup 1/3 Prepare the entry store: refused as 'drift'
-  @connections/entries.connection.json is behind @monitor/data/entries.store.json:
+  @connections/customers.connection.json is behind @customers/data/customers.store.json:
     entries  rename ua → agent (transformative); notes  drop collection (17 rows, destructive)
   → wilanis migrate example --profile production; ensure applies additive steps only
 ```
@@ -351,7 +351,7 @@ a default is `ADD COLUMN ... DEFAULT` followed by `DROP DEFAULT`, as RFC 0003's 
 
 `@wilanis/plugin-storage-memory` keeps nothing between processes, so there is nothing to record and nothing to
 migrate: `recorded` and `inspect` answer nothing, `rows` zero, `apply` does nothing, and the command prints
-`@connections/entries.connection.json  (memory): nothing kept between processes, nothing to migrate` for its
+`@connections/customers.connection.json  (memory): nothing kept between processes, nothing to migrate` for its
 connections. `ensure` on it keeps answering zeros.
 
 **`ensure` over the planner.** `ensure`'s handler in `@storage` (RFC 0002) becomes: lower the store, ask the engine

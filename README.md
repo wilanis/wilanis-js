@@ -64,17 +64,17 @@ a document of its own comes once this definition has settled.
     "produces": "application/json",
     "response": { "refusals": { "missing": 404, "upstream": 502, "invariant": 500 } }
   },
-  "in": "@monitor/edge/IdRequest.shape.json",
-  "out": "@monitor/edge/EntryView.shape.json",
+  "in": "@customers/edge/IdRequest.shape.json",
+  "out": "@customers/edge/CustomerView.shape.json",
   "fire": {
-    "run": "@monitor/domain/monitor.port.json#get",
+    "run": "@customers/domain/customer.port.json#get",
     "in": { "id": "{{request.params.id}}" }
   }
 }
 ```
 
 A GET on `/monitor/{id}`, open to anyone because it names no policy. It takes an `IdRequest` and answers an
-`EntryView`, both declared in files of their own. It runs the `get` operation of the `monitor` port with the
+`CustomerView`, both declared in files of their own. It runs the `get` operation of the `monitor` port with the
 id from the URL. If that operation refuses with `missing`, the client gets a 404; with `upstream`, a 502; with
 `invariant` -- the word a guard the compiler lowers refuses with, where an invariant of the tree could not be
 proved of the value a graph made -- a 500.
@@ -102,7 +102,7 @@ outcomes it routes to.
   "id": "missing",
   "type": "@wilanis/node/run.schema.json",
   "run": "@std/outcome.port.json#refuse",
-  "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@monitor/domain/Entry.shape.json" }
+  "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" }
 }
 ```
 
@@ -122,8 +122,8 @@ nothing is installed here.
 Rename an operation in the port and forget the route that calls it:
 
 ```
-R001  @features/monitor/edge/get-entry.trigger.json#fire/run
-    port '@monitor/domain/monitor.port.json' has no operation 'fetch' (operations: listAll, listByMethod, get, ...)
+R001  @features/customers/edge/get-customer.trigger.json#fire/run
+    port '@customers/domain/customer.port.json' has no operation 'fetch' (operations: listAll, listByMethod, get, ...)
     → wilanis ls port
 ```
 
@@ -143,15 +143,15 @@ in a file of its own:
   "label": "Writes are for recorders",
   "access": {
     "over": [
-      "@monitor/domain/monitor.port.json#record",
-      "@monitor/domain/monitor.port.json#update",
-      "@monitor/domain/monitor.port.json#remove",
-      "@monitor/domain/monitor.port.json#removeMany",
-      "@monitor/domain/monitor.port.json#submit",
-      "@monitor/domain/monitor.port.json#import"
+      "@customers/domain/customer.port.json#register",
+      "@customers/domain/customer.port.json#update",
+      "@customers/domain/customer.port.json#remove",
+      "@customers/domain/customer.port.json#removeMany",
+      "@customers/domain/customer.port.json#submit",
+      "@customers/domain/customer.port.json#import"
     ],
     "requires": {
-      "policy": "@access/edge/can-record.policy.json"
+      "policy": "@access/edge/can-register.policy.json"
     }
   }
 }
@@ -161,12 +161,12 @@ It names operations, never a role: what the gate decides is the policy's busines
 from `POST /monitor.csv` and the tree no longer checks:
 
 ```
-I001  @features/monitor/edge/import-entries.trigger.json#policies
-    trigger reaches @features/monitor/domain/monitor.port.json#import, which 'Writes are for recorders'
-    (@features/monitor/domain/writes-are-for-recorders.invariant.json) gates with
-    @access/edge/can-record.policy.json, but attaches no such policy
-    → attach "@access/edge/can-record.policy.json" under policies, or take
-      @features/monitor/domain/monitor.port.json#import out of the invariant's over
+I001  @features/customers/edge/import-customers.trigger.json#policies
+    trigger reaches @features/customers/domain/customer.port.json#import, which 'Writes are for recorders'
+    (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with
+    @access/edge/can-register.policy.json, but attaches no such policy
+    → attach "@access/edge/can-register.policy.json" under policies, or take
+      @features/customers/domain/customer.port.json#import out of the invariant's over
 ```
 
 Reaching is transitive, so the route that forgets the gate is caught whether it fires a covered operation
@@ -184,7 +184,7 @@ guarded where only a run can.
 inputs reach each rule, and runs that branch too:
 
 ```
-features/monitor/data/get-row  switch 'route'  3/3 branches
+features/customers/data/get-row  switch 'route'  3/3 branches
   ok  when status == 404               refused on purpose at 'missing' as missing: "no entry golf"
   ok  when status == 200 && has(body)  answered from 'row'
   ok  anything else                    refused on purpose at 'failed' as upstream: "the monitor API answered 500"

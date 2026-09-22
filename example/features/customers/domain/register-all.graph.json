@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "Record all drafts",
+  "atomic": true,
+  "description": "Domain graph behind customer.registerAll where the customers are kept in a store: every draft recorded, or none. A draft that refuses rolls back the rows recorded before it, so a half-imported file is not a state this tree can be left in. The map still fans out -- the drafts are submitted at once, not one after another -- and on the connection the writes are paced into the one transaction.",
+  "in": "@customers/domain/CustomerDraft.shape.json[]",
+  "out": {
+    "type": "@customers/domain/Customer.shape.json[]",
+    "from": "recorded"
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/map.schema.json",
+      "id": "recorded",
+      "label": "Record each draft",
+      "description": "customer.submit once per row; the row's name, email and tier are the submission",
+      "run": "@customers/domain/customer.port.json#submit",
+      "over": "{{in}}",
+      "bind": {
+        "name": "name",
+        "email": "email",
+        "tier": "tier"
+      }
+    }
+  ]
+}

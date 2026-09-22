@@ -41,7 +41,7 @@ describe.skipIf(!url)('the example, importing into PostgreSQL under one transact
     // is this case's own rather than a defaulted 0, which would be a position and not an absent one
     let at = 0;
     const run = (op: string, input: Record<string, unknown> = {}) =>
-      emb.startup({ run: `@monitor/domain/monitor.port.json#${op}`, in: input }, { blobs: scope, at: at++ });
+      emb.startup({ run: `@customers/domain/customer.port.json#${op}`, in: input }, { blobs: scope, at: at++ });
     const upload = (text: string) => scope.put(text, { contentType: 'text/csv', filename: 'entries.csv' });
     const mark = `https://${Date.now()}.example/`;
     try {

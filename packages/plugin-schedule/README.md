@@ -32,8 +32,8 @@ it and the runtime stops it when the process stops. Delete the step and no tick 
   "description": "At three in the morning, UTC, the digest.",
   "kind": "@schedule/schedule.trigger-kind.json",
   "settings": { "cron": "0 3 * * *", "timezone": "UTC" },
-  "out": "@monitor/edge/DigestView.shape.json",
-  "fire": { "run": "@monitor/domain/monitor.port.json#digest" }
+  "out": "@customers/edge/DigestView.shape.json",
+  "fire": { "run": "@customers/domain/customer.port.json#digest" }
 }
 ```
 

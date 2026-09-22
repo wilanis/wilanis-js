@@ -46,7 +46,7 @@ What the writing finds, read against the code:
   They do not agree on which node ended the run: `refusalOf` takes the first `failed` node in declaration order,
   `failedLeaf` in `stubbing.ts` recurses into `sub`.
 - **A fault cannot be routed.** A failed node never enters the run's values, never settles, and `Run.fail` cancels
-  everything pending; a `switch` downstream of it never runs. So `@monitor/data/get-row.graph.json` decides what a
+  everything pending; a `switch` downstream of it never runs. So `@customers/data/get-row.graph.json` decides what a
   404 and a 500 from the upstream mean and cannot decide what *no answer at all* means: `fetch` rejecting, a
   connection refused, a timeout. Those are answered 500 with the platform's message in the body, and the trigger's
   `response.refusals`, which already maps `upstream` to 502, never sees them.
@@ -97,8 +97,8 @@ too, and the word it says is one the trigger already maps:
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Get a row",
   "description": "Data graph behind monitor.get: GET the row. 200 is the entry, 404 is the declared refusal for an id that does not exist, anything else the API says is upstream, and so is the API saying nothing at all.",
-  "in": "@monitor/domain/EntryRef.shape.json",
-  "out": { "type": "@monitor/domain/Entry.shape.json", "from": ["row", "missing", "failed", "unreachable"] },
+  "in": "@customers/domain/CustomerRef.shape.json",
+  "out": { "type": "@customers/domain/Customer.shape.json", "from": ["row", "missing", "failed", "unreachable"] },
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
@@ -106,11 +106,11 @@ too, and the word it says is one the trigger already maps:
       "label": "GET the row",
       "run": "@http/http.port.json#request",
       "in": {
-        "connection": "@connections/monitor-api.connection.json",
+        "connection": "@connections/customers-api.connection.json",
         "method": "GET",
         "path": "/monitor/{{in.id}}",
         "produces": "application/json",
-        "returns": "@monitor/edge/EntryRow.shape.json"
+        "returns": "@customers/edge/CustomerRow.shape.json"
       }
     },
     {
@@ -126,13 +126,13 @@ too, and the word it says is one the trigger already maps:
       "catch": { "asked": "unreachable" }
     },
     { "type": "@wilanis/node/run.schema.json", "id": "row", "label": "The row", "run": "@std/object.port.json#make",
-      "in": { "value": "{{asked.body}}", "type": "@monitor/edge/EntryRow.shape.json" } },
+      "in": { "value": "{{asked.body}}", "type": "@customers/edge/CustomerRow.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "missing", "label": "No such entry", "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@monitor/domain/Entry.shape.json" } },
+      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "failed", "label": "Unexpected answer", "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "upstream", "message": "the monitor API answered {{asked.status}}", "type": "@monitor/domain/Entry.shape.json" } },
+      "in": { "reason": "upstream", "message": "the monitor API answered {{asked.status}}", "type": "@customers/domain/Customer.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "unreachable", "label": "No answer", "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "upstream", "message": "the monitor API could not be reached", "type": "@monitor/domain/Entry.shape.json" } }
+      "in": { "reason": "upstream", "message": "the monitor API could not be reached", "type": "@customers/domain/Customer.shape.json" } }
   ]
 }
 ```
@@ -140,7 +140,7 @@ too, and the word it says is one the trigger already maps:
 `catch` says: when `asked` breaks, this switch routes to `unreachable`, as if a rule had held. The rules are not
 tried -- there is no `status` to read -- and `else` is not taken; `unreachable` runs, refuses `upstream`, and the
 route answers 502 with `{ "reason": "upstream", "message": "the monitor API could not be reached" }`, which is what
-`get-entry.trigger.json` has said an `upstream` is since it was written. Nothing in the trigger changes. A refusal
+`get-customer.trigger.json` has said an `upstream` is since it was written. Nothing in the trigger changes. A refusal
 is never caught: had `asked` been a node that runs `refuse`, or a nested graph that refused `missing`, the run ends
 with that reason as it does today, because a refusal is the graph's own decision and the trigger is already holding
 it. The node that caught the fault is still `failed` in the report, with the message the handler threw, marked as
@@ -150,7 +150,7 @@ caught; the operator sees what broke, the caller sees the outcome the graph decl
 and the checker refuses:
 
 ```
-G0n3  @features/monitor/data/get-row.graph.json#nodes/unreachable/in/message
+G0n3  @features/customers/data/get-row.graph.json#nodes/unreachable/in/message
     reads 'asked', whose fault routed here: it produced nothing
     → say it without the value; the report and the trace carry what asked threw
 ```
@@ -158,7 +158,7 @@ G0n3  @features/monitor/data/get-row.graph.json#nodes/unreachable/in/message
 **What `rehearse` shows.** A catch is a branch, and the rehearsal walks it by making the stubbed effect break:
 
 ```
-features/monitor/data/get-row  switch 'route'  4/4 branches
+features/customers/data/get-row  switch 'route'  4/4 branches
   ok  when status == 404               refused on purpose at 'missing' as missing: "no entry golf"
   ok  when status == 200 && has(body)  answered from 'row'
   ok  anything else                    refused on purpose at 'failed' as upstream: "the monitor API answered 500"
@@ -183,8 +183,8 @@ The 500 says nothing of what broke: the run's id is what a caller quotes and an 
 log line says the rest, with the outcome's word instead of `failed`:
 
 ```
-GET /monitor/golf → 404 (12ms, @monitor/domain/monitor.port.json#get refused: missing)
-GET /monitor/golf → 500 (143ms, @monitor/domain/monitor.port.json#get failed at 'asked': fetch failed)  run=01J8ZK5R9V3Q
+GET /monitor/golf → 404 (12ms, @customers/domain/customer.port.json#get refused: missing)
+GET /monitor/golf → 500 (143ms, @customers/domain/customer.port.json#get failed at 'asked': fetch failed)  run=01J8ZK5R9V3Q
 GET /nope → 404 (0ms, no trigger)
 ```
 
@@ -269,7 +269,7 @@ this RFC (G005, G009, G010, G011, L002, T005, T006, A002, A003, S001) were check
 
 Three things follow from rules that exist. `refusalsReachable` in `refusals.ts` walks every node of a graph
 whatever the routing (`graphRefusals`), so the `refuse` node a `catch` routes to contributes its reason with no
-change, and T005 holds the trigger to it; the example's `unreachable` says `upstream`, which `get-entry.trigger.json`
+change, and T005 holds the trigger to it; the example's `unreachable` says `upstream`, which `get-customer.trigger.json`
 maps already, so `codes(EXAMPLE)` stays empty. G010 already asks that every `out.from` candidate answer the
 graph's type, and a `refuse` node "declares a type so it can stand as an out.from candidate" (`outcome.port.json`),
 so `unreachable` joins `from` as `missing` and `failed` do. `Narrowing` in `check/narrowing.ts` proves nothing for

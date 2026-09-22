@@ -56,7 +56,7 @@ describe('env.ports', () => {
     await expect(firing(ports => ports('@keep/files.port.json#get', { key: 'a' }))).rejects.toThrow(
       "env.ports fires the ports a plugin requires, and '@keep/files.port.json' is not one",
     );
-    await expect(firing(ports => ports('@monitor/domain/monitor.port.json#list', {}))).rejects.toThrow(/is not one/);
+    await expect(firing(ports => ports('@customers/domain/customer.port.json#list', {}))).rejects.toThrow(/is not one/);
     await expect(firing(ports => ports('@keep/memory.port.json#nope', {}))).rejects.toThrow(/^env\.ports: /);
   });
 });
@@ -64,7 +64,7 @@ describe('env.ports', () => {
 describe('a binding of a required port', () => {
   it('B009 when it reads the request, since the plugin fires it with none judged', async () => {
     const said = await refusals(true, keeper(), binding => {
-      binding.reads = { agent: '@monitor/edge/request.resolvers.json#agent' };
+      binding.reads = { agent: '@customers/edge/request.resolvers.json#agent' };
       binding.operations.get.in = { key: '{{agent}}' };
     });
     expect(said.filter(one => one.startsWith('B009'))).toEqual([

@@ -36,7 +36,7 @@ fast" rests on that speech: 62 codes in 11 families, each with a `hint` the type
 habit and a contract.
 
 - **The output is prose, parsed by regex or not at all.** `check` in `packages/runtime/src/cli.ts` prints
-  `RefusalList.format()` to stderr -- `L003  @features/monitor/data/get-row.graph.json#nodes/asked`, the message
+  `RefusalList.format()` to stderr -- `L003  @features/customers/data/get-row.graph.json#nodes/asked`, the message
   indented, the hint after an arrow -- then `6 refusal(s)` and exits 1. An agent that wants the code and the path
   splits on two spaces and a `#`. `rehearse` and `regress` answer `{ ok, lines }` (`Rehearsal` in `rehearse.ts`,
   `regress` in `fuzz.ts`), and the `Decision[]` that `rehearse` gathers -- graph, switch, triggers, branches, what
@@ -54,7 +54,7 @@ habit and a contract.
   -- so a reorder of nodes moves nothing. D001, made from the schema validator's `instancePath` in
   `packages/core/src/validate.ts` (`groupByPath`), addresses the same node by index: `nodes/0/in`. An agent that
   learns one form from a checker refusal applies it to a schema refusal and edits the wrong node.
-- **The fix is said, never given.** L003's hint is `add "@http/http.port.json#request" to @features/monitor/feature.json
+- **The fix is said, never given.** L003's hint is `add "@http/http.port.json#request" to @features/customers/feature.json
   → effects`: a file, a path and a value, written as a sentence. R001's message lists the operations the port has
   (`operations: request`) and its hint says `wilanis ls port`, leaving a one-letter typo for the reader to spot.
   D008's hint spells the destination path in full. For each, the rule computed the edit and then wrote it in words;
@@ -94,10 +94,10 @@ the checker:
 
 ```
 $ wilanis check example
-L003  @features/monitor/data/create-row.graph.json#nodes/asked
+L003  @features/customers/data/create-row.graph.json#nodes/asked
     node 'asked' runs effectful '@http/http.port.json#request' which the feature does not allow
-    → add "@http/http.port.json#request" to @features/monitor/feature.json → effects
-L003  @features/monitor/data/delete-row.graph.json#nodes/asked
+    → add "@http/http.port.json#request" to @features/customers/feature.json → effects
+L003  @features/customers/data/delete-row.graph.json#nodes/asked
     ...
 6 refusal(s)
 ```
@@ -117,26 +117,26 @@ $ wilanis check example --json
     {
       "code": "L003",
       "family": "L",
-      "file": "@features/monitor/data/create-row.graph.json",
+      "file": "@features/customers/data/create-row.graph.json",
       "at": "nodes/asked",
       "message": "node 'asked' runs effectful '@http/http.port.json#request' which the feature does not allow",
-      "hint": "add \"@http/http.port.json#request\" to @features/monitor/feature.json → effects",
+      "hint": "add \"@http/http.port.json#request\" to @features/customers/feature.json → effects",
       "url": "https://github.com/wilanis/wilanis-js/blob/main/docs/refusals/L003.md",
       "fixes": [
-        { "file": "@features/monitor/feature.json", "at": "effects", "add": "@http/http.port.json#request" }
+        { "file": "@features/customers/feature.json", "at": "effects", "add": "@http/http.port.json#request" }
       ]
     },
-    { "code": "L003", "family": "L", "file": "@features/monitor/data/delete-row.graph.json", "...": "the same fix" },
-    { "code": "L003", "family": "L", "file": "@features/monitor/data/get-row.graph.json", "...": "the same fix" },
-    { "code": "L003", "family": "L", "file": "@features/monitor/data/list-rows-by-method.graph.json", "...": "..." },
-    { "code": "L003", "family": "L", "file": "@features/monitor/data/list-rows.graph.json", "...": "..." },
-    { "code": "L003", "family": "L", "file": "@features/monitor/data/update-row.graph.json", "...": "..." }
+    { "code": "L003", "family": "L", "file": "@features/customers/data/delete-row.graph.json", "...": "the same fix" },
+    { "code": "L003", "family": "L", "file": "@features/customers/data/get-row.graph.json", "...": "the same fix" },
+    { "code": "L003", "family": "L", "file": "@features/customers/data/list-rows-by-tier.graph.json", "...": "..." },
+    { "code": "L003", "family": "L", "file": "@features/customers/data/list-rows.graph.json", "...": "..." },
+    { "code": "L003", "family": "L", "file": "@features/customers/data/update-row.graph.json", "...": "..." }
   ]
 }
 ```
 
 Six refusals, one fix: every one names the same edit to the same file, and `add` is idempotent -- applying it six
-times appends the value once. An agent reads `fixes[0]`, opens `@features/monitor/feature.json`, appends the string
+times appends the value once. An agent reads `fixes[0]`, opens `@features/customers/feature.json`, appends the string
 to the list at `effects`, and runs `check` again: `{ "ok": true, "documents": 140, "refusals": [] }`. It read no
 message.
 
@@ -147,20 +147,20 @@ message.
   "refusals": [
     {
       "code": "R001", "family": "R",
-      "file": "@features/monitor/data/get-row.graph.json", "at": "nodes/asked/run",
+      "file": "@features/customers/data/get-row.graph.json", "at": "nodes/asked/run",
       "message": "port '@http/http.port.json' has no operation 'requst' (operations: request)",
       "hint": "wilanis ls port",
       "url": "https://github.com/wilanis/wilanis-js/blob/main/docs/refusals/R001.md",
-      "fixes": [ { "file": "@features/monitor/data/get-row.graph.json", "at": "nodes/asked/run", "set": "@http/http.port.json#request" } ]
+      "fixes": [ { "file": "@features/customers/data/get-row.graph.json", "at": "nodes/asked/run", "set": "@http/http.port.json#request" } ]
     },
     {
       "code": "G011", "family": "G",
-      "file": "@features/monitor/data/get-row.graph.json", "at": "nodes/route/rules/0/when",
+      "file": "@features/customers/data/get-row.graph.json", "at": "nodes/route/rules/0/when",
       "message": "rule 0: 'status' is not an input of this node (inputs: none)",
       "hint": "write when as an expression over this node's inputs",
       "url": "https://github.com/wilanis/wilanis-js/blob/main/docs/refusals/G011.md"
     },
-    { "code": "G011", "family": "G", "file": "@features/monitor/data/get-row.graph.json", "at": "nodes/route/rules/1/when", "...": "..." }
+    { "code": "G011", "family": "G", "file": "@features/customers/data/get-row.graph.json", "at": "nodes/route/rules/1/when", "...": "..." }
   ]
 }
 ```
@@ -171,16 +171,16 @@ no fix and need none: they are the same typo seen from the switch that reads the
 what the sort order already says -- in one file, take the first refusal, apply it, check again -- and the second run
 is empty. Had it "fixed" the G011s by rewriting the rules, it would have broken the graph to satisfy a symptom.
 
-**A fix that moves a file.** Put `monitor-api.connection.json` under `features/monitor/data/`:
+**A fix that moves a file.** Put `customers-api.connection.json` under `features/customers/data/`:
 
 ```json
 {
   "code": "D008", "family": "D",
-  "file": "features/monitor/data/monitor-api.connection.json",
+  "file": "features/customers/data/customers-api.connection.json",
   "message": "a connection lives under connections/",
-  "hint": "a connection is a channel to an external system, shared across features; move it to connections/monitor-api.connection.json",
+  "hint": "a connection is a channel to an external system, shared across features; move it to connections/customers-api.connection.json",
   "url": "https://github.com/wilanis/wilanis-js/blob/main/docs/refusals/D008.md",
-  "fixes": [ { "file": "features/monitor/data/monitor-api.connection.json", "move": "connections/monitor-api.connection.json" } ]
+  "fixes": [ { "file": "features/customers/data/customers-api.connection.json", "move": "connections/customers-api.connection.json" } ]
 }
 ```
 
@@ -201,8 +201,8 @@ rewrite the author's intent to silence the validator. D001 offers nothing.
   "refusals": [],
   "decisions": [
     {
-      "graph": "@features/monitor/data/get-row.graph.json", "node": "route",
-      "triggers": ["@features/monitor/edge/get-entry.trigger.json"],
+      "graph": "@features/customers/data/get-row.graph.json", "node": "route",
+      "triggers": ["@features/customers/edge/get-customer.trigger.json"],
       "branches": [
         { "when": "status == 404", "to": "missing", "settled": { "status": "failed", "blocked": false, "declared": { "reason": "missing", "message": "no entry hotel403" } } },
         { "when": "status == 200 && has(body)", "to": "row", "settled": { "status": "done", "blocked": false } },
@@ -265,9 +265,9 @@ from inside.
 
 ## Example
 
-    L003  @features/monitor/data/get-row.graph.json#nodes/asked
+    L003  @features/customers/data/get-row.graph.json#nodes/asked
         node 'asked' runs effectful '@http/http.port.json#request' which the feature does not allow
-        → add "@http/http.port.json#request" to @features/monitor/feature.json → effects
+        → add "@http/http.port.json#request" to @features/customers/feature.json → effects
 
 ## Fix
 
@@ -444,9 +444,9 @@ only the codes) and `applyFix(dir, fix)` -- `set`, `add`, `remove` on the parsed
 
 | Rule | The sabotage | Asserts |
 |---|---|---|
-| L003 | `@http/http.port.json#request` removed from the monitor feature's `effects` | six refusals, each with the one fix `{ file: '@features/monitor/feature.json', at: 'effects', add: '@http/http.port.json#request' }`; applying `fixes[0]` of the first leaves `codes` empty; applying all six leaves `effects` with the value once |
+| L003 | `@http/http.port.json#request` removed from the monitor feature's `effects` | six refusals, each with the one fix `{ file: '@features/customers/feature.json', at: 'effects', add: '@http/http.port.json#request' }`; applying `fixes[0]` of the first leaves `codes` empty; applying all six leaves `effects` with the value once |
 | R001 | `get-row`'s `asked` runs `#requst`; then `#reqeust`; then `#xyz`; then a planted port with `get` and `set` and a node running `#sit` | `set: '@http/http.port.json#request'` for the first two and applying it leaves `codes` empty (the G011s go with it); no `fixes` for the third and fourth |
-| D008 | `monitor-api.connection.json` relocated under `features/monitor/data/`; `get-row.graph.json` relocated to `edge/`; `Entry.shape.json` given `"layer": "edge"` | one `move` and applying it leaves `codes` empty; no `fixes`; two alternatives in that order, and applying either leaves `codes` empty |
+| D008 | `customers-api.connection.json` relocated under `features/customers/data/`; `get-row.graph.json` relocated to `edge/`; `Customer.shape.json` given `"layer": "edge"` | one `move` and applying it leaves `codes` empty; no `fixes`; two alternatives in that order, and applying either leaves `codes` empty |
 | every rule | the whole suite | no refusal of any sabotage in the existing suites carries a `fixes` that, applied, leaves a refusal of the same code behind -- a guard that the rule of `fixes` holds for whatever a later pull request adds |
 
 **Runtime**, `packages/runtime/test/tools.test.ts`, on copies of the example:

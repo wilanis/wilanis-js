@@ -11,8 +11,8 @@ import plugin, { engines } from '../src/index.js';
 
 const KIND = '@fake/fake.connection-kind.json';
 const CONNECTION = '@connections/records.connection.json';
-const STORE = '@features/monitor/data/entries.store.json';
-const SHAPE = '@features/monitor/domain/Entry.shape.json';
+const STORE = '@features/customers/data/customers.store.json';
+const SHAPE = '@features/customers/domain/Customer.shape.json';
 
 const types = new TypeResolver(() => undefined);
 const ENTRY: Type = types.inline({

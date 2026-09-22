@@ -28,7 +28,7 @@ import { docsDir } from './example-harness.js';
  */
 describe('a startup step that prepares a store', () => {
   const Kind = '@drifty/drifty.connection-kind.json';
-  const Store = '@features/keep/data/entries.store.json';
+  const Store = '@features/keep/data/customers.store.json';
 
   /** What the fake engine's record holds for a collection, how many rows it has, and what a plan did to it. */
   interface Keeps {
@@ -154,7 +154,7 @@ describe('a startup step that prepares a store', () => {
       description: 'what the tree keeps',
       effects: ['@storage/storage.port.json#ensure'],
     });
-    put('features/keep/domain/Entry.shape.json', {
+    put('features/keep/domain/Customer.shape.json', {
       $schema: schemaRef('shape'),
       description: 'one observed call',
       layer: 'core',
@@ -176,11 +176,11 @@ describe('a startup step that prepares a store', () => {
         },
       },
     });
-    put('features/keep/data/entries.store.json', {
+    put('features/keep/data/customers.store.json', {
       $schema: schemaRef('store'),
       description: 'the entries kept so far',
       connection: '@connections/records.connection.json',
-      collections: { entries: { of: '@features/keep/domain/Entry.shape.json', key: 'id', ...collection } },
+      collections: { entries: { of: '@features/keep/domain/Customer.shape.json', key: 'id', ...collection } },
     });
     put('features/keep/data/keeping.binding.json', {
       $schema: schemaRef('binding'),

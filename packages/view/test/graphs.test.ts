@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { type DocView, viewOf } from '../src/index.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
-const GET_ROW = '@features/monitor/data/get-row.graph.json';
+const GET_ROW = '@features/customers/data/get-row.graph.json';
 
 const view = async (path: string): Promise<DocView> => {
   const seen = viewOf(await loadProject(EXAMPLE), path);
@@ -37,16 +37,20 @@ describe('the view model of a graph', () => {
     expect(asked.inputs.find(port => port.name === 'body')).toMatchObject({ missing: true, required: false });
     // a literal that names a document carries the canonical path, so the page can label and link it
     expect(asked.inputs.find(port => port.name === 'returns')).toMatchObject({
-      literal: '"@monitor/edge/EntryRow.shape.json"',
-      ref: '@features/monitor/edge/EntryRow.shape.json',
+      literal: '"@customers/edge/CustomerRow.shape.json"',
+      ref: '@features/customers/edge/CustomerRow.shape.json',
     });
-    expect(asked.inputs.find(port => port.name === 'connection')?.ref).toBe('@connections/monitor-api.connection.json');
+    expect(asked.inputs.find(port => port.name === 'connection')?.ref).toBe(
+      '@connections/customers-api.connection.json',
+    );
     // the result's fields are output ports, with the type variable bound from `returns`
     expect(asked.outputs.map(port => port.name)).toEqual(['', 'status', 'headers', 'body']);
-    expect(asked.outputs.find(port => port.name === 'body')?.type).toBe('@features/monitor/edge/EntryRow.shape.json');
+    expect(asked.outputs.find(port => port.name === 'body')?.type).toBe(
+      '@features/customers/edge/CustomerRow.shape.json',
+    );
     const input = seen.graph!.nodes.find(node => node.id === 'in')!;
     expect(input.label).toBe('Input');
-    expect(input.type).toBe('@features/monitor/domain/EntryRef.shape.json');
+    expect(input.type).toBe('@features/customers/domain/CustomerRef.shape.json');
     expect(input.outputs.map(port => port.name)).toEqual(['', 'id']);
   });
 
@@ -111,7 +115,7 @@ describe('the view model of a graph', () => {
 
   it('says a membership rule in words, so every operator of the grammar draws', async () => {
     // 'recorder' in principal.roles used to crash the view: the page 500'd on the graph behind every write
-    const seen = await view('@features/access/domain/require-recorder.graph.json');
+    const seen = await view('@features/access/domain/require-registrar.graph.json');
     const rule = seen.graph!.nodes.find(node =>
       node.says?.some(line => line.parts.some(part => part.text === ' is among ')),
     );
@@ -122,7 +126,7 @@ describe('the view model of a graph', () => {
     const seen = await view(GET_ROW);
     const out = seen.graph!.nodes.find(node => node.id === 'out')!;
     expect(out.inputs).toEqual([]);
-    expect(out.type).toBe('@features/monitor/domain/Entry.shape.json');
+    expect(out.type).toBe('@features/customers/domain/Customer.shape.json');
     expect(out.fields!.map(port => [port.name, port.type, port.required])).toEqual([
       ['id', 'string', true],
       ['url', 'string', true],
@@ -139,61 +143,61 @@ describe('the view model of a graph', () => {
       label: '3rd candidate',
     });
     // one candidate needs no ordinal: nothing else could have answered
-    const single = await view('@features/monitor/domain/record-entry.graph.json');
+    const single = await view('@features/customers/domain/register-customer.graph.json');
     expect(edge(single, { from: 'recorded', fromPort: '', to: 'out', toPort: '' })?.label).toBeUndefined();
   });
 
   it('names who calls a graph: the binding that binds it, and the trigger that fires the port operation, via it', async () => {
     const seen = await view(GET_ROW);
     expect(seen.callers).toContainEqual({
-      path: '@features/monitor/data/monitor-rest.binding.json',
+      path: '@features/customers/data/customers-rest.binding.json',
       label: 'REST storage',
       kind: 'binding',
       at: '/operations/get/graph',
     });
     expect(seen.callers).toContainEqual({
-      path: '@features/monitor/edge/get-entry.trigger.json',
+      path: '@features/customers/edge/get-customer.trigger.json',
       label: 'GET /monitor/{id}',
       kind: 'trigger',
       at: '/fire/run',
-      via: '@features/monitor/domain/monitor.port.json#get',
+      via: '@features/customers/domain/customer.port.json#get',
     });
   });
 
   it('points a domain call at its implementation: the graph behind the binding', async () => {
-    const seen = await view('@features/monitor/domain/list-entries.graph.json');
+    const seen = await view('@features/customers/domain/list-customers.graph.json');
     expect(seen.graph!.role).toBe('domain');
     const byMethod = seen.graph!.nodes.find(node => node.id === 'byMethod')!;
-    const ByMethod = '@features/monitor/data/list-rows-by-method.graph.json';
+    const ByMethod = '@features/customers/data/list-rows-by-tier.graph.json';
     expect(byMethod.target).toEqual({
-      op: '@features/monitor/domain/monitor.port.json#listByMethod',
+      op: '@features/customers/domain/customer.port.json#listByTier',
       opName: 'listByMethod',
-      port: '@features/monitor/domain/monitor.port.json',
+      port: '@features/customers/domain/customer.port.json',
       portLabel: 'Entry storage',
       native: false,
       // the port has three bindings now, and the viewer names both: which one answers is the profile's
       bindings: [
         {
-          path: '@features/monitor/data/monitor-postgres.binding.json',
+          path: '@features/customers/data/customers-postgres.binding.json',
           label: 'PostgreSQL storage',
-          graph: '@features/monitor/data/kept-list-by-method-postgres.graph.json',
+          graph: '@features/customers/data/kept-list-by-tier-postgres.graph.json',
           graphLabel: 'List what is kept, by method',
         },
         {
-          path: '@features/monitor/data/monitor-rest.binding.json',
+          path: '@features/customers/data/customers-rest.binding.json',
           label: 'REST storage',
           graph: ByMethod,
           graphLabel: 'List rows by method',
         },
         {
-          path: '@features/monitor/data/monitor-store.binding.json',
+          path: '@features/customers/data/customers-store.binding.json',
           label: 'Monitor over a store',
-          graph: '@features/monitor/data/kept-list-by-method.graph.json',
+          graph: '@features/customers/data/kept-list-by-tier.graph.json',
           graphLabel: 'List what is kept, by method',
         },
       ],
       // the first binding by path, which is what the page offers before a reader picks a profile
-      implementation: '@features/monitor/data/kept-list-by-method-postgres.graph.json',
+      implementation: '@features/customers/data/kept-list-by-tier-postgres.graph.json',
     });
     const asked = (await view(GET_ROW)).graph!.nodes.find(node => node.id === 'asked')!;
     expect(asked.target).toMatchObject({
@@ -206,7 +210,7 @@ describe('the view model of a graph', () => {
   // what each port of the request node then says -- the name the graph reads it by, the document that
   // declares it -- is `reads.test.ts`, which is what RFC 0029 made a concern of its own
   it('draws the request as a node whose ports are the paths the resolvers read, edged to what reads them', async () => {
-    const seen = await view('@features/monitor/data/create-row.graph.json');
+    const seen = await view('@features/customers/data/create-row.graph.json');
     const ids = seen.graph!.nodes.map(node => node.id);
     expect(ids.slice(0, 2)).toEqual(['request', 'in']);
     const request = seen.graph!.nodes.find(node => node.id === 'request')!;
@@ -221,11 +225,11 @@ describe('the view model of a graph', () => {
   });
 
   it('opens a deep read as an attribute port under its parent', async () => {
-    const seen = await view('@features/monitor/data/get-row.graph.json');
+    const seen = await view('@features/customers/data/get-row.graph.json');
     const asked = seen.graph!.nodes.find(node => node.id === 'asked')!;
     // {{asked.status}} and {{asked.body}} read top-level fields, which are ports already: nothing is added
     expect(asked.outputs.map(port => port.name)).toEqual(['', 'status', 'headers', 'body']);
-    const other = await view('@features/monitor/domain/record-entry.graph.json');
+    const other = await view('@features/customers/domain/register-customer.graph.json');
     const input = other.graph!.nodes.find(node => node.id === 'in')!;
     expect(input.outputs.map(port => port.name)).toEqual(['', 'url', 'method']);
   });

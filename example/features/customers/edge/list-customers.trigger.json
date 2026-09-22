@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
+  "label": "GET /customers",
+  "description": "GET /customers[?method=] \u2192 the customers; 502 as upstream when the monitor API broke.",
+  "kind": "@http/http.trigger-kind.json",
+  "settings": {
+    "route": "/customers",
+    "method": "GET",
+    "produces": "application/json",
+    "response": {
+      "refusals": {
+        "upstream": 502,
+        "invariant": 500
+      }
+    }
+  },
+  "in": "@customers/edge/ListRequest.shape.json",
+  "out": "@customers/edge/CustomerView.shape.json[]",
+  "fire": {
+    "run": "@customers/domain/customer.port.json#list",
+    "in": {
+      "method": "{{request.query.method}}"
+    }
+  }
+}

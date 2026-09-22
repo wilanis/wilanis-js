@@ -148,7 +148,7 @@ describe('X252: an in nothing fills', () => {
   it('an in declared with no fire.in: nothing arrives on a tick', () => {
     const found = at(
       schedule(doc => {
-        doc.in = '@features/monitor/edge/Cutoff.shape.json';
+        doc.in = '@features/customers/edge/Cutoff.shape.json';
       }),
       'X252',
     );
@@ -160,7 +160,7 @@ describe('X252: an in nothing fills', () => {
   it('the same in with a fire.in reading the tick is not refused', () => {
     const found = at(
       schedule(doc => {
-        doc.in = '@features/monitor/edge/Cutoff.shape.json';
+        doc.in = '@features/customers/edge/Cutoff.shape.json';
         doc.fire.in = { count: 1 };
       }),
       'X252',

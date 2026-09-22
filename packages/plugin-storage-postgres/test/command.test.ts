@@ -69,19 +69,19 @@ function write(tree: Tree): string {
       kind: '@storage-postgres/postgres.connection-kind.json',
       settings: { url: '{{secrets.database}}', schema },
     },
-    'features/monitor/feature.json': { $schema: schemaRef('feature'), description: 'what the monitor keeps' },
-    'features/monitor/domain/Entry.shape.json': {
+    'features/customers/feature.json': { $schema: schemaRef('feature'), description: 'what the monitor keeps' },
+    'features/customers/domain/Customer.shape.json': {
       $schema: schemaRef('shape'),
       description: 'one observed call',
       layer: 'core',
       fields: tree.fields,
     },
-    'features/monitor/data/entries.store.json': {
+    'features/customers/data/customers.store.json': {
       $schema: schemaRef('store'),
       description: 'the entries kept so far',
       connection: CONNECTION,
       collections: {
-        [named(tree)]: { of: '@features/monitor/domain/Entry.shape.json', key: 'id', ...tree.collection },
+        [named(tree)]: { of: '@features/customers/domain/Customer.shape.json', key: 'id', ...tree.collection },
       },
     },
   };

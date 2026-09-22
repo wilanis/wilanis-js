@@ -1,6 +1,6 @@
 /**
  * A write that repeats a `unique` the store declares is a conflict with what is kept, not a fault of the
- * upstream. `entries.store.json` says `unique: [["url", "method"]]`; `put` honours it and hands back
+ * upstream. `customers.store.json` says `unique: [["url", "method"]]`; `put` honours it and hands back
  * `violated` naming the constraint, and `store-and-latest` routes on that to refuse as `conflict`, which the
  * two write routes map to 409. Before the branch existed the same import read as `502 upstream`, saying the
  * store had broken when it had done exactly what the document asked (issue #484).

@@ -61,12 +61,12 @@ npm install @wilanis/access @wilanis/plugin-auth @wilanis/plugin-http
    ```json
    "policies": [
      { "policy": "@access/edge/employees-only.policy.json", "in": { "token": "{{request.headers.authorization}}" } },
-     "@access/edge/can-record.policy.json"
+     "@access/edge/can-register.policy.json"
    ]
    ```
 
-   `signed-in` allows any caller the token names; `employees-only` allows realm `employee`; `can-record`
-   allows the `recorder` role; `otp-verified` allows a challenge answered on the call and challenges otherwise
+   `signed-in` allows any caller the token names; `employees-only` allows realm `employee`; `can-register`
+   allows the `registrar` role; `otp-verified` allows a challenge answered on the call and challenges otherwise
    (`"in": { "challenge": { "id": "{{request.flags['challenge-id']}}", "code": "{{request.flags.code}}" } }`).
    A feature that attaches them declares `"dependsOn": ["access"]`.
 
@@ -102,7 +102,7 @@ npm install @wilanis/access @wilanis/plugin-auth @wilanis/plugin-http
 ## On its own
 
 This directory is a complete tree: `features/access-dev` binds `identity.port.json` to the directories written in
-`connections/`, and `@auth/state.port.json` to files under `.wilanis/auth` (bo / bo-pass holds `recorder`, cy / cy-pass only `viewer`, ana / ana-pass is a customer), so
+`connections/`, and `@auth/state.port.json` to files under `.wilanis/auth` (bo / bo-pass holds `registrar`, cy / cy-pass only `viewer`, ana / ana-pass is a customer), so
 `wilanis check .`, `wilanis rehearse .` and `wilanis start .` work here with `MONITOR_JWT_SECRET` set. A host
 that includes `["access"]` gets none of that: the dev feature and the connections stay behind.
 

@@ -12,8 +12,8 @@ import { FakeClock, FakeLeases, FlakyLeases, serving, settle, trigger } from './
 
 const START = '2026-09-11T10:07:13.000Z';
 /** The path the catchUp cases' trigger is written at: what names its schedule, and what a lease holds. */
-const DIGEST = 'features/monitor/edge/digest.trigger.json';
-const RUN = '@monitor/domain/monitor.port.json#digest';
+const DIGEST = 'features/customers/edge/digest.trigger.json';
+const RUN = '@customers/domain/customer.port.json#digest';
 
 describe('a lease decides who fires', () => {
   /** Two schedulers over one set of lease records, as two instances of one tree are. */

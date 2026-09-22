@@ -15,7 +15,7 @@ describe('the reach of a profile', () => {
 
   it('holds what live runs: the upstream API, the directories, the tokens, the files, the CSV, and what it holds open', () => {
     const live = reach('live');
-    expect(via(live, '@http/http.port.json#request')).toEqual(['@connections/monitor-api.connection.json']);
+    expect(via(live, '@http/http.port.json#request')).toEqual(['@connections/customers-api.connection.json']);
     expect(via(live, '@auth/identity.port.json#verify')).toEqual([
       '@connections/customers.connection.json',
       '@connections/employees.connection.json',
@@ -32,13 +32,13 @@ describe('the reach of a profile', () => {
     // a pure operation is no effect, and the connections are the ones those sites named, each once
     expect([...keys(live)].some(key => key.startsWith('@std/'))).toBe(false);
     expect(live.connections).toEqual([
-      '@connections/monitor-api.connection.json',
+      '@connections/customers-api.connection.json',
       '@connections/customers.connection.json',
       '@connections/employees.connection.json',
     ]);
     // and each site says where it was reached from and through, for the message that names it
     const request = live.operations.find(one => one.key === '@http/http.port.json#request');
-    expect(request?.binding).toBe('@features/monitor/data/monitor-rest.binding.json');
+    expect(request?.binding).toBe('@features/customers/data/customers-rest.binding.json');
     expect(request?.root.kind).toBe('trigger');
     const listen = live.operations.find(one => one.key === '@http/server.port.json#listen');
     expect(listen?.root).toEqual({ kind: 'startup', file: '@project.json', run: '@http/server.port.json#listen' });
@@ -54,13 +54,13 @@ describe('the reach of a profile', () => {
         .sort();
     expect(said('local')).toEqual(['MONITOR_JWT_SECRET (jwt, read by @auth settings)']);
     expect(said('production')).toEqual([
-      'MONITOR_DATABASE_URL (entriesDatabase, read by @connections/entries-postgres.connection.json)',
+      'MONITOR_DATABASE_URL (entriesDatabase, read by @connections/customers-postgres.connection.json)',
       'MONITOR_JWT_SECRET (jwt, read by @auth settings)',
     ]);
     // because the connection behind the entries is what the binding changes
-    expect(reach('local').connections).toContain('@connections/entries.connection.json');
-    expect(reach('production').connections).toContain('@connections/entries-postgres.connection.json');
-    expect(reach('local').connections).not.toContain('@connections/entries-postgres.connection.json');
+    expect(reach('local').connections).toContain('@connections/customers.connection.json');
+    expect(reach('production').connections).toContain('@connections/customers-postgres.connection.json');
+    expect(reach('local').connections).not.toContain('@connections/customers-postgres.connection.json');
     // and nothing a profile does not run is walked: live prepares with a request, the two stores with ensure
     expect(keys(reach('live'))).not.toContain('@storage/storage.port.json#ensure');
     expect(keys(reach('local'))).toContain('@storage/storage.port.json#ensure');
@@ -73,7 +73,7 @@ describe('the reach of a profile', () => {
     const live = reach('live');
     const roots = new Set(live.operations.map(one => `${one.root.kind} ${one.root.file}`));
     expect(roots).toContain('required @auth/plugin.json');
-    expect(roots).toContain('trigger @features/monitor/edge/list-entries.trigger.json');
+    expect(roots).toContain('trigger @features/customers/edge/list-customers.trigger.json');
     expect([...roots].some(one => one.startsWith('policy '))).toBe(false);
     // the same tree, the same profile, the same answer: the walk is pure over the loaded documents
     expect(reach('live')).toEqual(live);

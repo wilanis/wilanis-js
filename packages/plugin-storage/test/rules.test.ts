@@ -9,15 +9,15 @@ import { describe, expect, it } from 'vitest';
 import { CONNECTION, codes, type Docs, editing, refusals, SHAPE, STORE, tree } from './harness.js';
 
 const edit = (file: string, change: (doc: any) => void) => refusals(editing(file, change));
-const store = (change: (doc: any) => void) => edit('features/monitor/data/entries.store.json', change);
-const graph = (change: (doc: any) => void) => edit('features/monitor/data/read-entry.graph.json', change);
+const store = (change: (doc: any) => void) => edit('features/customers/data/customers.store.json', change);
+const graph = (change: (doc: any) => void) => edit('features/customers/data/read-entry.graph.json', change);
 const at = (found: ReturnType<typeof refusals>, code: string) => found.filter(one => one.code === code);
 
 /** The tree with a second feature keeping the same collection name over the same connection. */
 function alsoKeeping(of: string, shape?: Docs): Docs {
   const base = tree();
   // sharing a collection deliberately means the shape is one the other feature may name
-  (base['features/monitor/feature.json'] as { exports: string[] }).exports = [SHAPE];
+  (base['features/customers/feature.json'] as { exports: string[] }).exports = [SHAPE];
   return {
     ...base,
     ...shape,
@@ -26,7 +26,7 @@ function alsoKeeping(of: string, shape?: Docs): Docs {
       description: 'another feature that keeps things',
       dependsOn: ['monitor'],
     },
-    'features/other/data/entries.store.json': {
+    'features/other/data/customers.store.json': {
       $schema: '@wilanis/store.schema.json',
       description: 'the same collection, over the same connection',
       connection: CONNECTION,
@@ -45,7 +45,7 @@ describe('what a collection may keep, and what identifies one record', () => {
   it("X201 an edge shape: the world's shape is not what a tree keeps", () => {
     const found = at(
       store(doc => {
-        doc.collections.entries.of = '@features/monitor/edge/EntryRow.shape.json';
+        doc.collections.entries.of = '@features/customers/edge/CustomerRow.shape.json';
       }),
       'X201',
     );
@@ -104,7 +104,7 @@ describe('what a call may name', () => {
   it('X204 a store this tree does not hold, pointing at the input that named it', () => {
     const found = at(
       graph(doc => {
-        doc.nodes[0].in.store = '@features/monitor/data/nope.store.json';
+        doc.nodes[0].in.store = '@features/customers/data/nope.store.json';
       }),
       'X204',
     );
@@ -138,7 +138,7 @@ describe('two stores over one connection', () => {
     const found = at(refusals(alsoKeeping('@features/other/domain/Thing.shape.json', other)), 'X207');
     expect(found).toHaveLength(1);
     expect(found[0].at).toBe('collections/entries/of');
-    expect(found[0].message).toMatch(/already keeps .*Entry.shape.json/);
+    expect(found[0].message).toMatch(/already keeps .*Customer.shape.json/);
   });
 
   it('the same name with the same shape is how two features share a collection on purpose', () => {
@@ -210,7 +210,7 @@ describe('what a call may ask of the records', () => {
         id: 'said',
         type: '@wilanis/node/run.schema.json',
         run: '@std/object.port.json#make',
-        in: { value: { text: '{{in.id}}' }, type: '@features/monitor/edge/EntryRow.shape.json' },
+        in: { value: { text: '{{in.id}}' }, type: '@features/customers/edge/CustomerRow.shape.json' },
       });
       doc.nodes[1].in.where = { hits: '{{said.id}}' };
     });
@@ -229,8 +229,8 @@ describe('the scope a document wrote', () => {
   /** The tree with `entries` scoped by a tenant, and whatever else a case asks of it. */
   const scoping = (change: (docs: Docs) => void): Docs => {
     const docs = tree();
-    const store = docs['features/monitor/data/entries.store.json'] as any;
-    store.reads = { tenant: '@features/monitor/edge/request.resolvers.json#tenant' };
+    const store = docs['features/customers/data/customers.store.json'] as any;
+    store.reads = { tenant: '@features/customers/edge/request.resolvers.json#tenant' };
     store.collections.entries.scoped = { tenant: '{{tenant}}' };
     change(docs);
     return docs;
@@ -239,9 +239,9 @@ describe('the scope a document wrote', () => {
   const scoped = (change: (docs: Docs) => void) => at(refusals(scoping(change)), 'X214');
   const wrote = (scope: unknown, over = 'entries') =>
     scoped(docs => {
-      const store = docs['features/monitor/data/entries.store.json'] as any;
-      store.collections.everyEntry = { view: 'entries', behind: '@features/monitor/edge/nobody.policy.json' };
-      const graph = docs['features/monitor/data/read-entry.graph.json'] as any;
+      const store = docs['features/customers/data/customers.store.json'] as any;
+      store.collections.everyEntry = { view: 'entries', behind: '@features/customers/edge/nobody.policy.json' };
+      const graph = docs['features/customers/data/read-entry.graph.json'] as any;
       graph.nodes[0].in.collection = over;
       graph.nodes[0].in.scope = scope;
     });
@@ -252,7 +252,7 @@ describe('the scope a document wrote', () => {
     expect(found[0].at).toBe('nodes/asked/in/scope');
     expect(found[0].message).toMatch(/scope is the store's: 'entries' is scoped by tenant ← \{\{tenant\}\}/);
     expect(found[0].hint).toMatch(
-      /to change how 'entries' is scoped, change @features\/monitor\/data\/entries.store.json/,
+      /to change how 'entries' is scoped, change @features\/monitor\/data\/customers.store.json/,
     );
   });
 
@@ -277,7 +277,7 @@ describe('the scope a document wrote', () => {
 
   it('X214 a scope on newKey, which mints a key across every scope and takes none', () => {
     const found = scoped(docs => {
-      const graph = docs['features/monitor/data/read-entry.graph.json'] as any;
+      const graph = docs['features/customers/data/read-entry.graph.json'] as any;
       graph.nodes[0].run = '@storage/store.port.json#newKey';
       graph.nodes[0].in = { store: STORE, collection: 'entries', scope: { tenant: 'acme' } };
     });
@@ -287,16 +287,16 @@ describe('the scope a document wrote', () => {
 
   it('X214 a scope written in a binding delegation, where a call site is written too', () => {
     const found = scoped(docs => {
-      docs['features/monitor/domain/monitor.port.json'] = {
+      docs['features/customers/domain/customer.port.json'] = {
         $schema: '@wilanis/port.schema.json',
         description: 'what the monitor answers about what it kept',
         layer: 'domain',
         operations: { listed: { description: 'every entry', accepts: {}, answers: { type: `${SHAPE}[]` } } },
       };
-      docs['features/monitor/data/monitor.binding.json'] = {
+      docs['features/customers/data/monitor.binding.json'] = {
         $schema: '@wilanis/binding.schema.json',
         description: 'the monitor over the entries it keeps',
-        port: '@features/monitor/domain/monitor.port.json',
+        port: '@features/customers/domain/customer.port.json',
         operations: {
           listed: {
             run: '@storage/store.port.json#find',
@@ -307,7 +307,7 @@ describe('the scope a document wrote', () => {
     });
     expect(found).toHaveLength(1);
     expect(found[0].at).toBe('operations/listed/in/scope');
-    expect(found[0].file).toBe('@features/monitor/data/monitor.binding.json');
+    expect(found[0].file).toBe('@features/customers/data/monitor.binding.json');
   });
 
   it('a site over a scoped collection that writes no scope is refused nothing here', () => {
@@ -329,7 +329,7 @@ describe('what the tree already answers, so @storage does not', () => {
     // registered, and every call naming one would be refused again for having no store to name
     const found = refusals({
       ...tree(),
-      'features/monitor/data/other.store.json': {
+      'features/customers/data/other.store.json': {
         $schema: '@wilanis/store.schema.json',
         description: 'a store whose collection is named wrongly',
         connection: CONNECTION,
@@ -343,6 +343,6 @@ describe('what the tree already answers, so @storage does not', () => {
 
 describe('the store the tree holds', () => {
   it('is the one the graph names', () => {
-    expect(STORE).toBe('@features/monitor/data/entries.store.json');
+    expect(STORE).toBe('@features/customers/data/customers.store.json');
   });
 });

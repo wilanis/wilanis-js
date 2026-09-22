@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Latest registration of a tier",
+  "layer": "core",
+  "description": "The most recent customer registered into one tier: which tier, how to reach them, and the customer that was registered. One record per tier, so the tier is the key.",
+  "fields": {
+    "tier": {
+      "type": "string",
+      "description": "the tier, which is also what identifies the record"
+    },
+    "email": {
+      "type": "string",
+      "description": "the address of the most recent customer registered into it"
+    },
+    "customer": {
+      "type": "string",
+      "description": "the id of the customer that was registered"
+    }
+  }
+}

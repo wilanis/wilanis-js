@@ -37,11 +37,11 @@ describe('wilanis migrate: what it plans and prints', () => {
     const answer = await run(dir, plugins);
     const printed = answer.lines.join('\n');
     expect(answer.lines[0]).toBe(
-      'plan for @connections/entries.connection.json  (postgres, granted by @storage-postgres)',
+      'plan for @connections/customers.connection.json  (postgres, granted by @storage-postgres)',
     );
     expect(printed).toMatch(/^ {2}entries$/m);
     expect(printed).toMatch(/^ {4}rename {3}ua → agent {34}transformative$/m);
-    expect(printed).toMatch(/needs --allow-destructive @connections\/entries.connection.json\/notes/);
+    expect(printed).toMatch(/needs --allow-destructive @connections\/customers.connection.json\/notes/);
     expect(answer.lines.at(-1)).toBe('2 steps would apply; 1 refused. Nothing was applied: run again with --apply.');
     // one destructive step nobody allowed is a step that did not apply
     expect(answer.code).toBe(1);
@@ -62,7 +62,7 @@ describe('wilanis migrate: what it plans and prints', () => {
       targets: [target([], { drifted: ['entries.agent is text, required in the database; the record says optional'] })],
     });
     const answer = await run(dir, plugins, { apply: true });
-    expect(calls).not.toContain('apply:@connections/entries.connection.json');
+    expect(calls).not.toContain('apply:@connections/customers.connection.json');
     expect(answer.lines.join('\n')).toMatch(/drifted, so nothing is planned here/);
     expect(answer.code).toBe(1);
     rmSync(dir, { recursive: true, force: true });
@@ -75,7 +75,7 @@ describe('wilanis migrate: what it plans and prints', () => {
       targets: [target([], { skipped: 'nothing is kept between processes, so there is nothing to migrate' })],
     });
     const answer = await run(dir, plugins, { apply: true });
-    expect(calls).not.toContain('apply:@connections/entries.connection.json');
+    expect(calls).not.toContain('apply:@connections/customers.connection.json');
     expect(answer.lines.join('\n')).toMatch(/skipped: nothing is kept between processes/);
     expect(answer.lines.at(-1)).toBe('nothing to apply');
     expect(answer.code).toBe(0);
@@ -89,7 +89,7 @@ describe('wilanis migrate: what it plans and prints', () => {
     const { dir, calls, plugins } = tree({ targets: [target([step()], { notes: [said] })] });
     const answer = await run(dir, plugins, { apply: true });
     expect(answer.lines.join('\n')).toContain(`note: ${said}`);
-    expect(calls).toContain('apply:@connections/entries.connection.json');
+    expect(calls).toContain('apply:@connections/customers.connection.json');
     expect(answer.code).toBe(0);
     rmSync(dir, { recursive: true, force: true });
   });
@@ -137,7 +137,7 @@ describe('wilanis migrate: what it plans and prints', () => {
             appliedAt: '2026-09-11T09:14:02Z',
             by: 'rfontes@build-1',
             tree: 'boot',
-            connection: '@connections/entries.connection.json',
+            connection: '@connections/customers.connection.json',
             targets: ['entries  rename ua → agent; add note'],
           },
         ],

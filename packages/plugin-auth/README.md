@@ -25,7 +25,7 @@ A trigger attaches the **policies** that gate it, in order, and where it attache
 "policies": [
   { "policy": "@access/edge/employees-only.policy.json",
     "in": { "token": ["{{request.headers.authorization}}", "{{request.cookies.session}}"] } },
-  "@access/edge/can-record.policy.json"
+  "@access/edge/can-register.policy.json"
 ]
 ```
 

@@ -87,14 +87,14 @@ and `example/connections/cache.connection.json` says what it is:
 
 ### The monitor's read, cached
 
-`example/features/monitor/data/get-row.graph.json`, one line added to the node that calls the upstream:
+`example/features/customers/data/get-row.graph.json`, one line added to the node that calls the upstream:
 
 ```json
 { "type": "@wilanis/node/run.schema.json", "id": "asked", "label": "GET the row",
   "run": "@http/http.port.json#request",
   "cache": { "ttlMs": 60000, "key": "entry:{{in.id}}" },
-  "in": { "connection": "@connections/monitor-api.connection.json", "method": "GET", "path": "/monitor/{{in.id}}",
-          "produces": "application/json", "returns": "@monitor/edge/EntryRow.shape.json" } }
+  "in": { "connection": "@connections/customers-api.connection.json", "method": "GET", "path": "/monitor/{{in.id}}",
+          "produces": "application/json", "returns": "@customers/edge/CustomerRow.shape.json" } }
 ```
 
 Nothing else in the graph changes: `route` still reads `{{asked.status}}` and `{{asked.body}}`, and gets them from the
@@ -115,7 +115,7 @@ the request: the lowered nodes are effects the graph reaches, and a feature list
 domain operation's binding becomes a nested plan today:
 
 ```
-asked                      call   cache:@monitor/data/get-row.graph.json#asked      in: the site's inputs, and $key
+asked                      call   cache:@customers/data/get-row.graph.json#asked      in: the site's inputs, and $key
   ├ cached                 call   @cache/cache.port.json#get       key {{in.$key}}  type: the site's answer type
   ├ known                  switch hit == true && has(value) → hit, else → origin
   ├ hit                    call   @std/object.port.json#make       value {{cached.value}}
@@ -136,7 +136,7 @@ A data graph that is expensive as a whole says so at its root, and the key is it
 
 ```json
 { "$schema": "@wilanis/graph.schema.json", "label": "Digest", "cache": { "ttlMs": 300000 },
-  "in": "@monitor/domain/DigestRequest.shape.json", "out": { ... }, "nodes": [ ... ] }
+  "in": "@customers/domain/DigestRequest.shape.json", "out": { ... }, "nodes": [ ... ] }
 ```
 
 A plugin whose operation's answer usually stands writes the default in its port document, and every site inherits it
@@ -151,22 +151,22 @@ unless it writes `"cache": false` or a `cache` of its own:
 ### When it is refused
 
 ```
-G0n1  @features/monitor/data/get-row.graph.json#nodes/row/cache
+G0n1  @features/customers/data/get-row.graph.json#nodes/row/cache
     cache over '@std/object.port.json#make', which is pure
     → a pure operation costs nothing outside the run and has nothing to remember; drop cache
 
-G0n2  @features/monitor/data/create-row.graph.json#nodes/asked/cache
+G0n2  @features/customers/data/create-row.graph.json#nodes/asked/cache
     cache over '@http/http.port.json#request' with method POST, which is not idempotent here
     → a cache answers instead of calling, so the call must be one whose repeat changes nothing; drop cache, or
       make the call idempotent (RFC 0011)
 
-L0n1  @features/monitor/domain/record-entry.graph.json#nodes/recorded/cache
+L0n1  @features/customers/domain/register-customer.graph.json#nodes/recorded/cache
     cache in a domain graph
     → a domain graph says what happens, never for how long an answer stands; cache the data node or the data
       graph behind the port
 
 C0n1  project.json#cache
-    a cache is written at @features/monitor/data/get-row.graph.json#nodes/asked and the project names no cache connection
+    a cache is written at @features/customers/data/get-row.graph.json#nodes/asked and the project names no cache connection
     → name the one connection every cache in this tree uses: "cache": { "connection": "@connections/cache.connection.json" }
 ```
 
@@ -337,12 +337,12 @@ Sabotage tests in `packages/runtime/test/example.test.ts`, through `sabotage` in
 | Code | The edit |
 |---|---|
 | C0n1 | the guide's `cache` on `asked` in `get-row.graph.json`, and `project.json → cache` deleted |
-| C0n2 | `project.json → cache.connection` naming `@connections/monitor-api.connection.json` (an http kind); naming a path with no document |
+| C0n2 | `project.json → cache.connection` naming `@connections/customers-api.connection.json` (an http kind); naming a path with no document |
 | C0n3 | a fake plugin's port (under `docsDir`) whose `pure` operation declares `cache`; one declaring `cache` and neither `idempotent` nor `key` |
-| L0n1 | `"cache": { "ttlMs": 1000 }` on `recorded` in `record-entry.graph.json`; on the root of that graph |
+| L0n1 | `"cache": { "ttlMs": 1000 }` on `recorded` in `register-customer.graph.json`; on the root of that graph |
 | G0n1 | `"cache": { "ttlMs": 1000 }` on `row` in `get-row.graph.json` (`@std/object.port.json#make`, pure); on `missing` (`refuses`) |
 | G0n2 | `"cache": { "ttlMs": 1000 }` on `asked` in `create-row.graph.json` (POST); on the root of `create-row.graph.json` |
-| G0n3 | `"cache": { "ttlMs": 1000 }` on `drafts` in `import-entries.graph.json` (answers a `blob`); `"key": 12` on `asked` |
+| G0n3 | `"cache": { "ttlMs": 1000 }` on `drafts` in `import-customers.graph.json` (answers a `blob`); `"key": 12` on `asked` |
 | none | the guide's example whole: `codes(...)` is empty, and `rehearse` solves `asked.known → hit` and `asked.known → origin` |
 
 Runtime, in `packages/runtime/test/cache.test.ts` (new), with a fake plugin whose one effect counts its calls and a fake

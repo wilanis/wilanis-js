@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Id in the route",
+  "layer": "edge",
+  "description": "The {id} of GET, PUT and DELETE /customers/{id}.",
+  "fields": {
+    "id": {
+      "type": "string"
+    }
+  }
+}

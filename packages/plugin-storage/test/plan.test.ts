@@ -21,7 +21,7 @@ const ENTRY: Type = types.inline({
 });
 
 /** The `entries` collection as the example declares it: keyed by id, one url per method. */
-const ENTRIES: Declared = declaredOf({ of: '@x/Entry.shape.json', key: 'id', unique: [['url', 'method']] }, ENTRY);
+const ENTRIES: Declared = declaredOf({ of: '@x/Customer.shape.json', key: 'id', unique: [['url', 'method']] }, ENTRY);
 
 /** The `notes` collection: a note of an entry, so it references one. */
 const NOTES: Declared = declaredOf(
@@ -44,7 +44,7 @@ const DRAFTS: Declared = declaredOf(
 
 /** The same `entries`, with `ua` renamed `agent` in the shape and nothing else changed. */
 const RENAMED: Declared = declaredOf(
-  { of: '@x/Entry.shape.json', key: 'id', unique: [['url', 'method']] },
+  { of: '@x/Customer.shape.json', key: 'id', unique: [['url', 'method']] },
   types.inline({
     fields: {
       id: { type: 'string' },
@@ -58,7 +58,7 @@ const RENAMED: Declared = declaredOf(
 /** A declaration of `entries` with one field changed from the shape above. */
 function entriesWith(fields: Record<string, { type: string; required?: boolean }>): Declared {
   return declaredOf(
-    { of: '@x/Entry.shape.json', key: 'id', unique: [['url', 'method']] },
+    { of: '@x/Customer.shape.json', key: 'id', unique: [['url', 'method']] },
     types.inline({
       fields: { id: { type: 'string' }, url: { type: 'string' }, method: { type: 'string' }, ...fields },
     }),
@@ -164,7 +164,7 @@ describe('a field that changed its name', () => {
     // RFC 0017 point 4 wants the old name in the record *and the new one not*: renaming ua onto an agent that
     // already exists is not a rename, so the mark is stale and the record's own ua is what is dropped
     const both = declaredOf(
-      { of: '@x/Entry.shape.json', key: 'id', unique: [['url', 'method']] },
+      { of: '@x/Customer.shape.json', key: 'id', unique: [['url', 'method']] },
       types.inline({
         fields: {
           id: { type: 'string' },
@@ -263,7 +263,7 @@ describe('a field added, removed or changed', () => {
 
 describe('a constraint added or dropped', () => {
   it('[url] added to unique, and [url, method] removed: unique and ununique', () => {
-    const declared = declaredOf({ of: '@x/Entry.shape.json', key: 'id', unique: [['url']] }, ENTRY);
+    const declared = declaredOf({ of: '@x/Customer.shape.json', key: 'id', unique: [['url']] }, ENTRY);
     const { steps } = plan({ entries: ENTRIES }, { entries: declared }, { entries: {} });
     expect(does(steps)).toEqual(['unique', 'ununique']);
     expect(steps[0]).toMatchObject({ at: 'url', over: ['url'], says: 'unique   [url]' });
@@ -302,7 +302,7 @@ describe('a constraint added or dropped', () => {
 describe('what no count can make possible', () => {
   it('key from id to slug: refused, and the hint says declare, copy and drop', () => {
     const declared = declaredOf(
-      { of: '@x/Entry.shape.json', key: 'slug', unique: [['url', 'method']] },
+      { of: '@x/Customer.shape.json', key: 'slug', unique: [['url', 'method']] },
       types.inline({
         fields: {
           slug: { type: 'string' },

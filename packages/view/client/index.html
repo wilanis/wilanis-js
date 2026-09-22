@@ -154,7 +154,7 @@
   // ---- data --------------------------------------------------------------------------------------
   let STATIC = false;
   async function api(path) { const r = await fetch(STATIC ? staticFile(path) : path, { cache: 'no-store' }); const j = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(j.error || r.statusText || 'not found'), { body: j }); return j; }
-  /** A reference made canonical: a project alias expanded (@shapes/X → @features/monitor/shapes/X); anything else as written. */
+  /** A reference made canonical: a project alias expanded (@shapes/X → @features/customers/shapes/X); anything else as written. */
   const canon = (ref) => { const m = /^(@[a-z][a-z0-9-]*)(\/.*)?$/.exec(String(ref)); if (!m || !state.index) return ref; const t = state.index.aliases[m[1]]; return t === undefined ? ref : t.replace(/\/$/, '') + (m[2] || ''); };
   /** The file a route is answered by when the tree was written out: no server, so no query strings. The index carries the version. */
   const staticFile = (path) => { const [route, query] = path.split('?'); const asked = query ? new URLSearchParams(query).get('path') || '' : ''; if (route === '/api/doc') return 'docs/' + String(canon(asked)).replace(/^@/, ''); if (route === '/api/schema') return 'schemas/' + asked; return 'index.json'; };
@@ -322,7 +322,7 @@
   }
 
   // ---- document pages ---------------------------------------------------------------------------------
-  /** The document a type reference names, canonical, or null: "@shapes/Entry.shape.json[]" → the Entry shape. */
+  /** The document a type reference names, canonical, or null: "@shapes/Customer.shape.json[]" → the Entry shape. */
   const shapeOf = (t) => { if (typeof t !== 'string') return null; const base = t.replace(/(\[\])+$/, ''); return base.startsWith('@') && isDocPath(base) ? canon(base) : null; };
   /** A type shown as an element with its shape linked; plain text when it names none. */
   const typeLink = (t, cls) => { const s = el('span', cls || 'type'); const shape = shapeOf(t); if (shape) { s.appendChild(link(shape)); const m = /((?:\[\])+)$/.exec(t); if (m) s.appendChild(document.createTextNode(m[1])); } else s.textContent = showType(t); return s; };

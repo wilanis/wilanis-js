@@ -6,7 +6,7 @@ usage: facts.py <tree> <out.json> [<gate.txt>]
 The tree is a finished copy: a git repository whose first commit is the baseline. From it and that commit:
 whether `wilanis check` passes; what the rehearsal says the access rule holds at; the one new trigger's
 method, route, policies, refusal map and `out`; whether the access invariant's `over` gained the operation
-the trigger fires and whether any invariant's `when` or `requires` changed; whether `EntryView` gained
+the trigger fires and whether any invariant's `when` or `requires` changed; whether `CustomerView` gained
 `pinned`; which bindings meet the new operation; the files added and changed. When <gate.txt> is given the
 gate is run again with the trigger's verb and route, its output kept there, and its verdict is a fact too.
 """
@@ -16,8 +16,8 @@ import re
 import subprocess
 import sys
 
-ACCESS_RULE = 'features/monitor/domain/writes-are-for-recorders.invariant.json'
-VIEW = 'features/monitor/edge/EntryView.shape.json'
+ACCESS_RULE = 'features/customers/domain/writes-are-for-registrars.invariant.json'
+VIEW = 'features/customers/edge/CustomerView.shape.json'
 HOLDS = re.compile(r'Writes are for recorders\s+holds at (\d+) trigger\(s\)')
 
 

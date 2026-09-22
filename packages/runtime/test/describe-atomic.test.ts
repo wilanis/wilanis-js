@@ -17,8 +17,8 @@ import { describe as describeDoc, map } from '../src/index.js';
 import { EXAMPLE, INCLUDES, loadedEditing, PLUGINS } from './example-harness.js';
 
 const example = loadTree(EXAMPLE, PLUGINS, INCLUDES);
-const LATEST = '@monitor/data/store-and-latest.graph.json';
-const ALL = '@monitor/domain/record-all.graph.json';
+const LATEST = '@customers/data/store-and-latest.graph.json';
+const ALL = '@customers/domain/register-all.graph.json';
 
 describe('describe: a data graph whose effects move together', () => {
   const said = () => describeDoc(example, LATEST);
@@ -36,7 +36,7 @@ describe('describe: a data graph whose effects move together', () => {
   it('names the one connection the transaction falls on, which no node of the graph writes down', () => {
     // the nodes name a store and a collection; the store names the connection. A reader is told the end of
     // that chain rather than being left to walk it.
-    expect(said()).toContain('    on  @connections/entries.connection.json');
+    expect(said()).toContain('    on  @connections/customers.connection.json');
   });
 
   it('names the nodes that take part, in the order the document writes them', () => {
@@ -45,7 +45,7 @@ describe('describe: a data graph whose effects move together', () => {
   });
 
   it('says none of it of a graph that does not declare it, however many effects it reaches', () => {
-    expect(describeDoc(example, '@monitor/data/kept-update.graph.json')).not.toContain('atomic:');
+    expect(describeDoc(example, '@customers/data/kept-update.graph.json')).not.toContain('atomic:');
   });
 });
 
@@ -61,7 +61,7 @@ describe('describe: a domain graph whose effects move together', () => {
     // local keeps the entries in memory and production in PostgreSQL: the same graph, two connections,
     // and a reader chooses a profile before running
     expect(said()).toContain(
-      '    on  @connections/entries-postgres.connection.json or @connections/entries.connection.json  (one per profile; a run falls on the one its profile binds)',
+      '    on  @connections/customers-postgres.connection.json or @connections/customers.connection.json  (one per profile; a run falls on the one its profile binds)',
     );
   });
 });
@@ -76,7 +76,7 @@ describe('describe: an operation that can take part in one', () => {
 
 describe('map: where the tree names an atomic graph', () => {
   // kept-update is the one atomic-able graph the map's walk reaches, since it walks what a trigger fires
-  const marked = loadedEditing('features/monitor/data/kept-update.graph.json', (doc: any) => {
+  const marked = loadedEditing('features/customers/data/kept-update.graph.json', (doc: any) => {
     doc.atomic = true;
   });
   afterAll(() => {
@@ -84,7 +84,7 @@ describe('map: where the tree names an atomic graph', () => {
   });
 
   it('marks it where a binding leads to it, so the transaction is seen without opening the document', () => {
-    const lines = map(marked.load).filter(line => line.trim().startsWith('@features/monitor/data/kept-update.'));
+    const lines = map(marked.load).filter(line => line.trim().startsWith('@features/customers/data/kept-update.'));
     expect(lines.length).toBeGreaterThan(0);
     for (const line of lines) expect(line).toContain('[atomic]');
   });

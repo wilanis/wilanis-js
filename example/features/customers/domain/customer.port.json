@@ -1,0 +1,183 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/port.schema.json",
+  "label": "Customer storage",
+  "description": "What the domain needs from customer storage. Bound by customers-rest.binding.json; a test double binds the same contract.",
+  "operations": {
+    "listAll": {
+      "description": "Every customer.",
+      "returns": "@customers/domain/Customer.shape.json[]"
+    },
+    "listByTier": {
+      "description": "Customers of one tier.",
+      "accepts": {
+        "tier": {
+          "type": "string"
+        }
+      },
+      "returns": "@customers/domain/Customer.shape.json[]"
+    },
+    "get": {
+      "description": "One customer by id. Fails when there is no such customer.",
+      "accepts": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "returns": "@customers/domain/Customer.shape.json"
+    },
+    "register": {
+      "description": "Store a new customer and answer them with their id.",
+      "accepts": {
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "tier": {
+          "type": "string",
+          "enum": [
+            "bronze",
+            "silver",
+            "gold"
+          ]
+        },
+        "registrar": {
+          "type": "string"
+        }
+      },
+      "returns": "@customers/domain/Customer.shape.json"
+    },
+    "update": {
+      "description": "Replace who one customer is. Fails when there is no such customer.",
+      "accepts": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "tier": {
+          "type": "string",
+          "enum": [
+            "bronze",
+            "silver",
+            "gold"
+          ]
+        }
+      },
+      "returns": "@customers/domain/Customer.shape.json"
+    },
+    "remove": {
+      "description": "Delete one customer and answer what was deleted. Fails when there is no such customer.",
+      "accepts": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "returns": "@customers/domain/Customer.shape.json"
+    },
+    "removeMany": {
+      "description": "Delete several customers at once and answer what was deleted, in the order asked. Fails when any of them does not exist.",
+      "accepts": {
+        "ids": {
+          "type": "string[]",
+          "description": "the customers to remove, each by id"
+        }
+      },
+      "returns": "@customers/domain/Customer.shape.json[]"
+    },
+    "submit": {
+      "description": "Register a customer, attributing it to this API rather than the client.",
+      "accepts": {
+        "name": {
+          "type": "string",
+          "description": "the name they registered under"
+        },
+        "email": {
+          "type": "string",
+          "description": "the address to reach them at"
+        },
+        "tier": {
+          "type": "string",
+          "enum": [
+            "bronze",
+            "silver",
+            "gold"
+          ],
+          "description": "the tier they registered into"
+        }
+      },
+      "returns": "@customers/domain/Customer.shape.json"
+    },
+    "registerAll": {
+      "description": "Register every draft of a batch, each attributed the way a single submission is, and answer them in the order given. Where the customers are kept in a store, all of them are registered or none: a draft that refuses undoes the rows written before it.",
+      "accepts": {
+        "drafts": {
+          "type": "@customers/domain/CustomerDraft.shape.json[]",
+          "description": "the customers to register, in the order they are to be answered"
+        }
+      },
+      "returns": "@customers/domain/Customer.shape.json[]"
+    },
+    "list": {
+      "description": "Every customer, narrowed to one tier when a tier is given.",
+      "accepts": {
+        "tier": {
+          "type": "string",
+          "enum": [
+            "bronze",
+            "silver",
+            "gold"
+          ],
+          "required": false,
+          "description": "narrow to this tier; absent for everyone"
+        }
+      },
+      "returns": "@customers/domain/Customer.shape.json[]"
+    },
+    "digest": {
+      "description": "Every customer counted and listed as one digest.",
+      "returns": "@customers/domain/Digest.shape.json"
+    },
+    "parseDrafts": {
+      "description": "The customer drafts a CSV file holds: one per row, columns name, email and tier.",
+      "accepts": {
+        "file": {
+          "type": "blob",
+          "description": "the CSV file, as uploaded"
+        }
+      },
+      "returns": "@customers/domain/CustomerDraft.shape.json[]"
+    },
+    "toCsv": {
+      "description": "Customers written as a CSV file, one row each.",
+      "accepts": {
+        "customers": {
+          "type": "@customers/domain/Customer.shape.json[]"
+        }
+      },
+      "returns": "blob"
+    },
+    "import": {
+      "description": "Register every customer a CSV file holds, each attributed like a submitted one, and answer them in file order. Fails on a row that is not a customer.",
+      "accepts": {
+        "file": {
+          "type": "blob",
+          "description": "the CSV file: a header row, then name,email,tier per line"
+        }
+      },
+      "returns": "@customers/domain/Customer.shape.json[]"
+    },
+    "export": {
+      "description": "Every customer as a CSV file.",
+      "returns": "blob"
+    },
+    "prepare": {
+      "description": "Make the storage this profile chose ready to answer, once, before anything is served. Over a store it creates the collections the store declares; over the REST API it reads the collection once, so a tree whose upstream is unreachable refuses to serve rather than answering every route with a fault."
+    }
+  }
+}

@@ -103,7 +103,7 @@ describe('watching a tree', () => {
     const watcher = serving(() => ({ ok: true, documents: 185 }), copy);
     await watch(watcher.env, { debounceMs: 10 });
     // a document first, until the watcher is known to be live: a write it missed while registering proves nothing
-    expect(await touchUntilSeen(watcher, /185 documents/, 'features/monitor/domain/Probe.shape.json')).toBe(true);
+    expect(await touchUntilSeen(watcher, /185 documents/, 'features/customers/domain/Probe.shape.json')).toBe(true);
     const before = watcher.reloads();
 
     for (const dir of ['.wilanis/auth/sessions', 'scenarios', 'node_modules/some-package']) {
@@ -114,7 +114,7 @@ describe('watching a tree', () => {
     expect(watcher.reloads()).toBe(before);
 
     // and a document written afterwards is still served again
-    writeFileSync(join(copy, 'features/monitor/domain/Probe.shape.json'), '{"n":"again"}');
+    writeFileSync(join(copy, 'features/customers/domain/Probe.shape.json'), '{"n":"again"}');
     expect(await until(() => watcher.reloads() > before)).toBe(true);
     await watcher.held[0].stop();
   });

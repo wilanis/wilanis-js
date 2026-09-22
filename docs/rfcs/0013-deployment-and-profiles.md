@@ -34,7 +34,7 @@ each visible in the code:
   when none is declared, the one unnamed profile (`Judge.profiles()` in `check/judge.ts`). `wilanis start`
   without `--profile` runs the unnamed profile whether or not profiles are declared (`embedderFor(load,
   { profile: undefined })` in `serve.ts`; `Scope.bindingFor(port, undefined)` in `scope.ts` then takes a
-  port's one and only binding). Give `monitor.port.json` a second binding and choose it in `live`: `wilanis
+  port's one and only binding). Give `customer.port.json` a second binding and choose it in `live`: `wilanis
   check example` passes, and `wilanis start example` fails at startup step 1 with `port ... has 2 bindings --
   choose one in a project profile`, a run-time error for something the tree declared.
 - **A secret is demanded everywhere it is declared, not where it is read.** `buildEnv` in
@@ -92,18 +92,18 @@ default; `production` is the same tree against the real monitor API, with no fil
     "description": "The laptop: the public test API, the directories written in connections/, and a reload on every saved document.",
     "default": true,
     "bindings": {
-      "@monitor/domain/monitor.port.json": "@monitor/data/monitor-rest.binding.json",
+      "@customers/domain/customer.port.json": "@customers/data/customers-rest.binding.json",
       "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json"
     }
   },
   "production": {
     "description": "Behind the load balancer: the same bindings, the real monitor API in place of the test one, nothing watched.",
     "bindings": {
-      "@monitor/domain/monitor.port.json": "@monitor/data/monitor-rest.binding.json",
+      "@customers/domain/customer.port.json": "@customers/data/customers-rest.binding.json",
       "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json"
     },
     "connections": {
-      "@connections/monitor-api.connection.json": "@connections/monitor-api-production.connection.json"
+      "@connections/customers-api.connection.json": "@connections/monitor-api-production.connection.json"
     }
   }
 }
@@ -129,7 +129,7 @@ kind, with its own description and its own settings:
 ```
 
 Not one document under `features/` changes: every data graph still says `"connection":
-"@connections/monitor-api.connection.json"`, and under `production` that name reaches the stand-in. The
+"@connections/customers-api.connection.json"`, and under `production` that name reaches the stand-in. The
 secret it reads is declared once, beside the one the tokens already read:
 
 ```json
@@ -140,7 +140,7 @@ The watcher is a startup step, and a step may say which profiles run it:
 
 ```json
 "startup": [
-  { "label": "Reach the entry store", "run": "@monitor/domain/monitor.port.json#listAll", "required": true },
+  { "label": "Reach the entry store", "run": "@customers/domain/customer.port.json#listAll", "required": true },
   { "label": "Watch for changes", "run": "@reload/watch.port.json#watch", "profiles": ["live"] },
   { "label": "Listen", "run": "@http/server.port.json#listen" }
 ]
@@ -186,9 +186,9 @@ needs no variable, as today.
 
 ```
 profile production
-  binds     @monitor/domain/monitor.port.json  → @monitor/data/monitor-rest.binding.json
+  binds     @customers/domain/customer.port.json  → @customers/data/customers-rest.binding.json
             @access/domain/identity.port.json  → @features/directories/data/identity.binding.json
-  stands in @connections/monitor-api.connection.json  → @connections/monitor-api-production.connection.json
+  stands in @connections/customers-api.connection.json  → @connections/monitor-api-production.connection.json
   reaches   @http/http.port.json#request       via @connections/monitor-api-production.connection.json
             @auth/identity.port.json#verify    via @connections/employees.connection.json, @connections/customers.connection.json
             @auth/token.port.json#issue, #refresh
@@ -260,7 +260,7 @@ It is what `start` verifies, below.
   answer; nothing below it changes.
 - **`buildEnv(scope, env, profile)`** in `env.ts` substitutes each connection's settings from
   `connectionFor(path, profile)`, keyed by the path the documents name: a handler asking `env.connections`
-  for `@connections/monitor-api.connection.json` under `production` receives the stand-in's settings and
+  for `@connections/customers-api.connection.json` under `production` receives the stand-in's settings and
   never learns a stand-in exists. `Secrets.missing` stays what it is, every declared variable not set; the
   refusal is scoped by the reach.
 - **`start`** in `serve.ts`: after `check`, `activeProfile`; log `profile <name>` (or `profile none declared`);
@@ -310,15 +310,15 @@ Sabotage, in `packages/runtime/test/sabotage-project.test.ts` (copies of the exa
 in as a `ResolvedInclude`):
 
 - mark both `live` and `production` `default: true` → C0nn;
-- map `monitor-api.connection.json` to `employees.connection.json` (another kind) → C0nn; to itself → C0nn;
+- map `customers-api.connection.json` to `employees.connection.json` (another kind) → C0nn; to itself → C0nn;
   to `@connections/nowhere.connection.json` → R001;
 - add `"unused": "UNUSED_SECRET"` to `secrets` → C0nn;
 - give the `Listen` step `"profiles": ["staging"]` → B0nn;
-- bind `monitor.port.json` under `production` to a binding whose graph reads `request.*`, and give the
+- bind `customer.port.json` under `production` to a binding whose graph reads `request.*`, and give the
   `listAll` step `"profiles": ["production"]` → B008 names `production` and no other profile.
 
 The reach, in `packages/runtime/test/example.test.ts`: `reachOf` of the example under `live` holds
-`@http/http.port.json#request` via `monitor-api.connection.json`, `@auth/identity.port.json#verify` via the two
+`@http/http.port.json#request` via `customers-api.connection.json`, `@auth/identity.port.json#verify` via the two
 directories, the `@auth/token` and `@blob/csv` operations, `listen` and `watch` (and, once RFC 0005 lands,
 `@auth/files.port.json` through the state binding); under `production` the stand-in replaces
 `monitor-api`, `watch` is absent, and `secrets` holds `jwt` and `monitorKey`.

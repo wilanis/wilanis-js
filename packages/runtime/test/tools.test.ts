@@ -179,7 +179,7 @@ describe('wilanis fuzz and regress', () => {
     expect(written).toHaveLength(36);
     expect(readdirSync(join(dir, 'scenarios')).sort()).toEqual(written.map(one => one.split('/').pop()!).sort());
     const sc = read(join(dir, 'scenarios', 'get-entry.1.scenario.json'));
-    expect(sc.trigger).toBe('@features/monitor/edge/get-entry.trigger.json');
+    expect(sc.trigger).toBe('@features/customers/edge/get-customer.trigger.json');
     expect(['done', 'failed']).toContain(sc.expect.status);
     // the scenarios are documents of the tree: they load, and they pass check
     const again = loadTree(dir, PLUGINS, INCLUDES);
@@ -190,7 +190,7 @@ describe('wilanis fuzz and regress', () => {
     expect(replayed.lines).toHaveLength(36);
     expect(replayed.lines.every(line => line.endsWith(': same'))).toBe(true);
     // a graph that changes is caught: the answering node under a new name is a node the scenario never saw
-    const file = join(dir, 'features/monitor/data/get-row.graph.json');
+    const file = join(dir, 'features/customers/data/get-row.graph.json');
     const doc = read(file);
     doc.nodes.find((node: any) => node.id === 'row').id = 'entry';
     doc.nodes.find((node: any) => node.id === 'route').rules[1].to = 'entry';
@@ -209,7 +209,7 @@ describe('wilanis fuzz and regress', () => {
     await fuzz(loadTree(dir, PLUGINS, INCLUDES), { runs: 1, profile: 'live' });
     const sc = read(join(dir, 'scenarios', 'get-entry.1.scenario.json'));
     // the fire runs whatever the profile's binding met the port with -- the graph is the thing a rebind changes
-    expect(sc.expect.nodes.op.handler).toBe('graph:@features/monitor/data/get-row.graph.json');
+    expect(sc.expect.nodes.op.handler).toBe('graph:@features/customers/data/get-row.graph.json');
     // and under it, the operation each node ran, native or declared
     expect(sc.expect.nodes['op.asked'].handler).toBe('@http/http.port.json#request');
     expect(sc.expect.nodes['op.failed'].handler).toBe('@std/outcome.port.json#refuse');
@@ -225,12 +225,12 @@ describe('wilanis fuzz and regress', () => {
     // a node met by another graph is a change the recorded answer alone cannot name, and the diff names it
     const scenario = join(dir, 'scenarios', 'get-entry.1.scenario.json');
     const doc = read(scenario);
-    doc.expect.nodes.op.handler = 'graph:@features/monitor/data/kept-get.graph.json';
+    doc.expect.nodes.op.handler = 'graph:@features/customers/data/kept-get.graph.json';
     writeFileSync(scenario, JSON.stringify(doc));
     const changed = await regress(loadTree(dir, PLUGINS, INCLUDES), { profile: 'live' });
     expect(changed.ok).toBe(false);
     expect(changed.lines.join('\n')).toContain(
-      'op: ran graph:@features/monitor/data/kept-get.graph.json → graph:@features/monitor/data/get-row.graph.json',
+      'op: ran graph:@features/customers/data/kept-get.graph.json → graph:@features/customers/data/get-row.graph.json',
     );
     rmSync(dir, { recursive: true, force: true });
   });
@@ -243,7 +243,7 @@ describe('wilanis fuzz and regress', () => {
  * other end a reader has to go looking for.
  */
 describe('wilanis describe: the reads a document takes from the request', () => {
-  const said = () => describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@monitor/data/create-row.graph.json');
+  const said = () => describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@customers/data/create-row.graph.json');
 
   it('prints the reads block before the nodes, so no {{name}} is met before what binds it', () => {
     const lines = said().split('\n');
@@ -253,7 +253,9 @@ describe('wilanis describe: the reads a document takes from the request', () => 
 
   it('names each read, the resolver it is bound to, and what that resolver reads of the request', () => {
     // the ref is openable and the read beside it spares the reader opening it to learn what {{agent}} is
-    expect(said()).toContain("    agent ← @monitor/edge/request.resolvers.json#agent  (request.headers['user-agent'])");
+    expect(said()).toContain(
+      "    agent ← @customers/edge/request.resolvers.json#agent  (request.headers['user-agent'])",
+    );
   });
 
   it('says of a required read that it is required, since a trigger reaching it must prove it (A006)', () => {
@@ -262,42 +264,44 @@ describe('wilanis describe: the reads a document takes from the request', () => 
   });
 
   it('prints no block at all for a graph that reads nothing, rather than an empty heading', () => {
-    const lines = describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@monitor/data/get-row.graph.json');
+    const lines = describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@customers/data/get-row.graph.json');
     expect(lines).not.toContain('reads:');
   });
 
   it("prints a binding's reads above its operations, since a delegation's {{name}} is one of them", () => {
     // no binding of the example delegates over a read yet; the block is the binding's all the same
-    const { load, dir } = loadedEditing('features/monitor/data/monitor-rest.binding.json', doc => {
-      doc.reads = { agent: '@monitor/edge/request.resolvers.json#agent' };
+    const { load, dir } = loadedEditing('features/customers/data/customers-rest.binding.json', doc => {
+      doc.reads = { agent: '@customers/edge/request.resolvers.json#agent' };
     });
-    const lines = describeDoc(load, '@monitor/data/monitor-rest.binding.json').split('\n');
-    expect(lines).toContain("    agent ← @monitor/edge/request.resolvers.json#agent  (request.headers['user-agent'])");
+    const lines = describeDoc(load, '@customers/data/customers-rest.binding.json').split('\n');
+    expect(lines).toContain(
+      "    agent ← @customers/edge/request.resolvers.json#agent  (request.headers['user-agent'])",
+    );
     expect(lines.indexOf('reads:')).toBeLessThan(lines.indexOf('answers:'));
     rmSync(dir, { recursive: true, force: true });
   });
 
   it('says the ref and nothing more where the resolver behind it cannot be read', () => {
     // describe reads a tree the checker may not have passed; P004 is the checker's to say, not this command's
-    const { load, dir } = loadedEditing('features/monitor/data/create-row.graph.json', doc => {
-      doc.reads = { agent: '@monitor/edge/request.resolvers.json#agents' };
+    const { load, dir } = loadedEditing('features/customers/data/create-row.graph.json', doc => {
+      doc.reads = { agent: '@customers/edge/request.resolvers.json#agents' };
     });
-    expect(describeDoc(load, '@monitor/data/create-row.graph.json')).toContain(
-      '    agent ← @monitor/edge/request.resolvers.json#agents\n',
+    expect(describeDoc(load, '@customers/data/create-row.graph.json')).toContain(
+      '    agent ← @customers/edge/request.resolvers.json#agents\n',
     );
     rmSync(dir, { recursive: true, force: true });
   });
 });
 
 describe('wilanis describe: a resolvers document and who reads it', () => {
-  const said = () => describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@monitor/edge/request.resolvers.json');
+  const said = () => describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@customers/edge/request.resolvers.json');
 
   it('prints one line per resolver, saying what it reads', () => {
     expect(said()).toContain("    agent  ← request.headers['user-agent']");
   });
 
   it('names every document that binds it, and the local name each gave it', () => {
-    expect(said()).toContain('        used by @features/monitor/data/create-row.graph.json as {{agent}}');
+    expect(said()).toContain('        used by @features/customers/data/create-row.graph.json as {{agent}}');
   });
 
   it('names each user of a resolver several documents read, one line each', () => {
@@ -308,22 +312,22 @@ describe('wilanis describe: a resolvers document and who reads it', () => {
   });
 
   it('says so where a resolver is declared and nothing binds it', () => {
-    const { load, dir } = loadedEditing('features/monitor/edge/request.resolvers.json', doc => {
+    const { load, dir } = loadedEditing('features/customers/edge/request.resolvers.json', doc => {
       doc.resolvers.tenant = { read: 'request.session.attributes.tenant' };
     });
-    expect(describeDoc(load, '@monitor/edge/request.resolvers.json')).toContain(
+    expect(describeDoc(load, '@customers/edge/request.resolvers.json')).toContain(
       '        used by nothing yet -- bind it under a data graph’s or a binding’s reads',
     );
     rmSync(dir, { recursive: true, force: true });
   });
 
   it('reads the local name the reader chose, not the resolver name', () => {
-    const { load, dir } = loadedEditing('features/monitor/data/create-row.graph.json', doc => {
-      doc.reads = { who: '@monitor/edge/request.resolvers.json#agent' };
+    const { load, dir } = loadedEditing('features/customers/data/create-row.graph.json', doc => {
+      doc.reads = { who: '@customers/edge/request.resolvers.json#agent' };
       doc.nodes[0].in.headers['x-forwarded-user-agent'] = '{{who}}';
     });
-    expect(describeDoc(load, '@monitor/edge/request.resolvers.json')).toContain(
-      '        used by @features/monitor/data/create-row.graph.json as {{who}}',
+    expect(describeDoc(load, '@customers/edge/request.resolvers.json')).toContain(
+      '        used by @features/customers/data/create-row.graph.json as {{who}}',
     );
     rmSync(dir, { recursive: true, force: true });
   });

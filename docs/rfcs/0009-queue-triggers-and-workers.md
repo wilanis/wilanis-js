@@ -24,8 +24,8 @@ of rows without holding the caller's socket while every DELETE settles -- has no
 have to leave the tree and write a consumer in TypeScript, which is exactly the code the platform exists to
 remove, and the consumer would be invisible to `wilanis check`, `rehearse`, `map` and the viewer.
 
-The example shows the small form of it. `DELETE /monitor` (`example/features/monitor/edge/delete-entries.trigger.json`)
-fires `monitor.port.json#removeMany`, whose domain graph `remove-entries.graph.json` fans one removal out per id
+The example shows the small form of it. `DELETE /monitor` (`example/features/customers/edge/delete-customers.trigger.json`)
+fires `customer.port.json#removeMany`, whose domain graph `remove-customers.graph.json` fans one removal out per id
 and answers when the last has settled, paced by the connection's `throttle` of four. A hundred ids is a
 hundred DELETEs against the upstream while the caller waits, and one that refuses `missing` refuses the whole
 batch after the others are already gone. The natural shape is one message per id, acknowledged when the row
@@ -76,8 +76,8 @@ The example, made asynchronous for removals. A connection for the broker, at the
 }
 ```
 
-The trigger that consumes, `example/features/monitor/edge/remove-queued.trigger.json`. It fires the same
-`monitor.port.json#remove` that `DELETE /monitor/{id}` fires, reads the id from the message instead of the
+The trigger that consumes, `example/features/customers/edge/remove-queued.trigger.json`. It fires the same
+`customer.port.json#remove` that `DELETE /monitor/{id}` fires, reads the id from the message instead of the
 route, and attaches the same two policies -- with the token read from the message's headers instead of the
 request's:
 
@@ -90,7 +90,7 @@ request's:
   "settings": {
     "connection": "@connections/jobs.connection.json",
     "queue": "removals",
-    "message": "@monitor/edge/IdRequest.shape.json",
+    "message": "@customers/edge/IdRequest.shape.json",
     "maxAttempts": 5,
     "backoffMs": 1000,
     "outcomes": {
@@ -101,33 +101,33 @@ request's:
       "forbidden": "dead"
     }
   },
-  "in": "@monitor/edge/IdRequest.shape.json",
-  "out": "@monitor/edge/EntryView.shape.json",
+  "in": "@customers/edge/IdRequest.shape.json",
+  "out": "@customers/edge/CustomerView.shape.json",
   "policies": [
     {
       "policy": "@access/edge/employees-only.policy.json",
       "in": { "token": "{{request.headers.authorization}}" }
     },
-    "@access/edge/can-record.policy.json"
+    "@access/edge/can-register.policy.json"
   ],
   "fire": {
-    "run": "@monitor/domain/monitor.port.json#remove",
+    "run": "@customers/domain/customer.port.json#remove",
     "in": { "id": "{{request.message.id}}" }
   }
 }
 ```
 
 The route that publishes, `POST /monitor/{id}/removal` (`enqueue-removal.trigger.json`), fires a new domain
-operation `monitor.port.json#enqueueRemoval { id }` that answers nothing, and the route answers 202. Under
-the `live` profile the binding meets it with one data graph, `example/features/monitor/data/publish-removal.graph.json`:
+operation `customer.port.json#enqueueRemoval { id }` that answers nothing, and the route answers 202. Under
+the `live` profile the binding meets it with one data graph, `example/features/customers/data/publish-removal.graph.json`:
 
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Publish a removal",
   "description": "Data graph behind monitor.enqueueRemoval: one message on the removals queue, carrying the caller's token so the worker's gate judges the same caller.",
-  "reads": { "token": "@monitor/edge/request.resolvers.json#token" },
-  "in": "@monitor/domain/EntryRef.shape.json",
+  "reads": { "token": "@customers/edge/request.resolvers.json#token" },
+  "in": "@customers/domain/CustomerRef.shape.json",
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
@@ -137,7 +137,7 @@ the `live` profile the binding meets it with one data graph, `example/features/m
       "in": {
         "connection": "@connections/jobs.connection.json",
         "queue": "removals",
-        "type": "@monitor/edge/IdRequest.shape.json",
+        "type": "@customers/edge/IdRequest.shape.json",
         "message": { "id": "{{in.id}}" },
         "headers": { "authorization": "{{token}}" }
       }
@@ -153,33 +153,33 @@ and one more step:
 
 ```json
 "startup": [
-  { "label": "Reach the entry store", "run": "@monitor/domain/monitor.port.json#listAll", "required": true },
+  { "label": "Reach the entry store", "run": "@customers/domain/customer.port.json#listAll", "required": true },
   { "label": "Watch for changes", "run": "@reload/watch.port.json#watch" },
   { "label": "Work the queues", "run": "@queue/worker.port.json#consume" },
   { "label": "Listen", "run": "@http/server.port.json#listen" }
 ]
 ```
 
-`wilanis start example` now logs `queue: consuming removals on @connections/jobs.connection.json → @monitor/domain/monitor.port.json#remove`
+`wilanis start example` now logs `queue: consuming removals on @connections/jobs.connection.json → @customers/domain/customer.port.json#remove`
 beside `http: listening on :8080`, and each message one line:
-`queue removals 01J9… attempt 1 → ack (61ms, @monitor/domain/monitor.port.json#remove done)`.
+`queue removals 01J9… attempt 1 → ack (61ms, @customers/domain/customer.port.json#remove done)`.
 
 **The refusal an author meets first.** The memory broker, like the table broker, delivers at least once: a
 worker that dies between the DELETE and the acknowledgement sees the message again. So the operation a queue
-trigger fires must be safe to repeat, and `monitor.port.json#remove` says so with RFC 0011's word,
+trigger fires must be safe to repeat, and `customer.port.json#remove` says so with RFC 0011's word,
 `"idempotent": true` -- which holds, because under `live` the binding runs `delete-row.graph.json`, whose one
 effect is a DELETE, one of the methods `@http/http.port.json#request` declares idempotent. Drop the word and
 `wilanis check` answers:
 
 ```
-T0n1  @features/monitor/edge/remove-queued.trigger.json#fire/run
-    '@connections/jobs.connection.json' delivers a message at least once, so '@monitor/domain/monitor.port.json#remove'
+T0n1  @features/customers/edge/remove-queued.trigger.json#fire/run
+    '@connections/jobs.connection.json' delivers a message at least once, so '@customers/domain/customer.port.json#remove'
     may run twice for one message, and the operation does not promise idempotent
     → declare "idempotent": true on the operation (the checker then holds every profile to it, B0n1), or receive
       from a connection whose kind delivers at most once
 ```
 
-Point the trigger at `monitor.port.json#submit` instead -- a POST -- and the promise cannot be made: writing
+Point the trigger at `customer.port.json#submit` instead -- a POST -- and the promise cannot be made: writing
 `idempotent: true` on `submit` is refused by RFC 0011's B0n1 naming the profile and the node. The tree cannot
 be made to consume a message it cannot safely consume twice, and that is the point.
 
@@ -360,7 +360,7 @@ the kind's description does. T003 types `fire.in` over the context: `request.mes
 `checkRefusalTable`: every reason `refusalsOfTrigger` finds -- the graph's `missing` and `upstream`, the
 policies' `anonymous` and `forbidden`, the guard's `invalid_credential` since the attachment gives a
 credential -- must be a key, and no other may be. A004 judges `{{request.headers.authorization}}` as a read
-of what the kind hands and of the type the guard takes; A005 refuses `can-record` on a queue trigger that
+of what the kind hands and of the type the guard takes; A005 refuses `can-register` on a queue trigger that
 gives no token, as it does on a route. L003 requires `publish` under `effects`; L002 keeps it out of domain
 graphs; L008 keeps `consume` out of every graph; B006 admits `consume` in a startup step because it is a
 native `holds` operation, and refuses `publish` there since it is not. I001 (RFC 0007) holds a queue trigger
@@ -506,7 +506,7 @@ other, and `maxAttempts` counts deliveries, never tries.
   queue name -- the pairing X0n3 judges.
 - `wilanis describe <queue trigger>` prints the connection, the queue, the message type, and the outcomes
   table the way it prints a route's settings.
-- `wilanis map` prints a queue the way it prints a route: `queue removals (@connections/jobs.connection.json) → @monitor/edge/remove-queued.trigger.json → monitor.port.json#remove → …`,
+- `wilanis map` prints a queue the way it prints a route: `queue removals (@connections/jobs.connection.json) → @customers/edge/remove-queued.trigger.json → customer.port.json#remove → …`,
   and under the publishing graph `→ publish removals`.
 - The viewer's trigger page (`renderDocPage`, `case 'trigger'` in `packages/view/client/index.html`) shows a
   queue trigger's connection, queue and outcomes as it shows a route's; the connection page lists its queues.
@@ -542,12 +542,12 @@ names `@queue` and `@queue-memory` beside `@http`, `@blob`, `@reload` and `@auth
 
 | Code | The edit |
 |---|---|
-| T0n1 | drop `"idempotent": true` from `monitor.port.json#remove`; point `remove-queued.trigger.json` at `#submit` (also B0n1 if `idempotent` is then written on `submit`) |
-| T0n2 | `settings.connection: "@connections/monitor-api.connection.json"` (an http kind, no `delivery`); `"@connections/nope.connection.json"` (R001); `"{{secrets.jwt}}"` (a read) |
+| T0n1 | drop `"idempotent": true` from `customer.port.json#remove`; point `remove-queued.trigger.json` at `#submit` (also B0n1 if `idempotent` is then written on `submit`) |
+| T0n2 | `settings.connection: "@connections/customers-api.connection.json"` (an http kind, no `delivery`); `"@connections/nope.connection.json"` (R001); `"{{secrets.jwt}}"` (a read) |
 | X0n1 | `outcomes.upstream: "later"`; `maxAttempts: 0` |
 | X0n2 | a fake broker kind under `docsDir` declaring `at-most-once`, with `outcomes.upstream: "retry"` |
-| X0n3 | `publish-removal.graph.json` with `type: "@monitor/edge/DeleteRequest.shape.json"` and `message: { ids: [] }` |
-| X0n4 | `settings.message: "@monitor/edge/CsvUpload.shape.json"` (carries a blob) |
+| X0n3 | `publish-removal.graph.json` with `type: "@customers/edge/DeleteRequest.shape.json"` and `message: { ids: [] }` |
+| X0n4 | `settings.message: "@customers/edge/CsvUpload.shape.json"` (carries a blob) |
 | X0n5 | blocked on RFC 0004: `"atomic": true` on a data graph publishing to `@connections/jobs.connection.json` (memory: not `storage`) |
 | T005 | drop `missing` from `outcomes` → `['T005']`; drop the attachment's `in` → A005 and no `invalid_credential` reachable → `['A005', 'T006']` |
 | L003 | drop `publish` from `feature.json → effects` |

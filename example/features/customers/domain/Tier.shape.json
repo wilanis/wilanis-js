@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Tier",
+  "layer": "core",
+  "description": "One tier to narrow a listing by.",
+  "fields": {
+    "tier": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "Import customers",
+  "description": "Domain graph behind POST /customers.csv: the file's drafts read first, then recorded as one batch. The reading is outside whatever transaction the recording opens, because a file is not something a database can roll back; the recording is inside it, because rows are. That split is why this graph is two nodes rather than one, and it is the shape RFC 0004 asks for whenever an irreversible read sits beside writes that must move together.",
+  "in": "blob",
+  "out": {
+    "type": "@customers/domain/Customer.shape.json[]",
+    "from": "recorded"
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "drafts",
+      "label": "Read the file",
+      "run": "@customers/domain/customer.port.json#parseDrafts",
+      "in": {
+        "file": "{{in}}"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "recorded",
+      "label": "Record them all",
+      "description": "Where the profile keeps the customers in a store, this is the one transaction: every draft or none.",
+      "run": "@customers/domain/customer.port.json#registerAll",
+      "in": {
+        "drafts": "{{drafts}}"
+      }
+    }
+  ]
+}

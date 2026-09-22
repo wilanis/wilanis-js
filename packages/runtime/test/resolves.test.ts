@@ -75,7 +75,7 @@ function tree(graphIn: Record<string, unknown>): string {
     description: 'what this tree keeps',
     effects: ['@keeper/keep.port.json#get'],
   });
-  write('features/records/domain/Entry.shape.json', {
+  write('features/records/domain/Customer.shape.json', {
     $schema: schemaUrl('shape'),
     description: 'one entry that is kept',
     layer: 'core',
@@ -91,14 +91,14 @@ function tree(graphIn: Record<string, unknown>): string {
     $schema: schemaUrl('store'),
     description: 'the entries this tree keeps',
     connection: '@connections/records.connection.json',
-    collections: { entries: { of: '@features/records/domain/Entry.shape.json', key: 'id' } },
+    collections: { entries: { of: '@features/records/domain/Customer.shape.json', key: 'id' } },
   });
   write('features/records/data/read.graph.json', {
     $schema: schemaUrl('graph'),
     description: 'read one entry by its key',
     in: 'string',
     nodes: [{ type: NODE_RUN, id: 'got', run: '@keeper/keep.port.json#get', in: graphIn }],
-    out: { type: '@features/records/domain/Entry.shape.json', from: 'got' },
+    out: { type: '@features/records/domain/Customer.shape.json', from: 'got' },
   });
   return dir;
 }

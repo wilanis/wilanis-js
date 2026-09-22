@@ -46,7 +46,7 @@ describe('sabotage: who a scope may read', () => {
   });
   it('A007 points at the reads entry, since that is the line an author would change', () => {
     expect(scopedPointing(reading('request.params.id'))).toContain(
-      'A007 @features/monitor/data/entries.store.json#reads/tenant',
+      'A007 @features/customers/data/customers.store.json#reads/tenant',
     );
   });
   it('A007 a tree that scopes a store and has no guard at all', () => {
@@ -101,7 +101,7 @@ const viewedUnder = (graph: string): Edits => ({
   [STORE]: store => {
     store.collections.everyEntry = { ...VIEW };
   },
-  [`features/monitor/data/${graph}.graph.json`]: doc => {
+  [`features/customers/data/${graph}.graph.json`]: doc => {
     doc.nodes[0].in.collection = 'everyEntry';
   },
 });
@@ -113,7 +113,7 @@ describe('sabotage: what a view is behind', () => {
   });
   it('A008 names the node, the view, the collection it views and the policy', () => {
     expect(scopedSaying(viewedUnder('kept-list'))).toContain(
-      "A008 reaches @features/monitor/data/kept-list.graph.json#rows, which reads everyEntry, a view of entries across every scope behind @access/edge/employees-only.policy.json, and attaches no such policy (profile 'local')",
+      "A008 reaches @features/customers/data/kept-list.graph.json#rows, which reads everyEntry, a view of entries across every scope behind @access/edge/employees-only.policy.json, and attaches no such policy (profile 'local')",
     );
   });
   it('A008 offers the policy to attach, or the scoped collection to read instead', () => {
@@ -125,9 +125,9 @@ describe('sabotage: what a view is behind', () => {
     // the digest, the export and the listing all reach listAll, and the nightly digest fires it on a schedule:
     // a view is crossed by whoever reaches it, not by whoever names it
     const pointing = scopedPointing(viewedUnder('kept-list'));
-    expect(pointing).toContain('A008 @features/monitor/edge/digest.trigger.json#policies');
-    expect(pointing).toContain('A008 @features/monitor/edge/list-entries.trigger.json#policies');
-    expect(pointing).toContain('A008 @features/monitor/edge/nightly-digest.trigger.json#policies');
+    expect(pointing).toContain('A008 @features/customers/edge/digest.trigger.json#policies');
+    expect(pointing).toContain('A008 @features/customers/edge/list-customers.trigger.json#policies');
+    expect(pointing).toContain('A008 @features/customers/edge/nightly-digest.trigger.json#policies');
   });
   it('A008 is judged per profile: it names the profile whose binding reaches the view, and no other', () => {
     // only local binds listAll to kept-list; live and production bind it to graphs that read the scoped
@@ -152,13 +152,13 @@ describe('sabotage: what a view is behind', () => {
     // triggers reaching the same node are refused until they attach it too
     const gated: Edits = {
       ...viewedUnder('kept-list'),
-      'features/monitor/edge/digest.trigger.json': doc => {
+      'features/customers/edge/digest.trigger.json': doc => {
         doc.policies = ['@access/edge/employees-only.policy.json'];
       },
     };
     const pointing = scopedPointing(gated);
-    expect(pointing).not.toContain('A008 @features/monitor/edge/digest.trigger.json#policies');
-    expect(pointing).toContain('A008 @features/monitor/edge/list-entries.trigger.json#policies');
+    expect(pointing).not.toContain('A008 @features/customers/edge/digest.trigger.json#policies');
+    expect(pointing).toContain('A008 @features/customers/edge/list-customers.trigger.json#policies');
   });
   it('A008 says nothing of a trigger reaching the scoped collection rather than the view', () => {
     // the view is declared and nothing reads it: declaring a way across a scope is not taking it

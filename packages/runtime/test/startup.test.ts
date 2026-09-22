@@ -240,7 +240,7 @@ describe("the project's startup steps", () => {
 
   it('L008 a graph may not run what outlives the run', () => {
     expect(
-      sabotage('features/monitor/data/get-row.graph.json', graph => {
+      sabotage('features/customers/data/get-row.graph.json', graph => {
         graph.nodes[0].run = '@http/server.port.json#listen';
         graph.nodes[0].in = {};
       }),

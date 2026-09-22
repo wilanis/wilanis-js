@@ -9,7 +9,7 @@
     "rehearse": "wilanis rehearse .",
     "fuzz": "wilanis fuzz .",
     "regress": "wilanis regress .",
-    "digest": "wilanis run @monitor/edge/digest.trigger.json .",
+    "digest": "wilanis run @customers/edge/digest.trigger.json .",
     "start": "wilanis start .",
     "hello": "wilanis run @hello/edge/hello-gated.trigger.json .",
     "issue-otp": "wilanis run @access/edge/issue-otp.trigger.json ."

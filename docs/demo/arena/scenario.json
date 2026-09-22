@@ -7,15 +7,15 @@
   "description": "Every trigger that can change an entry attaches the recorder policy. Reads stay public. Without this the six write triggers are six coincidences: a new route firing monitor.update and forgetting the policy would check clean, and the write would be public.",
   "access": {
    "over": [
-    "@monitor/domain/monitor.port.json#record",
-    "@monitor/domain/monitor.port.json#update",
-    "@monitor/domain/monitor.port.json#remove",
-    "@monitor/domain/monitor.port.json#removeMany",
-    "@monitor/domain/monitor.port.json#submit",
-    "@monitor/domain/monitor.port.json#import"
+    "@customers/domain/customer.port.json#register",
+    "@customers/domain/customer.port.json#update",
+    "@customers/domain/customer.port.json#remove",
+    "@customers/domain/customer.port.json#removeMany",
+    "@customers/domain/customer.port.json#submit",
+    "@customers/domain/customer.port.json#import"
    ],
    "requires": {
-    "policy": "@access/edge/can-record.policy.json"
+    "policy": "@access/edge/can-register.policy.json"
    }
   }
  },

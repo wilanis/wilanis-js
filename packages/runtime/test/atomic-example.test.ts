@@ -48,7 +48,7 @@ async function serving(profile = 'local') {
    */
   let at = 0;
   const run = (op: string, input: Record<string, unknown> = {}) =>
-    emb.startup({ run: `@monitor/domain/monitor.port.json#${op}`, in: input }, { blobs, at: at++ });
+    emb.startup({ run: `@customers/domain/customer.port.json#${op}`, in: input }, { blobs, at: at++ });
 
   /** The CSV as the route would hand it: bytes in the registry, a handle in the graph. */
   const upload = (text: string): Promise<BlobHandle> =>

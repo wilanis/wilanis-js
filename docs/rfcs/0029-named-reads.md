@@ -9,7 +9,7 @@
 ## Summary
 
 A data graph or a binding that reads the request says, at its head, which reads it takes and where each is declared:
-`"reads": { "agent": "@monitor/edge/request.resolvers.json#agent" }`, one entry per name, each a path to a resolvers
+`"reads": { "agent": "@customers/edge/request.resolvers.json#agent" }`, one entry per name, each a path to a resolvers
 document and the resolver's name after `#`. The body reads `{{agent}}` as it does today. This replaces the
 `"resolvers": "@doc"` header, which bound every name of one document at once and left the reader to open it and
 search. After this, every cross-document reference in a tree is a path, a name's origin is one labelled line above
@@ -24,7 +24,7 @@ The data layer is the only layer that reads the request, and only through a `res
 graph or a binding names the document under `resolvers` and reads `{{name}}` wherever a value is used. The rule is
 right and stays. Its grammar has three costs, and an agent writing documents pays all of them.
 
-- **The binding is implicit.** `"resolvers": "@monitor/edge/request.resolvers.json"` binds every name of that document,
+- **The binding is implicit.** `"resolvers": "@customers/edge/request.resolvers.json"` binds every name of that document,
   and the body's `{{tenant}}` says nothing about being one of them. A reader -- or a small model -- meeting
   `{{tenant}}` must know the convention, open the document and search it. The template CLAUDE.md teaches the
   convention (`packages/runtime/templates/CLAUDE.md`, the layers paragraph and the `resolvers` row); nothing in the
@@ -45,7 +45,7 @@ What the code says: `GraphDoc.resolvers?: string` and `BindingDoc.resolvers?: st
 that document; `quietResolvers` and `requestNeedsOf` build the request needs from body reads whose root is a resolver
 name; `lower.ts` builds `roots.resolvers` from the same document; `graphs.ts` in the viewer keeps one `resolversDoc`
 per graph and draws one request node whose `opens` is that document. Four documents in this repository name the
-header (`example/features/monitor/data/create-row.graph.json`, and `write-theme`, `end-session`, `read-session` under
+header (`example/features/customers/data/create-row.graph.json`, and `write-theme`, `end-session`, `read-session` under
 `libraries/access/features/access/data/`), plus the template, and RFC 0009's example.
 
 What this RFC does not do. It does not change what a resolver is -- a read of `request.*`, declared once per feature
@@ -66,13 +66,13 @@ resolver's name: `"<local>": "@<feature>/edge/<file>.resolvers.json#<resolver>"`
 **Writing it.** The monitor's `create-row.graph.json` today names one document and reads one resolver:
 
 ```json
-"resolvers": "@monitor/edge/request.resolvers.json",
+"resolvers": "@customers/edge/request.resolvers.json",
 ```
 
 and after this RFC says which:
 
 ```json
-"reads": { "agent": "@monitor/edge/request.resolvers.json#agent" },
+"reads": { "agent": "@customers/edge/request.resolvers.json#agent" },
 ```
 
 with the body unchanged: `"agent": "{{agent}}"` in the `put`'s record. A reader of the graph sees, in the graph,
@@ -80,7 +80,7 @@ that `agent` is a resolver and where it is declared; `wilanis describe` on that 
 uses one the same way, and a delegation reads `{{token}}` in its `in`:
 
 ```json
-"reads": { "token": "@monitor/edge/request.resolvers.json#token" },
+"reads": { "token": "@customers/edge/request.resolvers.json#token" },
 "operations": {
   "enqueueRemoval": {
     "run": "@queue/queue.port.json#publish",
@@ -93,7 +93,7 @@ Two features, or two names for one read, are ordinary:
 
 ```json
 "reads": {
-  "agent": "@monitor/edge/request.resolvers.json#agent",
+  "agent": "@customers/edge/request.resolvers.json#agent",
   "who": "@access/edge/session.resolvers.json#sid"
 }
 ```
@@ -101,15 +101,15 @@ Two features, or two names for one read, are ordinary:
 **The refusals an author meets.** Name a resolver the document does not declare:
 
 ```
-P004  @features/monitor/data/create-row.graph.json#reads/agent
-    '@monitor/edge/request.resolvers.json' declares no resolver 'agents'
-    → wilanis describe @monitor/edge/request.resolvers.json lists its resolvers: agent, tenant
+P004  @features/customers/data/create-row.graph.json#reads/agent
+    '@customers/edge/request.resolvers.json' declares no resolver 'agents'
+    → wilanis describe @customers/edge/request.resolvers.json lists its resolvers: agent, tenant
 ```
 
 Keep an entry the body never reads:
 
 ```
-P005  @features/monitor/data/create-row.graph.json#reads/tenant
+P005  @features/customers/data/create-row.graph.json#reads/tenant
     'tenant' is used by no value of this graph
     → read it as {{tenant}}, or drop the entry: reads is exactly what this document reads
 ```
@@ -117,7 +117,7 @@ P005  @features/monitor/data/create-row.graph.json#reads/tenant
 Give a read a name a node already has:
 
 ```
-P006  @features/monitor/data/create-row.graph.json#reads/saved
+P006  @features/customers/data/create-row.graph.json#reads/saved
     'saved' is also the id of a node; {{saved}} would be ambiguous
     → rename the read: "reads": { "savedBy": "...#saved" }
 ```
@@ -125,9 +125,9 @@ P006  @features/monitor/data/create-row.graph.json#reads/saved
 Read `{{tenant}}` without naming it:
 
 ```
-G003  @features/monitor/data/create-row.graph.json#nodes/saved/in/record/tenant
+G003  @features/customers/data/create-row.graph.json#nodes/saved/in/record/tenant
     'tenant' is not in, const, a node that runs before this one, or a name under reads
-    → to read the request, bind the name: "reads": { "tenant": "@monitor/edge/request.resolvers.json#tenant" }
+    → to read the request, bind the name: "reads": { "tenant": "@customers/edge/request.resolvers.json#tenant" }
 ```
 
 Write `reads` on a domain graph, and L002 refuses it as it refuses `resolvers` today: a domain graph never reads the
@@ -137,16 +137,16 @@ request.
 
 ```
 reads
-  agent  ← @monitor/edge/request.resolvers.json#agent  (request.headers['user-agent'])
-  tenant ← @monitor/edge/request.resolvers.json#tenant  (request.session.attributes.tenant, required)
+  agent  ← @customers/edge/request.resolvers.json#agent  (request.headers['user-agent'])
+  tenant ← @customers/edge/request.resolvers.json#tenant  (request.session.attributes.tenant, required)
 ```
 
 and on the resolvers document, one line per resolver and who uses it:
 
 ```
-resolvers  @monitor/edge/request.resolvers.json  (Request context)
-  agent   request.headers['user-agent']          used by @monitor/data/create-row.graph.json as {{agent}}
-  tenant  request.session.attributes.tenant  required  used by @monitor/data/tenant-scope... as {{tenant}}
+resolvers  @customers/edge/request.resolvers.json  (Request context)
+  agent   request.headers['user-agent']          used by @customers/data/create-row.graph.json as {{agent}}
+  tenant  request.session.attributes.tenant  required  used by @customers/data/tenant-scope... as {{tenant}}
 ```
 
 ## Reference
@@ -154,7 +154,7 @@ resolvers  @monitor/edge/request.resolvers.json  (Request context)
 ### Documents and schemas
 
 **`common.schema.json`** gains `$defs/resolverRef`: "A resolver of a resolvers document: its path, `#`, and the
-resolver's name (`@monitor/edge/request.resolvers.json#agent`)." The pattern is `$defs/path`'s followed by `#` and
+resolver's name (`@customers/edge/request.resolvers.json#agent`)." The pattern is `$defs/path`'s followed by `#` and
 `$defs/ident`'s. The description of `$defs/ident` gains nothing: it already says "resolver".
 
 **`graph.schema.json`** and **`binding.schema.json`**: `resolvers` (path) is removed; `reads` (object, optional;
@@ -247,15 +247,15 @@ this grammar. No other RFC names the header.
 |---|---|---|
 | the schema | `packages/core/test/validate.test.ts` | the baseline data graph and binding carry `reads`; a `resolvers` header is refused; a `reads` value without `#`, with a name that is not an identifier, or an empty `reads` is refused |
 | `splitRef` | `packages/core/test/registry.test.ts` | splits `@a/b.port.json#op` and `@a/b.resolvers.json#name`; `splitOp` still answers |
-| P004 | `packages/runtime/test/example.test.ts`, sabotage | `#agents` (no such resolver); `@monitor/edge/nope.resolvers.json#agent` (R001); `@access/edge/session.resolvers.json#sid` from a monitor graph when access does not export it (L005) |
+| P004 | `packages/runtime/test/example.test.ts`, sabotage | `#agents` (no such resolver); `@customers/edge/nope.resolvers.json#agent` (R001); `@access/edge/session.resolvers.json#sid` from a monitor graph when access does not export it (L005) |
 | P005 | sabotage | `create-row.graph.json` given `"tenant": "...#tenant"` and no read of it |
 | P006 | sabotage | `create-row.graph.json` given `"saved": "...#agent"` (a node id); `"in": "...#agent"` (reserved) |
 | G003 | sabotage | `{{agent}}` read with `reads` removed: the message names `reads` and the hint writes the entry |
-| L002 | sabotage (existing case, edited) | `reads` on `record-entry.graph.json` |
+| L002 | sabotage (existing case, edited) | `reads` on `register-customer.graph.json` |
 | the walk holds | existing tests, unchanged in expectation | the A006, T004 and B008 cases of `example.test.ts` and `sabotage.test.ts` pass as they do: `opNeeds` answers the same paths |
 | the example | `packages/runtime/test/example.test.ts` | `codes(EXAMPLE)` is empty after the migration; the access tree's tests in `libraries/access/test` likewise |
 | `describe` | `packages/runtime/test/tools.test.ts` | the graph prints its `reads` block; the resolvers document prints its resolvers and `used by` |
-| the viewer | `packages/view/test/view.test.ts` | `create-row`'s request node has a port `agent` that opens `@monitor/edge/request.resolvers.json`; a fixture graph using two documents has two `opens` |
+| the viewer | `packages/view/test/view.test.ts` | `create-row`'s request node has a port `agent` that opens `@customers/edge/request.resolvers.json`; a fixture graph using two documents has two `opens` |
 
 ## Implementation plan
 
@@ -286,7 +286,7 @@ that proposes this RFC; no task carries them.
 - **The header as it is.** Keeping `"resolvers": "@doc"` and teaching the convention harder was considered. The
   convention is already taught; the cost is that the graph itself says nothing, that one document is the limit, and
   that shadowing is silent. A change that removes three costs and adds one line per read is the cheaper side.
-- **A document per resolver.** `@monitor/edge/tenant.resolver.json` would make every reference a plain path with no
+- **A document per resolver.** `@customers/edge/tenant.resolver.json` would make every reference a plain path with no
   `#`. It multiplies files, breaks "one resolvers document per feature says what the feature takes from the request",
   and adds a document kind for what `#name` already expresses on a port.
 - **`using` instead of `reads`.** `using` was the first word: it says the document depends on the resolvers, reads

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
+  "label": "GET /customers.csv",
+  "description": "GET /customers.csv \u2192 every customer as a CSV download (monitor.csv), streamed from the blob registry. 502 as upstream when the monitor API broke.",
+  "kind": "@http/http.trigger-kind.json",
+  "settings": {
+    "route": "/customers.csv",
+    "method": "GET",
+    "produces": "text/csv",
+    "response": {
+      "refusals": {
+        "upstream": 502,
+        "invariant": 500
+      }
+    }
+  },
+  "out": "blob",
+  "fire": {
+    "run": "@customers/domain/customer.port.json#export"
+  }
+}

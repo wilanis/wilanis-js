@@ -1,0 +1,48 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
+  "label": "POST /customers",
+  "description": "POST /customers -> 201 with the registered customer. The body is the input. 409 as conflict when a customer already uses the address (the store declares email unique). 502 as upstream when the customer API broke. Employees holding the registrar role only: 401 as anonymous without a token or as invalid_credential with a bad one, 403 as forbidden for a customer or an employee without the role.",
+  "settings": {
+    "route": "/customers",
+    "method": "POST",
+    "consumes": "application/json",
+    "produces": "application/json",
+    "response": {
+      "status": {
+        "default": 201
+      },
+      "refusals": {
+        "upstream": 502,
+        "conflict": 409,
+        "anonymous": 401,
+        "invalid_credential": 401,
+        "forbidden": 403,
+        "invariant": 500
+      }
+    },
+    "body": "@customers/edge/RegisterRequest.shape.json"
+  },
+  "in": "@customers/edge/RegisterRequest.shape.json",
+  "out": "@customers/edge/CustomerView.shape.json",
+  "policies": [
+    {
+      "policy": "@access/edge/employees-only.policy.json",
+      "in": {
+        "token": [
+          "{{request.headers.authorization}}",
+          "{{request.cookies.session}}"
+        ]
+      }
+    },
+    "@access/edge/can-register.policy.json"
+  ],
+  "kind": "@http/http.trigger-kind.json",
+  "fire": {
+    "run": "@customers/domain/customer.port.json#submit",
+    "in": {
+      "name": "{{request.body.name}}",
+      "email": "{{request.body.email}}",
+      "tier": "{{request.body.tier}}"
+    }
+  }
+}

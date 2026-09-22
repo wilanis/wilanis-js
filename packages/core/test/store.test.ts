@@ -13,24 +13,24 @@ describe('store', () => {
   });
   it('a collection is named by an identifier and says the shape it keeps and the field that keys it', () => {
     const collections = (one: Record<string, unknown>) => doc('store', { collections: { entries: one } });
-    expect(refused(collections({ of: '@features/f/domain/Entry.shape.json' }))).toEqual([
+    expect(refused(collections({ of: '@features/f/domain/Customer.shape.json' }))).toEqual([
       at('collections/entries', "missing 'key'"),
     ]);
     expect(refused(collections({ key: 'id' }))).toEqual([at('collections/entries', "missing 'of'")]);
     expect(refused(collections({ of: 'Entry', key: 'id' }))).toEqual([at('collections/entries/of', 'A type:')]);
-    expect(refused(collections({ of: '@features/f/domain/Entry.shape.json', key: 'the id' }))).toEqual([
+    expect(refused(collections({ of: '@features/f/domain/Customer.shape.json', key: 'the id' }))).toEqual([
       at('collections/entries/key', 'identifier'),
     ]);
-    expect(refused(collections({ of: '@features/f/domain/Entry.shape.json', key: 'id', table: 'entries' }))).toEqual([
-      at('collections/entries', "unknown property 'table'"),
-    ]);
+    expect(refused(collections({ of: '@features/f/domain/Customer.shape.json', key: 'id', table: 'entries' }))).toEqual(
+      [at('collections/entries', "unknown property 'table'")],
+    );
     expect(refused(doc('store', { collections: { 'Bad Name': { of: 'unknown', key: 'id' } } }))).toEqual([
       at('collections', "property name 'Bad Name'", 'identifier'),
     ]);
   });
   it('a collection may declare what no two records repeat, which field holds another collection key, what existing rows receive, and what it was called before', () => {
     const entries = {
-      of: '@features/f/domain/Entry.shape.json',
+      of: '@features/f/domain/Customer.shape.json',
       key: 'id',
       unique: [['url', 'method']],
       defaults: { ua: 'unknown' },
@@ -47,7 +47,7 @@ describe('store', () => {
   });
   it('a rename names both names by an identifier, and a previous collection name is one identifier', () => {
     const collections = (one: Record<string, unknown>) =>
-      doc('store', { collections: { entries: { of: '@features/f/domain/Entry.shape.json', key: 'id', ...one } } });
+      doc('store', { collections: { entries: { of: '@features/f/domain/Customer.shape.json', key: 'id', ...one } } });
     expect(refused(collections({ renamed: { agent: 7 } }))).toEqual([
       at('collections/entries/renamed/agent', 'must be string'),
     ]);
@@ -61,7 +61,7 @@ describe('store', () => {
   });
   it('a constraint names each field by its identifier, and names at least one', () => {
     const collections = (one: Record<string, unknown>) =>
-      doc('store', { collections: { entries: { of: '@features/f/domain/Entry.shape.json', key: 'id', ...one } } });
+      doc('store', { collections: { entries: { of: '@features/f/domain/Customer.shape.json', key: 'id', ...one } } });
     expect(refused(collections({ unique: [[]] }))).toEqual([
       at('collections/entries/unique/0', 'must NOT have fewer than 1 items'),
     ]);
@@ -79,7 +79,7 @@ describe('store', () => {
   it('a reference names one collection and refuses a removal, and admits nothing else', () => {
     const collections = (ref: Record<string, unknown>) =>
       doc('store', {
-        collections: { entries: { of: '@features/f/domain/Entry.shape.json', key: 'id', refs: { entryId: ref } } },
+        collections: { entries: { of: '@features/f/domain/Customer.shape.json', key: 'id', refs: { entryId: ref } } },
       });
     expect(refused(collections({}))).toEqual([at('collections/entries/refs/entryId', "missing 'collection'")]);
     expect(refused(collections({ collection: 'entries', onRemove: 'cascade' }))).toEqual([
@@ -95,7 +95,7 @@ describe('store', () => {
 });
 
 describe('a store that scopes what a caller sees', () => {
-  const kept = { of: '@features/f/domain/Entry.shape.json', key: 'id' };
+  const kept = { of: '@features/f/domain/Customer.shape.json', key: 'id' };
   const store = (collections: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
     doc('store', { collections, ...extra });
 
@@ -189,7 +189,7 @@ describe('a store that scopes what a caller sees', () => {
   it('keeps tells the two shapes apart, and kept answers only the collections that hold records', () => {
     // a reader asks this rather than reading `of` and `key` off whatever the map holds: the schema stopped
     // guaranteeing the pair the moment a view became a collection, and a view has neither to read
-    const entries = { of: '@features/f/domain/Entry.shape.json', key: 'id' };
+    const entries = { of: '@features/f/domain/Customer.shape.json', key: 'id' };
     const everyEntry = { view: 'entries', behind: '@a/edge/p.policy.json' };
     expect(keeps(entries)).toBe(true);
     expect(keeps(everyEntry)).toBe(false);

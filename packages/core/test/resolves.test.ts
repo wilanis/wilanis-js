@@ -9,7 +9,7 @@ import type { Field, PortDoc } from '../src/model.js';
 import { parsePath, type Resolves, resolvedBy, resolvedHere, showPath, substituted } from '../src/resolves.js';
 import { type Type, TypeError_, TypeResolver } from '../src/types.js';
 
-const ENTRY: Type = { kind: 'object', name: '@f/Entry.shape.json', fields: {}, open: false };
+const ENTRY: Type = { kind: 'object', name: '@f/Customer.shape.json', fields: {}, open: false };
 const COUNT: Type = { kind: 'object', name: '@f/Count.shape.json', fields: {}, open: false };
 
 /**
@@ -20,7 +20,7 @@ const COUNT: Type = { kind: 'object', name: '@f/Count.shape.json', fields: {}, o
 const store = {
   connection: '@connections/records.connection.json',
   collections: {
-    entries: { of: '@f/Entry.shape.json', key: 'id' },
+    entries: { of: '@f/Customer.shape.json', key: 'id' },
     counts: { of: '@f/Count.shape.json', key: 'at' },
     'every-entry': { view: 'entries', behind: '@f/edge/employees-only.policy.json' },
     'twice-over': { view: 'every-entry', behind: '@f/edge/employees-only.policy.json' },
@@ -29,14 +29,14 @@ const store = {
 
 const DOCS: Record<string, unknown> = {
   '@f/data/records.store.json': store,
-  '@f/Entry.shape.json': { layer: 'core', fields: { id: { type: 'string' }, note: { type: 'string' } } },
+  '@f/Customer.shape.json': { layer: 'core', fields: { id: { type: 'string' }, note: { type: 'string' } } },
   '@f/Count.shape.json': { layer: 'core', fields: { at: { type: 'number' } } },
 };
 
 const tree: Resolves = {
   document: ref => DOCS[ref],
   type: ref => {
-    if (ref === '@f/Entry.shape.json') return ENTRY;
+    if (ref === '@f/Customer.shape.json') return ENTRY;
     if (ref === '@f/Count.shape.json') return COUNT;
     if (ref === 'number') return { kind: 'number' };
     if (ref === 'string') return { kind: 'string' };
