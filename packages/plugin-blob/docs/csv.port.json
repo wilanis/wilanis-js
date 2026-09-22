@@ -16,7 +16,8 @@
           "description": "the shape of one row; its fields are the columns read"
         }
       },
-      "returns": "$T[]"
+      "returns": "$T[]",
+      "idempotent": true
     },
     "write": {
       "description": "Write rows as a CSV blob: a header row of the shape's fields in declared order, then one line per row, quoting what needs it. Answers the new file's handle.",
