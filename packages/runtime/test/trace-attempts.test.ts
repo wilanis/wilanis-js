@@ -6,7 +6,7 @@
 import { loadTree, type Trace } from '@wilanis/core';
 import type { NodeReport, Report } from '@wilanis/engine';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { atLevel, embedderFor, type Started, traceOf, traceText } from '../src/index.js';
+import { atLevel, embedderFor, type Fired, type Started, traceOf, traceText } from '../src/index.js';
 import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
 const BINDING = '@features/customers/data/customers-rest.binding.json';
@@ -158,6 +158,24 @@ describe('a binding operation that retried its graph', () => {
     // the try that broke says what broke in it, the way any nested run does
     expect(first?.children.map(one => one.name)).toEqual([GET_ROW]);
     expect(first?.children[0].children.map(one => [one.name, one.status])).toEqual([[`asked ${HTTP}`, 'failed']]);
+  });
+
+  it('says how often on the policy span too, where the operation a policy fires retried its graph', () => {
+    const tried = bound(getRow(), { attempts: [{ startedAt: 90, endedAt: 120, error: 'fetch failed' }] });
+    const fired: Fired = {
+      id: 'run-2',
+      trigger: '@features/nowhere.trigger.json',
+      kind: '@http/http.trigger-kind.json',
+      decisions: [{ policy: '@features/access/edge/signed-in.policy.json', report: tried }],
+      answer: tried,
+      startedAt: 90,
+      endedAt: 200,
+    };
+    const policy = named(traceOf(fired, scope), 'policy @features/access/edge/signed-in.policy.json');
+
+    // the policy span renders the tries, so it says their count, as a binding span does for the same run
+    expect(policy?.attributes['wilanis.attempts']).toBe(1);
+    expect(policy?.children.map(one => one.name)).toEqual(['get try 1', GET_ROW]);
   });
 });
 
