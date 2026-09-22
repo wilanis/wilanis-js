@@ -32,10 +32,10 @@ const { load, dir } = loadedWith({
   'features/customers/data/customers.store.json': {
     $schema: schemaUrl('store'),
     label: 'Entries',
-    description: 'The entries recorded so far, and the notes hung off them.',
+    description: 'The customers registered so far, and the notes hung off them.',
     connection: '@connections/customers.connection.json',
     collections: {
-      entries: {
+      customers: {
         of: '@customers/domain/Customer.shape.json',
         key: 'id',
         unique: [['url', 'method'], ['ua']],
@@ -47,7 +47,7 @@ const { load, dir } = loadedWith({
       notes: {
         of: '@customers/domain/Note.shape.json',
         key: 'id',
-        refs: { entryId: { collection: 'entries', onRemove: 'refuse' } },
+        refs: { customerId: { collection: 'customers', onRemove: 'refuse' } },
       },
     },
   },
@@ -59,7 +59,7 @@ describe('describe: a store', () => {
 
   it('says the connection its records live behind, and every collection with the shape it holds', () => {
     expect(said()).toContain('connection  @connections/customers.connection.json');
-    expect(said()).toContain('  collection entries: @customers/domain/Customer.shape.json');
+    expect(said()).toContain('  collection customers: @customers/domain/Customer.shape.json');
     expect(said()).toContain('  collection notes: @customers/domain/Note.shape.json');
   });
 
@@ -67,7 +67,7 @@ describe('describe: a store', () => {
     expect(said()).toContain('    key         id');
     expect(said()).toContain('    unique      [url, method], [ua]');
     expect(said()).toContain('    default     ua = "unknown"');
-    expect(said()).toContain('    refs        entryId → entries.id (refuse on remove)');
+    expect(said()).toContain('    refs        customerId → customers.id (refuse on remove)');
     expect(said()).toContain('    holds       one row per observed call');
   });
 
@@ -103,7 +103,7 @@ describe('describe: a store', () => {
 
 describe('describe: a shape a store keeps', () => {
   it('says which collection holds it, beside who writes it', () => {
-    expect(describeDoc(load, '@customers/domain/Customer.shape.json')).toContain(`held by  ${STORE}#entries`);
+    expect(describeDoc(load, '@customers/domain/Customer.shape.json')).toContain(`held by  ${STORE}#customers`);
     expect(describeDoc(load, '@customers/domain/Note.shape.json')).toContain(`held by  ${STORE}#notes`);
   });
 
@@ -119,7 +119,7 @@ const KEPT = '@features/customers/data/customers.store.json';
 
 describe('ls: the stores of a tree', () => {
   it('lists a store under its kind, as every other kind is listed', () => {
-    // two, since the example keeps its entries in memory under one profile and in PostgreSQL under another,
+    // two, since the example keeps its customers in memory under one profile and in PostgreSQL under another,
     // and a profile swaps bindings rather than connections
     expect(ls(example, 'store')).toEqual([
       'store            @features/customers/data/customers-postgres.store.json',
@@ -148,9 +148,9 @@ describe('describe: the engine behind a store', () => {
 
   it('names every graph that runs an operation against it, with the operation and the collection', () => {
     expect(said()).toContain('run against by (the operation each runs):');
-    expect(said()).toContain('    @features/customers/data/kept-get.graph.json#asked  get (entries)');
-    expect(said()).toContain('    @features/customers/data/store-and-latest.graph.json#key  newKey (entries)');
-    expect(said()).toContain('    @features/customers/data/store-and-latest.graph.json#stored  put (entries)');
+    expect(said()).toContain('    @features/customers/data/kept-get.graph.json#asked  get (customers)');
+    expect(said()).toContain('    @features/customers/data/store-and-latest.graph.json#key  newKey (customers)');
+    expect(said()).toContain('    @features/customers/data/store-and-latest.graph.json#stored  put (customers)');
     expect(said()).toContain('    @features/customers/data/store-and-latest.graph.json#latest  put (latest)');
   });
 });
@@ -191,8 +191,10 @@ describe('map: where a node lands', () => {
   const lines = () => map(example);
 
   it('ends a store call at the records, naming the store, the collection and the operation', () => {
-    expect(lines()).toContain(`      asked @storage/store.port.json#get  (effect) → store ${KEPT} entries (get)`);
-    expect(lines()).toContain(`      asked @storage/store.port.json#remove  (effect) → store ${KEPT} entries (remove)`);
+    expect(lines()).toContain(`      asked @storage/store.port.json#get  (effect) → store ${KEPT} customers (get)`);
+    expect(lines()).toContain(
+      `      asked @storage/store.port.json#remove  (effect) → store ${KEPT} customers (remove)`,
+    );
   });
 
   it('leaves a call that is not a store call as it was', () => {

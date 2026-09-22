@@ -281,7 +281,7 @@ wrote features/customers/edge/archive-customer.trigger.json</pre>
 <h3>What the tree answers</h3>
 <pre>features/access/domain/require-registrar  switch 'decide'  3/3 branches
   ok  when has(principal) &amp;&amp; 'registrar' in principal.roles  answered from 'granted'
-  ok  when has(principal)                                    refused on purpose at 'forbidden' as forbidden: "recording customers takes the registrar role"
+  ok  when has(principal)                                    refused on purpose at 'forbidden' as forbidden: "registering customers takes the registrar role"
   ok  anything else                                          refused on purpose at 'anonymous' as anonymous: "sign in first: no token was presented"
 
 every branch settled -- 45 branch(es), 20 decision(s), 16 graph(s).
@@ -351,7 +351,7 @@ features/access/domain/refresh  switch 'route'  2/2 branches
   ok  anything else                          refused on purpose at 'invalid' as invalid_refresh: "the refresh token is unknown, spent or expired"
 features/access/domain/require-registrar  switch 'decide'  3/3 branches
   ok  when has(principal) &amp;&amp; 'registrar' in principal.roles  answered from 'granted'
-  ok  when has(principal)                                    refused on purpose at 'forbidden' as forbidden: "recording customers takes the registrar role"
+  ok  when has(principal)                                    refused on purpose at 'forbidden' as forbidden: "registering customers takes the registrar role"
   ok  anything else                                          refused on purpose at 'anonymous' as anonymous: "sign in first: no token was presented"
 features/access/domain/require-employee  switch 'decide'  3/3 branches
   ok  when has(principal) &amp;&amp; principal.realm == 'employee'  answered from 'granted'
@@ -605,8 +605,8 @@ curl -s -X POST localhost:8099/customers/$ID/archive -H "authorization: Bearer $
 <h3>What the tree answers</h3>
 <pre>401  {"reason":"anonymous","message":"sign in first: no token was presented"}</pre>
 <p>As cy, beside the rehearsal's <code>forbidden</code> line from step 5:</p>
-<pre>403  {"reason":"forbidden","message":"recording customers takes the registrar role"}
-  ok  when has(principal)                                    refused on purpose at 'forbidden' as forbidden: "recording customers takes the registrar role"</pre>
+<pre>403  {"reason":"forbidden","message":"registering customers takes the registrar role"}
+  ok  when has(principal)                                    refused on purpose at 'forbidden' as forbidden: "registering customers takes the registrar role"</pre>
 <pre>201  {"id":"995f0dc1-b9b1-4eab-afd7-4440df9fd191","name":"Ada Lovelace","email":"ada@example.com","tier":"bronze"}
 200  {"id":"995f0dc1-b9b1-4eab-afd7-4440df9fd191","name":"Ada Lovelace","email":"ada@example.com","tier":"bronze"}</pre>
 <h3>Why it matters when an agent writes it</h3>

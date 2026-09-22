@@ -53,7 +53,7 @@ describe('describe: no kind answers with the document as JSON', () => {
     const said = describeDoc(example, '@customers/edge/register-customer.trigger.json');
     expect(said).toContain('kind  @http/http.trigger-kind.json');
     expect(said).toContain('fires   @customers/domain/customer.port.json#submit');
-    expect(said).toContain('    url ← {{request.body.url}}');
+    expect(said).toContain('    name ← {{request.body.name}}');
     // the description is prose at the top of every describe; printing the document repeated it verbatim below
     const description = (example.registry.get('trigger', '@features/customers/edge/register-customer.trigger.json')?.doc
       .description ?? '') as string;
@@ -102,7 +102,7 @@ describe('describe: no kind answers with the document as JSON', () => {
     expect(said).toContain('starts, in order:');
     expect(said).toContain('    @http/server.port.json#listen  (serving proceeds if it refuses)  -- Listen');
     expect(said).toContain(
-      '    @customers/domain/customer.port.json#prepare  (required: serving stops if it refuses)  -- Prepare the entry store',
+      '    @customers/domain/customer.port.json#prepare  (required: serving stops if it refuses)  -- Prepare the customer store',
     );
   });
 
@@ -120,7 +120,7 @@ describe('describe: no kind answers with the document as JSON', () => {
   it('says a shape as its fields rather than its JSON, keeping what each field means', () => {
     const said = describeDoc(example, '@customers/domain/Customer.shape.json');
     expect(said).toContain('layer  core');
-    expect(said).toContain('    agent?: string  -- the user agent that made the call');
+    expect(said).toContain('    registrar?: string  -- who registered this customer');
     expect(said).not.toContain('"$schema"');
   });
 });
