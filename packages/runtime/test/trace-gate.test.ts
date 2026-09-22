@@ -92,7 +92,7 @@ describe('the gate, said as spans', () => {
   });
 
   it('runs the operation under the gate when every policy allowed', async () => {
-    const trace = await gated({ context: { principal: { subject: 'bo', role: 'recorder' } } });
+    const trace = await gated({ context: { principal: { subject: 'bo', role: 'registrar' } } });
     const names = spansOf(trace).map(one => one.name);
 
     expect(trace.status).toBe('ok');

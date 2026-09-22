@@ -24,7 +24,7 @@ field optional) or **destructive** (drop a collection or a field that holds data
 required with no default). Nothing runs until `--apply`, a destructive step runs only when `--allow-destructive`
 names its collection, a step that existing rows would violate is refused outright with the count and the one-off
 graph that fixes it, and every plan that applied is one row of the record, so `--history` prints what changed and
-when. A rename is the one step no diff can see, so the store says it, `"renamed": { "agent": "ua" }`, and the planner
+when. A rename is the one step no diff can see, so the store says it, `"renamed": { "email": "emailAddress" }`, and the planner
 tells the author when the mark has done its work. RFC 0003's `ensure` becomes the same planner allowed only additive
 steps, so `wilanis start` on a store that is behind refuses with the plan it would need and names this command.
 `rehearse` never migrates: it reaches no engine.
@@ -39,7 +39,7 @@ operator writes a Kysely migration file, or a `psql` session, against the very p
 trusted with, and the tree learns nothing of it -- `wilanis check` cannot see a migration file, `describe` does not
 list it, the viewer does not show it, and the next `ensure` finds a table it did not make and stops the start.
 
-What an author, human or agent, cannot express now: that the shape's field `ua` is now called `agent` and the
+What an author, human or agent, cannot express now: that the shape's field `emailAddress` is now called `email` and the
 column should follow; that the `notes` collection is gone and its table may go, this once, with the rows it holds;
 that a new `unique` over `url` and `method` is meant, and what to do about the three rows that already repeat. Each
 is a decision about data that only the database can inform (how many rows, which repeat) and only the tree can
@@ -72,38 +72,38 @@ connection the tree's stores name. **A step** is one thing the engine would do, 
 | destructive | drop a collection that has rows; drop a field that holds a value in some row; change a field's type; make a field required with no default when rows are empty and `--allow-destructive` names the collection | rows or values, gone |
 | refused | a `unique` or a `refs` that existing rows violate; a required field with no default over empty rows, unless allowed as destructive; a changed `key`; a type change the engine cannot cast; a `renamed` whose old name is not in the record | nothing runs: the plan prints the count and the edit or the graph that makes the step possible |
 
-The example, after RFC 0003 gave its store the `entries` and `notes` collections. Three edits at once: `Entry` gains
-an optional `note`, its `ua` becomes `agent`, and the `notes` collection is dropped because notes now live in the
-entry. The shape changes in `domain/`, and the store in `data/` says the one thing a diff cannot see:
+The example, after RFC 0003 gave its store the `customers` and `notes` collections. Three edits at once: `Customer` gains
+an optional `note`, its `emailAddress` becomes `email`, and the `notes` collection is dropped because notes now live in the
+customer. The shape changes in `domain/`, and the store in `data/` says the one thing a diff cannot see:
 
 ```json
 {
   "$schema": "@wilanis/store.schema.json",
-  "label": "Entries",
-  "description": "Observed calls, one row each; a url is observed once per method. A note is a field of the entry.",
+  "label": "Customers",
+  "description": "Customers, one row each; no two share an address. A note is a field of the customer.",
   "connection": "@connections/customers.connection.json",
   "collections": {
-    "entries": {
+    "customers": {
       "of": "@customers/domain/Customer.shape.json",
       "key": "id",
-      "unique": [["url", "method"]],
-      "defaults": { "agent": "unknown" },
-      "renamed": { "agent": "ua" }
+      "unique": [["email"]],
+      "defaults": { "tier": "bronze" },
+      "renamed": { "email": "emailAddress" }
     }
   }
 }
 ```
 
-`renamed` is keyed by the field as it is now, and says what it was. Without it the diff would see `ua` gone and
-`agent` new: a destructive drop and an additive add, and every user agent lost. With it the column is renamed, and
-`defaults` on `agent` says what a row gets if the column had ever to be added -- the mark is read by the field's
+`renamed` is keyed by the field as it is now, and says what it was. Without it the diff would see `emailAddress` gone and
+`email` new: a destructive drop and an additive add, and every address lost. With it the column is renamed, and
+`defaults` on `tier` says what a row gets if the column had ever to be added -- the mark is read by the field's
 current name, as every mark is (RFC 0003).
 
 ```
 $ wilanis migrate example --profile production
 plan for @connections/customers.connection.json  (postgres, granted by @storage-postgres)
-  entries
-    rename   ua → agent                                     transformative
+  customers
+    rename   emailAddress → email                                     transformative
     add      note  text, optional                           additive
   notes
     drop     collection notes  (17 rows)                    destructive   ✗ needs --allow-destructive notes
@@ -117,8 +117,8 @@ third, saying so; to drop the table the operator names it:
 ```
 $ wilanis migrate example --profile production --apply --allow-destructive notes
 plan for @connections/customers.connection.json  (postgres, granted by @storage-postgres)
-  entries
-    rename   ua → agent                                     transformative   applied
+  customers
+    rename   emailAddress → email                                     transformative   applied
     add      note  text, optional                           additive         applied
   notes
     drop     collection notes  (17 rows)                    destructive      applied
@@ -131,21 +131,21 @@ The next run finds nothing to do, and one thing to say:
 ```
 $ wilanis migrate example --profile production
 plan for @connections/customers.connection.json  (postgres, granted by @storage-postgres)
-  entries
-    up to date; renamed.agent has been applied
-      → remove "renamed": { "agent": "ua" } from @customers/data/customers.store.json
+  customers
+    up to date; renamed.email has been applied
+      → remove "renamed": { "email": "emailAddress" } from @customers/data/customers.store.json
 
 nothing to apply
 ```
 
-A mark that has done its work is noise for the next reader and a lie to the next database (a fresh one has no `ua`
+A mark that has done its work is noise for the next reader and a lie to the next database (a fresh one has no `emailAddress`
 to rename), so the planner asks for its removal; it does not refuse, because a tree is deployed to more than one
 database and the mark must survive until the last of them has moved.
 
-**What existing rows can refuse.** Add `"unique": [["url"]]` to `entries` when four rows share a URL:
+**What existing rows can refuse.** Add `"unique": [["email"]]` to `customers` when four rows share an address:
 
 ```
-  entries
+  customers
     unique   [url]  (4 rows violate)                        refused
       → a constraint over rows that break it is a decision about which rows stay: fix them with a one-off
         graph fired by a command-line trigger, or drop the mark; wilanis migrate applies it once no row violates
@@ -154,16 +154,16 @@ database and the mark must survive until the last of them has moved.
 Nothing about this step can be made safe by a flag: deleting three of four rows is business, and business lives in
 a graph the tree declares. The same holds for a `refs` that dangling rows violate, and for a field made required
 while rows are empty and no `defaults` value says what they receive -- there the fix is often the mark itself,
-`"defaults": { "agent": "unknown" }`, which turns the step additive.
+`"defaults": { "tier": "bronze" }`, which turns the step additive.
 
 **`start`, on a store that is behind.** RFC 0003's `ensure` stays a startup step's operation and stays additive;
 what changes is that it computes the same plan and applies it when every step is additive, and otherwise refuses
 `drift` with the plan and this command in the hint:
 
 ```
-startup 1/3 Prepare the entry store: refused as 'drift'
+startup 1/3 Prepare the customer store: refused as 'drift'
   @connections/customers.connection.json is behind @customers/data/customers.store.json:
-    entries  rename ua → agent (transformative); notes  drop collection (17 rows, destructive)
+    customers  rename emailAddress → email (transformative); notes  drop collection (17 rows, destructive)
   → wilanis migrate example --profile production; ensure applies additive steps only
 ```
 
@@ -174,19 +174,19 @@ command and read the plan.
 
 ### Documents and schemas
 
-**`store.schema.json`** (`packages/core/schemas/`), the collection entry, gains two optional marks beside RFC 0003's
+**`store.schema.json`** (`packages/core/schemas/`), the collection customer, gains two optional marks beside RFC 0003's
 `unique`, `refs` and `defaults`:
 
 - `renamed` (object; `propertyNames` `common.schema.json#/$defs/ident`, values `ident`; `additionalProperties:
   false`): "Fields of the shape that changed name, each keyed by its name now and holding its name before, so
-  `wilanis migrate` renames the column instead of dropping one and adding another. Remove the entry once every
+  `wilanis migrate` renames the column instead of dropping one and adding another. Remove the customer once every
   database has applied it; the planner says when. A name may appear once as a value."
 - `was` (`ident`): "The collection's name before this one on the same connection, so `wilanis migrate` renames the
   table instead of dropping it and creating another. Remove it once every database has applied it."
 
 `StoreCollection` in `packages/core/src/model.ts` gains `renamed?: Record<string, string>` and `was?: string`. The
 `$id`, the `required` list and everything else stay. The baseline in `packages/core/test/validate.test.ts` gains a
-collection with both; `"renamed": { "agent": 7 }` and `"was": "two words"` are refused by validation.
+collection with both; `"renamed": { "email": 7 }` and `"was": "two words"` are refused by validation.
 
 No new kind, no change to placement: a store lives in `data/` (RFC 0002, `HOME.store`). The row in
 `packages/runtime/templates/CLAUDE.md` becomes:
@@ -289,8 +289,8 @@ The diff, collection by collection, keyed by the pair (connection, collection na
 Each step is then classed by the table under *Guide* once the engine has counted its rows (*The engine*), and the
 class decides what applies: additive always; transformative under `--apply`; destructive under `--apply` when
 `--allow-destructive` names the collection; refused never, and the plan says why. The planner's own wording for
-each step is the `says` the runtime prints (`rename ua → agent`, `drop collection notes (17 rows)`), and the
-`loses` line names the data (`17 rows`, `values of ua in 240 rows`).
+each step is the `says` the runtime prints (`rename emailAddress → email`, `drop collection notes (17 rows)`), and the
+`loses` line names the data (`17 rows`, `values of emailAddress in 240 rows`).
 
 **The record** is the engine's, in the database it describes, so a database carries its own history and a fresh one
 carries none. On PostgreSQL: one table `wilanis_migrations` in the connection's schema, beside RFC 0010's
@@ -302,17 +302,17 @@ by the engine on first contact, as `wilanis_schedule` is, and never by a step of
 applied plan, so `--history` reads one table and prints:
 
 ```
-migration 4  2026-09-11T09:14:02Z  by rfontes@build-1  tree monitor
-  entries  rename ua → agent; add note
+migration 4  2026-09-11T09:14:02Z  by rfontes@build-1  tree customers
+  customers  rename emailAddress → email; add note
   notes    drop collection (17 rows)
-migration 3  2026-09-02T17:40:11Z  by deploy@ci  tree monitor
-  entries  adopt (from the database as it stood)
+migration 3  2026-09-02T17:40:11Z  by deploy@ci  tree customers
+  customers  adopt (from the database as it stood)
 ```
 
 **Drift, and `--adopt`.** Before any plan is computed for a connection the engine compares each recorded collection
 with its catalog (`inspect`, the comparison RFC 0003's `ensure` already makes against `information_schema`). Where the
 two disagree -- someone altered the table by hand, or a migration outside the tree ran -- the connection is refused
-as drifted, the difference is printed in the record's words (`entries.agent is text, required in the database; the
+as drifted, the difference is printed in the record's words (`customers.agent is text, required in the database; the
 record says optional`), and nothing on that connection is planned: a plan from a record that is wrong would be wrong
 in ways the diff cannot see. `--adopt` re-seeds the record from the catalog for the drifted collections, as one
 additive step per collection, and plans from there; it is the operator saying the database is right and the record is
@@ -325,7 +325,7 @@ opened nothing yet needs the settings to reach the database, and `On` is `At`'s 
 still first, and every caller already holds one.
 
 ```ts
-/** The record's current entry for a collection, or nothing when it was never recorded on this connection. */
+/** The record's current customer for a collection, or nothing when it was never recorded on this connection. */
 recorded(on: On, collection: string): Promise<Declared | undefined>;
 /** What the catalog holds for a collection, lowered to Declared, or nothing when there is no table. */
 inspect(on: On, collection: string): Promise<Declared | undefined>;
@@ -385,7 +385,7 @@ the shape's words rather than reaching a graph; the fix is the plan.
 ### Discoverability
 
 - `wilanis describe <store>` (RFC 0003's page) prints the new marks one line each per collection, in the family's
-  place: `renamed  agent ← ua` and `was  entry`, and says under each `until wilanis migrate has applied it everywhere`.
+  place: `renamed  email ← emailAddress` and `was  customer`, and says under each `until wilanis migrate has applied it everywhere`.
   What the *database* holds is not `describe`'s to say: `describe` reads the tree and opens no connection, so the
   record is `wilanis migrate --history`'s alone.
 - `wilanis migrate --json` prints RFC 0019's envelope with `"command": "migrate"`: `format`, `runtime`, `root`,
@@ -457,15 +457,15 @@ table joins the connection's schema, and the plan never drops it. No `schemas-v2
 |---|---|
 | nothing recorded, nothing in the catalog | one `create` per declared collection, additive |
 | the RFC 0003 example against its own record | no step |
-| `ua` gone, `agent` added, no `renamed` | `remove ua` and `add agent`, the remove destructive once `rows` answers a count |
-| the same with `"renamed": { "agent": "ua" }` | one `rename`, transformative; a second run against the new record: no step and the `renamed`-is-stale line |
-| `"renamed": { "agent": "nope" }`, `nope` not in the record | refused, with the hint naming the record's fields |
+| `emailAddress` gone, `email` added, no `renamed` | `remove emailAddress` and `add email`, the remove destructive once `rows` answers a count |
+| the same with `"renamed": { "email": "emailAddress" }` | one `rename`, transformative; a second run against the new record: no step and the `renamed`-is-stale line |
+| `"renamed": { "email": "nope" }`, `nope` not in the record | refused, with the hint naming the record's fields |
 | `notes` no longer declared | `drop collection notes`, destructive when rows are counted, transformative at zero |
 | `notes` no longer declared, `drafts` declared with `"was": "notes"` | one `renameCollection`, then field steps against `notes`'s record |
-| `note` added optional; `agent` added with `defaults` | `add`, additive both; without `defaults` and required: `require` path refused at a count, destructive when allowed |
+| `note` added optional; `tier` added with `defaults` | `add`, additive both; without `defaults` and required: `require` path refused at a count, destructive when allowed |
 | `[url]` added to `unique` | `unique`, additive at zero rows, refused above; `[url, method]` removed: `ununique`, transformative |
-| `entryId` `refs` added | `ref`, additive at zero, refused above; removed: `unref` |
-| `ua` required now | `require`, additive at zero empty rows, refused above without a default, additive with one |
+| `customerId` `refs` added | `ref`, additive at zero, refused above; removed: `unref` |
+| `email` required now | `require`, additive at zero empty rows, refused above without a default, additive with one |
 | `method` from `string` to `number` | `retype`, destructive; the engine's count decides refused |
 | `key` from `id` to `slug` | refused, with the three-part hint |
 | a table in the catalog with no record | `adopt`, then the field steps against the adopted declared |
@@ -478,10 +478,10 @@ engine's connection is `skipped` with its line.
 
 `packages/plugin-storage-postgres/test/migrate.test.ts`, behind `WILANIS_TEST_POSTGRES_URL` as `engine.test.ts` is,
 end to end on a throwaway schema: `ensure` on an empty database creates and records; the shape gains `note`: `plan`
-prints one `add`, `apply` adds the column, `history` has two migrations; `ua` renamed with the mark: the column is
+prints one `add`, `apply` adds the column, `history` has two migrations; `emailAddress` renamed with the mark: the column is
 renamed and its values kept; `notes` dropped: refused without the flag, the table intact; with `--allow-destructive
 notes`: gone, recorded; a `unique` over repeating rows: refused with the count, nothing applied, the record
-unchanged; a second `apply` with nothing to do writes no row; `ALTER TABLE entries ALTER COLUMN agent SET NOT NULL`
+unchanged; a second `apply` with nothing to do writes no row; `ALTER TABLE customers ALTER COLUMN agent SET NOT NULL`
 by hand: the next plan is `drifted` and applies nothing, `--adopt` re-seeds and the plan proceeds; a table created
 by hand and never recorded is adopted on the first plan; a step that fails inside `apply` (a constraint racing a row
 inserted mid-plan) leaves the table and the record as they were.
@@ -490,8 +490,8 @@ inserted mid-plan) leaves the table and the record as they were.
 uses fake plugins -- `postLoad` ran before `plan` and the teardown after; no startup step ran and nothing is held;
 the printed lines and the exit code for a clean plan, a refused step, `--apply`, `--json` (a valid envelope with
 `command: "migrate"`); a tree `check` refuses runs no plugin. In `packages/runtime/test/sabotage-storage.test.ts`
-(RFC 0003), the two C rows: `"renamed": { "nope": "ua" }`; `"renamed": { "agent": "url" }` with both fields present;
-`"renamed": { "a": "ua", "b": "ua" }`; `"was": "entries"`; `"was": "notes"` while `notes` is declared. In
+(RFC 0003), the two C rows: `"renamed": { "nope": "emailAddress" }`; `"renamed": { "tier": "email" }` with both fields present;
+`"renamed": { "a": "addr", "b": "addr" }`; `"was": "customers"`; `"was": "notes"` while `notes` is declared. In
 `startup.test.ts`: a required `prepare` step on a database whose record is behind by a rename stops the start with
 `drift`, the step lines and the hint naming `wilanis migrate`. `packages/core/test/validate.test.ts`: the baseline.
 `packages/view/test/view.test.ts`: the store page shows the old name struck beside the field.

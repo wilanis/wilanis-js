@@ -35,13 +35,13 @@ page shows the lowering, the machine page draws the table, and every refusal poi
 
 ## Motivation
 
-The example, once RFC 0002 keeps its entries in a store, has a record and a handful of graphs that write it: one that
-makes an entry and puts it, one that patches its URL and method, one that removes it. Give `Entry` a `status` --
-observed, flagged, resolved, dismissed -- and the business acquires a rule it cannot state: an entry is born observed,
-only a flagged entry is resolved, a resolved one carries the note that says what was found, and nothing goes back to
-observed. Today that rule is a `switch` in each graph that moves an entry, written by hand, one per graph, and a graph
-that forgets it produces a tree `wilanis check` accepts. An agent adding `PUT /monitor/{id}/status` that merges
-`{{in.status}}` into the record and puts it has written a route that moves an entry anywhere, and nothing in the tree
+The example, once RFC 0002 keeps its customers in a store, has a record and a handful of graphs that write it: one that
+makes a customer and puts it, one that patches its URL and method, one that removes it. Give `Customer` a `status` --
+observed, flagged, resolved, dismissed -- and the business acquires a rule it cannot state: a customer is born observed,
+only a flagged customer is resolved, a resolved one carries the note that says what was found, and nothing goes back to
+observed. Today that rule is a `switch` in each graph that moves a customer, written by hand, one per graph, and a graph
+that forgets it produces a tree `wilanis check` accepts. An agent adding `PUT /customers/{id}/status` that merges
+`{{in.status}}` into the record and puts it has written a route that moves a customer anywhere, and nothing in the tree
 says otherwise. RFC 0007 saw this and stopped: "an order cannot become paid without a payment result" needs a record's
 old and new values at a storage write, and is better stated once against a lifecycle than at every write. It named
 RFC 0021 as the lifecycle and deferred the class.
@@ -78,16 +78,16 @@ a merge that leaves the state alone, a record read and put back -- is a **rewrit
 it. A `patch` never touches the state field: a move replaces the record it read, so the graph holds the old value the
 rule is judged against.
 
-The example, after RFC 0002 gave it a store. `Entry` gains two fields, `status` and an optional `note`, and the store's
+The example, after RFC 0002 gave it a store. `Customer` gains two fields, `status` and an optional `note`, and the store's
 collection says what every existing row receives (RFC 0003):
 
 ```json
-"status": { "type": "string", "enum": ["observed", "flagged", "resolved", "dismissed"], "description": "where the entry is in its review" },
+"status": { "type": "string", "enum": ["observed", "flagged", "resolved", "dismissed"], "description": "where the customer is in its review" },
 "note":   { "type": "string", "required": false, "description": "what the reviewer found" }
 ```
 
 ```json
-"defaults": { "status": "observed" }
+"defaults": { "status": "registered" }
 ```
 
 The machine, `example/features/customers/domain/review.machine.json`:
@@ -95,8 +95,8 @@ The machine, `example/features/customers/domain/review.machine.json`:
 ```json
 {
   "$schema": "@wilanis/machine.schema.json",
-  "label": "An entry's review",
-  "description": "An entry is observed. Someone may flag it for a look; a flagged entry is resolved with a note saying what was found, or dismissed. A closed entry may be reopened. Nothing returns to observed.",
+  "label": "A customer's review",
+  "description": "A customer is observed. Someone may flag it for a look; a flagged customer is resolved with a note saying what was found, or dismissed. A closed customer may be reopened. Nothing returns to observed.",
   "over": "@customers/domain/Customer.shape.json",
   "state": "status",
   "initial": "observed",
@@ -110,109 +110,109 @@ The machine, `example/features/customers/domain/review.machine.json`:
 ```
 
 `resolve`'s `when` is the class 3 invariant RFC 0007 could not state: a record may become resolved only carrying a
-note. It is written once, here, and holds at every graph that resolves an entry.
+note. It is written once, here, and holds at every graph that resolves a customer.
 
-Two operations join `customer.port.json`: `flag`, taking `CustomerRef` and answering `Entry`, and `review`, taking a new
-core shape `EntryReview` (`id`, `status` with the same enum, optional `note`) and answering `Entry`. Their data graphs
+Two operations join `customer.port.json`: `flag`, taking `CustomerRef` and answering `Customer`, and `review`, taking a new
+core shape `CustomerReview` (`id`, `status` with the same enum, optional `note`) and answering `Customer`. Their data graphs
 are ordinary. `flag-record.graph.json`:
 
 ```json
 {
   "$schema": "@wilanis/graph.schema.json",
-  "label": "Flag an entry",
-  "description": "Data graph behind monitor.flag: read the entry, mark it flagged, put it back. Absent is the declared refusal.",
+  "label": "Flag a customer",
+  "description": "Data graph behind customers.flag: read the customer, mark it flagged, put it back. Absent is the declared refusal.",
   "in": "@customers/domain/CustomerRef.shape.json",
   "out": { "type": "@customers/domain/Customer.shape.json", "from": ["answer", "missing"] },
   "nodes": [
     { "type": "@wilanis/node/run.schema.json", "id": "asked", "run": "@storage/store.port.json#get",
-      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "key": "{{in.id}}" } },
+      "in": { "store": "@customers/data/customers.store.json", "collection": "customers", "key": "{{in.id}}" } },
     { "type": "@wilanis/node/switch.schema.json", "id": "route", "in": { "record": "{{asked.record}}" },
-      "rules": [{ "when": "has(record)", "to": "entry" }], "else": "missing" },
-    { "type": "@wilanis/node/run.schema.json", "id": "entry", "label": "Mark it flagged", "run": "@std/object.port.json#merge",
+      "rules": [{ "when": "has(record)", "to": "customer" }], "else": "missing" },
+    { "type": "@wilanis/node/run.schema.json", "id": "customer", "label": "Mark it flagged", "run": "@std/object.port.json#merge",
       "in": { "base": "{{asked.record}}", "over": { "status": "flagged" }, "type": "@customers/domain/Customer.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "stored", "run": "@storage/store.port.json#put",
-      "in": { "store": "@customers/data/customers.store.json", "collection": "entries", "record": "{{entry}}" } },
+      "in": { "store": "@customers/data/customers.store.json", "collection": "customers", "record": "{{customer}}" } },
     { "type": "@wilanis/node/run.schema.json", "id": "answer", "run": "@std/object.port.json#make",
       "in": { "value": "{{stored.record}}", "type": "@customers/domain/Customer.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "missing", "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" } }
+      "in": { "reason": "missing", "message": "no customer {{in.id}}", "type": "@customers/domain/Customer.shape.json" } }
   ]
 }
 ```
 
-The author wrote no rule about `status`. The compiler sees a move at `entry`: its `base` is a record of `entries`, its
+The author wrote no rule about `status`. The compiler sees a move at `customer`: its `base` is a record of `customers`, its
 `over` writes `status` to the literal `flagged`, and two transitions end there: `flag`, from `observed`, and `reopen`,
 from `resolved` or `dismissed`. Nothing in the graph says what `asked.record.status` is, so the move is **guarded**: a
-switch the author never wrote, one rule per transition, routes to `entry` when the old state is `observed`, `resolved`
+switch the author never wrote, one rule per transition, routes to `customer` when the old state is `observed`, `resolved`
 or `dismissed`, and to a refusal with reason `transition` when it is `flagged` already. The trigger,
-`POST /monitor/{id}/flag`, maps the reason as it maps every other:
+`POST /customers/{id}/flag`, maps the reason as it maps every other:
 
 ```json
 "refusals": { "missing": 404, "transition": 409, "anonymous": 401, "invalid_credential": 401, "forbidden": 403 }
 ```
 
-Leave it out and T005 says so, naming `@customers/data/flag-record.graph.json#entry` as where `transition` is refused.
+Leave it out and T005 says so, naming `@customers/data/flag-record.graph.json#customer` as where `transition` is refused.
 
 `review-record.graph.json` is the same graph with `"over": { "status": "{{in.status}}", "note": "{{in.note}}" }`. The
 new state is the caller's, so the guard is the whole table: one rule per transition, `old.status` in its `from`,
 `new.status` its `to`, and its `when`; `resolve`'s rule reads `has(new.note)` from the merged record. A caller who
-`PUT`s `{ "status": "resolved" }` on an observed entry, or on a flagged one without a note, is told 409.
+`PUT`s `{ "status": "resolved" }` on an observed customer, or on a flagged one without a note, is told 409.
 
 **Proving the guard away.** An author who writes the decision themselves is rewarded with a graph that has no guard:
 
 ```json
 { "type": "@wilanis/node/switch.schema.json", "id": "route", "in": { "record": "{{asked.record}}" },
-  "rules": [{ "when": "has(record) && record.status == 'observed'", "to": "entry" }, { "when": "has(record)", "to": "closed" }],
+  "rules": [{ "when": "has(record) && record.status == 'observed'", "to": "customer" }, { "when": "has(record)", "to": "closed" }],
   "else": "missing" }
 ```
 
-`entry` is now routed by a rule that establishes `record.status == 'observed'` about the very value the merge is over,
+`customer` is now routed by a rule that establishes `record.status == 'observed'` about the very value the merge is over,
 which is `flag`'s `from`; `flag` has no `when`; the move is **proved by narrowing** and the compiler lowers nothing.
 The `closed` branch is the author's own refusal, with the author's own reason and message. This is RFC 0007's
 incentive, unchanged: the guard is the honest price of a value the tree cannot judge, and the switch that removes it
 is the graph a careful author would have written anyway.
 
-**A birth** is judged the same way. `create-record.graph.json` (RFC 0002) makes the entry whole with `"status":
-"observed"` beside `id`, `url`, `method` and `ua`, and puts it keyed by `newKey`'s answer: a birth in the initial
+**A birth** is judged the same way. `create-record.graph.json` (RFC 0002) makes the customer whole with `"status":
+"registered"` beside `id`, `name`, `email` and `tier`, and puts it keyed by `newKey`'s answer: a birth in the initial
 state, **proved by the literal**, no guard. Write `"status": "flagged"` there instead and `wilanis check` answers:
 
 ```
-M005  @features/customers/data/create-record.graph.json#nodes/entry
-    a record of @customers/domain/Customer.shape.json is born 'flagged', but 'An entry's review'
-    (@customers/domain/review.machine.json) says an entry is born 'observed'
-    → write "status": "observed", or make this a move: read the record and merge the change
+M005  @features/customers/data/create-record.graph.json#nodes/customer
+    a record of @customers/domain/Customer.shape.json is born 'flagged', but 'A customer's review'
+    (@customers/domain/review.machine.json) says a customer is born 'observed'
+    → write "status": "registered", or make this a move: read the record and merge the change
 ```
 
 Make it `"status": "{{in.status}}"` and the birth is guarded: the record is put only when the caller's state is
 `observed`, and the trigger maps `transition`.
 
 **A write the machine cannot judge** is refused, since a rule that a graph can route around is not a rule. A data
-graph that puts `{{in}}` -- an `Entry` the caller handed over whole -- over an existing record has moved it to
+graph that puts `{{in}}` -- an `Customer` the caller handed over whole -- over an existing record has moved it to
 whatever state the caller chose, and nothing in the graph knows what the record was:
 
 ```
 M006  @features/customers/data/replace-record.graph.json#nodes/stored/in/record
-    puts a record of @customers/domain/Customer.shape.json that was neither read from 'entries' nor made whole,
-    so 'An entry's review' cannot tell a birth from a move
+    puts a record of @customers/domain/Customer.shape.json that was neither read from 'customers' nor made whole,
+    so 'A customer's review' cannot tell a birth from a move
     → read the record with #get and merge the change over it; or make the record whole, born 'observed', and put it with "replace": false
 ```
 
 **The rehearsal** walks a guard as it walks every switch, and names each branch after its transition:
 
 ```
-features/customers/data/flag-record  move 'entry' An entry's review  3/3 branches
-  ok  flag       answered from 'entry'
-  ok  reopen     answered from 'entry'
-  ok  violated   refused on purpose at 'entry:violated' as transition: "'An entry's review' allows no move from 'flagged' to 'flagged'"
+features/customers/data/flag-record  move 'customer' A customer's review  3/3 branches
+  ok  flag       answered from 'customer'
+  ok  reopen     answered from 'customer'
+  ok  violated   refused on purpose at 'customer:violated' as transition: "'A customer's review' allows no move from 'flagged' to 'flagged'"
 
-features/customers/data/review-record  move 'entry' An entry's review  5/5 branches
-  ok  flag       answered from 'entry'
-  ok  resolve    answered from 'entry'
-  ok  dismiss    answered from 'entry'
-  ok  reopen     answered from 'entry'
-  ok  violated   refused on purpose at 'entry:violated' as transition: "'An entry's review' allows no move from 'observed' to 'resolved'"
+features/customers/data/review-record  move 'customer' A customer's review  5/5 branches
+  ok  flag       answered from 'customer'
+  ok  resolve    answered from 'customer'
+  ok  dismiss    answered from 'customer'
+  ok  reopen     answered from 'customer'
+  ok  violated   refused on purpose at 'customer:violated' as transition: "'A customer's review' allows no move from 'observed' to 'resolved'"
 
-machines -- 1 declared: 'An entry's review' (4 transitions): born at 1 site (proved); moved at 2 sites (0 proved, 2 guarded); every transition performed.
+machines -- 1 declared: 'A customer's review' (4 transitions): born at 1 site (proved); moved at 2 sites (0 proved, 2 guarded); every transition performed.
 ```
 
 **The diagram** is what the viewer draws on the machine's page: the four states as boxes, `observed` marked as the
@@ -493,40 +493,40 @@ Sabotage tests in a new `packages/runtime/test/sabotage-machines.test.ts`, throu
 - M002: `initial: "new"`; `flag.from: ["seen"]`; `resolve.to: "closed"`.
 - M003: remove `flag` and `reopen` (nothing reaches `flagged`); `dismiss.from: ["observed", "dismissed"]`.
 - M004: `when: "has(new.quantity)"`; `when: "new.url > 3"`; `when: "len(new.url) >"`; `when: "new.status == 'resolved'"`.
-- M005: `create-record.graph.json`'s `entry` with `"status": "flagged"` (a birth outside the initial state);
-  `flag-record.graph.json`'s merge with `"status": "observed"` (no transition ends there); the same merge left at
+- M005: `create-record.graph.json`'s `customer` with `"status": "flagged"` (a birth outside the initial state);
+  `flag-record.graph.json`'s merge with `"status": "registered"` (no transition ends there); the same merge left at
   `flagged` after a switch establishing `record.status == 'resolved'` with `reopen` removed (no transition from there);
   `review-record.graph.json` made a literal `resolve` with `"note"` absent from `over` and the base's `note` known
   absent by `!has(record.note)` on the routing switch (a `when` false over what is known).
-- M006: a `put` of `{{in}}` in a data graph taking `Entry`; a `merge` whose `base` is `{{in}}`; a `put` of a record
+- M006: a `put` of `{{in}}` in a data graph taking `Customer`; a `merge` whose `base` is `{{in}}`; a `put` of a record
   read from a second collection of another shape's store.
 - M007: `create-record.graph.json` with `"id": "{{in.id}}"` in place of `{{key}}` and no `replace`; the same with
   `"replace": false` passes.
 - M008: `reason: "transition"` on `get-record.graph.json`'s `missing` node.
 - M009: add `"archive": { "from": ["resolved"], "to": "archived" }` with `archived` in the enum and no graph moving
   there, with `review-record.graph.json`'s merge made literal `"status": "flagged"` so no dynamic move remains.
-- M010: a second machine over `Entry` and `status`.
+- M010: a second machine over `Customer` and `status`.
 - X2nn: `update-record.graph.json`'s `patch` with `"status": "flagged"` in `changes`.
 - D008: `relocate` the machine to `edge/` or `data/`.
-- T005/T006: drop `transition` from `flag-entry.trigger.json`'s refusal table → `['T005']`; map it on
+- T005/T006: drop `transition` from `flag-customer.trigger.json`'s refusal table → `['T005']`; map it on
   `get-customer.trigger.json` → `['T006']`; write the narrowing switch into `flag-record.graph.json` and the mapping on
   its trigger becomes `['T006']`, proving the guard is gone.
 
 Behaviour tests in `packages/runtime/test/example.test.ts` and `branches.test.ts`:
 
-- `rehearse` prints `move 'entry' An entry's review  3/3 branches` for `flag-record`, `5/5` for `review-record`, the
+- `rehearse` prints `move 'customer' A customer's review  3/3 branches` for `flag-record`, `5/5` for `review-record`, the
   `born` line for `create-record` as proved, and the summary line, for every seed 1 to 8; with the narrowing switch
   written into `flag-record`, its guard line is gone and the summary counts it proved.
-- `wilanis run` with the memory engine: `POST /monitor/{id}/flag` on an observed entry answers 200 with `flagged`;
-  again, 409 with the message naming `flagged` and `flagged`; `PUT /monitor/{id}/review` with `resolved` and no note,
+- `wilanis run` with the memory engine: `POST /customers/{id}/flag` on an observed customer answers 200 with `flagged`;
+  again, 409 with the message naming `flagged` and `flagged`; `PUT /customers/{id}/review` with `resolved` and no note,
   409; with a note, 200; with `observed`, 409.
-- Compiler: `flag-record`'s spec has `entry:made`, `entry:check` with two rules labelled `flag` and `reopen` in
-  declaration order, `entry`, `entry:violated`, and `entry:violated` in `output`; `review-record`'s check has four
+- Compiler: `flag-record`'s spec has `customer:made`, `customer:check` with two rules labelled `flag` and `reopen` in
+  declaration order, `customer`, `customer:violated`, and `customer:violated` in `output`; `review-record`'s check has four
   rules in declaration order; `create-record`'s spec has none of them.
 - `describe` of the machine, of `Customer.shape.json` and of `flag-record.graph.json` print the lines above; `map` prints
   `moves` under the two triggers.
 
-Scaffolds, in `packages/runtime/test/scaffolds.test.ts`: `new machine` over `Entry` and `status` writes the four-member
+Scaffolds, in `packages/runtime/test/scaffolds.test.ts`: `new machine` over `Customer` and `status` writes the four-member
 chain and refuses without `--over`; `new resource features/tickets/Ticket` in a copy of the example writes the
 nineteen files, appends the effects, and the tree then checks with no refusal and rehearses every branch; run twice it
 refuses on the first existing file and writes nothing.
@@ -540,7 +540,7 @@ sabotage. `packages/view/test` gains the machine page of the example and the bad
 
 1. **The kind.** Schema, `MachineDoc`, `Kind`/`KINDS`, `HOME`, the template row and paragraph, the `wilanis new
    machine` scaffold, the validate baseline. `area:core`, `area:runtime`. `good first issue`: the `CLAUDE.md` recipe.
-2. **The example.** `status` and `note` on `Entry`, `defaults` on the store, `EntryReview`, `flag` and `review` on the
+2. **The example.** `status` and `note` on `Customer`, `defaults` on the store, `CustomerReview`, `flag` and `review` on the
    port, the two data graphs, the two triggers with `transition` mapped, the two operations added to RFC 0007's access
    invariant. `area:runtime`. Lands with 4; until then the example has no machine and nothing judges the new graphs.
 3. **Provenance.** `provenance.ts`, the write site in `sitesOf`, with tests over the example's graphs: `create-record`

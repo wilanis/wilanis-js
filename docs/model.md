@@ -105,7 +105,7 @@ trigger maps every reason it can reach, its policies' included (T005).
 
 Validating a credential happens in the guarding plugin, before any policy, never in a graph, and the guard's
 `plugin.json` says which credentials it verifies and what each yields. A trigger with no policies is public.
-`has(principal) && 'recorder' in principal.roles` is a rule: `in` looks into a list, and what `has()` proves
+`has(principal) && 'registrar' in principal.roles` is a rule: `in` looks into a list, and what `has()` proves
 on the left of `&&` may be read on the right.
 
 A session is opened when a token is issued and carries attributes of a shape the project names; a graph reads
@@ -226,10 +226,10 @@ without, and its refusal is logged while the rest go on.
 
 ```
 $ npx wilanis start example
-startup 1/3 Reach the entry store: ok
+startup 1/3 Reach the customer store: ok
 reload: watching /path/to/example -- an edit is served once it passes wilanis check
 startup 2/3 Watch for changes: ok
-http: listening on :8099 -- GET /monitor → @customers/domain/customer.port.json#list, ...
+http: listening on :8099 -- GET /customers → @customers/domain/customer.port.json#list, ...
 startup 3/3 Listen: ok
 ```
 

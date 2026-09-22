@@ -322,7 +322,7 @@
   }
 
   // ---- document pages ---------------------------------------------------------------------------------
-  /** The document a type reference names, canonical, or null: "@shapes/Customer.shape.json[]" → the Entry shape. */
+  /** The document a type reference names, canonical, or null: "@shapes/Customer.shape.json[]" → the Customer shape. */
   const shapeOf = (t) => { if (typeof t !== 'string') return null; const base = t.replace(/(\[\])+$/, ''); return base.startsWith('@') && isDocPath(base) ? canon(base) : null; };
   /** A type shown as an element with its shape linked; plain text when it names none. */
   const typeLink = (t, cls) => { const s = el('span', cls || 'type'); const shape = shapeOf(t); if (shape) { s.appendChild(link(shape)); const m = /((?:\[\])+)$/.exec(t); if (m) s.appendChild(document.createTextNode(m[1])); } else s.textContent = showType(t); return s; };

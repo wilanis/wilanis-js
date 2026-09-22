@@ -96,7 +96,7 @@ too, and the word it says is one the trigger already maps:
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Get a row",
-  "description": "Data graph behind monitor.get: GET the row. 200 is the entry, 404 is the declared refusal for an id that does not exist, anything else the API says is upstream, and so is the API saying nothing at all.",
+  "description": "Data graph behind customer.get: GET the row. 200 is the customer, 404 is the declared refusal for an id that does not exist, anything else the API says is upstream, and so is the API saying nothing at all.",
   "in": "@customers/domain/CustomerRef.shape.json",
   "out": { "type": "@customers/domain/Customer.shape.json", "from": ["row", "missing", "failed", "unreachable"] },
   "nodes": [
@@ -108,7 +108,7 @@ too, and the word it says is one the trigger already maps:
       "in": {
         "connection": "@connections/customers-api.connection.json",
         "method": "GET",
-        "path": "/monitor/{{in.id}}",
+        "path": "/customers/{{in.id}}",
         "produces": "application/json",
         "returns": "@customers/edge/CustomerRow.shape.json"
       }
@@ -127,19 +127,19 @@ too, and the word it says is one the trigger already maps:
     },
     { "type": "@wilanis/node/run.schema.json", "id": "row", "label": "The row", "run": "@std/object.port.json#make",
       "in": { "value": "{{asked.body}}", "type": "@customers/edge/CustomerRow.shape.json" } },
-    { "type": "@wilanis/node/run.schema.json", "id": "missing", "label": "No such entry", "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "missing", "message": "no entry {{in.id}}", "type": "@customers/domain/Customer.shape.json" } },
+    { "type": "@wilanis/node/run.schema.json", "id": "missing", "label": "No such customer", "run": "@std/outcome.port.json#refuse",
+      "in": { "reason": "missing", "message": "no customer {{in.id}}", "type": "@customers/domain/Customer.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "failed", "label": "Unexpected answer", "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "upstream", "message": "the monitor API answered {{asked.status}}", "type": "@customers/domain/Customer.shape.json" } },
+      "in": { "reason": "upstream", "message": "the customer API answered {{asked.status}}", "type": "@customers/domain/Customer.shape.json" } },
     { "type": "@wilanis/node/run.schema.json", "id": "unreachable", "label": "No answer", "run": "@std/outcome.port.json#refuse",
-      "in": { "reason": "upstream", "message": "the monitor API could not be reached", "type": "@customers/domain/Customer.shape.json" } }
+      "in": { "reason": "upstream", "message": "the customer API could not be reached", "type": "@customers/domain/Customer.shape.json" } }
   ]
 }
 ```
 
 `catch` says: when `asked` breaks, this switch routes to `unreachable`, as if a rule had held. The rules are not
 tried -- there is no `status` to read -- and `else` is not taken; `unreachable` runs, refuses `upstream`, and the
-route answers 502 with `{ "reason": "upstream", "message": "the monitor API could not be reached" }`, which is what
+route answers 502 with `{ "reason": "upstream", "message": "the customer API could not be reached" }`, which is what
 `get-customer.trigger.json` has said an `upstream` is since it was written. Nothing in the trigger changes. A refusal
 is never caught: had `asked` been a node that runs `refuse`, or a nested graph that refused `missing`, the run ends
 with that reason as it does today, because a refusal is the graph's own decision and the trigger is already holding
@@ -159,22 +159,22 @@ G0n3  @features/customers/data/get-row.graph.json#nodes/unreachable/in/message
 
 ```
 features/customers/data/get-row  switch 'route'  4/4 branches
-  ok  when status == 404               refused on purpose at 'missing' as missing: "no entry golf"
+  ok  when status == 404               refused on purpose at 'missing' as missing: "no customer golf"
   ok  when status == 200 && has(body)  answered from 'row'
-  ok  anything else                    refused on purpose at 'failed' as upstream: "the monitor API answered 500"
-  ok  when asked broke                 refused on purpose at 'unreachable' as upstream: "the monitor API could not be reached"
+  ok  anything else                    refused on purpose at 'failed' as upstream: "the customer API answered 500"
+  ok  when asked broke                 refused on purpose at 'unreachable' as upstream: "the customer API could not be reached"
 ```
 
 A branch that breaks where nothing is declared is still `BROKE`, and the closing sentence of a passing rehearsal
 gains the second word: `"refused on purpose" is a refuse node the graph declares: a designed outcome with a reason the
 trigger maps, not a fault. A fault a switch catches is the graph deciding what breaking means.`
 
-**What a caller is told.** For `GET /monitor/golf`:
+**What a caller is told.** For `GET /customers/golf`:
 
 | the run | status | body |
 |---|---|---|
-| answers | 200 | the entry |
-| refuses `missing` | 404 | `{ "reason": "missing", "message": "no entry golf" }` |
+| answers | 200 | the customer |
+| refuses `missing` | 404 | `{ "reason": "missing", "message": "no customer golf" }` |
 | refuses `upstream` (the API answered 500, or answered nothing and `route` caught it) | 502 | `{ "reason": "upstream", "message": "..." }` |
 | faults (a node broke and nothing caught it), or blocked | 500 | `{ "error": "fault", "run": "01J8ZK5R9V3Q" }` |
 | cancelled (RFC 0012) | 504 | `{ "error": "cancelled: the deadline passed" }` |
@@ -183,8 +183,8 @@ The 500 says nothing of what broke: the run's id is what a caller quotes and an 
 log line says the rest, with the outcome's word instead of `failed`:
 
 ```
-GET /monitor/golf → 404 (12ms, @customers/domain/customer.port.json#get refused: missing)
-GET /monitor/golf → 500 (143ms, @customers/domain/customer.port.json#get failed at 'asked': fetch failed)  run=01J8ZK5R9V3Q
+GET /customers/golf → 404 (12ms, @customers/domain/customer.port.json#get refused: missing)
+GET /customers/golf → 500 (143ms, @customers/domain/customer.port.json#get failed at 'asked': fetch failed)  run=01J8ZK5R9V3Q
 GET /nope → 404 (0ms, no trigger)
 ```
 
@@ -195,7 +195,7 @@ report, which `--verbose` prints as it does now.
 **What a scenario pins.** `fuzz` records the reason a node refused with beside its status, and `regress` diffs it:
 
 ```
-scenarios/get-entry-seed-3.scenario.json: DIFF missing: reason missing → none
+scenarios/get-customer-seed-3.scenario.json: DIFF missing: reason missing → none
 ```
 
 is a `refuse` node that became a crash; `reason missing → conflict` is a reason that changed, and with it the
@@ -357,7 +357,7 @@ caller through a typed answer is the author's document saying so.
 
 **What reaches a caller, and what does not.** The rule that every kind applies: *a refusal's `reason`, `message`
 and `detail` are said to the caller; a fault's message is not.* A `reason` is a word the author declared in
-`refuses`, a closed set; a `message` is prose the author wrote for the caller (`"no entry {{in.id}}"`), and G0n5
+`refuses`, a closed set; a `message` is prose the author wrote for the caller (`"no customer {{in.id}}"`), and G0n5
 refuses one that reads a secret; `detail` is what the guard built for the caller, a challenge's id and how to
 answer it. A fault's `error` is prose a plugin or the platform wrote for nobody -- `fetch failed`,
 `ECONNREFUSED 10.0.0.7:5432`, `no blob '…' in the registry` -- and it goes to the report, the log and RFC 0006's trace
@@ -398,7 +398,7 @@ The one log line prints the outcome in the trace's words (RFC 0006's span status
 vocabulary in both): `ok`, `refused: <reason>`, `denied: <reason>` and `challenged: <reason>` when the gate ended
 the run, `failed at '<node>': <message>`, `blocked: needs <roots>`, `cancelled`. A fault's line appends `run=<id>`
 so the body's id is found. A request that never reached a trigger is logged too -- `GET /nope → 404 (0ms, no
-trigger)`, `POST /monitor → 400 (1ms, body does not conform: …)` -- where today `answerFor` returns without a
+trigger)`, `POST /customers → 400 (1ms, body does not conform: …)` -- where today `answerFor` returns without a
 report and the `if (answer.report)` guard prints nothing.
 
 **The command-line kind** (`packages/runtime/src/plugins/cli-trigger.ts`, `cli.ts`). `encode` answers the output
@@ -422,7 +422,7 @@ not load is D006 at check; `postLoad` throwing and a required step not answering
 edge's own answers are the kind's; and a fault of the runtime inside a request is answered as a fault of the run.
 
 **`rehearse`** (`packages/runtime/src/branches.ts`, `rehearse.ts`, `rehearsal-report.ts`, `stubbing.ts`).
-`casesFor` in `branches.ts` yields one case per rule and one for `else`; it yields one more per `catch` entry,
+`casesFor` in `branches.ts` yields one case per rule and one for `else`; it yields one more per `catch` customer,
 labelled `when <node> broke`, whose stubbing makes the caught node's effect throw instead of answering.
 `stubEffects(seed, record, types)` stands at three parameters and gains an options object
 (`{ record, types, broken: Set<nodePath>, cancelAt }`, the same object RFC 0012 gives it for `cancelAt`); a
@@ -435,7 +435,7 @@ The closing sentence of a passing rehearsal gains the second word, as the guide 
 
 **`fuzz` and `regress`** (`packages/runtime/src/fuzz.ts`). `pick` records `reason` on a `failed` node that has one;
 `nodeDiffs` prints `<id>: reason <was> → <now>`, with `none` for a node that broke, so a refusal that became a fault
-and a reason that changed are both diffs. `fuzz` stays a recorder of what the tree does with one exception: a run
+and a reason that changed are both diffs. `fuzz` stays a registrar of what the tree does with one exception: a run
 whose `outcomeOf` is `faulted` under stubs is the tree's own bug (the stubbed world never throws, so what broke is a
 `make` whose value does not fit, a `refuse` whose reason is not a string, a wiring hole) and `fuzz` writes no
 scenario for it, prints `<trigger> under seed <n>: FAULT at '<node>': <message>`, and exits 1 -- a scenario that
@@ -469,7 +469,7 @@ exists; a fault a switch caught is not a fault of the run, so `onFault` does not
   a `catch` as an edge from the switch to its target labelled `<node> broke`, dashed, beside the rule edges, and the
   side panel of a caught node says `its fault is caught by <switch>`. The trigger page's *Refusals it answers* table
   gains one closing line: "Anything that breaks and no switch catches is a fault: answered the kind's one way, never
-  mapped." The node entries `viewOf` builds carry `catch` on a switch and `caughtBy` on a node.
+  mapped." The node customers `viewOf` builds carry `catch` on a switch and `caughtBy` on a node.
 
 ### Plugin contract
 
@@ -542,8 +542,8 @@ Runtime, in `packages/runtime/test/`:
 | a teardown that throws does not stop the rest | `startup.test.ts` | two held things, the first's `stop` throws; the second's ran; both logged |
 
 Http, in `packages/plugin-http/test/http.test.ts` against the fake upstream in `harness.ts`: an upstream that
-refuses the socket, with the guide's `catch` on `get-row.graph.json`, answers `GET /monitor/{id}` 502
-`{ reason: 'upstream', message: 'the monitor API could not be reached' }`; without the catch, 500 `{ error: 'fault' }`
+refuses the socket, with the guide's `catch` on `get-row.graph.json`, answers `GET /customers/{id}` 502
+`{ reason: 'upstream', message: 'the customer API could not be reached' }`; without the catch, 500 `{ error: 'fault' }`
 and a body that contains neither `asked` nor `fetch`; the unmapped-reason test asserts `{ error: 'fault' }` and a log
 line naming `conflict`; the log line for a 404 reads `refused: missing`; `GET /nope` logs `→ 404 (…, no trigger)`;
 a policy graph that throws answers 500 `{ error: 'fault' }`, not 403. Once RFC 0006's step 3 lands: the 500 body's

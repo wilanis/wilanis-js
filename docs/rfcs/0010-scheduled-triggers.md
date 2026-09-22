@@ -64,7 +64,7 @@ The example, with the digest as a nightly job. One document, `example/features/c
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
   "label": "nightly digest",
-  "description": "At three in the morning, UTC, the digest: the count and one line per entry, logged by the scheduler. The same operation the digest command prints; nobody is calling, so no policy and nothing to answer. A tick that finds the previous night's run still going is skipped and counted.",
+  "description": "At three in the morning, UTC, the digest: the count and one line per customer, logged by the scheduler. The same operation the digest command prints; nobody is calling, so no policy and nothing to answer. A tick that finds the previous night's run still going is skipped and counted.",
   "kind": "@schedule/schedule.trigger-kind.json",
   "settings": {
     "cron": "0 3 * * *",
@@ -87,7 +87,7 @@ The example, with the digest as a nightly job. One document, `example/features/c
   ...
 ],
 "startup": [
-  { "label": "Reach the entry store", "run": "@customers/domain/customer.port.json#listAll", "required": true },
+  { "label": "Reach the customer store", "run": "@customers/domain/customer.port.json#listAll", "required": true },
   { "label": "Watch for changes", "run": "@reload/watch.port.json#watch" },
   { "label": "Keep the schedule", "run": "@schedule/scheduler.port.json#run" },
   { "label": "Listen", "run": "@http/server.port.json#listen" }
@@ -102,7 +102,7 @@ The command-line `digest.trigger.json` stays: the same operation, fired by a per
 the point of a trigger never naming a graph.
 
 **Reading the tick.** An operation that takes a time reads it from the context like any input. A cleanup of
-entries older than the tick, were the example to have one, would be a scheduled trigger with
+customers older than the tick, were the example to have one, would be a scheduled trigger with
 `"in": "@customers/edge/CutoffRequest.shape.json"` and `"fire": { "run": "…#purgeBefore", "in": { "before": "{{request.scheduled}}" } }`;
 T003 types the read as a string, the shape declares `before` a string, and the data graph compares it to a row's
 timestamp with `<`. Nothing in the domain calls a clock, so `wilanis run --seed` and `regress` replay the tick
@@ -440,7 +440,7 @@ Sabotage tests in `packages/runtime/test/sabotage.test.ts` and `sabotage-project
 | X0n4 | `startup[2].in.lease: "@connections/customers-api.connection.json"` (an http kind, no `leases`); `"@connections/nope.connection.json"`; and none with a fake kind under `docsDir` declaring `"leases": true` |
 | T001 | `settings.overlap: "sometimes"`; `settings.cron: 3` |
 | T003 | `fire.in: { "before": "{{request.body.since}}" }` after adding `in` -- the kind hands no `body` |
-| T004 | `fire.run: "@customers/domain/customer.port.json#submit"` with `fire.in: { "url": "https://x.example/", "method": "GET" }` and the matching `in`: `register-customer.graph.json` reaches `create-row.graph.json`, which reads the `agent` resolver (`request.headers['user-agent']`), and the schedule kind hands no `headers` |
+| T004 | `fire.run: "@customers/domain/customer.port.json#submit"` with `fire.in: { "name": "Ada", "email": "ada@x.example", "tier": "bronze" }` and the matching `in`: `register-customer.graph.json` reaches `create-row.graph.json`, which reads the `agent` resolver (`request.headers['user-agent']`), and the schedule kind hands no `headers` |
 | A005 | `policies: ["@access/edge/can-register.policy.json"]` -- reads the caller, given nothing |
 | L008 | a data graph node running `@schedule/scheduler.port.json#run` |
 | B006 | a startup step naming `@schedule/schedule.trigger-kind.json#run` (not an operation) |
@@ -536,7 +536,7 @@ contract in the runtime could not be met by `@wilanis/plugin-storage-postgres`; 
 `@wilanis/plugin-queue-memory` depends on `@wilanis/plugin-queue`. `@std` and `@cli` are built in because the
 toolchain itself uses them -- `wilanis run` is the cli kind -- and nothing in the toolchain fires a schedule.
 And `@reload` has no external dependency either and is its own package: "no dependency" was never the rule for
-being built in. The cost is one more package, README and release entry.
+being built in. The cost is one more package, README and release customer.
 
 **Time is an input, and the graph cannot compute with it.** A graph gets `request.scheduled` as an ISO string
 and can compare it, pass it to an effect, and write it; it cannot subtract a day from it, because the expression
@@ -563,7 +563,7 @@ handling; it would also make the plugin's `check` depend on a package's idea of 
 behind a minute matcher. The parser here accepts the five-field form and nothing else, on purpose; a dialect an
 author wants is an edit to `cron.ts` with a table test.
 
-**Cost.** One package, one README, one entry in `npm run release`; one table in the storage engine when step 6
+**Cost.** One package, one README, one customer in `npm run release`; one table in the storage engine when step 6
 lands. The scheduler holds one timer and one blob scope per tick in flight. Nothing is buffered.
 
 ## Open questions

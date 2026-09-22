@@ -94,17 +94,17 @@ $ npx wilanis manifest example
     { "name": "access", "included": "@wilanis/access", "effects": ["@auth/identity.port.json#verify", "@auth/token.port.json#issue", "@auth/token.port.json#refresh"] },
     { "name": "directories", "included": null, "effects": [] },
     { "name": "hello", "included": null, "effects": [] },
-    { "name": "monitor", "included": null, "effects": ["@blob/csv.port.json#parse", "@blob/csv.port.json#write", "@http/http.port.json#request"] }
+    { "name": "customers", "included": null, "effects": ["@blob/csv.port.json#parse", "@blob/csv.port.json#write", "@http/http.port.json#request"] }
   ],
   "documents": [
-    { "path": "@features/customers/edge/delete-customers.trigger.json", "kind": "trigger", "feature": "monitor", "layer": "edge", "included": null },
+    { "path": "@features/customers/edge/delete-customers.trigger.json", "kind": "trigger", "feature": "customers", "layer": "edge", "included": null },
     ...
   ],
   "triggers": [
     {
       "path": "@features/customers/edge/delete-customers.trigger.json",
       "kind": "@http/http.trigger-kind.json",
-      "settings": { "method": "DELETE", "route": "/monitor" },
+      "settings": { "method": "DELETE", "route": "/customers" },
       "fires": "@customers/domain/customer.port.json#removeMany",
       "policies": ["@access/edge/employees-only.policy.json", "@access/edge/can-register.policy.json"],
       "public": false,
@@ -116,7 +116,7 @@ $ npx wilanis manifest example
     "domain": [
       {
         "path": "@customers/domain/customer.port.json",
-        "feature": "monitor",
+        "feature": "customers",
         "operations": [
           { "name": "list", "firedBy": ["@features/customers/edge/list-customers.trigger.json"], "public": true },
           { "name": "removeMany", "firedBy": ["@features/customers/edge/delete-customers.trigger.json"], "public": false },
@@ -143,11 +143,11 @@ $ npx wilanis manifest example
   ],
   "connections": [
     { "path": "@connections/customers-api.connection.json", "kind": "@http/http.connection-kind.json", "settings": { "baseUrl": "https://6aa009e23e0d88d3d7e5525d.mockapi.io/api/v1", "throttle": { "concurrency": 4 }, "timeoutMs": 10000 }, "secrets": [] },
-    { "path": "@connections/monitor-api-production.connection.json", "kind": "@http/http.connection-kind.json", "settings": { "baseUrl": "https://monitor.internal/api/v1", "headers": { "x-api-key": "{{secrets.monitorKey}}" }, "timeoutMs": 5000 }, "secrets": ["monitorKey"] }
+    { "path": "@connections/customers-api-production.connection.json", "kind": "@http/http.connection-kind.json", "settings": { "baseUrl": "https://customers.internal/api/v1", "headers": { "x-api-key": "{{secrets.customerKey}}" }, "timeoutMs": 5000 }, "secrets": ["customerKey"] }
   ],
-  "secrets": { "jwt": "CUSTOMERS_JWT_SECRET", "monitorKey": "MONITOR_API_KEY" },
+  "secrets": { "jwt": "CUSTOMERS_JWT_SECRET", "customerKey": "CUSTOMERS_API_KEY" },
   "startup": [
-    { "label": "Reach the entry store", "run": "@customers/domain/customer.port.json#listAll", "required": true, "profiles": null },
+    { "label": "Reach the customer store", "run": "@customers/domain/customer.port.json#listAll", "required": true, "profiles": null },
     { "label": "Watch for changes", "run": "@reload/watch.port.json#watch", "required": true, "profiles": ["live"] },
     { "label": "Listen", "run": "@http/server.port.json#listen", "required": true, "profiles": null }
   ],
@@ -163,25 +163,25 @@ $ npx wilanis manifest example
         ...
       ],
       "holds": ["@http/server.port.json#listen", "@reload/watch.port.json#watch"],
-      "starts": ["Reach the entry store", "Watch for changes", "Listen"],
+      "starts": ["Reach the customer store", "Watch for changes", "Listen"],
       "needs": [{ "variable": "CUSTOMERS_JWT_SECRET", "key": "jwt", "readBy": ["@auth settings"] }],
       "permits": null
     },
     "production": {
       "default": false,
       ...
-      "connections": { "@connections/customers-api.connection.json": "@connections/monitor-api-production.connection.json" },
+      "connections": { "@connections/customers-api.connection.json": "@connections/customers-api-production.connection.json" },
       "reaches": [
-        { "operation": "@http/http.port.json#request", "via": ["@connections/monitor-api-production.connection.json"] },
+        { "operation": "@http/http.port.json#request", "via": ["@connections/customers-api-production.connection.json"] },
         ...
       ],
       "holds": ["@http/server.port.json#listen"],
-      "starts": ["Reach the entry store", "Listen"],
+      "starts": ["Reach the customer store", "Listen"],
       "needs": [
-        { "variable": "MONITOR_API_KEY", "key": "monitorKey", "readBy": ["@connections/monitor-api-production.connection.json"] },
+        { "variable": "CUSTOMERS_API_KEY", "key": "customerKey", "readBy": ["@connections/customers-api-production.connection.json"] },
         { "variable": "CUSTOMERS_JWT_SECRET", "key": "jwt", "readBy": ["@auth settings"] }
       ],
-      "permits": ["@auth/identity.port.json#verify", "@auth/token.port.json", "@blob/csv.port.json", "@connections/customers.connection.json", "@connections/employees.connection.json", "@connections/monitor-api-production.connection.json", "@http/http.port.json#request", "@http/server.port.json#listen"]
+      "permits": ["@auth/identity.port.json#verify", "@auth/token.port.json", "@blob/csv.port.json", "@connections/customers.connection.json", "@connections/employees.connection.json", "@connections/customers-api-production.connection.json", "@http/http.port.json#request", "@http/server.port.json#listen"]
     }
   }
 }
@@ -191,7 +191,7 @@ The example is the one RFC 0013 and RFC 0016 leave behind. Three things to notic
 printed as its document wrote them: the route and method of an http trigger, the queue and broker of RFC 0009's,
 the cron of RFC 0010's are each the kind's own settings, declared in the kind's schema, so the manifest does not
 restate their shape; a reader groups triggers by `kind`. A connection's `settings` are printed as written too:
-`{{secrets.monitorKey}}` stays the template text, the value never appears, and `secrets` beside it lists the
+`{{secrets.customerKey}}` stays the template text, the value never appears, and `secrets` beside it lists the
 keys it reads. Under a profile, `reaches` is RFC 0013's reach, with a stand-in where the profile chose one, and
 `permits` is RFC 0016's list or `null` when the profile permits everything.
 
@@ -212,11 +212,11 @@ profiles never has an empty key, so a reader tells the two cases apart by the ke
 
 ```
 $ npx wilanis manifest example --profile production | jq '.triggers[] | select(.public and .settings.route) | .settings.route'
-"/monitor"
-"/monitor.csv"
-"/monitor/{id}"
+"/customers"
+"/customers.csv"
+"/customers/{id}"
 $ npx wilanis manifest example --profile production | jq '.profiles.production.needs[].variable'
-"MONITOR_API_KEY"
+"CUSTOMERS_API_KEY"
 "CUSTOMERS_JWT_SECRET"
 $ npx wilanis manifest example > before.json; # edit; npx wilanis manifest example | diff before.json -
 ```
@@ -326,13 +326,13 @@ separately" RFC 0002 asks for (`0002:695`). `ir` follows RFC 0008: `v2` when the
 
 - **Golden.** `manifestOf` of the example: `format` 1; `plugins` six rows with `@auth` `guard: true` and `@std` `from: null`;
   `includes` one row with `@wilanis/access` and its version; `documents` includes the access triggers marked
-  `included`; `delete-customers.trigger.json` has `public: false` and two policies in order, `list-entries` has
+  `included`; `delete-customers.trigger.json` has `public: false` and two policies in order, `list-customers` has
   `public: true`; `customer.port.json#removeMany` is `firedBy` the delete trigger and not public; `listen` has
   `holds: true`; `customers-api.connection.json`'s settings equal the document's and `secrets` is empty;
   `startup` has three rows in declared order.
 - **Per profile** (after RFC 0013's steps 1 and 4): `profiles.live.reaches` holds `watch` and the test API;
-  `profiles.production` does not hold `watch`, holds the stand-in and not `monitor-api`, `needs` holds
-  `MONITOR_API_KEY` and `CUSTOMERS_JWT_SECRET`, `starts` has two labels; `permits` is `null` under `live` and the
+  `profiles.production` does not hold `watch`, holds the stand-in and not `customers-api`, `needs` holds
+  `CUSTOMERS_API_KEY` and `CUSTOMERS_JWT_SECRET`, `starts` has two labels; `permits` is `null` under `live` and the
   list under `production` (after RFC 0016's step 2).
 - **Determinism.** Two calls answer equal strings; a registry whose `all()` is reversed answers the same string;
   the string contains no timestamp and no value of any environment variable set for the test.

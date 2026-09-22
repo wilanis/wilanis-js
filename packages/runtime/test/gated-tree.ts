@@ -163,7 +163,7 @@ export function gatedTree(identifies: () => Identifies) {
     'features/gate/domain/roled.graph.json',
     decisionGraph(
       'Require the role',
-      "has(principal) && principal.role == 'recorder'",
+      "has(principal) && principal.role == 'registrar'",
       'forbidden',
       'the role is required',
     ),
