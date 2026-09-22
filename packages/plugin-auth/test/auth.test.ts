@@ -145,7 +145,7 @@ describe("policies over the registry's writes", () => {
     } = await signIn('auth-employees', 'cy', 'cy-pass');
     expect(await post({ token: accessToken }).then(answer => [answer.status, answer.body])).toEqual([
       403,
-      { reason: 'forbidden', message: 'recording customers takes the registrar role' },
+      { reason: 'forbidden', message: 'registering customers takes the registrar role' },
     ]);
   });
   it('an employee with the role registers, by header or by cookie', async () => {

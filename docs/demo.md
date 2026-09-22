@@ -26,7 +26,7 @@ lands: the hints do the explaining.
 
 ## 1. The hook
 
-**Say.** Every team has a rule like this one: every route that writes goes through the recorder check. It
+**Say.** Every team has a rule like this one: every route that writes goes through the registrar check. It
 lives in a wiki page, a review checklist, or one senior engineer's head, and it holds until someone who never
 read it adds a route. Today that someone is an agent. It writes fast and plausibly; what it lacks is the rule
 it never read and the consequence it cannot see. This is a tree with that rule in it, and it is a file.
@@ -42,7 +42,7 @@ ok: 185 documents
 ```
 
 Every one of the 185 is a JSON document; there is no JavaScript in the tree, and `check` judged every
-profile at once. Open the viewer on the rule and search for *Writes are for recorders*:
+profile at once. Open the viewer on the rule and search for *Writes are for registrars*:
 
 ```
 npx wilanis-view .     # http://127.0.0.1:4400/
@@ -83,36 +83,36 @@ appear there on its own, or be refused. The next beat is that route.
 ## 2. The new hire
 
 **Say.** A year later. An agent is given one line: add a way to archive an entry. It finds the `remove`
-operation on the monitor port and scaffolds a route that fires it. It has not read the invariant, and
+operation on the customer port and scaffolds a route that fires it. It has not read the invariant, and
 nothing asked it to.
 
 **Do.** Scaffold the route from the operation it fires, then check.
 
 ```
-npx wilanis new trigger features/customers/edge/archive-entry . \
+npx wilanis new trigger features/customers/edge/archive-customer . \
   --run '@customers/domain/customer.port.json#remove' --kind '@http/http.trigger-kind.json'
 npx wilanis check .
 ```
 
 ```
-wrote features/customers/edge/archive-entry.trigger.json
-T002  @features/customers/edge/archive-entry.trigger.json#in
+wrote features/customers/edge/archive-customer.trigger.json
+T002  @features/customers/edge/archive-customer.trigger.json#in
     '@customers/domain/customer.port.json#remove' takes {id: string} but the trigger declares no in
     → declare in on the trigger; wilanis describe @customers/domain/customer.port.json#remove shows what it takes
-T002  @features/customers/edge/archive-entry.trigger.json#out
+T002  @features/customers/edge/archive-customer.trigger.json#out
     '@customers/domain/customer.port.json#remove' answers @features/customers/domain/Customer.shape.json but the trigger declares no out
     → declare out on the trigger, or fire an operation that answers nothing
-T005  @features/customers/edge/archive-entry.trigger.json#settings/response/refusals
+T005  @features/customers/edge/archive-customer.trigger.json#settings/response/refusals
     @features/customers/data/delete-row.graph.json may refuse with reason 'missing', which settings.response.refusals does not map
     → add "missing" under settings.response.refusals: how this trigger answers that outcome
-T005  @features/customers/edge/archive-entry.trigger.json#settings/response/refusals
+T005  @features/customers/edge/archive-customer.trigger.json#settings/response/refusals
     @features/customers/data/delete-row.graph.json may refuse with reason 'upstream', which settings.response.refusals does not map
     → add "upstream" under settings.response.refusals: how this trigger answers that outcome
-T005  @features/customers/edge/archive-entry.trigger.json#settings/response/refusals
+T005  @features/customers/edge/archive-customer.trigger.json#settings/response/refusals
     @features/customers/data/kept-remove.graph.json may refuse with reason 'invariant', which settings.response.refusals does not map
     → add "invariant" under settings.response.refusals: how this trigger answers that outcome
-I001  @features/customers/edge/archive-entry.trigger.json#policies
-    trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for recorders' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy
+I001  @features/customers/edge/archive-customer.trigger.json#policies
+    trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for registrars' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy
     → attach "@access/edge/can-register.policy.json" under policies, or take @features/customers/domain/customer.port.json#remove out of the invariant's over
 
 6 refusal(s)
@@ -141,13 +141,13 @@ three reasons to statuses. It leaves the policy alone, since nothing yet told it
 **Do.** Paste the route with the shapes and the refusals filled in.
 
 ```
-cp $DEMO/archive-entry.step2.trigger.json features/customers/edge/archive-entry.trigger.json
+cp $DEMO/archive-customer.step2.trigger.json features/customers/edge/archive-customer.trigger.json
 npx wilanis check .
 ```
 
 ```
-I001  @features/customers/edge/archive-entry.trigger.json#policies
-    trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for recorders' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy
+I001  @features/customers/edge/archive-customer.trigger.json#policies
+    trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for registrars' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy
     → attach "@access/edge/can-register.policy.json" under policies, or take @features/customers/domain/customer.port.json#remove out of the invariant's over
 
 1 refusal(s)
@@ -164,13 +164,13 @@ npx wilanis check .
 ```
 
 ```
-A005  @features/customers/edge/archive-entry.trigger.json#policies/0
+A005  @features/customers/edge/archive-customer.trigger.json#policies/0
     policy '@features/access/edge/can-register.policy.json' reads request.principal, which the guard hands once it verified a token, but no attachment on this trigger gives one
     → write { "policy": "@access/edge/can-register.policy.json", "in": { "token": "{{request.headers.authorization}}" } } -- the read is where this kind hands the credential
-T005  @features/customers/edge/archive-entry.trigger.json#settings/response/refusals
+T005  @features/customers/edge/archive-customer.trigger.json#settings/response/refusals
     @features/access/domain/require-registrar.graph.json may refuse with reason 'forbidden', which settings.response.refusals does not map
     → add "forbidden" under settings.response.refusals: how this trigger answers that outcome
-T005  @features/customers/edge/archive-entry.trigger.json#settings/response/refusals
+T005  @features/customers/edge/archive-customer.trigger.json#settings/response/refusals
     @features/access/domain/require-registrar.graph.json may refuse with reason 'anonymous', which settings.response.refusals does not map
     → add "anonymous" under settings.response.refusals: how this trigger answers that outcome
 
@@ -186,7 +186,7 @@ Paste the finished route: the policy given the token as the hint wrote it, and 4
 `anonymous` and `invalid_credential`.
 
 ```
-cp $DEMO/archive-entry.step3.trigger.json features/customers/edge/archive-entry.trigger.json
+cp $DEMO/archive-customer.step3.trigger.json features/customers/edge/archive-customer.trigger.json
 npx wilanis check .
 ```
 
@@ -198,7 +198,7 @@ Three rounds of write, check, edit, and the agent read no manual.
 
 **If asked.** *"So the checker wanted the policy all along. Why not just add it for me?"* Because the second
 half of the I001 hint is the other legal edit: take `remove` out of the invariant. Whether archiving is a
-write for recorders is the team's decision, and the checker refuses to make it or to let it go unmade. The
+write for registrars is the team's decision, and the checker refuses to make it or to let it go unmade. The
 invariant is the one sentence the human wrote that the agent cannot talk its way past: however it phrased
 the route, the route reached `remove`, and every way to `remove` is gated or refused.
 
@@ -215,8 +215,8 @@ npx wilanis rehearse . --profile local
 
 ```
 features/access/domain/require-registrar  switch 'decide'  3/3 branches
-  ok  when has(principal) && 'recorder' in principal.roles  answered from 'granted'
-  ok  when has(principal)                                   refused on purpose at 'forbidden' as forbidden: "recording entries takes the recorder role"
+  ok  when has(principal) && 'registrar' in principal.roles  answered from 'granted'
+  ok  when has(principal)                                   refused on purpose at 'forbidden' as forbidden: "registering customers takes the registrar role"
   ok  anything else                                         refused on purpose at 'anonymous' as anonymous: "sign in first: no token was presented"
 ```
 
@@ -225,7 +225,7 @@ every branch settled -- 44 branch(es), 20 decision(s), 16 graph(s).
 3 invariant(s) declared:
   The session is the caller's  holds at 3 trigger(s)
   An entry names a call  proved at 0 site(s), guarded at 13
-  Writes are for recorders  holds at 6 trigger(s)
+  Writes are for registrars  holds at 6 trigger(s)
 ```
 
 This is the test suite the agent did not write. `holds at 6 trigger(s)`: it was five in beat 1. Then the map,
@@ -236,16 +236,16 @@ npx wilanis map . --profile local
 ```
 
 <!-- #481: today map ignores --profile, printing all three bindings' graphs under #remove and ?? lines under
-nested domain calls. This is the archive-entry block of a 2026-09-21 run with the two graphs local does not
+nested domain calls. This is the archive-customer block of a 2026-09-21 run with the two graphs local does not
 bind left out; check it against the real output once #481 lands. -->
 
 ```
-@features/customers/edge/archive-entry.trigger.json  (@http/http.trigger-kind.json)
+@features/customers/edge/archive-customer.trigger.json  (@http/http.trigger-kind.json)
   gated by @features/access/edge/can-register.policy.json → @access/domain/access.port.json#requireRecorder  given token
   holds  @features/customers/domain/writes-are-for-registrars.invariant.json  through @features/access/edge/can-register.policy.json
   @customers/domain/customer.port.json#remove
     @features/customers/data/kept-remove.graph.json
-      asked @storage/store.port.json#remove  (effect) → store @features/customers/data/customers.store.json entries (remove)
+      asked @storage/store.port.json#remove  (effect) → store @features/customers/data/customers.store.json customers (remove)
       route [switch → row | missing]
       row @std/object.port.json#make
       missing @std/outcome.port.json#refuse
@@ -261,34 +261,34 @@ npm run start -- --profile local
 It ends with `startup 7/7 Listen: ok`. In a second terminal, three calls. No token:
 
 ```
-curl -s -X POST localhost:8099/monitor/x/archive -w '  [%{http_code}]\n'
+curl -s -X POST localhost:8099/customers/x/archive -w '  [%{http_code}]\n'
 ```
 
 ```
 {"reason":"anonymous","message":"sign in first: no token was presented"}  [401]
 ```
 
-Sign in as cy, who holds the `viewer` group and not `recorder`:
+Sign in as cy, who holds the `viewer` group and not `registrar`:
 
 ```
 TOKEN=$(curl -s -X POST localhost:8099/api/v1/auth-employees -H 'content-type: application/json' \
   -d '{"username":"cy","password":"cy-pass"}' | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
-curl -s -X POST localhost:8099/monitor/x/archive -H "authorization: Bearer $TOKEN" -w '  [%{http_code}]\n'
+curl -s -X POST localhost:8099/customers/x/archive -H "authorization: Bearer $TOKEN" -w '  [%{http_code}]\n'
 ```
 
 ```
-{"reason":"forbidden","message":"recording entries takes the recorder role"}  [403]
+{"reason":"forbidden","message":"registering customers takes the registrar role"}  [403]
 ```
 
-Sign in as bo, a recorder; record an entry, then archive it:
+Sign in as bo, a registrar; register a customer, then archive them:
 
 ```
 TOKEN=$(curl -s -X POST localhost:8099/api/v1/auth-employees -H 'content-type: application/json' \
   -d '{"username":"bo","password":"bo-pass"}' | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
-curl -s -X POST localhost:8099/monitor -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+curl -s -X POST localhost:8099/customers -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
   -d '{"url":"https://api.example.com/orders","method":"GET"}' -w '  [%{http_code}]\n'
-ID=$(curl -s localhost:8099/monitor | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
-curl -s -X POST localhost:8099/monitor/$ID/archive -H "authorization: Bearer $TOKEN" -w '  [%{http_code}]\n'
+ID=$(curl -s localhost:8099/customers | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+curl -s -X POST localhost:8099/customers/$ID/archive -H "authorization: Bearer $TOKEN" -w '  [%{http_code}]\n'
 ```
 
 ```
@@ -299,22 +299,22 @@ curl -s -X POST localhost:8099/monitor/$ID/archive -H "authorization: Bearer $TO
 **Point at.** The rehearsal's second line and the live 403, side by side:
 
 ```
-  ok  when has(principal)  refused on purpose at 'forbidden' as forbidden: "recording entries takes the recorder role"
-{"reason":"forbidden","message":"recording entries takes the recorder role"}  [403]
+  ok  when has(principal)  refused on purpose at 'forbidden' as forbidden: "registering customers takes the registrar role"
+{"reason":"forbidden","message":"registering customers takes the registrar role"}  [403]
 ```
 
 The same branch, the same sentence. The rehearsal ran it with the effects stubbed before the server was up;
 the route mapped the reason to 403 in beat 3; the guard, the policy and the graph did the rest.
 
 **If asked.** *"Where is the role check? I want to read what the agent wrote."* The agent wrote none. One
-switch, in `features/access/domain/require-registrar.graph.json`: `has(principal) && 'recorder' in
+switch, in `features/access/domain/require-registrar.graph.json`: `has(principal) && 'registrar' in
 principal.roles`, the only place a condition can be written, and the rehearsal walked all three branches.
 The route never saw the token: the guard verified it before any graph ran and handed `request.principal` to
 the policy. No document validates a token and no graph checks access, so an agent cannot get that wrong.
 
 ## 5. The closer: all of it or none of it
 
-**Say.** One more thing this tree says once. `POST /monitor.csv` records a file of entries. Here is a file
+**Say.** One more thing this tree says once. `POST /customers.csv` registers a file of customers. Here is a file
 whose fifth row is not an entry: the URL is empty.
 
 ```
@@ -333,9 +333,9 @@ https://api.example.com/customers,GET
 **Do.** With bo's token from the last beat:
 
 ```
-curl -s -X POST localhost:8099/monitor.csv -H 'content-type: text/csv' -H "authorization: Bearer $TOKEN" \
+curl -s -X POST localhost:8099/customers.csv -H 'content-type: text/csv' -H "authorization: Bearer $TOKEN" \
   --data-binary @$DEMO/customers.bad.csv -w '  [%{http_code}]\n'
-curl -s localhost:8099/monitor -w '  [%{http_code}]\n'
+curl -s localhost:8099/customers -w '  [%{http_code}]\n'
 ```
 
 ```
@@ -361,13 +361,13 @@ half-written store. Under `live` the same operation is bound to a graph without 
 
 ## Other closers
 
-**The PostgreSQL swap.** `--profile production` binds the monitor port to a store in PostgreSQL; not one
+**The PostgreSQL swap.** `--profile production` binds the customer port to a store in PostgreSQL; not one
 route, policy, shape or business graph differs from `local`, and beat 1 judged it with everything else.
 `npx wilanis migrate . --profile production` prints what the database would have to do and does nothing until
 `--apply`. It needs a PostgreSQL, its URL in `CUSTOMERS_DATABASE_URL`, and [`example/README.md`](../example/README.md#changing-the-shape-and-the-plan-that-follows) as the script.
 
 **The edit that never reaches the serving tree.** With `start` still running, paste the beat-3 file back
-over the route (`cp $DEMO/archive-entry.step2.trigger.json features/customers/edge/archive-entry.trigger.json`):
+over the route (`cp $DEMO/archive-customer.step2.trigger.json features/customers/edge/archive-customer.trigger.json`):
 the log prints `reload refused, still serving the last good tree:` with the I001 refusal, hint and all, while
 `curl` keeps answering 401, so an agent editing a live tree cannot make the write public for one request.
 Paste the finished file back and it prints `reload: 186 documents, serving the new tree`. It needs nothing
@@ -395,5 +395,5 @@ The JWT secret is what the tree signs its tokens with, generated fresh each run 
 database URL is a placeholder, never dialled: today `start` reads every profile's secrets before it chooses
 one, so `local` asks for a URL it will not use. #302, #303 and #304 change that; when they land, the last two lines go.
 
-The prepared files are `docs/demo/archive-entry.step2.trigger.json` and `.step3.trigger.json` (beat 3) and
+The prepared files are `docs/demo/archive-customer.step2.trigger.json` and `.step3.trigger.json` (beat 3) and
 `docs/demo/customers.bad.csv` (beat 5); each JSON file says in its `description` which beat pastes it.

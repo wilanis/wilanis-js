@@ -19,7 +19,7 @@ import { describe as describeDoc, embedderFor, FileBlobStore, postLoad, rehearse
 import { copyOfExample, INCLUDES, PLUGINS, refusalsAt, refusalsHinting, refusalsSaying } from './example-harness.js';
 
 const DEMO = fileURLToPath(new URL('../../../docs/demo', import.meta.url));
-const ROUTE = 'features/customers/edge/archive-entry.trigger.json';
+const ROUTE = 'features/customers/edge/archive-customer.trigger.json';
 const AT = `@${ROUTE}`;
 const REMOVE = '@customers/domain/customer.port.json#remove';
 const POLICY = '@access/edge/can-register.policy.json';
@@ -48,10 +48,10 @@ describe('beat 1, the hook: the tree as it ships, and what the rule reaches', ()
     expect(said).toContain(`requires: attaches ${POLICY}`);
     expect(said).toContain('reached by (every one met by @features/access/edge/can-register.policy.json):');
     // five routes reach a write today, and the rule names none of them
-    const reached = said.filter(line => /^ {4}@features\/monitor\/edge\/.*\.trigger\.json {2}#/.test(line));
+    const reached = said.filter(line => /^ {4}@features\/customers\/edge\/.*\.trigger\.json {2}#/.test(line));
     expect(reached.map(line => line.trim().split(/ {2}/)[0])).toEqual([
-      '@features/customers/edge/delete-customers.trigger.json',
       '@features/customers/edge/delete-customer.trigger.json',
+      '@features/customers/edge/delete-customers.trigger.json',
       '@features/customers/edge/import-customers.trigger.json',
       '@features/customers/edge/register-customer.trigger.json',
       '@features/customers/edge/update-customer.trigger.json',
@@ -62,7 +62,7 @@ describe('beat 1, the hook: the tree as it ships, and what the rule reaches', ()
 describe('beat 2, the new hire: the scaffolded route', () => {
   it('yields exactly the six codes, at the paths the script quotes', () => {
     expect(
-      scaffold(dir, 'trigger', 'features/customers/edge/archive-entry', {
+      scaffold(dir, 'trigger', 'features/customers/edge/archive-customer', {
         run: REMOVE,
         kind: '@http/http.trigger-kind.json',
       }),
@@ -83,7 +83,7 @@ describe('beat 2, the new hire: the scaffolded route', () => {
       "T005 @features/customers/data/delete-row.graph.json may refuse with reason 'missing', which settings.response.refusals does not map",
       "T005 @features/customers/data/delete-row.graph.json may refuse with reason 'upstream', which settings.response.refusals does not map",
       "T005 @features/customers/data/kept-remove.graph.json may refuse with reason 'invariant', which settings.response.refusals does not map",
-      `I001 trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for recorders' (${INVARIANT}) gates with ${POLICY}, but attaches no such policy`,
+      `I001 trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for registrars' (${INVARIANT}) gates with ${POLICY}, but attaches no such policy`,
     ]);
   });
   it('ends on the hint the presenter reads aloud: the two edits that would fix it', () => {
@@ -95,7 +95,7 @@ describe('beat 2, the new hire: the scaffolded route', () => {
 
 describe('beat 3, following the hints', () => {
   it('the second step, shapes and refusals filled in, yields I001 alone', () => {
-    paste('archive-entry.step2.trigger.json');
+    paste('archive-customer.step2.trigger.json');
     expect(refusalsAt(dir)).toEqual([`I001 ${AT}#policies`]);
   });
   it('attaching the policy without the token yields A005 and the two T005 for forbidden and anonymous', () => {
@@ -121,7 +121,7 @@ describe('beat 3, following the hints', () => {
     );
   });
   it('the finished route yields ok, at 186 documents', () => {
-    paste('archive-entry.step3.trigger.json');
+    paste('archive-customer.step3.trigger.json');
     expect(refusalsAt(dir)).toEqual([]);
     expect(documents()).toBe(186);
   });
@@ -129,7 +129,7 @@ describe('beat 3, following the hints', () => {
 
 describe('beat 4, no test was written: the rehearsal', () => {
   it('settles the three branches of require-registrar, and the rule holds at six triggers', async () => {
-    paste('archive-entry.step3.trigger.json');
+    paste('archive-customer.step3.trigger.json');
     const run = await rehearse(load(), { seed: 1, profile: 'local' });
     const text = run.lines.join('\n');
     expect(run.ok, text).toBe(true);
@@ -139,13 +139,13 @@ describe('beat 4, no test was written: the rehearsal', () => {
     expect(header, text).toBeGreaterThanOrEqual(0);
     // the columns are padded for a reader; what each says is the claim
     expect(run.lines.slice(header + 1, header + 4).map(line => line.replace(/ {2,}/g, '  '))).toEqual([
-      "  ok  when has(principal) && 'recorder' in principal.roles  answered from 'granted'",
-      '  ok  when has(principal)  refused on purpose at \'forbidden\' as forbidden: "recording entries takes the recorder role"',
+      "  ok  when has(principal) && 'registrar' in principal.roles  answered from 'granted'",
+      '  ok  when has(principal)  refused on purpose at \'forbidden\' as forbidden: "registering customers takes the registrar role"',
       '  ok  anything else  refused on purpose at \'anonymous\' as anonymous: "sign in first: no token was presented"',
     ]);
     expect(text).toMatch(/^every branch settled/m);
     // it was five in beat 1: the route the agent wrote is counted without anyone adding it
-    expect(text).toContain('Writes are for recorders  holds at 6 trigger(s)');
+    expect(text).toContain('Writes are for registrars  holds at 6 trigger(s)');
   });
 });
 
@@ -207,7 +207,7 @@ async function serving(env: NodeJS.ProcessEnv) {
 
 describe('beats 4 and 5, live: the three writes, then all of it or none of it', () => {
   it('answers 401, 403 and 201, and the bad CSV 500 with the store empty after', async () => {
-    paste('archive-entry.step3.trigger.json');
+    paste('archive-customer.step3.trigger.json');
     const tree = await serving({
       // the one secret the demo needs from outside the tree: what the tree signs its tokens with
       CUSTOMERS_JWT_SECRET: randomBytes(32).toString('base64'),
@@ -219,7 +219,7 @@ describe('beats 4 and 5, live: the three writes, then all of it or none of it', 
     try {
       const archive = (id: string, token?: string) =>
         tree.answer(
-          '@customers/edge/archive-entry.trigger.json',
+          '@customers/edge/archive-customer.trigger.json',
           requestOf('POST', `/monitor/${id}/archive`, { token, params: { id } }),
         );
       const signIn = async (username: string) => {
@@ -236,22 +236,25 @@ describe('beats 4 and 5, live: the three writes, then all of it or none of it', 
         status: 401,
         body: { reason: 'anonymous', message: 'sign in first: no token was presented' },
       });
-      // cy holds the viewer group and not recorder: the rehearsal's second line, live
+      // cy holds the viewer group and not registrar: the rehearsal's second line, live
       expect(await archive('x', await signIn('cy'))).toEqual({
         status: 403,
-        body: { reason: 'forbidden', message: 'recording entries takes the recorder role' },
+        body: { reason: 'forbidden', message: 'registering customers takes the registrar role' },
       });
-      // bo, a recorder: record an entry, then archive it
+      // bo, a registrar: register a customer, then archive them
       const bo = await signIn('bo');
       const made = await tree.answer(
         '@customers/edge/register-customer.trigger.json',
-        requestOf('POST', '/monitor', { token: bo, body: { url: 'https://api.example.com/orders', method: 'GET' } }),
+        requestOf('POST', '/customers', {
+          token: bo,
+          body: { name: 'Ada Lovelace', email: 'ada@demo.example', tier: 'silver' },
+        }),
       );
       expect(made.status).toBe(201);
       expect(made.body).toMatchObject({
-        url: 'https://api.example.com/orders',
-        method: 'GET',
-        agent: 'wilanis-example/0.1.0',
+        name: 'Ada Lovelace',
+        email: 'ada@demo.example',
+        tier: 'silver',
       });
       const id = (made.body as { id: string }).id;
       expect(id).toMatch(/^[0-9a-f-]{36}$/);
@@ -259,33 +262,34 @@ describe('beats 4 and 5, live: the three writes, then all of it or none of it', 
       expect(gone.status).toBe(200);
       expect((gone.body as { id: string }).id).toBe(id);
 
-      // beat 5: a file whose fifth row is not an entry, imported as bo
-      const csv = readFileSync(join(DEMO, 'entries.bad.csv'), 'utf8');
-      expect(csv.trimEnd().split('\n').at(-1)).toBe(',DELETE');
+      // beat 5: a file whose fifth row is not a customer, imported as bo
+      const csv = readFileSync(join(DEMO, 'customers.bad.csv'), 'utf8');
+      expect(csv.trimEnd().split('\n').at(-1)).toBe('Barbara Liskov,,silver');
       const imported = await tree.answer(
         '@customers/edge/import-customers.trigger.json',
-        requestOf('POST', '/monitor.csv', {
+        requestOf('POST', '/customers.csv', {
           token: bo,
-          body: await tree.blobs.put(csv, { contentType: 'text/csv', filename: 'entries.bad.csv' }),
+          body: await tree.blobs.put(csv, { contentType: 'text/csv', filename: 'customers.bad.csv' }),
         }),
       );
       expect(imported).toEqual({
         status: 500,
         body: {
           reason: 'invariant',
-          message: "'An entry names a call' does not hold: len(url) > 0 && (method != 'DELETE' || has(agent))",
+          message:
+            "'A customer is reachable' does not hold: len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))",
         },
       });
       // four good rows went in before the fifth refused, and the store holds none of them
-      expect(await tree.answer('@customers/edge/list-customers.trigger.json', requestOf('GET', '/monitor'))).toEqual({
+      expect(await tree.answer('@customers/edge/list-customers.trigger.json', requestOf('GET', '/customers'))).toEqual({
         status: 200,
         body: [],
       });
       // the one word that made it so, and nothing else: no transaction node, no begin, no commit
-      const recordAll = JSON.parse(
+      const registerAll = JSON.parse(
         readFileSync(join(dir, 'features/customers/domain/register-all.graph.json'), 'utf8'),
       );
-      expect(recordAll.atomic).toBe(true);
+      expect(registerAll.atomic).toBe(true);
     } finally {
       await tree.stop();
     }
