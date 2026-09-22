@@ -263,7 +263,7 @@ this RFC (G005, G009, G010, G011, L002, T005, T006, A002, A003, S001) were check
 | G0n2 | `check/graph-nodes.ts`, `checkSwitch`, at `nodes/<reader>/in` | a node other than the catching switch reads a caught node and is not routed, directly or through the nodes it depends on, by that switch | `a reader of a node whose fault is caught runs only where the switch routes: move it behind the switch, or drop catch` |
 | G0n3 | `check/graph-nodes.ts`, `checkSwitch`, at `nodes/<target>/in/<field>` | the node a `catch` routes to reads the caught node, in any input or template | `say it without the value; the report and the trace carry what <node> threw` |
 | G0n4 | `check/graph-nodes.ts`, `checkSwitch`, at `nodes/<switch>/catch/<id>` | the caught node runs a `pure` operation, an operation marked `refuses`, or is a switch | `nothing here breaks but a bug, which rehearse reports as BROKE; delete catch` |
-| G0n5 | `check/inputs.ts`, beside G005, at `nodes/<id>/in/message` | a `refuse` node's `message` reads a path whose field is marked `secret` (the same field walk `redactFor` in `compiler.ts` makes for the report) | `a refusal's message is said to the caller; say it without the secret` |
+| G016 | `check/inputs.ts`, beside G005, at `nodes/<id>/in/message` | a `refuse` node's `message` reads a path whose field is marked `secret` (the same field walk `redactFor` in `compiler.ts` makes for the report) | `a refusal's message is said to the caller; say it without the secret` |
 | L0n1 | `check/graph.ts`, `checkOperationFits`, at `nodes/<switch>/catch` | a switch of a domain graph declares `catch` | `the domain says what is done; what an effect breaking means is the data layer's: catch it in the data graph that runs the effect` |
 | S0n1 | `check/triggers.ts`, `checkScenario`, beside S001 | a scenario's `expect.nodes.<id>` carries `reason` with a `status` other than `failed` | `a reason belongs to a node that refused; drop it, or let wilanis fuzz write the scenario again` |
 
@@ -357,7 +357,7 @@ caller through a typed answer is the author's document saying so.
 
 **What reaches a caller, and what does not.** The rule that every kind applies: *a refusal's `reason`, `message`
 and `detail` are said to the caller; a fault's message is not.* A `reason` is a word the author declared in
-`refuses`, a closed set; a `message` is prose the author wrote for the caller (`"no customer {{in.id}}"`), and G0n5
+`refuses`, a closed set; a `message` is prose the author wrote for the caller (`"no customer {{in.id}}"`), and G016
 refuses one that reads a secret; `detail` is what the guard built for the caller, a challenge's id and how to
 answer it. A fault's `error` is prose a plugin or the platform wrote for nobody -- `fetch failed`,
 `ECONNREFUSED 10.0.0.7:5432`, `no blob '…' in the registry` -- and it goes to the report, the log and RFC 0006's trace
@@ -523,7 +523,7 @@ document, answer the codes), in `example.test.ts` and `sabotage.test.ts`:
 | G0n2 | a node `logged` reading `{{asked.status}}` added to `get-row.graph.json` outside the switch's routes |
 | G0n3 | `"message": "the API said {{asked.status}}"` on `unreachable` |
 | G0n4 | `"catch": { "row": "unreachable" }` with `row` read by the switch (`@std/object.port.json#make`, pure); `{ "missing": … }` (a `refuse` node) |
-| G0n5 | a `refuse` node in `sign-in-customer.graph.json` whose message reads the password field |
+| G016 | a `refuse` node in `sign-in-customer.graph.json` whose message reads the password field |
 | L0n1 | `"catch": { "recorded": "failed" }` on the switch of a domain graph |
 | S0n1 | a scenario whose `expect.nodes.row` carries `reason: "missing"` with `status: "done"` |
 | none | the guide's `get-row.graph.json`: `codes(EXAMPLE)` is empty; `rehearse` prints `4/4 branches` for `route` and the `when asked broke` line |
@@ -566,7 +566,7 @@ Viewer, in `packages/view/test/view.test.ts`: the example's `get-row` view carri
 3. Core and compiler: `catch` on `SwitchNode` and its schema; `lowerNode` lowers it; G0n1, G0n2, G0n3, G0n4 in
    `check/graph-nodes.ts` and L0n1 in `check/graph.ts`, with the sabotage tests; `Narrowing` proves nothing for a
    catch target.
-4. Compiler: G0n5 in `check/inputs.ts`, a `refuse` message that reads a secret, with its sabotage test.
+4. Compiler: G016 in `check/inputs.ts`, a `refuse` message that reads a secret, with its sabotage test.
    (`good first issue`)
 5. Runtime: `failureOf`, `whyFailed`, `wholeOf`, `challenged` and `encodeTrouble` over `outcomeOf`, so no consumer
    searches for the first `failed` node itself; `runStartup`'s words and index; `postLoad` inside `start`'s `try`,

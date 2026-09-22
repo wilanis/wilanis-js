@@ -1,8 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkTree } from '@wilanis/compiler';
 import { loadTree, type PluginModule, schemaRef, schemaUrl, type Trace } from '@wilanis/core';
+import { Refusal } from '@wilanis/engine';
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_PLUGINS, start } from '../src/index.js';
 import { docsDir, sabotage } from './example-harness.js';
@@ -13,7 +14,7 @@ describe("the project's startup steps", () => {
    * `holds` operation standing in for a listener. `calls` records the order of the plugin's postLoad, each
    * startup step, and the moment the listener opened -- so the tests can say what started, and whether.
    */
-  const tree = (startup: unknown[], onBoot: () => unknown, onDown?: () => void) => {
+  const tree = (startup: unknown[], onBoot: () => unknown, onDown?: () => void, stuck?: number) => {
     const calls: string[] = [];
     /** What the fake listener was given as `env.serving`: the way a test asks the tree to load itself again. */
     let serving: { reload: () => Promise<{ ok: boolean }> } | undefined;
@@ -46,10 +47,13 @@ describe("the project's startup steps", () => {
         '@fake/server.port.json#listen': async ({ ctx }: any) => {
           calls.push('listening');
           serving = ctx.env.serving;
+          // the listeners are counted from 1 in the order they opened; the `stuck` one will not stop
+          const nth = calls.filter(call => call === 'listening').length;
           ctx.env.hold({
-            label: 'fake listener',
+            label: `fake listener ${nth}`,
             stop: async () => {
-              calls.push('stopped');
+              if (nth === stuck) throw new Error(`listener ${nth} is stuck`);
+              calls.push(stuck === undefined ? 'stopped' : `stopped ${nth}`);
             },
           });
           return undefined;
@@ -235,6 +239,68 @@ describe("the project's startup steps", () => {
     expect(calls).toContain('listening');
     expect(logs.join('\n')).toMatch(/the cache is cold/);
     await stop();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('a required step that refuses says its one-based place and the reason, the same way the log would', async () => {
+    const { dir, calls, plugins } = tree([step({ label: 'Warm the database' }), step(), listen], () => {
+      throw new Refusal('unreachable', 'the database is unreachable');
+    });
+    await expect(start(loadTree(dir, plugins), { log: () => {} })).rejects.toThrow(
+      "startup step 1/3 Warm the database: refused as 'unreachable': the database is unreachable; nothing is serving.",
+    );
+    expect(calls).not.toContain('listening');
+    // the plugins' teardown still ran: a start that stops holds nothing
+    expect(calls).toContain('postLoadDown');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('an optional step that breaks is logged as failed at the node that broke', async () => {
+    const { dir, plugins } = tree([step({ label: 'Warm the cache', required: false }), listen], () => {
+      throw new Error('the cache is cold');
+    });
+    const logs: string[] = [];
+    const { stop } = await start(loadTree(dir, plugins), { log: line => logs.push(line) });
+    expect(logs).toContainEqual(
+      expect.stringMatching(
+        /^startup 1\/2 Warm the cache: failed at '[^']+': the cache is cold \(optional, going on\)$/,
+      ),
+    );
+    expect(logs).toContain('startup 2/2 @fake/server.port.json#listen: ok');
+    await stop();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('a plugin whose postLoad throws is named, and what the plugins before it set up is torn down', async () => {
+    const { dir, calls, plugins } = tree([listen], () => 'ok');
+    const project = JSON.parse(readFileSync(join(dir, 'project.json'), 'utf8'));
+    project.plugins.push({ use: '@second' });
+    writeFileSync(join(dir, 'project.json'), JSON.stringify(project));
+    const second: PluginModule = {
+      root: '@second',
+      docs: docsDir({
+        'plugin.json': { $schema: schemaRef('plugin'), description: 'a plugin that will not load', grants: {} },
+      }),
+      handlers: {},
+      postLoad: async () => {
+        throw new Error('no license');
+      },
+    };
+    await expect(start(loadTree(dir, { ...plugins, '@second': second }), { log: () => {} })).rejects.toThrow(
+      "plugin '@second' postLoad: no license",
+    );
+    expect(calls).toEqual(['postLoad', 'postLoadDown']);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('a teardown that throws is logged, and the teardowns after it still run', async () => {
+    // two listeners held; the second is stopped first, and it is the one that will not stop
+    const { dir, calls, plugins } = tree([listen, listen], () => 'ok', undefined, 2);
+    const logs: string[] = [];
+    const { stop } = await start(loadTree(dir, plugins), { log: line => logs.push(line) });
+    await expect(stop()).rejects.toThrow('listener 2 is stuck');
+    expect(calls).toEqual(['postLoad', 'listening', 'listening', 'stopped 1', 'postLoadDown']);
+    expect(logs).toContain('stopping fake listener 2: listener 2 is stuck');
     rmSync(dir, { recursive: true, force: true });
   });
 
