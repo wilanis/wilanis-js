@@ -7,8 +7,8 @@ import { PSEUDO, rootPaths, sourcesOf } from './sources.js';
 import type { KernelSpec, NodeReport, Report } from './spec.js';
 import { isRefusal } from './spec.js';
 
-/** How a run ended before quiescence could answer for it: a node broke or refused. Absent: it ran out. */
-export type Ending = 'failed';
+/** How a run ended before quiescence could answer for it: a node broke or refused, or its signal fired. Absent: it ran out. */
+export type Ending = 'failed' | 'cancelled';
 
 /** What a run's report is assembled from, read at quiescence. */
 export interface Settled {
@@ -38,7 +38,7 @@ export function noteRefusal(report: NodeReport, error: unknown): void {
   if (error.detail) report.detail = error.detail;
 }
 
-/** The run's report: how it ended; else done with the first answered output candidate; else blocked on what was never supplied. */
+/** The run's report: how it ended, with no output (a cancelled run did not finish, whatever had settled); else done with the first answered output candidate; else blocked on what was never supplied. */
 export function reportOf(run: Settled): Report {
   const base = { graph: run.spec.name, nodes: run.nodes, startedAt: run.startedAt, endedAt: run.endedAt };
   if (run.ending) return { ...base, status: run.ending };
