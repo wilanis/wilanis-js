@@ -11,7 +11,7 @@
 import type { Scope, Trace, TraceAttributes, TraceLevel } from '@wilanis/core';
 import type { NodeReport, Report } from '@wilanis/engine';
 import { type Decided, type Fired, type Identified, isStarted, type Ran, statusOf } from './fired.js';
-import { nodeAttributes, nodeStatus, span, type Walk } from './trace-span.js';
+import { addressOf, nodeAttributes, nodeStatus, operationAddressOf, span, valued, type Walk } from './trace-span.js';
 
 /**
  * How much a span carries, and the narrowing of an already-built trace to it. Both are core's, beside the
@@ -65,7 +65,7 @@ function callSpan(id: string, node: NodeReport, walk: Walk): Trace {
     at: node,
     attributes: { ...nodeAttributes(id, node, walk), ...triedAgain(node) },
     children: [
-      ...triesOf(node, { name: id, attributes: { 'wilanis.node': id, 'wilanis.at': `nodes/${id}` } }, walk),
+      ...triesOf(node, { name: id, attributes: addressOf(id) }, walk),
       ...(node.sub ? nestedSpans(node.sub, walk) : []),
     ],
   });
@@ -91,7 +91,7 @@ function triesOf(node: NodeReport, site: TriedAt, walk: Walk): Trace[] {
       name: `${site.name} try ${at + 1}`,
       status: 'failed',
       at: attempt,
-      attributes: { ...site.attributes, ...(walk.level === 'full' ? { 'wilanis.error': attempt.error } : {}) },
+      attributes: { ...site.attributes, ...valued(attempt, walk.level) },
       children: attempt.sub ? nestedSpans(attempt.sub, walk) : [],
     }),
   );
@@ -143,13 +143,14 @@ function insideOperation(report: Report, walk: Walk): Trace[] {
   const op = report.nodes.op;
   if (!op?.sub) return nodesOf(report, walk);
   const opName = report.graph.split('#')[1] ?? 'op';
-  const site = { name: opName, attributes: { 'wilanis.at': `operations/${opName}` } };
+  const site = { name: opName, attributes: operationAddressOf(opName) };
   return [...triesOf(op, site, walk), graphSpan(op.sub, walk)];
 }
 
 /**
- * How often a binding operation that runs a graph was tried: the binding's span says it, since the `op` node
- * that carries the tries has no span of its own there. A delegation keeps its `op` span, which says it itself.
+ * How often a binding operation that runs a graph was tried: the binding's or the policy's span says it, since
+ * the `op` node that carries the tries has no span of its own there. A delegation keeps its `op` span, which
+ * says it itself.
  */
 const ranAGraphAgain = (report: Report): TraceAttributes => (report.nodes.op?.sub ? triedAgain(report.nodes.op) : {});
 
@@ -217,7 +218,11 @@ function policySpan(decided: Decided, walk: Walk): Trace {
     name: `policy ${decided.policy}`,
     status: outcome === 'allowed' ? 'allowed' : `${outcome}: ${refusal ?? 'refused'}`,
     at: decided.report,
-    attributes: { 'wilanis.policy': decided.policy, 'wilanis.policy.outcome': outcome },
+    attributes: {
+      'wilanis.policy': decided.policy,
+      'wilanis.policy.outcome': outcome,
+      ...ranAGraphAgain(decided.report),
+    },
     children: insideOperation(decided.report, walk),
   });
 }

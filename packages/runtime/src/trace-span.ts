@@ -31,7 +31,7 @@ export function span(what: {
 }
 
 /** What `wilanis.in`, `wilanis.out` and `wilanis.error` a node may carry: all of them at `full`, none at `summary`. */
-function valued(node: NodeReport, level: TraceLevel): TraceAttributes {
+export function valued(node: Pick<NodeReport, 'in' | 'out' | 'error'>, level: TraceLevel): TraceAttributes {
   if (level !== 'full') return {};
   const out: TraceAttributes = {};
   if (node.in !== undefined) out['wilanis.in'] = JSON.stringify(node.in);
@@ -71,11 +71,16 @@ function isEffect(handler: string | undefined, scope: Scope): boolean {
   return typeof hit === 'string' ? false : hit.op.pure !== true;
 }
 
+/** Where a node is, as a refusal would address it: its id, and `nodes/<id>` inside its graph. */
+export const addressOf = (id: string): TraceAttributes => ({ 'wilanis.node': id, 'wilanis.at': `nodes/${id}` });
+
+/** Where a binding operation is, as a refusal would address it: `operations/<name>` inside the binding. */
+export const operationAddressOf = (name: string): TraceAttributes => ({ 'wilanis.at': `operations/${name}` });
+
 /** What a node span says about itself whatever kind of node it is: where it is, and what it carried. */
 export function nodeAttributes(id: string, node: NodeReport, walk: Walk): TraceAttributes {
   return {
-    'wilanis.node': id,
-    'wilanis.at': `nodes/${id}`,
+    ...addressOf(id),
     ...(node.handler && !node.handler.startsWith('graph:')
       ? { 'wilanis.effect': isEffect(node.handler, walk.scope) }
       : {}),
