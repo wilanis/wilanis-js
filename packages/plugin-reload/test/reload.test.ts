@@ -47,6 +47,22 @@ const until = async (ok: () => boolean, ms = 2000) => {
 };
 
 /**
+ * Wait until a count has not moved for a quiet window, and answer it. One write can reach the watcher as more than one
+ * event, and under load they arrive further apart than the debounce, so a reload can still be on its way after the
+ * first one is seen; a negative judged against a count taken before it lands is judging the probe, not the watcher.
+ */
+const settled = async (count: () => number, quietMs = 250, ms = 5000) => {
+  const end = Date.now() + ms;
+  let last = count();
+  while (Date.now() < end) {
+    await sleep(quietMs);
+    if (count() === last) return last;
+    last = count();
+  }
+  throw new Error(`the count kept moving for ${ms}ms`);
+};
+
+/**
  * Touch a document until the watcher notices it. `fs.watch` registers asynchronously, so a write that lands before
  * the watch is live is simply missed -- the test would then wait for a reload nothing asked for.
  */
@@ -104,7 +120,7 @@ describe('watching a tree', () => {
     await watch(watcher.env, { debounceMs: 10 });
     // a document first, until the watcher is known to be live: a write it missed while registering proves nothing
     expect(await touchUntilSeen(watcher, /185 documents/, 'features/customers/domain/Probe.shape.json')).toBe(true);
-    const before = watcher.reloads();
+    const before = await settled(watcher.reloads);
 
     for (const dir of ['.wilanis/auth/sessions', 'scenarios', 'node_modules/some-package']) {
       mkdirSync(join(copy, dir), { recursive: true });
