@@ -47,6 +47,7 @@ function failureOf(outcome: Outcome): string | undefined {
   if (outcome.kind === 'refused') return `refused as '${outcome.reason}': ${outcome.message}`;
   if (outcome.kind === 'faulted') return `failed at '${outcome.at}': ${outcome.error}`;
   if (outcome.kind === 'blocked') return `blocked: needs ${outcome.needs.join(', ')}`;
+  if (outcome.kind === 'cancelled') return 'cancelled';
   return undefined;
 }
 
