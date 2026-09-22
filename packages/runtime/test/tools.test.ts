@@ -14,7 +14,9 @@ import storage from '@wilanis/plugin-storage';
 import memory from '@wilanis/plugin-storage-memory';
 import postgres from '@wilanis/plugin-storage-postgres';
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_PLUGINS, describe as describeDoc, fuzz, regress, scaffold } from '../src/index.js';
+import { BUILTIN_PLUGINS, describe as describeDoc, fuzz, regress, runTrigger, scaffold } from '../src/index.js';
+import { runSaid } from '../src/run-said.js';
+import { askingTree } from './asking-tree.js';
 import { loadedEditing } from './example-harness.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
@@ -329,6 +331,27 @@ describe('wilanis describe: a resolvers document and who reads it', () => {
     expect(describeDoc(load, '@customers/edge/request.resolvers.json')).toContain(
       '        used by @features/customers/data/create-row.graph.json as {{who}}',
     );
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('wilanis run: stdout is what the tree said, stderr what broke', () => {
+  it('prints a fault as its node and message on stderr, and a refusal as { reason, message } on stdout', async () => {
+    const { dir, plugins } = askingTree();
+    const load = loadTree(dir, { ...BUILTIN_PLUGINS, ...plugins });
+    expect(checkTree(load).items).toEqual([]);
+    const quiet = { log: () => {} };
+
+    const faulted = await runTrigger(load, '@features/asking/edge/ask.trigger.json', {}, quiet);
+    expect(faulted.report.status).toBe('failed');
+    // the node that broke, followed down from the fire into the graph it ran; nothing on stdout, never the report
+    expect(runSaid(faulted.report, faulted.answer)).toEqual({ stderr: "fault at 'asked': boom" });
+
+    const refused = await runTrigger(load, '@features/asking/edge/find.trigger.json', {}, quiet);
+    expect(refused.report.status).toBe('failed');
+    const said = runSaid(refused.report, refused.answer);
+    expect(said.stderr).toBeUndefined();
+    expect(JSON.parse(said.stdout ?? '')).toEqual({ reason: 'missing', message: 'no such thing' });
     rmSync(dir, { recursive: true, force: true });
   });
 });
