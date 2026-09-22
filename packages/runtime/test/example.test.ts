@@ -21,7 +21,8 @@ describe('the example tree', () => {
     // and the store is what answers: a data graph of the local binding is among the graphs walked
     expect(run.lines.join('\n')).toContain('features/customers/data/kept-get');
   });
-  it('rehearses every branch of every switch, whatever the seed', async () => {
+  // eight full rehearsals of the whole tree, well past vitest's five-second default
+  it('rehearses every branch of every switch, whatever the seed', { timeout: 60_000 }, async () => {
     // solved from the rules, so no seed can leave a branch untried
     for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
       const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed, profile: 'live' });
@@ -72,7 +73,9 @@ describe('the example tree', () => {
     expect(loud.lines.join('\n')).toMatch(/answered from '[^']+' {2}\(\d+ms\)/);
     expect(loud.lines.join('\n')).toMatch(/refused on purpose at '[^']+' as upstream: "[^"]*" {2}\(\d+ms\)/);
   });
-  it('rehearses a switch inside a mapped operation through the first element, whatever the seed', async () => {
+  it('rehearses a switch inside a mapped operation through the first element, whatever the seed', {
+    timeout: 60_000,
+  }, async () => {
     for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
       const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed, verbose: true, profile: 'live' });
       const text = run.lines.join('\n');

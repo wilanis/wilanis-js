@@ -324,7 +324,7 @@ features/customers/data/store-and-latest  (atomic)  guard 'row:check' A customer
   ok  holds     refused on purpose at 'row' as conflict: "a customer already uses  (kilo398)", rolled back
   ok  violated  refused on purpose at 'row:violated' as conflict: "a customer already uses  (kilo398)", rolled back
 features/customers/domain/list-customers  switch 'route'  2/2 branches
-  ok  when has(tier)  answered from 'byMethod'
+  ok  when has(tier)  answered from 'byTier'
   ok  anything else   answered from 'all'
 features/customers/data/kept-list-by-tier  guard 'in:check' A customer is reachable  2/2 branches
   ok  holds     answered from 'in:ok'
@@ -469,8 +469,8 @@ every branch settled -- 45 branch(es), 20 decision(s), 16 graph(s).
 @features/customers/edge/list-customers.trigger.json  (@http/http.trigger-kind.json)
   @customers/domain/customer.port.json#list
     @features/customers/domain/list-customers.graph.json
-      route [switch → byMethod | all]
-      byMethod @customers/domain/customer.port.json#listByTier
+      route [switch → byTier | all]
+      byTier @customers/domain/customer.port.json#listByTier
         @features/customers/data/customers-store.binding.json#listByTier
           @features/customers/data/kept-list-by-tier.graph.json
             rows @storage/store.port.json#find  (effect) → store @features/customers/data/customers.store.json customers (find)

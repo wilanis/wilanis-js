@@ -169,9 +169,9 @@ describe('the view model of a graph', () => {
   it('points a domain call at its implementation: the graph behind the binding', async () => {
     const seen = await view('@features/customers/domain/list-customers.graph.json');
     expect(seen.graph!.role).toBe('domain');
-    const byMethod = seen.graph!.nodes.find(node => node.id === 'byMethod')!;
+    const byTier = seen.graph!.nodes.find(node => node.id === 'byTier')!;
     const ByMethod = '@features/customers/data/list-rows-by-tier.graph.json';
-    expect(byMethod.target).toEqual({
+    expect(byTier.target).toEqual({
       op: '@features/customers/domain/customer.port.json#listByTier',
       opName: 'listByTier',
       port: '@features/customers/domain/customer.port.json',
