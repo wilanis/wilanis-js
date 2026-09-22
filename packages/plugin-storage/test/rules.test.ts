@@ -10,7 +10,7 @@ import { CONNECTION, codes, type Docs, editing, refusals, SHAPE, STORE, tree } f
 
 const edit = (file: string, change: (doc: any) => void) => refusals(editing(file, change));
 const store = (change: (doc: any) => void) => edit('features/customers/data/customers.store.json', change);
-const graph = (change: (doc: any) => void) => edit('features/customers/data/read-entry.graph.json', change);
+const graph = (change: (doc: any) => void) => edit('features/customers/data/read-customer.graph.json', change);
 const at = (found: ReturnType<typeof refusals>, code: string) => found.filter(one => one.code === code);
 
 /** The tree with a second feature keeping the same collection name over the same connection. */
@@ -24,13 +24,13 @@ function alsoKeeping(of: string, shape?: Docs): Docs {
     'features/other/feature.json': {
       $schema: '@wilanis/feature.schema.json',
       description: 'another feature that keeps things',
-      dependsOn: ['monitor'],
+      dependsOn: ['customers'],
     },
     'features/other/data/customers.store.json': {
       $schema: '@wilanis/store.schema.json',
       description: 'the same collection, over the same connection',
       connection: CONNECTION,
-      collections: { entries: { of, key: 'id' } },
+      collections: { customers: { of, key: 'id' } },
     },
   };
 }
@@ -45,31 +45,31 @@ describe('what a collection may keep, and what identifies one record', () => {
   it("X201 an edge shape: the world's shape is not what a tree keeps", () => {
     const found = at(
       store(doc => {
-        doc.collections.entries.of = '@features/customers/edge/CustomerRow.shape.json';
+        doc.collections.customers.of = '@features/customers/edge/CustomerRow.shape.json';
       }),
       'X201',
     );
     expect(found).toHaveLength(1);
-    expect(found[0].at).toBe('collections/entries/of');
+    expect(found[0].at).toBe('collections/customers/of');
     expect(found[0].message).toMatch(/is an edge shape/);
   });
 
   it('X202 a key the shape does not have, with the fields it does', () => {
     const found = at(
       store(doc => {
-        doc.collections.entries.key = 'nope';
+        doc.collections.customers.key = 'nope';
       }),
       'X202',
     );
     expect(found).toHaveLength(1);
-    expect(found[0].at).toBe('collections/entries/key');
-    expect(found[0].message).toMatch(/\(fields: id, url, hits, ok, tags, ua\)/);
+    expect(found[0].at).toBe('collections/customers/key');
+    expect(found[0].message).toMatch(/\(fields: id, email, orders, active, tags, note\)/);
   });
 
   it('X202 a key that may be absent, since a key identifies every record', () => {
     const found = at(
       store(doc => {
-        doc.collections.entries.key = 'ua';
+        doc.collections.customers.key = 'note';
       }),
       'X202',
     );
@@ -121,7 +121,7 @@ describe('what a call may name', () => {
     );
     expect(found).toHaveLength(1);
     expect(found[0].at).toBe('nodes/asked/in/collection');
-    expect(found[0].message).toMatch(/\(collections: entries\)/);
+    expect(found[0].message).toMatch(/\(collections: customers\)/);
   });
 });
 
@@ -137,7 +137,7 @@ describe('two stores over one connection', () => {
     };
     const found = at(refusals(alsoKeeping('@features/other/domain/Thing.shape.json', other)), 'X207');
     expect(found).toHaveLength(1);
-    expect(found[0].at).toBe('collections/entries/of');
+    expect(found[0].at).toBe('collections/customers/of');
     expect(found[0].message).toMatch(/already keeps .*Customer.shape.json/);
   });
 
@@ -170,36 +170,36 @@ describe('what a call may ask of the records', () => {
   });
 
   it('X209 a literal the field would not accept', () => {
-    expect(only({ url: 7 }, 'X209')).toHaveLength(1);
-    expect(only({ ua: { has: 'yes' } }, 'X209')).toHaveLength(1);
-    expect(only({ hits: { in: ['a'] } }, 'X209')).toHaveLength(1);
-    expect(only({ hits: 7 }, 'X209')).toEqual([]);
+    expect(only({ email: 7 }, 'X209')).toHaveLength(1);
+    expect(only({ note: { has: 'yes' } }, 'X209')).toHaveLength(1);
+    expect(only({ orders: { in: ['a'] } }, 'X209')).toHaveLength(1);
+    expect(only({ orders: 7 }, 'X209')).toEqual([]);
   });
 
   it('X210 an operator the grammar does not name, or one the field type does not admit', () => {
-    expect(only({ url: { like: 'x' } }, 'X210')).toHaveLength(1);
-    expect(only({ hits: { contains: '2' } }, 'X210')).toHaveLength(1);
-    expect(only({ ok: { gt: false } }, 'X210')).toHaveLength(1);
+    expect(only({ email: { like: 'x' } }, 'X210')).toHaveLength(1);
+    expect(only({ orders: { contains: '2' } }, 'X210')).toHaveLength(1);
+    expect(only({ active: { gt: false } }, 'X210')).toHaveLength(1);
     expect(only({ tags: { eq: ['a'] } }, 'X210')).toHaveLength(1);
     expect(only({ tags: { has: true } }, 'X210')).toEqual([]);
   });
 
   it('X209 a read of the graph in, typed by the shape the graph declares', () => {
-    // `hits` is a number and `in.id` a string: the graph's in shape is a document, so this is judgeable
-    const found = only({ hits: '{{in.id}}' }, 'X209');
+    // `orders` is a number and `in.id` a string: the graph's in shape is a document, so this is judgeable
+    const found = only({ orders: '{{in.id}}' }, 'X209');
     expect(found).toHaveLength(1);
-    expect(found[0].at).toBe('nodes/asked/in/where/hits');
-    expect(only({ url: '{{in.id}}' }, 'X209')).toEqual([]);
+    expect(found[0].at).toBe('nodes/asked/in/where/orders');
+    expect(only({ email: '{{in.id}}' }, 'X209')).toEqual([]);
   });
 
   it('a read is judged by the type it reads, never by the shape of the read itself', () => {
-    // `{{in.urls}}` is not an array until it is read, and `{{in.tagged}}` is not a boolean; judging either by
+    // `{{in.emails}}` is not an array until it is read, and `{{in.tagged}}` is not a boolean; judging either by
     // how it is spelled would refuse a filter the run then accepts, which is the opposite of the promise
     expect(codes(tree())).toEqual([]);
-    expect(only({ url: { in: '{{in.urls}}' } }, 'X210')).toEqual([]);
+    expect(only({ email: { in: '{{in.emails}}' } }, 'X210')).toEqual([]);
     expect(only({ tags: { has: '{{in.tagged}}' } }, 'X209')).toEqual([]);
     // and the type it reads is still judged: a list of the wrong thing, and a boolean that is not one
-    expect(only({ hits: { in: '{{in.urls}}' } }, 'X209')).toHaveLength(1);
+    expect(only({ orders: { in: '{{in.emails}}' } }, 'X209')).toHaveLength(1);
     expect(only({ tags: { has: '{{in.id}}' } }, 'X209')).toHaveLength(1);
   });
 
@@ -212,7 +212,7 @@ describe('what a call may ask of the records', () => {
         run: '@std/object.port.json#make',
         in: { value: { text: '{{in.id}}' }, type: '@features/customers/edge/CustomerRow.shape.json' },
       });
-      doc.nodes[1].in.where = { hits: '{{said.id}}' };
+      doc.nodes[1].in.where = { orders: '{{said.id}}' };
     });
     expect(found.filter(one => one.code === 'X209')).toEqual([]);
   });
@@ -220,28 +220,28 @@ describe('what a call may ask of the records', () => {
   it('a refusal points where the document says it, under a combinator and at a bare value', () => {
     expect(only({ any: [{ methd: 'x' }] }, 'X208')[0].at).toBe('nodes/asked/in/where/any/0/methd');
     // a bare value has no `eq` key to point at, so the field is where it points
-    expect(only({ url: 7 }, 'X209')[0].at).toBe('nodes/asked/in/where/url');
-    expect(only({ url: { contains: 7 } }, 'X209')[0].at).toBe('nodes/asked/in/where/url/contains');
+    expect(only({ email: 7 }, 'X209')[0].at).toBe('nodes/asked/in/where/email');
+    expect(only({ email: { contains: 7 } }, 'X209')[0].at).toBe('nodes/asked/in/where/email/contains');
   });
 });
 
 describe('the scope a document wrote', () => {
-  /** The tree with `entries` scoped by a tenant, and whatever else a case asks of it. */
+  /** The tree with `customers` scoped by a tenant, and whatever else a case asks of it. */
   const scoping = (change: (docs: Docs) => void): Docs => {
     const docs = tree();
     const store = docs['features/customers/data/customers.store.json'] as any;
     store.reads = { tenant: '@features/customers/edge/request.resolvers.json#tenant' };
-    store.collections.entries.scoped = { tenant: '{{tenant}}' };
+    store.collections.customers.scoped = { tenant: '{{tenant}}' };
     change(docs);
     return docs;
   };
   /** What a tree answers with X214, and nothing else: how the store's read is bound is C012's and A's. */
   const scoped = (change: (docs: Docs) => void) => at(refusals(scoping(change)), 'X214');
-  const wrote = (scope: unknown, over = 'entries') =>
+  const wrote = (scope: unknown, over = 'customers') =>
     scoped(docs => {
       const store = docs['features/customers/data/customers.store.json'] as any;
-      store.collections.everyEntry = { view: 'entries', behind: '@features/customers/edge/nobody.policy.json' };
-      const graph = docs['features/customers/data/read-entry.graph.json'] as any;
+      store.collections.everyCustomer = { view: 'customers', behind: '@features/customers/edge/nobody.policy.json' };
+      const graph = docs['features/customers/data/read-customer.graph.json'] as any;
       graph.nodes[0].in.collection = over;
       graph.nodes[0].in.scope = scope;
     });
@@ -250,9 +250,9 @@ describe('the scope a document wrote', () => {
     const found = wrote({ tenant: '{{in.id}}' });
     expect(found).toHaveLength(1);
     expect(found[0].at).toBe('nodes/asked/in/scope');
-    expect(found[0].message).toMatch(/scope is the store's: 'entries' is scoped by tenant ← \{\{tenant\}\}/);
+    expect(found[0].message).toMatch(/scope is the store's: 'customers' is scoped by tenant ← \{\{tenant\}\}/);
     expect(found[0].hint).toMatch(
-      /to change how 'entries' is scoped, change @features\/monitor\/data\/customers.store.json/,
+      /to change how 'customers' is scoped, change @features\/customers\/data\/customers.store.json/,
     );
   });
 
@@ -269,17 +269,17 @@ describe('the scope a document wrote', () => {
   });
 
   it('X214 a scope over a view, which sees every row whatever a site says', () => {
-    const found = wrote({ tenant: 'acme' }, 'everyEntry');
+    const found = wrote({ tenant: 'acme' }, 'everyCustomer');
     expect(found).toHaveLength(1);
-    expect(found[0].message).toBe("'everyEntry' is a view of 'entries', and a view sees every row");
-    expect(found[0].hint).toBe(`drop "scope": read 'entries' where a scope is meant`);
+    expect(found[0].message).toBe("'everyCustomer' is a view of 'customers', and a view sees every row");
+    expect(found[0].hint).toBe(`drop "scope": read 'customers' where a scope is meant`);
   });
 
   it('X214 a scope on newKey, which mints a key across every scope and takes none', () => {
     const found = scoped(docs => {
-      const graph = docs['features/customers/data/read-entry.graph.json'] as any;
+      const graph = docs['features/customers/data/read-customer.graph.json'] as any;
       graph.nodes[0].run = '@storage/store.port.json#newKey';
-      graph.nodes[0].in = { store: STORE, collection: 'entries', scope: { tenant: 'acme' } };
+      graph.nodes[0].in = { store: STORE, collection: 'customers', scope: { tenant: 'acme' } };
     });
     expect(found).toHaveLength(1);
     expect(found[0].at).toBe('nodes/asked/in/scope');
@@ -295,12 +295,12 @@ describe('the scope a document wrote', () => {
       };
       docs['features/customers/data/monitor.binding.json'] = {
         $schema: '@wilanis/binding.schema.json',
-        description: 'the monitor over the entries it keeps',
+        description: 'the registry over the customers it keeps',
         port: '@features/customers/domain/customer.port.json',
         operations: {
           listed: {
             run: '@storage/store.port.json#find',
-            in: { store: STORE, collection: 'entries', scope: { tenant: 'acme' } },
+            in: { store: STORE, collection: 'customers', scope: { tenant: 'acme' } },
           },
         },
       };
