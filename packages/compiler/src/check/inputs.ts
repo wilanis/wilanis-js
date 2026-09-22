@@ -3,7 +3,8 @@
  * Fields of type `type` and fields marked static must be literals: the checker reads them here, and binds the
  * variables they name (P001) -- a type field from its own literal, a static field through its `resolves`.
  * Every other value is typed by the site's reader in the caller's context (G003), must be an input (G006),
- * present when required (G005), and assignable (G004).
+ * present when required (G005), and assignable (G004). Where the operation refuses, its `message` is said to
+ * the caller, and reads no field marked secret (G016).
  */
 import {
   assignable,
@@ -11,12 +12,14 @@ import {
   type Field,
   type Fields,
   hasVars,
+  joinPath,
   type Loaded,
   type Read,
   resolvedHere,
   substitute,
   type Type,
 } from '@wilanis/core';
+import { secretPaths } from '../lower.js';
 import { type Judge, RESERVED, type Reader, type Refuser, type Resolve, type ShapeLayer } from './judge.js';
 
 /** Where an operation is called: what is given, what it accepts, and how a value given there is typed. */
@@ -32,6 +35,14 @@ export interface CallSite {
   layer: ShapeLayer;
   /** inputs typed elsewhere (a map's bound element) */
   extra?: Record<string, Read>;
+  /** where the operation refuses: what a read path of its `message` starts from, for G016 */
+  said?: (path: string[]) => RootOf | undefined;
+}
+
+/** The type a read path starts from -- in, a constant, a resolver, a node's answer -- and the segments below it. */
+export interface RootOf {
+  type: Type;
+  below: string[];
 }
 
 /** A reader whose templates `resolve` types; a read that cannot be typed is G003. */
@@ -51,6 +62,7 @@ export function checkInputs(judge: Judge, site: CallSite): Record<string, Type> 
 }
 
 const BRACES = /^\{\{(.*)\}\}$/s;
+const INDEX = /^[0-9]+$/;
 
 /**
  * Is the value `{{a.x || b.y}}`, two nodes' answers joined with `||`? No template reads that way -- the braces
@@ -156,6 +168,7 @@ class InputCheck {
     const at = `${this.site.at}/${name}`;
     const read = this.readOf(name, field);
     if (!read) return;
+    if (name === 'message') this.checkSaid(at);
     let want = this.judge.type(field.type, this.site.file, at);
     if (!want) return;
     if (hasVars(want)) want = substitute(want, this.subst);
@@ -170,6 +183,24 @@ class InputCheck {
       ? "two nodes' answers are joined at out.from, one per branch, never with ||: give each branch its own node and list both under out.from"
       : `make what '${name}' reads and what ${this.site.what} takes one type`;
     this.refuse('G004', `'${name}': ${bad}`, at, hint);
+  }
+
+  /**
+   * G016: a refusal's message is said to the caller, so no read in it reaches a field marked secret. What is
+   * secret is the walk `redactFor` makes for the report, `secretPaths`, over the type the read starts from.
+   */
+  private checkSaid(at: string): void {
+    const said = this.site.said;
+    if (!said) return;
+    for (const path of this.judge.scope.templateReads(this.site.given.message)) {
+      const root = said(path);
+      if (!root) continue;
+      const below = root.below.filter(segment => !INDEX.test(segment));
+      const secret = secretPaths(root.type).some(hidden => hidden.every((segment, index) => below[index] === segment));
+      if (!secret) continue;
+      const hint = "a refusal's message is said to the caller; say it without the secret";
+      this.refuse('G016', `the message reads '${joinPath(path)}', a field marked secret`, at, hint);
+    }
   }
 
   /** How an input is typed: from `extra`, from the value given (a static field as a literal, P001), or not at all (G005 when required). */

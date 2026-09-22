@@ -246,6 +246,7 @@ class GraphCheck {
       from: this.graph,
       layer: this.layer,
       extra,
+      said: hit.op.refuses ? path => reads.rootOf(path) : undefined,
     });
     reads.nodeOut(node.id);
   }

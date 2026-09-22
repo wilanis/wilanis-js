@@ -21,6 +21,7 @@ import {
 } from '@wilanis/core';
 import { bindings } from '../documents.js';
 import { firstReaders, type Routing, readersOf, readOnSomeBranchesOnly, routed } from './graph-routing.js';
+import type { RootOf } from './inputs.js';
 import type { Judge, JudgedResolver, Reader, Refuser } from './judge.js';
 import { Narrowing } from './narrowing.js';
 import { readAt } from './typing.js';
@@ -133,6 +134,22 @@ export class GraphReads {
     let returns = this.judge.quiet(hit.op.returns) ?? EMPTY_OBJECT;
     if (hasVars(returns)) returns = substitute(returns, bindings(this.judge.scope, hit.op, node.in));
     return isMap(node) ? { kind: 'list', of: returns } : returns;
+  }
+
+  /**
+   * The type a read path starts from and the segments below it: in, one constant, a resolver or a node's
+   * answer. Nothing is remembered as read, since only the path's own read says what a graph uses.
+   */
+  rootOf(path: string[]): RootOf | undefined {
+    const [root, ...below] = path;
+    if (root === 'in') return this.table.inType ? { type: this.table.inType, below } : undefined;
+    if (root === 'const') {
+      const type = this.table.constTypes[below[0]];
+      return type ? { type, below: below.slice(1) } : undefined;
+    }
+    if (root in this.table.resolvers) return { type: this.table.resolvers[root].read.type, below };
+    const type = this.table.nodes.has(root) ? this.nodeOut(root) : undefined;
+    return type ? { type, below } : undefined;
   }
 
   /** Type one value; a whole template the routing switch proved present loses its optionality. */
