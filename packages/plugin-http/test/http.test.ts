@@ -12,6 +12,7 @@ import postgres from '@wilanis/plugin-storage-postgres';
 import { BUILTIN_PLUGINS, start } from '@wilanis/runtime';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import http, { encode } from '../src/index.js';
+import { outcomeWords } from '../src/said.js';
 import {
   caller,
   fakeUpstream,
@@ -193,6 +194,17 @@ describe('http trigger kind against a mockapi-shaped upstream', () => {
       status: 500,
       body: { error: 'fault' },
     });
+    // a cancelled run is 504 whatever had settled, a mapped refusal that landed late included, and its line says so
+    const cancelled = {
+      ...refused,
+      status: 'cancelled' as const,
+      nodes: { n: { ...refused.nodes.n, reason: 'missing' } },
+    };
+    expect(encode(trigger, cancelled, 'r4')).toEqual({
+      status: 504,
+      body: { error: 'cancelled: the deadline passed' },
+    });
+    expect(outcomeWords(cancelled, {}, () => true)).toBe('cancelled');
   });
   it('400 on a batch whose body is not the declared shape', async () => {
     expect((await call('DELETE', '/customers', { ids: 'nope' }, true)).status).toBe(400);
