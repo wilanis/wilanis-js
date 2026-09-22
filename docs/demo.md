@@ -230,7 +230,7 @@ npx wilanis rehearse . --profile local
 ```
 
 ```
-features/access/domain/require-registrar  switch 'decide'  3/3 branches
+features/access/domain/require-registrar  switch 'isRegistrar'  3/3 branches
   ok  when has(principal) && 'registrar' in principal.roles  answered from 'granted'
   ok  when has(principal)                                   refused on purpose at 'forbidden' as forbidden: "registering customers takes the registrar role"
   ok  anything else                                         refused on purpose at 'anonymous' as anonymous: "sign in first: no token was presented"
