@@ -171,9 +171,10 @@ describe('sabotage: the reads a document takes from the request', () => {
     ).toEqual(['P006']);
   });
   it('P006 a store that names a read after a root', () => {
+    // the entry is added beside the tenant the store scopes by, which its collections go on reading
     expect(
       sabotage('features/customers/data/customers.store.json', store => {
-        store.reads = { in: '@customers/edge/request.resolvers.json#agent' };
+        store.reads = { ...store.reads, in: '@customers/edge/request.resolvers.json#agent' };
       }),
     ).toEqual(['P006']);
   });

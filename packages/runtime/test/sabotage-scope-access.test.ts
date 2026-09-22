@@ -9,12 +9,14 @@
  * `sabotage-scoping.test.ts` beside this, and the two are split the way the rules are: a store may scope a
  * collection by a perfectly well-formed read of the wrong thing.
  *
- * Every case starts from the example scoped by a tenant (`scoping-harness.ts`), since the example does not
- * scope its store until RFC 0015's step 10.
+ * The example scopes its customers by the session's tenant and reads the view behind employees-only, so it is
+ * refused nothing as written; every case here breaks one document of it (`scoping-harness.ts`).
  */
 import { describe, expect, it } from 'vitest';
 import {
+  DIGEST_TRIGGER,
   type Edits,
+  POSTGRES_STORE,
   RESOLVERS,
   STORE,
   scopedCodes,
@@ -67,16 +69,19 @@ describe('sabotage: who a scope may read', () => {
   });
   it('A007 says nothing of a read the guard does hand', () => {
     // request.session is a key of the guard's context, so the example's own scope is not this rule's business
-    expect(scopedCodes()).not.toContain('A007');
     expect(scopedCodes(reading('request.principal.subject'))).not.toContain('A007');
   });
   it('A007 says nothing of a store that scopes nothing, whatever it reads', () => {
     // a reads entry no scoped column fills is P005's business, not this rule's: A007 judges what a scope
-    // reads, and a store with no scope has no caller to be wrong about
+    // reads, and a store with no scope has no caller to be wrong about. Both stores read the one resolver, so
+    // both are left keeping the read and scoping nothing by it
+    const scopingNothing = (store: any) => {
+      delete store.collections.customers.scoped;
+      delete store.collections.everyCustomer;
+    };
     const codes = scopedCodes({
-      [STORE]: store => {
-        delete store.collections.customers.scoped;
-      },
+      [STORE]: scopingNothing,
+      [POSTGRES_STORE]: scopingNothing,
       ...reading("request.headers['x-tenant']"),
     });
     expect(codes).not.toContain('A007');
@@ -84,105 +89,85 @@ describe('sabotage: who a scope may read', () => {
   });
 });
 
-/** A view of the scoped customers, across every tenant, behind the policy the access tree declares for employees. */
-const VIEW = {
-  view: 'customers',
-  behind: '@access/edge/employees-only.policy.json',
-  description: 'the same rows, every tenant',
-};
+/** The digest with the employees-only policy dropped: nothing then opens the view its listEvery reads. */
+const UNGATED: Edits = { [DIGEST_TRIGGER]: doc => (doc.policies = []) };
 
 /**
- * A copy whose `listAll` reads the view under one profile only. The local profile binds `kept-list` and
- * production binds `kept-list-postgres`, against a store of its own, so editing the first makes the view
- * reachable under local and under no other profile -- which is what judging A008 per profile is for: the
- * walk goes through the binding, so which graph, and so which collection, is reached is the profile's answer.
+ * The finds behind listAll pointed at the view, under the one profile whose graph a case names: local binds
+ * listAll to `kept-list`, production to `kept-list-postgres` over a store of its own, and live to a REST call. So
+ * editing one makes the view reachable under that profile alone -- which is what judging A008 per profile is for:
+ * the walk goes through the binding, so which graph, and so which collection, is reached is the profile's answer.
  */
 const viewedUnder = (graph: string): Edits => ({
-  [STORE]: store => {
-    store.collections.everyCustomer = { ...VIEW };
-  },
   [`features/customers/data/${graph}.graph.json`]: doc => {
     doc.nodes[0].in.collection = 'everyCustomer';
   },
 });
 
+/** The A008 messages a copy answers, which each end in the profile the crossing was found under. */
+const a008 = (edits: Edits) => scopedSaying(edits).filter(one => one.startsWith('A008'));
+
 describe('sabotage: what a view is behind', () => {
   it('A008 a trigger reaching a view that attaches no such policy', () => {
-    const codes = scopedCodes(viewedUnder('kept-list'));
-    expect(codes).toContain('A008');
+    expect(scopedPointing(UNGATED)).toContain('A008 @features/customers/edge/digest.trigger.json#policies');
   });
   it('A008 names the node, the view, the collection it views and the policy', () => {
-    expect(scopedSaying(viewedUnder('kept-list'))).toContain(
-      "A008 reaches @features/customers/data/kept-list.graph.json#rows, which reads everyCustomer, a view of customers across every scope behind @access/edge/employees-only.policy.json, and attaches no such policy (profile 'local')",
+    expect(scopedSaying(UNGATED)).toContain(
+      "A008 reaches @features/customers/data/kept-list-every.graph.json#rows, which reads everyCustomer, a view of customers across every scope behind @access/edge/employees-only.policy.json, and attaches no such policy (profile 'local')",
     );
   });
   it('A008 offers the policy to attach, or the scoped collection to read instead', () => {
-    expect(scopedHinting(viewedUnder('kept-list'))).toContain(
+    expect(scopedHinting(UNGATED)).toContain(
       'A008 attach "@access/edge/employees-only.policy.json" under policies, or read customers',
     );
   });
-  it('A008 points at the policies of every trigger that reaches it', () => {
-    // the digest, the export and the listing all reach listAll, and the nightly digest fires it on a schedule:
-    // a view is crossed by whoever reaches it, not by whoever names it
-    const pointing = scopedPointing(viewedUnder('kept-list'));
-    expect(pointing).toContain('A008 @features/customers/edge/digest.trigger.json#policies');
-    expect(pointing).toContain('A008 @features/customers/edge/list-customers.trigger.json#policies');
-    expect(pointing).toContain('A008 @features/customers/edge/nightly-digest.trigger.json#policies');
+  it('A008 is judged per profile: every profile whose binding reaches a view, and no other', () => {
+    // local and production bind listEvery to a find over each store's view; live binds it to a REST call that
+    // reaches no store, so the dropped policy is owed under two profiles and the third is not held to it
+    const said = a008(UNGATED);
+    expect(said.filter(one => one.endsWith("(profile 'local')"))).toHaveLength(1);
+    expect(said.filter(one => one.endsWith("(profile 'production')"))).toHaveLength(1);
+    expect(said.some(one => one.includes("'live'"))).toBe(false);
   });
-  it('A008 is judged per profile: it names the profile whose binding reaches the view, and no other', () => {
-    // only local binds listAll to kept-list; live and production bind it to graphs that read the scoped
-    // collection of another store. So the walk finds the crossing under local alone, and the message says so
-    // rather than holding every profile to a gate only one of them needs
-    const said = scopedSaying(viewedUnder('kept-list')).filter(one => one.startsWith('A008'));
-    expect(said.length).toBeGreaterThan(0);
-    for (const one of said) {
-      expect(one).toContain("(profile 'local')");
-      expect(one).not.toContain("'production'");
-      expect(one).not.toContain("'live'");
+  it('A008 points at the policies of every trigger that reaches it, not of the one that names it', () => {
+    // the listing and the export both reach listAll: a view is crossed by whoever reaches it
+    const pointing = scopedPointing(viewedUnder('kept-list'));
+    expect(pointing).toContain('A008 @features/customers/edge/list-customers.trigger.json#policies');
+    expect(pointing).toContain('A008 @features/customers/edge/export-customers.trigger.json#policies');
+  });
+  it('A008 names the profile of the one binding that reaches the view, from either side', () => {
+    // only local binds listAll to kept-list, and only production to kept-list-postgres: the same crossing is
+    // owed under the profile whose graph makes it, rather than every profile being held to a gate one needs
+    for (const [graph, profile] of [
+      ['kept-list', 'local'],
+      ['kept-list-postgres', 'production'],
+    ]) {
+      const said = a008(viewedUnder(graph));
+      expect(said.length).toBeGreaterThan(0);
+      for (const one of said) expect(one).toMatch(new RegExp(`\\(profile '${profile}'\\)$`));
     }
   });
-  it('A008 says nothing under a profile whose binding reaches the scoped collection', () => {
-    // the postgres binding meets listAll with a graph over a store this harness does not scope: nothing it
-    // reaches is a view, so production earns no A008 however the local graph is written
-    const codes = scopedCodes(viewedUnder('kept-list-postgres'));
-    expect(codes).not.toContain('A008');
-  });
   it('A008 is answered by attaching the policy the view names, on the trigger that attaches it', () => {
-    // the gate is per trigger and not per view: the digest is answered by attaching it, and the other
-    // triggers reaching the same node are refused until they attach it too
+    // the gate is per trigger and not per view: the listing is answered by attaching it, and the export
+    // reaching the same node is refused until it attaches it too
     const gated: Edits = {
       ...viewedUnder('kept-list'),
-      'features/customers/edge/digest.trigger.json': doc => {
-        doc.policies = ['@access/edge/employees-only.policy.json'];
+      'features/customers/edge/list-customers.trigger.json': doc => {
+        doc.policies.push({ ...doc.policies[0], policy: '@access/edge/employees-only.policy.json' });
       },
     };
     const pointing = scopedPointing(gated);
-    expect(pointing).not.toContain('A008 @features/customers/edge/digest.trigger.json#policies');
-    expect(pointing).toContain('A008 @features/customers/edge/list-customers.trigger.json#policies');
-  });
-  it('A008 says nothing of a trigger reaching the scoped collection rather than the view', () => {
-    // the view is declared and nothing reads it: declaring a way across a scope is not taking it
-    expect(
-      scopedCodes({
-        [STORE]: store => {
-          store.collections.everyCustomer = { ...VIEW };
-        },
-      }),
-    ).not.toContain('A008');
+    expect(pointing).not.toContain('A008 @features/customers/edge/list-customers.trigger.json#policies');
+    expect(pointing).toContain('A008 @features/customers/edge/export-customers.trigger.json#policies');
   });
 });
 
 describe('a site over a view types as the collection it views', () => {
-  it('a find over a view answers the viewed shape, so the graph it feeds is typed', () => {
-    // the view declares no `of`, so before the port hopped one a find over it answered unknown[] and the
-    // graph earned G010 against its own out. The hop is the port document's word, read through `resolves`:
-    // nothing in the compiler learns what a view is, and the whole change is which path store.port.json writes
-    expect(scopedCodes(viewedUnder('kept-list'))).not.toContain('G010');
-  });
-  it('a view earns its policy gate and nothing else: the typing of the site is not a refusal', () => {
-    // every refusal the planted view earns is about the way across the scope -- the policy a trigger must
-    // attach, and the read it must guarantee -- and none is about what the rows are
-    const codes = new Set(scopedCodes(viewedUnder('kept-list')));
-    expect([...codes].sort()).toEqual(['A006', 'A008']);
+  it('a find over a view answers the viewed shape, and earns its policy gate and nothing else', () => {
+    // the view declares no `of`, so before the port hopped one a find over it answered unknown[] and the graph
+    // earned G010 against its own out. The hop is the port document's word, read through `resolves`: nothing in
+    // the compiler learns what a view is. The example's listEvery graphs are that find, and are refused nothing;
+    // pointing a graph whose out was typed over customers at the view earns the way across and no more
+    expect([...new Set(scopedCodes(viewedUnder('kept-list')))]).toEqual(['A008']);
   });
 });

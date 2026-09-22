@@ -25,6 +25,9 @@ const REMOVE = '@customers/domain/customer.port.json#remove';
 const POLICY = '@access/edge/can-register.policy.json';
 const INVARIANT = '@features/customers/domain/writes-are-for-registrars.invariant.json';
 const REFUSALS = `${AT}#settings/response/refusals`;
+const STORE = '@features/customers/data/customers.store.json';
+const PG_STORE = '@features/customers/data/customers-postgres.store.json';
+const TENANT = 'request.session.attributes.tenant';
 
 /** One copy of the example, driven through the whole script in order; the beats below share it. */
 let dir: string;
@@ -40,9 +43,9 @@ const documents = () => load().registry.files.length;
 const paste = (name: string) => copyFileSync(join(DEMO, name), join(dir, ROUTE));
 
 describe('beat 1, the hook: the tree as it ships, and what the rule reaches', () => {
-  it('checks ok at 185 documents, and describe computes the five routes the rule reaches', () => {
+  it('checks ok at 198 documents, and describe computes the five routes the rule reaches', () => {
     expect(refusalsAt(dir)).toEqual([]);
-    expect(documents()).toBe(194);
+    expect(documents()).toBe(198);
     const said = describeDoc(load(), '@customers/domain/writes-are-for-registrars.invariant.json').split('\n');
     expect(said).toContain('access: every trigger reaching these domain operations is gated');
     expect(said).toContain(`requires: attaches ${POLICY}`);
@@ -60,7 +63,7 @@ describe('beat 1, the hook: the tree as it ships, and what the rule reaches', ()
 });
 
 describe('beat 2, the new hire: the scaffolded route', () => {
-  it('yields exactly the six codes, at the paths the script quotes', () => {
+  it('yields exactly the eight codes, at the paths the script quotes', () => {
     expect(
       scaffold(dir, 'trigger', 'features/customers/edge/archive-customer', {
         run: REMOVE,
@@ -70,16 +73,20 @@ describe('beat 2, the new hire: the scaffolded route', () => {
     expect(refusalsAt(dir)).toEqual([
       `T002 ${AT}#in`,
       `T002 ${AT}#out`,
+      `A006 ${AT}#policies`,
+      `A006 ${AT}#policies`,
       `T005 ${REFUSALS}`,
       `T005 ${REFUSALS}`,
       `T005 ${REFUSALS}`,
       `I001 ${AT}#policies`,
     ]);
   });
-  it('says what each refusal says: the shapes the operation takes and answers, the three reasons, the rule', () => {
+  it('says what each refusal says: the shapes the operation takes and answers, the tenant, the three reasons, the rule', () => {
     expect(refusalsSaying(dir)).toEqual([
       `T002 '${REMOVE}' takes {id: string} but the trigger declares no in`,
       `T002 '${REMOVE}' answers @features/customers/domain/Customer.shape.json but the trigger declares no out`,
+      `A006 ${STORE} reads ${TENANT} as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'local')`,
+      `A006 ${PG_STORE} reads ${TENANT} as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')`,
       "T005 @features/customers/data/delete-row.graph.json may refuse with reason 'missing', which settings.response.refusals does not map",
       "T005 @features/customers/data/delete-row.graph.json may refuse with reason 'upstream', which settings.response.refusals does not map",
       "T005 @features/customers/data/kept-remove.graph.json may refuse with reason 'invariant', which settings.response.refusals does not map",
@@ -94,9 +101,9 @@ describe('beat 2, the new hire: the scaffolded route', () => {
 });
 
 describe('beat 3, following the hints', () => {
-  it('the second step, shapes and refusals filled in, yields I001 alone', () => {
+  it('the second step, shapes and refusals filled in, yields the three that want a policy: A006 twice and I001', () => {
     paste('archive-customer.step2.trigger.json');
-    expect(refusalsAt(dir)).toEqual([`I001 ${AT}#policies`]);
+    expect(refusalsAt(dir)).toEqual([`A006 ${AT}#policies`, `A006 ${AT}#policies`, `I001 ${AT}#policies`]);
   });
   it('attaching the policy without the token yields A005 and the two T005 for forbidden and anonymous', () => {
     // exactly what the I001 hint said and no more: the one line, written after `out` as build.mjs writes it
@@ -120,10 +127,10 @@ describe('beat 3, following the hints', () => {
       `A005 write { "policy": "${POLICY}", "in": { "token": "{{request.headers.authorization}}" } } -- the read is where this kind hands the credential`,
     );
   });
-  it('the finished route yields ok, at 186 documents', () => {
+  it('the finished route yields ok, at 199 documents', () => {
     paste('archive-customer.step3.trigger.json');
     expect(refusalsAt(dir)).toEqual([]);
-    expect(documents()).toBe(195);
+    expect(documents()).toBe(199);
   });
 });
 
@@ -280,11 +287,10 @@ describe('beats 4 and 5, live: the three writes, then all of it or none of it', 
             "'A customer is reachable' does not hold: len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))",
         },
       });
-      // four good rows went in before the fifth refused, and the store holds none of them
-      expect(await tree.answer('@customers/edge/list-customers.trigger.json', requestOf('GET', '/customers'))).toEqual({
-        status: 200,
-        body: [],
-      });
+      // four good rows went in before the fifth refused, and bo's tenant holds none of them
+      expect(
+        await tree.answer('@customers/edge/list-customers.trigger.json', requestOf('GET', '/customers', { token: bo })),
+      ).toEqual({ status: 200, body: [] });
       // the one word that made it so, and nothing else: no transaction node, no begin, no commit
       const registerAll = JSON.parse(
         readFileSync(join(dir, 'features/customers/domain/register-all.graph.json'), 'utf8'),

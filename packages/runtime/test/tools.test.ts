@@ -175,19 +175,19 @@ describe('wilanis fuzz and regress', () => {
     const dir = tmp();
     cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
     const written = await fuzz(loadTree(dir, PLUGINS, INCLUDES), { runs: 2, profile: 'live' });
-    // eighteen triggers -- the example's, the nightly digest among them, and the included access tree's -- two seeds each
-    expect(written).toHaveLength(36);
+    // seventeen triggers -- the example's and the included access tree's -- two seeds each
+    expect(written).toHaveLength(34);
     expect(readdirSync(join(dir, 'scenarios')).sort()).toEqual(written.map(one => one.split('/').pop()!).sort());
     const sc = read(join(dir, 'scenarios', 'get-customer.1.scenario.json'));
     expect(sc.trigger).toBe('@features/customers/edge/get-customer.trigger.json');
     expect(['done', 'failed']).toContain(sc.expect.status);
     // the scenarios are documents of the tree: they load, and they pass check
     const again = loadTree(dir, PLUGINS, INCLUDES);
-    expect(again.registry.all('scenario')).toHaveLength(36);
+    expect(again.registry.all('scenario')).toHaveLength(34);
     expect(checkTree(again).items).toEqual([]);
     const replayed = await regress(again, { profile: 'live' });
     expect(replayed.ok, replayed.lines.join('\n')).toBe(true);
-    expect(replayed.lines).toHaveLength(36);
+    expect(replayed.lines).toHaveLength(34);
     expect(replayed.lines.every(line => line.endsWith(': same'))).toBe(true);
     // a graph that changes is caught: the answering node under a new name is a node the scenario never saw
     const file = join(dir, 'features/customers/data/get-row.graph.json');
@@ -313,7 +313,7 @@ describe('wilanis describe: a resolvers document and who reads it', () => {
 
   it('says so where a resolver is declared and nothing binds it', () => {
     const { load, dir } = loadedEditing('features/customers/edge/request.resolvers.json', doc => {
-      doc.resolvers.tenant = { read: 'request.session.attributes.tenant' };
+      doc.resolvers.region = { read: 'request.session.attributes.region' };
     });
     expect(describeDoc(load, '@customers/edge/request.resolvers.json')).toContain(
       '        used by nothing yet -- bind it under a data graph’s or a binding’s reads',

@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
   "label": "GET /customers.csv",
-  "description": "GET /customers.csv \u2192 every customer as a CSV download (customers.csv), streamed from the blob registry. 502 as upstream when the customer API broke.",
+  "description": "GET /customers.csv → every customer as a CSV download (customers.csv), streamed from the blob registry. 502 as upstream when the customer API broke. For a signed-in caller only, who downloads their tenant's customers.",
   "kind": "@http/http.trigger-kind.json",
   "settings": {
     "route": "/customers.csv",
@@ -10,11 +10,24 @@
     "response": {
       "refusals": {
         "upstream": 502,
-        "invariant": 500
+        "invariant": 500,
+        "anonymous": 401,
+        "invalid_credential": 401
       }
     }
   },
   "out": "blob",
+  "policies": [
+    {
+      "policy": "@access/edge/signed-in.policy.json",
+      "in": {
+        "token": [
+          "{{request.headers.authorization}}",
+          "{{request.cookies.session}}"
+        ]
+      }
+    }
+  ],
   "fire": {
     "run": "@customers/domain/customer.port.json#export"
   }

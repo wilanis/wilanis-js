@@ -135,10 +135,11 @@ describe('the shape a type names is what judges: conforms, as a session write is
 });
 
 /**
- * X105 needs a store that scopes a collection by a session attribute. Step 10 of the RFC gives the example one;
- * until then each case plants it, so the rule is proved over exactly the documents it reads: the session shape
- * the guard's settings name gains the attribute, the customers feature's one edge document that reads the request gains
- * the resolver, and the store binds the read and scopes `customers` by it.
+ * X105 needs a store that scopes a collection by a session attribute some graph writes after sign-in. The example
+ * scopes its customers by `tenant`, which only the sign-ins write, so each case here scopes them by `theme` as
+ * well -- the attribute the preferences route writes -- over exactly the documents the rule reads: the session
+ * shape the guard's settings name, the customers feature's one edge document that reads the request, and the
+ * store. The same rule over `tenant` itself is `packages/runtime/test/sabotage-scoping.test.ts`.
  *
  * The attribute is declared on the shape -- optional there and `required` on the resolver, as
  * `packages/runtime/test/scoping-harness.ts` declares its own -- because C012 holds a scope's read to a string
@@ -160,14 +161,14 @@ const scoping = (attribute: string) => ({
     };
   },
   'features/customers/data/customers.store.json': (doc: any) => {
-    doc.reads = { [attribute]: `@customers/edge/request.resolvers.json#${attribute}` };
-    doc.collections.customers.scoped = { [attribute]: `{{${attribute}}}` };
+    doc.reads[attribute] = `@customers/edge/request.resolvers.json#${attribute}`;
+    doc.collections.customers.scoped[attribute] = `{{${attribute}}}`;
   },
 });
 
 describe('X105: a scoped session attribute is written at sign-in and never again', () => {
   it('a set that writes the attribute a store scopes by is refused, naming the store and the collection', () => {
-    // write-theme already writes `theme` through session.port.json#set; the store now scopes customers by it
+    // write-theme already writes `theme` through session.port.json#set; the store now scopes customers by it too
     const codes = sabotageInclude(scoping('theme'), shapeOf('theme'));
     expect(codes).toContain('X105');
   });
@@ -197,14 +198,8 @@ describe('X105: a scoped session attribute is written at sign-in and never again
     expect(codes).toContain('X105');
   });
 
-  it('an attribute no store scopes by is written as freely as before', () => {
-    // the store scopes customers by `tenant`, which nothing writes; the tree's one session write writes `theme`.
-    // What this case proves is X105's silence: a scope earns the triggers that reach it A006 and B008 of their
-    // own, which are the compiler's cases, not this rule's.
-    expect(sabotageInclude(scoping('tenant'), shapeOf('tenant'))).not.toContain('X105');
-  });
-
-  it('a tree whose stores scope by nothing refuses nothing: the example as written', () => {
+  it('the example as written refuses nothing: its stores scope by tenant, and only the sign-ins write it', () => {
+    // the tree's one session write after sign-in writes `theme`, which no store scopes by, so X105 is silent
     expect(sabotage({})).toEqual([]);
   });
 });

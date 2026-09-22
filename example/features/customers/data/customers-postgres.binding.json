@@ -7,6 +7,9 @@
     "listAll": {
       "graph": "@customers/data/kept-list-postgres.graph.json"
     },
+    "listEvery": {
+      "graph": "@customers/data/kept-list-every-postgres.graph.json"
+    },
     "listByTier": {
       "graph": "@customers/data/kept-list-by-tier-postgres.graph.json"
     },

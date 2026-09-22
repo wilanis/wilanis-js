@@ -7,6 +7,9 @@
     "listAll": {
       "graph": "@customers/data/kept-list.graph.json"
     },
+    "listEvery": {
+      "graph": "@customers/data/kept-list-every.graph.json"
+    },
     "listByTier": {
       "graph": "@customers/data/kept-list-by-tier.graph.json"
     },

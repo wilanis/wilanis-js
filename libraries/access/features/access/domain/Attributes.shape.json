@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Account attributes",
+  "description": "What the customer directory says about an account beside its subject, name and groups, and this tree reads: the tenant the account belongs to. verify is given this shape, so an account that does not say it fails the sign-in's directory node rather than opening a session without one.",
+  "layer": "core",
+  "fields": {
+    "tenant": {
+      "type": "string",
+      "description": "the tenant the account belongs to; the sign-in writes it into the session, and nothing writes it again"
+    }
+  }
+}

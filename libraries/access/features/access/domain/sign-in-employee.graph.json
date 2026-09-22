@@ -7,6 +7,11 @@
       "type": "string",
       "value": "employee",
       "description": "the realm every token this sign-in issues carries"
+    },
+    "tenant": {
+      "type": "string",
+      "value": "operator",
+      "description": "the tenant every employee session carries: the operator's own, since an employee belongs to the business that runs the registry"
     }
   },
   "in": "@access/domain/Credential.shape.json",
@@ -60,7 +65,8 @@
         "roles": "{{checked.identity.groups}}",
         "attributes": {
           "displayName": "{{checked.identity.name}}",
-          "realm": "{{const.realm}}"
+          "realm": "{{const.realm}}",
+          "tenant": "{{const.tenant}}"
         }
       }
     },

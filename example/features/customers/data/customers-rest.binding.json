@@ -7,6 +7,9 @@
     "listAll": {
       "graph": "@customers/data/list-rows.graph.json"
     },
+    "listEvery": {
+      "graph": "@customers/data/list-rows.graph.json"
+    },
     "listByTier": {
       "graph": "@customers/data/list-rows-by-tier.graph.json"
     },

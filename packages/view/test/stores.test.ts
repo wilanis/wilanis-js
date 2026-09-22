@@ -43,6 +43,8 @@ describe('the view of a store', () => {
     expect(calls.map(call => `${call.file}#${call.where} ${call.op} ${call.collection}`)).toEqual([
       '@features/customers/data/kept-get.graph.json#asked get customers',
       '@features/customers/data/kept-list-by-tier.graph.json#rows find customers',
+      // the digest reads every tenant's customers through the view, and the call is listed under the view's name
+      '@features/customers/data/kept-list-every.graph.json#rows find everyCustomer',
       '@features/customers/data/kept-list.graph.json#rows find customers',
       '@features/customers/data/kept-remove.graph.json#asked remove customers',
       '@features/customers/data/kept-update.graph.json#asked patch customers',
@@ -69,6 +71,18 @@ describe('the view of a node that reaches a store', () => {
       collection: 'customers',
       of: '@features/customers/domain/Customer.shape.json',
       op: 'get',
+      // the collection is kept per tenant, and the node says so, since the compiler carries the store's scope to it
+      scope: {
+        store: STORE,
+        by: [
+          {
+            column: 'tenant',
+            read: 'tenant',
+            from: 'session.attributes.tenant',
+            opens: '@features/customers/edge/request.resolvers.json',
+          },
+        ],
+      },
     });
   });
 

@@ -5,15 +5,15 @@
  * the one way across, and it is a document: the page links the collection it crosses and the policy it is
  * behind, and the trigger that reaches it marks that policy as one it could not have dropped.
  *
- * The example does not scope its store yet -- that is RFC 0015's step 10 -- so every case plants a tree that
- * does (`scoped-harness.ts`): the collection scoped by a tenant, and where a case needs one, a view of it
- * behind the employees-only policy. Split from `view.test.ts` because it is a family of its own with a fixture
- * of its own, and that file is at the length the house rules allow.
+ * The example keeps its customers per tenant and declares the view the digest reads, so every case reads it as
+ * written, and the one about a store that scopes nothing edits a copy (`scoped-harness.ts`). Split from
+ * `view.test.ts` because it is a family of its own with a fixture of its own, and that file is at the length
+ * the house rules allow.
  */
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { STORE_FILE, scopedView, VIEW } from './scoped-harness.js';
+import { STORE_FILE, scopedView } from './scoped-harness.js';
 
 const PAGE = fileURLToPath(new URL('../client/index.html', import.meta.url));
 const STORE = '@features/customers/data/customers.store.json';
@@ -62,7 +62,8 @@ describe('a scope, and the view across it', () => {
         // the name the store reads it by, not the resolver's own label, as a graph's request node does it
         label: 'tenant',
         opens: REQUEST_DOC,
-        description: "The caller's tenant. written into the session at sign-in; every customer belongs to one",
+        description:
+          "The caller's tenant. Written into the session at sign-in from what the directory said about the account; every customer kept in a store belongs to one",
       },
     ]);
   });
@@ -77,11 +78,7 @@ describe('a scope, and the view across it', () => {
   });
 
   it('the store page draws a view, linking the viewed collection and the policy it is behind', () => {
-    const store = scopedView(STORE, {
-      [STORE_FILE]: doc => {
-        doc.collections.everyCustomer = { ...VIEW };
-      },
-    }).store;
+    const store = scopedView(STORE).store;
     expect(store?.views).toEqual({
       everyCustomer: { of: 'customers', behind: EMPLOYEES_ONLY, behindLabel: 'Employees only' },
     });
@@ -94,6 +91,7 @@ describe('a scope, and the view across it', () => {
       [STORE_FILE]: doc => {
         doc.reads = undefined;
         doc.collections.customers.scoped = undefined;
+        doc.collections.everyCustomer = undefined;
       },
     }).store;
     // absent, not empty: an empty map would draw a heading with nothing under it
@@ -103,35 +101,32 @@ describe('a scope, and the view across it', () => {
   });
 
   it("the trigger page's Gated by marks the policy a view it reaches requires", () => {
-    const seen = scopedView('@features/customers/edge/list-customers.trigger.json', {
-      [STORE_FILE]: doc => {
-        doc.collections.everyCustomer = { ...VIEW };
-      },
-      'features/customers/data/kept-list.graph.json': doc => {
-        doc.nodes[0].in.collection = 'everyCustomer';
-      },
-      'features/customers/edge/list-customers.trigger.json': doc => {
-        doc.policies = [EMPLOYEES_ONLY];
-      },
-    });
+    // the digest reads every tenant's customers through the view, and attaches the policy it is behind
+    const seen = scopedView('@features/customers/edge/digest.trigger.json');
     expect(seen.policies).toEqual([
       {
         path: EMPLOYEES_ONLY,
         label: 'Employees only',
         decide: '@access/domain/access.port.json#requireEmployee',
-        // the one attachment the author could not have dropped: A008 would refuse the trigger without it
-        required: [{ store: STORE, storeLabel: 'Customers', view: 'everyCustomer', of: 'customers' }],
+        gives: { token: '{{request.flags.token}}' },
+        // the one attachment the author could not have dropped: A008 would refuse the trigger without it, under
+        // each profile whose store's view the digest reads
+        required: [
+          { store: STORE, storeLabel: 'Customers', view: 'everyCustomer', of: 'customers' },
+          {
+            store: '@features/customers/data/customers-postgres.store.json',
+            storeLabel: 'Customers in PostgreSQL',
+            view: 'everyCustomer',
+            of: 'customers',
+          },
+        ],
       },
     ]);
   });
 
   it('marks no policy where the trigger reaches the scoped collection rather than a view', () => {
-    // the view is declared and this trigger reads the scoped collection: attaching a policy is still a choice
-    const seen = scopedView('@features/customers/edge/register-customer.trigger.json', {
-      [STORE_FILE]: doc => {
-        doc.collections.everyCustomer = { ...VIEW };
-      },
-    });
+    // the view is declared and this trigger writes the scoped collection: attaching a policy is still a choice
+    const seen = scopedView('@features/customers/edge/register-customer.trigger.json');
     expect(seen.policies?.map(policy => policy.path)).toEqual([
       EMPLOYEES_ONLY,
       '@features/access/edge/can-register.policy.json',

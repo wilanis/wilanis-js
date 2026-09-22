@@ -5,10 +5,12 @@
  *
  * The example is the tree, because the claim is about a trace of a real fire: the trigger an author wrote, the
  * port it names, the binding a profile chose and the data graph beneath it, each with its own span. The one
- * effect is stubbed, so nothing here reaches a network. What a gate says as spans is `trace-gate.test.ts`.
+ * effect is stubbed, so nothing here reaches a network. Every customer read is for a signed-in caller, so each
+ * fire carries ana's token, issued by the tree's own sign-in against the directory written in its connection;
+ * what a gate says as spans is `trace-gate.test.ts`.
  */
 import { loadTree, type Trace } from '@wilanis/core';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
   atLevel,
   embedderFor,
@@ -32,6 +34,28 @@ function spansOf(trace: Trace): Trace[] {
 /** The one span with this name, or nothing: what a case reaches for when the claim is about one of them. */
 const spanNamed = (trace: Trace, name: string): Trace | undefined =>
   spansOf(trace).find(one => one.name === name || one.name.startsWith(`${name} `));
+
+/** The customer sign-in the access tree ships, which issues the token every customer read's gate verifies. */
+const SIGN_IN = '@access/edge/auth-customers.trigger.json';
+
+/** ana's access token, issued once by the tree's own sign-in: what a customer read is fired with. */
+let token = '';
+
+beforeAll(async () => {
+  // the @auth settings read the signing secret from the environment, so it is set before any tree is loaded
+  process.env.CUSTOMERS_JWT_SECRET ??= 'a-secret-of-thirty-two-bytes-or-more!';
+  const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);
+  const trigger = load.registry.get('trigger', load.resolve(SIGN_IN));
+  const credential = { username: 'ana', password: 'ana-pass' };
+  const signedIn = await embedderFor(load, { profile: 'live' }).fire(trigger?.doc as never, credential, {
+    body: credential,
+    headers: {},
+  });
+  token = (signedIn.output as { accessToken: string }).accessToken;
+});
+
+/** The headers of a request from ana, signed in: every customer read is for a signed-in caller only. */
+const signedIn = (headers: Record<string, unknown> = {}) => ({ ...headers, authorization: `Bearer ${token}` });
 
 /**
  * Fire one of the example's triggers under a profile and answer the record the embedder handed the server.
@@ -57,7 +81,7 @@ async function fire(
 async function getCustomer(status: number, level: 'summary' | 'full' = 'full'): Promise<Trace> {
   const { ran, scope } = await fire(GET_CUSTOMER, {
     input: { id: 'golf' },
-    request: { params: { id: 'golf' }, headers: {} },
+    request: { params: { id: 'golf' }, headers: signedIn() },
     stubs: {
       'op.asked': {
         status,
@@ -72,8 +96,15 @@ describe('one fire, said as spans', () => {
   it('nests the fire, the port operation, the binding, the graph and every node that ran', async () => {
     const trace = await getCustomer(500);
 
+    // the gate comes first: the guard names ana, and the one policy the route attaches allows her
     expect(spansOf(trace).map(one => one.name)).toEqual([
       'fire @features/customers/edge/get-customer.trigger.json',
+      'identify (@auth)',
+      'policy @features/access/edge/signed-in.policy.json',
+      '@features/access/domain/require-signed-in.graph.json',
+      'decide switch → granted',
+      'granted @std/object.port.json#make',
+      'anonymous',
       '@features/customers/domain/customer.port.json#get',
       'binding @features/customers/data/customers-rest.binding.json#get',
       '@features/customers/data/get-row.graph.json',
@@ -113,7 +144,7 @@ describe('one fire, said as spans', () => {
     const parent = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
     const { ran, scope } = await fire(GET_CUSTOMER, {
       input: { id: 'golf' },
-      request: { params: { id: 'golf' }, headers: { traceparent: parent } },
+      request: { params: { id: 'golf' }, headers: signedIn({ traceparent: parent }) },
       stubs: { 'op.asked': { status: 500 } },
     });
 
@@ -223,8 +254,15 @@ describe('a run written out', () => {
     expect(lines[0]).toMatch(
       /^trace [0-9a-f-]{36}\s+fire @features\/customers\/edge\/get-customer\.trigger\.json → refused: upstream\s+\d+ms$/,
     );
-    expect(lines[1]).toMatch(/^ {2}@features\/customers\/domain\/customer\.port\.json#get\b/);
-    expect(lines[2]).toMatch(/^ {4}binding @features\/customers\/data\/customers-rest\.binding\.json#get\b/);
+    // the gate's spans come first, then the run: the port operation, and the binding that met it beneath it
+    expect(lines[1]).toMatch(/^ {2}identify \(@auth\)/);
+    const operation = lines.findIndex(line =>
+      /^ {2}@features\/customers\/domain\/customer\.port\.json#get\b/.test(line),
+    );
+    expect(operation).toBeGreaterThan(1);
+    expect(lines[operation + 1]).toMatch(
+      /^ {4}binding @features\/customers\/data\/customers-rest\.binding\.json#get\b/,
+    );
     expect(lines.some(line => /^ {8}asked @http\/http\.port\.json#request\s+\d+ms {2}ok\b/.test(line))).toBe(true);
     // the reason the author declared is on the line, where a reader of a terminal looks first
     expect(text).toContain('refused: upstream');
@@ -265,7 +303,7 @@ describe('the record and the trace are two things', () => {
   it('leaves the record untouched: traceOf reads and never writes', async () => {
     const { ran, scope } = await fire(GET_CUSTOMER, {
       input: { id: 'golf' },
-      request: { params: { id: 'golf' }, headers: {} },
+      request: { params: { id: 'golf' }, headers: signedIn() },
       stubs: { 'op.asked': { status: 500 } },
     });
     const before = JSON.stringify(ran);
@@ -286,7 +324,7 @@ describe('a run that calls another port operation', () => {
     // single node called `op`, which names nothing an author wrote and must not reach a reader
     const { ran, scope } = await fire(
       '@customers/edge/export-customers.trigger.json',
-      { input: undefined, request: { params: {}, headers: {} } },
+      { input: undefined, request: { params: {}, headers: signedIn() } },
       'local',
     );
     const trace = traceOf(ran, scope);

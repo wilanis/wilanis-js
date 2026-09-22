@@ -5,9 +5,11 @@
  * the latest registration of each tier beside it.
  *
  * Nothing here is a stand-in. The tree is the example, loaded under `local` so `@storage-memory` keeps the
- * records, and every operation is fired through the `Embedder` the way a startup step is -- the path a served
- * tree takes, blob scope and all. What is read back is the store itself, through the tree's own `listAll`,
- * so a rollback that left rows behind would be seen rather than inferred.
+ * records, and every operation is run through the `Embedder`'s compiled binding the way a trigger's fire is --
+ * the path a served tree takes, blob scope and all -- as a caller whose session carries the tenant `acme`,
+ * since the store keeps its customers per tenant and a run with no tenant reads none. What is read back is the
+ * store itself, through the tree's own `listAll`, so a rollback that left rows behind would be seen rather than
+ * inferred.
  *
  * The trigger's policies are not in the way because they gate the trigger and not the operation: who may
  * import is `@auth`'s business and is proved in its own tests, while what an import leaves behind is this
@@ -17,6 +19,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runGraph } from '@wilanis/compiler';
 import type { BlobHandle, LoadResult } from '@wilanis/core';
 import { loadTree } from '@wilanis/core';
 import { embedderFor, FileBlobStore, postLoad } from '@wilanis/runtime';
@@ -29,9 +32,12 @@ const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 const people = (rows: unknown): { email: string; tier: string }[] =>
   (rows as { email: string; tier: string }[]).map(row => ({ email: row.email, tier: row.tier }));
 
+/** The request a signed-in customer of tenant acme is read from: all the scoped store asks of it is the tenant. */
+const ACME = { session: { attributes: { tenant: 'acme' } } };
+
 /**
  * The example, served under one profile: its plugins registered by `postLoad`, a blob scope for the file,
- * and a way to fire a domain operation the way a startup step does. Every case takes a fresh one, since the
+ * and a way to fire a domain operation as a caller of one tenant. Every case takes a fresh one, since the
  * memory engine keeps its records for as long as the process and two cases must not see each other's.
  */
 async function serving(profile = 'local') {
@@ -42,13 +48,15 @@ async function serving(profile = 'local') {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-atomic-e2e-'));
 
   /**
-   * Fire one operation of the customer port, with what it accepts, and answer the whole report. `at` is the
-   * place this call takes in the order they were made here -- these are not the project's steps, so the index
-   * is this harness's own, and it is counted rather than defaulted so no record claims a position it has not.
+   * Fire one operation of the customer port, with what it accepts, and answer the whole report. The request is
+   * acme's, as a trigger past its gate hands it on; a startup step has none, so it could not reach the scoped
+   * collection at all (B008).
    */
-  let at = 0;
   const run = (op: string, input: Record<string, unknown> = {}) =>
-    emb.startup({ run: `@customers/domain/customer.port.json#${op}`, in: input }, { blobs, at: at++ });
+    runGraph(emb.operation(`@customers/domain/customer.port.json#${op}`), {
+      initial: { in: input, request: ACME },
+      env: emb.envFor(blobs),
+    });
 
   /** The CSV as the route would hand it: bytes in the registry, a handle in the graph. */
   const upload = (text: string): Promise<BlobHandle> =>

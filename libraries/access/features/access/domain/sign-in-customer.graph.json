@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Sign a customer in",
-  "description": "Ask the customer directory about the credential, then decide: verified issues our token with realm customer and the directory's groups as roles, and opens the session with the display name; rejected refuses bad_credentials; anything else refuses directory_unavailable. The realm is this graph's decision, never the caller's.",
+  "description": "Ask the customer directory about the credential, then decide: verified issues our token with realm customer and the directory's groups as roles, and opens the session with the display name and the tenant the directory said the account belongs to; rejected refuses bad_credentials; anything else refuses directory_unavailable. The realm is this graph's decision, never the caller's.",
   "constants": {
     "realm": {
       "type": "string",
@@ -60,7 +60,8 @@
         "roles": "{{checked.identity.groups}}",
         "attributes": {
           "displayName": "{{checked.identity.name}}",
-          "realm": "{{const.realm}}"
+          "realm": "{{const.realm}}",
+          "tenant": "{{checked.identity.attributes.tenant}}"
         }
       }
     },

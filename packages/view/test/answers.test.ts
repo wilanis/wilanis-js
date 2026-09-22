@@ -50,6 +50,25 @@ describe('how the viewer says a refusal is answered', () => {
         answer: 502,
         from: [{ graph: GET_ROW, graphLabel: 'Get a row', node: 'failed', nodeLabel: 'Unexpected answer' }],
       },
+      // the route is for a signed-in caller: the policy's graph refuses a caller who sent no credential, and the
+      // guard itself one whose credential it could not verify, which the viewer names by the plugin that refuses
+      {
+        reason: 'anonymous',
+        answer: 401,
+        from: [
+          {
+            graph: '@features/access/domain/require-signed-in.graph.json',
+            graphLabel: 'Require a signed-in caller',
+            node: 'anonymous',
+            nodeLabel: 'No caller',
+          },
+        ],
+      },
+      {
+        reason: 'invalid_credential',
+        answer: 401,
+        from: [{ graph: '@auth/plugin.json', graphLabel: 'Auth', node: 'identify', nodeLabel: 'Identify' }],
+      },
       // no node writes this one down: it is the guard the compiler lowers where the field invariant could not
       // be proved of the customer `row` makes, and the viewer names the site it stands at like any other refusal
       {

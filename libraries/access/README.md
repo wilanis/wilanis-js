@@ -21,14 +21,18 @@ npm install @wilanis/access @wilanis/plugin-auth @wilanis/plugin-http
 
    ```json
    { "port": "@access/domain/identity.port.json", "operations": {
-       "verifyCustomer": { "run": "@auth/identity.port.json#verify", "in": { "connection": "@connections/customers.connection.json" } },
+       "verifyCustomer": { "run": "@auth/identity.port.json#verify", "in": { "connection": "@connections/customers.connection.json", "type": "@access/domain/Attributes.shape.json" } },
        "verifyEmployee": { "run": "@auth/identity.port.json#verify", "in": { "connection": "@connections/employees.connection.json" } },
        "issue": { "run": "@auth/token.port.json#issue" },
        "refresh": { "run": "@auth/token.port.json#refresh" } } }
    ```
 
    The connections are the host's, of any directory kind `@auth` grants: accounts written in the connection
-   for development, an OIDC issuer for production. `wilanis check` says B002 until the port is bound.
+   for development, an OIDC issuer for production. `wilanis check` says B002 until the port is bound. The
+   customer directory must say which tenant each account belongs to -- `attributes.tenant` on an account
+   written in the connection, a `tenant` claim from an OIDC issuer -- and `type` hands `verify` the shape that
+   says so (`Attributes.shape.json`, exported): an account that does not say it fails the sign-in rather than
+   opening a session with no tenant.
 
 2. **Bind `@auth/state.port.json`**, the guard's memory, in a feature of its own (`features/state/`). `@auth`
    requires it and keeps every session and challenge through it; one delegation per operation, to the plugin's
@@ -76,19 +80,23 @@ npm install @wilanis/access @wilanis/plugin-auth @wilanis/plugin-http
   the access token also set as the `session` cookie. The sign-in graphs decide the realm (`customer`,
   `employee`) and write the directory's groups as roles; 401 as `bad_credentials`, 503 as `directory_unavailable`.
 - `POST /api/v1/token/refresh`, `POST /api/v1/sign-out`, `GET|PUT /api/v1/me/preferences`.
-- `Session.shape.json`: `displayName` and `realm` written at sign-in, `theme` written by the preferences route.
+- `Session.shape.json`: `displayName`, `realm` and `tenant` written at sign-in, `theme` written by the preferences
+  route. A host's store may scope its records by `request.session.attributes.tenant` (RFC 0015), and nothing
+  writes the tenant again (X105 refuses a graph that would).
   `wilanis describe @access/domain/Session.shape.json` lists who writes what.
 - `wilanis run @access/edge/issue-otp.trigger.json --challenge-id=XXXX-XXXX`: gives an open challenge its code
   and prints it. A production profile binds `access.port.json#deliverCode` to whatever delivers the code instead.
 
 ## The session, file by file
 
-- **What it holds:** `features/access/domain/Session.shape.json` -- `displayName`, `realm`, an optional `theme`.
+- **What it holds:** `features/access/domain/Session.shape.json` -- `displayName`, `realm`, `tenant`, an optional
+  `theme`.
   The host names this shape in the `@auth` settings (`"session"`), so every write is judged against it, at
   `wilanis check` (X103) and at run time.
 - **Where it is born:** the `issued` node of `domain/sign-in-employee.graph.json` and `sign-in-customer.graph.json`
   calls `identity.port.json#issue` with the token's subject, realm and roles and an `attributes` object -- the
-  session's first contents: `displayName` from the directory, `realm` from the graph's constant. The binding
+  session's first contents: `displayName` from the directory, `realm` from the graph's constant, and `tenant` from
+  what the customer directory said about the account, or the constant `operator` for an employee. The binding
   delegates `issue` to `@auth/token.port.json#issue`, which opens the session and signs the token that names it.
 - **How a graph finds it:** `edge/session.resolvers.json` reads `request.session.id` as `{{sid}}`, declared
   `required` because the `signed-in` policy proves the session is there.
@@ -102,7 +110,7 @@ npm install @wilanis/access @wilanis/plugin-auth @wilanis/plugin-http
 ## On its own
 
 This directory is a complete tree: `features/access-dev` binds `identity.port.json` to the directories written in
-`connections/`, and `@auth/state.port.json` to files under `.wilanis/auth` (bo / bo-pass holds `registrar`, cy / cy-pass only `viewer`, ana / ana-pass is a customer), so
+`connections/`, and `@auth/state.port.json` to files under `.wilanis/auth` (bo / bo-pass holds `registrar`, cy / cy-pass only `viewer`, ana / ana-pass is a customer in `acme`, dee / dee-pass one in `globex`), so
 `wilanis check .`, `wilanis rehearse .` and `wilanis start .` work here with `CUSTOMERS_JWT_SECRET` set. A host
 that includes `["access"]` gets none of that: the dev feature and the connections stay behind.
 

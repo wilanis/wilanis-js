@@ -155,8 +155,12 @@ describe("policies over the registry's writes", () => {
     expect((await post({ token: accessToken })).status).toBe(201);
     expect((await post({ cookie: `session=${accessToken}` })).status).toBe(201);
   });
-  it('public reads stay public', async () => {
-    expect((await call('/customers')).status).toBe(200);
+  it('reads take a signed-in caller of either realm, and answer 401 as anonymous without one', async () => {
+    expect(await call('/customers').then(answer => [answer.status, answer.body.reason])).toEqual([401, 'anonymous']);
+    const {
+      body: { accessToken },
+    } = await signIn('auth-customers', 'dee', 'dee-pass');
+    expect((await call('/customers', { token: accessToken })).status).toBe(200);
   });
 });
 

@@ -43,14 +43,14 @@ const REGISTRATION = '{"name":"Ada Lovelace","email":"ada@example.com","tier":"b
 function step0(ctx) {
   const title = "The tree and its two rules";
   const out = check(ctx);
-  assert(title, out === "ok: 194 documents", out, "check answers ok: 194 documents");
+  assert(title, out === "ok: 198 documents", out, "check answers ok: 198 documents");
   return {
     number: 0,
     title,
     summary: out,
     does: [{ text: "Nothing yet. The tree is the example as it ships, and it is judged before anyone touches it.", pre: "npx wilanis check ." }],
     answers: [{ pre: out }],
-    why: "Every one of the 194 is a JSON document and none is code, so there is nothing an agent can write that the checker does not read whole. The two sentences above are the rules a human wrote; step 1 is where the first is caught, step 7 the second. Neither is repeated anywhere else in the tree.",
+    why: "Every one of the 198 is a JSON document and none is code, so there is nothing an agent can write that the checker does not read whole. The two sentences above are the rules a human wrote; step 1 is where the first is caught, step 7 the second. Neither is repeated anywhere else in the tree.",
   };
 }
 
@@ -58,12 +58,12 @@ function step1(ctx) {
   const title = "The agent scaffolds a route";
   const made = wilanis(ctx, "new", "trigger", "features/customers/edge/archive-customer", ".", "--run", "@customers/domain/customer.port.json#remove", "--kind", "@http/http.trigger-kind.json").text;
   const out = check(ctx);
-  const want = ["T002", "T002", "T005", "T005", "T005", "I001"];
-  assert(title, codesOf(out).join(" ") === want.join(" ") && out.endsWith("6 refusal(s)"), out, `check answers ${want.join(", ")} and 6 refusal(s)`);
+  const want = ["T002", "T002", "A006", "A006", "T005", "T005", "T005", "I001"];
+  assert(title, codesOf(out).join(" ") === want.join(" ") && out.endsWith("8 refusal(s)"), out, `check answers ${want.join(", ")} and 8 refusal(s)`);
   return {
     number: 1,
     title,
-    summary: `${codesOf(out).join(" ")}, 6 refusal(s)`,
+    summary: `${codesOf(out).join(" ")}, 8 refusal(s)`,
     does: [
       { text: "The task is one line: add a way to archive a customer. The agent finds the <code>remove</code> operation on the customer port and scaffolds a route that fires it.", pre: `npx wilanis new trigger features/customers/edge/archive-customer . \\\n  --run '@customers/domain/customer.port.json#remove' --kind '@http/http.trigger-kind.json'\n${made}` },
       { text: `What it wrote, <code>${ROUTE}</code>:`, pre: read(ctx, ROUTE) },
@@ -78,17 +78,17 @@ function step2(ctx) {
   const title = "The agent follows the hints";
   paste(ctx, "archive-customer.step2.trigger.json");
   const out = check(ctx);
-  assert(title, codesOf(out).join(" ") === "I001" && out.endsWith("1 refusal(s)"), out, "check answers I001 alone and 1 refusal(s)");
+  assert(title, codesOf(out).join(" ") === "A006 A006 I001" && out.endsWith("3 refusal(s)"), out, "check answers A006, A006, I001 and 3 refusal(s)");
   return {
     number: 2,
     title,
-    summary: "I001, 1 refusal(s)",
+    summary: "A006 A006 I001, 3 refusal(s)",
     does: [
-      { text: "Five of the six hints are shape and status: the agent declares what the route takes and answers and maps the three reasons the operation can end with. It leaves the policy alone, since nothing yet told it why.", pre: read(ctx, ROUTE) },
+      { text: "Five of the eight hints are shape and status: the agent declares what the route takes and answers and maps the three reasons the operation can end with. It leaves the policy alone, since nothing yet told it why.", pre: read(ctx, ROUTE) },
       CHECK,
     ],
     answers: [{ pre: out, codes: true }],
-    why: "One round of edits took five refusals to zero and touched nothing else, because each hint said where and what. What remains is the one refusal that is not about the route's shape but about a rule of the tree, and it says the same thing it said before, since the rule did not move.",
+    why: "One round of edits took five refusals to zero and touched nothing else, because each hint said where and what. What remains is not about the route's shape but about who may call it: I001, a rule of the tree, says the same thing it said before, since the rule did not move; and the two A006 say the customer stores keep each tenant's rows apart, so the route needs a policy that proves the caller's session carries a tenant. All three point at <code>#policies</code>.",
   };
 }
 
@@ -121,7 +121,7 @@ function step4(ctx) {
   const title = "The finished route";
   paste(ctx, "archive-customer.step3.trigger.json");
   const out = check(ctx);
-  assert(title, out === "ok: 195 documents", out, "check answers ok: 195 documents");
+  assert(title, out === "ok: 199 documents", out, "check answers ok: 199 documents");
   return {
     number: 4,
     title,
@@ -197,8 +197,8 @@ async function step7(ctx) {
   const csv = readFileSync(join(here, "customers.bad.csv"), "utf8");
   const imp = await call("POST", "/customers.csv", { token: ctx.bo, type: "text/csv", body: csv });
   assert(title, imp.status === 500 && imp.json?.reason === "invariant" && imp.json.message.includes("A customer is reachable"), `${imp.status} ${imp.text}`, "the import answers 500 invariant naming A customer is reachable");
-  const list = await call("GET", "/customers");
-  assert(title, list.text === "[]", `${list.status} ${list.text}`, "GET /customers answers []");
+  const list = await call("GET", "/customers", { token: ctx.bo });
+  assert(title, list.text === "[]", `${list.status} ${list.text}`, "GET /customers as bo answers []");
   const atomic = read(ctx, "features/customers/domain/register-all.graph.json").split("\n").find((l) => l.includes('"atomic"'));
   assert(title, Boolean(atomic), "no atomic line", "register-all.graph.json has an atomic line");
   return {
@@ -207,20 +207,20 @@ async function step7(ctx) {
     summary: `${imp.status} invariant, then []`,
     does: [
       { text: "A file of five customers whose fifth row is not a customer: the address is empty.", pre: csv.trimEnd() },
-      { text: "Import it as bo, then list.", pre: `curl -s -X POST localhost:8099/customers.csv -H 'content-type: text/csv' -H "authorization: Bearer $TOKEN" \\\n  --data-binary @customers.bad.csv\ncurl -s localhost:8099/customers` },
+      { text: "Import it as bo, then list.", pre: `curl -s -X POST localhost:8099/customers.csv -H 'content-type: text/csv' -H "authorization: Bearer $TOKEN" \\\n  --data-binary @customers.bad.csv\ncurl -s localhost:8099/customers -H "authorization: Bearer $TOKEN"` },
     ],
     answers: [
       { pre: `${imp.status}  ${imp.text}\n${list.status}  ${list.text}` },
       { text: "The line in <code>features/customers/domain/register-all.graph.json</code> that made it so:", pre: atomic.trim() },
     ],
-    why: "Four good rows went in before the fifth refused, and the store holds none of them. The 500 carries the second rule in its own words, and nobody wrote that message. The graph says one word, <code>atomic</code>, and the compiler refused to accept it anywhere the effects could not be one transaction, so the word is checked rather than trusted. An agent that writes a graph with that word gets the promise or a refusal, never a half-written store.",
+    why: "Four good rows went in before the fifth refused, and bo's tenant holds none of them. The 500 carries the second rule in its own words, and nobody wrote that message. The graph says one word, <code>atomic</code>, and the compiler refused to accept it anywhere the effects could not be one transaction, so the word is checked rather than trusted. An agent that writes a graph with that word gets the promise or a refusal, never a half-written store.",
   };
 }
 
 async function step8(ctx) {
   const title = "An edit that never reaches the serving tree";
   paste(ctx, "archive-customer.step2.trigger.json");
-  const refused = await ctx.server.waitFor(/reload refused, still serving the last good tree:\n.*I001.*\n(?: .*\n?){2}/, 15_000);
+  const refused = await ctx.server.waitFor(/reload refused, still serving the last good tree:\n(?:.*\n)*?.*I001.*\n(?: .*\n?){2}/, 15_000);
   assert(title, refused.includes("I001"), refused, "the reload is refused with I001");
   const anon = await call("POST", "/customers/x/archive");
   assert(title, anon.status === 401, `${anon.status} ${anon.text}`, "the route still answers 401");

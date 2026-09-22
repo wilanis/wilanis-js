@@ -4,14 +4,14 @@
  * can forget one (RFC 0015). These read the kernel spec rather than the refusals: the claim is not that a
  * tree is refused but that what runs carries the read, and that nothing else about the spec moved.
  *
- * The example keeps its customers unscoped until RFC 0015 step 10, so every case here compiles a scoped copy
- * of it -- the one `scoping-harness` makes -- and the unscoped example beside it says what did not change.
+ * The example keeps its customers per tenant, so every case compiles it as written, and a copy with both
+ * stores unscoped (`scoping-harness`'s `UNSCOPED`) says what did not change.
  */
 import { Compiler } from '@wilanis/compiler';
 import { type LoadResult, loadTree, type PluginModule, Scope } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
-import { scopedTree } from './scoping-harness.js';
+import { scopedTree, UNSCOPED } from './scoping-harness.js';
 
 /** What the store's one read lowers to: the session attribute the sign-in wrote, read off what the guard hands. */
 const tenant = { ref: 'request', path: ['session', 'attributes', 'tenant'] };
@@ -21,9 +21,10 @@ const modules = Object.values(PLUGINS) as PluginModule[];
 
 const compilerOf = (load: LoadResult, profile?: string) =>
   new Compiler(new Scope(load.registry, load.resolve), modules, { profile });
-const nodesOf = (graph: string) => scopedTree(load => compilerOf(load).graph(graph).spec.nodes as Record<string, any>);
-const plainNodesOf = (graph: string) =>
+const nodesOf = (graph: string) =>
   compilerOf(loadTree(EXAMPLE, PLUGINS, INCLUDES)).graph(graph).spec.nodes as Record<string, any>;
+const plainNodesOf = (graph: string) =>
+  scopedTree(load => compilerOf(load).graph(graph).spec.nodes as Record<string, any>, UNSCOPED);
 
 describe('the scope the lowering fills, which no document writes', () => {
   it('carries the store read to a site over a scoped collection, and adds no node for it', () => {
@@ -46,9 +47,19 @@ describe('the scope the lowering fills, which no document writes', () => {
     // and newKey takes none, because it declares none: a key is global to the table whatever the scope
     expect(nodes.key.in.scope).toBeUndefined();
   });
+  it('carries none to the find over a view, which sees every row of the collection it views', () => {
+    // the digest's graph: the one site of the example that reads across tenants, and no scope is put on it
+    expect(nodesOf('@features/customers/data/kept-list-every.graph.json').rows.in.scope).toBeUndefined();
+  });
   it('carries none where nothing is scoped, so a tree that scopes nothing lowers as it did', () => {
-    // the example itself, whose store declares no scoped column: the same graph, and no scope on its site
+    // the example with both stores unscoped: the same graph, and no scope on its site
     expect(plainNodesOf('@features/customers/data/kept-get.graph.json').asked.in.scope).toBeUndefined();
+  });
+  it('carries the production store read to the postgres graphs, as the local one to its own', () => {
+    // two stores, one resolver: each profile's site is scoped by the store it names, filled from the one read
+    expect(nodesOf('@features/customers/data/kept-get-postgres.graph.json').asked.in.scope).toEqual({
+      object: { tenant },
+    });
   });
   it('carries the read a binding delegation names, since a delegation is a site like any other', () => {
     // the example meets every read with a data graph, so this plants the other shape a site takes: listAll

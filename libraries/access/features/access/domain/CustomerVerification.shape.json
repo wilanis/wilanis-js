@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Customer verification",
+  "description": "What the customer directory said about a credential: verified with the identity and its attributes, rejected, or unavailable.",
+  "layer": "core",
+  "fields": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "verified",
+        "rejected",
+        "unavailable"
+      ]
+    },
+    "identity": {
+      "type": "@access/domain/CustomerIdentity.shape.json",
+      "required": false
+    }
+  }
+}

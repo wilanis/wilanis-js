@@ -209,10 +209,10 @@ describe('the view of a field invariant', () => {
   it('tables every site of the shape, read from the compiler and never worked out here', () => {
     const seen = holds('len(name) > 0');
     expect(Object.keys(seen).sort()).toEqual(['fields', 'form', 'on', 'onLabel', 'sites', 'when']);
-    // the sites are `sitesOf`'s, which is what the checker judges (I005) and the compiler guards by: thirteen
-    // places a value of Customer comes into being in the example, twelve nodes that make one and one graph that
+    // the sites are `sitesOf`'s, which is what the checker judges (I005) and the compiler guards by: sixteen
+    // places a value of Customer comes into being in the example, fifteen nodes that make one and one graph that
     // takes a list. The viewer counts none of them itself; it asks the one function that already knows.
-    expect(seen.sites.length).toBe(14);
+    expect(seen.sites.length).toBe(16);
     expect(seen.sites.filter(site => site.kind === 'taken').map(site => [site.graph, site.node, site.arity])).toEqual([
       ['@features/customers/data/write-csv.graph.json', 'in', 'list'],
     ]);

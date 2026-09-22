@@ -7,6 +7,10 @@
       "description": "Every customer.",
       "returns": "@customers/domain/Customer.shape.json[]"
     },
+    "listEvery": {
+      "description": "Every customer of every tenant: what the digest counts. Where a store keeps the customers per tenant this reads its view across them, behind the policy the view names.",
+      "returns": "@customers/domain/Customer.shape.json[]"
+    },
     "listByTier": {
       "description": "Customers of one tier.",
       "accepts": {
