@@ -1,6 +1,6 @@
 # RFC 0034: `context` is the root: one word for what a kind hands, where it is declared and where it is read
 
-- **Status:** draft
+- **Status:** accepted
 - **Areas:** `area:core`, `area:compiler`, `area:engine`, `area:runtime`, `area:view`, `area:access`
 - **Tracking issue:** #525
 - **Depends on:** none. RFC 0029 fixed the three places the request is read and is unchanged by this; RFC 0009,
@@ -130,8 +130,9 @@ No new code. The rules that read the root keep their codes and change what they 
 
 | Code | Where it lives | Change |
 |---|---|---|
-| T003 | `check/triggers.ts`, through `requestOnly` in `check/typing.ts` | the root accepted is `context`; a read whose root is `request` is refused with "the root is context, what the trigger kind hands; write {{context.<path>}}" |
-| A005, A006 | `check/access.ts` (`checkAttachment`, `checkGuardRead`) | walk reads rooted at `context` |
+| T003 | `check/triggers.ts` (three refusal sites), through `requestOnly` in `check/typing.ts` | the root accepted is `context`; a read whose root is `request` is refused with "the root is context, what the trigger kind hands; write {{context.<path>}}" |
+| A005 | `check/access.ts` (`checkAttachment`, `checkGuardRead`) | walks reads rooted at `context` |
+| A006 | `check/triggers.ts` | the path a required resolver reads, and a policy's `proves`, are `context.*` paths |
 | A001 (`proves`, `decide.in`) | `check/access.ts` (`provesFaultIn`, `checkPolicy`) | "'…', which is not a context.* path", hint "write context.principal, context.session…" |
 | G003 | `check/graph-reads.ts` (`rootReadRaw`) | "graphs do not read context.* -- a resolvers document does; bind it under reads and read {{name}}" |
 | P006 | `check/judge.ts` (`RESERVED`) | `context` joins the reserved names and `request` leaves them: a node, constant or resolver named `context` is refused as a reserved root; one named `request` no longer is |
@@ -152,7 +153,12 @@ request says `context.params.id`, in the tree's word. Nothing else the embedder,
 `regress` or `start` do changes.
 
 `RunContext.request` in `packages/engine/src/spec.ts`, the field a handler receives, is renamed `context` in the
-same step so that no TypeScript name in the engine spells the retired word (see Open questions).
+same step, so that no TypeScript name in the engine spells the retired word (settled on acceptance, below).
+
+Every other source file that spells the root moves with them, since there is no alias: in the compiler
+`check/scopes.ts` and `compiler.ts`; in core `model.ts` and `templates.ts`; in the runtime `branches.ts`, `cli.ts`,
+`embed.ts`, `fired.ts`, `scaffolds.ts`, `scope-said.ts`, `serve.ts` and `stubbing.ts`; in the plugins `@auth`'s
+`guard.ts`, `index.ts` and `rules.ts`, `@http`'s `index.ts` and `serve.ts`, and `@schedule`'s `rules.ts`.
 
 ### Discoverability
 
@@ -171,9 +177,12 @@ same step so that no TypeScript name in the engine spells the retired word (see 
 
 ### Plugin contract
 
-`PluginModule` in `packages/core/src/plugin.ts` does not change. `RunContext` in `packages/engine/src/spec.ts`,
-which every handler receives, renames its `request` field to `context`; the `@http` plugin's `serve.ts` and
-the `@auth` plugin's handlers are the readers in this repository and move with it.
+`packages/core/src/plugin.ts` spells the word twice, and both rename: `FireArgs.request`, the context a trigger kind
+hands the embedder when it fires ("what resolvers read as request.*"), becomes `FireArgs.context`, and
+`GuardArgs.request`, what the guard is given to identify a caller from, becomes `GuardArgs.context`. `RunContext` in
+`packages/engine/src/spec.ts`, which every handler receives, renames its `request` field the same way. The `@http`
+plugin's `serve.ts`, the `@schedule` plugin, the `@cli` kind in the runtime and the `@auth` plugin's `guard.ts` are
+the callers and readers in this repository and move with it. A plugin outside this repository does not exist yet.
 
 ## Compatibility
 
@@ -185,7 +194,7 @@ place: every description that spells `request.*` spells `context.*`, `kind` gain
 `{{request.*}}` is refused by T003, A001 or G003 with the new spelling in the message; nothing is published to
 npm, so no consumer exists outside this repository. No `schemas-v2`.
 
-The 12 documents of `example/` and the 13 of `libraries/access/` that spell the root migrate in the implementing
+The 11 documents of `example/` and the 12 of `libraries/access/` that spell the root, and the README of each tree, migrate in the implementing
 pull request, one word each. RFC 0009, RFC 0015 and RFC 0020, accepted and not yet implemented, are amended to the
 new spelling in the same pull request. RFC 0005, RFC 0012, RFC 0029 and the other implemented RFCs that spell
 `request.*` are the record of what was decided when, and stay as written; `docs/model.md` and `docs/demo.md` are
@@ -212,9 +221,9 @@ current documents and move.
 
 1. The word moves, atomically: `RESERVED`, `requestOnly`, `rootReadRaw`, `provesFaultIn`, `checkAttachment`,
    `lowerRef` and `Roots` in the compiler; `PSEUDO`, `KSource`'s comment and `RunContext` in the engine;
-   `compiler.ts`, `gate.ts`, `fuzz.ts`, `rehearse.ts` and the `@http` and `@auth` plugins' readers in the
-   runtime; every schema description, `kind`'s new description and the scenario key in core; the validate
-   baseline; the 25 documents of the two trees; the three kinds' and the guard's prose; the template
+   `compiler.ts`, `gate.ts`, `fuzz.ts`, `rehearse.ts` and every other reader the Runtime behaviour section lists;
+   `FireArgs`, `GuardArgs` and `RunContext`; every schema description, `kind`'s new description and the scenario key
+   in core; the validate baseline; the 23 documents of the two trees and their READMEs; the three kinds' and the guard's prose; the template
    `CLAUDE.md`; `docs/model.md`; the existing tests' expectations; the sabotage cases above. One pull request,
    because no alias means the compiler and the documents cannot move apart. Waits for the maintainer's approval
    in CI, since schemas change.
@@ -228,7 +237,7 @@ The index row and the roadmap line are added in the pull request that proposes t
 
 ## Drawbacks and alternatives
 
-**Cost.** About 25 documents, 22 pages under `docs/`, 11 schemas, 16 source files and 40 test files spell the
+**Cost.** 23 documents, 22 pages under `docs/`, 11 schemas, about 35 source files and 40 test files spell the
 word, and step 1 moves most of them in one pull request. Pre-1.0 with nothing published is the one time this
 costs a diff and nothing else; after 1.0 it would be `schemas-v2`.
 
@@ -254,11 +263,16 @@ Rejected.
 the reason policies and resolvers are kind-agnostic: a policy proves `context.principal` for a route and a command
 alike, and a resolver serves data graphs behind operations fired from three kinds. Rejected.
 
-## Open questions
+## Settled on acceptance
 
-- Whether `RunContext.request`, the TypeScript field a handler receives, renames with the language. This RFC says
-  yes, so that no name in the engine spells the retired word; the cost is `ctx.context` in every handler. To be
-  decided before `accepted`.
-- Whether the implemented RFCs that spell `request.*` (0005, 0012, 0029 among them) are amended or left as the
-  record. This RFC leaves them; `docs/model.md` is the current statement. To be decided before `accepted`.
-- The exact wording of the new `describe` line and of `kind`'s description may be settled during implementation.
+- `RunContext.request`, `FireArgs.request` and `GuardArgs.request`, the TypeScript fields a handler, the embedder and
+  the guard receive, rename with the language, so that no name in the engine or the plugin contract spells the
+  retired word. The cost is `ctx.context` in a handler, and the RFC takes it: internal names bend to the one the
+  author reads.
+- The implemented RFCs that spell `request.*` (RFC 0005, RFC 0012, RFC 0029 among them) are the record of what was
+  decided when and stay as written; `docs/model.md` is the current statement. RFC 0009, RFC 0015 and RFC 0020,
+  accepted and not implemented, are amended in step 4.
+
+## Decided during implementation
+
+- The exact wording of the `describe` line on a trigger and of `kind`'s description in `trigger.schema.json`.
