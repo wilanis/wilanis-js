@@ -6,7 +6,7 @@
   "out": {
     "type": "@customers/domain/Customer.shape.json[]",
     "from": [
-      "byMethod",
+      "byTier",
       "all"
     ]
   },
@@ -21,14 +21,14 @@
       "rules": [
         {
           "when": "has(tier)",
-          "to": "byMethod"
+          "to": "byTier"
         }
       ],
       "else": "all"
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "byMethod",
+      "id": "byTier",
       "label": "Customers of that tier",
       "run": "@customers/domain/customer.port.json#listByTier",
       "in": {
