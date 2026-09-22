@@ -80,20 +80,24 @@ async function writeBody(
   if (written.length !== undefined) headers['content-length'] ??= String(written.length);
 }
 
-/** Where a request is sent, and what paces it. */
+/** Where a request is sent, what paces it, and the caller's signal: the run's, joined with the site's bound when it has one. */
 interface Sending {
   canonical: string;
   conn: Conn;
   url: URL;
   init: RequestInit;
+  signal?: AbortSignal;
 }
 
-/** Send, paced by the connection's throttle; the timeout counts from the moment the request is let through. */
-function send(wire: Wire, { canonical, conn, url, init }: Sending) {
+/**
+ * Send, paced by the connection's throttle. The connection's timeout counts from the moment the request is let
+ * through; the caller's signal is joined with it, so whichever bound is tighter, or a cancelled run, stops the request.
+ */
+function send(wire: Wire, { canonical, conn, url, init, signal }: Sending) {
   return throttleFor(wire.env, canonical, conn.settings.throttle).run(async () => {
     const control = new AbortController();
     const timer = setTimeout(() => control.abort(), Number(conn.settings.timeoutMs ?? 30000));
-    init.signal = control.signal;
+    init.signal = signal ? AbortSignal.any([signal, control.signal]) : control.signal;
     try {
       return await fetch(url, init);
     } finally {
@@ -125,7 +129,7 @@ export async function request({
   ctx,
 }: {
   in: Record<string, unknown>;
-  ctx: { env: Record<string, unknown> };
+  ctx: { env: Record<string, unknown>; signal?: AbortSignal };
 }) {
   const { conn, canonical } = connectionOf(ctx.env, input.connection);
   const wire: Wire = { env: ctx.env, codecs: codecTable(ctx.env), blobs: ctx.env.blobs as BlobStore };
@@ -136,7 +140,8 @@ export async function request({
   const init: RequestInit = { method: String(input.method), headers };
   if (input.body !== undefined) await writeBody(input, init, headers, wire);
   if (input.produces) headers.accept ??= String(input.produces);
-  const answer = await send(wire, { canonical, conn, url: urlOf(conn, String(input.path)), init });
+  const url = urlOf(conn, String(input.path));
+  const answer = await send(wire, { canonical, conn, url, init, signal: ctx.signal });
   const answered: Record<string, string> = {};
   answer.headers.forEach((value, name) => {
     answered[name] = value;
