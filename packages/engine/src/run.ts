@@ -1,13 +1,14 @@
 /**
  * One run of a spec. The scheduler fires every node the instant its sources have settled, all of them
  * concurrently, and answers a report at quiescence. A switch routes and cancels the branches it did not
- * choose; a call runs its handler; a map runs its handler once per element and settles only when every
- * element has, so a failed map still says what each element did.
+ * choose; a call runs its handler; a map runs its handler once per element (`map.ts`). When the run's signal
+ * fires, nothing more starts: what had not started is cancelled, what was in flight settles as it settles.
  */
+import { type MapHost, runMap } from './map.js';
 import { type Plan, planOf, targetsOf } from './plan.js';
 import { redactEach, redactValue } from './redact.js';
 import { answered, type Ending, initialReport, noteRefusal, reportOf } from './report.js';
-import { nodeRefs, PSEUDO, readAll, readPath, readSource } from './sources.js';
+import { nodeRefs, PSEUDO, readAll } from './sources.js';
 import type {
   Handlers,
   KCall,
@@ -20,50 +21,12 @@ import type {
   RunContext,
   RunOptions,
 } from './spec.js';
-import { Refusal } from './spec.js';
-
-/** What one element of a map came to: its value, or the error (and the reason, when it refused). */
-type ElementResult =
-  | { ok: true; value: unknown }
-  | { ok: false; error: string; reason?: string; detail?: Record<string, unknown> };
-
-/** A running map: what every element shares. */
-interface MapSite {
-  id: string;
-  node: KMap;
-  broadcast: Record<string, unknown>;
-  items: NodeReport[];
-}
-
-/** What one element's handler takes: the broadcast inputs, and the element under `item` or through `bind`. */
-function elementInputs(node: KMap, broadcast: Record<string, unknown>, item: unknown): Record<string, unknown> {
-  const inputs: Record<string, unknown> = { ...broadcast };
-  if (!node.bind) {
-    inputs.item = item;
-    return inputs;
-  }
-  for (const [key, path] of Object.entries(node.bind)) {
-    const value = readPath(item, path);
-    if (value !== undefined) inputs[key] = value;
-  }
-  return inputs;
-}
-
-/** A map's answer: every element's outcome when failures are collected; else the values, unless an element failed. */
-function collectMap(id: string, node: KMap, results: ElementResult[]): unknown[] {
-  if (node.onItemFailure === 'collect') return results;
-  const index = results.findIndex(result => !result.ok);
-  if (index < 0) return results.map(result => (result as { value: unknown }).value);
-  const failed = results[index] as Extract<ElementResult, { ok: false }>;
-  // an element that refused refuses the map, with its reason; an element that broke is a fault of the map
-  if (failed.reason !== undefined) throw new Refusal(failed.reason, failed.error, failed.detail);
-  throw new Error(`map '${id}' element ${index}: ${failed.error}`);
-}
 
 /**
  * One run of one spec: it fires every node the instant its sources have settled, all of them concurrently,
  * routes and cancels the branches a switch did not choose, and answers at quiescence -- failed with the node
- * that broke or refused, done with the first output candidate that settled, or blocked on what was never supplied.
+ * that broke or refused, cancelled when its signal fired first, done with the first output candidate that
+ * settled, or blocked on what was never supplied.
  */
 export class Run {
   private readonly values = new Map<string, unknown>();
@@ -77,6 +40,8 @@ export class Run {
   private ending: Ending | undefined;
   private running = 0;
   private wake: (() => void) | undefined;
+  /** What a map of this run reads and calls through. */
+  private readonly mapHost: MapHost;
 
   constructor(
     private readonly handlers: Handlers,
@@ -89,11 +54,35 @@ export class Run {
     this.startedAt = this.clock();
     for (const [key, value] of Object.entries(opts.initial ?? {})) this.values.set(key, value);
     for (const id of Object.keys(spec.nodes)) this.reports[id] = initialReport(this.values, id);
+    this.mapHost = {
+      values: this.values,
+      clock: this.clock,
+      call: (node, path, inputs, report) =>
+        this.invoke(node.handler, inputs, this.contextFor(node, [...this.root, ...path], report)),
+    };
   }
 
-  /** Fire everything ready, wait for any settle, repeat until quiescence; then answer. */
+  /** Fire everything ready, wait for any settle, repeat until quiescence; then answer. An abort ends the run cancelled. */
   async execute(): Promise<Report> {
+    const signal = this.opts.signal;
+    const aborted = () => {
+      this.cancelRun();
+      this.wake?.();
+    };
+    signal?.addEventListener('abort', aborted, { once: true });
+    try {
+      await this.schedule();
+    } finally {
+      signal?.removeEventListener('abort', aborted);
+    }
+    const { spec, reports: nodes, values, ending } = this;
+    return reportOf({ spec, nodes, values, ending, startedAt: this.startedAt, endedAt: this.clock() });
+  }
+
+  /** The scheduler's loop: start what is ready, else wait for a node to settle, until nothing is running. */
+  private async schedule(): Promise<void> {
     for (;;) {
+      if (this.opts.signal?.aborted) this.cancelRun();
       const ready = Object.keys(this.spec.nodes).filter(id => this.isReady(id));
       if (ready.length) {
         for (const id of ready) this.start(id);
@@ -105,8 +94,6 @@ export class Run {
       });
       this.wake = undefined;
     }
-    const { spec, reports: nodes, values, ending } = this;
-    return reportOf({ spec, nodes, values, ending, startedAt: this.startedAt, endedAt: this.clock() });
   }
 
   // ---- readiness ----------------------------------------------------------------------------------
@@ -185,6 +172,18 @@ export class Run {
       if (this.status(id) === 'pending') this.reports[id].status = 'cancelled';
   }
 
+  /**
+   * The run's signal fired: the run is cancelled unless it had already ended, and nothing that had not started
+   * ever will -- every pending node, and every pending element of a map in flight. What is running is left alone.
+   */
+  private cancelRun(): void {
+    this.ending ??= 'cancelled';
+    for (const report of Object.values(this.reports)) {
+      if (report.status === 'pending') report.status = 'cancelled';
+      for (const item of report.items ?? []) if (item.status === 'pending') item.status = 'cancelled';
+    }
+  }
+
   /** Cancel a pending node and, transitively, whatever waits for it. */
   private cancel(id: string): void {
     if (this.status(id) !== 'pending') return;
@@ -209,43 +208,8 @@ export class Run {
   }
 
   private async runMap(id: string, node: KMap, report: NodeReport): Promise<void> {
-    const over = readSource(node.over, this.values);
-    if (!Array.isArray(over)) throw new Error(`map '${id}': over is not a list`);
-    const broadcast = readAll(node.in, this.values);
-    report.in = { ...broadcast, over };
-    // one report per element; an element supplied in initial as '<id>.<index>' is seeded and never runs
-    const items = over.map((_, index) => initialReport(this.values, `${id}.${index}`));
-    report.items = items;
-    const site: MapSite = { id, node, broadcast, items };
-    // every element settles before the node does, whatever happened to the others
-    const results = await Promise.all(over.map((item, index) => this.runElement(site, index, item)));
-    const out = collectMap(id, node, results);
+    const out = await runMap(this.mapHost, id, node, report);
     this.finish(id, report, out, redactEach(out, node.redact?.out));
-  }
-
-  /** One element of a map: a seeded element answers at once; the rest run the handler with the element bound in. */
-  private async runElement(site: MapSite, index: number, item: unknown): Promise<ElementResult> {
-    const element = site.items[index];
-    if (element.status === 'seeded') return { ok: true, value: element.out };
-    const inputs = elementInputs(site.node, site.broadcast, item);
-    element.status = 'running';
-    element.startedAt = this.clock();
-    element.handler = site.node.handler;
-    element.in = redactValue(inputs, site.node.redact?.in) as Record<string, unknown>;
-    const ctx = this.contextFor(site.node, [...this.root, site.id, String(index)], element);
-    try {
-      const value = await this.invoke(site.node.handler, inputs, ctx);
-      element.out = redactValue(value, site.node.redact?.out);
-      element.status = 'done';
-      return { ok: true, value };
-    } catch (error) {
-      element.status = 'failed';
-      element.error = (error as Error).message;
-      noteRefusal(element, error);
-      return { ok: false, error: element.error, reason: element.reason, detail: element.detail };
-    } finally {
-      element.endedAt = this.clock();
-    }
   }
 
   /**

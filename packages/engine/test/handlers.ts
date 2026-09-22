@@ -1,5 +1,8 @@
-/** Handlers the kernel tests share: arithmetic, echoes, sleeps, a fault and refusals, this engine's and a foreign one's. */
-import { Refusal } from '../src/index.js';
+/**
+ * Handlers the kernel tests share: arithmetic, echoes, sleeps, a fault and refusals, this engine's and a foreign
+ * one's, and a sleep that stops when the run's signal aborts.
+ */
+import { type HandlerArgs, Refusal } from '../src/index.js';
 
 /** A refusal thrown by a plugin that bundles its own copy of the engine: an Error named Refusal, not ours. */
 function foreign(reason: unknown, message: string): Error {
@@ -30,4 +33,18 @@ export const handlers = {
     await new Promise(resolve => setTimeout(resolve, Number(input.ms)));
     return input.tag;
   },
+  /** Sleeps, then refuses as `late`: a refusal that may land after the run was cancelled. */
+  sleepThenRefuse: async ({ in: input }: { in: Record<string, unknown> }) => {
+    await new Promise(resolve => setTimeout(resolve, Number(input.ms)));
+    throw new Refusal('late', `no ${input.tag}`);
+  },
+  /** Sleeps unless the run's signal aborts first, and then rejects the way an aborted `fetch` does. */
+  abortable: ({ in: input, ctx }: HandlerArgs) =>
+    new Promise((resolve, reject) => {
+      const timer = setTimeout(() => resolve(input.tag), Number(input.ms));
+      ctx.signal?.addEventListener('abort', () => {
+        clearTimeout(timer);
+        reject(new Error('This operation was aborted'));
+      });
+    }),
 };

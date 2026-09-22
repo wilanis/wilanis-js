@@ -123,7 +123,8 @@ export interface Attempt {
 
 export interface Report {
   graph: string;
-  status: 'done' | 'failed' | 'blocked';
+  /** How the run ended: `cancelled` when its signal fired before anything else ended it; a cancelled run has no output. */
+  status: 'done' | 'failed' | 'blocked' | 'cancelled';
   output?: unknown;
   /** blocked: the root paths that were read but never supplied. */
   needs?: string[];

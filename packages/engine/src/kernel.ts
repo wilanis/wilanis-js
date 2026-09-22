@@ -2,7 +2,8 @@
  * The kernel. Stateless: it takes a spec, handlers and initial values, runs every node the instant its
  * sources have settled (all of them concurrently), routes, cancels, and answers a report at quiescence.
  * It never decides whether to run again -- the embedder reads the report and decides. It reads a clock only
- * to stamp what it reports (`RunOptions.clock`, `Date.now` unless given); it never waits on one.
+ * to stamp what it reports (`RunOptions.clock`, `Date.now` unless given); it never waits on one. It observes
+ * the signal it is given (`RunOptions.signal`): an abort wakes it, and the run ends `cancelled`.
  *
  * A graph whose inputs are not supplied is valid: the report says `blocked` and names what it needs.
  * Any node's value may be pre-supplied (`initial[nodeId]`): the node is `seeded`, not executed. That is replay.
@@ -32,7 +33,7 @@ export interface ReportRefusal {
 /**
  * The refusal a failed report carries: the reason and message of the node that refused on purpose. A nested
  * run's refusal reaches the node that ran it, so the top level answers for the whole run. Absent when the
- * run answered, blocked, or failed on a fault.
+ * run answered, blocked, was cancelled, or failed on a fault.
  */
 export function refusalOf(report: Report): ReportRefusal | undefined {
   const outcome = outcomeOf(report);
@@ -46,7 +47,8 @@ export type Outcome =
   | { kind: 'answered'; output: unknown }
   | { kind: 'refused'; reason: string; message: string; detail?: Record<string, unknown>; at: string }
   | { kind: 'faulted'; at: string; error: string }
-  | { kind: 'blocked'; needs: string[] };
+  | { kind: 'blocked'; needs: string[] }
+  | { kind: 'cancelled' };
 
 /** The node that ended the run: the first `failed` one a refusal was wanted from, or a fault was. */
 function endedAt(report: Report, refused: boolean): [string, NodeReport] | undefined {
@@ -70,11 +72,12 @@ function failure(report: Report): Outcome {
 /**
  * How a run ended, in one word with what that word carries: `answered` with the output, `refused` with the
  * reason the graph declared and the node that gave it, `faulted` with the node that broke and what it threw,
- * or `blocked` with the roots nothing supplied. A nested run's ending has already reached the node that ran
+ * `blocked` with the roots nothing supplied, or `cancelled` when the run's signal fired first. A nested run's ending has already reached the node that ran
  * it, so the top level answers for the whole run.
  */
 export function outcomeOf(report: Report): Outcome {
   if (report.status === 'blocked') return { kind: 'blocked', needs: report.needs ?? [] };
   if (report.status === 'failed') return failure(report);
+  if (report.status === 'cancelled') return { kind: 'cancelled' };
   return { kind: 'answered', output: report.output };
 }
