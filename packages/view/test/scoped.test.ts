@@ -23,10 +23,10 @@ const EMPLOYEES_ONLY = '@features/access/edge/employees-only.policy.json';
 describe('a scope, and the view across it', () => {
   it('a storage node over a scoped collection carries a scope badge naming the column and linking the store', () => {
     const seen = scopedView('@features/customers/data/kept-get.graph.json');
-    const asked = seen.graph?.nodes.find(node => node.id === 'asked');
+    const stored = seen.graph?.nodes.find(node => node.id === 'storedCustomer');
     // the node names the store and the collection, as before; what is new is the scope the compiler put there
-    expect(asked?.keeps).toMatchObject({ store: STORE, collection: 'customers', op: 'get' });
-    expect(asked?.keeps?.scope).toEqual({
+    expect(stored?.keeps).toMatchObject({ store: STORE, collection: 'customers', op: 'get' });
+    expect(stored?.keeps?.scope).toEqual({
       // the badge links the store page, since the store is whose word the scope is
       store: STORE,
       by: [

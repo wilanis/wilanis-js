@@ -113,7 +113,7 @@ describe('sabotage: what a view is behind', () => {
   });
   it('A008 names the node, the view, the collection it views and the policy', () => {
     expect(scopedSaying(UNGATED)).toContain(
-      "A008 reaches @features/customers/data/kept-list-every.graph.json#rows, which reads everyCustomer, a view of customers across every scope behind @access/edge/employees-only.policy.json, and attaches no such policy (profile 'local')",
+      "A008 reaches @features/customers/data/kept-list-every.graph.json#customers, which reads everyCustomer, a view of customers across every scope behind @access/edge/employees-only.policy.json, and attaches no such policy (profile 'local')",
     );
   });
   it('A008 offers the policy to attach, or the scoped collection to read instead', () => {

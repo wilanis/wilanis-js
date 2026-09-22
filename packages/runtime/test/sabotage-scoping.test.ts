@@ -216,7 +216,9 @@ describe('sabotage: how a store is scoped', () => {
     // "the agent added the filter by hand" is the one thing a scope makes unwriteable: the store says how
     // customers are scoped, the compiler carries it to every site, and a document that repeats it is refused
     const broken = { [GET]: (graph: any) => (graph.nodes[0].in.scope = { tenant: '{{in.id}}' }) };
-    expect(scopedPointing(broken)).toContain('X214 @features/customers/data/kept-get.graph.json#nodes/asked/in/scope');
+    expect(scopedPointing(broken)).toContain(
+      'X214 @features/customers/data/kept-get.graph.json#nodes/storedCustomer/in/scope',
+    );
     expect(scopedSaying(broken)).toContain(
       "X214 scope is the store's: 'customers' is scoped by tenant ← {{tenant}} of @customers/data/customers.store.json, and the compiler puts it here",
     );
@@ -244,7 +246,7 @@ describe('sabotage: how a store is scoped', () => {
     const broken = { [LIST]: (graph: any) => (graph.nodes[0].in.where = { tenant: 'acme' }) };
     expect(scopedCodes(broken)).toContain('X208');
     expect(scopedPointing(broken)).toContain(
-      'X208 @features/customers/data/kept-list.graph.json#nodes/rows/in/where/tenant',
+      'X208 @features/customers/data/kept-list.graph.json#nodes/customers/in/where/tenant',
     );
   });
   it('the scope edge follows the store and not the shape: the session attribute is the one carrier', () => {

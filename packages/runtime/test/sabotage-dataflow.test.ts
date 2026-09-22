@@ -36,8 +36,8 @@ const patch = (id: string, note: string) =>
     key: '{{in.id}}',
     changes: { name: '{{in.name}}', email: '{{in.email}}', tier: '{{in.tier}}', note },
   });
-const make = (value: string) => run('row', '@std/object.port.json#make', { value, type: CUSTOMER });
-const missing = run('missing', '@std/outcome.port.json#refuse', {
+const make = (value: string) => run('customer', '@std/object.port.json#make', { value, type: CUSTOMER });
+const missing = run('noCustomer', '@std/outcome.port.json#refuse', {
   reason: 'missing',
   message: 'no customer {{in.id}}',
   type: CUSTOMER,
@@ -47,7 +47,7 @@ const missing = run('missing', '@std/outcome.port.json#refuse', {
 const toggle = (graph: any) => {
   graph.nodes = [
     get,
-    decide('check', [{ when: 'has(record)', to: 'row' }], 'missing'),
+    decide('check', [{ when: 'has(record)', to: 'customer' }], 'noCustomer'),
     patch('pin', 'pinned'),
     patch('unpin', 'unpinned'),
     make('{{pin.record || unpin.record}}'),
@@ -61,7 +61,7 @@ const G004_OLD = (name: string, what: string) => `G004 make what '${name}' reads
 describe('sabotage: a graph written as control flow', () => {
   it('refuses the toggle at each write and at the join, and nowhere else', () => {
     expect(sabotagePointing(GRAPH, toggle)).toEqual([
-      `G004 @${GRAPH}#nodes/row/in/value`,
+      `G004 @${GRAPH}#nodes/customer/in/value`,
       `G008 @${GRAPH}#nodes/pin`,
       `G008 @${GRAPH}#nodes/unpin`,
     ]);
@@ -94,17 +94,17 @@ describe('sabotage: a graph written as control flow', () => {
     const hints = sabotageHinting(GRAPH, graph => {
       graph.nodes = [
         get,
-        decide('check', [{ when: 'has(record)', to: 'pin' }], 'missing'),
+        decide('check', [{ when: 'has(record)', to: 'pin' }], 'noCustomer'),
         patch('pin', 'pinned'),
         missing,
       ];
-      graph.out.from = ['missing'];
+      graph.out.from = ['noCustomer'];
     });
     expect(hints).toEqual([G008_OLD]);
   });
 
   it('G004 keeps its hint where one read of the wrong type feeds the input', () => {
-    // the example's own row, handed the id where it made the record
+    // the example's own customer, handed the id where it made the record
     const hints = sabotageHinting(GRAPH, graph => {
       graph.nodes[2].in.value = '{{in.id}}';
     });

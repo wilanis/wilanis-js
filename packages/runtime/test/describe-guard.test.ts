@@ -37,24 +37,26 @@ describe('describe: a graph whose made value is guarded', () => {
   });
 
   it('prints each node the compiler lowered, marked as a guard, under the id the spec gives it', () => {
-    expect(said()).toContain('        row:check  switch → row | row:violated  (guard)');
-    expect(said()).toContain('        row  answers row:made, which the rule let through  (guard)');
-    expect(said()).toContain("        row:violated  refuses 'invariant'  (guard)");
+    expect(said()).toContain('        customer:check  switch → customer | customer:violated  (guard)');
+    expect(said()).toContain('        customer  answers customer:made, which the rule let through  (guard)');
+    expect(said()).toContain("        customer:violated  refuses 'invariant'  (guard)");
   });
 
   it('prints the author s own node under the id it moved aside to, and does not call it a guard', () => {
-    // `row:made` is the node the author wrote; the mark belongs on what the compiler added, not what it renamed
-    expect(said()).toContain('    row:made  @std/object.port.json#make');
-    expect(said()).not.toContain('row:made  @std/object.port.json#make  (guard)');
+    // `customer:made` is the node the author wrote; the mark belongs on what the compiler added, not what it renamed
+    expect(said()).toContain('    customer:made  @std/object.port.json#make');
+    expect(said()).not.toContain('customer:made  @std/object.port.json#make  (guard)');
   });
 
   it('routes whatever routed the made node to where it moved, since that is where the value is made', () => {
-    expect(said()).toContain('    route  switch → row:made | missing');
-    expect(said()).not.toContain('    route  switch → row | missing');
+    expect(said()).toContain('    isKept  switch → customer:made | noCustomer');
+    expect(said()).not.toContain('    isKept  switch → customer | noCustomer');
   });
 
   it('answers with the guard s refusal too, which is how the graph refuses when its own rule fails', () => {
-    expect(said()).toContain('answers @customers/domain/Customer.shape.json  from row | row:violated | missing');
+    expect(said()).toContain(
+      'answers @customers/domain/Customer.shape.json  from customer | customer:violated | noCustomer',
+    );
   });
 });
 
@@ -63,13 +65,15 @@ describe('describe: a graph whose value is a list of the shape', () => {
     const said = describeDoc(example, KEPT_LIST);
     expect(said).toContain(`    guard for ${CALLS}, when ${RULE}:`);
     expect(said).toContain(
-      '        rows  maps rows:made through guard:@features/customers/data/kept-list.graph.json#rows, element by element  (guard)',
+      '        customers  maps customers:made through guard:@features/customers/data/kept-list.graph.json#customers, element by element  (guard)',
     );
-    expect(said).toContain('    rows:made  @storage/store.port.json#find');
+    expect(said).toContain('    customers:made  @storage/store.port.json#find');
   });
 
   it('appends no refusal to what the graph answers, since the map refuses with the element s reason', () => {
-    expect(describeDoc(example, KEPT_LIST)).toContain('answers @customers/domain/Customer.shape.json[]  from rows');
+    expect(describeDoc(example, KEPT_LIST)).toContain(
+      'answers @customers/domain/Customer.shape.json[]  from customers',
+    );
   });
 });
 
@@ -104,7 +108,7 @@ describe('describe: a graph with nothing to guard', () => {
  * one switch tests their conjunction, and where it fails routes to the refusal of the first rule that did not
  * hold, so the caller is told that rule alone (#492). The header must read correctly in that case too, or a
  * reader would go looking for a rule the guard tests and the line never named; and each refusal must say whose
- * it is, or a reader could not tell `row:violated` from `row:violated:2`.
+ * it is, or a reader could not tell `customer:violated` from `customer:violated:2`.
  */
 const SECOND = '@features/customers/domain/a-customer-has-an-id.invariant.json';
 const { load: two, dir: twoDir } = loadedWith({
@@ -130,22 +134,24 @@ describe('describe: a site two invariants are unproved at', () => {
   it('still lowers one guard, whose switch routes to one refusal per rule, the first keeping its id', () => {
     const said = describeDoc(two, KEPT_GET);
     expect(said.split('guard for')).toHaveLength(2);
-    expect(said).toContain('        row:check  switch → row | row:violated | row:violated:2  (guard)');
-    expect(said).toContain('        row  answers row:made, which the rule let through  (guard)');
+    expect(said).toContain(
+      '        customer:check  switch → customer | customer:violated | customer:violated:2  (guard)',
+    );
+    expect(said).toContain('        customer  answers customer:made, which the rule let through  (guard)');
   });
 
   it('says which invariant each refusal is for, in the order the header names them', () => {
     const said = describeDoc(two, KEPT_GET);
-    expect(said).toContain("        row:violated  refuses 'invariant' for 'A customer has an id'  (guard)");
-    expect(said).toContain("        row:violated:2  refuses 'invariant' for 'A customer is reachable'  (guard)");
+    expect(said).toContain("        customer:violated  refuses 'invariant' for 'A customer has an id'  (guard)");
+    expect(said).toContain("        customer:violated:2  refuses 'invariant' for 'A customer is reachable'  (guard)");
     // and the graph answers with either refusal, since it refuses with whichever the guard routed to
     expect(said).toContain(
-      'answers @customers/domain/Customer.shape.json  from row | row:violated | row:violated:2 | missing',
+      'answers @customers/domain/Customer.shape.json  from customer | customer:violated | customer:violated:2 | noCustomer',
     );
   });
 
   it('does not repeat the invariant on the refusal where the guard stands for one rule alone', () => {
     // the header has said it; a second spelling on the one refusal would be the same fact twice
-    expect(describeDoc(example, KEPT_GET)).toContain("        row:violated  refuses 'invariant'  (guard)");
+    expect(describeDoc(example, KEPT_GET)).toContain("        customer:violated  refuses 'invariant'  (guard)");
   });
 });

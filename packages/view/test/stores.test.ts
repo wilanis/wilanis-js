@@ -41,13 +41,13 @@ describe('the view of a store', () => {
   it('lists every call run against it: the document, the node, the operation and the collection', async () => {
     const calls = (await view(STORE)).store?.calls ?? [];
     expect(calls.map(call => `${call.file}#${call.where} ${call.op} ${call.collection}`)).toEqual([
-      '@features/customers/data/kept-get.graph.json#asked get customers',
-      '@features/customers/data/kept-list-by-tier.graph.json#rows find customers',
+      '@features/customers/data/kept-get.graph.json#storedCustomer get customers',
+      '@features/customers/data/kept-list-by-tier.graph.json#customers find customers',
       // the digest reads every tenant's customers through the view, and the call is listed under the view's name
-      '@features/customers/data/kept-list-every.graph.json#rows find everyCustomer',
-      '@features/customers/data/kept-list.graph.json#rows find customers',
-      '@features/customers/data/kept-remove.graph.json#asked remove customers',
-      '@features/customers/data/kept-update.graph.json#asked patch customers',
+      '@features/customers/data/kept-list-every.graph.json#customers find everyCustomer',
+      '@features/customers/data/kept-list.graph.json#customers find customers',
+      '@features/customers/data/kept-remove.graph.json#gone remove customers',
+      '@features/customers/data/kept-update.graph.json#patched patch customers',
       // the atomic graph writes twice, to two collections, and both writes are listed against the store
       '@features/customers/data/store-and-latest.graph.json#key newKey customers',
       '@features/customers/data/store-and-latest.graph.json#stored put customers',
@@ -64,7 +64,7 @@ describe('the view of a store', () => {
 describe('the view of a node that reaches a store', () => {
   it('links the store and names the collection, the operation and the shape the records are of', async () => {
     const graph = await view('@features/customers/data/kept-get.graph.json');
-    const node = graph.graph?.nodes.find(one => one.id === 'asked');
+    const node = graph.graph?.nodes.find(one => one.id === 'storedCustomer');
     expect(node?.keeps).toEqual({
       store: STORE,
       label: 'Customers',
@@ -94,6 +94,6 @@ describe('the view of a node that reaches a store', () => {
 
   it('leaves a node that reaches no store without one', async () => {
     const graph = await view('@features/customers/data/kept-get.graph.json');
-    expect(graph.graph?.nodes.find(one => one.id === 'row')?.keeps).toBeUndefined();
+    expect(graph.graph?.nodes.find(one => one.id === 'customer')?.keeps).toBeUndefined();
   });
 });

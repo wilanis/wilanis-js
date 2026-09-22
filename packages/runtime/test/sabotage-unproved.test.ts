@@ -150,7 +150,7 @@ describe('sabotage: graphs', () => {
     // G004 and G010 follow: the node the rule left unreached is the one the answer read
     expect(
       sabotage('features/customers/data/list-rows.graph.json', graph => {
-        graph.nodes.find((node: any) => node.id === 'route').rules[0].to = 'nowhere';
+        graph.nodes.find((node: any) => node.id === 'outcome').rules[0].to = 'nowhere';
       }),
     ).toEqual(['G009', 'G004', 'G010']);
   });
@@ -158,14 +158,14 @@ describe('sabotage: graphs', () => {
     // G004: the branch that no longer decides feeds an input that needed it
     expect(
       sabotage('features/customers/data/list-rows.graph.json', graph => {
-        graph.nodes.find((node: any) => node.id === 'route').rules[0].when = 'status';
+        graph.nodes.find((node: any) => node.id === 'outcome').rules[0].when = 'status';
       }),
     ).toEqual(['G011', 'G004']);
   });
   it('G011 a rule whose when does not parse', () => {
     expect(
       sabotage('features/customers/data/list-rows.graph.json', graph => {
-        graph.nodes.find((node: any) => node.id === 'route').rules[0].when = 'status >=';
+        graph.nodes.find((node: any) => node.id === 'outcome').rules[0].when = 'status >=';
       }),
     ).toEqual(['G011', 'G004']);
   });

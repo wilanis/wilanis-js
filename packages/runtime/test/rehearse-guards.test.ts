@@ -52,16 +52,16 @@ describe('the rehearsal reports a guard', () => {
     expect(run.ok).toBe(true);
     // the compiler's own node, named by the rule it tests rather than by an id nobody wrote
     expect(run.lines).toContain(
-      "features/customers/data/kept-get  guard 'row:check' A customer is reachable  2/2 branches",
+      "features/customers/data/kept-get  guard 'customer:check' A customer is reachable  2/2 branches",
     );
     // and the switch the author did write is untouched, still headed as a switch
-    expect(run.lines).toContain("features/customers/data/kept-get  switch 'route'  2/2 branches");
+    expect(run.lines).toContain("features/customers/data/kept-get  switch 'isKept'  2/2 branches");
   });
 
   it("labels a guard's branches holds and violated, and refuses the violated one on purpose", async () => {
-    const said = decision((await localRun()).lines, "kept-get  guard 'row:check'");
-    expect(said[1]).toBe("  ok  holds     answered from 'row'");
-    expect(said[2]).toMatch(/^ {2}ok {2}violated {2}refused on purpose at 'row:violated' as invariant: /);
+    const said = decision((await localRun()).lines, "kept-get  guard 'customer:check'");
+    expect(said[1]).toBe("  ok  holds     answered from 'customer'");
+    expect(said[2]).toMatch(/^ {2}ok {2}violated {2}refused on purpose at 'customer:violated' as invariant: /);
     // the message is the invariant's own, so a reader sees which rule the value did not satisfy
     expect(said[2]).toContain(
       "'A customer is reachable' does not hold: len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))",
@@ -97,7 +97,7 @@ describe('the rehearsal reports a guard', () => {
     const guards = run.lines.filter(line => line.includes(" guard '"));
     expect(guards).toHaveLength(8);
     // the four made sites of a single value, at the `<id>:check` the RFC names
-    expect(guards.filter(line => line.includes("guard 'row:check'"))).toHaveLength(4);
+    expect(guards.filter(line => line.includes("guard 'customer:check'"))).toHaveLength(4);
     // and the four lists, each judged element by element inside a nested spec whose ids are the fixed `in:*`
     expect(guards.filter(line => line.includes("guard 'in:check'"))).toHaveLength(4);
     // every one of them walks both branches, a list's exactly as a single value's
@@ -157,16 +157,16 @@ describe('the rehearsal reports a guard', () => {
     try {
       const run = await rehearse(load, { seed: 1, profile: 'local' });
       expect(run.ok).toBe(true);
-      const said = decision(run.lines, "kept-get  guard 'row:check'");
+      const said = decision(run.lines, "kept-get  guard 'customer:check'");
       expect(said[0]).toBe(
-        "features/customers/data/kept-get  guard 'row:check' A customer has an id; A customer is reachable  3/3 branches",
+        "features/customers/data/kept-get  guard 'customer:check' A customer has an id; A customer is reachable  3/3 branches",
       );
-      expect(said[1]).toBe("  ok  holds     answered from 'row'");
+      expect(said[1]).toBe("  ok  holds     answered from 'customer'");
       expect(said[2]).toBe(
-        `  ok  violated  refused on purpose at 'row:violated' as invariant: "'A customer has an id' does not hold: len(id) > 0"`,
+        `  ok  violated  refused on purpose at 'customer:violated' as invariant: "'A customer has an id' does not hold: len(id) > 0"`,
       );
       expect(said[3]).toBe(
-        `  ok  violated  refused on purpose at 'row:violated:2' as invariant: "'A customer is reachable' does not hold: len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))"`,
+        `  ok  violated  refused on purpose at 'customer:violated:2' as invariant: "'A customer is reachable' does not hold: len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))"`,
       );
       expect(said).toHaveLength(4);
       // a list site's nested spec is the same three ways round, at the fixed `in:*`
@@ -186,12 +186,12 @@ describe('the rehearsal reports a guard', () => {
         $schema: 'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json',
         label: 'Proving',
         description: 'A graph planted so that one site of Customer is proved and the count is not all guarded.',
-        out: { type: CUSTOMER, from: 'row' },
+        out: { type: CUSTOMER, from: 'customer' },
         nodes: [
           {
             type: '@wilanis/node/run.schema.json',
-            id: 'row',
-            label: 'row',
+            id: 'customer',
+            label: 'The customer',
             run: '@std/object.port.json#make',
             in: { value: { id: 'a', name: 'Ada', email: 'ada@example.com', tier: 'bronze' }, type: CUSTOMER },
           },

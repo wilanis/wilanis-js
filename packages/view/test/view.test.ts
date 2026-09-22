@@ -174,7 +174,7 @@ describe('the view model of the example', () => {
       type: 'blob',
       outputs: [{ name: '', type: 'blob' }],
     });
-    expect(edge(seen, { from: 'in', fromPort: '', to: 'rows', toPort: 'file' })).toMatchObject({ kind: 'data' });
+    expect(edge(seen, { from: 'in', fromPort: '', to: 'drafts', toPort: 'file' })).toMatchObject({ kind: 'data' });
     const wrote = await view('@features/customers/data/write-csv.graph.json');
     expect(wrote.graph!.nodes.find(node => node.id === 'out')).toMatchObject({ type: 'blob' });
     expect((await view('@features/customers/edge/export-customers.trigger.json')).fires).toMatchObject({

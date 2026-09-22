@@ -30,17 +30,17 @@ describe('how the viewer says a refusal is answered', () => {
         reason: 'missing',
         answer: 404,
         from: [
-          { graph: GET_ROW, graphLabel: 'Get a row', node: 'missing', nodeLabel: 'No such customer' },
+          { graph: GET_ROW, graphLabel: 'Get a row', node: 'noCustomer', nodeLabel: 'No such customer' },
           {
             graph: '@features/customers/data/kept-get.graph.json',
             graphLabel: 'Get what is kept',
-            node: 'missing',
+            node: 'noCustomer',
             nodeLabel: 'No such customer',
           },
           {
             graph: '@features/customers/data/kept-get-postgres.graph.json',
             graphLabel: 'Get what is kept',
-            node: 'missing',
+            node: 'noCustomer',
             nodeLabel: 'No such customer',
           },
         ],
@@ -48,7 +48,7 @@ describe('how the viewer says a refusal is answered', () => {
       {
         reason: 'upstream',
         answer: 502,
-        from: [{ graph: GET_ROW, graphLabel: 'Get a row', node: 'failed', nodeLabel: 'Unexpected answer' }],
+        from: [{ graph: GET_ROW, graphLabel: 'Get a row', node: 'upstreamFailed', nodeLabel: 'Unexpected answer' }],
       },
       // the route is for a signed-in caller: the policy's graph refuses a caller who sent no credential, and the
       // guard itself one whose credential it could not verify, which the viewer names by the plugin that refuses
@@ -70,7 +70,7 @@ describe('how the viewer says a refusal is answered', () => {
         from: [{ graph: '@auth/plugin.json', graphLabel: 'Auth', node: 'identify', nodeLabel: 'Identify' }],
       },
       // no node writes this one down: it is the guard the compiler lowers where the field invariant could not
-      // be proved of the customer `row` makes, and the viewer names the site it stands at like any other refusal
+      // be proved of the customer `customer` makes, and the viewer names the site it stands at like any other refusal
       {
         reason: 'invariant',
         answer: 500,
@@ -78,13 +78,13 @@ describe('how the viewer says a refusal is answered', () => {
           {
             graph: '@features/customers/data/kept-get.graph.json',
             graphLabel: 'Get what is kept',
-            node: 'row',
+            node: 'customer',
             nodeLabel: 'The record',
           },
           {
             graph: '@features/customers/data/kept-get-postgres.graph.json',
             graphLabel: 'Get what is kept',
-            node: 'row',
+            node: 'customer',
             nodeLabel: 'The record',
           },
         ],
@@ -95,16 +95,16 @@ describe('how the viewer says a refusal is answered', () => {
     expect(batch.answers!.find(answer => answer.reason === 'missing')).toMatchObject({
       answer: 404,
       from: [
-        { graph: '@features/customers/data/delete-row.graph.json', node: 'missing' },
-        { graph: '@features/customers/data/kept-remove.graph.json', node: 'missing' },
-        { graph: '@features/customers/data/kept-remove-postgres.graph.json', node: 'missing' },
+        { graph: '@features/customers/data/delete-row.graph.json', node: 'noCustomer' },
+        { graph: '@features/customers/data/kept-remove.graph.json', node: 'noCustomer' },
+        { graph: '@features/customers/data/kept-remove-postgres.graph.json', node: 'noCustomer' },
       ],
     });
     // a kind that maps no refusals has nothing to say here
     expect((await view('@features/customers/edge/digest.trigger.json')).answers).toBeUndefined();
   });
   it('tells a refusing node which triggers reach it and how each answers its reason', async () => {
-    const missing = (await view(GET_ROW)).graph!.nodes.find(node => node.id === 'missing')!;
+    const missing = (await view(GET_ROW)).graph!.nodes.find(node => node.id === 'noCustomer')!;
     expect(missing.target?.refuses).toBe(true);
     expect(missing.answeredBy).toEqual([
       {
@@ -116,7 +116,7 @@ describe('how the viewer says a refusal is answered', () => {
     ]);
     // list-rows is reached by the http listing, which maps the reason, and by the cli digest, whose kind answers every refusal alike
     const failed = (await view('@features/customers/data/list-rows.graph.json')).graph!.nodes.find(
-      node => node.id === 'failed',
+      node => node.id === 'upstreamFailed',
     )!;
     expect(failed.answeredBy).toEqual(
       expect.arrayContaining([
@@ -130,6 +130,6 @@ describe('how the viewer says a refusal is answered', () => {
       ]),
     );
     // a node that answers has no such list
-    expect((await view(GET_ROW)).graph!.nodes.find(node => node.id === 'row')?.answeredBy).toBeUndefined();
+    expect((await view(GET_ROW)).graph!.nodes.find(node => node.id === 'customer')?.answeredBy).toBeUndefined();
   });
 });

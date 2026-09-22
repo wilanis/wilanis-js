@@ -13,7 +13,7 @@
   "nodes": [
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "route",
+      "id": "tierGiven",
       "label": "Is a tier given?",
       "in": {
         "tier": "{{in.tier}}"

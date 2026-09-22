@@ -13,7 +13,7 @@
   "nodes": [
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "decide",
+      "id": "anyoneThere",
       "label": "Is anyone there?",
       "in": {
         "principal": "{{in.principal}}"

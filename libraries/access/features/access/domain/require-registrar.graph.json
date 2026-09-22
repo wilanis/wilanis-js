@@ -14,7 +14,7 @@
   "nodes": [
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "decide",
+      "id": "isRegistrar",
       "label": "What may they do?",
       "in": {
         "principal": "{{in.principal}}"

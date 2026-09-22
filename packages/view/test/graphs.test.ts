@@ -21,31 +21,31 @@ describe('the view model of a graph', () => {
   it('draws a data graph: in, every node, out, with typed ports', async () => {
     const seen = await view(GET_ROW);
     const ids = seen.graph!.nodes.map(node => node.id);
-    expect(ids).toEqual(['in', 'asked', 'route/1', 'route/2', 'row', 'missing', 'failed', 'out']);
-    const asked = seen.graph!.nodes.find(node => node.id === 'asked')!;
-    expect(asked.kind).toBe('run');
-    expect(asked.label).toBe('GET the row');
-    expect(asked.op).toBe('@http/http.port.json#request');
-    expect(asked.target).toMatchObject({ op: '@http/http.port.json#request', native: true, effect: true });
+    expect(ids).toEqual(['in', 'fetched', 'outcome/1', 'outcome/2', 'customer', 'noCustomer', 'upstreamFailed', 'out']);
+    const fetched = seen.graph!.nodes.find(node => node.id === 'fetched')!;
+    expect(fetched.kind).toBe('run');
+    expect(fetched.label).toBe('GET the row');
+    expect(fetched.op).toBe('@http/http.port.json#request');
+    expect(fetched.target).toMatchObject({ op: '@http/http.port.json#request', native: true, effect: true });
     // every declared input is a port: given literals carry their value, reads carry nothing, absent optionals are marked
-    expect(asked.inputs.find(port => port.name === 'method')).toMatchObject({
+    expect(fetched.inputs.find(port => port.name === 'method')).toMatchObject({
       type: expect.stringContaining('"GET"'),
       literal: '"GET"',
       static: true,
     });
-    expect(asked.inputs.find(port => port.name === 'path')).toMatchObject({ text: '/customer/{{in.id}}' });
-    expect(asked.inputs.find(port => port.name === 'body')).toMatchObject({ missing: true, required: false });
+    expect(fetched.inputs.find(port => port.name === 'path')).toMatchObject({ text: '/customer/{{in.id}}' });
+    expect(fetched.inputs.find(port => port.name === 'body')).toMatchObject({ missing: true, required: false });
     // a literal that names a document carries the canonical path, so the page can label and link it
-    expect(asked.inputs.find(port => port.name === 'returns')).toMatchObject({
+    expect(fetched.inputs.find(port => port.name === 'returns')).toMatchObject({
       literal: '"@customers/edge/CustomerRow.shape.json"',
       ref: '@features/customers/edge/CustomerRow.shape.json',
     });
-    expect(asked.inputs.find(port => port.name === 'connection')?.ref).toBe(
+    expect(fetched.inputs.find(port => port.name === 'connection')?.ref).toBe(
       '@connections/customers-api.connection.json',
     );
     // the result's fields are output ports, with the type variable bound from `returns`
-    expect(asked.outputs.map(port => port.name)).toEqual(['', 'status', 'headers', 'body']);
-    expect(asked.outputs.find(port => port.name === 'body')?.type).toBe(
+    expect(fetched.outputs.map(port => port.name)).toEqual(['', 'status', 'headers', 'body']);
+    expect(fetched.outputs.find(port => port.name === 'body')?.type).toBe(
       '@features/customers/edge/CustomerRow.shape.json',
     );
     const input = seen.graph!.nodes.find(node => node.id === 'in')!;
@@ -56,35 +56,37 @@ describe('the view model of a graph', () => {
 
   it('wires a data edge per read, from the field read to the input that reads it', async () => {
     const seen = await view(GET_ROW);
-    expect(edge(seen, { from: 'in', fromPort: 'id', to: 'asked', toPort: 'path' })).toMatchObject({ kind: 'data' });
-    expect(edge(seen, { from: 'asked', fromPort: 'status', to: 'route/1', toPort: 'status' })).toMatchObject({
+    expect(edge(seen, { from: 'in', fromPort: 'id', to: 'fetched', toPort: 'path' })).toMatchObject({ kind: 'data' });
+    expect(edge(seen, { from: 'fetched', fromPort: 'status', to: 'outcome/1', toPort: 'status' })).toMatchObject({
       kind: 'data',
     });
-    expect(edge(seen, { from: 'asked', fromPort: 'body', to: 'row', toPort: 'value' })).toMatchObject({ kind: 'data' });
-    expect(edge(seen, { from: 'asked', fromPort: 'status', to: 'failed', toPort: 'message' })).toMatchObject({
+    expect(edge(seen, { from: 'fetched', fromPort: 'body', to: 'customer', toPort: 'value' })).toMatchObject({
+      kind: 'data',
+    });
+    expect(edge(seen, { from: 'fetched', fromPort: 'status', to: 'upstreamFailed', toPort: 'message' })).toMatchObject({
       kind: 'data',
     });
   });
 
   it('draws a switch as a ladder: one rule node per rule, reading only what its condition names, then to its target, otherwise down or out', async () => {
     const seen = await view(GET_ROW);
-    const first = seen.graph!.nodes.find(node => node.id === 'route/1')!,
-      second = seen.graph!.nodes.find(node => node.id === 'route/2')!;
+    const first = seen.graph!.nodes.find(node => node.id === 'outcome/1')!,
+      second = seen.graph!.nodes.find(node => node.id === 'outcome/2')!;
     expect(first).toMatchObject({
       kind: 'rule',
       label: 'if status is 404',
       inputs: [{ name: 'status' }],
-      outputs: [{ name: 'then', description: 'missing' }],
+      outputs: [{ name: 'then', description: 'noCustomer' }],
     });
     expect(first.decision).toEqual({
-      id: 'route',
+      id: 'outcome',
       label: 'What did the API say?',
       description: undefined,
       when: 'status == 404',
       rule: 1,
       of: 2,
-      then: 'missing',
-      otherwise: 'route/2',
+      then: 'noCustomer',
+      otherwise: 'outcome/2',
       last: false,
     });
     // a condition is said in words, one clause per line, each input named so the page can point at its port
@@ -95,22 +97,24 @@ describe('the view model of a graph', () => {
     ]);
     expect(second.inputs.map(port => port.name)).toEqual(['status', 'body']);
     expect(second.outputs.map(port => port.name)).toEqual(['then', 'otherwise']);
-    expect(second.decision).toMatchObject({ rule: 2, then: 'row', otherwise: 'failed', last: true });
-    expect(edge(seen, { from: 'route/1', fromPort: 'then', to: 'missing', toPort: '' })).toMatchObject({
+    expect(second.decision).toMatchObject({ rule: 2, then: 'customer', otherwise: 'upstreamFailed', last: true });
+    expect(edge(seen, { from: 'outcome/1', fromPort: 'then', to: 'noCustomer', toPort: '' })).toMatchObject({
       kind: 'route',
     });
-    expect(edge(seen, { from: 'route/1', fromPort: 'otherwise', to: 'route/2', toPort: '' })).toMatchObject({
+    expect(edge(seen, { from: 'outcome/1', fromPort: 'otherwise', to: 'outcome/2', toPort: '' })).toMatchObject({
       kind: 'route',
     });
-    expect(edge(seen, { from: 'route/2', fromPort: 'then', to: 'row', toPort: '' })).toMatchObject({ kind: 'route' });
-    expect(edge(seen, { from: 'route/2', fromPort: 'otherwise', to: 'failed', toPort: '' })).toMatchObject({
+    expect(edge(seen, { from: 'outcome/2', fromPort: 'then', to: 'customer', toPort: '' })).toMatchObject({
+      kind: 'route',
+    });
+    expect(edge(seen, { from: 'outcome/2', fromPort: 'otherwise', to: 'upstreamFailed', toPort: '' })).toMatchObject({
       kind: 'route',
     });
     // the body is read by the second rule only: the first never looks at it
-    expect(edge(seen, { from: 'asked', fromPort: 'body', to: 'route/2', toPort: 'body' })).toMatchObject({
+    expect(edge(seen, { from: 'fetched', fromPort: 'body', to: 'outcome/2', toPort: 'body' })).toMatchObject({
       kind: 'data',
     });
-    expect(edge(seen, { from: 'asked', fromPort: 'body', to: 'route/1', toPort: 'body' })).toBeUndefined();
+    expect(edge(seen, { from: 'fetched', fromPort: 'body', to: 'outcome/1', toPort: 'body' })).toBeUndefined();
   });
 
   it('says a membership rule in words, so every operator of the grammar draws', async () => {
@@ -136,11 +140,11 @@ describe('the view model of a graph', () => {
       ['active', 'boolean', false],
       ['note', 'string', false],
     ]);
-    expect(edge(seen, { from: 'row', fromPort: '', to: 'out', toPort: '' })).toMatchObject({
+    expect(edge(seen, { from: 'customer', fromPort: '', to: 'out', toPort: '' })).toMatchObject({
       kind: 'out',
       label: '1st candidate',
     });
-    expect(edge(seen, { from: 'failed', fromPort: '', to: 'out', toPort: '' })).toMatchObject({
+    expect(edge(seen, { from: 'upstreamFailed', fromPort: '', to: 'out', toPort: '' })).toMatchObject({
       kind: 'out',
       label: '3rd candidate',
     });
@@ -201,8 +205,8 @@ describe('the view model of a graph', () => {
       // the first binding by path, which is what the page offers before a reader picks a profile
       implementation: '@features/customers/data/kept-list-by-tier-postgres.graph.json',
     });
-    const asked = (await view(GET_ROW)).graph!.nodes.find(node => node.id === 'asked')!;
-    expect(asked.target).toMatchObject({
+    const fetched = (await view(GET_ROW)).graph!.nodes.find(node => node.id === 'fetched')!;
+    expect(fetched.target).toMatchObject({
       portLabel: 'HTTP',
       opName: 'request',
       implementation: '@http/http.port.json',
@@ -218,7 +222,7 @@ describe('the view model of a graph', () => {
     const request = seen.graph!.nodes.find(node => node.id === 'request')!;
     expect(request.outputs.map(port => port.name)).toEqual(['headers', 'headers.user-agent']);
     expect(
-      edge(seen, { from: 'request', fromPort: 'headers.user-agent', to: 'asked', toPort: 'headers' }),
+      edge(seen, { from: 'request', fromPort: 'headers.user-agent', to: 'posted', toPort: 'headers' }),
     ).toMatchObject({
       kind: 'data',
     });
@@ -228,9 +232,9 @@ describe('the view model of a graph', () => {
 
   it('opens a deep read as an attribute port under its parent', async () => {
     const seen = await view('@features/customers/data/get-row.graph.json');
-    const asked = seen.graph!.nodes.find(node => node.id === 'asked')!;
-    // {{asked.status}} and {{asked.body}} read top-level fields, which are ports already: nothing is added
-    expect(asked.outputs.map(port => port.name)).toEqual(['', 'status', 'headers', 'body']);
+    const fetched = seen.graph!.nodes.find(node => node.id === 'fetched')!;
+    // {{fetched.status}} and {{fetched.body}} read top-level fields, which are ports already: nothing is added
+    expect(fetched.outputs.map(port => port.name)).toEqual(['', 'status', 'headers', 'body']);
     const other = await view('@features/customers/domain/register-customer.graph.json');
     const input = other.graph!.nodes.find(node => node.id === 'in')!;
     expect(input.outputs.map(port => port.name)).toEqual(['', 'name', 'email', 'tier']);

@@ -194,9 +194,9 @@ describe('wilanis fuzz and regress', () => {
     // a graph that changes is caught: the answering node under a new name is a node the scenario never saw
     const file = join(dir, 'features/customers/data/get-row.graph.json');
     const doc = read(file);
-    doc.nodes.find((node: any) => node.id === 'row').id = 'customer';
-    doc.nodes.find((node: any) => node.id === 'route').rules[1].to = 'customer';
-    doc.out.from = ['customer', 'missing', 'failed'];
+    doc.nodes.find((node: any) => node.id === 'customer').id = 'renamed';
+    doc.nodes.find((node: any) => node.id === 'outcome').rules[1].to = 'renamed';
+    doc.out.from = ['renamed', 'noCustomer', 'upstreamFailed'];
     writeFileSync(file, JSON.stringify(doc));
     const changed = await regress(loadTree(dir, PLUGINS, INCLUDES), { profile: 'live' });
     expect(changed.ok).toBe(false);
@@ -213,11 +213,11 @@ describe('wilanis fuzz and regress', () => {
     // the fire runs whatever the profile's binding met the port with -- the graph is the thing a rebind changes
     expect(sc.expect.nodes.op.handler).toBe('graph:@features/customers/data/get-row.graph.json');
     // and under it, the operation each node ran, native or declared
-    expect(sc.expect.nodes['op.asked'].handler).toBe('@http/http.port.json#request');
-    expect(sc.expect.nodes['op.failed'].handler).toBe('@std/outcome.port.json#refuse');
+    expect(sc.expect.nodes['op.fetched'].handler).toBe('@http/http.port.json#request');
+    expect(sc.expect.nodes['op.upstreamFailed'].handler).toBe('@std/outcome.port.json#refuse');
     // a switch has no handler to record, and nothing invented one
-    expect(sc.expect.nodes['op.route'].selected).toBe('failed');
-    expect(sc.expect.nodes['op.route'].handler).toBeUndefined();
+    expect(sc.expect.nodes['op.outcome'].selected).toBe('upstreamFailed');
+    expect(sc.expect.nodes['op.outcome'].handler).toBeUndefined();
 
     // the scenarios still load and pass check with the field on them
     const again = loadTree(dir, PLUGINS, INCLUDES);

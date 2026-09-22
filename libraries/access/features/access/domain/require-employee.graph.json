@@ -14,7 +14,7 @@
   "nodes": [
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "decide",
+      "id": "isEmployee",
       "label": "Who is it?",
       "in": {
         "principal": "{{in.principal}}"

@@ -6,15 +6,15 @@
   "out": {
     "type": "@customers/domain/Customer.shape.json[]",
     "from": [
-      "rows",
+      "customers",
       "none",
-      "failed"
+      "upstreamFailed"
     ]
   },
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "asked",
+      "id": "requested",
       "label": "GET the rows of one method",
       "run": "@http/http.port.json#request",
       "in": {
@@ -27,31 +27,31 @@
     },
     {
       "type": "@wilanis/node/switch.schema.json",
-      "id": "route",
+      "id": "outcome",
       "label": "What did the API say?",
       "in": {
-        "status": "{{asked.status}}",
-        "body": "{{asked.body}}"
+        "status": "{{requested.status}}",
+        "body": "{{requested.body}}"
       },
       "rules": [
         {
           "when": "status == 200 && has(body)",
-          "to": "rows"
+          "to": "customers"
         },
         {
           "when": "status == 404",
           "to": "none"
         }
       ],
-      "else": "failed"
+      "else": "upstreamFailed"
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "rows",
+      "id": "customers",
       "label": "The rows",
       "run": "@std/object.port.json#make",
       "in": {
-        "value": "{{asked.body}}",
+        "value": "{{requested.body}}",
         "type": "@customers/edge/CustomerRow.shape.json[]"
       }
     },
@@ -70,12 +70,12 @@
     },
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "failed",
+      "id": "upstreamFailed",
       "label": "Unexpected answer",
       "run": "@std/outcome.port.json#refuse",
       "in": {
         "reason": "upstream",
-        "message": "the customer API answered {{asked.status}}",
+        "message": "the customer API answered {{requested.status}}",
         "type": "@customers/domain/Customer.shape.json[]"
       }
     }

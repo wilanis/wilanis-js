@@ -43,8 +43,8 @@ describe('the view model of an atomic data graph', () => {
   it('marks the nodes that take part, and only those', () => {
     const nodes = view(LATEST).graph!.nodes;
     expect(nodes.filter(node => node.participates).map(node => node.id)).toEqual(['key', 'stored', 'latest']);
-    // route is a switch, row makes an object, failed refuses: none of them reaches the store
-    for (const id of ['in', 'route/1', 'row', 'failed', 'out']) {
+    // bothWritten is a switch, customer makes an object, nothingWritten refuses: none of them reaches the store
+    for (const id of ['in', 'bothWritten/1', 'customer', 'nothingWritten', 'out']) {
       expect(nodes.find(node => node.id === id)?.participates).toBeUndefined();
     }
   });

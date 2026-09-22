@@ -43,48 +43,51 @@ describe('lowering a guard', () => {
     // the greeting names no shape an invariant holds over, so nothing of it is guarded
     expect(hasGuard(scope, graphOf(GREET))).toBe(false);
     const guards = guardsOf(scope, graphOf(KEPT_GET));
-    expect(guards.map(one => [one.id, one.arity, one.site.kind])).toEqual([['row', 'one', 'made']]);
+    expect(guards.map(one => [one.id, one.arity, one.site.kind])).toEqual([['customer', 'one', 'made']]);
     expect(guards[0].unproved.map(one => one.invariant.doc.label)).toEqual(['A customer is reachable']);
   });
 
   it('puts the original node aside and the guard in its place, under the four ids the RFC names', () => {
     const spec = specOf(KEPT_GET);
     expect(Object.keys(spec.nodes).sort()).toEqual([
-      'asked',
-      'missing',
-      'route',
-      'row',
-      'row:check',
-      'row:made',
-      'row:violated',
+      'customer',
+      'customer:check',
+      'customer:made',
+      'customer:violated',
+      'isKept',
+      'noCustomer',
+      'storedCustomer',
     ]);
     // the node that made the entry is the one the author wrote, moved aside and otherwise untouched
-    expect((spec.nodes['row:made'] as KCall).handler).toBe('@std/object.port.json#make');
-    expect((spec.nodes['row:made'] as KCall).in.value).toEqual({ ref: 'asked', path: ['record'] });
+    expect((spec.nodes['customer:made'] as KCall).handler).toBe('@std/object.port.json#make');
+    expect((spec.nodes['customer:made'] as KCall).in.value).toEqual({ ref: 'storedCustomer', path: ['record'] });
   });
 
   it('routes the rule to the value and the refusal, reading one input per root it names', () => {
-    const check = specOf(KEPT_GET).nodes['row:check'] as KSwitch;
+    const check = specOf(KEPT_GET).nodes['customer:check'] as KSwitch;
     expect(check.kind).toBe('switch');
     expect(check.in).toEqual({
-      name: { ref: 'row:made', path: ['name'] },
-      email: { ref: 'row:made', path: ['email'] },
-      tier: { ref: 'row:made', path: ['tier'] },
-      note: { ref: 'row:made', path: ['note'] },
+      name: { ref: 'customer:made', path: ['name'] },
+      email: { ref: 'customer:made', path: ['email'] },
+      tier: { ref: 'customer:made', path: ['tier'] },
+      note: { ref: 'customer:made', path: ['note'] },
     });
     expect(check.rules.map(rule => [rule.label, rule.to])).toEqual([
-      ["(len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note)))", 'row'],
+      ["(len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note)))", 'customer'],
     ]);
-    expect(check.else).toBe('row:violated');
+    expect(check.else).toBe('customer:violated');
   });
 
   it('answers the value the rule let through, and refuses the other branch as invariant', () => {
     const spec = specOf(KEPT_GET);
-    const ok = spec.nodes.row as KCall;
+    const ok = spec.nodes.customer as KCall;
     // it declares no type: the node it reads already made a value of the shape and was judged against it
-    expect(ok).toMatchObject({ handler: '@std/object.port.json#make', in: { value: { ref: 'row:made', path: [] } } });
+    expect(ok).toMatchObject({
+      handler: '@std/object.port.json#make',
+      in: { value: { ref: 'customer:made', path: [] } },
+    });
     expect(ok.in.type).toBeUndefined();
-    const violated = spec.nodes['row:violated'] as KCall;
+    const violated = spec.nodes['customer:violated'] as KCall;
     expect(violated.handler).toBe('@std/outcome.port.json#refuse');
     expect(violated.in.reason).toEqual({ value: 'invariant' });
     expect(violated.in.message).toEqual({
@@ -94,28 +97,28 @@ describe('lowering a guard', () => {
   });
 
   it('routes whatever routed the node to the node that moved aside, so it is made where it was made', () => {
-    const route = specOf(KEPT_GET).nodes.route as KSwitch;
-    expect(route.rules.map(rule => rule.to)).toEqual(['row:made']);
-    expect(route.else).toBe('missing');
+    const route = specOf(KEPT_GET).nodes.isKept as KSwitch;
+    expect(route.rules.map(rule => rule.to)).toEqual(['customer:made']);
+    expect(route.else).toBe('noCustomer');
   });
 
   it('appends the refusal after the value wherever the graph answered with it', () => {
-    // out.from was ["row", "missing"]; the graph refuses where its guard does, so row:violated follows row
-    expect(specOf(KEPT_GET).output).toEqual(['row', 'row:violated', 'missing']);
+    // out.from was ["customer", "noCustomer"]; the graph refuses where its guard does, so customer:violated follows customer
+    expect(specOf(KEPT_GET).output).toEqual(['customer', 'customer:violated', 'noCustomer']);
   });
 
   it('guards a list element by element, through a map over a nested spec', () => {
     const spec = specOf(KEPT_LIST);
-    expect(Object.keys(spec.nodes).sort()).toEqual(['rows', 'rows:made']);
-    expect(spec.nodes.rows).toMatchObject({
+    expect(Object.keys(spec.nodes).sort()).toEqual(['customers', 'customers:made']);
+    expect(spec.nodes.customers).toMatchObject({
       kind: 'map',
-      over: { ref: 'rows:made', path: [] },
+      over: { ref: 'customers:made', path: [] },
       bind: { in: [] },
       onItemFailure: 'fail',
     });
     // the element's own three nodes, read off the `in` the map hands it whole
     const nested = compiler.graph(KEPT_LIST).handlers;
-    expect(Object.keys(nested)).toContain(`guard:${KEPT_LIST}#rows`);
+    expect(Object.keys(nested)).toContain(`guard:${KEPT_LIST}#customers`);
   });
 
   it('guards a taken value at in:ok, leaving the caller the graph was handed at in', () => {
@@ -163,31 +166,31 @@ describe('lowering a guard two invariants are unproved at', () => {
 
   it('keeps the four ids of the frame and adds one refusal for the second rule', () => {
     expect(Object.keys(spec().nodes).sort()).toEqual([
-      'asked',
-      'missing',
-      'route',
-      'row',
-      'row:check',
-      'row:made',
-      'row:violated',
-      'row:violated:2',
+      'customer',
+      'customer:check',
+      'customer:made',
+      'customer:violated',
+      'customer:violated:2',
+      'isKept',
+      'noCustomer',
+      'storedCustomer',
     ]);
   });
 
   it('tests the conjunction first, then asks which rule failed, the last being what remains', () => {
-    const check = spec().nodes['row:check'] as KSwitch;
+    const check = spec().nodes['customer:check'] as KSwitch;
     expect(check.rules.map(rule => [rule.label, rule.to])).toEqual([
-      [`(${ID_RULE}) && (${REACH_RULE})`, 'row'],
-      [`!(${ID_RULE})`, 'row:violated'],
+      [`(${ID_RULE}) && (${REACH_RULE})`, 'customer'],
+      [`!(${ID_RULE})`, 'customer:violated'],
     ]);
-    expect(check.else).toBe('row:violated:2');
+    expect(check.else).toBe('customer:violated:2');
     // one input per root either rule reads, still read off the made value
     expect(Object.keys(check.in).sort()).toEqual(['email', 'id', 'name', 'note', 'tier']);
   });
 
   it('gives each refusal the sentence of its own invariant and no other', () => {
-    const first = spec().nodes['row:violated'] as KCall;
-    const second = spec().nodes['row:violated:2'] as KCall;
+    const first = spec().nodes['customer:violated'] as KCall;
+    const second = spec().nodes['customer:violated:2'] as KCall;
     expect(first.in.message).toEqual({ value: `'A customer has an id' does not hold: ${ID_RULE}` });
     expect(second.in.message).toEqual({ value: `'A customer is reachable' does not hold: ${REACH_RULE}` });
     for (const node of [first, second]) {
@@ -197,13 +200,16 @@ describe('lowering a guard two invariants are unproved at', () => {
   });
 
   it('appends every refusal after the value wherever the graph answered with it', () => {
-    expect(spec().output).toEqual(['row', 'row:violated', 'row:violated:2', 'missing']);
+    expect(spec().output).toEqual(['customer', 'customer:violated', 'customer:violated:2', 'noCustomer']);
   });
 
   /** The graph run with the store's answer seeded, so the guard judges exactly the customer a case hands it. */
   const judged = async (record: Record<string, unknown>) => {
     const compiled = embedder.graph(KEPT_GET);
-    const report = await runGraph(compiled, { initial: { in: { id: 'x' }, asked: { record } }, env: embedder.env });
+    const report = await runGraph(compiled, {
+      initial: { in: { id: 'x' }, storedCustomer: { record } },
+      env: embedder.env,
+    });
     return outcomeOf(report);
   };
 
@@ -213,7 +219,7 @@ describe('lowering a guard two invariants are unproved at', () => {
     expect(noId).toMatchObject({
       kind: 'refused',
       reason: 'invariant',
-      at: 'row:violated',
+      at: 'customer:violated',
       message: `'A customer has an id' does not hold: ${ID_RULE}`,
     });
     // the id is there and the address is empty: only the example's own rule fails
@@ -221,7 +227,7 @@ describe('lowering a guard two invariants are unproved at', () => {
     expect(noEmail).toMatchObject({
       kind: 'refused',
       reason: 'invariant',
-      at: 'row:violated:2',
+      at: 'customer:violated:2',
       message: `'A customer is reachable' does not hold: ${REACH_RULE}`,
     });
     for (const outcome of [noId, noEmail]) {
@@ -232,7 +238,7 @@ describe('lowering a guard two invariants are unproved at', () => {
 
   it('names the first rule where both fail, and lets a value satisfying both through', async () => {
     const both = await judged({ id: '', name: '', email: '', tier: 'bronze' });
-    expect(both).toMatchObject({ kind: 'refused', at: 'row:violated' });
+    expect(both).toMatchObject({ kind: 'refused', at: 'customer:violated' });
     const ok = { id: 'x', name: 'Ada', email: 'ada@example.com', tier: 'bronze' };
     const fine = await judged(ok);
     expect(fine).toMatchObject({ kind: 'answered', output: ok });
