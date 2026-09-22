@@ -44,7 +44,7 @@ export const scopeColumns = (scope: Scope | undefined): string[] => Object.keys(
 
 /**
  * The column type one scope value is kept in: `text` for a string, `double precision` for a number, which are
- * the two a scope may be. The checker has already refused a read that types as anything else (C011), so a
+ * the two a scope may be. The checker has already refused a read that types as anything else (C012), so a
  * value of another type reaching here is a tree reloaded under a store that changed, and it says so.
  */
 export function scopeTypeOf(column: string, value: string | number): string {
