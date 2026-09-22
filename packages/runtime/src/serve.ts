@@ -10,46 +10,44 @@ import {
   type Trace,
   type TriggerDoc,
 } from '@wilanis/core';
-import type { Report } from '@wilanis/engine';
+import { type Outcome, outcomeOf, type Report } from '@wilanis/engine';
 import { FileBlobStore } from './blobs.js';
 import type { Embedder } from './embed.js';
-import { postLoad } from './post-load.js';
+import { postLoad, stopEach } from './post-load.js';
 import { Served } from './served.js';
 import { embedderFor } from './tools.js';
 
 /**
  * Run the project's startup steps in order, before any trigger kind starts: each fires the domain port
- * operation it names, and the profile's binding decides how it is met. A step that refuses stops serving
- * unless it says `required: false`, in which case the refusal is logged and the rest go on.
+ * operation it names, and the profile's binding decides how it is met. A step that does not answer stops
+ * serving unless it says `required: false`, in which case how it ended is logged and the rest go on. The log
+ * line and the throw name a step the same way: its one-based place in the list, its name, and its outcome.
  */
 export async function runStartup(load: LoadResult, emb: Embedder, log: (line: string) => void): Promise<void> {
   const steps = load.registry.project?.doc.startup ?? [];
   for (const [at, step] of steps.entries()) {
-    const name = step.label ?? step.run;
-    const report = await emb.startup(step, { at });
-    if (report.status === 'done') {
-      log(`startup ${at + 1}/${steps.length} ${name}: ok`);
+    const said = `${at + 1}/${steps.length} ${step.label ?? step.run}`;
+    const why = failureOf(outcomeOf(await emb.startup(step, { at })));
+    if (why === undefined) {
+      log(`startup ${said}: ok`);
       continue;
     }
-    const why = failureOf(report);
     if (step.required === false) {
-      log(`startup ${at + 1}/${steps.length} ${name}: ${why} (optional, going on)`);
+      log(`startup ${said}: ${why} (optional, going on)`);
       continue;
     }
     throw new Error(
-      `startup step ${at} '${name}' ${why}; nothing is serving. Mark it "required": false in project.json to serve without it.`,
+      `startup step ${said}: ${why}; nothing is serving. Mark it "required": false in project.json to serve without it.`,
     );
   }
 }
 
-/** Why a report did not reach done: the first node that did not finish, and what it said. */
-function failureOf(report: Report): string {
-  if (report.status === 'blocked') return `is blocked, needing ${(report.needs ?? []).join(', ')}`;
-  for (const [id, node] of Object.entries(report.nodes)) {
-    if (node.status !== 'failed') continue;
-    return node.reason ? `refused at '${id}' with '${node.reason}': ${node.error}` : `failed at '${id}': ${node.error}`;
-  }
-  return `did not finish (${report.status})`;
+/** How a step that did not answer ended, in the outcome's words; nothing for one that answered. */
+function failureOf(outcome: Outcome): string | undefined {
+  if (outcome.kind === 'refused') return `refused as '${outcome.reason}': ${outcome.message}`;
+  if (outcome.kind === 'faulted') return `failed at '${outcome.at}': ${outcome.error}`;
+  if (outcome.kind === 'blocked') return `blocked: needs ${outcome.needs.join(', ')}`;
+  return undefined;
 }
 
 /**
@@ -69,19 +67,31 @@ export async function start(
   const served = new Served({ load, emb }, log, opts.profile);
   if (opts.observe) served.observe(opts.observe);
   emb.serve(served);
-  served.setDown(await postLoad(load, emb, log));
-  const bye = async () => {
-    for (const holding of [...served.emb.held].reverse()) await holding.stop();
-    await served.stopPlugins();
-    if (emb.blobs instanceof FileBlobStore) emb.blobs.destroy();
-  };
+  // what was held, in reverse, then the plugins' own teardowns (which say for themselves what would not stop),
+  // then the blob store: each runs whatever the one before it threw
+  const bye = () =>
+    stopEach(
+      [
+        ...[...served.emb.held].reverse(),
+        { stop: () => served.stopPlugins() },
+        { label: 'the blob store', stop: async () => destroyed(emb) },
+      ],
+      log,
+    );
   try {
+    served.setDown(await postLoad(load, emb, log));
     await runStartup(load, emb, log);
   } catch (error) {
-    await bye();
+    // what would not stop has been logged; the error that stopped the start is the one to answer
+    await bye().catch(() => undefined);
     throw error;
   }
   return { stop: bye, held: emb.held.length };
+}
+
+/** Remove what the embedder's blob store wrote, where that store is one on disk. */
+function destroyed(emb: Embedder): void {
+  if (emb.blobs instanceof FileBlobStore) emb.blobs.destroy();
 }
 
 /** The content type a file on disk is taken to have, by its extension; anything else is a stream of bytes. */
@@ -188,6 +198,6 @@ export async function runTrigger(
   } finally {
     await blobs.release();
     await down();
-    if (emb.blobs instanceof FileBlobStore) emb.blobs.destroy();
+    destroyed(emb);
   }
 }
