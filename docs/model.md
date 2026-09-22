@@ -132,9 +132,13 @@ trigger maps that reason like any other (T005), and `wilanis rehearse` reports e
 and a site is where the value is made -- so a graph that writes before it answers has already written when the
 guard fires. Patch a record into a state the rule forbids and the patch commits, the guard refuses the answer,
 and the row stays as it was written: every later read of it is guarded too, and refuses. Until that changes
-(issue #489, RFC 0033), write the graph so the decision precedes the effect -- read the record, `switch` on the
-rule, and reach the write only from the branch that holds -- or mark the graph `atomic`, so that the refusal
-ends the transaction and the write rolls back with it.
+(issue #489, RFC 0035, tracking #536), write the graph so the decision precedes the effect -- a `switch` that
+judges the record as the change will leave it, its `in` carrying the incoming fields beside the stored `record`
+(`in.tier != 'gold' || has(in.note) || has(record.note)`), with the write reached only from the branch that holds;
+a switch over the stored row alone judges the row before the change and lets the bad patch through. Better, load
+the record, lay the change over it with `@std/object.port.json#merge` in a domain graph, and `#put` the result
+whole: the merge is where the value is made, so the guard stands before the write. Or mark the graph `atomic`, so
+that the refusal ends the transaction and the write rolls back with it.
 
 ## A tree includes trees
 
