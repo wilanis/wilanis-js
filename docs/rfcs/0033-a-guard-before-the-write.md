@@ -172,16 +172,23 @@ still gets `invariant`, which is the truthful answer, and no row is corrupted. T
 left broken are never broken.
 
 *What it misses.* Nothing about correctness, but it costs something (a) does not: every such graph becomes a
-transaction, on trees and engines where that is not free. `@storage-memory` has no real transaction; every
-`@storage/store.port.json` operation is declared `transactional: true`, so L009 and L010 are satisfied, but
-what a memory engine's rollback is worth is the engine's business and worth stating in the rule's hint. It
-also refuses graphs that are correct today for a reason the author cannot see locally -- the rule is about an
-invariant declared in another document over a shape the graph merely stores -- so the refusal must name the
-invariant, the field, and the guarded site, or it reads as the checker being arbitrary.
+transaction, on trees and engines where that is not free. Both shipped engines can pay. `@storage-memory`'s
+`begin` forks every collection and answers a second `MemoryEngine` over the copy: the transaction writes
+there, `commit` adopts the copy back, and `rollback` drops it, so the original is never touched and the
+rollback is real. `@storage-postgres` opens a database transaction. The engine that cannot pay is the one
+whose `begin` answers nothing -- the contract allows it, since `begin?(at: At): Promise<Transaction |
+undefined>` in `packages/plugin-storage/src/engine.ts` is optional and may answer `undefined` -- and
+`@storage` already refuses such a run in `handlers.ts`: *"the engine keeping '...' cannot take part in a
+transaction, so an atomic graph cannot write through it"*. So the cost of (b) is a transaction per such
+graph, and a run-time refusal on a profile whose engine opened none. It also refuses graphs that are correct
+today for a reason the author cannot see locally -- the rule is about an invariant declared in another
+document over a shape the graph merely stores -- so the refusal must name the invariant, the field, and the
+guarded site, or it reads as the checker being arbitrary.
 
-And it hands the author a second way to be wrong: a graph marked `atomic` to silence the refusal, on a tree
-whose profile binds an engine whose rollback does nothing. That is a `B`-family question this RFC does not
-have an answer for.
+And it hands the author a second way to be wrong: a graph marked `atomic` to satisfy the refusal, on a tree
+whose profile binds an engine that begins no transaction. The tree then checks clean and fails at run time on
+that profile. Whether the checker should catch that over the binding, or leave it to `@storage`'s run-time
+refusal, is open question 2.
 
 *What it would take.* The walk exists. `atomicReachOf` in `packages/compiler/src/check/atomic.ts` already
 gathers every effect a graph reaches under a profile, with the node of the graph each descended from, and
@@ -312,8 +319,14 @@ mistake.
 Every one of these must be decided before `accepted`, and the first is the RFC:
 
 1. **Which option.** (a), (b), (c), or documenting the hole and leaving the mechanism alone.
-2. Under (b), what the rule does with an engine whose transaction is nominal. `@storage-memory` declares its
-   operations transactional; is `atomic` over it a rollback or a promise?
+2. Under (b), what the rule does with a profile binding an engine that implements no `begin`. Both shipped
+   engines open a real transaction, so this is about a third-party engine, or a future one, whose optional
+   `begin` answers nothing. Either the checker refuses it -- a `B` rule over the binding, holding a profile
+   that binds such an engine to a store an atomic graph writes through -- or the tree checks clean and
+   `@storage` refuses the run, as it does today. The first tells the author which profile is broken before
+   they deploy it, at the cost of the checker asking an engine a capability question it asks of nothing else;
+   the second keeps the checker ignorant of engines and pays for it with a failure that only the profile that
+   has it will show.
 3. Under (a), what the guard's ids are, given that RFC 0007 fixed four of them as a contract the rehearsal,
    `describe` and the viewer read.
 4. Whether the example's write graphs become atomic or are rewritten to decide before they write. The two
