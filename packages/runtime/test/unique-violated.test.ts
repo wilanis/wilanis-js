@@ -20,7 +20,7 @@ import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
 // spaced apart per vitest worker, since test files run in parallel and a fixed port is one two of them can
 // ask for at once: the second gets EADDRINUSE and the whole file fails on the hook that was starting a server
-const PORT = 8300 + (Number(process.env.VITEST_POOL_ID ?? 0) % 32) * 16;
+const PORT = 8300 + Number(process.env.VITEST_POOL_ID ?? 0) * 16;
 let dir: string;
 let stop: () => Promise<void>;
 let token: string;
