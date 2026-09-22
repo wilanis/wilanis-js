@@ -118,7 +118,8 @@ An `invariant` lives in a feature's `domain/` and states a rule the whole tree i
 has to remember it. An **access** invariant names domain port operations and the gate every way in that reaches
 them must attach; reaching is transitive, so a graph cannot route around it by calling the operation itself, and
 a trigger that reaches one of those operations without the gate is I001. A **field** invariant names a core shape
-and a rule over its fields in the `switch` grammar (`len(url) > 0 && (method != 'DELETE' || has(agent))`).
+and a rule over its fields in the `switch` grammar
+(`len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))`).
 
 A field invariant is judged where a value of the shape comes into being: a node that makes one, and a graph that
 takes one as `in`. Where the rule is established there -- every root a literal, or a `switch` that routes to the

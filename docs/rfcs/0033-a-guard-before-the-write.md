@@ -17,32 +17,35 @@ leaves the choice to the maintainer. It decides nothing.
 
 ## Motivation
 
-`Entry` in the example carries the field invariant *An entry names a call*
-(`len(url) > 0 && (method != 'DELETE' || has(agent))`). Give it an optional boolean `pinned` and state a
-second rule, *A pinned entry is a GET* (`!(has(pinned) && pinned) || method == 'GET'`). Now write the data
-graph a toggle wants: `@storage/store.port.json#get` the record, `switch` on `has(record.pinned) &&
-record.pinned`, `#patch` the key with `{ "pinned": true }` or `{ "pinned": false }`, and answer the patched
-record as `Entry`. `wilanis check` accepts the tree and lowers a guard at the node that answers.
+`Customer` in the example carries the field invariant *A customer is reachable*
+(`len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))`) and an optional boolean `active`. State a
+second rule over that flag, *An active customer is gold* (`!(has(active) && active) || tier == 'gold'`). Now
+write the data graph a toggle wants: `@storage/store.port.json#get` the record, `switch` on
+`has(record.active) && record.active`, `#patch` the key with `{ "active": true }` or `{ "active": false }`, and
+answer the patched record as `Customer`. `wilanis check` accepts the tree and lowers a guard at the node that
+answers.
 
-Call the toggle on an entry whose method is `POST`. The patch commits. The guard then fires on the answer and
-the route answers `500 invariant`. The row in the store now violates the rule, so `GET /monitor/{id}` over it
-answers `500 invariant`, and so does `GET /monitor`, because one violating element fails the list's guard for
+Call the toggle on a customer whose tier is `silver`. The patch commits. The guard then fires on the answer and
+the route answers `500 invariant`. The row in the store now violates the rule, so `GET /customers/{id}` over it
+answers `500 invariant`, and so does `GET /customers`, because one violating element fails the list's guard for
 every caller -- until the row is removed or, on the memory engine, the process restarts. A rule meant to keep a
 bad value out has instead made the store unreadable, and the graph that did it was refused nothing.
 
-`kept-update.graph.json` in `example/` on `main` has the same defect today, without `pinned` and without a new
-rule. Its `asked` node patches `url` and `method` from the caller's `EntryUpdate`; its `row` node makes the
-`Entry` from `asked.record`; the guard is lowered at `row`. `PUT /monitor/{id}` changing a pinned entry's
-method -- or, with the shipped rule alone, changing a `DELETE` entry's method where no agent was recorded --
-corrupts the row exactly the same way. The graph is the shape the tree's own example teaches.
+`kept-update.graph.json` in `example/` on `main`, and `kept-update-postgres.graph.json` beside it, have the same
+defect today, with the shipped rule alone. The `asked` node patches `name`, `email` and `tier` from the caller's
+`CustomerUpdate`; the `row` node makes the `Customer` from `asked.record`; the guard is lowered at `row`.
+`PUT /customers/{id}` moving a customer to `gold` where no note was recorded corrupts the row exactly the same
+way. The graph is the shape the tree's own example teaches.
 
 **The evidence that this is the graph an author writes.** Run of 2026-09-21, three arenas off `main` at
-cc1c8de, each an unsupervised agent given a copy of the example and the same task. Claude Sonnet 5 and Claude
-Opus 5 independently wrote the broken toggle and both hit it; the coordinator's validation of the Sonnet tree
-records toggle a `POST` entry → `500 invariant`, then `GET /monitor/{id}` → `500 invariant`, then
-`GET /monitor` → `500 invariant`. Claude Haiku 4.5 avoided it, but by accident of ordering: its graph happened
-to read and decide before patching, so the write was never reached. Opus, on being shown the failure, rewrote
-its graph to refuse `unpinnable` in a branch before the patch.
+cc1c8de, each an unsupervised agent given a copy of the example and the same task. The example was then a
+monitor of HTTP calls -- an `Entry` with a `url` and a `method`, served under `/monitor` -- and the toggle was
+of a `pinned` flag, so the recorded calls below speak that vocabulary; the graph shape is the one above.
+Claude Sonnet 5 and Claude Opus 5 independently wrote the broken toggle and both hit it; the coordinator's
+validation of the Sonnet tree records toggle a `POST` entry → `500 invariant`, then `GET /monitor/{id}` →
+`500 invariant`, then `GET /monitor` → `500 invariant`. Claude Haiku 4.5 avoided it, but by accident of
+ordering: its graph happened to read and decide before patching, so the write was never reached. Opus, on being
+shown the failure, rewrote its graph to refuse `unpinnable` in a branch before the patch.
 
 Neither of those is the rule doing its job. **The point of stating a rule once is that no graph has to
 remember it.** A workaround that every author must reproduce in every graph that writes is the five
@@ -63,11 +66,11 @@ The tree states the rule once:
 ```json
 {
   "$schema": "@wilanis/invariant.schema.json",
-  "label": "A pinned entry is a GET",
-  "description": "Only a GET may be pinned to the dashboard.",
+  "label": "An active customer is gold",
+  "description": "Only a customer of the gold tier may be marked active.",
   "holds": {
-    "on": "@monitor/domain/Entry.shape.json",
-    "when": "!(has(pinned) && pinned) || method == 'GET'"
+    "on": "@customers/domain/Customer.shape.json",
+    "when": "!(has(active) && active) || tier == 'gold'"
   }
 }
 ```
@@ -79,20 +82,20 @@ and the data graph behind the toggle writes, then answers:
   "id": "asked",
   "run": "@storage/store.port.json#patch",
   "in": {
-    "store": "@monitor/data/entries.store.json",
-    "collection": "entries",
+    "store": "@customers/data/customers.store.json",
+    "collection": "customers",
     "key": "{{in.id}}",
-    "changes": { "pinned": true }
+    "changes": { "active": true }
   }
 },
 {
   "id": "row",
   "run": "@std/object.port.json#make",
-  "in": { "value": "{{asked.record}}", "type": "@monitor/domain/Entry.shape.json" }
+  "in": { "value": "{{asked.record}}", "type": "@customers/domain/Customer.shape.json" }
 }
 ```
 
-`wilanis check` passes. `wilanis rehearse` reports `guard 'row' A pinned entry is a GET  2/2 branches`, and
+`wilanis check` passes. `wilanis rehearse` reports `guard 'row' An active customer is gold  2/2 branches`, and
 both branches settle, because the rehearsal judges the graph and not the store. The tree is accepted, the
 guard is honest about what it guards, and the store is corrupted on the first call that takes the branch.
 
@@ -188,8 +191,9 @@ the guarded sites `heldWhollyAt` already answers and to which fields each invari
 a field some unproved invariant over that shape reads. That is one new code in `atomic.ts`, beside the four
 that live there, and its sabotage test is `kept-update.graph.json` without `atomic`.
 
-The example must then change with it: `kept-update.graph.json` and every write graph behind `monitor.port.json`
-either become atomic or are rewritten to decide before they write, and the template's guidance changes to match.
+The example must then change with it: `kept-update.graph.json`, `kept-update-postgres.graph.json` and every write
+graph behind `customer.port.json` either become atomic or are rewritten to decide before they write, and the
+template's guidance changes to match.
 
 ### Option (c): both
 
@@ -263,13 +267,13 @@ whatever replaces them must be named in this RFC before it is accepted.
 Written when an option is chosen. Whichever it is, these cases must be in the suite, since they are the
 behaviour the arenas found:
 
-- The toggle graph of "Motivation", over the memory engine, on a `POST` entry: the store must not hold a
+- The toggle graph of "Motivation", over the memory engine, on a `silver` customer: the store must not hold a
   violating row afterwards, whether because the write never happened (a) or because it rolled back (b).
-- After that call, `GET /monitor/{id}` and `GET /monitor` answer as they did before it. This is the assertion
-  that matters most: today they answer `500 invariant`, and a fix that refuses the write but leaves the listing
-  broken has fixed nothing.
-- `kept-update.graph.json` driven to violate the shipped rule (*An entry names a call*) by updating a `DELETE`
-  entry whose `agent` was never recorded.
+- After that call, `GET /customers/{id}` and `GET /customers` answer as they did before it. This is the
+  assertion that matters most: today they answer `500 invariant`, and a fix that refuses the write but leaves
+  the listing broken has fixed nothing.
+- `kept-update.graph.json` driven to violate the shipped rule (*A customer is reachable*) by moving a customer
+  to `gold` whose `note` was never written.
 - Under (b), the sabotage: `kept-update.graph.json` with `atomic` removed → the new `L` code.
 
 ## Implementation plan
