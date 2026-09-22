@@ -188,7 +188,15 @@ interface Column {
  */
 describe.skipIf(!url)('what a scope costs the table', () => {
   beforeEach(async () => {
-    for (const name of ['e_scope', 'e_scope_rows', 'e_scope_again', 'e_scope_num', 'e_scope_late', 'e_scope_race'])
+    for (const name of [
+      'e_scope',
+      'e_scope_rows',
+      'e_scope_again',
+      'e_scope_num',
+      'e_scope_late',
+      'e_scope_race',
+      'e_scope_txn',
+    ])
       await drop(name);
   });
 
@@ -269,5 +277,18 @@ describe.skipIf(!url)('what a scope costs the table', () => {
     expect(written.every(answer => answer.violated === undefined)).toBe(true);
     expect(await engine.count(collection, undefined, { tenant: 't1' })).toBe(1);
     expect((await catalogOf('e_scope_race')).constraints).toEqual(['wl_us_e_scope_race_tenant_url']);
+  });
+  it('first scoped writes at once inside one transaction all land: the lock is theirs, so they take turns here', async () => {
+    // a map over rows in an atomic graph writes them together on one session, which holds the lock already
+    const collection = at('e_scope_txn', { unique: [['url']] });
+    await engine.ensure([collection]);
+    const trx = await engine.begin?.(collection);
+    if (!trx) throw new Error('the postgres engine opened no transaction');
+    const written = await Promise.all(
+      ['1', '2', '3'].map(id => trx.engine.put(collection, one(id), { replace: true, scope: { tenant: 'acme' } })),
+    );
+    await trx.commit();
+    expect(written.every(answer => answer.violated === undefined)).toBe(true);
+    expect(await engine.count(collection, undefined, { tenant: 'acme' })).toBe(3);
   });
 });

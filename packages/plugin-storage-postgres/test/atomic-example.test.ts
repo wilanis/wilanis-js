@@ -7,12 +7,15 @@
  * It runs only where a database is named, as the rest of this package's cases do: set
  * `WILANIS_TEST_POSTGRES_URL` and it runs, leave it unset and it is skipped. The example itself reads the URL
  * from `CUSTOMERS_DATABASE_URL`, so the case hands its own along under that name and puts back whatever was
- * there, and it prepares the store first the way the tree's own startup step does.
+ * there, and it prepares the store first the way the tree's own startup step does. Every other operation runs
+ * as a caller whose session carries the tenant `acme`, as a trigger past its gate hands it on: the store keeps
+ * its customers per tenant, and a run with no request -- a startup step's -- could not reach them (B008).
  *
  * The plugins come from the example through `resolvePlugins`, never from imports here: this package is one
  * engine, and a tree naming seven plugins is no reason for it to depend on the other six.
  */
 import { fileURLToPath } from 'node:url';
+import { runGraph } from '@wilanis/compiler';
 import { loadTree } from '@wilanis/core';
 import { embedderFor, postLoad, resolveIncludes, resolvePlugins } from '@wilanis/runtime';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -20,6 +23,8 @@ import { closePools } from '../src/pool.js';
 
 const url = process.env.WILANIS_TEST_POSTGRES_URL;
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
+/** The request a signed-in customer of tenant acme is read from: all the scoped store asks of it is the tenant. */
+const ACME = { session: { attributes: { tenant: 'acme' } } };
 
 afterAll(async () => {
   if (url) await closePools();
@@ -37,16 +42,20 @@ describe.skipIf(!url)('the example, importing into PostgreSQL under one transact
     const emb = embedderFor(load, { profile: 'production' });
     const down = await postLoad(load, emb, () => {});
     const scope = emb.blobs.scope();
-    // `at` counts the order these calls were made in: they are not the project's startup steps, so the index
-    // is this case's own rather than a defaulted 0, which would be a position and not an absent one
-    let at = 0;
     const run = (op: string, input: Record<string, unknown> = {}) =>
-      emb.startup({ run: `@customers/domain/customer.port.json#${op}`, in: input }, { blobs: scope, at: at++ });
+      runGraph(emb.operation(`@customers/domain/customer.port.json#${op}`), {
+        initial: { in: input, request: ACME },
+        env: emb.envFor(scope),
+      });
     const upload = (text: string) => scope.put(text, { contentType: 'text/csv', filename: 'customers.csv' });
     const mark = `run-${Date.now()}`;
     try {
       // the tree's own first startup step: the collections the store declares, created once
-      expect((await run('prepare')).status).toBe('done');
+      const prepared = await emb.startup(
+        { run: '@customers/domain/customer.port.json#prepare' },
+        { blobs: scope, at: 0 },
+      );
+      expect(prepared.status).toBe('done');
       const good = run('import', {
         file: await upload(`name,email,tier\nAda,${mark}a@x.example,bronze\nGrace,${mark}b@x.example,silver\n`),
       });
