@@ -229,6 +229,42 @@ export async function ensureScope(db: Kysely<never>, where: Where, at: At, scope
   const memo = memoOf(at, where);
   const known = kept.get(memo);
   if (known && wanted.every(([column]) => known.has(folded(column)))) return false;
+  const work = () => ensureUnremembered(db, where, at, wanted);
+  return where.lasting ? work() : inTurn(db, memo, work);
+}
+
+/**
+ * The scope work already running over one table on one connection, so a second caller waits for it. Inside a
+ * transaction the lock cannot make them take turns -- both hold it, since it is the transaction's -- and a map
+ * whose elements write at once would otherwise read the catalog together, find the column missing together,
+ * and add it twice. Outside one each write has a session of its own and the lock is what orders them; keyed
+ * by the transaction's connection, so two transactions still meet at the lock and not here.
+ */
+const running = new WeakMap<object, Map<string, Promise<boolean>>>();
+
+/** Run `work` after whatever this connection is already doing to this table's scope, and let the next wait on it. */
+async function inTurn(db: Kysely<never>, memo: string, work: () => Promise<boolean>): Promise<boolean> {
+  const mine = running.get(db) ?? new Map<string, Promise<boolean>>();
+  running.set(db, mine);
+  const ahead = mine.get(memo) ?? Promise.resolve(false);
+  const next = ahead.catch(() => false).then(work);
+  mine.set(memo, next);
+  try {
+    return await next;
+  } finally {
+    if (mine.get(memo) === next) mine.delete(memo);
+  }
+}
+
+/** The table read and made ready for the scope, where nothing this process remembers says it already is. */
+async function ensureUnremembered(
+  db: Kysely<never>,
+  where: Where,
+  at: At,
+  wanted: [string, string | number][],
+): Promise<boolean> {
+  const memo = memoOf(at, where);
+  const scope = Object.fromEntries(wanted);
   const has = await namesOf(db, where);
   if (!has) return false; // no table yet: `ensure` makes one, and the scope is added the first time it is written
   const made = lacking(wanted, has).length > 0 && (await holding(db, where, on => addUnderLock(on, where, at, scope)));
