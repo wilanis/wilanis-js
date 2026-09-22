@@ -169,7 +169,7 @@ claim holds on `main` at the time of writing, which the implementing task confir
 | `the-engine-imports-nothing` | `packages/engine/src` has no import from outside itself | none | holds |
 | `the-compiler-imports-only-core-and-engine` | `packages/compiler/src` imports nothing but `@wilanis/core`, `@wilanis/engine` and itself; no `node:` module | none | holds |
 | `every-public-function-says-what-it-answers` | every exported function, exported arrow constant and public class method under `src/` has a leading doc comment | none | 87 undocumented; the implementing task documents them |
-| `a-kind-is-declared-once-and-mirrored` | every entry of `KINDS` has a schema file under `packages/core/schemas/`, a `case` in the viewer's `renderDocPage` unless the table names the function that renders it instead, and, unless a plugin ships it, a row in `packages/runtime/templates/CLAUDE.md` and a home in `HOME` or the top-level list | `SHIPPED_BY_PLUGINS = ['plugin', 'trigger-kind', 'connection-kind', 'codec']`, `TOP_LEVEL = ['project', 'feature']`, `RENDERED_BY = { graph: <the graph page's function> }` | holds; `graph` has its own page outside `renderDocPage` |
+| `a-kind-is-declared-once-and-mirrored` | every customer of `KINDS` has a schema file under `packages/core/schemas/`, a `case` in the viewer's `renderDocPage` unless the table names the function that renders it instead, and, unless a plugin ships it, a row in `packages/runtime/templates/CLAUDE.md` and a home in `HOME` or the top-level list | `SHIPPED_BY_PLUGINS = ['plugin', 'trigger-kind', 'connection-kind', 'codec']`, `TOP_LEVEL = ['project', 'feature']`, `RENDERED_BY = { graph: <the graph page's function> }` | holds; `graph` has its own page outside `renderDocPage` |
 | `a-plugin-grants-files-not-objects` | every `packages/plugin-*` has `docs/plugin.json` and lists `docs` in its `files` | none | holds |
 | `tests-live-beside-what-they-test` | every `packages/*/src` has a sibling `test/`, except the packages the table says are tested through another | `TESTED_THROUGH = { compiler: 'packages/runtime/test' }` | holds |
 | `a-refusal-code-is-made-where-its-family-lives` | under `src/` only, a string literal shaped `[A-Z]\d{3}` appears only in the directories its family letter names; tests carry codes of every family on purpose | `HOME = { D: core/src, runtime/src/project.ts; R L G P B T A C S: compiler/src/check; X: plugin-*/src }` | holds; the two `D` literals in the runtime's project loader (`badPlugin`, D006, and `badInclude`, D010, in `project.ts`) stay where they are and the table names them, since resolving an npm package is the runtime's knowledge, not the loader's |
@@ -227,7 +227,7 @@ None.
 
 `ls fitness` is the index; the file names read as sentences. `fitness/README.md` says what a fitness
 function is, how one is written, and how one is retired, and holds no table, since a table would drift from
-the directory. `CLAUDE.md` gains one entry under "How to change things": a decision about the code is a
+the directory. `CLAUDE.md` gains one customer under "How to change things": a decision about the code is a
 file under `fitness/`, a fitness function that bites is a design signal, and the `Decision:` line is the
 maintainer's to write. `CONTRIBUTING.md` names the hook and the `decisions` approval under "Commits and pull
 requests". Every failing fitness function names the offending file and the edit that fixes it.
@@ -264,7 +264,7 @@ behaviour stated in `fitness/README.md`; the CI jobs are seen to run on that pul
 5. The configuration claims: `the-house-rules-hold-everywhere`, `no-house-rule-is-suppressed`,
    `typescript-is-strict-in-every-package`. (`good first issue`.)
 6. The gate: `.githooks/commit-msg` and the `prepare` script, the `fitness` and `decision` jobs, the
-   pull request template line, the `CLAUDE.md` entry and the `CONTRIBUTING.md` paragraph. `CLAUDE.md`'s
+   pull request template line, the `CLAUDE.md` customer and the `CONTRIBUTING.md` paragraph. `CLAUDE.md`'s
    "no generated trailers" sentence under Commits gains the one exception: the `Decision:` line, which the
    maintainer writes by hand and no tool adds.
 7. Maintainer's steps, not a pull request: create the `decisions` environment with themselves as required

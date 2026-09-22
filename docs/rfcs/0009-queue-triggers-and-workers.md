@@ -24,7 +24,7 @@ of rows without holding the caller's socket while every DELETE settles -- has no
 have to leave the tree and write a consumer in TypeScript, which is exactly the code the platform exists to
 remove, and the consumer would be invisible to `wilanis check`, `rehearse`, `map` and the viewer.
 
-The example shows the small form of it. `DELETE /monitor` (`example/features/customers/edge/delete-customers.trigger.json`)
+The example shows the small form of it. `DELETE /customers` (`example/features/customers/edge/delete-customers.trigger.json`)
 fires `customer.port.json#removeMany`, whose domain graph `remove-customers.graph.json` fans one removal out per id
 and answers when the last has settled, paced by the connection's `throttle` of four. A hundred ids is a
 hundred DELETEs against the upstream while the caller waits, and one that refuses `missing` refuses the whole
@@ -70,14 +70,14 @@ The example, made asynchronous for removals. A connection for the broker, at the
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/connection.schema.json",
   "label": "Jobs",
-  "description": "The broker the monitor's queued work goes through. In development the in-process broker; production names the storage engine's kind instead, so the queue is a table beside the entries and nothing else runs.",
+  "description": "The broker the customers's queued work goes through. In development the in-process broker; production names the storage engine's kind instead, so the queue is a table beside the customers and nothing else runs.",
   "kind": "@queue-memory/memory.connection-kind.json",
   "settings": {}
 }
 ```
 
 The trigger that consumes, `example/features/customers/edge/remove-queued.trigger.json`. It fires the same
-`customer.port.json#remove` that `DELETE /monitor/{id}` fires, reads the id from the message instead of the
+`customer.port.json#remove` that `DELETE /customers/{id}` fires, reads the id from the message instead of the
 route, and attaches the same two policies -- with the token read from the message's headers instead of the
 request's:
 
@@ -85,7 +85,7 @@ request's:
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
   "label": "removals queue",
-  "description": "One message per entry to remove. missing is acknowledged (the entry is already gone: the work is done); upstream is retried up to five times, a second apart and then doubling, and then dead-lettered. Employees holding the recorder role only, as for DELETE /monitor/{id}: the token rides in the message's headers, and a message whose token does not verify is dead, since redelivering it cannot help.",
+  "description": "One message per customer to remove. missing is acknowledged (the customer is already gone: the work is done); upstream is retried up to five times, a second apart and then doubling, and then dead-lettered. Employees holding the registrar role only, as for DELETE /customers/{id}: the token rides in the message's headers, and a message whose token does not verify is dead, since redelivering it cannot help.",
   "kind": "@queue/queue.trigger-kind.json",
   "settings": {
     "connection": "@connections/jobs.connection.json",
@@ -117,7 +117,7 @@ request's:
 }
 ```
 
-The route that publishes, `POST /monitor/{id}/removal` (`enqueue-removal.trigger.json`), fires a new domain
+The route that publishes, `POST /customers/{id}/removal` (`enqueue-removal.trigger.json`), fires a new domain
 operation `customer.port.json#enqueueRemoval { id }` that answers nothing, and the route answers 202. Under
 the `live` profile the binding meets it with one data graph, `example/features/customers/data/publish-removal.graph.json`:
 
@@ -125,7 +125,7 @@ the `live` profile the binding meets it with one data graph, `example/features/c
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Publish a removal",
-  "description": "Data graph behind monitor.enqueueRemoval: one message on the removals queue, carrying the caller's token so the worker's gate judges the same caller.",
+  "description": "Data graph behind customers.enqueueRemoval: one message on the removals queue, carrying the caller's token so the worker's gate judges the same caller.",
   "reads": { "token": "@customers/edge/request.resolvers.json#token" },
   "in": "@customers/domain/CustomerRef.shape.json",
   "nodes": [
@@ -153,7 +153,7 @@ and one more step:
 
 ```json
 "startup": [
-  { "label": "Reach the entry store", "run": "@customers/domain/customer.port.json#listAll", "required": true },
+  { "label": "Reach the customer store", "run": "@customers/domain/customer.port.json#listAll", "required": true },
   { "label": "Watch for changes", "run": "@reload/watch.port.json#watch" },
   { "label": "Work the queues", "run": "@queue/worker.port.json#consume" },
   { "label": "Listen", "run": "@http/server.port.json#listen" }
@@ -510,7 +510,7 @@ other, and `maxAttempts` counts deliveries, never tries.
   and under the publishing graph `→ publish removals`.
 - The viewer's trigger page (`renderDocPage`, `case 'trigger'` in `packages/view/client/index.html`) shows a
   queue trigger's connection, queue and outcomes as it shows a route's; the connection page lists its queues.
-  The view model (`packages/view/src/model.ts`) carries `delivery` on a connection entry. No new page: a
+  The view model (`packages/view/src/model.ts`) carries `delivery` on a connection customer. No new page: a
   queue trigger is an existing kind.
 
 ### Plugin contract
@@ -599,7 +599,7 @@ its trigger; `map` prints the queue line. View, in `packages/view/test`: the exa
    `broker.test.ts` over the suite. `good first issue` once 3 lands.
 5. **The example** (`area:runtime`): `jobs.connection.json`, `remove-queued.trigger.json`,
    `enqueue-removal.trigger.json`, `publish-removal.graph.json`, the `token` resolver, `#enqueueRemoval` and its
-   binding entry, `publish` under effects, the two plugins and the `consume` step in `project.json`,
+   binding customer, `publish` under effects, the two plugins and the `consume` step in `project.json`,
    `example/README.md`'s paragraph. `"idempotent": true` on `#remove` waits for RFC 0011's step 1; until then the
    example carries the trigger without it and step 2's T0n1 is not yet judging.
 6. **Discoverability** (`area:runtime`, `area:view`): `describe`, `map`, the connection and trigger pages, the
@@ -681,7 +681,7 @@ queue in `project.json`, which is the routes-in-the-startup-list the http design
 **Polling.** The table broker polls; the memory broker polls its array. A LISTEN/NOTIFY wake-up is an
 optimisation inside `@wilanis/plugin-storage-postgres` and changes no document.
 
-**Cost.** Two packages, two READMEs, two entries in `npm run release`; a third when the table broker lands.
+**Cost.** Two packages, two READMEs, two customers in `npm run release`; a third when the table broker lands.
 Two optional fields in core. The worker holds one blob scope per delivery and one `Fired` per delivery, as the
 listener does per request. A message body is buffered whole: it is JSON of an edge shape without a blob (X0n4),
 never a file.

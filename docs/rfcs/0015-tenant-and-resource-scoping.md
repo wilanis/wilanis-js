@@ -97,24 +97,24 @@ domain never sees the column: `Customer.shape.json` has no `tenant`, a data grap
 one. Where the record is kept is the data layer's business, and so is under which tenant.
 
 **Declaring it.** The store binds the read the way a data graph binds one, and the collection names the column and
-the read. The monitor's store, once its entries belong to tenants:
+the read. The customers's store, once its customers belong to tenants:
 
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/store.schema.json",
-  "label": "Entries",
-  "description": "Observed calls, one row each, kept per tenant: a caller sees the rows of the tenant their sign-in wrote into the session, and nothing else. everyEntry is the support desk's view across tenants.",
+  "label": "Customers",
+  "description": "Observed calls, one row each, kept per tenant: a caller sees the rows of the tenant their sign-in wrote into the session, and nothing else. everyCustomer is the support desk's view across tenants.",
   "connection": "@connections/customers.connection.json",
   "reads": { "tenant": "@customers/edge/request.resolvers.json#tenant" },
   "collections": {
-    "entries": {
+    "customers": {
       "of": "@customers/domain/Customer.shape.json",
       "key": "id",
-      "unique": [["url", "method"]],
+      "unique": [["email"]],
       "scoped": { "tenant": "{{tenant}}" }
     },
-    "everyEntry": {
-      "view": "entries",
+    "everyCustomer": {
+      "view": "customers",
       "behind": "@access/edge/employees-only.policy.json",
       "description": "the same rows, every tenant's: the digest, for employees"
     }
@@ -129,13 +129,13 @@ and that the read fills it. The resolver, in the feature's one `edge/` document 
 "tenant": {
   "read": "request.session.attributes.tenant",
   "required": true,
-  "description": "the caller's tenant, written into the session at sign-in from what the directory said; every row of entries belongs to one"
+  "description": "the caller's tenant, written into the session at sign-in from what the directory said; every row of customers belongs to one"
 }
 ```
 
-`tenant` is `required`, so it is read as present, and A006 holds every trigger reaching any operation over `entries`
+`tenant` is `required`, so it is read as present, and A006 holds every trigger reaching any operation over `customers`
 to attaching a policy that proves `request.session`, since a storage operation over a scoped collection reads the
-store's scope. `GET /monitor/{id}` is public today; once its data graph runs `get` over `entries`, the checker asks
+store's scope. `GET /customers/{id}` is public today; once its data graph runs `get` over `customers`, the checker asks
 for `signed-in`, or any policy that proves the session, and the trigger gains it. Nothing else about the trigger
 changes: it fires `customer.port.json#get` with the id, as before. The read has a type because the guard's
 `settings.session` names `Session.shape.json` and the checker substitutes it for `$Session`: `tenant` is a `string`
@@ -147,7 +147,7 @@ the same node that opens the session:
 ```json
 "tenant": {
   "type": "string",
-  "description": "written at sign-in from what the directory said about the account; scopes the entry store, and nothing writes it again"
+  "description": "written at sign-in from what the directory said about the account; scopes the customer store, and nothing writes it again"
 }
 ```
 
@@ -169,27 +169,27 @@ realm. A graph that would write the attribute again, however it came by the valu
 
 ```
 X1n1  @features/access/data/write-theme.graph.json#nodes/saved/in/values/tenant
-    set writes 'tenant', which @customers/data/customers.store.json scopes entries by; a scope is written at sign-in and never again
+    set writes 'tenant', which @customers/data/customers.store.json scopes customers by; a scope is written at sign-in and never again
     → drop it: a scoped attribute is what the sign-in graph gave token.port.json#issue, and only that
 ```
 
-**Writing the operation.** A storage operation over `entries` says nothing about its scope:
+**Writing the operation.** A storage operation over `customers` says nothing about its scope:
 
 ```json
 {
   "type": "@wilanis/node/run.schema.json",
   "id": "asked",
-  "label": "Read the entry",
+  "label": "Read the customer",
   "run": "@storage/store.port.json#get",
   "in": {
     "store": "@customers/data/customers.store.json",
-    "collection": "entries",
+    "collection": "customers",
     "key": "{{in.id}}"
   }
 }
 ```
 
-The compiler reads the store, sees `entries` is scoped, and lowers the node with the store's read on its `scope`
+The compiler reads the store, sees `customers` is scoped, and lowers the node with the store's read on its `scope`
 input, a source reference like any resolver read: nothing runs. A `get` by key that would find another tenant's row
 answers `record` absent, which the graph already routes as `missing`; a `find` answers the tenant's rows; a `put`
 writes the tenant beside the record; a `remove` of another tenant's key removes nothing. The store's engine puts the
@@ -198,8 +198,8 @@ to forget it, and the one that remembers is refused:
 
 ```
 X2n1  @features/customers/data/create-record.graph.json#nodes/saved/in/scope
-    scope is the store's: entries is scoped by {{tenant}} of @customers/data/customers.store.json, and the compiler puts it here
-    → drop "scope": to change how entries are scoped, change the store
+    scope is the store's: customers is scoped by {{tenant}} of @customers/data/customers.store.json, and the compiler puts it here
+    → drop "scope": to change how customers are scoped, change the store
 ```
 
 **The refusal an author meets.** Bind the store's read to a resolver of what the caller chose -- a header, because the
@@ -207,7 +207,7 @@ request has an `x-tenant` header and it seemed the obvious source:
 
 ```
 A0n1  @features/customers/data/customers.store.json#reads/tenant
-    scopes entries, and reads request.headers['x-tenant']: a caller may send any value there
+    scopes customers, and reads request.headers['x-tenant']: a caller may send any value there
     → a scope reads what the guard hands once it identified the caller (request.principal, request.session); wilanis describe @auth
 ```
 
@@ -215,19 +215,19 @@ Write the scope as anything but one whole read of a bound name -- a literal, `"{
 does not bind:
 
 ```
-C0n1  @features/customers/data/customers.store.json#collections/entries/scoped/tenant
+C0n1  @features/customers/data/customers.store.json#collections/customers/scoped/tenant
     "acme" is not a read; a scope is exactly one resolver the store binds under reads
     → write "scoped": { "tenant": "{{tenant}}" } and bind tenant: "reads": { "tenant": "@customers/edge/request.resolvers.json#tenant" }
 ```
 
-**A view across tenants.** The digest lists every entry, whoever recorded it, for the support desk. Its data graph
-runs `find` over `everyEntry`, which has no scope because a view has none; and every trigger that reaches that
+**A view across tenants.** The digest lists every customer, whoever recorded it, for the support desk. Its data graph
+runs `find` over `everyCustomer`, which has no scope because a view has none; and every trigger that reaches that
 graph must attach `employees-only`, because the view says `behind`. Drop the policy from `digest.trigger.json`:
 
 ```
 A0n2  @features/customers/edge/digest.trigger.json#policies
-    reaches @customers/data/digest-rows.graph.json#rows, which reads everyEntry, a view of entries across every tenant behind @access/edge/employees-only.policy.json, and attaches no such policy
-    → attach "@access/edge/employees-only.policy.json" under policies, or read entries
+    reaches @customers/data/digest-rows.graph.json#rows, which reads everyCustomer, a view of customers across every tenant behind @access/edge/employees-only.policy.json, and attaches no such policy
+    → attach "@access/edge/employees-only.policy.json" under policies, or read customers
 ```
 
 A view is the one way across a scope, and it is a document: `wilanis describe` prints it, the viewer draws it, and
@@ -236,18 +236,18 @@ a reader of the store knows exactly which rows leave their tenant and behind wha
 **What `describe` says.**
 
 ```
-store  @customers/data/customers.store.json  (Entries)
+store  @customers/data/customers.store.json  (Customers)
   connection  @connections/customers.connection.json  (engine postgres)
   reads
     tenant ← @customers/edge/request.resolvers.json#tenant  (request.session.attributes.tenant: string, required)
-  collection entries: @customers/domain/Customer.shape.json
+  collection customers: @customers/domain/Customer.shape.json
     key         id
     unique      [url, method]  (within the scope)
     scoped by   tenant ← {{tenant}}  (guaranteed at 5 trigger(s) by signed-in, employees-only, can-register)
                 written at sign-in by @access/domain/sign-in-customer.graph.json#issued, @access/domain/sign-in-employee.graph.json#issued
     read by     @customers/data/get-record.graph.json#asked (get), @customers/data/list-records.graph.json#asked (find)
     written by  @customers/data/create-record.graph.json#saved (put), @customers/data/delete-record.graph.json#gone (remove)
-  collection everyEntry: view of entries, behind @access/edge/employees-only.policy.json
+  collection everyCustomer: view of customers, behind @access/edge/employees-only.policy.json
     read by     @customers/data/digest-rows.graph.json#rows (find)  reached by digest.trigger.json (attaches it)
 ```
 
@@ -257,8 +257,8 @@ store  @customers/data/customers.store.json  (Entries)
 
 **`store.schema.json`** (RFC 0002, extended by RFC 0003) gains, on the document, `reads` (RFC 0029's shape: keys
 `ident`, values `resolverRef`, optional): "The reads this store's collections are scoped by: local name → the
-resolver that declares it, as a data graph binds them. Every entry is read by some `scoped` (P005)." And on a
-collection entry, two shapes it may take beside RFC 0002's and RFC 0003's fields:
+resolver that declares it, as a data graph binds them. Every customer is read by some `scoped` (P005)." And on a
+collection customer, two shapes it may take beside RFC 0002's and RFC 0003's fields:
 
 - `scoped` (object, optional; keys are identifiers, values are strings): "column → the read that fills it. Each key
   names a column the store keeps beside the record, which the shape does not declare. Each value is exactly
@@ -358,7 +358,7 @@ nothing downstream can tell them apart; the proof is made here or nowhere.
 |---|---|---|---|
 | C0n1 | `check/contracts.ts`, `checkStore` (RFC 0003), at `collections/<c>/scoped/<column>` | a `scoped` column is a field of the collection's shape; or its value is not exactly `{{<name>}}` (a literal, interpolation, `{{name.field}}`, `{{in.x}}`); or `<name>` is not bound under the store's `reads` (P004 and R001 judge the binding itself, as on a graph); or the bound resolver is not `required`; or its read types as anything but a string or a number (`JudgedResolver.read.type`: so a field of `request.principal.claims`, which is open, and a session attribute of a tree whose guard names no `settings.session`, both `unknown`, are refused here) | `a scope is a column the store keeps, not a field of the shape: rename one` / `write "scoped": { "<column>": "{{<name>}}" } and bind <name>: "reads": { "<name>": "@<feature>/edge/<file>.resolvers.json#<name>" }` / `declare the resolver required: a scope is read as present` / `a scope is a string or a number: declare the attribute in the shape the guard's settings.session names` |
 | C0n2 | `checkStore`, at `collections/<c>/view` or `/behind` | `view` names a collection this store does not declare, one that is itself a view, or one that declares no `scoped`; a view declares `of`, `key`, `unique`, `refs`, `defaults` or `scoped` (the schema refuses most; this refuses what it cannot); `behind` names no policy document (R001) | `a view sees every row of one scoped collection of this store` / `a view has the viewed collection's shape and key; declare them there` |
-| P005 (RFC 0029) | `checkStore` | a `reads` entry of the store that no `scoped` reads | as RFC 0029 |
+| P005 (RFC 0029) | `checkStore` | a `reads` customer of the store that no `scoped` reads | as RFC 0029 |
 | A0n1 | `check/access.ts`, a new `checkStoreScopes(judge)` over every store, at `reads/<name>` | the tree has no guard; or a resolver a `scoped` column reads has a `request.*` path whose first segment is not a key of the guard's `guard.context` (`scope.guard()`, `packages/plugin-auth/docs/plugin.json`: `principal`, `session`, `challenge`) | `add a guarding plugin to project.json → plugins, such as @wilanis/plugin-auth` / `a scope reads what the guard hands once it identified the caller (request.principal, request.session); wilanis describe <guard>` |
 | A0n2 | `check/access.ts`, `AccessCheck` per trigger, at `policies` | under some profile, a trigger's `fire.run` reaches (`effectsReachable`) a call site of `@storage/store.port.json` whose static `store` and `collection` name a view, and no attached policy is the view's `behind` by canonical path; the message names the graph, the node, the view and the policy | `attach "<behind>" under policies, or read <viewed>` |
 | X2n1 | `plugin-storage/src/rules.ts`, at `nodes/<id>/in/scope` (a binding delegation: `operations/<op>/in/scope`) | a document gives `scope` to any operation of `@storage/store.port.json`: over a scoped collection (the compiler writes it), over one that declares no `scoped`, over a view, or to `newKey` | `drop "scope": to change how <collection> is scoped, change the store` / `this collection keeps no scope; drop it` / `a view sees every row; drop scope, or read <viewed>` |
@@ -458,16 +458,16 @@ this RFC does not pretend otherwise.
   the scope)`. A view prints `view of <collection>, behind <policy>` and, beside each reader, the triggers reaching
   it and that each attaches the policy.
 - `wilanis describe <resolvers document>` (RFC 0029) lists, under `used by`, the store as `@customers/data/customers.store.json
-  as {{tenant}} (scopes entries)`.
+  as {{tenant}} (scopes customers)`.
 - `wilanis describe <graph>` (`nodeLines`) prints `scope tenant ← {{tenant}} of @customers/data/customers.store.json` after
   a storage node's line: what the compiler carries there, named.
-- `wilanis describe <trigger>` prints, after its policies, `reaches everyEntry (a view) behind
+- `wilanis describe <trigger>` prints, after its policies, `reaches everyCustomer (a view) behind
   @access/edge/employees-only.policy.json: attached`.
-- `wilanis map` prints a scoped store as `store entries (get, scoped by tenant)` and a view as `view everyEntry (find)`.
+- `wilanis map` prints a scoped store as `store customers (get, scoped by tenant)` and a view as `view everyCustomer (find)`.
 - The viewer (`packages/view/src/graphs.ts`, `ports.ts`; `renderDocPage` in `client/index.html`): a storage node over a
   scoped collection carries a `scope` badge naming the column and linking the store page, from documents alone; the
   store page draws its `reads` as a graph's request node is drawn -- one port per read, each opening its resolvers
-  document -- marks a scoped column with the read that fills it, and draws a view as a second entry linking the viewed
+  document -- marks a scoped column with the read that fills it, and draws a view as a second customer linking the viewed
   collection and the policy; the trigger page's *Gated by* list marks the policy a view requires.
 
 ### Plugin contract
@@ -495,20 +495,20 @@ The stub's dependency on RFC 0007 is dropped, and its citation of `check/access.
 ## Tests
 
 Sabotage tests through `sabotage` in `packages/runtime/test/example-harness.ts` (copy the example, edit one document,
-answer the codes), in a new `sabotage-scoping.test.ts`, once the example keeps its entries in a scoped store (step 9):
+answer the codes), in a new `sabotage-scoping.test.ts`, once the example keeps its customers in a scoped store (step 9):
 
 | Code | The edit |
 |---|---|
-| C0n1 | `"scoped": { "url": "{{tenant}}" }` (a field of the shape); `"acme"`; `"{{tenant}}-eu"`; `"{{tenant.id}}"`; `"{{in.tenant}}"`; `"{{agent}}"` with `agent` not under the store's `reads`; the resolver `tenant` without `required`; its read changed to `request.principal.roles` (a list); to `request.principal.claims.tenant` (open, so unknown); `settings.session` removed from the `@auth` plugin in `project.json` (the attribute reads unknown; the access tree's own refusals filtered) |
-| C0n2 | `"view": "nope"`; `"view": "everyEntry"` (a view of a view); a view with `"of"` beside it; `"behind": "@access/edge/nope.policy.json"` (R001) |
-| P004, P005 | `"reads": { "tenant": "...#nope" }`; a second `reads` entry no `scoped` reads |
+| C0n1 | `"scoped": { "email": "{{tenant}}" }` (a field of the shape); `"acme"`; `"{{tenant}}-eu"`; `"{{tenant.id}}"`; `"{{in.tenant}}"`; `"{{agent}}"` with `agent` not under the store's `reads`; the resolver `tenant` without `required`; its read changed to `request.principal.roles` (a list); to `request.principal.claims.tenant` (open, so unknown); `settings.session` removed from the `@auth` plugin in `project.json` (the attribute reads unknown; the access tree's own refusals filtered) |
+| C0n2 | `"view": "nope"`; `"view": "everyCustomer"` (a view of a view); a view with `"of"` beside it; `"behind": "@access/edge/nope.policy.json"` (R001) |
+| P004, P005 | `"reads": { "tenant": "...#nope" }`; a second `reads` customer no `scoped` reads |
 | A0n1 | the resolver `tenant` read changed to `request.headers['x-tenant']`; to `request.params.id`; to `request.query['tenant']`; the `@auth` plugin removed from `project.json` (with the access feature's other refusals filtered) |
 | A0n2 | `employees-only` dropped from `digest.trigger.json` |
 | A006 | `signed-in` dropped from `get-customer.trigger.json`: the message names `request.session`, read by the store |
-| B008 | a startup step naming `@customers/domain/customer.port.json#count` over `entries`: the message names the store's read |
-| X2n1 | `"scope": { "tenant": "{{tenant}}" }` written on `asked` in `get-record.graph.json` (the M12 demo: "the agent added the filter by hand"); on the `find` over `everyEntry`; on a `newKey` |
+| B008 | a startup step naming `@customers/domain/customer.port.json#count` over `customers`: the message names the store's read |
+| X2n1 | `"scope": { "tenant": "{{tenant}}" }` written on `asked` in `get-record.graph.json` (the M12 demo: "the agent added the filter by hand"); on the `find` over `everyCustomer`; on a `newKey` |
 | X1n1 | `"values": { "theme": "{{in.theme}}", "tenant": "globex" }` in `write-theme.graph.json`; `"keys": ["tenant"]` on a `session.port.json#remove`; the same through a binding delegation |
-| X208 | `"where": { "tenant": "acme" }` on the `find` over `entries` |
+| X208 | `"where": { "tenant": "acme" }` on the `find` over `customers` |
 | none | the example as written: `codes(EXAMPLE)` is empty; `describe` of the store prints the lines above |
 
 Runtime, in `packages/plugin-storage/test/suite.ts`, run by both engines (`plugin-storage-memory/test/engine.test.ts`,
@@ -528,14 +528,14 @@ Compiler and core:
 
 | Test | Where | What it does |
 |---|---|---|
-| `collectionOf` | `packages/runtime/test/example.test.ts` | the `get` node of `get-record.graph.json` names `entries`; the digest's `rows` names `everyEntry`; an http node names nothing |
+| `collectionOf` | `packages/runtime/test/example.test.ts` | the `get` node of `get-record.graph.json` names `customers`; the digest's `rows` names `everyCustomer`; an http node names nothing |
 | the scope edge | `packages/runtime/test/example.test.ts` | `opNeeds` of `customer.port.json#get` includes `request.session.attributes.tenant`, required; of `#digest` it does not |
 | lowering | `packages/runtime/test/example.test.ts` | the lowered `get-record` graph's `asked` node has `scope.tenant` as `{ ref: 'request', path: ['session', 'attributes', 'tenant'] }`, and no node was added; the lowered `digest-rows` graph's `rows` has no `scope` |
-| the view gate under a profile | `sabotage-scoping.test.ts` | a second profile binding `digest` to a graph that reads `entries`: A0n2 is not raised; binding it to the view graph without the policy: raised, naming the profile |
+| the view gate under a profile | `sabotage-scoping.test.ts` | a second profile binding `digest` to a graph that reads `customers`: A0n2 is not raised; binding it to the view graph without the policy: raised, naming the profile |
 | the schema | `packages/core/test/validate.test.ts` | the baseline store gains `reads`, a scoped collection and a view; a view with `of`, a `scoped` whose value is not a string, a `reads` value without `#`, and `view` without `behind` are refused |
 
 Discoverability, in `packages/runtime/test/tools.test.ts`: `describe` of the store prints `reads`, `scoped by`,
-`within the scope` and `view of`; `describe` of the resolvers document prints `used by ... (scopes entries)`; `map`
+`within the scope` and `view of`; `describe` of the resolvers document prints `used by ... (scopes customers)`; `map`
 prints `scoped by tenant`. Viewer, in `packages/view/test/view.test.ts`: the `get-record` view's `asked` node carries
 the `scope` badge; the store page carries the read, the scope and the view.
 
@@ -569,9 +569,9 @@ not; over the fake OIDC issuer, the claims the type's fields name are read and t
     values), the `identity.binding.json` delegation of `verifyCustomer` and `verifyEmployee` gives `verify` the
     tree's identity-attributes shape, `Session.shape.json` gains `tenant` (required), `sign-in-customer.graph.json`
     writes it from `{{checked.identity.attributes.tenant}}` and `sign-in-employee.graph.json` from a constant;
-    `Principal.shape.json`, the guard's `plugin.json` and the token are untouched. The example's monitor feature: the
+    `Principal.shape.json`, the guard's `plugin.json` and the token are untouched. The example's customers feature: the
     `request.resolvers.json` gains `tenant` reading `request.session.attributes.tenant`; the store gains `reads`,
-    `scoped` and `everyEntry`; no storage node changes; `get-entry` and `list-entries` attach `signed-in`; the
+    `scoped` and `everyCustomer`; no storage node changes; `get-customer` and `list-customers` attach `signed-in`; the
     digest's graph reads the view and its trigger attaches `employees-only`; `sabotage-scoping.test.ts`; the README's
     storage paragraph gains a sentence on scope.
 11. Viewer: the `scope` badge; the store page's `reads`, scope and view. Test.
@@ -623,7 +623,7 @@ not; over the fake OIDC issuer, the claims the type's fields name are read and t
   It does not, and that is the design: a domain graph cannot read the request (L002), so a tenant on the shape would
   have to arrive through the trigger's `fire.in` and the domain graph's `make`, and the value the store writes would
   then come from what the caller sent, exactly the provenance the rule refuses. Keeping it in the store puts the scope
-  where the request is read, in the data layer, and lets `Entry` mean an entry. The cost is that a domain graph that
+  where the request is read, in the data layer, and lets `Customer` mean a customer. The cost is that a domain graph that
   wants to *display* the tenant reads it through `in` from the trigger, like any request value, and that value is not
   the scope: the scope is the store's.
 - **Several scopes.** `scoped` is a map, so a collection may be scoped by a tenant and an owner at once, each column
@@ -631,7 +631,7 @@ not; over the fake OIDC issuer, the claims the type's fields name are read and t
 - **A view is the exemption, and it is a document.** The alternative -- `"scope": "*"`, or a flag on the node, or a
   policy named at the call site -- puts the exemption where the hole was. A view is a collection: `describe` lists
   who reads it, the viewer draws it, and A0n2 holds every trigger reaching it to one policy the store named.
-  Its cost is a second collection entry per crossing, which is the price of being able to find them all.
+  Its cost is a second collection customer per crossing, which is the price of being able to find them all.
 - **One read, not a computation.** A scope is `{{name}}` and nothing else: no interpolation, no field of a read, no
   graph between the guard and the column. An employee's tenant is therefore decided at sign-in and written into the
   session, not derived from the realm at every call; a "subject → tenant" membership table is read at sign-in, once,

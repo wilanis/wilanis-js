@@ -13,7 +13,7 @@
 A tree can state a rule that must hold everywhere, in one document, and the checker holds every document
 to it. Today the checker answers structural questions: does the reference exist, does the type fit, is
 the reason mapped. An `invariant` document asks a behavioural one: is every write to this port gated by
-a signed-in recorder, is a URL ever empty. The checker proves what it can at compile time and refuses
+a signed-in registrar, is a URL ever empty. The checker proves what it can at compile time and refuses
 with an `I` code where the tree contradicts the invariant. Where a value cannot be judged before it
 exists, the compiler lowers a guard the author never writes, and `rehearse` reports which invariants
 were proved and which are guarded at run time. Nothing is added to the engine: a guard is a `switch`
@@ -21,16 +21,16 @@ and a `refuse` node the compiler synthesises.
 
 ## Motivation
 
-The example gates every write of the monitor feature with `@access/edge/can-register.policy.json`. It
+The example gates every write of the customers feature with `@access/edge/can-register.policy.json`. It
 does so trigger by trigger: five triggers each attach `employees-only` and `can-register`, and a sixth
 operation, `#record`, is gated only because the two that reach it are. Nothing in the tree says that this
-is a rule rather than five coincidences and a piece of luck. An agent adding `PATCH /monitor/{id}/method`
+is a rule rather than five coincidences and a piece of luck. An agent adding `PATCH /customers/{id}/method`
 that fires `customer.port.json#update` and forgets the policies produces a tree `wilanis check` accepts.
 The write is public, and the only thing that would catch it is a human reading the trigger.
 
 The same holds for the values the domain trusts. `Customer.shape.json` says `url` is a string. It cannot
 say the string is never empty. A data graph translating a row from the upstream API can hand the domain
-an entry with `"url": ""`, and every graph downstream believes it.
+a customer with `"email": ""`, and every graph downstream believes it.
 
 Both mistakes are of one kind: a rule the author holds in their head and the tree cannot state. An
 `invariant` document states it. The checker then has two jobs it did not have: to find every place the
@@ -58,8 +58,8 @@ the policy says what it decides.
 ```json
 {
   "$schema": "@wilanis/invariant.schema.json",
-  "label": "Writes are for recorders",
-  "description": "Every trigger that can change an entry attaches the recorder policy. Reads stay public.",
+  "label": "Writes are for registrars",
+  "description": "Every trigger that can change a customer attaches the registrar policy. Reads stay public.",
   "access": {
     "over": [
       "@customers/domain/customer.port.json#register",
@@ -76,7 +76,7 @@ the policy says what it decides.
 }
 ```
 
-"Reaches" is transitive. `POST /monitor/import` fires `#import`, whose domain graph calls `#record` for
+"Reaches" is transitive. `POST /customers/import` fires `#import`, whose domain graph calls `#record` for
 every row; the trigger therefore reaches `#record`, and the invariant holds it to the same gate. A
 domain graph cannot route around an invariant by calling the operation itself.
 
@@ -94,7 +94,7 @@ Drop `can-register` from `delete-customer.trigger.json` and `wilanis check` answ
 
 ```
 I001  @features/customers/edge/delete-customer.trigger.json#policies
-    trigger reaches @customers/domain/customer.port.json#remove, which 'Writes are for recorders'
+    trigger reaches @customers/domain/customer.port.json#remove, which 'Writes are for registrars'
     (@customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json,
     but attaches no such policy
     → attach "@access/edge/can-register.policy.json" under policies, or take #remove out of the invariant's over
@@ -106,20 +106,20 @@ already uses: `has()`, `len()`, comparisons, `in`, `&&`, `||`, `!`. The fields a
 ```json
 {
   "$schema": "@wilanis/invariant.schema.json",
-  "label": "An entry names a call",
+  "label": "A customer is reachable",
   "description": "A URL is never empty, and a deletion always says who asked for it.",
   "holds": {
     "on": "@customers/domain/Customer.shape.json",
-    "when": "len(url) > 0 && (method != 'DELETE' || has(ua))"
+    "when": "len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))"
   }
 }
 ```
 
-Where a value of `Entry` comes into being, the rule is judged:
+Where a value of `Customer` comes into being, the rule is judged:
 
 - If every value the rule reads is a literal at that node, the checker evaluates the rule. True is
   proved; false is a refusal, I005, at check time.
-- If a `switch` that routes to the node already established the rule (its `when` says `len(url) > 0`
+- If a `switch` that routes to the node already established the rule (its `when` says `len(email) > 0`
   about the same value), the node is proved by narrowing, the way `has()` narrows a read today.
 - Otherwise the compiler lowers a **guard** at the node: a `switch` on the rule, routing to the value
   when it holds and to a `refuse` with reason `invariant` when it does not. The author writes nothing;
@@ -128,11 +128,11 @@ Where a value of `Entry` comes into being, the rule is judged:
 `wilanis rehearse` then reports a guard as it reports a decision:
 
 ```
-features/customers/data/create-row  guard 'row' An entry names a call  2/2 branches
+features/customers/data/create-row  guard 'row' A customer is reachable  2/2 branches
   ok  holds     answered from 'row'
-  ok  violated  refused on purpose at 'row:violated' as invariant: "An entry names a call does not hold"
+  ok  violated  refused on purpose at 'row:violated' as invariant: "A customer is reachable does not hold"
 
-invariants -- 2 declared: 'Writes are for recorders' holds at 6 trigger(s); 'An entry names a call' proved at 1 site(s), guarded at 5.
+invariants -- 2 declared: 'Writes are for registrars' holds at 6 trigger(s); 'A customer is reachable' proved at 1 site(s), guarded at 5.
 ```
 
 The two examples above are added to the example tree by this RFC, so its tests exercise both forms.
@@ -179,7 +179,7 @@ those ports is held to it. The exemption is I003 alone (above): an include may c
 not exercise without being wrong.
 
 **`proves` stays a static list of paths.** It is a compile-time claim, not a run-time one: A001 judges each
-entry is a `request.*` path and A006 lets a resolver lean on it, so I001 can be decided without running
+customer is a `request.*` path and A006 lets a resolver lean on it, so I001 can be decided without running
 anything. Naming a graph there -- to compute the required proofs from a store or an identity provider --
 would make both undecidable, and the invariant would assert something the checker cannot see. Dynamic access
 is already expressible where it belongs: a policy's `decide.run` names a domain port operation, and the
@@ -239,7 +239,7 @@ by `sitesOf(scope, shape)` in `packages/compiler/src/sites.ts`, used by the chec
   operation of RFC 0002). A domain operation's result is not a site: it was made inside the graph that
   answers it and judged there.
 - A **taken site**: a graph whose `in` is the shape or a list of it. The value arrives from a caller, a
-  trigger through the embedder or another graph, and is judged on entry.
+  trigger through the embedder or another graph, and is judged on customer.
 
 **Proof.** A site is proved when every conjunct of the rule (`&&` at the top, as `provedBy` in
 `packages/core/src/expr/check.ts` splits it) is established, by one of:
@@ -261,7 +261,7 @@ lowered, each guarded made site `id` becomes three kernel nodes and a rename:
 
 ```
 id:made      the original node, as lowered
-id:check     switch  in: one entry per root the rule reads, {{id:made.<field>}}
+id:check     switch  in: one customer per root the rule reads, {{id:made.<field>}}
                      rules: [{ when: <rule>, to: 'id' }]   else: 'id:violated'
 id           call    @std/object.port.json#make  value: {{id:made}}  type: <shape>
 id:violated  call    @std/outcome.port.json#refuse  reason: 'invariant'
@@ -342,28 +342,28 @@ Sabotage tests in a new `packages/runtime/test/sabotage-invariants.test.ts`, thr
 - I003: `over: ["@customers/domain/customer.port.json#listByTier"]` with `list-customers.graph.json`
   edited not to call it; `on` a core shape no graph makes or takes.
 - I004: `when: "quantity >= 0"` (no such field); `when: "url > 3"` (string against number);
-  `when: "len(url) >"` (parse error).
-- I005: in `register-customer.graph.json`, a `make` node with a literal `{ "id": "x", "url": "", "method": "GET" }`.
+  `when: "len(email) >"` (parse error).
+- I005: in `register-customer.graph.json`, a `make` node with a literal `{ "id": "x", "email": "", "method": "GET" }`.
 - I006: `reason: "invariant"` on `create-row.graph.json`'s `failed` node.
 - D008: `relocate` an invariant to `edge/` or `data/`.
 - T005/T006: with the field invariant present, drop `invariant` from `register-customer.trigger.json`'s
   refusal table → `['T005']`; with the invariant document removed, the mapping is `['T006']`.
 
 The proof rules themselves in `packages/runtime/test/invariant-proof.test.ts`, over graphs planted in a copy
-of the example, each case reading back how `heldAt` established every conjunct at one site of `Entry`. A
+of the example, each case reading back how `heldAt` established every conjunct at one site of `Customer`. A
 wrongly-proved invariant silently removes a guard, so what each rule refuses to prove is held as firmly as
 what it proves: a literal site proved and a contradicting one refused; a site the routing established the
 rule for proved, and the switch named; `>` proving `>=` and `!=`, and `==` a literal proving `!=` another;
-and guarded, every one of them -- `len(url) > 1` against `len(url) > 0` (no arithmetic on the literals),
-`0 < len(url)` against `len(url) > 0` (no reversed comparison), `== 'GET'` against `== 'POST'`,
-`len(url) > 0` against `has(url)`, a rule about a field the routing never mentioned, a read of a node that
+and guarded, every one of them -- `len(email) > 1` against `len(email) > 0` (no arithmetic on the literals),
+`0 < len(email)` against `len(email) > 0` (no reversed comparison), `== 'gold'` against `== 'silver'`,
+`len(email) > 0` against `has(email)`, a rule about a field the routing never mentioned, a read of a node that
 is no site of the shape, a read of a field rather than the value whole, and every taken site.
 
 Behaviour tests in `packages/runtime/test/example.test.ts` and `branches.test.ts`:
 
-- `rehearse` reports `guard 'row' An entry names a call  2/2 branches` for each guarded data graph,
+- `rehearse` reports `guard 'row' A customer is reachable  2/2 branches` for each guarded data graph,
   `proved` for `register-customer.graph.json`'s pass-through, and the summary line, for every seed 1 to 8.
-- A run through `wilanis run` with a stubbed upstream answering `"url": ""` refuses with reason
+- A run through `wilanis run` with a stubbed upstream answering `"email": ""` refuses with reason
   `invariant`, and the http kind answers the status the trigger maps.
 - `describe` of the invariant, of `delete-customer.trigger.json` and of `Customer.shape.json` print the lines
   above; `map` prints `holds` under each write trigger.
@@ -380,7 +380,7 @@ document with both or neither. `packages/view/test` gains the invariant page of 
    scaffold, the validate baseline. `area:core`, `area:runtime`. Good first issue: it follows the recipe
    in `CLAUDE.md` for a new kind.
 2. **Reaching.** Factor `operationsReachable` out of `refusalsReachable` in `refusals.ts`, with a test
-   that `import-entries` reaches `#record`. `area:compiler`.
+   that `import-customers` reaches `#record`. `area:compiler`.
 3. **Access invariants.** `check/invariants.ts` with I001, I002, I003 for the `access` form; the
    `judgeTree` order; the two example invariants and their sabotage tests. `area:compiler`.
 4. **Sites and proof.** `sites.ts`; `Narrowing` collecting every conjunct; the three proof rules; I004
@@ -410,12 +410,12 @@ a payment result") are transitions over stored state. They need a record's old a
 storage operation, and are best stated against a lifecycle construct. Section "Class 3" names the shape
 of the design so RFC 0002 and RFC 0021 leave room for it; this RFC does not design it.
 
-**A rule on the shape itself** (`"where": "len(url) > 0"` inside `Customer.shape.json`) was considered.
+**A rule on the shape itself** (`"where": "len(email) > 0"` inside `Customer.shape.json`) was considered.
 It is shorter, but a shape is a type and this is a rule with a label, a description and a place in the
 checker's output; a document of its own is what `describe`, `map` and the viewer can name, and what an
 include can ship. It also keeps the shape schema unchanged.
 
-**Naming a role** in an access invariant (`"requires": { "role": "recorder" }`) was considered and
+**Naming a role** in an access invariant (`"requires": { "role": "registrar" }`) was considered and
 rejected: the checker cannot read a role out of a policy's graph without learning what a principal is,
 which is the guard's business. Naming the policy says the same thing without a new concept.
 

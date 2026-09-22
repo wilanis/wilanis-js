@@ -23,7 +23,7 @@ tree, a document kind or the runtime; two published TypeScript types change shap
 ## Motivation
 
 RFC 0027 turned twelve sentences of `CLAUDE.md` into tests. Reviewing what it left out began from three DRY
-violations found *by reading* the suite it had just built: `sourceFiles` and `entriesUnder` in
+violations found *by reading* the suite it had just built: `sourceFiles` and `customersUnder` in
 `fitness/lib/sources.ts` were the same recursive walk with a different filter, written four tasks apart;
 `fileExists` and `statOf` both wrapped `statSync` in a `try`; `statementsOf` and `Manifest` were exported and
 used by nothing outside `lib/`. Pull request #110 folded them. The question that followed was whether the
@@ -32,7 +32,7 @@ now are, and the first answer offered was that DRY has a mechanical signature (d
 two do not.
 
 Measured against the code, that answer is wrong in both directions, and this RFC records why. Duplication
-does not have a clean signature: at any threshold that catches the `sourceFiles`/`entriesUnder` pair it
+does not have a clean signature: at any threshold that catches the `sourceFiles`/`customersUnder` pair it
 also catches the compiler's designed entry points (the numbers are under "Drawbacks and alternatives").
 But four sentences under "Principles" do have one, none of them import-shaped, and each is false or
 unguarded today:
@@ -48,7 +48,7 @@ unguarded today:
   which a grep for `refuse(` misses and two readers of this RFC miscounted by. An agent in a repair loop
   reads `B001 operation 'x' of 'p' is not bound` and is left to guess the edit.
 - "Every document kind has a schema with descriptions." Under `packages/core/schemas/` and its `node/`
-  directory, 19 files, there are 200 properties -- every entry of every `properties` object anywhere in a
+  directory, 19 files, there are 200 properties -- every customer of every `properties` object anywhere in a
   file, under whatever keyword holds it (`items`, `additionalProperties`, `allOf`, `if`,
   `dependentSchemas`, `$defs`); 121 carry no `description` of their own. 26 of those are a `$ref` to a
   definition that describes itself, which is a description by reference; 95 are not: 83 plain properties
@@ -205,7 +205,7 @@ whether the claim holds on `main` at the time of writing, which the implementing
 | File | Claim | Data | Today |
 |---|---|---|---|
 | `a-refusal-says-how-to-fix-it` | `Refusal` in `packages/core/src/registry.ts` and `Refuser` in `packages/compiler/src/check/judge.ts` do not declare `hint` optional | `SHAPES` (the two declarations and the member) | fails: both declare `hint?`; 46 of 118 `refuse(` calls under `compiler/src/check` and 10 of 23 refusal literals in `core/src` pass none (the 12 literals in the runtime's loader and the plugins' X rules all carry one). The implementing task writes the 56 hints, then requires the member. `at` stays optional, as settled: 12 of the 23 core literals refuse a file as a whole (unreadable, of no known kind), and a path into a document that could not be parsed is a fiction; the claim pins `hint` alone |
-| `a-schema-describes-every-property` | every property of every `*.schema.json` under `packages/core/schemas/` and `node/` carries a `description`, or is a `$ref` to a definition that does; every `$defs` entry carries one | `SCHEMAS = ['packages/core/schemas', 'packages/core/schemas/node']` | fails: 19 files, 200 properties (every entry of every `properties` object, under whatever keyword), 95 violations (83 plain, 12 `$ref` to an undescribed definition), 3 of 11 `$defs` undescribed (`common.schema.json` `type`, `fields`, `values`, which the 12 point at). A `$ref` to a described definition counts as a description, as settled: 26 properties rely on it, and the alternative repeats what `common.schema.json` says once; a `$ref` resolves in its own file, or in the file of the set its path names. The implementing task writes 86 sentences: 83 on properties, 3 on `$defs` |
+| `a-schema-describes-every-property` | every property of every `*.schema.json` under `packages/core/schemas/` and `node/` carries a `description`, or is a `$ref` to a definition that does; every `$defs` customer carries one | `SCHEMAS = ['packages/core/schemas', 'packages/core/schemas/node']` | fails: 19 files, 200 properties (every customer of every `properties` object, under whatever keyword), 95 violations (83 plain, 12 `$ref` to an undescribed definition), 3 of 11 `$defs` undescribed (`common.schema.json` `type`, `fields`, `values`, which the 12 point at). A `$ref` to a described definition counts as a description, as settled: 26 properties rely on it, and the alternative repeats what `common.schema.json` says once; a `$ref` resolves in its own file, or in the file of the set its path names. The implementing task writes 86 sentences: 83 on properties, 3 on `$defs` |
 | `a-blob-is-never-read-whole` | under `packages/*/src`, `readAll` is imported from `@wilanis/core` only by the files the table names | `MAY_READ_WHOLE = { 'packages/plugin-http/src/codecs.ts': 'the JSON, text and form codecs need the body entire; the blob codec streams', 'packages/plugin-blob/src/index.ts': '@blob/text#read answers the file as a string; the string is the value, so there is no copy beside the store' }` | holds once the table names both: `plugin-http/src/codecs.ts` and `plugin-blob/src/index.ts` are the only importers today |
 | `only-the-guard-knows-who-is-calling` | no identifier and no string literal under `packages/plugin-*/src` other than the guard's, nor under `packages/runtime/src/plugins/`, is one of the guard's words | `GUARD = 'packages/plugin-auth'`, `KINDS_OF_THE_RUNTIME = 'packages/runtime/src/plugins'`, `WORDS = ['principal', 'session', 'challenge', 'credential', 'credentials', 'policy', 'policies']` | holds: `plugin-http/src` carries `policy` in two comments (`serve.ts:177`, `answer.ts:121`), which a reader of identifiers passes over. The embedder, `discovery.ts`, `stubbing.ts`, `scaffolds.ts` and the view know the words because they run, print, rehearse, scaffold and show the gate; they are outside the claim's scope by design, not exempted by data |
 | `a-fitness-function-is-one-claim` (amended) | as today, and: every export of `fitness/lib/*.ts` is imported by a `*.fitness.ts`, or is a type named in the signature of an export that is | none | holds: `Export` in `lib/sources.ts` is the one export no claim imports, and it is the return type of `exportsOf`, which `every-public-function-says-what-it-answers` imports |
@@ -228,7 +228,7 @@ reader nobody reads:
 - `wordsOf(text)`: every identifier and every string literal of a file, comments excluded, so a claim can
   hold a vocabulary. In `sources.ts`.
 
-The amended one-claim rule needs no reader beyond `textOf` and `entriesUnder`: it matches `export` lines in
+The amended one-claim rule needs no reader beyond `textOf` and `customersUnder`: it matches `export` lines in
 `lib/` and `import { ... } from './lib/` lines in the claims, as its `exportedNames` already does for the
 four owed exports.
 
@@ -253,7 +253,7 @@ field's shape a decision that is changed on purpose, not a line that drifts back
 The fitness functions are the tests, registered by `fitness/run.test.ts`: one test under each claim and one
 proof, "<claim> bites", over its `sabotage` cases. The cases: a `registry.ts` text declaring `hint?: string`;
 a schema with a plain undescribed property, one with a `$ref` to an undescribed definition, and an
-undescribed `$defs` entry; a file the table does not name (`packages/plugin-reload/src/index.ts`) importing
+undescribed `$defs` customer; a file the table does not name (`packages/plugin-reload/src/index.ts`) importing
 `readAll` from `@wilanis/core`;
 a file under `packages/plugin-http/src` with the identifier `session`; a `lib/` file exporting `unused`
 that no claim imports, and one exporting a type named in an imported function's signature, which passes.
@@ -324,7 +324,7 @@ At 0.9, the six compiler pairs are every pairing of the three-line family entry 
 are the seam `judgeTree` runs and the shape `CLAUDE.md` asks for, not duplication. `fileExists` and
 `dirExists` in `fitness/lib/sources.ts` score 1.00 and differ in `isFile` against `isDirectory`;
 `parse.ts:or` and `parse.ts:and` in core score 1.00 and are two precedence levels of one parser. The pair
-that motivated the proposal, `sourceFiles`/`entriesUnder`, needed a threshold near 0.9 to be caught at all,
+that motivated the proposal, `sourceFiles`/`customersUnder`, needed a threshold near 0.9 to be caught at all,
 and at that threshold the exemption list fills on the first run. Below 0.8 the compiler alone yields 38 to
 220 pairs. The claim would need two constants -- the threshold and the minimum body length -- and its
 violation would read "A resembles B at 0.91", which names no edit. RFC 0027 says "this RFC does not add

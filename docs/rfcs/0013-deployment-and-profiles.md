@@ -47,7 +47,7 @@ each visible in the code:
 - **A connection that differs by place is a duplicated binding.** A profile swaps bindings and nothing
   else, so a base URL, a pool size or an endpoint that differs between staging and production means a second
   connection *and* a second binding to name it (RFC 0002, *Drawbacks*; RFC 0022 leaves "swapping a connection
-  per profile" to this RFC). The alternative in use, `"baseUrl": "{{secrets.monitorBase}}"`, makes a URL a
+  per profile" to this RFC). The alternative in use, `"baseUrl": "{{secrets.customerBase}}"`, makes a URL a
   secret, and the trace then redacts the one thing an operator wants to read.
 - **"What a tree needs to run" has no name.** The compiler already walks from an operation through the
   profile's binding to the graphs it reaches, once, for one payload: `opNeeds` in `check/resolvers.ts`, the
@@ -84,7 +84,7 @@ includes `project.json` names, and nothing else: no build output, since document
 starts it, `wilanis start <root> --profile <name>`, and what the process does there is what the profile says.
 
 **The example, after this RFC.** `example/project.json` declares two profiles. `live` is the laptop and the
-default; `production` is the same tree against the real monitor API, with no file watcher:
+default; `production` is the same tree against the real customers API, with no file watcher:
 
 ```json
 "profiles": {
@@ -97,13 +97,13 @@ default; `production` is the same tree against the real monitor API, with no fil
     }
   },
   "production": {
-    "description": "Behind the load balancer: the same bindings, the real monitor API in place of the test one, nothing watched.",
+    "description": "Behind the load balancer: the same bindings, the real customers API in place of the test one, nothing watched.",
     "bindings": {
       "@customers/domain/customer.port.json": "@customers/data/customers-rest.binding.json",
       "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json"
     },
     "connections": {
-      "@connections/customers-api.connection.json": "@connections/monitor-api-production.connection.json"
+      "@connections/customers-api.connection.json": "@connections/customers-api-production.connection.json"
     }
   }
 }
@@ -116,13 +116,13 @@ kind, with its own description and its own settings:
 ```json
 {
   "$schema": "@wilanis/connection.schema.json",
-  "label": "Monitor API (production)",
-  "description": "The monitor's real REST API. Same routes as the test API; authenticated with a key the environment supplies.",
+  "label": "Customers API (production)",
+  "description": "The customers's real REST API. Same routes as the test API; authenticated with a key the environment supplies.",
   "kind": "@http/http.connection-kind.json",
   "settings": {
-    "baseUrl": "https://monitor.internal/api/v1",
+    "baseUrl": "https://customers.internal/api/v1",
     "timeoutMs": 5000,
-    "headers": { "x-api-key": "{{secrets.monitorKey}}" },
+    "headers": { "x-api-key": "{{secrets.customerKey}}" },
     "throttle": { "concurrency": 16 }
   }
 }
@@ -133,14 +133,14 @@ Not one document under `features/` changes: every data graph still says `"connec
 secret it reads is declared once, beside the one the tokens already read:
 
 ```json
-"secrets": { "jwt": "CUSTOMERS_JWT_SECRET", "monitorKey": "MONITOR_API_KEY" }
+"secrets": { "jwt": "CUSTOMERS_JWT_SECRET", "customerKey": "CUSTOMERS_API_KEY" }
 ```
 
 The watcher is a startup step, and a step may say which profiles run it:
 
 ```json
 "startup": [
-  { "label": "Reach the entry store", "run": "@customers/domain/customer.port.json#listAll", "required": true },
+  { "label": "Reach the customer store", "run": "@customers/domain/customer.port.json#listAll", "required": true },
   { "label": "Watch for changes", "run": "@reload/watch.port.json#watch", "profiles": ["live"] },
   { "label": "Listen", "run": "@http/server.port.json#listen" }
 ]
@@ -173,7 +173,7 @@ pool when the message prints:
 ```
 $ npx wilanis start example --profile production
 profile production
-missing secrets: MONITOR_API_KEY (monitorKey, read by @connections/monitor-api-production.connection.json),
+missing secrets: CUSTOMERS_API_KEY (customerKey, read by @connections/customers-api-production.connection.json),
   CUSTOMERS_JWT_SECRET (jwt, read by @auth settings); nothing is serving
 ```
 
@@ -188,14 +188,14 @@ needs no variable, as today.
 profile production
   binds     @customers/domain/customer.port.json  → @customers/data/customers-rest.binding.json
             @access/domain/identity.port.json  → @features/directories/data/identity.binding.json
-  stands in @connections/customers-api.connection.json  → @connections/monitor-api-production.connection.json
-  reaches   @http/http.port.json#request       via @connections/monitor-api-production.connection.json
+  stands in @connections/customers-api.connection.json  → @connections/customers-api-production.connection.json
+  reaches   @http/http.port.json#request       via @connections/customers-api-production.connection.json
             @auth/identity.port.json#verify    via @connections/employees.connection.json, @connections/customers.connection.json
             @auth/token.port.json#issue, #refresh
             @blob/csv.port.json#parse, #write
   holds     @http/server.port.json#listen
-  starts    Reach the entry store · Listen
-  needs     MONITOR_API_KEY (monitorKey) · CUSTOMERS_JWT_SECRET (jwt)
+  starts    Reach the customer store · Listen
+  needs     CUSTOMERS_API_KEY (customerKey) · CUSTOMERS_JWT_SECRET (jwt)
 ```
 
 ## Reference
@@ -321,14 +321,14 @@ The reach, in `packages/runtime/test/example.test.ts`: `reachOf` of the example 
 `@http/http.port.json#request` via `customers-api.connection.json`, `@auth/identity.port.json#verify` via the two
 directories, the `@auth/token` and `@blob/csv` operations, `listen` and `watch` (and, once RFC 0005 lands,
 `@auth/files.port.json` through the state binding); under `production` the stand-in replaces
-`monitor-api`, `watch` is absent, and `secrets` holds `jwt` and `monitorKey`.
+`customers-api`, `watch` is absent, and `secrets` holds `jwt` and `customerKey`.
 
 Start, in `packages/runtime/test/startup.test.ts`, against a plugin whose `postLoad` records that it ran:
 
 - profiles declared, no flag, no `WILANIS_PROFILE`, no default → throws naming both profiles; `postLoad` did
   not run;
 - `WILANIS_PROFILE=production` → the log's first line is `profile production`; `--profile live` beside it wins;
-- `production` with `MONITOR_API_KEY` unset → throws naming `MONITOR_API_KEY` and the stand-in, and not
+- `production` with `CUSTOMERS_API_KEY` unset → throws naming `CUSTOMERS_API_KEY` and the stand-in, and not
   `CUSTOMERS_JWT_SECRET` when that one is set; `postLoad` did not run;
 - `production` with a variable set only for a connection `live` alone reaches → starts;
 - `production` runs two steps and `live` three, by the log.
@@ -342,7 +342,7 @@ Start, in `packages/runtime/test/startup.test.ts`, against a plugin whose `postL
 3. `activeProfile`; `start`, `run`, `rehearse`, `fuzz`, `regress` through it; the scoped secrets refusal
    before `postLoad`; `runStartup` per profile; `Served.reload`; the usage text; the start tests.
    (`area:runtime`)
-4. The example: `production`, the stand-in connection, `monitorKey`, `watch` under `live`, `default` on `live`;
+4. The example: `production`, the stand-in connection, `customerKey`, `watch` under `live`, `default` on `live`;
    `wilanis new project`; `templates/CLAUDE.md`; the README's *Try it* and startup paragraphs.
    (`area:runtime`; `good first issue` for the templates and README)
 5. `describe project.json` and `describe <connection>`; the viewer's project page.
@@ -390,7 +390,7 @@ None before `accepted`.
   profile, since the chart always does. Setting `WILANIS_PROFILE` in every shell was rejected as a paper cut that
   would teach nobody anything. *Drawbacks*, first item.
 - **A stand-in may also be named directly.** A stand-in is an ordinary connection document: a data graph may name it
-  as its `connection` and a profile may name it on the right of a `connections` entry, and neither use refuses the
+  as its `connection` and a profile may name it on the right of a `connections` customer, and neither use refuses the
   other. A rule that a stand-in is named nowhere else is cheap to add if a tree gets confusing, and is not added until
   one does.
 

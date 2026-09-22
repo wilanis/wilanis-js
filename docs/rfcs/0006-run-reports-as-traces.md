@@ -20,7 +20,7 @@ instrumentation.
 A request that answers 502 today leaves one line, written by the http listener in `packages/plugin-http/src/serve.ts`:
 
 ```
-GET /monitor/golf → 502 (143ms, @customers/domain/customer.port.json#get failed)
+GET /customers/golf → 502 (143ms, @customers/domain/customer.port.json#get failed)
 ```
 
 The report behind it knows far more: that `asked` (the `http.request` node) took 131 of those 143 ms against
@@ -46,19 +46,19 @@ A run of a trigger is one trace. Its root span is the fire; under it, the guard'
 decision, then the operation itself; under the operation, one span per node that ran, and a binding graph's
 nodes under the node that called it. Nothing is added to the tree to get this.
 
-Running the example's `GET /monitor/{id}` with tracing on:
+Running the example's `GET /customers/{id}` with tracing on:
 
 ```
 $ npx wilanis start example --trace
 ...
-trace 01J8ZK5R9V3Q  GET /monitor/golf → 502  143ms
+trace 01J8ZK5R9V3Q  GET /customers/golf → 502  143ms
   fire @customers/edge/get-customer.trigger.json                    143ms  refused: upstream
     @customers/domain/customer.port.json#get                       141ms  refused: upstream
-      binding @customers/data/monitor.binding.json#get            141ms
+      binding @customers/data/customers.binding.json#get            141ms
         get-row (@customers/data/get-row.graph.json)              140ms  refused: upstream
           asked   @http/http.port.json#request                  131ms  ok   connection=@connections/customers-api.connection.json status=500
           route   switch → failed                                 0ms  ok
-          failed  @std/outcome.port.json#refuse                   0ms  refused: upstream "the monitor API answered 500"
+          failed  @std/outcome.port.json#refuse                   0ms  refused: upstream "the customer API answered 500"
           missing                                                      cancelled
           row                                                          cancelled
 ```
@@ -66,11 +66,11 @@ trace 01J8ZK5R9V3Q  GET /monitor/golf → 502  143ms
 A gated trigger shows the gate:
 
 ```
-trace 01J8ZK6D2M7X  DELETE /monitor/golf → 403  9ms  correlation=00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
-  fire @customers/edge/remove-entry.trigger.json                   9ms  denied: forbidden
+trace 01J8ZK6D2M7X  DELETE /customers/golf → 403  9ms  correlation=00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+  fire @customers/edge/remove-customer.trigger.json                   9ms  denied: forbidden
     identify (@auth)                                             6ms  ok   principal=yes session=yes
     policy @access/edge/signed-in.policy.json                    1ms  allowed
-    policy @access/edge/recorder-only.policy.json                1ms  denied: forbidden "the recorder role is required"
+    policy @access/edge/registrar-only.policy.json                1ms  denied: forbidden "the registrar role is required"
 ```
 
 The same trace as JSON (`--trace=json`) is one object per run on stdout, for a log shipper. To send traces to
@@ -78,7 +78,7 @@ a collector instead, a project adds the exporter to what it starts, exactly as i
 
 ```json
 "plugins": [
-  { "use": "@otel", "from": "@wilanis/plugin-otel", "settings": { "endpoint": "{{secrets.OTLP_ENDPOINT}}", "service": "monitor" } }
+  { "use": "@otel", "from": "@wilanis/plugin-otel", "settings": { "endpoint": "{{secrets.OTLP_ENDPOINT}}", "service": "customers" } }
 ],
 "startup": [
   { "label": "Export traces", "run": "@otel/exporter.port.json#export" },
@@ -226,7 +226,7 @@ sees the branches not taken; the `full` level keeps them, the `summary` level dr
 carries the request: only the correlation string. At level `summary` a span carries status, timing and the
 attributes above, and never a value. At level `full` a span also carries `wilanis.in` and `wilanis.out` as JSON
 of the report's redacted `in`/`out`, and `wilanis.error` as the node's message. A refusal's `message` and a
-fault's `error` can interpolate values (`"no entry {{in.id}}"`), and the rule is that `summary` carries the
+fault's `error` can interpolate values (`"no customer {{in.id}}"`), and the rule is that `summary` carries the
 reason alone and never the message; the message appears at `full` only. This RFC first said `trace.ts` would
 pass every message through `redactValue` with the union of the node's redact paths; it does not, because a
 message is a string and `redactValue` walks paths into a value -- see "Decided during implementation" 3.
@@ -306,8 +306,8 @@ gains a member, which only plugins that hold something ever see. `@wilanis/plugi
 | Test | Where | What it does |
 |---|---|---|
 | a frozen clock stamps every node | `packages/engine/test/kernel.test.ts` | run a spec with `clock` counting 1, 2, 3; expect the stamps |
-| a fire yields a trace with the right spans | `packages/runtime/test/trace.test.ts` (new) | fire `GET /monitor/{id}` through the example harness with stubs; expect `fire → #get → binding → get-row → asked/route/failed`, statuses and `wilanis.connection` |
-| a gated fire shows identify and every policy | `packages/runtime/test/trace.test.ts` | fire `DELETE /monitor/{id}` with a token from the access tree's fake directory; expect `identify` then two `policy` spans, the second `denied: forbidden` |
+| a fire yields a trace with the right spans | `packages/runtime/test/trace.test.ts` (new) | fire `GET /customers/{id}` through the example harness with stubs; expect `fire → #get → binding → get-row → asked/route/failed`, statuses and `wilanis.connection` |
+| a gated fire shows identify and every policy | `packages/runtime/test/trace.test.ts` | fire `DELETE /customers/{id}` with a token from the access tree's fake directory; expect `identify` then two `policy` spans, the second `denied: forbidden` |
 | a startup step is traced | `packages/runtime/test/startup.test.ts` | `start` with a printing observer; expect one trace per step |
 | an allowed decision is kept, a stubbed run records nothing | `packages/runtime/test/trace.test.ts` | rehearse the example; expect no observer call |
 | `summary` carries no value, `full` carries redacted ones | `packages/runtime/test/trace.test.ts` | fire sign-in; expect `«secret»` in `wilanis.in` at `full`, and no `wilanis.in` at `summary` |

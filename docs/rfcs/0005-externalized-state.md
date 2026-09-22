@@ -104,7 +104,7 @@ feature, its two collections `of` the shapes `@auth` grants:
 ```
 
 and binds the same six operations to `@storage/store.port.json`, every delegation naming the store, the
-collection and the collection's shape as `type`, the way RFC 0002's example binds the monitor's entries:
+collection and the collection's shape as `type`, the way RFC 0002's example binds the customers's customers:
 
 ```json
 {
@@ -167,7 +167,7 @@ plugin offers a blob store for. Absent, the registry is the file store it is tod
   "$schema": "@wilanis/connection.schema.json",
   "label": "Uploads bucket",
   "kind": "@s3/bucket.connection-kind.json",
-  "settings": { "endpoint": "http://minio.wilanis.svc:9000", "region": "us-east-1", "bucket": "monitor-uploads", "accessKeyId": "{{secrets.s3Key}}", "secretAccessKey": "{{secrets.s3Secret}}" }
+  "settings": { "endpoint": "http://minio.wilanis.svc:9000", "region": "us-east-1", "bucket": "customers-uploads", "accessKeyId": "{{secrets.s3Key}}", "secretAccessKey": "{{secrets.s3Secret}}" }
 }
 ```
 

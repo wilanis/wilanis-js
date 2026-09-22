@@ -78,7 +78,7 @@ field and none of this one; a report shows the value under the node's `in` besid
 
 ### The worked example
 
-The monitor has no operation that wants its site, and the first that will, RFC 0002's `raw`, is not in the workspace
+The customers has no operation that wants its site, and the first that will, RFC 0002's `raw`, is not in the workspace
 yet. The worked example is therefore a test plugin, `packages/runtime/test/fixtures/plugin-note/`, the shape every
 plugin has, whose one port keeps a note of who wrote what. Its port, `docs/note.port.json`:
 
@@ -107,7 +107,7 @@ A copy of the example gains the plugin and one node in `features/customers/data/
 { "type": "@wilanis/node/run.schema.json", "id": "noted", "label": "Note the record",
   "description": "Every record made through this graph is noted, so the test can see which site made it.",
   "run": "@note/note.port.json#record",
-  "in": { "text": "{{in.url}}" } }
+  "in": { "text": "{{in.email}}" } }
 ```
 
 `text` is the author's. `site` is not written, and the report of a run shows what the compiler wrote:
@@ -163,7 +163,7 @@ was renamed -- which is a change, and the diff says so.
 `types.ts` gain `provided?: 'site'`, filled by `TypeResolver.field`.
 
 **One shape the `@std` plugin grants.** `packages/runtime/docs/std/Site.shape.json`, listed under `grants.shapes` in
-`docs/std/plugin.json` (the first entry there): "Where a native operation was called, in the author's words. The
+`docs/std/plugin.json` (the first customer there): "Where a native operation was called, in the author's words. The
 compiler writes it for every field marked `provided: site`; nothing else does." Fields:
 
 | Field | Type | Description |

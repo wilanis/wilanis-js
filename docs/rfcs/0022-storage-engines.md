@@ -35,7 +35,7 @@ RFC 0002 made an engine a plugin and promised that "a tree can carry an engine w
 missing for that promise to be more than a shape of the code.
 
 The first is the second engine. The memory engine keeps nothing across a restart, which is right for a test and wrong
-for a developer who stops the server, edits a graph and starts again expecting yesterday's entries. PostgreSQL keeps
+for a developer who stops the server, edits a graph and starts again expecting yesterday's customers. PostgreSQL keeps
 them, and asks for a server, a URL, a secret and a running process before the first `put`. Between the two is what
 every framework's development story ends up being: one file, deleted with `rm`, copied with `cp`, opened with any
 SQLite tool, and real enough that a `unique` violation or a `refs` restriction is the same answer it will be in
@@ -46,7 +46,7 @@ planner, each of which is written against a real database and currently has one 
 
 The second is the vocabulary. Three RFCs already lean on a fact about the engine that no document states. RFC 0017
 says a plan is one transaction "where the engine can" and names `transactionalDdl` as this RFC's word. RFC 0003 has a
-rule, `a unique or refs entry names a field an engine cannot constrain`, with nothing to read. RFC 0004 lets a graph
+rule, `a unique or refs customer names a field an engine cannot constrain`, with nothing to read. RFC 0004 lets a graph
 declare `atomic` and RFC 0021 wonders aloud whether every connection "can carry that". Each of those is, today, a
 sentence in prose about PostgreSQL. Kysely speaks several dialects, and the temptation is to promise them all on the
 first day and let the differences surface as run-time failures. This RFC takes the opposite bet, as the stub did: the
@@ -68,16 +68,16 @@ tree gets from `wilanis init`, which is the template's decision, not this RFC's.
 planner read. An author never writes them: they are in a plugin's `docs/`. An author meets them in a refusal, or in
 `wilanis describe`.
 
-The example's entries live in memory under RFC 0002. To keep them across restarts, edit
+The example's customers live in memory under RFC 0002. To keep them across restarts, edit
 `example/connections/customers.connection.json`:
 
 ```json
 {
   "$schema": "@wilanis/connection.schema.json",
-  "label": "Entries",
-  "description": "Where the monitor's entries are kept: one SQLite file under .wilanis, created on first start.",
+  "label": "Customers",
+  "description": "Where the customers's customers are kept: one SQLite file under .wilanis, created on first start.",
   "kind": "@storage-sqlite/sqlite.connection-kind.json",
-  "settings": { "file": ".wilanis/entries.sqlite" }
+  "settings": { "file": ".wilanis/customers.sqlite" }
 }
 ```
 
@@ -105,14 +105,14 @@ The kind document the connection names, `packages/plugin-storage-sqlite/docs/sql
 Read the block top to bottom. A migration plan (RFC 0017) applies in one transaction, so a step that fails leaves
 the file as it was. A `unique` (RFC 0003) may name a string, a number or a boolean field, and not a field that is a
 shape, a list or `unknown`: those are kept as JSON, and equality of two JSON documents is not a business rule an
-author meant to declare. `refs` are enforced: a note whose entry does not exist is refused, and so is removing an
-entry that still has notes.
+author meant to declare. `refs` are enforced: a note whose customer does not exist is refused, and so is removing an
+customer that still has notes.
 
 The refusal an author meets when a declaration asks more than the engine gives. Declare, over a MySQL connection,
-`"unique": [["url", "meta"]]` where `meta` is a shape:
+`"unique": [["email", "meta"]]` where `meta` is a shape:
 
 ```
-C0nn  @features/customers/data/customers.store.json#collections/entries/unique/0/1
+C0nn  @features/customers/data/customers.store.json#collections/customers/unique/0/1
     'meta' is a shape; @storage-mysql/mysql.connection-kind.json constrains unique over string, number, boolean
     → wilanis describe @storage-mysql/mysql.connection-kind.json
 ```
@@ -125,11 +125,11 @@ What `describe` shows for the connection, one line more than RFC 0002 gave it:
 
 ```
 $ wilanis describe @connections/customers.connection.json
-connection  Entries
+connection  Customers
   kind          @storage-sqlite/sqlite.connection-kind.json  (granted by @storage-sqlite (@wilanis/plugin-storage-sqlite))
   capabilities  transactional DDL: yes; unique over: string, number, boolean; refs: yes
-  settings      file  .wilanis/entries.sqlite
-  stores        @customers/data/customers.store.json (entries, notes)
+  settings      file  .wilanis/customers.sqlite
+  stores        @customers/data/customers.store.json (customers, notes)
 ```
 
 MySQL is the same story with a URL. `example/connections/customers.connection.json` under a tree that has one:
@@ -137,10 +137,10 @@ MySQL is the same story with a URL. `example/connections/customers.connection.js
 ```json
 {
   "$schema": "@wilanis/connection.schema.json",
-  "label": "Entries",
-  "description": "The monitor's entries, in the team's MySQL.",
+  "label": "Customers",
+  "description": "The customers's customers, in the team's MySQL.",
   "kind": "@storage-mysql/mysql.connection-kind.json",
-  "settings": { "url": "{{secrets.entriesUrl}}", "pool": { "max": 10 } }
+  "settings": { "email": "{{secrets.customersUrl}}", "pool": { "max": 10 } }
 }
 ```
 
@@ -198,7 +198,7 @@ comparison, SQLite's case-insensitive `LIKE` -- the engine sets the dialect righ
 
 **Two existing kinds gain the block.** `@storage-memory/memory.connection-kind.json`:
 `{ "transactionalDdl": true, "unique": ["string", "number", "boolean", "shape", "list", "unknown"], "refs": true }`,
-every entry at its widest, which is the truth: it keeps any value, enforces `unique` and `refs` in `put` and `remove`
+every customer at its widest, which is the truth: it keeps any value, enforces `unique` and `refs` in `put` and `remove`
 (RFC 0003), and has nothing to migrate (RFC 0017), so a plan of zero steps is trivially one transaction.
 `@storage-postgres/postgres.connection-kind.json`: `{ "transactionalDdl": true, "unique": ["string", "number",
 "boolean"], "refs": true }`. PostgreSQL *can* put a unique constraint on a `jsonb` column; this RFC says a storage kind
@@ -298,7 +298,7 @@ The compiler, RFC 0003's rule given its fact (its code is assigned when RFC 0003
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
-| C0nn (RFC 0003) | `checkStore`, `check/contracts.ts` (or `check/stores.ts` once split) | a `unique` entry names a field whose `fieldClass` is not in the connection's kind's `capabilities.unique`, or a collection declares `refs` and the kind's `capabilities.refs` is false; the kind is read through `scope.get('connection-kind', kind)` from the connection `Judge.connectionOf` resolves | `'<field>' is a <class>; <kind> constrains unique over <list>` / `<kind> does not enforce refs; check the target with a get, or move the store to a connection that does` |
+| C0nn (RFC 0003) | `checkStore`, `check/contracts.ts` (or `check/stores.ts` once split) | a `unique` customer names a field whose `fieldClass` is not in the connection's kind's `capabilities.unique`, or a collection declares `refs` and the kind's `capabilities.refs` is false; the kind is read through `scope.get('connection-kind', kind)` from the connection `Judge.connectionOf` resolves | `'<field>' is a <class>; <kind> constrains unique over <list>` / `<kind> does not enforce refs; check the target with a get, or move the store to a connection that does` |
 
 Missing block on a storage kind: schema validation when the plugin loads (D001 family, existing), never a compiler
 rule; the compiler may assume every kind it reads with `storage: true` carries one.
@@ -520,7 +520,7 @@ those RFCs' shared suites, the sqlite ones unconditionally.
 
 ## Drawbacks and alternatives
 
-- **The matrix.** Every engine is a package, a README, a release entry and one run of every shared suite -- RFC 0002's
+- **The matrix.** Every engine is a package, a README, a release customer and one run of every shared suite -- RFC 0002's
   port suite, RFC 0004's atomic, RFC 0003's constraints, RFC 0015's scope, RFC 0017's planner, and RFC 0009's and
   0010's when they land. Seven suites by four engines is the cost the stub warned of, and it is paid by design rather
   than by accident: the suites are the definition of a store, and an engine that ran fewer of them would be an engine

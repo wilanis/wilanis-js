@@ -44,8 +44,8 @@ every operation the bot may perform and whose fields are the union of their inpu
 operation per action. Four things are wrong with it.
 
 **The bot's actions bypass the routes' policies.** `POST /chat` attaches the policies it attaches; the operations its
-switch reaches are the domain's, and the policies a route puts in front of `DELETE /monitor` are not in front of the
-chat's branch that removes an entry. The access invariant of RFC 0007 catches the write, and the author's fix is to
+switch reaches are the domain's, and the policies a route puts in front of `DELETE /customers` are not in front of the
+chat's branch that removes a customer. The access invariant of RFC 0007 catches the write, and the author's fix is to
 copy every reachable route's policies onto the chat trigger, gating every action by the strictest of them. What the
 author wanted is for the sentence to fire *the route*, so the route's policies decide, once, where they are written.
 No graph can do that: a graph is under a port, a trigger is the edge, and the layers point one way.
@@ -287,7 +287,7 @@ trigger  @tickets/edge/get-summary.trigger.json
 | `mode` | string, enum `fire` · `confirm`, default `fire` | "`fire`: the route fires. `confirm`: the route's gate runs and the listener answers the request a client sends to fire it, with `preview`'s answer beside it." |
 | `preview` | string, optional | "A trigger of the http kind fired for the details a client shows before confirming, with the same said fields. Only with `mode: confirm`." |
 
-`IntentDoc` in `model.ts` and the `Kind` entry; `HOME` in `placement.ts` puts it in `edge/` (D008 elsewhere); the row
+`IntentDoc` in `model.ts` and the `Kind` customer; `HOME` in `placement.ts` puts it in `edge/` (D008 elsewhere); the row
 in `packages/runtime/templates/CLAUDE.md`: `intent | a way to say a route: which trigger a sentence fires and the
 sentences that mean it | edge/`; `wilanis new intent <Name>` scaffolds one with `for` to fill and one example; the
 baseline in `packages/core/test/validate.test.ts`; a page in the viewer's `client/index.html` (`renderDocPage`) that
@@ -358,7 +358,7 @@ kind out of place.
 | X0m4 | same, against `project.json` at `plugins/<i>/settings/intent` | the tree has an intent and `settings.intent` is absent; `connection` names a connection whose kind is not a detector kind; `path` does not start with `/`; `port` is not a whole number 1 to 65535 | `set plugins[@model].settings.intent: port, path, connection (a model kind or @model/patterns.connection-kind.json)` |
 | X0m5 | same, at the tree's intents | two intents lower to one tool name (the feature's name and the file's stem, joined by `__`, non-alphanumerics folded to `-`) | `rename one file: the detector tells intents apart by name` |
 | I0n1 | `check/invariants.ts`, against the intent at `for`, or against the trigger at `fire/run` | an access invariant has `kinds`, and an intent with `mode: fire` names a trigger that reaches an operation of `over`, under some profile, directly or through the reach walk I001 uses, while `kinds` lacks `@wilanis/intent.schema.json`; or a trigger of a kind not in `kinds` reaches one. A `confirm` intent is judged by its `preview`, since that is what it fires | `set mode: confirm, name a route that does not reach <op>, or add <kind> to the invariant's kinds` |
-| I002 (extended) | `check/invariants.ts`, at `access/kinds/<i>` | an entry is neither a trigger kind a plugin of the tree grants nor `@wilanis/intent.schema.json` | `wilanis ls trigger-kind` |
+| I002 (extended) | `check/invariants.ts`, at `access/kinds/<i>` | a customer is neither a trigger kind a plugin of the tree grants nor `@wilanis/intent.schema.json` | `wilanis ls trigger-kind` |
 
 `kinds` without `requires` is accepted: an invariant may say only who reaches, or only which edge does. Every rule a
 route already meets -- T005 mapping every reachable refusal, A006, RFC 0007's I001 -- is untouched by an intent, because

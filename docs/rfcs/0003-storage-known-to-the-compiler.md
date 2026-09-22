@@ -36,38 +36,38 @@ the whole shape, as RFC 0002 and the "no absence" rule say.
 
 A store lives in a feature's `data/`, beside the binding that uses it, and names the connection it sits on
 and the collections it holds, each records of one core shape from the feature's `domain/` (RFC 0002). This
-is the monitor's store, once the REST API is replaced by a table:
+is the customers's store, once the REST API is replaced by a table:
 
 ```json
 {
   "$schema": "@wilanis/store.schema.json",
-  "label": "Entries",
-  "description": "Observed calls, one row each; a url is observed once per method. Notes hang off an entry.",
+  "label": "Customers",
+  "description": "Customers, one row each; no two share an address. Notes hang off a customer.",
   "connection": "@connections/customers.connection.json",
   "collections": {
-    "entries": {
+    "customers": {
       "of": "@customers/domain/Customer.shape.json",
       "key": "id",
-      "unique": [["url", "method"]],
-      "defaults": { "ua": "unknown" }
+      "unique": [["email"]],
+      "defaults": { "tier": "bronze" }
     },
     "notes": {
       "of": "@customers/domain/Note.shape.json",
       "key": "id",
-      "refs": { "entryId": { "collection": "entries" } }
+      "refs": { "customerId": { "collection": "customers" } }
     }
   }
 }
 ```
 
-Read it top to bottom. `entries` holds `Entry` records, identified by `id`, which the graph asks
+Read it top to bottom. `customers` holds `Customer` records, identified by `id`, which the graph asks
 `@storage/store.port.json#newKey` for before it `put`s (RFC 0002: no field is filled in silently). No two
-records share a `url` and a `method`. `notes` holds `Note` records whose `entryId` is the `id` of an entry; a note whose entry does not exist
-is refused by the database, and so is removing an entry that still has notes.
+records share an `email`. `notes` holds `Note` records whose `customerId` is the `id` of a customer; a note whose customer does not exist
+is refused by the database, and so is removing a customer that still has notes.
 
-`defaults` is about existing rows, not about what a graph writes. When `ensure` adds the column `ua` to a
+`defaults` is about existing rows, not about what a graph writes. When `ensure` adds the column `note` to a
 table that already has rows, those rows receive `"unknown"`; a `put` still gives the whole record, and a
-record without `ua` is simply one where the optional field is absent. Whether a field may be absent is not
+record without `note` is simply one where the optional field is absent. Whether a field may be absent is not
 said here twice: it is the shape's `required: false`, as everywhere else, and it is what makes the column
 nullable.
 
@@ -80,9 +80,9 @@ A data graph reads the store the way RFC 0002 shows, with the filter it declares
   "run": "@storage/store.port.json#find",
   "in": {
     "store": "@customers/data/customers.store.json",
-    "collection": "entries",
-    "where": { "method": "{{in.method}}", "ua": { "has": true } },
-    "order": [{ "by": "url" }]
+    "collection": "customers",
+    "where": { "tier": "{{in.tier}}", "note": { "has": true } },
+    "order": [{ "by": "email" }]
   }
 }
 ```
@@ -91,7 +91,7 @@ Misspell the field and `wilanis check` answers, instead of the handler at run ti
 
 ```
 X208  @features/customers/data/list-rows.graph.json#nodes/asked/in/where/methd
-    'methd' is not a field of @customers/domain/Customer.shape.json (fields: id, url, method, ua)
+    'methd' is not a field of @customers/domain/Customer.shape.json (fields: id, name, email, tier, note)
     → wilanis describe @customers/data/customers.store.json
 ```
 
@@ -103,7 +103,7 @@ The declaration reaches PostgreSQL at start, the way RFC 0002 arranges it: a sta
 operation, and the profile's binding delegates it to `@storage/storage.port.json#ensure`:
 
 ```json
-{ "label": "Prepare the entry store", "run": "@customers/domain/customer.port.json#prepare" }
+{ "label": "Prepare the customer store", "run": "@customers/domain/customer.port.json#prepare" }
 ```
 
 ```json
@@ -122,9 +122,9 @@ rules an engine can honour is its own to declare and refuse, as RFC 0002 splits 
 
 ### Documents and schemas
 
-RFC 0002 adds the `store` kind: `packages/core/schemas/store.schema.json`, `StoreDoc` and the `Kind` entry in
+RFC 0002 adds the `store` kind: `packages/core/schemas/store.schema.json`, `StoreDoc` and the `Kind` customer in
 `packages/core/src/model.ts`, `HOME.store = { layers: ['data'] }` in `packages/core/src/placement.ts`, the row
-in `packages/runtime/templates/CLAUDE.md`, `wilanis new store`. This RFC extends the collection entry:
+in `packages/runtime/templates/CLAUDE.md`, `wilanis new store`. This RFC extends the collection customer:
 
 ```ts
 export interface StoreCollection {
@@ -208,10 +208,10 @@ been the highest (the other families stand at A006 B008 D010 G013 L008 P003 R001
 |---|---|---|---|
 | C003 | `checkStore` | a name in `unique`, `refs` or `defaults` is not a field of the shape | `wilanis describe <shape>` |
 | C004 | `checkStore` | a `defaults` value is not assignable to its field's type, or is given for the key | `write a literal of type <type>; a key is never defaulted` |
-| C005 | `checkStore` | a `refs` entry names a collection this store does not declare | `a reference stays within one store; declare the collection here, or read it by a second get` |
+| C005 | `checkStore` | a `refs` customer names a collection this store does not declare | `a reference stays within one store; declare the collection here, or read it by a second get` |
 | C006 | `checkStore` | a `refs` field's type is not the type of the referenced collection's key | `<field> is <type>; <collection> is keyed by <type>` |
 | C007 | `checkStore` | a `refs` field is the collection's own key, or a `unique` list names it | `a key is unique already; a constraint names each field once` |
-| C008 | `checkStore` | a `unique` or `refs` entry names a field an engine holds no single value of: a `blob`, a shape or a list | `wilanis describe <the connection>` |
+| C008 | `checkStore` | a `unique` or `refs` customer names a field an engine holds no single value of: a `blob`, a shape or a list | `wilanis describe <the connection>` |
 
 Two notes on what landed against what this table asked for. **A `unique` list that repeats a field** is not
 C007's: the schema already refuses it as D001, through the `uniqueItems` this RFC puts on the inner list, and
@@ -222,8 +222,8 @@ nor a list is one value to index -- and a genuinely per-engine constraint belong
 X201-X207. A field C008 refuses is not then judged by C006: it holds no value to compare.
 
 Neither of two rows in *Tests* below became a rule. A `refs` on an optional field is an ordinary nullable
-reference and nothing in this table forbids it, so it is a passing case. Two collections named `Entries` and
-`entries` are D001's, through `ident`, and X223's for postgres.
+reference and nothing in this table forbids it, so it is a passing case. Two collections named `Customers` and
+`customers` are D001's, through `ident`, and X223's for postgres.
 
 Plugin rules live in `packages/plugin-storage/src/rules.ts`, the plugin's `check`, given `PluginCheckContext`
 (`packages/core/src/plugin.ts`), continuing RFC 0002's table. They walk every run and map node of every graph
@@ -234,7 +234,7 @@ settled which shape the collection holds, so every rule below reads that shape.
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
-| X208 | `rules.ts` | a key of `where` (at any nesting under `all`, `any`, `not`), or an `order` entry's `by`, is neither a field of the shape nor a combinator | `wilanis describe <the store>` |
+| X208 | `rules.ts` | a key of `where` (at any nesting under `all`, `any`, `not`), or an `order` customer's `by`, is neither a field of the shape nor a combinator | `wilanis describe <the store>` |
 | X209 | `rules.ts` | a `where` value -- a literal, or a read typed where it comes from -- is not assignable to the field's type (`eq`, `ne`, `lt`, `lte`, `gt`, `gte`), or is a list of the wrong thing (`in`, `notIn`), or is not a boolean (`has`), or is not a string (`contains`, `startsWith`) | `<field> is <type>` |
 | X210 | `rules.ts` | a `where` operator is one the field's type does not admit under RFC 0002's **The `where` grammar**: `contains` or `startsWith` on a non-string, an ordering on a boolean, anything but `has` on a field that is a shape or a list, or an operator the grammar does not name; and a literal `in` or `notIn` that is not a list, which the grammar refuses as the shape of a test while it parses, before any value is judged | `see The where grammar in @storage/store.port.json` |
 | X211 | `rules.ts` | a `patch` whose `changes` is a literal object names the key, a field the shape lacks, or gives a value not assignable to the field's type; a `changes` that is one read is judged as an object against the shape with every field optional | `a key identifies; it is never patched` / `wilanis describe <shape>` |
@@ -289,17 +289,17 @@ before it what they can see.
 `packages/runtime/src/discovery.ts`, a `store` case in `kindBody`); the store's page gains the marks:
 
 ```
-store  @customers/data/customers.store.json  (Entries)
+store  @customers/data/customers.store.json  (Customers)
   connection  @connections/customers.connection.json  (engine postgres)
-  collection entries: @customers/domain/Customer.shape.json
+  collection customers: @customers/domain/Customer.shape.json
     key         id
     unique      [url, method], [slug]
-    default     ua = "unknown"
+    default     tier = "bronze"
     read by     @customers/data/get-row.graph.json#asked (get), @customers/data/list-rows.graph.json#asked (find)
     written by  @customers/data/create-row.graph.json#saved (put), @customers/data/delete-row.graph.json#gone (remove)
   collection notes: @customers/domain/Note.shape.json
     key         id
-    refs        entryId → entries.id (refuse on remove)
+    refs        customerId → customers.id (refuse on remove)
   ensured by  @customers/domain/customer.port.json#prepare  (startup 1/3, profile live)
 ```
 
@@ -307,8 +307,8 @@ One line per mark family, its constraints comma-separated and each composite in 
 collection with several uniques grows one line rather than one unreadable one; the label column is the
 `padEnd` the rest of `discovery.ts` already uses, and a family with nothing to say prints no line. The
 readers and writers come from the same walk the plugin's rules make. `describe` of a shape held by a
-collection gains a line `held by  @customers/data/customers.store.json#entries`, beside the lines saying who
-writes it. `wilanis map` already prints `store entries (get)` (RFC 0002); nothing to add.
+collection gains a line `held by  @customers/data/customers.store.json#customers`, beside the lines saying who
+writes it. `wilanis map` already prints `store customers (get)` (RFC 0002); nothing to add.
 
 The viewer's `store` case in `renderDocPage` (`packages/view/client/index.html`, RFC 0002) grows one column
 per mark -- key, unique, default, ref -- on each collection's field table, a ref rendered as a link to
@@ -334,18 +334,18 @@ tests edit that store. In `packages/runtime/test/sabotage-storage.test.ts`, with
 `example-harness.ts`, one `it` per compiler row:
 
 - C (names): `"unique": [["urrl"]]`; `"defaults": { "nope": 1 }`; `"refs": { "nope": ... }`.
-- C (defaults): `"defaults": { "ua": 7 }`; `"defaults": { "id": "x" }`.
-- C (refs): `"refs": { "ua": { "collection": "nowhere" } }`; a ref on an optional field (`ua`); a ref on the
+- C (defaults): `"defaults": { "tier": 7 }`; `"defaults": { "id": "x" }`.
+- C (refs): `"refs": { "note": { "collection": "nowhere" } }`; a ref on an optional field (`note`); a ref on the
   collection's own key.
-- C (repeats): `"unique": [["url", "url"]]`.
-- C (case): two collections `Entries` and `entries`.
+- C (repeats): `"unique": [["email", "email"]]`.
+- C (case): two collections `Customers` and `customers`.
 
 In `packages/plugin-storage/test/rules.test.ts`, extending RFC 0002's small tree and its `check` through
 `checkTree`:
 
 - X208: `where: { methd: "GET" }`; `where: { any: [{ nope: 1 }] }`; `order: [{ by: "nope" }]`.
 - X209: `where: { method: 7 }`; `where: { method: "{{in.count}}" }` with `count: number`;
-  `where: { hits: { in: ["a"] } }`, a list of the wrong thing; `where: { ua: { has: "yes" } }`.
+  `where: { hits: { in: ["a"] } }`, a list of the wrong thing; `where: { note: { has: "yes" } }`.
 - X210: `where: { ok: { gt: false } }` on a boolean field; `where: { hits: { contains: "2" } }` on a number
   field; `where: { tags: { eq: [...] } }` on a list; `where: { url: { like: "x" } }`; and a literal
   `where: { url: { in: "GET" } }`, which is not a list.
@@ -395,7 +395,7 @@ because a store is judged the way a connection is -- a declaration against the c
 because the families stay few; the review settled that they do.
 
 **Declaring the schema in the shape.** `unique` and `refs` could be marks on the shape's fields instead of on
-the collection. A shape is a type and is used in more places than a store; the same `Entry` may be held in two
+the collection. A shape is a type and is used in more places than a store; the same `Customer` may be held in two
 stores with different uniqueness. The declaration stays with the store.
 
 **No `cascade`, ever.** `onRemove` admits only `refuse`, so removing a parent means removing the children

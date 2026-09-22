@@ -18,7 +18,7 @@ it names allows the tree to reach. The checker holds the profile's reach (RFC 00
 directions. An operation or a connection the tree reaches under the profile and the list does not permit is
 refused, naming the trigger or startup step it is reached from, the binding it is reached through, the
 feature -- and the package, when the feature is included -- with the hint to remove the reach before widening
-the list. An entry nothing reaches is refused as dead. A profile without `permits` permits everything, so no
+the list. A customer nothing reaches is refused as dead. A profile without `permits` permits everything, so no
 tree written before this RFC changes; the security model (RFC 0020) recommends every production profile write
 one.
 
@@ -62,13 +62,13 @@ judges.
 
 ```json
 "production": {
-  "description": "Behind the load balancer: the same bindings, the real monitor API in place of the test one, nothing watched.",
+  "description": "Behind the load balancer: the same bindings, the real customers API in place of the test one, nothing watched.",
   "bindings": {
     "@customers/domain/customer.port.json": "@customers/data/customers-rest.binding.json",
     "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json"
   },
   "connections": {
-    "@connections/customers-api.connection.json": "@connections/monitor-api-production.connection.json"
+    "@connections/customers-api.connection.json": "@connections/customers-api-production.connection.json"
   },
   "permits": [
     "@http/http.port.json#request",
@@ -76,18 +76,18 @@ judges.
     "@blob/csv.port.json",
     "@auth/identity.port.json#verify",
     "@auth/token.port.json",
-    "@connections/monitor-api-production.connection.json",
+    "@connections/customers-api-production.connection.json",
     "@connections/employees.connection.json",
     "@connections/customers.connection.json"
   ]
 }
 ```
 
-An entry is an operation, `path#operation`; a whole native port, `path`, which permits every operation of it;
+A customer is an operation, `path#operation`; a whole native port, `path`, which permits every operation of it;
 or a connection, which permits reaching the system it describes. The list is what production does and nothing
 more. It does not name `@reload/watch.port.json#watch`, because the `Watch for changes` step runs under `live`
 alone (RFC 0013). It names `listen`, because opening a port is something a place permits or does not -- a
-worker profile of RFC 0009 would not. It names the stand-in, `monitor-api-production`, and not the test API
+worker profile of RFC 0009 would not. It names the stand-in, `customers-api-production`, and not the test API
 it stands in for, because the stand-in is what production reaches. `live` has no `permits` and permits
 everything, as every profile does today.
 
@@ -109,12 +109,12 @@ C0nn  project.json#profiles/production/permits
 ```
 
 The agent may fix L003 alone, since the feature is its to edit. Production already permits `http.request` --
-the monitor makes them -- so the operation passes; the *connection* does not, and that is the refusal that
+the customers makes them -- so the operation passes; the *connection* does not, and that is the refusal that
 stays until either the graph no longer reaches it or a person decides production may. The hint says remove
 first; widening the list is the last clause, written so that the diff a reviewer reads is one line in
 `project.json` under the word `production`.
 
-**When the list is stale.** The monitor stops exporting CSV: the node that ran `@blob/csv.port.json#write`
+**When the list is stale.** The customers stops exporting CSV: the node that ran `@blob/csv.port.json#write`
 goes, and so does the one that ran `#parse`. `wilanis check` then refuses the profile that still says it may:
 
 ```
@@ -149,7 +149,7 @@ feature out of `includes[].features`, and every trigger of it with it.
 or `#/$defs/path`, with the description: *What this place allows the tree to reach: effectful native
 operations as path#operation, whole native ports as path, and connections as path. Absent: everything.
 Present: exactly what the profile reaches (C0nn) -- an operation or connection reached and not listed is
-refused, and so is an entry nothing reaches.* `ProjectDoc` in `packages/core/src/model.ts` mirrors it:
+refused, and so is a customer nothing reaches.* `ProjectDoc` in `packages/core/src/model.ts` mirrors it:
 `permits?: string[]`. `HOME` in `placement.ts`: no change. `packages/runtime/templates/CLAUDE.md`: the
 `project` row names `permits`; a sentence under *Effects*: "a profile may list what its place permits; L003
 means the feature allows it, C0nn means the place does". `wilanis new project` scaffolds no `permits`: the
@@ -169,10 +169,10 @@ G013 L008 P003 R001 S001 T006, X103; RFC 0003 took C003-C008, and RFC 0013 takes
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
-| C0nn | `checkPermits` | the reach holds an operation no entry permits (no entry is that operation and none is its port), or a connection no entry names. The message names what is reached, the root it is reached from (a trigger, a policy, a startup step, or the guard), the binding it is reached through, the feature, and the include's package when the feature is included | `remove the node that reaches it, or bind the port to a binding that does not; else, if <profile> may, add "<entry>" to profiles/<profile>/permits` (for an included feature the first clause reads `remove the feature from includes[].features`) |
-| C0nn | `checkPermits` | an entry permits nothing the profile reaches: an operation entry not in the reach, a port entry none of whose operations is, a connection entry no reached operation names | `remove it from profiles/<profile>/permits` |
-| C0nn | `checkPermits` | an entry names a domain port or one of its operations (a port a binding meets, including one a plugin requires), a `pure` operation, a port with no effectful operation, or a connection that stands on the left of this profile's `connections` map (the tree reaches its stand-in, not it) | `permits lists effectful native operations and connections; a domain port is met by a binding, a pure operation needs no permit, a replaced connection is named by its stand-in` |
-| R001 (existing) | `checkPermits` | an entry names no port, no connection, or a port with no such operation | `wilanis ls port`, `wilanis ls connection` |
+| C0nn | `checkPermits` | the reach holds an operation no customer permits (no customer is that operation and none is its port), or a connection no customer names. The message names what is reached, the root it is reached from (a trigger, a policy, a startup step, or the guard), the binding it is reached through, the feature, and the include's package when the feature is included | `remove the node that reaches it, or bind the port to a binding that does not; else, if <profile> may, add "<customer>" to profiles/<profile>/permits` (for an included feature the first clause reads `remove the feature from includes[].features`) |
+| C0nn | `checkPermits` | a customer permits nothing the profile reaches: an operation customer not in the reach, a port customer none of whose operations is, a connection customer no reached operation names | `remove it from profiles/<profile>/permits` |
+| C0nn | `checkPermits` | a customer names a domain port or one of its operations (a port a binding meets, including one a plugin requires), a `pure` operation, a port with no effectful operation, or a connection that stands on the left of this profile's `connections` map (the tree reaches its stand-in, not it) | `permits lists effectful native operations and connections; a domain port is met by a binding, a pure operation needs no permit, a replaced connection is named by its stand-in` |
+| R001 (existing) | `checkPermits` | a customer names no port, no connection, or a port with no such operation | `wilanis ls port`, `wilanis ls connection` |
 
 A `holds` operation is effectful and is permitted like any other: `listen`, `watch`, a subscription, a
 scheduler. L003 is unchanged. No rule reads `permits` at any other place: a feature never sees a profile.
@@ -188,7 +188,7 @@ cannot add one. `rehearse`, `fuzz`, `regress` and `run` are unchanged.
 ### Discoverability
 
 - `wilanis describe project.json` (RFC 0013's block per profile) prints `permits` under `reaches`: `permits
-  the 6 operations and 3 connections above, by 8 entries` when the list is present, `permits   everything (no
+  the 6 operations and 3 connections above, by 8 customers` when the list is present, `permits   everything (no
   permits)` when not. Since the checker holds the two lists together, the block never has to show a
   difference; `wilanis check` does.
 - `wilanis describe <native port>` and `wilanis describe <connection>` gain `permitted by  production, staging`
@@ -216,8 +216,8 @@ right, and this RFC uses *capability* only in its title.
 Sabotage, in `packages/runtime/test/sabotage-project.test.ts` (copies of the example hand `@wilanis/access`
 in as a `ResolvedInclude`), against the example's `production` profile of RFC 0013:
 
-- remove `"@http/http.port.json#request"` from `permits` → C0nn naming the operation, a monitor trigger,
-  `customers-rest.binding.json` and `feature monitor`;
+- remove `"@http/http.port.json#request"` from `permits` → C0nn naming the operation, a customer trigger,
+  `customers-rest.binding.json` and `feature customers`;
 - remove `"@connections/customers.connection.json"` → C0nn whose message ends `(feature access, included from
   @wilanis/access)` and whose hint's first clause names `includes[].features`;
 - add `"@reload/watch.port.json#watch"` → C0nn (dead: the step runs under `live` alone);
@@ -247,7 +247,7 @@ No end-to-end test: nothing runs.
 - **Two lists that must agree, in both directions.** Every node that reaches out, and every one removed,
   touches `project.json` under a profile that has `permits`. That is the cost, and it is the feature: the
   diff under the word `production` is the review. The hint's order -- remove first, widen last -- is what
-  keeps an agent from turning every refusal into a wider list, and the dead-entry rule is what keeps the list
+  keeps an agent from turning every refusal into a wider list, and the dead-customer rule is what keeps the list
   from staying wide once the reach has shrunk. The alternative, one direction only (reached ⊆ permitted),
   was rejected: a list that may be wider than the tree tells a reviewer what the tree *might* do, not what it
   does.
@@ -259,9 +259,9 @@ No end-to-end test: nothing runs.
   the reach already knows which ones are reached, so the list names them. The cost: a `permits` list is longer
   by one line per system, and a stand-in (RFC 0013) is named twice, once in `connections` as the choice and
   once in `permits` as the permission.
-- **A whole-port entry permits operations the port does not have yet.** A plugin update that adds an
-  operation to `@blob/csv.port.json` is permitted by the entry `"@blob/csv.port.json"` without a diff. That
-  is the trade a port entry makes for brevity; a profile that wants the diff writes operations. The
+- **A whole-port customer permits operations the port does not have yet.** A plugin update that adds an
+  operation to `@blob/csv.port.json` is permitted by the customer `"@blob/csv.port.json"` without a diff. That
+  is the trade a port customer makes for brevity; a profile that wants the diff writes operations. The
   example writes the port for `@blob/csv` and `@auth/token`, the operation for `@http`.
 - **Deriving `permits` from the bindings** was rejected in the stub and stays rejected: then nothing would be
   written by a person, and the checker would compare a list with itself. Printing the derived list is what

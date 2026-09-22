@@ -89,7 +89,7 @@ digits; the *family* is the letter. A *fix* is one edit to one document, or one 
 `docs/refusals/`. The *envelope* is the JSON object a `--json` command prints. A *transcript* is the sequence of
 envelopes an agent sees while repairing a tree; because each is sorted, two are diffable.
 
-**The loop, today and after.** Remove `@http/http.port.json#request` from the monitor feature's `effects` and run
+**The loop, today and after.** Remove `@http/http.port.json#request` from the customers feature's `effects` and run
 the checker:
 
 ```
@@ -204,7 +204,7 @@ rewrite the author's intent to silence the validator. D001 offers nothing.
       "graph": "@features/customers/data/get-row.graph.json", "node": "route",
       "triggers": ["@features/customers/edge/get-customer.trigger.json"],
       "branches": [
-        { "when": "status == 404", "to": "missing", "settled": { "status": "failed", "blocked": false, "declared": { "reason": "missing", "message": "no entry hotel403" } } },
+        { "when": "status == 404", "to": "missing", "settled": { "status": "failed", "blocked": false, "declared": { "reason": "missing", "message": "no customer hotel403" } } },
         { "when": "status == 200 && has(body)", "to": "row", "settled": { "status": "done", "blocked": false } },
         { "when": "else", "to": "failed", "settled": { "status": "failed", "blocked": false, "declared": { "reason": "upstream", "message": "..." } } }
       ]
@@ -214,7 +214,7 @@ rewrite the author's intent to silence the validator. D001 offers nothing.
     { "trigger": "@features/access/edge/sign-out.trigger.json", "graph": "…", "status": "done" },
     { "...": "the hello greeting and the two preference operations: the other runs of graphs without a switch" }
   ],
-  "lines": [ "get-row  switch 'route'  3/3 branches  [via get-entry]", "..." ]
+  "lines": [ "get-row  switch 'route'  3/3 branches  [via get-customer]", "..." ]
 }
 ```
 
@@ -223,7 +223,7 @@ words it prints, kept because an agent reads prose well and a diff of two transc
 --json` prints the same envelope with `"command": "regress"` and, beside `lines`:
 
 ```json
-"results": [ { "scenario": "@scenarios/get-entry.1.scenario.json", "same": true, "diffs": [] } ]
+"results": [ { "scenario": "@scenarios/get-customer.1.scenario.json", "same": true, "diffs": [] } ]
 ```
 
 `scenarios --check --json` -- the one CI step RFC 0018 adds, `rehearse --check` and `fuzz --edges --check` over the
@@ -231,7 +231,7 @@ directories they own -- prints the same envelope with `"command": "scenarios"` a
 its `--check` already computes:
 
 ```json
-"stale": ["@scenarios/rehearsed/get-entry/monitor.get-row.route.missing.scenario.json"], "missing": [], "extra": []
+"stale": ["@scenarios/rehearsed/get-customer/customers.get-row.route.missing.scenario.json"], "missing": [], "extra": []
 ```
 
 `ok` is whether all three are empty. Nothing is added to what `--check` knows: the words it prints and these lists
@@ -444,7 +444,7 @@ only the codes) and `applyFix(dir, fix)` -- `set`, `add`, `remove` on the parsed
 
 | Rule | The sabotage | Asserts |
 |---|---|---|
-| L003 | `@http/http.port.json#request` removed from the monitor feature's `effects` | six refusals, each with the one fix `{ file: '@features/customers/feature.json', at: 'effects', add: '@http/http.port.json#request' }`; applying `fixes[0]` of the first leaves `codes` empty; applying all six leaves `effects` with the value once |
+| L003 | `@http/http.port.json#request` removed from the customers feature's `effects` | six refusals, each with the one fix `{ file: '@features/customers/feature.json', at: 'effects', add: '@http/http.port.json#request' }`; applying `fixes[0]` of the first leaves `codes` empty; applying all six leaves `effects` with the value once |
 | R001 | `get-row`'s `asked` runs `#requst`; then `#reqeust`; then `#xyz`; then a planted port with `get` and `set` and a node running `#sit` | `set: '@http/http.port.json#request'` for the first two and applying it leaves `codes` empty (the G011s go with it); no `fixes` for the third and fourth |
 | D008 | `customers-api.connection.json` relocated under `features/customers/data/`; `get-row.graph.json` relocated to `edge/`; `Customer.shape.json` given `"layer": "edge"` | one `move` and applying it leaves `codes` empty; no `fixes`; two alternatives in that order, and applying either leaves `codes` empty |
 | every rule | the whole suite | no refusal of any sabotage in the existing suites carries a `fixes` that, applied, leaves a refusal of the same code behind -- a guard that the rule of `fixes` holds for whatever a later pull request adds |
@@ -457,8 +457,8 @@ only the codes) and `applyFix(dir, fix)` -- `set`, `add`, `remove` on the parsed
 | determinism | two calls give equal JSON; a copy whose refusals the loader found in another order (two files renamed to swap their walk order) gives the same JSON |
 | the sort | a copy with the R001 typo: R001 before the two G011s (same file, `nodes/asked/run` before `nodes/route/…`) |
 | the untouched tree | `ok: true`, `refusals: []`, `documents: 140` and no other member |
-| `rehearse --json` | `decisions` has 15 entries and 37 branches in all, `plain` the four branchless runs, `ok: true`, `seed: 1`; every `settled` has `status` and `blocked` |
-| `regress --json` | after `fuzz` on a copy, `results` has one entry per scenario with `same: true`; the `missing` rule changed to 410, the `get-entry` entries have `same: false` and non-empty `diffs` |
+| `rehearse --json` | `decisions` has 15 customers and 37 branches in all, `plain` the four branchless runs, `ok: true`, `seed: 1`; every `settled` has `status` and `blocked` |
+| `regress --json` | after `fuzz` on a copy, `results` has one customer per scenario with `same: true`; the `missing` rule changed to 410, the `get-customer` customers have `same: false` and non-empty `diffs` |
 | `scenarios --check --json` | on a copy with its directories recorded, `ok: true` and the three lists empty; with the `missing` rule's threshold moved, `stale` names the recorded `missing` scenario and `ok: false`; `missing` and `extra` after a deleted and a hand-added file |
 | the CLI | `wilanis check <copy> --json` exits 1, writes nothing to stderr, and stdout parses to the envelope; `wilanis rehearse <copy> --json` on the refused copy prints `command: 'rehearse'` with the refusals and exits 1; on the good copy exits 0 with `decisions` |
 

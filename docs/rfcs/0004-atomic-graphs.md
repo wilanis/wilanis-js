@@ -16,7 +16,7 @@ transaction underneath the storage plugin; wilanis knows *what* must be transact
 
 ## Motivation
 
-The example's `import` takes a CSV of drafts and records each row through `monitor.submit`, all at once
+The example's `import` takes a CSV of drafts and records each row through `customer.submit`, all at once
 (`example/features/customers/domain/import-customers.graph.json` fans out through a `map`). When the fifth
 draft refuses, the first four are already stored. Today nothing in the tree can say "all of these or none":
 an author would have to write a graph that removes what it recorded, and remember every path that can fail.
@@ -56,7 +56,7 @@ transaction, since a file is not something a database can roll back; the recordi
       "label": "Record each draft",
       "run": "@customers/domain/customer.port.json#submit",
       "over": "{{in}}",
-      "bind": { "url": "url", "method": "method", "ua": "ua" }
+      "bind": { "name": "name", "email": "email", "tier": "tier" }
     }
   ]
 }
@@ -69,15 +69,15 @@ binding, one `@storage/store.port.json#put` per draft, all on the connection tha
 still fans out in the graph; on the connection the writes are paced to one transaction, the way a
 `throttle` paces a map's requests against an HTTP connection today.
 
-A data graph may be atomic too. This one behind `monitor.record` stores the entry and records it as the
-latest call of its method, in a second collection of the same store, and answers the entry only when both
+A data graph may be atomic too. This one behind `customer.register` stores the customer and records it as the
+latest call of its method, in a second collection of the same store, and answers the customer only when both
 are in:
 
 ```json
 {
   "$schema": "@wilanis/graph.schema.json",
-  "label": "Store an entry and its method's latest",
-  "description": "The entry and the latest-call record of its method move together.",
+  "label": "Store a customer and their tier's latest",
+  "description": "The customer and the latest-call record of its method move together.",
   "atomic": true,
   "in": "@customers/domain/Customer.shape.json",
   "out": { "type": "@customers/domain/Customer.shape.json", "from": "answer" },
@@ -88,7 +88,7 @@ are in:
       "run": "@storage/store.port.json#put",
       "in": {
         "store": "@customers/data/customers.store.json",
-        "collection": "entries",
+        "collection": "customers",
         "record": "{{in}}"
       }
     },
@@ -99,8 +99,8 @@ are in:
       "in": {
         "store": "@customers/data/customers.store.json",
         "collection": "latest",
-        "key": "{{in.method}}",
-        "changes": { "url": "{{in.url}}", "entry": "{{in.id}}" }
+        "key": "{{in.tier}}",
+        "changes": { "email": "{{in.email}}", "customer": "{{in.id}}" }
       }
     },
     {
@@ -358,7 +358,7 @@ holding.stop()` without resolving who held what. `settle` is that move with two 
 also why `PluginModule` gains no member: there is nothing to register, because the participant arrives by
 being used.
 
-The loop reads over a map that holds exactly one entry, since L0n2 refuses a graph whose effects fall on more
+The loop reads over a map that holds exactly one customer, since L0n2 refuses a graph whose effects fall on more
 than one connection. It is written over the map because the map is the natural shape of `join`'s memo, not
 because a second participant is expected; a second one is a fault, which is what `join` raises.
 
@@ -383,7 +383,7 @@ solved and walked as any graph's are.
 - `wilanis map` marks a graph `[atomic]` where it names it.
 - The viewer's graph page (`packages/view/client/index.html`, `renderDocPage`) shows an `atomic` badge on the
   graph and a marker on each node that takes part; the side panel says the connection. The view model
-  (`packages/view/src/model.ts`) carries `atomic` and the connection on the graph entry.
+  (`packages/view/src/model.ts`) carries `atomic` and the connection on the graph customer.
 
 ### Plugin contract
 
@@ -455,7 +455,7 @@ through the example's storage profile:
 ## Drawbacks and alternatives
 
 **The flag on the binding instead of the graph.** A binding says how a port is met, and a transaction is
-a data-layer mechanism, so the entry `"record": { "graph": "...", "atomic": true }` reads naturally. But
+a data-layer mechanism, so the customer `"record": { "graph": "...", "atomic": true }` reads naturally. But
 the thing that must be atomic is the composition -- CreateOrder is reserve, create, pay -- and the
 composition lives in a domain graph; a binding never sees it. The flag on the graph covers both the domain
 graph that composes operations and the data graph that composes statements, with one rule set. The domain
@@ -479,7 +479,7 @@ An unlisted effect is not sequenced against the listed ones: `Run.execute` fires
 it runs *beside* the transaction and its result survives the rollback, which is the half-committed state this
 RFC exists to prevent. An unlisted `@storage` call on the *same* connection is worse still: it takes a second
 session from the pool and blocks on rows the transaction has locked, a deadlock the boolean cannot produce.
-And in a domain graph the names are the wrong things -- a node names `monitor.submit`, while the writes live
+And in a domain graph the names are the wrong things -- a node names `customer.submit`, while the writes live
 under whichever binding the profile chooses, so the checker must walk per profile anyway and the list tells it
 nothing it did not derive. Nesting has no answer either: when an atomic graph reaches another, it is undefined
 whose list governs the inner one. Node ids are referable elsewhere (`out.from`, a switch's `to`), so a rename

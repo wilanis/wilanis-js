@@ -15,14 +15,14 @@ carries the day it is due. Reordering the page means renumbering it and the GitH
 Nothing on this roadmap needs a paid service. Every piece of infrastructure a demo needs runs on a local
 Kubernetes cluster from an open-source chart the repository ships (see RFC 0024).
 
-## M01 Entries kept in a store
+## M01 Customers kept in a store
 
-Start the example and the monitor keeps its entries in the storage plugin's memory engine instead of the
+Start the example and the customers keeps its customers in the storage plugin's memory engine instead of the
 upstream API. Draws on RFC 0002 and the call-site rules of RFC 0003.
 
 ```
 npx wilanis start example
-curl -X POST :8099/monitor -d '{...}'   # then GET /monitor/{id} answers what you posted
+curl -X POST :8099/customers -d '{...}'   # then GET /customers/{id} answers what you posted
 npx wilanis describe @customers/data/customers.store.json
 ```
 
@@ -37,9 +37,9 @@ profile swaps is which binding meets `customer.port.json`, and through it which 
 behind. Draws on the PostgreSQL engine of RFC 0002 and `ensure` of RFC 0003.
 
 ```
-export CUSTOMERS_DATABASE_URL=postgres://user:password@localhost:5432/monitor
+export CUSTOMERS_DATABASE_URL=postgres://user:password@localhost:5432/customers
 npx wilanis start example --profile production
-startup 1/4 Prepare the entry store: ok
+startup 1/4 Prepare the customer store: ok
 ```
 
 The step is the one `local` runs; what differs is the connection behind the store it prepares, so the first
@@ -47,7 +47,7 @@ start creates the table and the next creates nothing.
 
 ## M03 All or nothing
 
-The CSV import records every row in one atomic graph, and an entry and the latest call of its method move
+The CSV import records every row in one atomic graph, and a customer and the latest call of its method move
 together in another. A bad row in the middle leaves nothing written; rehearsal prints the rolled-back
 branch. Draws on RFC 0004.
 
@@ -63,12 +63,12 @@ Here because RFC 0006 depends on nothing, and RFC 0024 under M11 depends on it.
 
 ## M05 Change the schema, get the plan
 
-Add a field to the entry shape and `wilanis migrate` prints the migration, refusing the destructive
+Add a field to the customer shape and `wilanis migrate` prints the migration, refusing the destructive
 step until told. Draws on RFC 0017, which depends on RFC 0003 and nothing after it.
 
 ## M06 The checker knows the rule
 
-An access invariant over every monitor write and a field invariant on the entry shape. Removing a policy
+An access invariant over every customers write and a field invariant on the customer shape. Removing a policy
 from a route is a refusal; rehearsal reports each invariant as proved or guarded. Draws on RFC 0007.
 
 ## M07 Sign in on one instance, stay signed in on another
@@ -106,7 +106,7 @@ Draws on RFC 0013, RFC 0016, RFC 0024 and RFC 0026.
 
 ```
 npx wilanis-deploy example --profile production
-scripts/cluster.sh up     # → http://localhost:8099/monitor
+scripts/cluster.sh up     # → http://localhost:8099/customers
 ```
 
 RFC 0013 depends on RFC 0005, so this follows M07 and M08; RFC 0024 depends on RFC 0006, so it follows M04.
