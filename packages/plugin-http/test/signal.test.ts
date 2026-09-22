@@ -71,7 +71,7 @@ afterAll(async () => {
 });
 
 /**
- * The example pointed at the scripted upstream, with `said` written on the `asked` node of get-row.graph.json,
+ * The example pointed at the scripted upstream, with `said` written on the `fetched` node of get-row.graph.json,
  * checked, and the graph compiled under `live`; with the environment its handlers see.
  */
 function getRow(said: Record<string, unknown>): { compiled: Compiled; env: Record<string, unknown> } {
@@ -83,7 +83,7 @@ function getRow(said: Record<string, unknown>): { compiled: Compiled; env: Recor
   writeFileSync(connection, JSON.stringify(conn));
   const graph = JSON.parse(readFileSync(join(dir, GRAPH), 'utf8'));
   Object.assign(
-    graph.nodes.find((node: { id: string }) => node.id === 'asked'),
+    graph.nodes.find((node: { id: string }) => node.id === 'fetched'),
     said,
   );
   writeFileSync(join(dir, GRAPH), JSON.stringify(graph));
@@ -115,9 +115,9 @@ describe('request honours the signal it is handed', () => {
     const report = await runGraph(compiled, { initial: { in: { id: '1' } }, env });
     expect(report.status).toBe('done');
     expect(report.output).toMatchObject({ id: '1', name: 'Ada' });
-    expect(report.nodes.asked.handler).toBe('@http/http.port.json#request');
-    expect(report.nodes.asked.attempts).toHaveLength(1);
-    expect(report.nodes.asked.attempts?.[0].error).toBe('answer retried: status >= 500');
+    expect(report.nodes.fetched.handler).toBe('@http/http.port.json#request');
+    expect(report.nodes.fetched.attempts).toHaveLength(1);
+    expect(report.nodes.fetched.attempts?.[0].error).toBe('answer retried: status >= 500');
     expect(seen).toHaveLength(2);
   });
 
@@ -128,8 +128,8 @@ describe('request honours the signal it is handed', () => {
     const report = await runGraph(compiled, { initial: { in: { id: '1' } }, env });
     const took = Date.now() - startedAt;
     expect(report.status).toBe('failed');
-    expect(report.nodes.asked.status).toBe('failed');
-    expect(report.nodes.asked.error).toBe('timed out after 50ms');
+    expect(report.nodes.fetched.status).toBe('failed');
+    expect(report.nodes.fetched.error).toBe('timed out after 50ms');
     expect(took).toBeGreaterThanOrEqual(45);
     expect(took).toBeLessThan(1000);
     // the fetch itself was aborted, not abandoned: the upstream saw the socket close
@@ -149,8 +149,8 @@ describe('request honours the signal it is handed', () => {
     control.abort();
     const report = await running;
     expect(Date.now() - startedAt).toBeLessThan(1000);
-    expect(report.nodes.asked.status).toBe('failed');
-    expect(report.nodes.asked.error).toMatch(/abort/i);
+    expect(report.nodes.fetched.status).toBe('failed');
+    expect(report.nodes.fetched.error).toMatch(/abort/i);
     await expect.poll(() => seen[0]?.closed).toBe(true);
   });
 });
