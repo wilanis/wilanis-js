@@ -95,6 +95,50 @@ describe('csv.port.json', () => {
     const file = await store.put('url,method\nhttps://a/,PATCH\n', { contentType: 'text/csv' });
     await expect(run('csv.port.json#parse', { file, type: 'Row' })).rejects.toThrow('row 2.method: "PATCH" not in');
   });
+  it('parse: once the signal aborts it stops between rows, reads no further chunk and closes the stream', async () => {
+    const file = await store.put('', { contentType: 'text/csv' });
+    const control = new AbortController();
+    const pulled: number[] = [];
+    let closed = false;
+    const chunk = (at: number) => {
+      pulled.push(at);
+      if (at === 3) control.abort(); // the run is cancelled while the file is still arriving
+      return Buffer.from(at === 1 ? 'url,method\n' : `https://a/${at},GET\nhttps://b/${at},POST\n`);
+    };
+    async function* chunks() {
+      try {
+        for (let at = 1; at <= 100; at++) yield chunk(at);
+      } finally {
+        closed = true;
+      }
+    }
+    const blobs = { open: () => Readable.from(chunks()) };
+    const aborting = { env: { ...env, blobs }, nodePath: [], attach: () => {}, signal: control.signal } as never;
+    const parse = plugin.handlers['@blob/csv.port.json#parse'];
+    await expect(parse({ in: { file, type: 'Row' }, ctx: aborting })).rejects.toThrow('This operation was aborted');
+    expect(pulled).toEqual([1, 2, 3]);
+    expect(closed).toBe(true);
+  });
+  it('parse: a signal already aborted opens nothing', async () => {
+    const file = await store.put('url,method\nhttps://a/,GET\n', { contentType: 'text/csv' });
+    let opened = false;
+    const blobs = {
+      open: () => {
+        opened = true;
+        return store.open(file);
+      },
+    };
+    const aborted = { env: { ...env, blobs }, nodePath: [], attach: () => {}, signal: AbortSignal.abort() } as never;
+    const parse = plugin.handlers['@blob/csv.port.json#parse'];
+    await expect(parse({ in: { file, type: 'Row' }, ctx: aborted })).rejects.toThrow('This operation was aborted');
+    expect(opened).toBe(false);
+  });
+  it('parse: a signal that never aborts changes nothing', async () => {
+    const file = await store.put('url,method\nhttps://a/,GET\n', { contentType: 'text/csv' });
+    const listening = { env, nodePath: [], attach: () => {}, signal: new AbortController().signal } as never;
+    const parse = plugin.handlers['@blob/csv.port.json#parse'];
+    expect(await parse({ in: { file, type: 'Row' }, ctx: listening })).toEqual([{ url: 'https://a/', method: 'GET' }]);
+  });
   it("write: the shape's columns in order, quoting what needs it; the handle carries the filename; parse reads it back", async () => {
     const written = (await run('csv.port.json#write', {
       rows: [
