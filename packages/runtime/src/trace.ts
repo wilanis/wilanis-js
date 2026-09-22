@@ -11,6 +11,7 @@
 import type { Scope, Trace, TraceAttributes, TraceLevel } from '@wilanis/core';
 import type { NodeReport, Report } from '@wilanis/engine';
 import { type Decided, type Fired, type Identified, isStarted, type Ran, statusOf } from './fired.js';
+import { nodeAttributes, nodeStatus, span, type Walk } from './trace-span.js';
 
 /**
  * How much a span carries, and the narrowing of an already-built trace to it. Both are core's, beside the
@@ -20,84 +21,6 @@ import { type Decided, type Fired, type Identified, isStarted, type Ran, statusO
 export { atLevel } from '@wilanis/core';
 export { traceJson, traceText } from './trace-print.js';
 export type Level = TraceLevel;
-
-/** What a walk of one run carries down: the tree it reads contracts from, and how much a span may say. */
-interface Walk {
-  scope: Scope;
-  level: Level;
-}
-
-/** A span built from its parts, so every one of them is made in one place and carries the same shape. */
-function span(what: {
-  name: string;
-  status: string;
-  at: { startedAt?: number; endedAt?: number };
-  attributes: TraceAttributes;
-  children?: Trace[];
-}): Trace {
-  return {
-    name: what.name,
-    startedAt: what.at.startedAt ?? 0,
-    endedAt: what.at.endedAt ?? what.at.startedAt ?? 0,
-    status: what.status,
-    attributes: what.attributes,
-    children: what.children ?? [],
-  };
-}
-
-/** What `wilanis.in`, `wilanis.out` and `wilanis.error` a node may carry: all of them at `full`, none at `summary`. */
-function valued(node: NodeReport, level: Level): TraceAttributes {
-  if (level !== 'full') return {};
-  const out: TraceAttributes = {};
-  if (node.in !== undefined) out['wilanis.in'] = JSON.stringify(node.in);
-  if (node.out !== undefined) out['wilanis.out'] = JSON.stringify(node.out);
-  if (node.error !== undefined) out['wilanis.error'] = node.error;
-  return out;
-}
-
-/**
- * The connection an effect used and the status an HTTP call answered, read off the node's own `in` and `out`.
- * It is a lookup and never a branch that spreads: the engine knows nothing of connections or of HTTP, so the
- * two names a reader searches on are read here, where the tree's words are already known.
- */
-function looked(node: NodeReport): TraceAttributes {
-  const out: TraceAttributes = {};
-  const connection = node.in?.connection;
-  if (typeof connection === 'string') out['wilanis.connection'] = connection;
-  const answered = node.out as Record<string, unknown> | undefined;
-  const status = answered && typeof answered === 'object' ? answered.status : undefined;
-  if (node.handler === HTTP_REQUEST && typeof status === 'number') out['http.response.status_code'] = status;
-  return out;
-}
-
-/** The one handler whose answer carries a status a reader of a trace expects to find under its own name. */
-const HTTP_REQUEST = '@http/http.port.json#request';
-
-/** How a node ended, in the words a span carries: a refusal says its reason, anything else says its status. */
-function nodeStatus(node: NodeReport): string {
-  if (node.status !== 'failed') return node.status === 'done' ? 'ok' : node.status;
-  return node.reason ? `refused: ${node.reason}` : 'failed';
-}
-
-/** Whether the operation a node ran is an effect: not `pure`, as the port that declares it says. */
-function isEffect(handler: string | undefined, scope: Scope): boolean {
-  if (!handler || handler.startsWith('graph:')) return false;
-  const hit = scope.op(handler);
-  return typeof hit === 'string' ? false : hit.op.pure !== true;
-}
-
-/** What a node span says about itself whatever kind of node it is: where it is, and what it carried. */
-function nodeAttributes(id: string, node: NodeReport, walk: Walk): TraceAttributes {
-  return {
-    'wilanis.node': id,
-    'wilanis.at': `nodes/${id}`,
-    ...(node.handler && !node.handler.startsWith('graph:')
-      ? { 'wilanis.effect': isEffect(node.handler, walk.scope) }
-      : {}),
-    ...looked(node),
-    ...valued(node, walk.level),
-  };
-}
 
 /**
  * A `switch`: what it routed to. Which of its rules fired is not on the span, because no report carries it --
@@ -128,7 +51,11 @@ function mapSpan(id: string, node: NodeReport, walk: Walk): Trace {
   });
 }
 
-/** A `run` node: what it ran, how it ended, and what ran inside it where it called something nested. */
+/**
+ * A `run` node or a map element: what it ran, how it ended, and what ran inside it. A node that was tried
+ * again says how often on its own span and carries each try that did not stand as a child, in order, before
+ * what ran inside the try that did; a node tried once is exactly what it was before anything retried.
+ */
 function callSpan(id: string, node: NodeReport, walk: Walk): Trace {
   const handler = node.handler ?? '';
   const graph = handler.startsWith('graph:') ? handler.slice('graph:'.length) : undefined;
@@ -136,9 +63,38 @@ function callSpan(id: string, node: NodeReport, walk: Walk): Trace {
     name: graph ? `${id} (${graph})` : `${id} ${handler}`.trimEnd(),
     status: nodeStatus(node),
     at: node,
-    attributes: nodeAttributes(id, node, walk),
-    children: node.sub ? nestedSpans(node.sub, walk) : [],
+    attributes: { ...nodeAttributes(id, node, walk), ...triedAgain(node) },
+    children: [
+      ...triesOf(node, { name: id, attributes: { 'wilanis.node': id, 'wilanis.at': `nodes/${id}` } }, walk),
+      ...(node.sub ? nestedSpans(node.sub, walk) : []),
+    ],
   });
+}
+
+/** How many tries a node took before the one that stood, where it took any: `wilanis.attempts`. */
+const triedAgain = (node: NodeReport): TraceAttributes =>
+  node.attempts?.length ? { 'wilanis.attempts': node.attempts.length } : {};
+
+/** Where the tries of one site are said to be: the name each is called by, and the address each carries. */
+interface TriedAt {
+  name: string;
+  attributes: TraceAttributes;
+}
+
+/**
+ * Each try of a node that did not stand, in order, as `<name> try <n>` with its own stamps. Its error is a
+ * message like a node's, so it is carried at `full` only; a try that ran a graph has that graph beneath it.
+ */
+function triesOf(node: NodeReport, site: TriedAt, walk: Walk): Trace[] {
+  return (node.attempts ?? []).map((attempt, at) =>
+    span({
+      name: `${site.name} try ${at + 1}`,
+      status: 'failed',
+      at: attempt,
+      attributes: { ...site.attributes, ...(walk.level === 'full' ? { 'wilanis.error': attempt.error } : {}) },
+      children: attempt.sub ? nestedSpans(attempt.sub, walk) : [],
+    }),
+  );
 }
 
 /**
@@ -179,12 +135,23 @@ function nodesOf(report: Report, walk: Walk): Trace[] {
 /**
  * What ran inside one port operation's report. A binding operation lowers to a single node called `op`, which
  * names nothing an author wrote: where it ran a graph, the graph beneath it is what a reader wants, and where
- * it delegated to a native operation the wrapper is the only node there is and stands for it.
+ * it delegated to a native operation the wrapper is the only node there is and stands for it. A binding
+ * operation that retried its graph keeps each try that did not stand, named by the operation, before the one
+ * that did.
  */
 function insideOperation(report: Report, walk: Walk): Trace[] {
-  const sub = report.nodes.op?.sub;
-  return sub ? [graphSpan(sub, walk)] : nodesOf(report, walk);
+  const op = report.nodes.op;
+  if (!op?.sub) return nodesOf(report, walk);
+  const opName = report.graph.split('#')[1] ?? 'op';
+  const site = { name: opName, attributes: { 'wilanis.at': `operations/${opName}` } };
+  return [...triesOf(op, site, walk), graphSpan(op.sub, walk)];
 }
+
+/**
+ * How often a binding operation that runs a graph was tried: the binding's span says it, since the `op` node
+ * that carries the tries has no span of its own there. A delegation keeps its `op` span, which says it itself.
+ */
+const ranAGraphAgain = (report: Report): TraceAttributes => (report.nodes.op?.sub ? triedAgain(report.nodes.op) : {});
 
 /**
  * What met one port operation, and what ran inside it: the binding a profile chose, or the port itself where
@@ -198,7 +165,7 @@ function bindingSpan(report: Report, walk: Walk): Trace {
     name: bound ? `binding ${report.graph}` : report.graph,
     status: statusOf(report),
     at: report,
-    attributes: bound ? { 'wilanis.binding': path } : { 'wilanis.port': path },
+    attributes: { ...(bound ? { 'wilanis.binding': path } : { 'wilanis.port': path }), ...ranAGraphAgain(report) },
     children: insideOperation(report, walk),
   });
 }
