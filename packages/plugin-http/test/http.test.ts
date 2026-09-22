@@ -304,7 +304,7 @@ describe('an upstream that answers nothing', () => {
       const body = JSON.parse(text);
       expect(body).toEqual({ error: 'fault', run: expect.any(String) });
       expect(runs).toContain(body.run);
-      expect(text).not.toContain('asked');
+      expect(text).not.toContain('fetched');
       expect(text).not.toContain('fetch');
       // the log line is where the operator finds what broke, under the id the caller was handed
       const line = lineFor('GET /customers/1', 500);
