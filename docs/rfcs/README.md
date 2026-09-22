@@ -38,7 +38,7 @@ accepted. Statuses: draft, accepted, implemented, withdrawn.
 | [0030](0030-cache.md) | `cache`: one word on a node, a graph or an operation, lowered to the nodes it stands for | accepted |
 | [0031](0031-intent-triggers.md) | Intents: a sentence fires a route, under the route's own policies | accepted |
 | [0032](0032-site-as-declared-input.md) | The site as a declared input: what the compiler tells an operation about where it was called | accepted |
-| [0033](0033-a-guard-before-the-write.md) | A guard before the write: a field invariant over a value an effect has already stored | withdrawn |
+| 0033 | A guard before the write: three ways to compensate a guard lowered behind a store write; superseded by RFC 0035 and removed, so the number stays taken | withdrawn |
 | [0034](0034-context-is-the-root.md) | `context` is the root: one word for what a kind hands, where it is declared and where it is read | accepted |
 | [0035](0035-the-whole-record-before-the-write.md) | The whole record before the write: a guarded shape is made upstream of the effect, never from it | accepted |
 
