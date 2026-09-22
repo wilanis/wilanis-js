@@ -14,19 +14,24 @@ import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 /** The example's two stores: the same collections over the memory connection and over the postgres one. */
 const STORES = ['@customers/data/customers.store.json', '@customers/data/customers-postgres.store.json'];
 
+/** The collections that keep records: a view has no table of its own, so the plan never sees one. */
+function keeping(collections: Record<string, any>): Record<string, any> {
+  return Object.fromEntries(Object.entries(collections).filter(([, collection]) => collection.view === undefined));
+}
+
 describe("the example's migration plan", () => {
   it('is every collection created, against a database that has recorded nothing', () => {
     const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);
     const scope = new Scope(load.registry, load.resolve);
     for (const path of STORES) {
       const store = scope.get('store', path)?.doc;
-      const declaring = { connection: store?.connection ?? '', collections: store?.collections ?? {} };
+      const declaring = { connection: store?.connection ?? '', collections: keeping(store?.collections ?? {}) };
       const steps = plan(
         {},
         declaredOfStore(declaring, of => scope.types.shape(of)),
         marksOfStore(declaring),
       ).steps;
-      // both collections are created, and the unique the customers declare is written over the rows there are
+      // both collections are created (the view of customers has no table to create), and the unique the customers declare is written over the rows there are
       // none of: an empty database loses nothing, so the whole plan is additive and needs no permission
       expect(
         steps.map(step => `${step.do} ${step.target}`),

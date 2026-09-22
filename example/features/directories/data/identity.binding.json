@@ -7,7 +7,8 @@
     "verifyCustomer": {
       "run": "@auth/identity.port.json#verify",
       "in": {
-        "connection": "@connections/people.connection.json"
+        "connection": "@connections/people.connection.json",
+        "type": "@access/domain/Attributes.shape.json"
       }
     },
     "verifyEmployee": {

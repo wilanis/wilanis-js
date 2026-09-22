@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/project.schema.json",
   "label": "Customers",
   "name": "customers",
-  "description": "A registry of customers: the routes talk to a REST API (mockapi.io); customers are imported from and exported to CSV files through the blob registry. Reads are public; writes are for signed-in employees holding the registrar role, identified by our own token, issued by the included access tree (@wilanis/access) at /api/v1/auth-employees against a directory this project binds (account holders sign in at /api/v1/auth-customers and hold a token too, but no write). Preferences live in the session. A command-line greeting is gated by a one-time code. Plugins come from npm packages named by \"from\".",
+  "description": "A registry of customers: the routes talk to a REST API (mockapi.io); customers are imported from and exported to CSV files through the blob registry. Customers are kept per tenant, the tenant the sign-in wrote into the caller's session; reads are for a signed-in caller, and writes for signed-in employees holding the registrar role, identified by our own token, issued by the included access tree (@wilanis/access) at /api/v1/auth-employees against a directory this project binds (account holders sign in at /api/v1/auth-customers and hold a token too, and read their own tenant's customers, but no write). Preferences live in the session. A command-line greeting is gated by a one-time code. Plugins come from npm packages named by \"from\".",
   "aliases": {
     "@customers": "@features/customers",
     "@hello": "@features/hello"
@@ -111,8 +111,8 @@
     },
     {
       "label": "Reach the customer store",
-      "description": "Read the customers once before the HTTP server opens, so a tree whose storage is unreachable refuses to serve instead of answering every route with a fault. The port is bound per profile, so this checks whatever storage the profile chose.",
-      "run": "@customers/domain/customer.port.json#listAll",
+      "description": "Read the customers once before the HTTP server opens, so a tree whose storage is unreachable refuses to serve instead of answering every route with a fault. It reads every tenant's, since nobody is calling yet and a startup step has no tenant to read (B008). The port is bound per profile, so this checks whatever storage the profile chose.",
+      "run": "@customers/domain/customer.port.json#listEvery",
       "required": true
     },
     {
@@ -131,7 +131,7 @@
     },
     {
       "label": "Keep the schedule",
-      "description": "Fire the scheduled triggers of this tree, each at the instants its cron expression names. Delete this step and nothing is scheduled: the nightly digest is a document either way, and it fires because project.json asks for a scheduler, never because the trigger exists. One process runs it here; several instances would give it a lease.",
+      "description": "Fire the scheduled triggers of this tree, each at the instants its cron expression names. This tree declares none: its customers are kept per tenant, and a tick has no caller to be a tenant of, so a scheduled trigger could reach neither them nor the view across them. Delete this step and nothing is scheduled: a scheduled trigger fires because project.json asks for a scheduler, never because the trigger exists. One process runs it here; several instances would give it a lease.",
       "run": "@schedule/scheduler.port.json#run"
     },
     {

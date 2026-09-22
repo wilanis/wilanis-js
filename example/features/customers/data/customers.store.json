@@ -1,11 +1,14 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/store.schema.json",
   "label": "Customers",
-  "description": "What the registry keeps: one record per customer, identified by their id. The collection is where the record type is written down, so the graphs below name the store and the collection and repeat no shape. It also says what the records may not repeat and what an added column gives the rows already there, so the compiler judges a filter or a patch against the declaration rather than the database finding out at run time.",
+  "description": "What the registry keeps: one record per customer, identified by their id, and kept under the tenant of whoever wrote it. The collection is where the record type is written down, so the graphs below name the store and the collection and repeat no shape. It also says what the records may not repeat and what an added column gives the rows already there, so the compiler judges a filter or a patch against the declaration rather than the database finding out at run time.",
   "connection": "@connections/customers.connection.json",
+  "reads": {
+    "tenant": "@customers/edge/request.resolvers.json#tenant"
+  },
   "collections": {
     "customers": {
-      "description": "the customers, one row each: no two share an address, a note is a field of the customer, and a row written before the tier column reads as bronze",
+      "description": "the customers, one row each, kept per tenant: a caller sees the rows of the tenant their sign-in wrote into the session and no other, no two of a tenant share an address, a note is a field of the customer, and a row written before the tier column reads as bronze",
       "of": "@customers/domain/Customer.shape.json",
       "key": "id",
       "unique": [
@@ -18,12 +21,20 @@
       },
       "renamed": {
         "email": "emailAddress"
+      },
+      "scoped": {
+        "tenant": "{{tenant}}"
       }
     },
     "latest": {
-      "description": "the most recent customer registered into each tier, one row per tier: written in the same transaction as the customer itself, so the two cannot disagree",
+      "description": "the most recent customer registered into each tier, one row per tier: written in the same transaction as the customer itself, so the two cannot disagree. It is not scoped: its key is the tier, which is one row for every tenant, and nothing reads it back",
       "of": "@customers/domain/TierLatest.shape.json",
       "key": "tier"
+    },
+    "everyCustomer": {
+      "description": "the same rows as customers, every tenant's: the digest, for employees",
+      "view": "customers",
+      "behind": "@access/edge/employees-only.policy.json"
     }
   }
 }

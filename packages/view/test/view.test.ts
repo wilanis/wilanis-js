@@ -242,8 +242,9 @@ describe("the store page's marks the database has not caught up with", () => {
 
   it('draws them from the store document alone, so the page opens no connection', async () => {
     const store = (await view('@features/customers/data/customers.store.json')).store;
-    // the view model says what the tree says: the engine behind the store, its key types and its call sites,
-    // and nothing about what any database has recorded
+    // the view model says what the tree says: the engine behind the store, its key types, its call sites, the
+    // request its scope reads, the collections it scopes and the view across them, and nothing about what any
+    // database has recorded
     expect(Object.keys(store ?? {}).sort()).toEqual([
       'calls',
       'connection',
@@ -253,6 +254,9 @@ describe("the store page's marks the database has not caught up with", () => {
       'kind',
       'kindLabel',
       'plugin',
+      'request',
+      'scoped',
+      'views',
     ]);
   });
 });

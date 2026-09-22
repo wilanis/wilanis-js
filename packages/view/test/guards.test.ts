@@ -228,8 +228,8 @@ describe('the invariant page tables every site', () => {
       if (seen?.form !== 'holds') throw new Error('the example invariant is not a field invariant');
       return seen as VHoldsInvariant;
     });
-    expect(marked.sites.length).toBe(14);
-    // the whole return on stating the rule once: thirteen places, each named, and what each costs the tree
+    expect(marked.sites.length).toBe(16);
+    // the whole return on stating the rule once: sixteen places, each named, and what each costs the tree
     expect(marked.sites.filter(one => one.held).length).toBe(0);
     expect(marked.sites[0]).toEqual({
       graph: '@features/customers/data/kept-get-postgres.graph.json',
@@ -254,7 +254,7 @@ describe('the invariant page tables every site', () => {
       kind: 'made',
       held: [{ by: 'literal' }, { by: 'literal' }, { by: 'literal' }],
     });
-    expect(seen.sites.length).toBe(15);
+    expect(seen.sites.length).toBe(17);
   });
 });
 

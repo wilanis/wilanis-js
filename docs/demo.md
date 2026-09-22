@@ -38,10 +38,10 @@ npx wilanis check .
 ```
 
 ```
-ok: 185 documents
+ok: 198 documents
 ```
 
-Every one of the 185 is a JSON document; there is no JavaScript in the tree, and `check` judged every
+Every one of the 198 is a JSON document; there is no JavaScript in the tree, and `check` judged every
 profile at once. Open the viewer on the rule and search for *Writes are for registrars*:
 
 ```
@@ -64,10 +64,10 @@ access: every trigger reaching these domain operations is gated
     @customers/domain/customer.port.json#import
 requires: attaches @access/edge/can-register.policy.json
 reached by (every one met by @features/access/edge/can-register.policy.json):
-    @features/customers/edge/delete-customers.trigger.json  #remove (through #removeMany), #removeMany
     @features/customers/edge/delete-customer.trigger.json  #remove
-    @features/customers/edge/import-customers.trigger.json  #record (through #submit), #submit (through #recordAll), #import
-    @features/customers/edge/register-customer.trigger.json  #record (through #submit), #submit
+    @features/customers/edge/delete-customers.trigger.json  #remove (through #removeMany), #removeMany
+    @features/customers/edge/import-customers.trigger.json  #register (through #submit), #submit (through #registerAll), #import
+    @features/customers/edge/register-customer.trigger.json  #register (through #submit), #submit
     @features/customers/edge/update-customer.trigger.json  #update
 ```
 
@@ -102,6 +102,12 @@ T002  @features/customers/edge/archive-customer.trigger.json#in
 T002  @features/customers/edge/archive-customer.trigger.json#out
     '@customers/domain/customer.port.json#remove' answers @features/customers/domain/Customer.shape.json but the trigger declares no out
     → declare out on the trigger, or fire an operation that answers nothing
+A006  @features/customers/edge/archive-customer.trigger.json#policies
+    @features/customers/data/customers.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'local')
+    → gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence
+A006  @features/customers/edge/archive-customer.trigger.json#policies
+    @features/customers/data/customers-postgres.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')
+    → gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence
 T005  @features/customers/edge/archive-customer.trigger.json#settings/response/refusals
     @features/customers/data/delete-row.graph.json may refuse with reason 'missing', which settings.response.refusals does not map
     → add "missing" under settings.response.refusals: how this trigger answers that outcome
@@ -115,7 +121,7 @@ I001  @features/customers/edge/archive-customer.trigger.json#policies
     trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for registrars' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy
     → attach "@access/edge/can-register.policy.json" under policies, or take @features/customers/domain/customer.port.json#remove out of the invariant's over
 
-6 refusal(s)
+8 refusal(s)
 ```
 
 **Point at.** The last refusal. Read it aloud, whole, and land on its hint:
@@ -125,18 +131,20 @@ I001  @features/customers/edge/archive-customer.trigger.json#policies
 ```
 
 The file the agent wrote a second ago, the rule it broke by its label, the file the rule lives in, and the
-two edits that would fix it. Nothing has run. Each of the six has a stable code, the file, the path inside it
+two edits that would fix it. Nothing has run. Each of the eight has a stable code, the file, the path inside it
 (`#in`, `#policies`, `#settings/response/refusals`) and a hint that is an edit: an agent's whole loop, write, check, edit.
 
 **If asked.** *"The agent should have read the invariant first."* It would have, had it known there was one
 to read. Instead the checker read the route, the port it fires, the graphs bound to that port and the
 invariant, and told the agent about the rule in the one place it was going to look: the output of the
 command it runs after every edit. `kept-remove` is the graph two ports down that will run under this profile.
+The two A006 are the same kind of news: the customer stores keep each tenant's rows apart, reading the tenant
+from the caller's session, and nothing on this route proves there is a caller.
 
 ## 3. Following the hints
 
-**Say.** The agent does what the first five hints say: declare what the route takes and answers, and map the
-three reasons to statuses. It leaves the policy alone, since nothing yet told it why.
+**Say.** The agent does what the five shape and status hints say: declare what the route takes and answers,
+and map the three reasons to statuses. It leaves the policies alone, since nothing yet told it which.
 
 **Do.** Paste the route with the shapes and the refusals filled in.
 
@@ -146,14 +154,21 @@ npx wilanis check .
 ```
 
 ```
+A006  @features/customers/edge/archive-customer.trigger.json#policies
+    @features/customers/data/customers.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'local')
+    → gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence
+A006  @features/customers/edge/archive-customer.trigger.json#policies
+    @features/customers/data/customers-postgres.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')
+    → gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence
 I001  @features/customers/edge/archive-customer.trigger.json#policies
     trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for registrars' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy
     → attach "@access/edge/can-register.policy.json" under policies, or take @features/customers/domain/customer.port.json#remove out of the invariant's over
 
-1 refusal(s)
+3 refusal(s)
 ```
 
-One round took five refusals to zero. Now the agent does exactly what the last one says, and no more:
+One round took five refusals to zero. The three left all point at `#policies`: who may call the route, and
+whether a caller's tenant is known. Now the agent does exactly what the last one says, and no more:
 
 ```json
 "policies": ["@access/edge/can-register.policy.json"],
@@ -177,8 +192,9 @@ T005  @features/customers/edge/archive-customer.trigger.json#settings/response/r
 3 refusal(s)
 ```
 
-**Point at.** `A005 ... no attachment on this trigger gives one`, and the JSON in its hint. Fixing one refusal
-surfaced three the agent could not have seen: the policy decides on who is calling, and nothing on this route
+**Point at.** `A005 ... no attachment on this trigger gives one`, and the JSON in its hint. The two A006 are
+gone: the registrar policy proves a signed-in session, and a session carries the tenant its sign-in wrote.
+Fixing one refusal surfaced three the agent could not have seen: the policy decides on who is calling, and nothing on this route
 hands the guard a token; and a gated route can now end `forbidden` or `anonymous`, which the route has to
 map. A rule catching a route is a conversation, and every turn of it is an edit.
 
@@ -191,7 +207,7 @@ npx wilanis check .
 ```
 
 ```
-ok: 186 documents
+ok: 199 documents
 ```
 
 Three rounds of write, check, edit, and the agent read no manual.
@@ -221,11 +237,11 @@ features/access/domain/require-registrar  switch 'decide'  3/3 branches
 ```
 
 ```
-every branch settled -- 44 branch(es), 20 decision(s), 16 graph(s).
+every branch settled -- 47 branch(es), 21 decision(s), 17 graph(s).
 3 invariant(s) declared:
-  The session is the caller's  holds at 3 trigger(s)
-  A customer is reachable  proved at 0 site(s), guarded at 13
+  A customer is reachable  proved at 0 site(s), guarded at 16
   Writes are for registrars  holds at 6 trigger(s)
+  The session is the caller's  holds at 3 trigger(s)
 ```
 
 This is the test suite the agent did not write. `holds at 6 trigger(s)`: it was five in beat 1. Then the map,
@@ -287,7 +303,7 @@ TOKEN=$(curl -s -X POST localhost:8099/api/v1/auth-employees -H 'content-type: a
   -d '{"username":"bo","password":"bo-pass"}' | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
 curl -s -X POST localhost:8099/customers -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
   -d '{"url":"https://api.example.com/orders","method":"GET"}' -w '  [%{http_code}]\n'
-ID=$(curl -s localhost:8099/customers | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+ID=$(curl -s localhost:8099/customers -H "authorization: Bearer $TOKEN" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
 curl -s -X POST localhost:8099/customers/$ID/archive -H "authorization: Bearer $TOKEN" -w '  [%{http_code}]\n'
 ```
 
@@ -335,7 +351,7 @@ https://api.example.com/customers,GET
 ```
 curl -s -X POST localhost:8099/customers.csv -H 'content-type: text/csv' -H "authorization: Bearer $TOKEN" \
   --data-binary @$DEMO/customers.bad.csv -w '  [%{http_code}]\n'
-curl -s localhost:8099/customers -w '  [%{http_code}]\n'
+curl -s localhost:8099/customers -H "authorization: Bearer $TOKEN" -w '  [%{http_code}]\n'
 ```
 
 ```
@@ -343,7 +359,8 @@ curl -s localhost:8099/customers -w '  [%{http_code}]\n'
 []  [200]
 ```
 
-**Point at.** `[]`. Four good rows went in before the fifth refused, and the store holds none of them. The
+**Point at.** `[]`. Four good rows went in before the fifth refused, and bo's tenant holds none of them; a
+list is a signed-in read, answered from the caller's tenant only. The
 sentence in the 500 is the tree's other invariant, `a-customer-is-reachable.invariant.json`, in its own words;
 nobody wrote that message. Then open `features/customers/domain/register-all.graph.json` and point at one line:
 
@@ -368,9 +385,9 @@ route, policy, shape or business graph differs from `local`, and beat 1 judged i
 
 **The edit that never reaches the serving tree.** With `start` still running, paste the beat-3 file back
 over the route (`cp $DEMO/archive-customer.step2.trigger.json features/customers/edge/archive-customer.trigger.json`):
-the log prints `reload refused, still serving the last good tree:` with the I001 refusal, hint and all, while
+the log prints `reload refused, still serving the last good tree:` with the two A006 and the I001, hints and all, while
 `curl` keeps answering 401, so an agent editing a live tree cannot make the write public for one request.
-Paste the finished file back and it prints `reload: 186 documents, serving the new tree`. It needs nothing
+Paste the finished file back and it prints `reload: 199 documents, serving the new tree`. It needs nothing
 beyond what this script already runs; `build.mjs` runs it as its last step.
 
 ## Reset

@@ -267,3 +267,55 @@ describe('an operation inside an atomic graph', () => {
     ).rejects.toThrow(/cannot take part in a transaction, so an atomic graph cannot write through it/);
   });
 });
+
+/**
+ * A view of a scoped collection, read through the handlers: the same table as the collection it views, read
+ * with no scope, so it answers every scope's rows. A write names the collection whose rows it writes, so the
+ * handler refuses one through a view whatever the engine would have done with it.
+ */
+describe('a view, read and written through', () => {
+  const collections = storeDoc.collections as Record<string, Record<string, unknown>>;
+  const viaView = (extra: Record<string, unknown> = {}) => ({ store: STORE, collection: 'everyEntry', ...extra });
+  beforeEach(() => {
+    collections.entries.scoped = { tenant: '{{tenant}}' };
+    collections.everyEntry = { view: 'entries', behind: '@access/edge/employees-only.policy.json' };
+  });
+  afterEach(() => {
+    collections.entries.scoped = undefined;
+    delete collections.everyEntry;
+  });
+
+  it("answers every scope's rows, where the viewed collection answers one scope's", async () => {
+    await run(
+      '@storage/store.port.json#put',
+      on({ record: { id: '1', url: 'a', hits: 1 }, scope: { tenant: 'acme' } }),
+    );
+    await run(
+      '@storage/store.port.json#put',
+      on({ record: { id: '2', url: 'b', hits: 1 }, scope: { tenant: 'globex' } }),
+    );
+    expect(await run('@storage/store.port.json#count', on({ scope: { tenant: 'acme' } }))).toBe(1);
+    expect(await run('@storage/store.port.json#count', viaView())).toBe(2);
+    expect(await run('@storage/store.port.json#get', viaView({ key: '2' }))).toEqual({
+      record: { id: '2', url: 'b', hits: 1 },
+    });
+  });
+
+  it('takes no scope, as a collection that keeps none takes none', async () => {
+    await expect(run('@storage/store.port.json#find', viaView({ scope: { tenant: 'acme' } }))).rejects.toThrow(
+      /scope: 'entries' keeps no scope, and this operation carries one/,
+    );
+  });
+
+  it('refuses a put, a patch and a remove: a write says whose row it is', async () => {
+    const writes: [string, Record<string, unknown>][] = [
+      ['put', { record: { id: '1', url: 'a', hits: 1 } }],
+      ['patch', { key: '1', changes: { hits: 2 } }],
+      ['remove', { key: '1' }],
+    ];
+    for (const [op, input] of writes)
+      await expect(run(`@storage/store.port.json#${op}`, viaView(input))).rejects.toThrow(
+        /'everyEntry' is a view of 'entries', and a view reads: write 'entries', whose rows have a scope/,
+      );
+  });
+});

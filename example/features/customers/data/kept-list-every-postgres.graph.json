@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "List what is kept, across tenants",
+  "description": "Data graph behind customer.listEvery under the local profile: every record of every tenant, read through the everyCustomer view. The view is behind employees-only, so every trigger reaching this graph attaches that policy (A008).",
+  "out": {
+    "type": "@customers/domain/Customer.shape.json[]",
+    "from": [
+      "rows"
+    ]
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "rows",
+      "label": "Read every customer of every tenant",
+      "run": "@storage/store.port.json#find",
+      "in": {
+        "store": "@customers/data/customers-postgres.store.json",
+        "collection": "everyCustomer",
+        "order": [
+          {
+            "by": "email"
+          }
+        ]
+      }
+    }
+  ]
+}

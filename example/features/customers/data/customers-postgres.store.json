@@ -3,9 +3,12 @@
   "label": "Customers in PostgreSQL",
   "description": "The same customers as @customers/data/customers.store.json, kept in a database rather than in memory. Every word of the declaration is the same -- the collection, the shape, the key, what no two records may repeat, what an added column gives the rows already there -- and only the connection differs. Two stores exist because a profile swaps bindings and not connections (RFC 0002 settled that; RFC 0005 is where it changes), so this is the seam until it does.",
   "connection": "@connections/customers-postgres.connection.json",
+  "reads": {
+    "tenant": "@customers/edge/request.resolvers.json#tenant"
+  },
   "collections": {
     "customers": {
-      "description": "the customers, one row each: no two share an address, a note is a field of the customer, and a row written before the tier column reads as bronze",
+      "description": "the customers, one row each, kept per tenant: a caller sees the rows of the tenant their sign-in wrote into the session and no other, no two of a tenant share an address, a note is a field of the customer, and a row written before the tier column reads as bronze",
       "of": "@customers/domain/Customer.shape.json",
       "key": "id",
       "unique": [
@@ -18,12 +21,20 @@
       },
       "renamed": {
         "email": "emailAddress"
+      },
+      "scoped": {
+        "tenant": "{{tenant}}"
       }
     },
     "latest": {
-      "description": "the most recent customer registered into each tier, one row per tier: written in the same transaction as the customer itself, so the two cannot disagree",
+      "description": "the most recent customer registered into each tier, one row per tier: written in the same transaction as the customer itself, so the two cannot disagree. It is not scoped: its key is the tier, which is one row for every tenant, and nothing reads it back",
       "of": "@customers/domain/TierLatest.shape.json",
       "key": "tier"
+    },
+    "everyCustomer": {
+      "description": "the same rows as customers, every tenant's: the digest, for employees",
+      "view": "customers",
+      "behind": "@access/edge/employees-only.policy.json"
     }
   }
 }

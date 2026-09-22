@@ -46,12 +46,14 @@ describe('sabotage: access, as the example attaches the included policies', () =
         trigger.policies.pop();
       }),
     ).toEqual(['I001']);
+    // with no policy at all nothing proves the session either, so the tenant each profile's store scopes by is
+    // read as required where the kind hands it only sometimes (A006), besides the two stale reasons
     expect(
       sabotage('features/customers/edge/register-customer.trigger.json', trigger => {
         delete trigger.policies;
         delete trigger.settings.response.refusals.invalid_credential;
       }),
-    ).toEqual(['T006', 'T006', 'I001']);
+    ).toEqual(['A006', 'A006', 'A006', 'A006', 'T006', 'T006', 'I001']);
   });
   it('R001 a trigger naming a policy that is not there', () => {
     expect(

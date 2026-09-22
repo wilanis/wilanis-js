@@ -1,16 +1,13 @@
 /**
- * A copy of the example whose customers are kept per tenant, with a view across every tenant, for the pages that
- * draw a scope and a view (RFC 0015). The example does not scope its store yet -- that is RFC 0015's step 10 --
- * so every case here starts from a tree that does: the session shape the guard's settings name gains the
- * attribute, the registry's one edge document that reads the request gains the resolver, and the store binds the
- * read, scopes `customers` by it and declares `everyCustomer` as a view behind the employees-only policy.
+ * The example, loaded as the viewer loads it, for the pages that draw a scope and a view (RFC 0015). The example
+ * keeps its customers per tenant: the session shape the guard's settings name carries the attribute, the
+ * customers feature's resolvers read it back, and the store binds that read, scopes `customers` by it and
+ * declares `everyCustomer` as a view behind the employees-only policy. A case reads the page as written, or
+ * edits a copy where what an unscoped store draws is the claim.
  *
- * This mirrors `packages/runtime/test/scoping-harness.ts`, which plants the same tree for the checker's rules.
- * It is a copy rather than an import because the two packages' tests do not share a directory, and because what
- * a page needs from the tree is a loaded one rather than its refusals.
- *
- * The included access tree is copied too, since the session shape lives there and a scope's whole claim is about
- * what the guard hands.
+ * This is the viewer's side of `packages/runtime/test/scoping-harness.ts`, which edits the same tree for the
+ * checker's rules. It is its own file rather than an import because the two packages' tests do not share a
+ * directory, and because what a page needs from the tree is a loaded one rather than its refusals.
  */
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -30,15 +27,19 @@ import { BUILTIN_PLUGINS } from '@wilanis/runtime';
 import { type DocView, viewOf } from '../src/index.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
-const ACCESS = fileURLToPath(new URL('../../../libraries/access', import.meta.url));
+/** The tree the example includes, as the runtime would resolve it from the example's node_modules. */
+const INCLUDES: ResolvedInclude[] = [
+  {
+    from: '@wilanis/access',
+    dir: fileURLToPath(new URL('../../../libraries/access', import.meta.url)),
+    features: ['access'],
+  },
+];
 
-/** The store the registry keeps its customers in, and the one edge document of that feature that reads the request. */
+/** The store the local profile keeps its customers in. */
 export const STORE_FILE = 'features/customers/data/customers.store.json';
-export const RESOLVERS_FILE = 'features/customers/edge/request.resolvers.json';
-/** The session shape the guard's settings.session names, in the included access tree. */
-export const SESSION_FILE = 'features/access/domain/Session.shape.json';
 
-/** Where a document being edited lives: the example itself, or the access tree it includes. */
+/** An edit to one document of a copy of the example, by its path in the tree. */
 export type Edits = Record<string, (doc: any) => void>;
 
 /** The plugins the example names, handed in: a copy of the tree has no node_modules and resolves none of them. */
@@ -55,13 +56,6 @@ const PLUGINS: Record<string, PluginModule> = {
   '@otel': otel,
 };
 
-/** A view of the scoped customers, across every tenant, behind the policy the access tree declares for employees. */
-export const VIEW = {
-  view: 'customers',
-  behind: '@access/edge/employees-only.policy.json',
-  description: 'the same rows, every tenant',
-};
-
 /** Apply an edit to one document of a copied tree, in place. */
 function editing(dir: string, file: string, edit: Edits[string]): void {
   const path = join(dir, file);
@@ -70,54 +64,25 @@ function editing(dir: string, file: string, edit: Edits[string]): void {
   writeFileSync(path, JSON.stringify(doc));
 }
 
-/** A throwaway copy of one tree, without what a check must not read. */
-function copyOf(from: string): string {
+/** The view of one document of the example as written. */
+const viewed = (root: string, path: string): DocView => {
+  const seen = viewOf(loadTree(root, PLUGINS, INCLUDES), path);
+  if (!seen) throw new Error(`no view for ${path}`);
+  return seen;
+};
+
+/**
+ * The view of one document of the example, or of a copy of it with the edits a case asks for. A copy lives for
+ * the length of the call and no longer.
+ */
+export function scopedView(path: string, edits?: Edits): DocView {
+  if (!edits) return viewed(EXAMPLE, path);
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-view-scoped-'));
-  cpSync(from, dir, { recursive: true, filter: path => !path.includes('node_modules') });
-  return dir;
-}
-
-/**
- * What the example scopes its customers by, written into a copy: the attribute the sign-in would have put in the
- * session, the resolver that reads it back off what the guard hands, and the store binding that read and scoping
- * the collection by it. The attribute is declared optional in the shape and `required` on the resolver, so the
- * sign-in graphs of the access tree need no change and the read is still read as present.
- */
-function scope(example: string, access: string): void {
-  editing(access, SESSION_FILE, shape => {
-    shape.fields.tenant = { type: 'string', required: false, description: 'written at sign-in, and never again' };
-  });
-  editing(example, RESOLVERS_FILE, doc => {
-    doc.resolvers.tenant = {
-      label: "The caller's tenant",
-      read: 'request.session.attributes.tenant',
-      required: true,
-      description: 'written into the session at sign-in; every customer belongs to one',
-    };
-  });
-  editing(example, STORE_FILE, store => {
-    store.reads = { tenant: '@customers/edge/request.resolvers.json#tenant' };
-    store.collections.customers.scoped = { tenant: '{{tenant}}' };
-  });
-}
-
-/**
- * The view of one document of the example scoped by a tenant, with whatever further edits a case asks for. The
- * copies live for the length of the call and no longer.
- */
-export function scopedView(path: string, edits: Edits = {}, accessEdits: Edits = {}): DocView {
-  const dir = copyOf(EXAMPLE);
-  const access = copyOf(ACCESS);
   try {
-    scope(dir, access);
+    cpSync(EXAMPLE, dir, { recursive: true, filter: from => !from.includes('node_modules') });
     for (const [file, edit] of Object.entries(edits)) editing(dir, file, edit);
-    for (const [file, edit] of Object.entries(accessEdits)) editing(access, file, edit);
-    const includes: ResolvedInclude[] = [{ from: '@wilanis/access', dir: access, features: ['access'] }];
-    const seen = viewOf(loadTree(dir, PLUGINS, includes), path);
-    if (!seen) throw new Error(`no view for ${path}`);
-    return seen;
+    return viewed(dir, path);
   } finally {
     rmSync(dir, { recursive: true, force: true });
-    rmSync(access, { recursive: true, force: true });
   }
 }

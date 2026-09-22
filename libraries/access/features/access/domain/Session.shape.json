@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
   "label": "Session",
-  "description": "What a session carries between calls: the display name the directory gave at sign-in, the realm the sign-in decided, and the theme the caller chose, when one was. Named by the @auth plugin's settings.session, so every write through session.port.json is judged against it.",
+  "description": "What a session carries between calls: the display name the directory gave at sign-in, the realm and the tenant the sign-in decided, and the theme the caller chose, when one was. Named by the @auth plugin's settings.session, so every write through session.port.json is judged against it.",
   "layer": "core",
   "fields": {
     "displayName": {
@@ -11,6 +11,10 @@
     "realm": {
       "type": "string",
       "description": "written at sign-in: customer or employee"
+    },
+    "tenant": {
+      "type": "string",
+      "description": "written at sign-in, from what the customer directory said about the account or the operator's own for an employee; a host's store may scope its records by it, and nothing writes it again"
     },
     "theme": {
       "type": "string",

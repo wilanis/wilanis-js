@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Digest",
-  "description": "Every customer counted and listed, composed into one Digest: the count from one node, the text from another.",
+  "description": "Every customer of every tenant counted and listed, composed into one Digest: the count from one node, the text from another.",
   "out": {
     "type": "@customers/domain/Digest.shape.json",
     "from": "digest"
@@ -10,8 +10,8 @@
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "all",
-      "label": "Every customer",
-      "run": "@customers/domain/customer.port.json#listAll"
+      "label": "Every customer, every tenant",
+      "run": "@customers/domain/customer.port.json#listEvery"
     },
     {
       "type": "@wilanis/node/map.schema.json",

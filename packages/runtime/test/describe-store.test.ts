@@ -191,9 +191,12 @@ describe('map: where a node lands', () => {
   const lines = () => map(example);
 
   it('ends a store call at the records, naming the store, the collection and the operation', () => {
-    expect(lines()).toContain(`      asked @storage/store.port.json#get  (effect) → store ${KEPT} customers (get)`);
+    // the customers are kept per tenant, so a call over them says what it is scoped by
     expect(lines()).toContain(
-      `      asked @storage/store.port.json#remove  (effect) → store ${KEPT} customers (remove)`,
+      `      asked @storage/store.port.json#get  (effect) → store ${KEPT} customers (get), scoped by tenant`,
+    );
+    expect(lines()).toContain(
+      `      asked @storage/store.port.json#remove  (effect) → store ${KEPT} customers (remove), scoped by tenant`,
     );
   });
 

@@ -2,7 +2,7 @@
 
 *This page is the reference. To present the tree rather than read it, [`docs/demo.md`](../docs/demo.md) is the script.*
 
-A wilanis project: a registry of customers, with sign-in, sessions and policies over its writes, and a
+A wilanis project: a registry of customers kept per tenant, with sign-in, sessions and policies over its writes, and a
 command-line greeting gated by a one-time code. Everything in this directory is JSON; `package.json` installs
 the runtime and the plugin packages it uses. Two secrets are named in `project.json`: `CUSTOMERS_JWT_SECRET`,
 the key our tokens are signed with, which `start` and `run` need in the environment, and
@@ -51,6 +51,20 @@ is unreachable refuses to serve rather than answering every route with a fault. 
 documents rather than one connection swapped under a profile is the seam RFC 0002 settled and RFC 0005 will
 close: a profile swaps bindings, and a store names its connection in the document.
 
+**Both stores keep their customers per tenant, and no graph says so.** `customers` is
+`"scoped": { "tenant": "{{tenant}}" }`, and the store's `reads` binds `tenant` to the resolver of that name in
+`request.resolvers.json`, which reads `request.session.attributes.tenant`: what the sign-in wrote into the
+session from what the directory said about the account (ana is in `acme`, dee in `globex`, and every employee's
+session carries `operator`). `Customer` has no tenant field and no data graph names one: the compiler carries
+the read to every storage operation over `customers`, and the engine keeps the column and puts it on every
+statement, so a caller reads, writes and removes their own tenant's rows and another tenant's id is `missing`.
+`wilanis check` holds the rest: every trigger reaching `customers` attaches a policy that proves the session
+(`A006`), a graph that writes `scope` by hand is refused (`X214`), and a store scoped by a header or a route
+parameter is refused (`A007`), since the caller chose it. The one way across is `everyCustomer`, a `view` of
+`customers` `behind` `employees-only`: the digest reads it, and every trigger that reaches it attaches that
+policy (`A008`). `latest` is not scoped; its key is the tier, one row for every tenant, and nothing reads it
+back. Under `live` the customers are the REST API's, which knows no tenants, and nothing is scoped.
+
 Because the port has three bindings, **a command that runs the tree names a profile**: `--profile local`,
 `--profile live` or `--profile production`. `wilanis check` needs none -- it judges every profile.
 
@@ -59,7 +73,7 @@ npm install
 export CUSTOMERS_JWT_SECRET=$(openssl rand -base64 32)
 npm run check                       # wilanis check .  -- every profile at once
 npm run rehearse -- --profile local # every trigger, every policy, every branch of every switch, effects stubbed
-npm run digest -- --profile local   # the count and one line per customer, for real
+npm run digest -- --profile local --token=$TOKEN   # an employee's token: the count and one line per customer of every tenant
 npm run start -- --profile local    # GET /customers[?tier=], POST /customers, GET|PUT|DELETE /customers/{id}, DELETE /customers, GET|POST /customers.csv,
                                     # POST /api/v1/auth-customers | auth-employees | token/refresh | sign-out, GET|PUT /api/v1/me/preferences on :8099
 npm run hello -- --profile local    # challenged until a one-time code is answered
@@ -68,13 +82,18 @@ npm run hello -- --profile local    # challenged until a one-time code is answer
 Kept in memory, it answers for itself:
 
 ```
-curl -s localhost:8099/customers                                    # []
+curl -s localhost:8099/customers                                    # 401: a read is for a signed-in caller
 TOKEN=$(curl -s -X POST localhost:8099/api/v1/auth-employees \
   -H 'content-type: application/json' \
   -d '{"username":"bo","password":"bo-pass"}' | jq -r .accessToken)
+curl -s localhost:8099/customers -H "authorization: Bearer $TOKEN"  # []
 curl -s -X POST localhost:8099/customers -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' -d '{"name":"Ada","email":"ada@example.com","tier":"silver"}'
-curl -s localhost:8099/customers                                    # the customer, read back from the store
+curl -s localhost:8099/customers -H "authorization: Bearer $TOKEN"  # the customer, read back from the store
+ANA=$(curl -s -X POST localhost:8099/api/v1/auth-customers \
+  -H 'content-type: application/json' \
+  -d '{"username":"ana","password":"ana-pass"}' | jq -r .accessToken)
+curl -s localhost:8099/customers -H "authorization: Bearer $ANA"    # []: ana is in acme, and Ada was kept under operator
 ```
 
 The store lives exactly as long as the process: stop it and the customers are gone. That is what the memory
@@ -198,7 +217,8 @@ production changes shape because an operator ran it and read the plan, never bec
 
 ## Who may do what
 
-Reads are public. Every write (`POST /customers`, `PUT|DELETE /customers/{id}`, `DELETE /customers`,
+Every read (`GET /customers`, `GET /customers/{id}`, `GET /customers.csv`) attaches `signed-in`, since what it
+answers is the caller's tenant's customers and an anonymous caller has no tenant. Every write (`POST /customers`, `PUT|DELETE /customers/{id}`, `DELETE /customers`,
 `POST /customers.csv`) attaches two policies, and gives the guard the token where the route reads it:
 
 ```json
@@ -226,9 +246,9 @@ There are two sign-in routes, and they are for two different sets of people. `PO
 verifies the credential against the employee directory (`connections/employees.connection.json`: bo /
 bo-pass holds the `registrar` group and may write customers; cy / cy-pass holds only `viewer` and may not).
 `POST /api/v1/auth-customers` verifies it against the account holder directory
-(`connections/people.connection.json`: ana / ana-pass). The registry's *records* are customers; the people
+(`connections/people.connection.json`: ana / ana-pass in the tenant `acme`, dee / dee-pass in `globex`). The registry's *records* are customers; the people
 who sign in there are the account holders those records are about. An account holder gets a perfectly valid
-token of our own and can read their preferences with it, and no write route will take it. Both directories
+token of our own and can read their preferences and their tenant's customers with it, and no write route will take it. Both directories
 are written in the connection, for development; a production profile binds the same `identity.port.json` to
 an OIDC issuer or LDAP, in `features/directories`, and nothing in the included tree changes.
 
@@ -286,34 +306,20 @@ production profile binds `deliverCode` to); the guard verifies the code the call
 `request.challenge`, the policy allows, and the challenge is spent by the run. The three processes share the
 challenge through the plugin's store under `.wilanis/auth/`.
 
-## The digest, nightly
+## The digest, across tenants
 
-`digest.trigger.json` is a command: `npm run digest` prints the count and one line per customer.
-`nightly-digest.trigger.json` fires the *same* domain operation at three in the morning, UTC:
+`digest.trigger.json` is a command: `npm run digest -- --token=<an employee's access token>` prints the count
+and one line per customer of every tenant. It fires `customer.port.json#digest`, whose graph runs
+`listEvery`, and under a store that is a `find` over `everyCustomer`, the view of `customers` across every
+tenant. The view is `behind` `employees-only`, so the command attaches it and gives the guard the token from
+`--token`; drop the policy and `wilanis check` refuses the trigger (`A008`), naming the graph, the node and
+the view it reaches.
 
-```json
-"kind": "@schedule/schedule.trigger-kind.json",
-"settings": {
-  "cron": "0 3 * * *",
-  "timezone": "UTC"
-},
-"out": "@customers/edge/DigestView.shape.json",
-"fire": {
-  "run": "@customers/domain/customer.port.json#digest"
-}
-```
-
-One operation, two ways in, and neither document names a graph -- which is what a port is for. Nobody is
-calling a tick, so the trigger attaches no policy (one that read the caller would be refused, `A005`) and
-answers nobody: the digest is judged against `out` and written to the log. The tick's instant reaches a graph
-as `request.scheduled` where one takes it, so nothing in this tree calls a clock and `wilanis rehearse`
-replays a tick like any request.
-
-It fires because the startup list asks for a scheduler, never because the document exists -- **delete the
-`Keep the schedule` step and nothing is scheduled**, exactly as deleting `Listen` closes the port. This tree
-runs one process and needs no lease; several instances would give the step a `lease` naming a connection
-whose kind declares `leases`, and one of them would take each tick.
-`wilanis describe @customers/edge/nightly-digest.trigger.json` prints the schedule as written.
+A digest used to fire at three in the morning, too. It does not now: a tick has no caller, so it has no tenant
+to be scoped by and no one for `employees-only` to be about. A policy that read the caller would be refused on
+it (`A005`), and without one it may reach neither `customers` (`A006`) nor the view (`A008`). A job over
+customers kept per tenant is one run per tenant, fired by something that knows the tenant, and nothing in this
+tree does yet. The `Keep the schedule` step stays, and schedules nothing until a scheduled trigger is written.
 
 ## What this tree starts
 
@@ -324,11 +330,11 @@ customer means here -- the REST API is a public one, seeded with rows that carry
 tree promises, so the step reads them through `RawCustomer`, gives each an address and a tier, and writes it
 back. A record that already says who it is is left alone, so a second start writes nothing; the connection's
 throttle paces the writes at three a second. Under a store there is nothing to repair and the step passes
-over an empty walk, which is what lets one step serve every profile. `customer.port.json#listAll` then reads
-the customers, so a tree whose storage is unreachable refuses to serve rather than answering every route with
+over an empty walk, which is what lets one step serve every profile. `customer.port.json#listEvery` then reads
+the customers of every tenant -- nobody is calling yet, so there is no tenant to read (`B008`) -- so a tree whose storage is unreachable refuses to serve rather than answering every route with
 a fault. `@auth/state.port.json#getSession`
 does the same for the guard's memory. `@reload/watch.port.json#watch` serves the tree again whenever a
-document changes, without closing the port. `@schedule/scheduler.port.json#run` keeps the schedule above.
+document changes, without closing the port. `@schedule/scheduler.port.json#run` keeps the schedule, which is empty here.
 `@otel/exporter.port.json#export` sends every run as spans to a collector on :4318; it is the one step marked
 `"required": false`, since no collector is running when you clone this, and what it cannot send is said once
 in the log rather than delaying the run. `@http/server.port.json#listen` opens :8099 -- **delete that step

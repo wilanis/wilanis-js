@@ -33,7 +33,7 @@ interface StoreDocument {
 /**
  * The collections of a store that keep records, by name. A view has no shape, no key and no table of its own,
  * so nothing here -- the references, the plan, the engine -- has anything to do with one: it is the viewed
- * collection's rows that exist, and reading them through a view is RFC 0015's later step.
+ * collection's rows that exist, which `collectionAt` answers for a view.
  */
 function keeping(store: StoreDocument): Record<string, Declared> {
   const entries = Object.entries(store.collections).filter(
@@ -74,11 +74,20 @@ function refsOf(store: StoreDocument): Ref[] {
   );
 }
 
+/**
+ * The collection a store keeps the records of a named one in: itself, or, for a view, the collection it views.
+ * A view is the same table read with no scope, so its rows are the viewed collection's and nothing else.
+ */
+export function viewed(env: Record<string, unknown>, named: unknown, name: unknown): string | undefined {
+  return documentOf(env, named).collections[String(name)]?.view;
+}
+
 /** One collection of a store, as the engine sees it: where it lives, what it is called, its shape and its key. */
 export function collectionAt(env: Record<string, unknown>, named: unknown, name: unknown): At {
   const store = documentOf(env, named);
   const collections = keeping(store);
-  const declared = collections[String(name)];
+  const kept = store.collections[String(name)]?.view ?? String(name);
+  const declared = collections[kept];
   if (!declared) {
     const names = Object.keys(collections).join(', ') || 'none';
     throw new Error(`store '${named}' has no collection '${name}' (collections: ${names})`);
@@ -91,13 +100,13 @@ export function collectionAt(env: Record<string, unknown>, named: unknown, name:
     connection: path,
     kind: conn.kind,
     settings: conn.settings,
-    name: String(name),
+    name: kept,
     shape: resolving.type(declared.of),
     key: declared.key,
     unique: declared.unique ?? [],
     defaults: declared.defaults ?? {},
-    refs: refs.filter(ref => ref.from === String(name)),
-    referenced: refs.filter(ref => ref.to === String(name)),
+    refs: refs.filter(ref => ref.from === kept),
+    referenced: refs.filter(ref => ref.to === kept),
   };
 }
 

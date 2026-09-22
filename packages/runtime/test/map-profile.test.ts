@@ -59,7 +59,7 @@ describe('map under a profile', () => {
     expect(
       digest.filter(line => line.includes(`?? port '@features/customers/domain/customer.port.json' ${CHOOSE}`)),
     ).toHaveLength(3);
-    expect(digest.some(line => line.includes('.binding.json#listAll'))).toBe(false);
+    expect(digest.some(line => line.includes('.binding.json#listEvery'))).toBe(false);
   });
 
   it('under local, walks the store binding alone and never asks the reader to choose', () => {
@@ -71,10 +71,10 @@ describe('map under a profile', () => {
     expect(lines.some(line => line.includes('delete-row.graph.json'))).toBe(false);
     // a domain graph reaching the port mid-walk is met by the same profile's binding, and walked through it
     const digest = under(all, DIGEST);
-    expect(digest.some(line => line.includes('@features/customers/data/customers-store.binding.json#listAll'))).toBe(
+    expect(digest.some(line => line.includes('@features/customers/data/customers-store.binding.json#listEvery'))).toBe(
       true,
     );
-    expect(digest.some(line => line.includes('kept-list.graph.json'))).toBe(true);
+    expect(digest.some(line => line.includes('kept-list-every.graph.json'))).toBe(true);
     expect(all.some(line => line.includes('customers-postgres.binding.json#'))).toBe(false);
   });
 
@@ -106,7 +106,7 @@ describe('map under a profile', () => {
   });
 
   it('calls nothing in the example an orphan: every graph is entered under some profile', () => {
-    // the policy graphs run at every gate, the digest's list graphs behind `listAll` mid-walk, `record-each`
+    // the policy graphs run at every gate, the digest's list graphs behind `listEvery` mid-walk, `record-each`
     // under a `map` node's nested spec, the CSV graphs behind `import` and `export`: the drawing above stops
     // short of each, and the checker's walk enters them all, so the word reads that walk and not the drawing
     for (const profile of [undefined, 'local', 'production', 'live']) {

@@ -1,6 +1,6 @@
 # RFC 0015: Tenant and resource scoping as a provenance rule
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:core`, `area:compiler`, `area:plugin-storage`, `area:plugin-auth`, `area:runtime`, `area:view`
 - **Tracking issue:** #17
 - **Depends on:** RFC 0002 (the `store` kind, `@storage/store.port.json`, the `resolves` channel) and RFC 0003

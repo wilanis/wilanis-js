@@ -1,12 +1,20 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
   "label": "digest",
-  "description": "wilanis run @customers/edge/digest.trigger.json prints the digest: the count and one line per customer.",
+  "description": "wilanis run @customers/edge/digest.trigger.json --token=<access token> prints the digest: the count and one line per customer of every tenant. It reads across tenants, so it is for an employee only, identified by the token the employee sign-in issued.",
   "kind": "@cli/cli.trigger-kind.json",
   "settings": {
     "command": "digest"
   },
   "out": "@customers/edge/DigestView.shape.json",
+  "policies": [
+    {
+      "policy": "@access/edge/employees-only.policy.json",
+      "in": {
+        "token": "{{request.flags.token}}"
+      }
+    }
+  ],
   "fire": {
     "run": "@customers/domain/customer.port.json#digest"
   }

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Customer identity",
+  "description": "Who the customer directory said a credential belongs to, and what it said about the account beside that: the tenant, under attributes.",
+  "layer": "core",
+  "fields": {
+    "subject": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "groups": {
+      "type": "string[]"
+    },
+    "attributes": {
+      "type": "@access/domain/Attributes.shape.json",
+      "required": false,
+      "description": "what the directory said about the account, judged against Attributes.shape.json by verify: present whenever the credential is verified, since an account that does not say it fails the directory node"
+    }
+  }
+}

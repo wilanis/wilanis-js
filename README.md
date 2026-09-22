@@ -6,18 +6,18 @@ them, what may enter and what gates it. The compiler reads every file and proves
 engine runs what it approved, and everything that touches the world (a route, a command, a clock, a file, a
 database) is a plugin behind a port the tree declares. The language never learns what HTTP is.
 
-The example in this repository is a customer registry: routes, commands and a nightly job over one port, CSV
-import and export, sign-in against two directories, sessions, and role-based policies over every write.
+The example in this repository is a customer registry: routes and commands over one port, customers kept per
+tenant, CSV import and export, sign-in against two directories, sessions, and role-based policies over every write.
 **Every one of its documents is JSON, and there is no JavaScript at all.** It is drawn, document by document,
 at [wilanis.dev](https://wilanis.dev).
 
 *Pre-1.0 and moving. Nothing is on npm yet, so clone and build to try it. See [Status](#status).*
 
-## One port, three ways in
+## One port, two ways in
 
 The domain of the example is a port, `customer.port.json`, and the operations it declares. How each is met is
 a binding's business, chosen per profile, so the same documents run against memory, PostgreSQL or a fake. What
-reaches an operation is a trigger, and a trigger is one file. Three of them, from the example:
+reaches an operation is a trigger, and a trigger is one file. Two of them, from the example:
 
 ```json
 {
@@ -30,13 +30,26 @@ reaches an operation is a trigger, and a trigger is one file. Three of them, fro
       "refusals": {
         "missing": 404,
         "upstream": 502,
-        "invariant": 500
+        "invariant": 500,
+        "anonymous": 401,
+        "invalid_credential": 401
       }
     }
   },
   "in": "@customers/edge/IdRequest.shape.json",
   "out": "@customers/edge/CustomerView.shape.json",
   "kind": "@http/http.trigger-kind.json",
+  "policies": [
+    {
+      "policy": "@access/edge/signed-in.policy.json",
+      "in": {
+        "token": [
+          "{{request.headers.authorization}}",
+          "{{request.cookies.session}}"
+        ]
+      }
+    }
+  ],
   "fire": {
     "run": "@customers/domain/customer.port.json#get",
     "in": {
@@ -46,10 +59,13 @@ reaches an operation is a trigger, and a trigger is one file. Three of them, fro
 }
 ```
 
-A GET on `/customers/{id}`, open to anyone because it names no policy. It takes an `IdRequest` and answers a
-`CustomerView`, both declared in files of their own, and runs `get` with the id from the URL. When the
-operation refuses, the reason becomes the status this file maps it to, and the checker refuses a mapping for
-a reason nothing behind the route can produce.
+A GET on `/customers/{id}`, for a signed-in caller: `signed-in` is a policy of the included access tree, given
+the token from the header or the session cookie. It takes an `IdRequest` and answers a `CustomerView`, both
+declared in files of their own, and runs `get` with the id from the URL. When the operation refuses, the reason
+becomes the status this file maps it to, and the checker refuses a mapping for a reason nothing behind the route
+can produce. It answers only a customer of the caller's own tenant, and nothing in this file says so: the store
+keeps its customers per tenant, and the compiler carries the tenant the sign-in wrote into the session to every
+read of them.
 
 ```json
 {
@@ -59,38 +75,29 @@ a reason nothing behind the route can produce.
     "command": "digest"
   },
   "out": "@customers/edge/DigestView.shape.json",
+  "policies": [
+    {
+      "policy": "@access/edge/employees-only.policy.json",
+      "in": {
+        "token": "{{request.flags.token}}"
+      }
+    }
+  ],
   "fire": {
     "run": "@customers/domain/customer.port.json#digest"
   }
 }
 ```
 
-`wilanis run @customers/edge/digest.trigger.json example` prints the digest: the count, and one line per
-customer.
+`wilanis run @customers/edge/digest.trigger.json example --token=<an employee's access token>` prints the
+digest: the count, and one line per customer of every tenant. It reads across tenants through a view the store
+declares, and the view names the policy every trigger reaching it must attach.
 
-```json
-{
-  "label": "nightly digest",
-  "kind": "@schedule/schedule.trigger-kind.json",
-  "settings": {
-    "cron": "0 3 * * *",
-    "timezone": "UTC"
-  },
-  "out": "@customers/edge/DigestView.shape.json",
-  "fire": {
-    "run": "@customers/domain/customer.port.json#digest"
-  }
-}
-```
-
-At three in the morning, the same digest, logged by the scheduler. Nobody is calling, so no policy and
-nothing to answer.
-
-None of the three names a graph, and none knows how `get` or `digest` is met. A trigger's kind is granted by
-a plugin (`@http`, `@cli`, `@schedule`), the compiler judges the trigger's settings by what that kind
-declares, and the engine sees a fired operation and nothing else. A queue or a file drop would be another
-kind from another plugin, with no change to the port or to the language. `wilanis ls example trigger` lists
-every way into the example, and `wilanis map example` draws what each one reaches.
+Neither names a graph, and neither knows how `get` or `digest` is met. A trigger's kind is granted by a plugin
+(`@http`, `@cli`, `@schedule`), the compiler judges the trigger's settings by what that kind declares, and the
+engine sees a fired operation and nothing else. A queue or a file drop would be another kind from another
+plugin, with no change to the port or to the language. `wilanis ls example trigger` lists every way into the
+example, and `wilanis map example` draws what each one reaches.
 
 ## The compiler reads it first
 

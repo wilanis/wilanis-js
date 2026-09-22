@@ -4,7 +4,7 @@
   "description": "What the sign-in graphs need from the outside: a directory's verdict on a credential, and our tokens. Bound by identity.binding.json to the @auth plugin and the two directories written in connections/; a production profile binds it to real directories.",
   "operations": {
     "verifyCustomer": {
-      "description": "Ask the customer directory about a credential.",
+      "description": "Ask the customer directory about a credential, and what it says about the account: the tenant.",
       "accepts": {
         "username": {
           "type": "string"
@@ -14,7 +14,7 @@
           "secret": true
         }
       },
-      "returns": "@access/domain/Verification.shape.json"
+      "returns": "@access/domain/CustomerVerification.shape.json"
     },
     "verifyEmployee": {
       "description": "Ask the employee directory about a credential.",

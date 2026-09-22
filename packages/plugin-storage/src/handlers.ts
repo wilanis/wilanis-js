@@ -7,7 +7,7 @@ import type { Atomic } from '@wilanis/core';
 import type { Handler } from '@wilanis/engine';
 import type { At, Engine, Order, Query, Scope, Transaction } from './engine.js';
 import { ensureStore } from './ensure.js';
-import { collectionAt, engineFor, scopedAt, storeFor } from './store.js';
+import { collectionAt, engineFor, scopedAt, storeFor, viewed } from './store.js';
 import { whereOf } from './where.js';
 
 type Input = Record<string, unknown>;
@@ -87,6 +87,20 @@ async function at(input: Input, ctx: Ctx, unscoped?: 'takes no scope'): Promise<
   return { at: collection, engine: joined.engine, scope };
 }
 
+/**
+ * A write names the collection whose rows it writes, never a view of it: a view is every scope's rows at once,
+ * so a record written through one would say nothing of whose it is, and one removed or patched through it
+ * could be any scope's. X214 keeps a scope off a site over a view; this keeps a write off one, at run time,
+ * since the port cannot say which collections of a store are views.
+ */
+function writable(input: Input, ctx: Ctx): void {
+  const of = viewed(ctx.env, input.store, input.collection);
+  if (of !== undefined)
+    throw new Error(
+      `'${input.collection}' is a view of '${of}', and a view reads: write '${of}', whose rows have a scope`,
+    );
+}
+
 /** The orderings a find asks for, held to the one shape they may have. */
 function orderOf(given: unknown): Order[] | undefined {
   if (given === undefined || given === null) return undefined;
@@ -135,11 +149,13 @@ const count: Handler = async ({ in: input, ctx }) => {
 };
 
 const put: Handler = async ({ in: input, ctx }) => {
+  writable(input, ctx);
   const { at: where, engine, scope } = await at(input, ctx);
   return engine.put(where, objectOf(input.record, 'record'), { replace: input.replace !== false, scope });
 };
 
 const patch: Handler = async ({ in: input, ctx }) => {
+  writable(input, ctx);
   const { at: where, engine, scope } = await at(input, ctx);
   const changes = objectOf(input.changes, 'changes');
   if (where.key in changes)
@@ -148,6 +164,7 @@ const patch: Handler = async ({ in: input, ctx }) => {
 };
 
 const remove: Handler = async ({ in: input, ctx }) => {
+  writable(input, ctx);
   const { at: where, engine, scope } = await at(input, ctx);
   return engine.remove(where, input.key, scope);
 };

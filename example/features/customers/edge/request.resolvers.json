@@ -1,12 +1,18 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/resolvers.schema.json",
   "label": "Request context",
-  "description": "What this feature reads from the HTTP request beyond its body and route: the caller's user agent, forwarded to the API on a registration.",
+  "description": "What this feature reads from the HTTP request beyond its body and route: the caller's user agent, forwarded to the API on a registration, and the caller's tenant, which the customer stores scope their records by.",
   "resolvers": {
     "agent": {
       "label": "The caller's user agent",
       "read": "request.headers['user-agent']",
       "description": "absent when the caller sent none; the header is then not forwarded"
+    },
+    "tenant": {
+      "label": "The caller's tenant",
+      "read": "request.session.attributes.tenant",
+      "required": true,
+      "description": "Written into the session at sign-in from what the directory said about the account; every customer kept in a store belongs to one"
     }
   }
 }

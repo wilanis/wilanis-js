@@ -73,17 +73,22 @@ afterAll(async () => {
 
 describe('http trigger kind against a mockapi-shaped upstream', () => {
   it('lists everything, pruned to the edge shape', async () => {
-    const answer = await call('GET', '/customers');
+    const answer = await call('GET', '/customers', undefined, true);
     expect(answer.status).toBe(200);
     expect(answer.body).toEqual([{ id: '1', name: 'Ada', email: 'ada@a.example', tier: 'bronze', active: true }]);
   });
   it('narrows by tier through the declared statement', async () => {
-    const answer = await call('GET', '/customers?tier=gold');
+    const answer = await call('GET', '/customers?tier=gold', undefined, true);
     expect(answer.status).toBe(200);
     expect(answer.body).toEqual([]);
   });
   it('400 on a query value outside the enum', async () => {
-    expect((await call('GET', '/customers?tier=bogus')).status).toBe(400);
+    expect((await call('GET', '/customers?tier=bogus', undefined, true)).status).toBe(400);
+  });
+  it('401 as anonymous on a read too: listing the customers takes a signed-in caller', async () => {
+    const answer = await call('GET', '/customers');
+    expect(answer.status).toBe(401);
+    expect(answer.body.reason).toBe('anonymous');
   });
   it('401 as anonymous without a token on a gated route: the policy refused, and the route maps the reason', async () => {
     const answer = await call('POST', '/customers', { name: 'Bo', email: 'bo@b.example', tier: 'silver' });
@@ -133,7 +138,7 @@ describe('http trigger kind against a mockapi-shaped upstream', () => {
     expect(rows.map(row => row.id)).toEqual(['1', '2']);
   });
   it('answers a declared refusal with the status the route maps its reason to, and the reason and message as the body', async () => {
-    const answer = await call('GET', '/customers/zzz');
+    const answer = await call('GET', '/customers/zzz', undefined, true);
     expect(answer.status).toBe(404);
     expect(answer.body).toEqual({ reason: 'missing', message: 'no customer zzz' });
   });
@@ -186,7 +191,9 @@ describe('files through the blob registry', () => {
     expect(rows.filter(row => String(row.email).startsWith('csv-'))).toHaveLength(2);
   });
   it('downloads every customer as a CSV: streamed from the registry with its content type, length and filename', async () => {
-    const answer = await fetch('http://localhost:8099/customers.csv');
+    const answer = await fetch('http://localhost:8099/customers.csv', {
+      headers: { authorization: `Bearer ${token}` },
+    });
     expect(answer.status).toBe(200);
     expect(answer.headers.get('content-type')).toBe('text/csv; charset=utf-8');
     expect(answer.headers.get('content-disposition')).toBe('attachment; filename="customers.csv"');

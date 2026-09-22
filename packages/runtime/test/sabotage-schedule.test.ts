@@ -1,10 +1,13 @@
 /**
- * The example's nightly digest, broken one way at a time. `nightly-digest.trigger.json` fires the same domain
- * operation the `digest` command does -- one operation, two ways in -- so every rule below is proved against
- * the document a reader learns the kind from, not against a fixture written for the rule.
+ * A nightly schedule, planted in the example and broken one way at a time. The example keeps its customers per
+ * tenant, so every operation over them reads the caller's tenant and the digest reads a view behind a policy;
+ * a tick has no caller to be a tenant of, so the example ships no scheduled trigger and keeps only the startup
+ * step that would run one. The copy plants `nightly-greeting.trigger.json` in the hello feature, firing
+ * `greeting.port.json#hello`, which composes its answer from constants and reaches no collection and no view
+ * under any profile, so the planted copy checks clean and each case below breaks exactly the one thing it names.
  *
- * What is judged here is what the *tree* says: @schedule's own band (X251 to X254) against the real example,
- * and the rules a scheduled trigger shares with a route, which the compiler already had -- T001 the settings
+ * What is judged here is what the *tree* says: @schedule's own band (X251 to X254) against the example, and
+ * the rules a scheduled trigger shares with a route, which the compiler already had -- T001 the settings
  * against the kind's contract, T003 a read of a context the kind does not hand, T004 a resolver under a kind
  * that hands no request, A005 a policy reading a caller nobody is, L008 a graph running what only a startup
  * step may, B006 a startup step naming what is not an operation, D008 the trigger outside edge/. The plugin's
@@ -13,11 +16,26 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { EXAMPLE, relocate, sabotage, sabotagePointing } from './example-harness.js';
+import { EXAMPLE, planted, plantedEditing, plantedEditingAllAt } from './example-harness.js';
 
-const NIGHTLY = 'features/customers/edge/nightly-digest.trigger.json';
+const NIGHTLY = 'features/hello/edge/nightly-greeting.trigger.json';
 /** The same document as a refusal names it: canonical, from the tree's root. */
 const AT = `@${NIGHTLY}`;
+/** The scheduled trigger the copy plants: a tick at three, UTC, firing an operation that needs no caller. */
+const TRIGGER = {
+  $schema: 'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json',
+  label: 'nightly greeting',
+  description: 'At three in the morning, UTC, the greeting: nobody is calling, so no policy and nothing to answer.',
+  kind: '@schedule/schedule.trigger-kind.json',
+  settings: { cron: '0 3 * * *', timezone: 'UTC' },
+  out: '@hello/edge/GreetingView.shape.json',
+  fire: { run: '@hello/domain/greeting.port.json#hello' },
+};
+const PLANT = { [NIGHTLY]: TRIGGER };
+/** The codes of the planted copy once one of its documents is edited: the trigger, or any other it has. */
+const sabotage = (file: string, edit: (doc: any) => void) => plantedEditing(PLANT, file, edit);
+/** The same, as `code file#at`. */
+const sabotagePointing = (file: string, edit: (doc: any) => void) => plantedEditingAllAt(PLANT, { [file]: edit });
 const codesOf = (edit: (doc: any) => void) => sabotage(NIGHTLY, edit);
 const pointing = (edit: (doc: any) => void) => sabotagePointing(NIGHTLY, edit);
 
@@ -25,6 +43,12 @@ const pointing = (edit: (doc: any) => void) => sabotagePointing(NIGHTLY, edit);
 const KEEP = JSON.parse(readFileSync(join(EXAMPLE, 'project.json'), 'utf8')).startup.findIndex(
   (step: { run: string }) => step.run === '@schedule/scheduler.port.json#run',
 );
+
+describe('the planted schedule', () => {
+  it('checks clean before any case breaks it', () => {
+    expect(planted(NIGHTLY, TRIGGER)).toEqual([]);
+  });
+});
 
 describe('sabotage: a schedule that is not one -- X251', () => {
   it('six fields, where a cron expression has five', () => {
@@ -99,7 +123,7 @@ describe('sabotage: what a tick cannot fill or remember -- X252, X253, X254', ()
   it('X252 an in nothing fills: nothing arrives on a tick', () => {
     expect(
       pointing(trigger => {
-        trigger.in = '@customers/edge/ListRequest.shape.json';
+        trigger.in = '@hello/edge/GreetingView.shape.json';
       }),
     ).toEqual([`X252 ${AT}#in`]);
   });
@@ -168,7 +192,7 @@ describe('sabotage: what a scheduled trigger shares with a route', () => {
     ).toContain('A005');
   });
   it('D008 the scheduled trigger outside the edge layer', () => {
-    expect(relocate(NIGHTLY, 'features/customers/domain/nightly-digest.trigger.json')).toContain('D008');
+    expect(planted('features/hello/domain/nightly-greeting.trigger.json', TRIGGER)).toContain('D008');
   });
 });
 
