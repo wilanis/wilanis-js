@@ -38,6 +38,10 @@ export interface MapNode {
   in?: Values;
   bind?: Record<string, string>;
   onItemFailure?: 'fail' | 'collect';
+  /** The most elements it runs over: a longer list fails the node before any element starts. */
+  limit?: number;
+  /** How many elements run at once; the rest wait their turn in index order. Absent: all at once. */
+  concurrency?: number;
   /** Per element: each element's call is bounded and retried on its own. */
   retry?: Retry;
   timeoutMs?: number;

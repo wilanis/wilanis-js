@@ -11,7 +11,8 @@ export type Type =
   /** A stored file. The value is a handle -- id, contentType, size, filename -- never the bytes; the blob registry holds those. */
   | { kind: 'blob' }
   | { kind: 'unknown' }
-  | { kind: 'list'; of: Type }
+  /** `max`: the most items a value may hold, judged at run time; assignability ignores it. */
+  | { kind: 'list'; of: Type; max?: number }
   | { kind: 'object'; name?: string; fields: Record<string, ObjField>; open: false | Type }
   /** A type variable of a native contract ($T), bound per call site by unification or a `type` param. */
   | { kind: 'var'; name: string }
@@ -20,6 +21,7 @@ export type Type =
 
 export type ObjectType = Extract<Type, { kind: 'object' }>;
 export type StringType = Extract<Type, { kind: 'string' }>;
+export type ListType = Extract<Type, { kind: 'list' }>;
 
 export interface ObjField {
   type: Type;
@@ -130,12 +132,13 @@ export class TypeResolver {
   }
 
   /**
-   * One declared field as a typed field: its type, its enum narrowing a string, and whether it must be
-   * there -- a field is required unless it says otherwise.
+   * One declared field as a typed field: its type, its enum narrowing a string, its maxItems bounding a list,
+   * and whether it must be there -- a field is required unless it says otherwise.
    */
   field(field: Field): ObjField {
     let type = this.spec(field.type);
     if (field.enum && type.kind === 'string') type = { kind: 'string', enum: field.enum };
+    if (field.maxItems && type.kind === 'list') type = { ...type, max: field.maxItems };
     return { type, required: field.required !== false, secret: field.secret };
   }
 
@@ -150,7 +153,10 @@ export class TypeResolver {
   }
 }
 
-/** A type as a reader sees it: a shape by its name, an inline object by its fields, an enum by its values. */
+/**
+ * A type as a reader sees it: a shape by its name, an inline object by its fields, an enum by its values. A
+ * list's bound is not part of the name, as it is not part of assignability; `describe` prints it.
+ */
 export function show(type: Type): string {
   switch (type.kind) {
     case 'list':

@@ -50,6 +50,16 @@
       ],
       "default": "fail"
     },
+    "limit": {
+      "description": "The most elements this map will run over. A longer list fails the node as a fault before any element starts. Absent: any length.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "concurrency": {
+      "description": "How many elements run at once; the rest wait for a slot, in index order. Absent: every element at once.",
+      "type": "integer",
+      "minimum": 1
+    },
     "timeoutMs": {
       "$ref": "../common.schema.json#/$defs/timeoutMs"
     },

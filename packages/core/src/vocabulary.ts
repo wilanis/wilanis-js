@@ -22,7 +22,8 @@ export type TypeSpec = TypeRef | InlineObject;
 /**
  * One field of a shape or a contract. `static`: where the operation is called the value must be a literal,
  * never a read; a field of type `type` always is. `resolves`: variable -> the path within the document this
- * field's literal names whose value is the type to bind it to (`resolves.ts` holds the grammar).
+ * field's literal names whose value is the type to bind it to (`resolves.ts` holds the grammar). `maxItems`:
+ * on a list, the most items a value may hold.
  */
 export interface Field {
   type: TypeSpec;
@@ -30,6 +31,7 @@ export interface Field {
   description?: string;
   secret?: boolean;
   enum?: string[];
+  maxItems?: number;
   binds?: string;
   static?: boolean;
   resolves?: Record<string, string>;

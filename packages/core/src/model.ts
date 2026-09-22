@@ -355,8 +355,10 @@ export interface ScenarioDoc extends Envelope {
   in?: unknown;
   request?: Record<string, unknown>;
   stubs?: Record<string, unknown>;
+  /** The stubbed node at which a replay aborts the run's signal: one of the keys of `stubs`. */
+  cancelAt?: string;
   expect: {
-    status: 'done' | 'failed' | 'blocked';
+    status: 'done' | 'failed' | 'blocked' | 'cancelled';
     output?: unknown;
     nodes: Record<string, { status: string; handler?: string; out?: unknown; selected?: string }>;
   };

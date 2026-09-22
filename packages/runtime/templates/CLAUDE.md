@@ -40,17 +40,17 @@ property is described.
 |---|---|---|
 | `project` | aliases, plugins (`use`, `from`, `settings` incl. the codecs table), includes (trees whose features load here), secrets, startup, profiles | `project.json` |
 | `feature` | dependsOn, exports, effects allowlist | `features/<name>/feature.json` |
-| `shape` | a named object type; `layer: edge` (the world's) or `core` (ours) | `edge/` or `domain/` |
+| `shape` | a named object type; `layer: edge` (the world's) or `core` (ours); a list field may say `maxItems` | `edge/` or `domain/` |
 | `port` | a contract: operations with accepts / returns, each maybe `pure`, `refuses`, `holds` or `transactional`; a field may be `static`; an operation may say `idempotent` (always, or when an expression over its inputs holds) or name its `key` | `domain/` |
 | `binding` | how a port is met -- a domain port, or one a plugin requires: per operation a graph or a delegation (`run` + `in`); an operation may say `timeoutMs` and `retry` | `data/` |
-| `graph` | dataflow: nodes of type run / switch / map, `in`, `out.from`, constants; `atomic` when its effects commit or roll back together; a data graph may name `reads`, and a data graph's node may say `timeoutMs` and `retry`. One that changes a record it first read takes the read-decide-write form -- `#get`, a switch on `has(record)` and on what it holds, one write per branch, a switch on what that write answered, a record or a refusal each -- which `wilanis new graph <path> --store <store> --collection <name> --read-then patch\|put\|remove --branch <id>:<when>` writes with the ids and the routing in place and `TODO` where a value goes | `domain/` or `data/` |
+| `graph` | dataflow: nodes of type run / switch / map, `in`, `out.from`, constants; `atomic` when its effects commit or roll back together; a data graph may name `reads`, and a data graph's node may say `timeoutMs` and `retry`; a `map` may say `limit` (the most elements) and `concurrency` (how many at once). One that changes a record it first read takes the read-decide-write form -- `#get`, a switch on `has(record)` and on what it holds, one write per branch, a switch on what that write answered, a record or a refusal each -- which `wilanis new graph <path> --store <store> --collection <name> --read-then patch\|put\|remove --branch <id>:<when>` writes with the ids and the routing in place and `TODO` where a value goes | `domain/` or `data/` |
 | `trigger` | a way in: `kind`, `settings`, `in`, `out`, `policies` (what gates it, in order, each given the credentials it needs), and `fire` -- the run node it invokes | `edge/` |
 | `policy` | a gate: `decide` fires a domain operation over what the guard hands (`{{request.principal}}`), `outcomes` maps each reason its graph refuses with to `deny` or `challenge`, `proves` says what is present once it allows | `edge/` |
 | `invariant` | a rule that must hold: `access` (which policy gates writes to a port) or `holds` (a rule over a core shape's fields) | `domain/` |
 | `resolvers` | named reads of the request (`request.params.id`, `request.headers['user-agent']`, `request.session.id`), for data graphs and bindings to bind under `reads` and read as `{{name}}`; `required` when a policy guarantees the read | `edge/` |
 | `store` | what the feature keeps: a connection and collections of a core shape (or a plugin's shape), each by key, with `unique`, `refs`, `defaults`; `renamed` and `was` record what a field or the collection was called before, so a rename is read as one. A collection may be `scoped` by columns the store keeps, each filled from one read the store binds under `reads` (a `required` resolver over what the guard hands), and a `view` of a scoped collection sees every row `behind` a policy | `data/` |
 | `connection` | a channel to an external system, settings read `{{secrets.*}}` | `connections/` |
-| `scenario` | a recorded run (fuzz writes, regress replays) | `scenarios/` |
+| `scenario` | a recorded run (fuzz writes, regress replays); `cancelAt` pins a cancellation | `scenarios/` |
 
 ## Layers
 

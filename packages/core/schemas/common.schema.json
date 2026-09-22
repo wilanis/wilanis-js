@@ -109,6 +109,11 @@
           "minItems": 1,
           "uniqueItems": true
         },
+        "maxItems": {
+          "description": "For lists: the most items a value may hold. Judged wherever the type is judged at run time -- a body at the edge, a trigger's answer -- and refused where it is written on a field that is not a list.",
+          "type": "integer",
+          "minimum": 1
+        },
         "binds": {
           "description": "Native contracts only. On a field of type `type`: the variable its value binds, so returns can name it. On a string setting of a trigger kind: the variable its {name} placeholders bind, as an object of required strings, so the kind's context can name it.",
           "type": "string",
