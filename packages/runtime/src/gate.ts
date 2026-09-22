@@ -7,7 +7,7 @@
  */
 import { type Compiled, runGraph } from '@wilanis/compiler';
 import { type GuardArgs, type PluginModule, policyPath, type Scope, type TriggerDoc } from '@wilanis/core';
-import { type Report, refusalOf } from '@wilanis/engine';
+import { outcomeOf, type Report } from '@wilanis/engine';
 import type { Decided, Identified } from './fired.js';
 import { fillTemplates, refused } from './values.js';
 
@@ -104,23 +104,23 @@ async function decide(
     return undefined;
   }
   const decided: Report = { ...report, graph: policy.path };
-  const outcome = refusalOf(report);
-  const declared = outcome ? policy.doc.outcomes[outcome.reason] : undefined;
+  const outcome = outcomeOf(report);
+  const declared = outcome.kind === 'refused' ? policy.doc.outcomes[outcome.reason] : undefined;
   const keep = (ended: Report) => {
     gated.decisions.push({ policy: policy.path, report: ended, ...(declared ? { effect: declared.effect } : {}) });
     return ended;
   };
-  if (!outcome) return keep(decided); // the decision broke: a fault, answered as one
+  if (outcome.kind !== 'refused') return keep(decided); // the decision broke: a fault, answered as one
   if (declared?.effect !== 'challenge' || !emb.guard) return keep(decided);
   return keep(await challenged(emb, decided, run.args, { policy: policy.path, outcome, method: declared.method }));
 }
 
-/** A denial the guard turns into a challenge: the same report, carrying how to answer it. */
+/** A denial the guard turns into a challenge: the same report, the node that refused carrying how to answer it. */
 async function challenged(
   emb: Gating,
   decided: Report,
   args: GuardArgs,
-  what: { policy: string; outcome: { reason: string; message: string }; method?: string },
+  what: { policy: string; outcome: { reason: string; message: string; at: string }; method?: string },
 ): Promise<Report> {
   const challenge = await emb.guard?.guard?.challenge({
     ...args,
@@ -129,11 +129,10 @@ async function challenged(
     message: what.outcome.message,
     method: what.method,
   });
-  const failed = Object.entries(decided.nodes).find(([, node]) => node.status === 'failed');
-  if (!challenge || !failed) return decided;
-  const [id, node] = failed;
+  const node = decided.nodes[what.outcome.at];
+  if (!challenge || !node) return decided;
   return {
     ...decided,
-    nodes: { ...decided.nodes, [id]: { ...node, error: challenge.message, detail: challenge.detail } },
+    nodes: { ...decided.nodes, [what.outcome.at]: { ...node, error: challenge.message, detail: challenge.detail } },
   };
 }

@@ -6,7 +6,7 @@ import { guardsOf, idsOf, TAKEN_IDS } from '@wilanis/compiler';
 import type { Loaded, LoadResult, TriggerDoc, Type } from '@wilanis/core';
 import { Scope } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
-import { refusalOf } from '@wilanis/engine';
+import { outcomeOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, nonEmpty, type Stubbing, setPath, switchesOf } from './branches.js';
 import type { Embedder } from './embed.js';
 import { type Decision, format, gather, type Plain, statedOf, stateName } from './rehearsal-report.js';
@@ -70,22 +70,23 @@ function settle(report: Report, sw: FoundSwitch, aim: string): Settled {
     misrouted: took !== undefined && took !== aim ? took : undefined,
     ms: local.endedAt - local.startedAt,
   };
-  const failed = Object.entries(local.nodes).find(([, node]) => node.status === 'failed');
-  if (local.status !== 'failed' || !failed) return out;
-  return { ...out, ...whyFailed(failed[0], failed[1]) };
+  return { ...out, ...whyFailed(local) };
 }
 
 /**
  * Why a run failed, said where the decision was made. A refusal in THIS graph is a declared outcome; a refusal that
  * arrived from a graph this one calls is that graph's declared outcome surfacing here, and naming it as ours would
- * credit the wrong document.
+ * credit the wrong document. Which node ended the run is `outcomeOf`'s to say; only the credit is read below it.
  */
-function whyFailed(id: string, node: Report['nodes'][string]): Partial<Settled> {
-  const deeper = failedBelow(id, node);
-  if (!deeper && node.reason !== undefined) return { declared: { reason: node.reason, message: node.error ?? '' } };
+function whyFailed(local: Report): Partial<Settled> {
+  const outcome = outcomeOf(local);
+  if (outcome.kind !== 'refused' && outcome.kind !== 'faulted') return {};
+  const node = local.nodes[outcome.at];
+  const deeper = node && failedBelow(outcome.at, node);
   if (deeper?.reason !== undefined)
-    return { propagated: { node: id, reason: deeper.reason, error: deeper.error ?? '' } };
-  return { error: `${id}: ${node.error}` };
+    return { propagated: { node: outcome.at, reason: deeper.reason, error: deeper.error ?? '' } };
+  if (outcome.kind === 'refused') return { declared: { reason: outcome.reason, message: outcome.message } };
+  return { error: brokeAt(outcome) };
 }
 
 /**
@@ -119,25 +120,22 @@ export async function rehearse(
   return { ok: format(decisions, settledGraphs, lines, said), lines };
 }
 
-/** What broke, when a run failed without declaring a refusal. */
-const whatBroke = (failed: [string, { error?: string }] | undefined) =>
-  failed ? `${failed[0]}: ${failed[1].error}` : 'failed';
+/** What broke, when a run failed without declaring a refusal: the node, and what it threw. */
+const brokeAt = (fault: { at: string; error: string }) => (fault.at ? `${fault.at}: ${fault.error}` : 'failed');
 
 /** A trigger with no switch anywhere under it: one run is the whole of it. */
 async function wholeOf(load: LoadResult, trigger: Loaded<TriggerDoc>, seed: number, profile?: string) {
   const emb = embedderFor(load, { seed, profile });
   const { input, request } = generatedFire(emb, trigger, seed);
   const report = await emb.fire(trigger.doc, input, request);
-  const refused = refusalOf(report);
-  const failed = Object.entries(report.nodes).find(([, node]) => node.status === 'failed');
-  const broke = report.status === 'failed' && !refused;
+  const outcome = outcomeOf(report);
   return {
     trigger: trigger.name,
     graph: trigger.doc.fire.run,
     atomic: atomicAt(emb, rootGraph(emb, trigger)),
     status: report.status === 'blocked' ? 'BLOCKED' : report.status,
-    declared: refused ? `${refused.reason}: "${refused.message}"` : undefined,
-    error: broke ? whatBroke(failed) : undefined,
+    declared: outcome.kind === 'refused' ? `${outcome.reason}: "${outcome.message}"` : undefined,
+    error: outcome.kind === 'faulted' ? brokeAt(outcome) : undefined,
   };
 }
 

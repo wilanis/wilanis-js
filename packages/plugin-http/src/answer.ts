@@ -3,7 +3,7 @@
  * from the output, and the shape a refusal or a fault is reported in.
  */
 import type { TriggerDoc } from '@wilanis/core';
-import { type Report, readPath, refusalOf } from '@wilanis/engine';
+import { type Outcome, outcomeOf, type Report, readPath } from '@wilanis/engine';
 
 /** A cookie the answer sets: the field of the answer it takes (`from`), or `clear` for one to drop; `omit` keeps the field out of the body. */
 export interface CookieOut {
@@ -138,13 +138,11 @@ function encodeRefusal(settings: HttpSettings, refused: { reason: string; messag
   };
 }
 
-/** What went wrong, for a report that did not finish: a node that broke, or a run that could not start. */
-function encodeTrouble(report: Report) {
-  if (report.status === 'failed') {
-    const failed = Object.entries(report.nodes).find(([, node]) => node.status === 'failed');
-    return { status: 500, body: { error: failed ? `${failed[0]}: ${failed[1].error}` : 'failed' } };
-  }
-  return { status: 500, body: { error: `blocked: needs ${report.needs?.join(', ')}` } };
+/** What went wrong, for a run that did not finish: the node that broke, or the roots a run that could not start needs. */
+function encodeTrouble(outcome: Extract<Outcome, { kind: 'faulted' | 'blocked' }>) {
+  if (outcome.kind === 'faulted')
+    return { status: 500, body: { error: outcome.at ? `${outcome.at}: ${outcome.error}` : 'failed' } };
+  return { status: 500, body: { error: `blocked: needs ${outcome.needs.join(', ')}` } };
 }
 
 /**
@@ -154,9 +152,9 @@ function encodeTrouble(report: Report) {
  */
 export function encode(trigger: TriggerDoc, report: Report): { status: number; body: unknown; cookies?: string[] } {
   const settings = trigger.settings as unknown as HttpSettings;
-  const refused = refusalOf(report);
-  if (refused) return encodeRefusal(settings, refused);
-  if (report.status === 'failed' || report.status === 'blocked') return encodeTrouble(report);
+  const outcome = outcomeOf(report);
+  if (outcome.kind === 'refused') return encodeRefusal(settings, outcome);
+  if (outcome.kind !== 'answered') return encodeTrouble(outcome);
   const { headers, body } = cookiesOf(settings, report.output);
   return { status: statusFor(settings, report), body, ...(headers.length ? { cookies: headers } : {}) };
 }
