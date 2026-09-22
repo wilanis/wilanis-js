@@ -1,53 +1,37 @@
 # Working on wilanis
 
-This is the `@wilanis/*` workspace: ten npm packages, one example project, and a test directory beside each package that has one. Read this
-before changing anything; it says where things live and which direction dependencies may point.
+This is the `@wilanis/*` workspace. Read this before changing anything; it says where things live and which
+direction dependencies may point.
 
 ## Layout
 
 ```
-packages/engine/       @wilanis/engine     spec.ts kernel.ts run.ts plan.ts sources.ts redact.ts   depends on nothing
-packages/core/         @wilanis/core       model registry types assign values generate expr/ templates scope load documents placement paths validate plugin, schemas/   → engine
-packages/compiler/     @wilanis/compiler   checker.ts check/<family>.ts compiler.ts compiled.ts lower.ts env.ts refusals.ts sites.ts guard.ts guard-lowering.ts documents.ts   → core, engine
-packages/runtime/      @wilanis/runtime    embed tools branches serve(start) project cli, plugins/{std,cli-trigger}, docs/{std,cli}, bin/, templates/   → core, engine, compiler
-packages/plugin-http/  @wilanis/plugin-http  index.ts codecs.ts throttle.ts, docs/  → core, engine
-packages/plugin-blob/  @wilanis/plugin-blob  index.ts, docs/                        → core, engine
-packages/plugin-reload/ @wilanis/plugin-reload  index.ts, docs/                     → core, engine
-packages/plugin-auth/  @wilanis/plugin-auth  index.ts store.ts, docs/               → core, engine   (the guard: tokens, sessions, challenges, directories)
-packages/plugin-storage/ @wilanis/plugin-storage  index.ts engine.ts store.ts where.ts handlers.ts suite.ts, docs/   → core, engine   (records behind one port; an engine plugin keeps them)
-packages/plugin-storage-memory/ @wilanis/plugin-storage-memory  index.ts engine.ts match.ts, docs/   → core, engine, plugin-storage   (an engine: records in a Map, for as long as the process)
-packages/plugin-storage-postgres/ @wilanis/plugin-storage-postgres  index.ts engine.ts ensure.ts filter.ts columns.ts names.ts pool.ts rules.ts, docs/   → core, engine, plugin-storage   (an engine: records in PostgreSQL, through Kysely)
-packages/view/         @wilanis/view       model.ts serve.ts cli.ts, client/index.html, bin/   → core, compiler, runtime
-libraries/access/      @wilanis/access     a tree to include: features/access (sign-in, sessions, policies, otp), features/access-dev (its own binding), connections/, project.json, test/
-example/               a consumer project: JSON documents + package.json; includes @wilanis/access and binds its identity port in features/directories
-reserved/wilanis/      a name held on npm with no code under it; not a workspace member, never built (reserved/README.md)
+packages/    one npm package per directory: engine, core, compiler, runtime, view, and each plugin as plugin-<name>
+libraries/   trees a project includes, published as @wilanis/<name>: pure JSON documents, each with its own test/
+example/     a consumer project, JSON documents and a package.json; it includes @wilanis/access and uses every plugin
+reserved/    names held on npm with no code under them; not workspace members, never built (reserved/README.md)
+docs/        the language reference (model.md), the roadmap, the RFCs under rfcs/, the demos
+fitness/     the decisions about the code, one claim per file; `ls fitness` is the index (fitness/README.md)
 ```
+
+What is inside a package is read off the package, not kept here: `ls packages/<name>/src` for its modules, its
+README for what it is for, and for a plugin `npx wilanis describe @<use>/plugin.json example` for the settings
+it takes and what it grants and requires (the example names every plugin, so each resolves there).
 
 Dependencies point one way: engine ← core ← compiler ← runtime ← view, and plugins depend on core and
 engine only. The viewer is a tool over a loaded tree, not a plugin: it grants nothing to a tree and
 executes nothing; `viewOf` is pure and the page under `client/` is one static file with no build step. A plugin never imports the compiler or the runtime. One plugin may import another only where that other is a **contract** it implements -- `@storage` says what a store is and an engine plugin answers it -- and the contract imports no engine, so the arrow still points one way. The runtime never reaches into a plugin's
 internals; it sees the `PluginModule` contract in `packages/core/src/plugin.ts`. If a change needs an
-import against this direction, the design is wrong, not the import rule.
+import against this direction, the design is wrong, not the import rule. `fitness/dependencies-point-one-way.fitness.ts`
+holds it against every manifest, and the engine and the compiler each have a narrower claim of their own.
 
-Tests live next to what they test: `packages/engine/test` (kernel), `packages/core/test` (schema validation,
-scope), `packages/runtime/test` (the example tree, sabotaged variants, plugin loading, postLoad, the project's
-startup steps; the proof rules behind a field invariant, over graphs planted in a copy of the example, since
-what they refuse to prove is a guard the compiler must still lower, and the spec each of those guards lowers
-to, node by node, since its ids are what the rehearsal, `describe` and the viewer read a guard by; and the
-branch solver behind `rehearse`), `packages/plugin-http/test` (end to end against a fake upstream),
-`packages/plugin-blob/test` (the file store, the CSV parser, the operations), `packages/plugin-reload/test`
-(the watcher, and what it does with a tree that refuses), `packages/plugin-auth/test` (sign-in against a directory
-and a fake OIDC issuer, the policies over the example's writes, the session across calls and a refresh, the
-one-time code on the command line, the plugin's X rules), `packages/plugin-storage/test` (the shipped documents
-through the real checker, the `where` grammar, the engine table both ways round and through a copy of the
-environment, the handlers driven as the kernel drives them, and the shared suite over a fake engine),
-`libraries/access/test` (the access tree alone, and
-every A rule sabotaged),
-`packages/view/test` (the view model of the example, how a refusal is answered read from both ends, and the
-server). The compiler has no test directory of
-its own: every checker rule is exercised through the example and its sabotaged variants in
-`packages/runtime/test/example.test.ts`. The runtime and the view depend on the http plugin, the http
-plugin on the runtime, and the storage plugin on the compiler and the runtime, only as devDependencies, for tests.
+Tests live beside what they test, in the package's own `test/` (`fitness/tests-live-beside-what-they-test.fitness.ts`).
+The compiler's rules have no tests of their own: every checker rule is exercised through the example and its
+sabotaged variants in `packages/runtime/test/example.test.ts`, where a real tree can be broken, and
+`packages/compiler/test` holds only what a tree that passes cannot show (the atomic scope). A test may reach
+against the arrow -- the runtime's and the viewer's tests load every plugin, a plugin's tests load the compiler
+and the runtime -- only because its package names what it reaches under `devDependencies`; a `src/` file never
+imports what its package names only there.
 
 ## Commands
 
@@ -103,7 +87,7 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   `request.challenge` to every kind's context; a `policy` (edge/) fires a domain operation over those, and its
   graph refuses with a reason the policy maps to `deny` or `challenge`. A trigger attaches its policies
   in order, and where it attaches one it gives the guard the credentials it verifies (`in: { token: ... }`), read from
-  the kind's context like any input; the runtime's embedder runs the gate (`Embedder.gate`), never a kind. No graph
+  the kind's context like any input; the runtime's embedder runs the gate (`gate` in `packages/runtime/src/gate.ts`), never a kind. No graph
   ever validates a token or a code, and no kind ever checks access.
   A tree may include trees (`project.json → includes`, npm packages only): the loader walks their `features/` as
   if local, marks each document `included`, brings their aliases along, and leaves their connections, plugins and
@@ -137,13 +121,13 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   families run in is `judgeTree` in `checker.ts`.
 - **A new placement rule.** Placement lives in one place: `HOME` in `packages/core/src/placement.ts`, which says
   the layer (or top-level directory) each kind lives in and refuses the rest as D008. Add the kind there, add
-  its row to `packages/runtime/templates/CLAUDE.md`, and teach `into()` in `tools.ts` where `wilanis new`
+  its row to `packages/runtime/templates/CLAUDE.md`, and teach `into()` in `scaffolds.ts` where `wilanis new`
   should write it. A document's layer is read off its path by `layerOf` in `model.ts` -- never inferred from
   what references it.
 - **A new document kind.** Schema in `packages/core/schemas/` (with `$id` under the published base and
   `$schema` accepting both forms, and the optional `label` every kind carries), a `*Doc` interface and the
   `Kind` entry in `model.ts`, a row in `packages/runtime/templates/CLAUDE.md`, the baseline in
-  `packages/core/test/validate.test.ts`, a `wilanis new` scaffold in `tools.ts`, and a page in the viewer's
+  `packages/core/test/validate.test.ts`, a `wilanis new` scaffold in `scaffolds.ts`, and a page in the viewer's
   `client/index.html` (`renderDocPage`), since the viewer never shows raw JSON by default.
 - **A new include.** A directory under `libraries/`, a workspace member, published as `@wilanis/<name>`: `project.json`
   (its own plugins and aliases; the host reads only the aliases), `features/<name>/` (what a host includes),
@@ -186,7 +170,7 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   and `refuses`); it reads `env.hold` to hand back its teardown and `env.serving` to reach the tree, and the
   runtime stops what was held, in reverse, before the `postLoad` teardowns. Only a startup step may name one
   (L008 refuses a graph that runs one), and a native `holds` operation is the one native operation a startup
-  step may name (B006 otherwise). `runStartup` and `Served` live in `serve.ts`; `checkStartup` in
+  step may name (B006 otherwise). `runStartup` lives in `serve.ts` and `Served` in `served.ts`; `checkStartup` in
   `check/project.ts` judges the steps (B006, B007, B008) and runs last, after the resolvers documents are read.
   A plugin's `postLoad` stays what it is: that plugin's own wiring, not the project's.
 - **The project template.** `packages/runtime/templates/` is what `wilanis init` writes into a consumer
