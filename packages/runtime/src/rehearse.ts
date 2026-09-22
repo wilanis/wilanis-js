@@ -10,7 +10,7 @@ import { refusalOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, nonEmpty, type Stubbing, setPath, switchesOf } from './branches.js';
 import type { Embedder } from './embed.js';
 import { type Decision, format, gather, type Plain, statedOf, stateName } from './rehearsal-report.js';
-import { atomicAt, rootGraph, specBehind, type Where, whereOf } from './rehearse-where.js';
+import { atomicAt, declaredAt, rootGraph, specBehind, type Where, whereOf } from './rehearse-where.js';
 import { embedderFor, failedBelow, generatedFire, policyRoots } from './stubbing.js';
 
 // ---- rehearse ----------------------------------------------------------------------------------------
@@ -167,7 +167,9 @@ async function rehearseTrigger(
   const inType = probe.types(trigger.doc).in;
   const stubbing = {
     generated: (path: string) => record[path],
-    typeOf: (path: string) => types[path],
+    // a node no stub recorded -- a call into a graph -- still declares what it answers, and a value built for it
+    // from nothing must be of that type, or whatever reads it downstream is handed only what a demand wrote
+    typeOf: (path: string) => types[path] ?? declaredAt(probe, spec, path),
     seed,
     inputSeed: input,
     inType,
