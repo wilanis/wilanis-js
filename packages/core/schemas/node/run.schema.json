@@ -26,6 +26,12 @@
     },
     "in": {
       "$ref": "../common.schema.json#/$defs/values"
+    },
+    "timeoutMs": {
+      "$ref": "../common.schema.json#/$defs/timeoutMs"
+    },
+    "retry": {
+      "$ref": "../common.schema.json#/$defs/retry"
     }
   },
   "required": [

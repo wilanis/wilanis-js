@@ -1,7 +1,8 @@
 /**
  * The vocabulary every document is written in, under the envelope each one carries: the types a shape or a
- * contract names, the fields they are built from, and the values written where an operation is called. It is
- * the grammar the kinds share, so it says nothing about any one kind; which documents exist is `model.ts`.
+ * contract names, the fields they are built from, the values written where an operation is called, and how a
+ * call there is retried. It is the grammar the kinds share, so it says nothing about any one kind; which
+ * documents exist is `model.ts`.
  */
 
 /** Every document: its kind, what it is for, and optionally a short human name a reader sees instead of its path. */
@@ -42,3 +43,14 @@ export type Fields = Record<string, Field>;
  */
 export type Value = unknown;
 export type Values = Record<string, Value>;
+
+/**
+ * When a call that faults or times out is tried again: `times` more at most, waiting `backoffMs` (default 0)
+ * before the second try and doubling it before each further one; `when`, an expression over the answer, retries
+ * an answer it accepts as well. A declared refusal is never retried.
+ */
+export interface Retry {
+  times: number;
+  backoffMs?: number;
+  when?: string;
+}

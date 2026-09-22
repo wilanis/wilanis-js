@@ -2,12 +2,15 @@
  * The document model: one TypeScript type per document kind, mirroring schemas/*.schema.json.
  * A document's kind is its $schema (the published URL, or the alias @wilanis/<kind>.schema.json); its identity is its path (@...).
  * Where those URLs point, and how a $schema is read back to a kind, is `published.ts`.
- * The vocabulary every kind is written in -- the envelope, types, fields and values -- is `vocabulary.ts`,
- * re-exported here so model.js stays the one import for the document model.
+ * The vocabulary every kind is written in -- the envelope, types, fields and values -- is `vocabulary.ts`, and
+ * the nodes a graph is made of are `nodes.ts`; both are re-exported here so model.js stays the one import for
+ * the document model.
  */
 
-import type { Envelope, Fields, InlineObject, TypeRef, TypeSpec, Value, Values } from './vocabulary.js';
+import type { Node } from './nodes.js';
+import type { Envelope, Fields, InlineObject, Retry, TypeRef, TypeSpec, Values } from './vocabulary.js';
 
+export * from './nodes.js';
 export * from './vocabulary.js';
 
 export type Kind =
@@ -63,10 +66,6 @@ export function layerOf(path: string): Layer | undefined {
   const match = /^@features\/[^/]+\/([a-z]+)\//.exec(path);
   return match && (LAYERS as string[]).includes(match[1]) ? (match[1] as Layer) : undefined;
 }
-
-export const NODE_RUN = '@wilanis/node/run.schema.json';
-export const NODE_SWITCH = '@wilanis/node/switch.schema.json';
-export const NODE_MAP = '@wilanis/node/map.schema.json';
 
 /** One resolver: a named read of the trigger kind's context, request.params.id or request.headers['user-agent']. Nothing runs. */
 export interface ResolverRead {
@@ -143,7 +142,9 @@ export interface PluginDoc extends Envelope {
  * kind maps that word to how it answers. `holds`: running it starts something that outlives the run -- a
  * listener, a watcher -- which a project's startup list names and the runtime stops when the process ends.
  * `transactional`: running it can take part in the transaction of an atomic graph, which it finds through the
- * static `connection` or `store` field it accepts.
+ * static `connection` or `store` field it accepts. `idempotent`: calling it again with the same inputs changes
+ * nothing further -- always, or when an expression over its accepted fields holds. `key`: the accepted field a
+ * repeated call is recognised by, so a caller who gives it makes the call safe to repeat.
  */
 export interface Operation {
   description: string;
@@ -153,14 +154,19 @@ export interface Operation {
   refuses?: boolean;
   holds?: boolean;
   transactional?: boolean;
+  idempotent?: boolean | string;
+  key?: string;
 }
 export interface PortDoc extends Envelope {
   operations: Record<string, Operation>;
 }
+/** How one operation of a port is met: a graph, or a delegation (`run` + `in`); either may be bounded and retried whole. */
 export interface BindingOp {
   graph?: string;
   run?: string;
   in?: Values;
+  retry?: Retry;
+  timeoutMs?: number;
   description?: string;
 }
 /** How a domain port is met. `reads` names each read of the request a delegation may use, as `@path#resolver`. */
@@ -170,42 +176,6 @@ export interface BindingDoc extends Envelope {
   reads?: Record<string, string>;
   operations: Record<string, BindingOp>;
 }
-
-export interface RunNode {
-  type: typeof NODE_RUN;
-  id: string;
-  label?: string;
-  description?: string;
-  run: string;
-  in?: Values;
-}
-export interface SwitchNode {
-  type: typeof NODE_SWITCH;
-  id: string;
-  label?: string;
-  description?: string;
-  in: Values;
-  rules: { when: string; to: string; description?: string }[];
-  else: string;
-}
-export interface MapNode {
-  type: typeof NODE_MAP;
-  id: string;
-  label?: string;
-  description?: string;
-  run: string;
-  over: Value;
-  in?: Values;
-  bind?: Record<string, string>;
-  onItemFailure?: 'fail' | 'collect';
-}
-export type Node = RunNode | SwitchNode | MapNode;
-/** Whether a graph node is the one that calls an operation, narrowed so its `run` and `in` may be read. */
-export const isRun = (node: Node): node is RunNode => node.type === NODE_RUN;
-/** Whether a graph node is the one that routes on its rules, narrowed so its cases may be read. */
-export const isSwitch = (node: Node): node is SwitchNode => node.type === NODE_SWITCH;
-/** Whether a graph node is the one that runs per element, narrowed so its `over` and binding may be read. */
-export const isMap = (node: Node): node is MapNode => node.type === NODE_MAP;
 
 export interface GraphDoc extends Envelope {
   /** Every effect this graph reaches runs in one transaction on one connection; its answer commits it. */

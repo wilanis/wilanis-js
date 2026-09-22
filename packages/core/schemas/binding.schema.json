@@ -55,6 +55,12 @@
           "in": {
             "$ref": "common.schema.json#/$defs/values"
           },
+          "timeoutMs": {
+            "$ref": "common.schema.json#/$defs/timeoutMs"
+          },
+          "retry": {
+            "$ref": "common.schema.json#/$defs/retry"
+          },
           "description": {
             "description": "How this operation is met, for a reader comparing bindings of the same port.",
             "type": "string"
@@ -75,7 +81,7 @@
         "additionalProperties": false,
         "dependentSchemas": {
           "graph": {
-            "description": "An operation bound to a graph is not delegated: no run, no in.",
+            "description": "An operation bound to a graph is not delegated: no run, no in. It may still say timeoutMs and retry, which bound and repeat the whole graph.",
             "properties": {
               "run": false,
               "in": false
