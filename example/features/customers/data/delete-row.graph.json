@@ -20,7 +20,7 @@
       "in": {
         "connection": "@connections/customers-api.connection.json",
         "method": "DELETE",
-        "path": "/customers/{{in.id}}",
+        "path": "/customer/{{in.id}}",
         "produces": "application/json",
         "returns": "@customers/edge/CustomerRow.shape.json"
       }

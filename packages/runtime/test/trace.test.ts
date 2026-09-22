@@ -190,7 +190,7 @@ describe('what a level lets a span carry', () => {
     const asked = spanNamed(trace, 'asked');
     const refused = spanNamed(trace, 'failed');
 
-    expect(JSON.parse(String(asked?.attributes['wilanis.in'])).path).toBe('/customers/golf');
+    expect(JSON.parse(String(asked?.attributes['wilanis.in'])).path).toBe('/customer/golf');
     expect(JSON.parse(String(asked?.attributes['wilanis.out'])).status).toBe(500);
     expect(refused?.attributes['wilanis.error']).toBe('the customer API answered 500');
   });

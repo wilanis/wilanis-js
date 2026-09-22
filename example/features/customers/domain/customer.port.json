@@ -178,6 +178,34 @@
     },
     "prepare": {
       "description": "Make the storage this profile chose ready to answer, once, before anything is served. Over a store it creates the collections the store declares; over the REST API it reads the collection once, so a tree whose upstream is unreachable refuses to serve rather than answering every route with a fault."
+    },
+    "repair": {
+      "description": "Make one record of the storage this profile chose whole: a row that carries no address or no tier is given one and written back, a row that already says who it is is answered untouched. Over a store there is nothing to repair, so it answers what it was handed.",
+      "accepts": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string",
+          "required": false
+        },
+        "tier": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "returns": "@customers/domain/Repaired.shape.json"
+    },
+    "backfill": {
+      "description": "Make every record of the storage this profile chose whole, once, before anything is served. It answers what it walked. Running it twice writes nothing the second time, since a record that already says who it is is left as it is.",
+      "returns": "@customers/domain/Repaired.shape.json[]"
+    },
+    "listRaw": {
+      "description": "Every record of the storage this profile chose, as it stands: only an id and a name are promised, since a record the storage was seeded with carries neither an address nor a tier. Only the backfill reads it; every other listing reads whole customers.",
+      "returns": "@customers/domain/RawCustomer.shape.json[]"
     }
   }
 }

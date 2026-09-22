@@ -104,6 +104,12 @@
       "required": true
     },
     {
+      "label": "Make the customers whole",
+      "description": "Repair every record the storage holds that predates what a customer means here: one read, then one write per record that carries no address or no tier, paced by the connection. It runs before the port opens, so no route ever answers a record this tree cannot vouch for, and it writes nothing on a second run. Under a store there is nothing to repair and the step passes over every record untouched.",
+      "run": "@customers/domain/customer.port.json#backfill",
+      "required": true
+    },
+    {
       "label": "Reach the customer store",
       "description": "Read the customers once before the HTTP server opens, so a tree whose storage is unreachable refuses to serve instead of answering every route with a fault. The port is bound per profile, so this checks whatever storage the profile chose.",
       "run": "@customers/domain/customer.port.json#listAll",

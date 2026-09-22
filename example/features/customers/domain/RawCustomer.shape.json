@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Customer, as the storage has them",
+  "layer": "core",
+  "description": "A record before this tree has vouched for it: an id and a name are promised, an address and a tier are not, because storage this tree did not seed may hold rows that predate what a customer means here. Only the backfill speaks it; every other operation speaks Customer, which promises what a customer is.",
+  "fields": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string",
+      "required": false
+    },
+    "tier": {
+      "type": "string",
+      "required": false
+    }
+  }
+}

@@ -63,6 +63,17 @@
       "in": {
         "store": "@customers/data/customers-postgres.store.json"
       }
+    },
+    "repair": {
+      "graph": "@customers/data/repair-kept.graph.json"
+    },
+    "backfill": {
+      "description": "The business graph that reads every record as it stands and repairs each one.",
+      "graph": "@customers/domain/backfill-customers.graph.json"
+    },
+    "listRaw": {
+      "description": "A store holds only what this tree wrote, so there is nothing that predates what a customer means here: the walk starts empty and the backfill writes nothing.",
+      "graph": "@customers/data/list-raw-none.graph.json"
     }
   }
 }
