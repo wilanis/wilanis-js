@@ -96,12 +96,13 @@ export function correlationOf(request: Record<string, unknown>, path: string | u
 }
 
 /**
- * How one run ended, in the words a span carries: `ok`, `refused: <reason>`, `failed` or `blocked`. A gate's
+ * How one run ended, in the words a span carries: `ok`, `refused: <reason>`, `failed`, `blocked` or `cancelled`. A gate's
  * denial and a challenge are said by the decision's own span, so what the root says is what the run did.
  */
 export function statusOf(report: Report): string {
   const outcome = outcomeOf(report);
   if (outcome.kind === 'answered') return 'ok';
   if (outcome.kind === 'refused') return `refused: ${outcome.reason}`;
+  if (outcome.kind === 'cancelled') return 'cancelled';
   return outcome.kind === 'blocked' ? 'blocked' : 'failed';
 }
