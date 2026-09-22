@@ -8,6 +8,7 @@ import { checkTree } from '@wilanis/compiler';
 import type { BlobHandle, Trace } from '@wilanis/core';
 import { KINDS, type Kind, type LoadResult } from '@wilanis/core';
 import { loadProject } from './project.js';
+import { runSaid } from './run-said.js';
 import { runTrigger, start } from './serve.js';
 import { type StopInput, stopHook } from './stopping.js';
 import { describe, fuzz, init, ls, map, migrate, regress, rehearse, SCENARIOS, scaffold } from './tools.js';
@@ -188,7 +189,9 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
         observe: tracing(flags),
       },
     );
-    if (!delivered) console.log(typeof answer === 'string' ? answer : JSON.stringify(answer ?? report, null, 2));
+    const said = runSaid(report, answer);
+    if (said.stdout !== undefined && !delivered) console.log(said.stdout);
+    if (said.stderr !== undefined) console.error(said.stderr);
     if (report.status !== 'done') process.exit(1);
   },
   migrate: async ({ flags, rootArg }) => {
