@@ -57,16 +57,24 @@ function rowOf(header: string[], cells: string[], type: Type): Row {
   return row;
 }
 
-/** Rows of a shape, read from a CSV blob as it streams: the first line names the columns. */
+/**
+ * Rows of a shape, read from a CSV blob as it streams: the first line names the columns. Between one row and the
+ * next it asks the run's signal, and once that has aborted it rejects as an aborted call does, so a cancelled
+ * import reads no further into the file.
+ */
 class RowReader {
   private header: string[] | undefined;
   private line = 0;
   readonly rows: Row[] = [];
 
-  constructor(private readonly type: Type) {}
+  constructor(
+    private readonly type: Type,
+    private readonly signal: AbortSignal | undefined,
+  ) {}
 
   take(rows: string[][]): void {
     for (const cells of rows) {
+      this.signal?.throwIfAborted();
       this.line++;
       if (!this.header) {
         this.header = cells.map(name => name.trim());
@@ -81,11 +89,18 @@ class RowReader {
   }
 }
 
-async function parse(blobs: BlobStore, file: unknown, type: Type | undefined): Promise<unknown[]> {
+/** The rows of a CSV blob, streamed; stops between rows, the stream closed, once the signal has aborted. */
+async function parse(
+  blobs: BlobStore,
+  file: unknown,
+  type: Type | undefined,
+  signal?: AbortSignal,
+): Promise<unknown[]> {
   if (!type) throw new Error("parse: 'type' must name the row shape");
+  signal?.throwIfAborted();
   const decoder = new StringDecoder('utf8');
   const csv = new CsvRows();
-  const reader = new RowReader(type);
+  const reader = new RowReader(type, signal);
   for await (const chunk of blobs.open(handleOf(file, 'file'))) reader.take(csv.feed(decoder.write(chunk as Buffer)));
   reader.take(csv.feed(decoder.end()));
   reader.take(csv.end());
@@ -112,7 +127,7 @@ function* lines(rows: unknown[], type: Type | undefined): Iterable<string> {
 // ---- the operations ------------------------------------------------------------------------------------
 
 const csvParse: Handler = async ({ in: input, ctx }) =>
-  parse(storeOf(ctx.env), input.file, rowType(ctx.env, input.type));
+  parse(storeOf(ctx.env), input.file, rowType(ctx.env, input.type), ctx.signal);
 
 const csvWrite: Handler = async ({ in: input, ctx }) => {
   if (!Array.isArray(input.rows)) throw new Error('write: rows is not a list');
