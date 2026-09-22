@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/invariant.schema.json",
   "label": "A customer is reachable",
-  "description": "A customer can always be reached and always says why they are where they are: a name and an address are never empty, and a gold account always carries the note explaining it. Every graph that makes or takes a customer is held to this, wherever the value comes from.",
+  "description": "A customer can always be reached, and a gold account always says why it is gold: a name and an address are never empty, and a customer of the gold tier carries the note explaining it. Every graph that makes or takes a customer is held to this, wherever the value comes from.",
   "holds": {
     "on": "@customers/domain/Customer.shape.json",
     "when": "len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))"

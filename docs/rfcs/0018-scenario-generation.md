@@ -83,7 +83,7 @@ scenarios/
       customers.get-row.route.row.scenario.json
       customers.get-row.route.failed.scenario.json
     list-customers/
-      customer.list-customers.route.byMethod.scenario.json
+      customer.list-customers.route.byTier.scenario.json
       ...
     policies/
       employees-only/
