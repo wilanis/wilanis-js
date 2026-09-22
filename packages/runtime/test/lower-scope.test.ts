@@ -4,7 +4,7 @@
  * can forget one (RFC 0015). These read the kernel spec rather than the refusals: the claim is not that a
  * tree is refused but that what runs carries the read, and that nothing else about the spec moved.
  *
- * The example keeps its entries unscoped until RFC 0015 step 10, so every case here compiles a scoped copy
+ * The example keeps its customers unscoped until RFC 0015 step 10, so every case here compiles a scoped copy
  * of it -- the one `scoping-harness` makes -- and the unscoped example beside it says what did not change.
  */
 import { Compiler } from '@wilanis/compiler';
@@ -38,7 +38,7 @@ describe('the scope the lowering fills, which no document writes', () => {
     expect(Object.keys(nodes).sort()).toEqual(Object.keys(plain).sort());
   });
   it('carries none to a site over a collection the store does not scope', () => {
-    // one graph, two collections of one store: entries is scoped and latest is not, and each site answers
+    // one graph, two collections of one store: customers is scoped and latest is not, and each site answers
     // for itself, so a scope is per collection and never per store
     const nodes = nodesOf('@features/customers/data/store-and-latest.graph.json');
     expect(nodes.stored.in.scope).toEqual({ object: { tenant } });
@@ -59,7 +59,7 @@ describe('the scope the lowering fills, which no document writes', () => {
         [binding]: (doc: any) => {
           doc.operations.listAll = {
             run: '@storage/store.port.json#find',
-            in: { store: '@customers/data/customers.store.json', collection: 'entries' },
+            in: { store: '@customers/data/customers.store.json', collection: 'customers' },
           };
         },
       },
