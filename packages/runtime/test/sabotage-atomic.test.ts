@@ -152,7 +152,7 @@ describe('an atomic graph over more than one connection', () => {
   });
 
   it('names the profiles whose bindings put the effects on two connections -- L010', () => {
-    // record-entry fires monitor.record, which the local profile meets in memory and the production
+    // register-customer fires customer.register, which the local profile meets in memory and the production
     // profile in PostgreSQL: two connections, each different from the notes one, so both profiles refuse.
     // The live profile meets it over HTTP, which is L009 and not a second connection at all.
     const broken = plantedEditingSaying(ELSEWHERE, RECORD, doc => {
@@ -243,7 +243,7 @@ describe('an operation that says it is transactional', () => {
 });
 
 /**
- * The batch graph the example's `import` wants: one map over `monitor.submit`, declaring that the rows it
+ * The batch graph the example's `import` wants: one map over `customer.submit`, declaring that the rows it
  * records move together. What it reaches depends entirely on which binding meets `submit`, so it is the graph
  * the profile filter is about.
  */

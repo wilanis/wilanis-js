@@ -9,7 +9,7 @@ import { at } from '../src/level.js';
 import { configure } from '../src/settings.js';
 import { parentOf, type Scope, spansOf } from '../src/spans.js';
 
-const SCOPE: Scope = { service: 'monitor', name: '@wilanis/plugin-otel', version: '0.1.0' };
+const SCOPE: Scope = { service: 'customers', name: '@wilanis/plugin-otel', version: '0.1.0' };
 
 /** A span of a trace, written as the runtime hands one. */
 const span = (name: string, status: string, over: Partial<Trace> = {}): Trace => ({
@@ -76,7 +76,7 @@ describe('a trace becomes spans', () => {
 
   it('every span carries the service and the scope that sent it', () => {
     const [one] = spansOf(span('fire t', 'ok'), SCOPE);
-    expect(one.resource.attributes['service.name']).toBe('monitor');
+    expect(one.resource.attributes['service.name']).toBe('customers');
     expect(one.instrumentationScope.name).toBe('@wilanis/plugin-otel');
   });
 });

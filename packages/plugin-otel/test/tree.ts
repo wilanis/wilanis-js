@@ -30,14 +30,14 @@ export function tree(): Docs {
         {
           use: ROOT,
           from: '@wilanis/plugin-otel',
-          settings: { endpoint: 'http://localhost:4318/v1/traces', service: 'monitor' },
+          settings: { endpoint: 'http://localhost:4318/v1/traces', service: 'customers' },
         },
       ],
       startup: [{ label: 'Export traces', run: EXPORT }],
     },
     'features/customers/feature.json': {
       $schema: schemaRef('feature'),
-      description: 'what the monitor observes',
+      description: 'who the registry keeps',
     },
     'features/customers/domain/Digest.shape.json': {
       $schema: schemaRef('shape'),
@@ -47,7 +47,7 @@ export function tree(): Docs {
     },
     'features/customers/domain/customer.port.json': {
       $schema: schemaRef('port'),
-      description: 'what the monitor can be asked for',
+      description: 'what the registry can be asked for',
       operations: {
         digest: { description: 'the digest of what was seen', returns: '@features/customers/domain/Digest.shape.json' },
       },

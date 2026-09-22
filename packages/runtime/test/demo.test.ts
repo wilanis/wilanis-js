@@ -220,7 +220,7 @@ describe('beats 4 and 5, live: the three writes, then all of it or none of it', 
       const archive = (id: string, token?: string) =>
         tree.answer(
           '@customers/edge/archive-customer.trigger.json',
-          requestOf('POST', `/monitor/${id}/archive`, { token, params: { id } }),
+          requestOf('POST', `/customers/${id}/archive`, { token, params: { id } }),
         );
       const signIn = async (username: string) => {
         const signed = await tree.answer(

@@ -105,12 +105,12 @@ describe('the five members an engine answers about the record it keeps', () => {
     const { engine, asked } = fake({});
     const steps: Step[] = [{ do: 'add', target: 'entries', at: 'note', says: 'add note  string, optional' }];
     const record: Recording = { entries: ENTRIES, notes: null };
-    const applying: Applying = { by: 'rfontes@build-1', tree: 'monitor' };
+    const applying: Applying = { by: 'rfontes@build-1', tree: 'customers' };
     const answer = await engine.apply(on, steps, record, applying);
     expect(asked.applied).toHaveLength(1);
     expect(asked.applied[0]?.steps).toEqual(steps);
     expect(asked.applied[0]?.record).toEqual(record);
-    expect(answer).toMatchObject({ id: 1, by: 'rfontes@build-1', tree: 'monitor', connection: CONNECTION });
+    expect(answer).toMatchObject({ id: 1, by: 'rfontes@build-1', tree: 'customers', connection: CONNECTION });
     expect(answer?.targets).toEqual(['entries', 'notes']);
   });
 

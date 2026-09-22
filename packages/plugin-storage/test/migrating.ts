@@ -156,7 +156,7 @@ function documents(collections: { entries: Record<string, Declares>; notes: Reco
     },
     'connections/customers.connection.json': connection('entries'),
     'connections/notes.connection.json': connection('notes'),
-    'features/customers/feature.json': { $schema: schemaRef('feature'), description: 'what the monitor observes' },
+    'features/customers/feature.json': { $schema: schemaRef('feature'), description: 'who the registry keeps' },
     'features/customers/domain/Customer.shape.json': {
       $schema: schemaRef('shape'),
       description: 'one observed call',

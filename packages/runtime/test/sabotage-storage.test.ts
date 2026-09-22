@@ -278,10 +278,10 @@ describe('what a call may do to the records', () => {
   });
 
   it("X213 a graph of one feature naming another feature's store", () => {
-    // hello keeps nothing; monitor's records are monitor's, and hello asks monitor's domain port for them
+    // hello keeps nothing; the registry's records are its own, and hello asks the registry's domain port for them
     const found = planted('features/hello/data/peek.graph.json', {
       $schema: schemaUrl('graph'),
-      label: 'Peek at what monitor keeps',
+      label: 'Peek at what the registry keeps',
       description: "A data graph of one feature reaching into another feature's collection.",
       nodes: [
         {

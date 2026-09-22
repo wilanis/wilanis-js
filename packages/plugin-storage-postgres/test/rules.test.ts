@@ -40,7 +40,7 @@ function tree(): Docs {
     },
     'features/customers/feature.json': {
       $schema: schemaRef('feature'),
-      description: 'what the monitor observes',
+      description: 'who the registry keeps',
       effects: ['@storage/store.port.json#get'],
     },
     'features/customers/domain/Customer.shape.json': {

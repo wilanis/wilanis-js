@@ -196,7 +196,7 @@ describe('sabotage: a store names a connection and the shapes it keeps', () => {
     expect(keptIn('../auth')).toEqual(refused);
     expect(keptIn('.')).toEqual(refused);
     expect(keptIn('.wilanis/sessions')).toEqual([]);
-    expect(keptIn('/var/lib/monitor/auth')).toEqual([]);
+    expect(keptIn('/var/lib/customers/auth')).toEqual([]);
   });
   it("B002 a tree that leaves the guard's memory unbound, since @auth requires it", () => {
     expect(without('features/state/data/auth-files.binding.json')).toContain('B002');
