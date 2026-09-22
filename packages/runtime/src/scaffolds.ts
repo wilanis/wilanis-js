@@ -73,7 +73,10 @@ function collectionOf(file: string): string {
   return /^[a-z]/.test(named) ? named : 'records';
 }
 
-const SCAFFOLDS: Record<string, (target: string, opts: Record<string, string | undefined>) => [string, unknown][]> = {
+/** One kind's builder: the files it writes, from the target, the flags, and the root of the tree they go into. */
+type Build = (target: string, opts: Record<string, string | undefined>, root: string) => [string, unknown][];
+
+const SCAFFOLDS: Record<string, Build> = {
   project: (target, _opts) => {
     return [
       [
@@ -134,9 +137,9 @@ const SCAFFOLDS: Record<string, (target: string, opts: Record<string, string | u
       ],
     ];
   },
-  graph: (target, opts) => {
+  graph: (target, opts, root) => {
     // two forms, both in scaffold-graph.ts: one node to replace, or the read-decide-write shape --store asks for
-    const { layer, doc } = graphScaffold(opts, schemaOf);
+    const { layer, doc } = graphScaffold(opts, schemaOf, root);
     return [[into(target, layer, 'graph'), doc]];
   },
   binding: (target, opts) => {
@@ -247,7 +250,7 @@ export function scaffold(
     throw new Error(
       `unknown kind '${kind}'; one of project, feature, shape, port, graph, binding, store, trigger, policy, resolvers, invariant`,
     );
-  const files = build(target, opts);
+  const files = build(target, opts, root);
   // placement first, for every file: nothing is written that the checker would then refuse
   for (const [rel, doc] of files) {
     const why = refusedPlace({ root, kind, target }, rel, doc);
