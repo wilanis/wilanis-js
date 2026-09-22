@@ -39,7 +39,7 @@ describe('the example tree', () => {
     expect(text.match(/delete-row {2}switch 'route'/g)).toHaveLength(1);
     // the sixteenth decision is the guard over the CSV export's list of customers, whose nested spec the walk
     // opens by name; the fifteen the tree's authors wrote are unchanged
-    expect(text).toMatch(/every branch settled -- 39 branch\(es\), 16 decision\(s\), 16 graph\(s\)/);
+    expect(text).toMatch(/every branch settled -- 42 branch\(es\), 17 decision\(s\), 16 graph\(s\)/);
   });
   it('reaches both the answer and the declared failure of every data graph', async () => {
     const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'live' });
@@ -50,7 +50,7 @@ describe('the example tree', () => {
     expect(text.match(/refused on purpose at 'missing' as missing: "no customer /g)).toHaveLength(3);
     // every branch that answers names the node it answered from, never a bare status word: the registry's eight,
     // the access feature's, and the `in:ok` of the guard over the CSV export's list
-    expect(text.match(/answered from '/g)).toHaveLength(17);
+    expect(text.match(/answered from '/g)).toHaveLength(20);
     // the rule is shown as a condition, not as a bare expression next to a node id
     expect(text).toMatch(/when status == 200 && has\(body\)/);
     expect(text).toMatch(/anything else/);
