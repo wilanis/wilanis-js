@@ -42,20 +42,24 @@ describe.skipIf(!url)('the example, importing into PostgreSQL under one transact
     let at = 0;
     const run = (op: string, input: Record<string, unknown> = {}) =>
       emb.startup({ run: `@customers/domain/customer.port.json#${op}`, in: input }, { blobs: scope, at: at++ });
-    const upload = (text: string) => scope.put(text, { contentType: 'text/csv', filename: 'entries.csv' });
-    const mark = `https://${Date.now()}.example/`;
+    const upload = (text: string) => scope.put(text, { contentType: 'text/csv', filename: 'customers.csv' });
+    const mark = `run-${Date.now()}`;
     try {
       // the tree's own first startup step: the collections the store declares, created once
       expect((await run('prepare')).status).toBe('done');
-      const good = run('import', { file: await upload(`url,method\n${mark}a,GET\n${mark}b,POST\n`) });
-      // the same call twice in one file: unique [url, method] refuses the second and rolls the first back
-      const bad = run('import', { file: await upload(`url,method\n${mark}z,GET\n${mark}z,GET\n`) });
+      const good = run('import', {
+        file: await upload(`name,email,tier\nAda,${mark}a@x.example,bronze\nGrace,${mark}b@x.example,silver\n`),
+      });
+      // the same address twice in one file: unique [email] refuses the second and rolls the first back
+      const bad = run('import', {
+        file: await upload(`name,email,tier\nZoe,${mark}z@x.example,bronze\nZoe,${mark}z@x.example,bronze\n`),
+      });
       const [first, second] = await Promise.all([good, bad]);
       expect(first.status).toBe('done');
       expect(second.status).toBe('failed');
-      const kept = (await run('listAll')).output as { url: string }[];
-      const mine = kept.filter(row => row.url.startsWith(mark)).map(row => row.url);
-      expect(mine.sort()).toEqual([`${mark}a`, `${mark}b`]);
+      const kept = (await run('listAll')).output as { email: string }[];
+      const mine = kept.filter(row => row.email.startsWith(mark)).map(row => row.email);
+      expect(mine.sort()).toEqual([`${mark}a@x.example`, `${mark}b@x.example`]);
     } finally {
       await scope.release();
       await down();
