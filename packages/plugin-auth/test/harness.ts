@@ -50,9 +50,12 @@ export const INCLUDES: ResolvedInclude[] = [
  * that was starting a fake issuer never finishes, and the run fails with a hook timeout and a `stop` that was
  * never assigned. Which file loses is a matter of scheduling, so it fails on CI and not on a developer's
  * machine. `VITEST_POOL_ID` is the worker's own number, so a band per worker is a band nothing else binds --
- * the ports stay readable and fixed within a run, and no two workers ever ask for the same one.
+ * the ports stay readable and fixed within a run, and no two workers ever ask for the same one. The harnesses'
+ * bands overlap as ranges; what keeps them apart is that each base sits on its own residue mod 16 (8093 here is
+ * 13 against 8300's 12 in `unique-violated`; 54325 and 54326 are 5 and 6 against the http upstream's 54900 at 4),
+ * so a new base goes on a residue nothing else uses.
  */
-const BAND = (Number(process.env.VITEST_POOL_ID ?? 0) % 32) * 16;
+const BAND = Number(process.env.VITEST_POOL_ID ?? 0) * 16;
 
 export const PORT = 8093 + BAND;
 export const UPSTREAM = 54325 + BAND;

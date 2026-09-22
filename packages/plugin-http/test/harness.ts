@@ -26,7 +26,7 @@ export const INCLUDES: ResolvedInclude[] = [
  * can ask for at once: the second gets EADDRINUSE, and a `beforeAll` that was starting a server fails the
  * whole file with a hook timeout. Which one loses is scheduling, so it bites CI rather than a local run.
  */
-export const UPSTREAM = 54900 + (Number(process.env.VITEST_POOL_ID ?? 0) % 32) * 16;
+export const UPSTREAM = 54900 + Number(process.env.VITEST_POOL_ID ?? 0) * 16;
 export const SECRET = 'secret-secret-secret-secret-secret-1';
 const SCHEMAS = 'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/';
 
