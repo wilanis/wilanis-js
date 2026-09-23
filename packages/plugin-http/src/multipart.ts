@@ -49,6 +49,16 @@ export class MultipartParts {
     return this.fields;
   }
 
+  /**
+   * The stream broke before it ended: the file part being written is failed with `error`, so its blob write rejects
+   * rather than waiting forever for bytes that will not come, and every write is waited for before the error passes up.
+   */
+  async abort(error: Error): Promise<void> {
+    this.sink?.destroy(error);
+    this.sink = undefined;
+    await Promise.allSettled(this.pending);
+  }
+
   /** The first boundary has no leading CRLF; the window starts with "--boundary". */
   private skipPreamble(): boolean {
     const first = this.window.indexOf(this.delimiter.subarray(2));
@@ -102,11 +112,14 @@ export class MultipartParts {
     const sink = new PassThrough();
     this.sink = sink;
     const field = this.name;
-    this.pending.push(
-      this.blobs.put(sink, { contentType: partType ?? 'application/octet-stream', filename }).then(handle => {
+    const written = this.blobs
+      .put(sink, { contentType: partType ?? 'application/octet-stream', filename })
+      .then(handle => {
         this.fields[field] = handle;
-      }),
-    );
+      });
+    // `end` or `abort` awaits it; until one does, a write that fails early is not an unhandled rejection
+    written.catch(() => undefined);
+    this.pending.push(written);
   }
 
   /** Bytes of the part being read. */

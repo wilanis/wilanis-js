@@ -5,8 +5,9 @@
  * in, served on a port of its own against a fake upstream that can stop answering.
  */
 import { rmSync } from 'node:fs';
+import { Readable } from 'node:stream';
 import { checkTree } from '@wilanis/compiler';
-import { loadTree } from '@wilanis/core';
+import { type BlobStore, loadTree } from '@wilanis/core';
 import auth from '@wilanis/plugin-auth';
 import blobs from '@wilanis/plugin-blob';
 import otel from '@wilanis/plugin-otel';
@@ -17,7 +18,9 @@ import memory from '@wilanis/plugin-storage-memory';
 import postgres from '@wilanis/plugin-storage-postgres';
 import { BUILTIN_PLUGINS, start } from '@wilanis/runtime';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { multipart } from '../src/codecs.js';
 import http from '../src/index.js';
+import { bounded } from '../src/limit.js';
 import {
   caller,
   type Edit,
@@ -92,17 +95,25 @@ function loaded(edits: (edit: Edit) => void) {
   return loadTree(dir, PLUGINS, INCLUDES);
 }
 
-/** A body sent as a stream, so it carries no content-length and the bound has to count it as it arrives. */
-const streamed = (text: string) =>
-  ({
+/**
+ * A body sent as a stream a kilobyte at a time, a tick apart, so it carries no content-length, the bound has to count
+ * it as it arrives, and a reader has begun on it by the time it is cut.
+ */
+const streamed = (text: string) => {
+  const bytes = new TextEncoder().encode(text);
+  let at = 0;
+  return {
     body: new ReadableStream({
-      start(control) {
-        control.enqueue(new TextEncoder().encode(text));
-        control.close();
+      async pull(control) {
+        if (at >= bytes.length) return control.close();
+        if (at > 0) await new Promise(done => setTimeout(done, 5));
+        control.enqueue(bytes.subarray(at, at + 1024));
+        at += 1024;
       },
     }),
     duplex: 'half',
-  }) as unknown as RequestInit;
+  } as unknown as RequestInit;
+};
 
 beforeAll(async () => {
   stopUpstream = await listening(server, BACK);
@@ -191,6 +202,66 @@ describe('a body past its bound', () => {
     expect(answer.status).toBe(413);
     expect(await answer.json()).toEqual({ error: 'body exceeds 64 bytes' });
     expect(upstream.rows).toHaveLength(before);
+  });
+
+  it("a multipart upload cut inside its file part is 413, and the part's blob write settles rather than hanging", async () => {
+    const boundary = 'cut-here';
+    const form = [
+      `--${boundary}`,
+      'content-disposition: form-data; name="note"',
+      '',
+      'a note',
+      `--${boundary}`,
+      'content-disposition: form-data; name="file"; filename="bulk.csv"',
+      'content-type: text/csv',
+      '',
+      `name,email,tier\n${'Row,row@x.example,bronze\n'.repeat(400)}`,
+      `--${boundary}--`,
+      '',
+    ].join('\r\n');
+    const answered = fetch(`http://localhost:${PORT}/customers/upload`, {
+      method: 'POST',
+      headers: { 'content-type': `multipart/form-data; boundary=${boundary}`, authorization: `Bearer ${token}` },
+      ...streamed(form),
+    });
+    // a write left open would hold the answer forever: give it a second, then say so
+    const hung = new Promise<'hung'>(done => setTimeout(() => done('hung'), 1000));
+    const answer = await Promise.race([answered, hung]);
+    expect(answer).not.toBe('hung');
+    expect((answer as Response).status).toBe(413);
+    expect(await (answer as Response).json()).toEqual({ error: 'body exceeds 4096 bytes' });
+  });
+
+  it("a multipart body cut inside its file part fails that part's blob write rather than leaving it open", async () => {
+    const boundary = 'cut-here';
+    const head = `--${boundary}\r\ncontent-disposition: form-data; name="file"; filename="bulk.csv"\r\n\r\n`;
+    // a tick apart, so the part has begun its write before the bound cuts the body
+    async function* chunks() {
+      for (const chunk of [Buffer.from(head), Buffer.alloc(1024, 'a'), Buffer.alloc(1024, 'b')]) {
+        yield chunk;
+        await new Promise(done => setTimeout(done, 5));
+      }
+    }
+    // a registry that reads what it is handed to the end and says how its write ended
+    const writes: string[] = [];
+    const registry = {
+      async put(source: Readable) {
+        try {
+          for await (const _ of source);
+          writes.push('stored');
+        } catch (error) {
+          writes.push(`failed: ${(error as Error).message}`);
+          throw error;
+        }
+        return { id: 'x', contentType: 'text/csv', size: 0 };
+      },
+    } as unknown as BlobStore;
+    const body = bounded(Readable.from(chunks()), { max: 1500, what: 'body', rest: 'drop' });
+    await expect(
+      multipart.decode(body.stream, `multipart/form-data; boundary=${boundary}`, undefined, registry),
+    ).rejects.toThrow('body exceeds 1500 bytes');
+    // the decode waited for the write it began: by the time it rejected, the write had failed too
+    expect(writes).toEqual(['failed: body exceeds 1500 bytes']);
   });
 
   it('a body under the bound is read as ever', async () => {
