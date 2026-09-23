@@ -34,6 +34,10 @@ world imposes) or `core` (ours). An edge shape lives in `edge/`, a core shape in
 only in edge shapes and native contracts. The misspelled field a partner API returns lives in an edge shape
 and never reaches the domain.
 
+A list field may say `maxItems`, the most items a value may hold, judged wherever the type is judged at run
+time. It bounds a list and nothing else: written on a field of a shape or a contract that is not a list, it is
+C016.
+
 ## Ports and bindings
 
 A **port** is a contract: operations with `accepts` and `returns`. Granted by a plugin it is *native* -- the
@@ -94,6 +98,10 @@ A trigger names its kind (an http route, a cli command, whatever a plugin grants
 judges, edge `in`/`out` types, and `fire`: the domain port operation it runs, with its inputs read from the
 kind's context (`{{request.body.title}}`). **A trigger never names a graph**; the port's binding decides how
 the operation is met.
+
+A trigger with no `policies` is called by anyone, so every list its edge shapes take -- its `in`, and each
+setting of its kind typed `type` -- says `maxItems`, at any depth; an unbounded one is T008, answered by
+bounding the list or gating the trigger.
 
 ## Access is a trigger's declaration and a policy's decision
 
@@ -197,7 +205,8 @@ secrets.
 A `scenario` is a recorded run: `wilanis fuzz` writes one per trigger and seed, under stubs, and `wilanis
 regress` replays it node by node. `fuzz` records the reason a node refused with beside its status
 (`expect.nodes.<id>.reason`) and `regress` diffs it, so a refusal that became a fault reads `reason missing →
-none`. A reason pinned on a node whose status is not `failed` is S002. `fuzz` writes no scenario of a run that
+none`. A reason pinned on a node whose status is not `failed` is S002. A scenario's `cancelAt` names the stubbed effect at which
+`regress` cancels the replay, so it is a key of the scenario's own `stubs` (S003). `fuzz` writes no scenario of a run that
 faults under stubs: it prints `FAULT at '<node>'` and exits 1.
 
 ## Refusal codes
