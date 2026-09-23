@@ -7,6 +7,7 @@ import type { Kind, Layer, Loaded, LoadResult, Outcome, Refusal } from '@wilanis
 import { SCHEMA_BASE } from '@wilanis/core';
 import type { TriggerLimits } from '@wilanis/runtime';
 import type { VAttempts, VPromised } from './attempts.js';
+import type { VCatches, VCaught } from './catches.js';
 import type { VFanOut } from './limits.js';
 
 export type { VAttempts, VPromised } from './attempts.js';
@@ -64,7 +65,7 @@ export type VNodeKind = 'in' | 'const' | 'request' | 'run' | 'map' | 'rule' | 'o
  * One node as a page draws it; a run or map node carries the retry and the bound its call site declares, and a
  * map the most elements it runs over and how many at once.
  */
-export interface VNode extends VAttempts, VFanOut {
+export interface VNode extends VAttempts, VFanOut, VCaught {
   id: string;
   kind: VNodeKind;
   /** The node's label, or its id made readable. */
@@ -201,7 +202,7 @@ export interface VScopedColumn {
  * names. `then` routes to the rule's target; `otherwise` steps to the next rule, and leaves the ladder for the
  * switch's `else` from the last one. So "the first rule that holds wins" is the shape, not a caption.
  */
-export interface VDecision {
+export interface VDecision extends VCatches {
   /** The switch node's id, shared by every rule of it. */
   id: string;
   label: string;
@@ -236,8 +237,8 @@ export interface VEdge {
   to: string;
   /** The input port; '' for the node itself (a route, or the out node). */
   toPort: string;
-  kind: 'data' | 'route' | 'out';
-  /** A rule's `when` on a route; the candidate's place on an out edge. */
+  kind: 'data' | 'route' | 'catch' | 'out';
+  /** A rule's `when` on a route; the candidate's place on an out edge; `<node> broke` on a catch. */
   label?: string;
 }
 

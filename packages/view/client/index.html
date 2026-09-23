@@ -46,6 +46,7 @@
   main .legend { position: absolute; left: 12px; bottom: 10px; display: flex; gap: 14px; color: var(--dim); font-size: 11px; align-items: center; }
   main .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--muted); margin-right: 4px; vertical-align: -1px; } main .legend i.full { background: var(--muted); }
   main .legend s { display: inline-block; width: 18px; border-top: 2px dashed var(--muted); vertical-align: 3px; margin-right: 4px; }
+  main .legend s.catch { border-top-style: dotted; }
   main .legend u { display: inline-block; width: 11px; height: 8px; border: 1.5px dashed var(--ok); border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
   main .empty { padding: 40px; color: var(--muted); }
   main .page { padding: 22px 28px 40px; overflow: auto; height: 100%; max-width: 1100px; }
@@ -115,7 +116,7 @@
   .group .box { fill: #12171d; stroke: var(--line); stroke-width: 1; stroke-dasharray: 4 3; rx: 12; }
   .group .title { font: 600 12px var(--sans); fill: var(--muted); } .group .tag { font: 10px var(--sans); fill: var(--dim); letter-spacing: .06em; }
   .edge.step { stroke-dasharray: 3 3; } .elabel.step { font: italic 10px var(--sans); fill: var(--dim); }
-  .edge { fill: none; stroke-width: 1.6; opacity: .9; } .edge.route { stroke-dasharray: 5 4; }
+  .edge { fill: none; stroke-width: 1.6; opacity: .9; } .edge.route { stroke-dasharray: 5 4; } .edge.catch { stroke-dasharray: 1.5 4; stroke-linecap: round; }
   .edge.dim { opacity: .12; } .edge.hot { stroke-width: 2.6; opacity: 1; }
   .elabel { font: 10px var(--mono); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
 </style>
@@ -622,6 +623,7 @@
             }
             page.appendChild(t);
           }
+          page.appendChild(el('p', null, "Anything that breaks and no switch catches is a fault: answered the kind's one way, never mapped."));
         }
         page.appendChild(el('h2', null, 'What the operation is given'));
         if (d.fire && d.fire.in) { page.appendChild(el('p', null, 'Each input, read from what the kind hands as request.*:')); page.appendChild(valuesTable(d.fire.in, ['input', 'read from'])); }
@@ -952,6 +954,17 @@
     }
     page.appendChild(t);
   }
+  /** A node a switch catches (RFC 0014): its fault is routed on rather than ending the run, and to where. */
+  function caughtEl(box, n, g) {
+    const rule = g.nodes.find(x => x.decision && x.decision.id === n.caughtBy);
+    const to = rule && rule.decision.catch ? rule.decision.catch[n.id] : undefined;
+    box.appendChild(el('h4', null, 'caught'));
+    const p = el('p'); p.appendChild(frag('its fault is caught by ')); p.appendChild(el('b', null, rule ? rule.decision.label : n.caughtBy));
+    if (to) { p.appendChild(frag(', which routes it to ')); const b = el('b', null, labelOfNode(g, to)); b.style.color = nodeColors(g).get(to); p.appendChild(b); }
+    p.appendChild(frag('. A refusal here is never caught: it reaches the trigger as its reason.'));
+    box.appendChild(p);
+  }
+
   function renderNodeDetails(box, n, v) {
     const color = nodeColors(v.graph).get(n.id);
     const h = el('h3'); const sw = el('span', 'swatch'); sw.style.background = color; h.appendChild(sw); h.appendChild(document.createTextNode(n.label + ' ')); const kindText = { run: 'operation', map: 'for each', rule: 'rule', in: 'input', out: 'output', const: 'constants', request: 'request' }[n.kind]; h.appendChild(NODE_SCHEMA[n.kind] ? schemaBadge(n.kind, kindText, NODE_SCHEMA[n.kind]) : badge(n.kind, kindText)); box.appendChild(h);
@@ -961,6 +974,7 @@
     if (n.type) { const p = el('p'); p.appendChild(frag(n.kind === 'in' ? 'The graph takes ' : 'The graph answers ')); p.appendChild(typeLink(n.type)); box.appendChild(p); }
     if (n.description) box.appendChild(el('p', null, n.description));
     if (n.decision) { const d = n.decision, p = el('p'); p.appendChild(frag(`Rule ${d.rule} of ${d.of} in `)); p.appendChild(el('b', null, d.label)); p.appendChild(frag('. The first rule that holds wins.' + (d.description ? ' ' + d.description : ''))); box.appendChild(p); }
+    if (n.caughtBy) caughtEl(box, n, v.graph);
     if (n.participates) { box.appendChild(el('h4', null, 'in the transaction')); box.appendChild(el('p', null, 'What this node does is inside the one transaction the graph declares. It is kept only if the graph answers; a refusal or a fault anywhere below undoes it with the rest.')); }
     if (n.guarded) guardedEl(box, n.guarded);
     if (n.proved) provedEl(box, n.proved);
@@ -1021,6 +1035,7 @@
       const to = (word, id, cls) => { const d = el('div', 'row'); d.appendChild(el('span', cls, word)); const t = el('span', 'from'); t.appendChild(frag(TO)); const b = el('b', null, labelOfNode(v.graph, id)); b.style.color = nodeColors(v.graph).get(id); t.appendChild(b); d.appendChild(t); box.appendChild(d); };
       to('then', n.decision.then, 'val');
       to('otherwise', n.decision.otherwise, 'miss');
+      for (const [broke, target] of Object.entries(n.decision.catch || {})) to(broke + ' broke', target, 'miss');
     }
     if (n.bind) { box.appendChild(el('h4', null, 'each item is read as')); for (const [k, p] of Object.entries(n.bind)) box.appendChild(el('div', 'row', `${k} ${FROM}item${p ? '.' + p : ''}`)); }
     if (n.outputs.length && n.kind !== 'rule') {
@@ -1034,7 +1049,7 @@
       }
     }
     if (n.fields && n.fields.length) { box.appendChild(el('h4', null, 'fields of the answer')); for (const p of n.fields) { const r = el('div', 'row'); r.appendChild(el('span', 'name ' + (p.required === false ? 'opt' : 'req'), p.name)); r.appendChild(typeLink(p.type)); box.appendChild(r); } }
-    const used = v.graph.edges.filter(e => e.from === n.id && e.kind !== 'route');
+    const used = v.graph.edges.filter(e => e.from === n.id && e.kind !== 'route' && e.kind !== 'catch');
     if (used.length) { box.appendChild(el('h4', null, 'read by')); for (const e of used) { const d = el('div', 'row'); const b = el('b', null, labelOfNode(v.graph, e.to)); b.style.color = nodeColors(v.graph).get(e.to); const f = el('span', 'from'); f.appendChild(b); d.appendChild(f); d.appendChild(el('span', 'type', e.toPort ? e.toPort : (e.kind === 'out' ? (e.label || 'the answer') : ''))); box.appendChild(d); } }
     const back = el('button', null, 'back to the graph'); back.style.marginTop = '16px';
     back.onclick = () => { state.selected = null; renderDetails(); for (const x of $('main').querySelectorAll('.node')) x.classList.remove('selected'); };
@@ -1243,15 +1258,18 @@
         edgesG.appendChild(txt(x + 8, (a.y + a.h + b.y) / 2 + 3.5, 'otherwise', 'elabel step'));
         continue;
       }
-      const x1 = a.x + a.w, y1 = outY(e.from, e.fromPort);
-      const toHead = e.kind === 'route' || e.toPort === '';
+      // a catch leaves the ladder's top rule at its head: a fault is caught before any rule is tried
+      const x1 = a.x + a.w, y1 = e.kind === 'catch' ? a.y + headOf(byId.get(e.from)) / 2 : outY(e.from, e.fromPort);
+      const toHead = e.kind === 'route' || e.kind === 'catch' || e.toPort === '';
       const x2 = b.x, y2 = toHead ? b.y + headOf(byId.get(e.to)) / 2 : inY(e.to, e.toPort);
       const dx = Math.max(40, Math.abs(x2 - x1) / 2);
       const color = colors.get(e.to);
       const p = svg('path', { d: `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`, stroke: color }, 'edge ' + e.kind);
       p.dataset.from = e.from; p.dataset.to = e.to; p.dataset.toPort = e.toPort; edgesG.appendChild(p); edgeEls.push(p);
-      // labels sit a third of the way along, where the curve is still near its source and clear of the target box
-      if (e.label) edgesG.appendChild(withTitle(txt(x1 + (x2 - x1) * 0.33, y1 + (y2 - y1) * 0.18 - 5, trunc(e.label, 28), 'elabel', { 'text-anchor': 'middle', fill: color }), e.label));
+      // labels sit a third of the way along, where the curve is still near its source and clear of the target box;
+      // a catch leaves from the ladder's header, so its label sits halfway, clear of the switch's name
+      const along = e.kind === 'catch' ? 0.5 : 0.33, rise = e.kind === 'catch' ? 0.5 : 0.18;
+      if (e.label) edgesG.appendChild(withTitle(txt(x1 + (x2 - x1) * along, y1 + (y2 - y1) * rise - 5, trunc(e.label, 28), 'elabel', { 'text-anchor': 'middle', fill: color }), e.label));
     }
     for (const n of g.nodes) {
       const b = boxes.get(n.id), color = colors.get(n.id);
@@ -1360,6 +1378,7 @@
     const a = el('span'); a.appendChild(el('i', 'full')); a.appendChild(frag('required')); legend.appendChild(a);
     const b2 = el('span'); b2.appendChild(el('i')); b2.appendChild(frag('optional')); legend.appendChild(b2);
     const c = el('span'); c.appendChild(el('s')); c.appendChild(frag('a decision routes')); legend.appendChild(c);
+    if (g.edges.some(e => e.kind === 'catch')) { const k = el('span'); k.appendChild(el('s', 'catch')); k.appendChild(frag('a switch catches a node that broke')); legend.appendChild(k); }
     legend.appendChild(el('span', null, 'an edge has the colour of the node it feeds'));
     // the rim is only worth explaining where something wears it
     if (g.atomic) { const t = el('span'); t.appendChild(el('u')); t.appendChild(frag('a rimmed node is in the transaction')); legend.appendChild(t); }
