@@ -57,6 +57,7 @@ export {
   storeTail,
 } from './stores.js';
 export {
+  type CancelAt,
   describe,
   embedderFor,
   failedLeaf,
@@ -72,6 +73,7 @@ export {
   type Rehearsal,
   regress,
   rehearse,
+  type StubOptions,
   scaffold,
   stubEffects,
 } from './tools.js';

@@ -58,17 +58,53 @@ function answerType(info: EffectInfo, given: Record<string, unknown>, tree: Reso
   return substitute(returns, boundHere(info, given, tree));
 }
 
-/** Every effectful native operation answers a generated value of its declared type, deterministic per seed and node path. */
-export function stubEffects(seed: number, record?: Record<string, unknown>, types?: Record<string, Type>) {
+/** Where a replay cancels its run: the dotted path of one stubbed effect, and what aborts the run's signal. */
+export interface CancelAt {
+  path: string;
+  abort: () => void;
+}
+
+/**
+ * What a stubbed run is asked to do beyond answering: where to write each effect's answer and its type, and the
+ * one effect at which the run is cancelled. One object, so a new way to bend a stub joins it rather than the
+ * signature.
+ */
+export interface StubOptions {
+  /** Every stubbed answer, by dotted node path: what fuzz records as a scenario's stubs. */
+  record?: Record<string, unknown>;
+  /** The type each stubbed answer was generated from, by dotted node path. */
+  types?: Record<string, Type>;
+  /** The effect that, when reached, aborts the run's signal and rejects as an aborted call does (RFC 0012). */
+  cancelAt?: CancelAt;
+}
+
+/**
+ * Every effectful native operation answers a generated value of its declared type, deterministic per seed and node
+ * path -- except the one `cancelAt` names, which aborts the run and rejects with `cancelled at <path>`.
+ */
+export function stubEffects(seed: number, opts: StubOptions = {}) {
   return (info: EffectInfo): Handler =>
     async ({ in: input, ctx }) => {
-      const type = answerType(info, input, ctx.env.resolving as Resolves | undefined);
       const key = ctx.nodePath.join('.');
-      const value = type ? generate(type, rng(seed ^ hash(key))) : undefined;
-      if (record) record[key] = value;
-      if (types && type) types[key] = type;
-      return value;
+      if (opts.cancelAt?.path === key) throw aborted(opts.cancelAt);
+      return generated(seed, key, answerType(info, input, ctx.env.resolving as Resolves | undefined), opts);
     };
+}
+
+/** The value a stubbed effect answers at one node path, written down where the options ask for it. */
+function generated(seed: number, key: string, type: Type | undefined, opts: StubOptions): unknown {
+  const value = type ? generate(type, rng(seed ^ hash(key))) : undefined;
+  if (opts.record) opts.record[key] = value;
+  if (opts.types && type) opts.types[key] = type;
+  return value;
+}
+
+/** Abort the run at a named effect, and the rejection an aborted call answers with. */
+function aborted(at: CancelAt): Error {
+  at.abort();
+  const error = new Error(`cancelled at ${at.path}`);
+  error.name = 'AbortError';
+  return error;
 }
 
 /**
@@ -81,6 +117,8 @@ export function embedderFor(
     seed?: number;
     record?: Record<string, unknown>;
     types?: Record<string, Type>;
+    /** The stubbed effect at which a replay cancels its run; only with a seed. */
+    cancelAt?: CancelAt;
     profile?: string;
     env?: NodeJS.ProcessEnv;
     /** What every stamp of every run is read from; `Date.now` unless given, so a test can freeze time. */
@@ -91,7 +129,10 @@ export function embedderFor(
   const env = opts.env ?? (opts.seed !== undefined ? fakeEnv(scope) : process.env);
   return new Embedder(scope, load.plugins, {
     profile: opts.profile,
-    stubEffects: opts.seed !== undefined ? stubEffects(opts.seed, opts.record, opts.types) : undefined,
+    stubEffects:
+      opts.seed !== undefined
+        ? stubEffects(opts.seed, { record: opts.record, types: opts.types, cancelAt: opts.cancelAt })
+        : undefined,
     env,
     root: load.root,
     clock: opts.clock,
