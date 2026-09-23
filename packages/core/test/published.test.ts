@@ -9,4 +9,9 @@ describe('the page of a refusal code', () => {
     expect(pageUrl('L03')).toBeUndefined();
     expect(pageUrl('')).toBeUndefined();
   });
+
+  it('an invariant code has one, as every other checker family does', () => {
+    expect(pageUrl('I001')).toBe('https://github.com/wilanis/wilanis-js/blob/main/docs/refusals/I001.md');
+    expect(pageUrl('I006')).toBe('https://github.com/wilanis/wilanis-js/blob/main/docs/refusals/I006.md');
+  });
 });
