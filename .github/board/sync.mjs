@@ -31,21 +31,27 @@ async function write(ctx, what, query, variables) {
 
 /** Syncs one issue, and answers the issue numbers whose board depends on it and may have moved with it. */
 export async function syncIssue(ctx, issue) {
-  if (issue.state === 'OPEN') {
-    await linkBlockers(ctx, issue);
-    await linkParent(ctx, issue);
-  }
-  const derived = {
-    ...issue,
-    claimed: ctx.claims.has(issue.number),
-  };
+  await linkIssue(ctx, issue);
+  await placeIssue(ctx, issue);
+  return [...issue.blocking, ...(issue.labels.includes('rfc') ? issue.steps : [])];
+}
+
+/** Adds the blocked-by relationships and the parent an open issue's body states and GitHub lacks. */
+export async function linkIssue(ctx, issue) {
+  if (issue.state !== 'OPEN') return;
+  await linkBlockers(ctx, issue);
+  await linkParent(ctx, issue);
+}
+
+/** Brings the issue's board item, type and triage label in line with what is derived from it. */
+export async function placeIssue(ctx, issue) {
+  const derived = { ...issue, claimed: ctx.claims.has(issue.number) };
   await placeItem(ctx, derived);
   await setType(ctx, derived);
   await setField(ctx, derived, 'Status', statusOf(derived));
   await setField(ctx, derived, 'Waiting on', waitingOf(derived));
   await setAreas(ctx, derived);
   await setTriage(ctx, derived);
-  return [...issue.blocking, ...(issue.labels.includes('rfc') ? issue.steps : [])];
 }
 
 async function linkBlockers(ctx, issue) {
