@@ -102,8 +102,8 @@ export function underProfiles(profiles: (string | undefined)[]): string {
   return ` (profile${named.length > 1 ? 's' : ''} ${named.map(one => `'${one}'`).join(', ')})`;
 }
 
-/** The roots an expression reads: the first segment of every path and `has` in it. */
-function rootsOf(rule: expr.Expr, out = new Set<string>()): Set<string> {
+/** The field names an expression reads: the first segment of every path and `has` in it. */
+export function rootsOf(rule: expr.Expr, out = new Set<string>()): Set<string> {
   if (rule.kind === 'path' || rule.kind === 'has') out.add(rule.path[0]);
   else if (rule.kind === 'len' || rule.kind === 'not') rootsOf(rule.arg, out);
   else if (rule.kind === 'bin') rootsOf(rule.right, rootsOf(rule.left, out));
