@@ -173,8 +173,10 @@ operation -- it may say `timeoutMs` and `retry`; a domain graph says neither (L0
 retry over what cannot fail transiently, a pure operation or a graph that reaches no effect (G017); over a
 call that is not idempotent where it is made, judged over the literal inputs of the site or, for a binding's
 graph, over every effect it reaches under each profile (G018); and a `retry.when` that is not boolean over the
-fields of the answer (G019). A retry repeats a fault or a timeout, and an answer `when` accepts; never a
-refusal.
+fields of the answer (G019). Nothing below an atomic graph retries (G020): a failed statement has aborted the
+transaction, so the retry belongs on the binding operation that runs the atomic graph, whose every try is a
+transaction of its own and whose transactional effects G018 does not hold to idempotency. A retry repeats a
+fault or a timeout, and an answer `when` accepts; never a refusal.
 
 ## The engine
 
