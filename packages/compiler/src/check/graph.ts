@@ -4,7 +4,8 @@
  * nodes of this graph, each routed once (G009, G011); a map iterates a list and binds its element (G012); no
  * cycle (G007); out.from names nodes that answer the out type (G010); everything declared is read (G008,
  * and P005 for the `reads` map); an effect no switch routes is read on every branch (G015); no read is named
- * after a node (P006); constants conform (G013). A domain graph that only forwards its input is refused (L007).
+ * after a node (P006); constants conform (G013). A domain graph that only forwards its input is refused (L007),
+ * and writes no retry or timeout (L012); a data graph's retry is judged in attempts.ts (G017, G018, G019).
  */
 import {
   conforms,
@@ -22,6 +23,7 @@ import {
   type Type,
 } from '@wilanis/core';
 import { outputCandidates } from '../documents.js';
+import { answersOf, checkCallRetry } from './attempts.js';
 import { checkReason, checkSwitch, elementInputs } from './graph-nodes.js';
 import { GraphReads } from './graph-reads.js';
 import { checkWhole } from './graph-whole.js';
@@ -213,6 +215,7 @@ class GraphCheck {
         `add "${key}" to ${this.effects.at}`,
       );
     }
+    if (this.role === 'domain') this.checkNoAttempts(node);
     if (hit.op.holds) {
       const hint = 'name it in project.json → startup, where what a tree starts is declared';
       this.refuse(
@@ -221,6 +224,17 @@ class GraphCheck {
         at,
         hint,
       );
+    }
+  }
+
+  /** L012: a domain graph says what is done, never how long a call may take or how often it is tried. */
+  private checkNoAttempts(node: RunNode | MapNode): void {
+    const hint =
+      'the domain says what is done, the data layer how: write retry in the binding that meets the operation, or in the data graph that runs the effect';
+    for (const word of ['retry', 'timeoutMs'] as const) {
+      if (node[word] === undefined) continue;
+      const message = `domain graph declares ${word} on '${node.run}'`;
+      this.refuse('L012', message, `nodes/${node.id}/${word}`, hint);
     }
   }
 
@@ -236,7 +250,7 @@ class GraphCheck {
     if (!hit) return;
     checkReason(this, node, hit, this.judge.scope);
     const extra = isMap(node) ? elementInputs(this, node, read) : {};
-    checkInputs(this.judge, {
+    const subst = checkInputs(this.judge, {
       given: node.in ?? {},
       accepts: hit.op.accepts,
       read,
@@ -248,6 +262,15 @@ class GraphCheck {
       extra,
       said: hit.op.refuses ? path => reads.rootOf(path) : undefined,
     });
+    if (this.role === 'data' && node.retry) {
+      const site = {
+        file: this.file,
+        at: `nodes/${node.id}`,
+        retry: node.retry,
+        answers: answersOf(this.judge, hit, subst),
+      };
+      checkCallRetry(this.judge, site, { hit, given: node.in });
+    }
     reads.nodeOut(node.id);
   }
 }

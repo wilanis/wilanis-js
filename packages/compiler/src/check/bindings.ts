@@ -2,7 +2,8 @@
  * B bindings. A binding implements a domain port (R001, B003, L005) from inside a feature (L007), binds every
  * operation of it and nothing else (B001), and meets each operation's contract (B005): through a data graph
  * whose in and out fit it, or by delegating to an operation the feature allows (L003) with inputs that fit.
- * Its `reads` map is exactly what its delegations read (P005).
+ * Its `reads` map is exactly what its delegations read (P005). A retry on an operation is judged in
+ * attempts.ts (G017, G018, G019).
  */
 import {
   assignable,
@@ -12,6 +13,7 @@ import {
   type Loaded,
   type Operation,
   type PortDoc,
+  type Retry,
   show,
   substitute,
   type Type,
@@ -19,6 +21,7 @@ import {
   type Values,
 } from '@wilanis/core';
 import { passedInputs } from '../documents.js';
+import { checkCallRetry, checkGraphRetry } from './attempts.js';
 import { checkInputs, reader } from './inputs.js';
 import type { Effects, Judge, JudgedResolver, Refuser, Resolve } from './judge.js';
 import { resolversFor } from './resolvers.js';
@@ -120,14 +123,14 @@ class BindingCheck {
     const accepts = this.judge.fieldsType(op.accepts, this.port.path, `${at}/accepts`);
     const returns = this.judge.type(op.returns, this.port.path, `${at}/returns`);
     const contract: Contract = { opName, op, at, accepts: accepts?.kind === 'object' ? accepts : undefined, returns };
-    if (bound.graph) this.graphMeets(contract, bound.graph);
-    else if (bound.run) this.delegateMeets(contract, bound.run, bound.in);
+    if (bound.graph) this.graphMeets(contract, bound.graph, bound.retry);
+    else if (bound.run) this.delegateMeets(contract, bound, bound.run);
   }
 
   // ---- a data graph -------------------------------------------------------------------------------
 
   /** B005: the operation's accepts fit the graph's in, and the graph's out fits the returns. */
-  private graphMeets(contract: Contract, graphRef: string): void {
+  private graphMeets(contract: Contract, graphRef: string, retry: Retry | undefined): void {
     const at = `${contract.at}/graph`;
     const graph = this.judge.scope.get('graph', graphRef);
     if (!graph) {
@@ -139,6 +142,13 @@ class BindingCheck {
     const graphOut = this.judge.quiet(graph.doc.out?.type);
     if (contract.accepts) this.acceptsFitGraph(contract, graphRef, graphIn);
     this.graphAnswers(contract, graphRef, graphOut);
+    if (retry)
+      checkGraphRetry(
+        this.judge,
+        { file: this.binding.path, at: contract.at, retry, answers: graphOut },
+        this.binding,
+        graphRef,
+      );
   }
 
   private acceptsFitGraph(contract: Contract, graphRef: string, graphIn: Type | undefined): void {
@@ -226,7 +236,7 @@ class BindingCheck {
   // ---- a delegation -------------------------------------------------------------------------------
 
   /** The feature allows the effect (L003), the inputs fit the target (G rules), and its answer fits the returns (B005). */
-  private delegateMeets(contract: Contract, run: string, given: Values | undefined): void {
+  private delegateMeets(contract: Contract, bound: BindingOp, run: string): void {
     const at = `${contract.at}/run`;
     const hit = this.judge.opAt(run, this.binding, at);
     if (!hit) return;
@@ -240,7 +250,7 @@ class BindingCheck {
       );
     }
     let answers = this.judge.type(hit.op.returns, hit.port.path, 'returns');
-    const passed = passedInputs(hit.op, contract.op, given);
+    const passed = passedInputs(hit.op, contract.op, bound.in);
     const subst = checkInputs(this.judge, {
       given: passed,
       accepts: hit.op.accepts,
@@ -253,6 +263,10 @@ class BindingCheck {
     });
     if (answers && hasVars(answers)) answers = substitute(answers, subst);
     this.delegateAnswers(contract, run, answers);
+    if (bound.retry) {
+      const site = { file: this.binding.path, at: contract.at, retry: bound.retry, answers };
+      checkCallRetry(this.judge, site, { hit, given: passed });
+    }
   }
 
   /** What a delegation's values may read: the binding's `reads`, and the operation's own inputs. */

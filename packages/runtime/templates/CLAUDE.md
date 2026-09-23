@@ -71,7 +71,8 @@ features/<name>/
 - **The domain** holds the rules. A domain graph speaks core shapes and domain ports; the only native
   operations it may run are pure. Every effect it needs, it reaches through a port (L002). It never says
   `retry` or `timeoutMs`: how long and how often a call is tried is the data layer's, on a data graph's node or
-  a binding's operation.
+  a binding's operation (L012). A retry is refused over a pure call (G017) and over one that is not idempotent
+  where it is made (G018): a POST that failed may have been applied.
 - **The data layer** translates. A data graph may name edge shapes and speaks native ports, and every
   effectful operation it reaches is listed in `feature.json → effects` (L003). It is the only layer that
   reads the request, and only through resolvers it names: `"reads": { "agent": "@f/edge/request.resolvers.json#agent" }`,

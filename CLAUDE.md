@@ -112,6 +112,8 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   lowers both ask, through the one `heldAt`, so neither can prove a site the other would guard --,
   `graph-nodes.ts` again for I006, which is a rule about the word a `refuse` node may name and so belongs
   with the node it judges rather than with the invariant it reserves the word for,
+  `attempts.ts` (G017, G018, G019: what a `retry` on a data graph's node or a binding's operation is written
+  over, each asking `Judge.idempotentAt` whether the call is idempotent where it is made),
   `atomic.ts` (the L and G rules about what an
   atomic graph reaches: L009, L010, L011 and G014, gathered there because each is a judgement over the one
   per-profile walk and not over a document) -- give it the next code, write the hint, and add a
