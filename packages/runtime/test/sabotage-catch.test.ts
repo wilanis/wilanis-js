@@ -4,7 +4,8 @@
  * clean; each case then breaks one thing about it. A caught node is one the switch reads and caught by it alone,
  * routed to another node of the graph (G021); it is an effect, since nothing else breaks but a bug (G024); whatever
  * else reads it runs behind the switch (G022); and nothing behind where its fault goes reads it (G023). Only a data
- * graph catches (L013). The lowering carries the catch to the kernel's switch as written.
+ * graph catches (L013), and no catch names a node a guard the compiler lowers moves aside (G025). The lowering
+ * carries the catch to the kernel's switch as written.
  */
 import { rmSync } from 'node:fs';
 import { Compiler } from '@wilanis/compiler';
@@ -146,5 +147,44 @@ describe('L013: only a data graph catches', () => {
     };
     expect(sabotage(LIST, domain)).toEqual(['L013']);
     expect(sabotagePointing(LIST, domain)).toEqual([`L013 @${LIST}#nodes/tierGiven/catch`]);
+  });
+});
+
+describe('G025: a catch of a node a guard moves aside', () => {
+  const Kept = 'features/customers/data/kept-list.graph.json';
+  /** kept-list's `customers` caught: it is a made site of the customer invariant, so the compiler guards it. */
+  const guarded = (doc: any) => {
+    doc.nodes.push(
+      {
+        type: '@wilanis/node/switch.schema.json',
+        id: 'anyKept',
+        in: { list: '{{customers}}' },
+        rules: [{ when: 'len(list) >= 0', to: 'kept' }],
+        else: 'kept',
+        catch: { customers: 'unreachable' },
+      },
+      make('kept', '{{customers}}', `${CUSTOMER}[]`),
+      run('unreachable', '@std/outcome.port.json#refuse', {
+        reason: 'upstream',
+        message: 'the store could not be read',
+        type: `${CUSTOMER}[]`,
+      }),
+    );
+    doc.out.from = ['kept', 'unreachable'];
+  };
+  it('refuses it, where the catch names the node', () => {
+    expect(sabotage(Kept, guarded)).toEqual(['G025']);
+    expect(sabotagePointing(Kept, guarded)).toEqual([`G025 @${Kept}#nodes/anyKept/catch/customers`]);
+    expect(sabotageHinting(Kept, guarded)).toEqual([
+      "G025 catch a node the invariant is not checked at, or prove the rule where 'customers' is made, so no guard is lowered there",
+    ]);
+  });
+  it('because the lowering moves the effect aside, where the catch no longer reaches it', () => {
+    const { load, dir } = loadedEditing(Kept, guarded);
+    const modules = Object.values(PLUGINS) as PluginModule[];
+    const spec = new Compiler(new Scope(load.registry, load.resolve), modules).graph(`@${Kept}`).spec;
+    rmSync(dir, { recursive: true, force: true });
+    expect(spec.nodes['customers:made']).toMatchObject({ kind: 'call' });
+    expect(spec.nodes.anyKept).toMatchObject({ catch: { customers: 'unreachable' } });
   });
 });
