@@ -18,7 +18,7 @@ describe('a tree written out as a site', () => {
     for (const doc of index.docs) expect(files[`docs/${doc.path.slice(1)}`]).toBeDefined();
     const row = files[`docs/${GET_ROW.slice(1)}`] as DocView;
     expect(row.path).toBe(GET_ROW);
-    expect(row.graph?.nodes.length).toBe(8);
+    expect(row.graph?.nodes.length).toBe(9);
     const run = files['schemas/node/run.schema.json'] as SchemaView;
     expect(run.path).toBe('@wilanis/node/run.schema.json');
     expect(files['schemas/graph.schema.json']).toBeDefined();

@@ -1,8 +1,8 @@
 /**
  * What `wilanis describe` says about a fault (RFC 0014, step 11). A switch's line names where it routes a node that
  * broke, after its rules; a trigger whose kind maps refusals closes its refusal table with what that table leaves
- * out, since a fault has no reason to map. The example has no catch of its own, so a copy's `get-row` is given the
- * guide's: `fetched` breaking routes to `unreachable`, which refuses `upstream`.
+ * out, since a fault has no reason to map. The example's `get-row` declares the guide's catch: `fetched` breaking
+ * routes to `unreachable`, which refuses `upstream`. A copy with the catch taken out shows a switch that has none.
  */
 import { rmSync } from 'node:fs';
 import { loadTree } from '@wilanis/core';
@@ -13,31 +13,22 @@ import { EXAMPLE, INCLUDES, loadedEditing, PLUGINS } from './example-harness.js'
 const GET_ROW = 'features/customers/data/get-row.graph.json';
 const example = loadTree(EXAMPLE, PLUGINS, INCLUDES);
 
-const { load: caught, dir } = loadedEditing(GET_ROW, (doc: any) => {
-  doc.nodes.push({
-    type: '@wilanis/node/run.schema.json',
-    id: 'unreachable',
-    run: '@std/outcome.port.json#refuse',
-    in: {
-      reason: 'upstream',
-      message: 'the customer API could not be reached',
-      type: '@customers/domain/Customer.shape.json',
-    },
-  });
-  doc.out.from.push('unreachable');
-  doc.nodes.find((node: any) => node.id === 'outcome').catch = { fetched: 'unreachable' };
+const { load: uncaught, dir } = loadedEditing(GET_ROW, (doc: any) => {
+  delete doc.nodes.find((node: any) => node.id === 'outcome').catch;
+  doc.nodes = doc.nodes.filter((node: any) => node.id !== 'unreachable');
+  doc.out.from = doc.out.from.filter((id: string) => id !== 'unreachable');
 });
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 describe('describe: a switch that catches a fault', () => {
   it('names the caught node and its target after the rules, on the switch line', () => {
-    expect(describeDoc(caught, `@${GET_ROW}`)).toContain(
+    expect(describeDoc(example, `@${GET_ROW}`)).toContain(
       '    outcome  switch → noCustomer | customer | upstreamFailed  catches fetched → unreachable',
     );
   });
 
   it('says nothing of a catch on a switch that has none', () => {
-    const said = describeDoc(example, `@${GET_ROW}`);
+    const said = describeDoc(uncaught, `@${GET_ROW}`);
     expect(said).toContain('    outcome  switch → noCustomer | customer | upstreamFailed\n');
     expect(said).not.toContain('catches');
   });

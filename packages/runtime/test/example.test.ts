@@ -38,7 +38,7 @@ describe('the example tree', () => {
     expect(text.match(/delete-row {2}switch 'outcome'/g)).toHaveLength(1);
     // the sixteenth decision is the guard over the CSV export's list of customers, whose nested spec the walk
     // opens by name; the fifteen the tree's authors wrote are unchanged
-    expect(text).toMatch(/every branch settled -- 42 branch\(es\), 17 decision\(s\), 16 graph\(s\)/);
+    expect(text).toMatch(/every branch settled -- 43 branch\(es\), 17 decision\(s\), 16 graph\(s\)/);
   });
   it('reaches both the answer and the declared failure of every data graph', async () => {
     const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'live' });
@@ -177,30 +177,18 @@ describe('branch rehearsal', () => {
   });
 
   /**
-   * The guide's catch on get-row (RFC 0014): `fetched` breaking routes to `target`, which the case supplies. The
-   * example has no catch of its own yet, so a copy is given one.
+   * The guide's catch on get-row (RFC 0014): `fetched` breaking routes to `unreachable`, which the example has refuse
+   * `upstream` and a case may rewrite as `target`.
    */
   const GetRow = 'features/customers/data/get-row.graph.json';
   const caughtTo = (target: Record<string, unknown>) => (doc: any) => {
-    doc.nodes.push({ type: '@wilanis/node/run.schema.json', id: 'unreachable', ...target });
-    doc.out.from.push('unreachable');
-    doc.nodes.find((node: any) => node.id === 'outcome').catch = { fetched: 'unreachable' };
+    doc.nodes = doc.nodes.map((node: any) =>
+      node.id === 'unreachable' ? { type: '@wilanis/node/run.schema.json', id: 'unreachable', ...target } : node,
+    );
   };
 
   it('walks the branch a catch routes to by making the caught effect break', { timeout: 20_000 }, async () => {
-    const { lines, codes: refused } = await withEdits(
-      {
-        [GetRow]: caughtTo({
-          run: '@std/outcome.port.json#refuse',
-          in: {
-            reason: 'upstream',
-            message: 'the customer API could not be reached',
-            type: '@customers/domain/Customer.shape.json',
-          },
-        }),
-      },
-      'live',
-    );
+    const { lines, codes: refused } = await withEdits({}, 'live');
     expect(refused).toEqual([]);
     const text = lines.join('\n');
     // one more branch than the rules and the else, counted with them

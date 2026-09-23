@@ -391,6 +391,23 @@ since whether recording a customer is worth trying twice is the profile's busine
 `wilanis describe @customers/data/get-row.graph.json` prints the node as `retries 2 (200ms backoff, when
 status >= 500)  timeout 5000ms`, and the viewer badges it.
 
+When the tries run out with no answer at all (the socket refused, the network down, the timeout struck) the
+graph says what that means too. The switch `outcome` declares `"catch": { "fetched": "unreachable" }`: when
+`fetched` breaks, the rules and `else` are not tried and the run goes to `unreachable`, which refuses
+`upstream` with "the customer API could not be reached". `get-customer.trigger.json` already maps `upstream`
+to 502, so nothing in the route changes; without the catch the same request is a 500 that says only
+`{ "error": "fault", "run": ... }`. `unreachable` reads nothing of `fetched`, since a node that broke produced
+nothing, and a refusal is never caught. `wilanis rehearse example --profile live` walks the catch as a branch,
+by making the stubbed request break:
+
+```
+features/customers/data/get-row  switch 'outcome'  4/4 branches
+  ok  when status == 404               refused on purpose at 'noCustomer' as missing: "no customer hotel403"
+  ok  when status == 200 && has(body)  answered from 'customer'
+  ok  anything else                    refused on purpose at 'upstreamFailed' as upstream: "the customer API answered 500"
+  ok  when fetched broke               refused on purpose at 'unreachable' as upstream: "the customer API could not be reached"
+```
+
 ## When something hangs
 
 Every route has a deadline and every body a size, written in `@http`'s settings in `project.json`:

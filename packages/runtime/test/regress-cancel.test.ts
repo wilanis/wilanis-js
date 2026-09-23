@@ -35,6 +35,7 @@ const cancelledAtFetch = (recorded: any) => ({
     'op.customer': { status: 'cancelled' },
     'op.noCustomer': { status: 'cancelled' },
     'op.upstreamFailed': { status: 'cancelled' },
+    'op.unreachable': { status: 'cancelled' },
   },
 });
 
