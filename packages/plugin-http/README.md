@@ -68,7 +68,8 @@ own is its limit; with neither there is none. The deadline counts from the momen
 body is read and judged: past it the run is cancelled (nothing more starts, what is in flight is told through
 its signal) and the route answers `504 { "error": "cancelled: the deadline passed" }` once the run has settled,
 whatever had settled before. A body past its bound is answered 413 before any codec has finished with it: a
-JSON body is not parsed, an upload is not stored past the cut. A connection's `maxBodyBytes` bounds an answer
+JSON body is not parsed, an upload is not stored past the cut. The rest of an over-bound request body is read and
+discarded, so the 413 can be written on the same socket. A connection's `maxBodyBytes` bounds an answer
 from the upstream the same way, and a request past it fails its node as a fault. The `check` hook refuses
 (X004) a limit that is not a whole number of 1 or more.
 

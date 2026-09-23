@@ -5,6 +5,7 @@
  * in, served on a port of its own against a fake upstream that can stop answering.
  */
 import { readdirSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { checkTree } from '@wilanis/compiler';
 import { type BlobStore, loadTree } from '@wilanis/core';
@@ -67,11 +68,12 @@ const lineFor = (asked: string, status: number) =>
 /**
  * The example with limits: every route has 500 ms and 4 KB from the plugin's settings, GET /customers/{id} 50 ms of
  * its own, the CSV upload 64 bytes of its own, a batch removal two ids at most, and the customer API's answers 600
- * bytes at most.
+ * bytes at most. The tree's blob registry is kept under `.blobs` in the copy, so a test can see what it holds.
  */
 function withLimits(edit: Edit) {
   edit('project.json', project => {
     Object.assign(httpSettings(project), { port: PORT, deadlineMs: 500, maxBodyBytes: 4096 });
+    project.blobs = { ...project.blobs, dir: '.blobs' };
   });
   edit(`${EDGE}/get-customer.trigger.json`, trigger => {
     trigger.settings.deadlineMs = 50;
@@ -207,6 +209,8 @@ describe('a body past its bound', () => {
     expect(answer.status).toBe(413);
     expect(await answer.json()).toEqual({ error: 'body exceeds 64 bytes' });
     expect(upstream.rows).toHaveLength(before);
+    // nothing of the cut upload is left in the tree's registry
+    expect(readdirSync(join(dirs[0], '.blobs'))).toEqual([]);
   });
 
   it("a multipart upload cut inside its file part is 413, and the part's blob write settles rather than hanging", async () => {
