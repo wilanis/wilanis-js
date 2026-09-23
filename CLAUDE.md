@@ -113,10 +113,11 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   `graph-nodes.ts` again for I006, which is a rule about the word a `refuse` node may name and so belongs
   with the node it judges rather than with the invariant it reserves the word for,
   `attempts.ts` (G017, G018, G019: what a `retry` on a data graph's node or a binding's operation is written
-  over, each asking `Judge.idempotentAt` whether the call is idempotent where it is made),
+  over, each asking `Judge.idempotentAt` whether the call is idempotent where it is made; a retry below an
+  atomic graph is G020, in `atomic.ts`),
   `atomic.ts` (the L and G rules about what an
-  atomic graph reaches: L009, L010, L011 and G014, gathered there because each is a judgement over the one
-  per-profile walk and not over a document) -- give it the next code, write the hint, and add a
+  atomic graph reaches: L009, L010, L011, G014 and G020, gathered there because each is a judgement over the one
+  per-profile walk in `atomic-reach.ts` and not over a document) -- give it the next code, write the hint, and add a
   sabotage test in `packages/runtime/test/example.test.ts` that breaks the example and expects the code. What
   every family shares (typing a spec, visibility, the layer a type may name, settings that read secrets only)
   is a method of `Judge` in `check/judge.ts`; a refusal is made through `judge.refuser(file)`. The order the
