@@ -6,7 +6,7 @@
  * and P005 for the `reads` map); an effect no switch routes is read on every branch (G015); no read is named
  * after a node (P006); constants conform (G013). A domain graph that only forwards its input is refused (L007),
  * and writes no retry or timeout (L012) and catches nothing (L013); a data graph's retry is judged in attempts.ts
- * (G017, G018, G019), and what its switches catch in graph-nodes.ts (G021 to G024).
+ * (G017, G018, G019), and what its switches catch in graph-nodes.ts (G021 to G025).
  */
 import {
   conforms,
@@ -25,6 +25,7 @@ import {
   type Type,
 } from '@wilanis/core';
 import { outputCandidates } from '../documents.js';
+import { guardsOf } from '../guard.js';
 import { answersOf, checkCallRetry } from './attempts.js';
 import { checkCatches, checkReason, checkSwitch, elementInputs } from './graph-nodes.js';
 import { GraphReads } from './graph-reads.js';
@@ -238,10 +239,12 @@ class GraphCheck {
     }
   }
 
-  /** G021 to G024, once every node is judged: what a data graph's switches catch. */
+  /** G021 to G025, once every node is judged: what a data graph's switches catch. */
   private checkCatches(reads: GraphReads): void {
     const { refuse, nodes, routedBy, ops } = this;
-    checkCatches({ refuse, nodes, routedBy, ops, scope: this.judge.scope, dependencies: reads.narrowing.dependencies });
+    const { scope } = this.judge;
+    const guarded = new Set(guardsOf(scope, this.graph).flatMap(one => (one.site.kind === 'made' ? [one.id] : [])));
+    checkCatches({ refuse, nodes, routedBy, ops, scope, dependencies: reads.narrowing.dependencies, guarded });
   }
 
   /** L013: what an effect breaking means is the data layer's, where the effect runs; a domain graph catches nothing. */

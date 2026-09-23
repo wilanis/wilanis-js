@@ -94,6 +94,8 @@ export interface CatchSite extends NodeSite {
   scope: Scope;
   /** node id -> the nodes it reads */
   dependencies: Map<string, Set<string>>;
+  /** the nodes a guard the compiler lowers moves aside to `<id>:made`: made sites an invariant is unproved at */
+  guarded: Set<string>;
 }
 
 /** One entry of a switch's `catch`: the switch, the node whose fault it routes, where it goes, and where it is written. */
@@ -112,6 +114,8 @@ const CATCH_HINT =
  * switch reads, caught by no other switch, routed to another node of this graph (G021, and then G009 as any
  * route is), and an effect -- something that breaks for a reason other than a bug (G024). Then every other
  * reader of a caught node runs behind the switch (G022), and nothing behind where its fault goes reads it (G023).
+ * And none is a node a guard moves aside (G025), since the lowered switch would then catch a node that no longer
+ * runs.
  */
 export function checkCatches(site: CatchSite): void {
   const caughtBy = new Map<string, string>();
@@ -128,7 +132,26 @@ export function checkCatches(site: CatchSite): void {
     if (routes) checkRoute(site, one.by, one.to);
     return known && routes && saidOnce(site, 'G024', one, whyNeverBreaks(site, one));
   });
-  for (const one of judged) checkReaders(site, one);
+  for (const one of judged) {
+    checkUnguarded(site, one);
+    checkReaders(site, one);
+  }
+}
+
+/**
+ * G025: a guard at a made site moves the node aside to `<id>:made` and answers the value from `<id>` once the
+ * rule held, so a catch of `<id>` would catch the guard's answer and never the effect. Rekeyed to `<id>:made`,
+ * the switch would wait on a guard node that never runs once the effect broke. Which sites are guarded is
+ * `guardsOf`'s, the one answer the lowering writes the guards from.
+ */
+function checkUnguarded(site: CatchSite, one: Caught): void {
+  if (!site.guarded.has(one.node)) return;
+  site.refuse(
+    'G025',
+    `catches '${one.node}', where an invariant is guarded: the guard moves it aside, and its fault would go uncaught`,
+    one.at,
+    `catch a node the invariant is not checked at, or prove the rule where '${one.node}' is made, so no guard is lowered there`,
+  );
 }
 
 /** Refuse what a catch entry says wrong, if anything; answer whether it said nothing wrong. */
