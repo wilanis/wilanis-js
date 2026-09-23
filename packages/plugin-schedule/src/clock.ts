@@ -25,3 +25,23 @@ export const systemClock: Clock = {
       signal.addEventListener('abort', finish, { once: true });
     }),
 };
+
+/** A run's deadline: the signal the run is handed, and whether it was the deadline that aborted it. */
+export interface Deadline {
+  /** absent where the trigger sets no deadline: the run is handed no signal */
+  signal?: AbortSignal;
+  struck(): boolean;
+}
+
+/**
+ * Arm a deadline of `ms` on the clock, from now: the signal aborts once it passes, unless `answered` aborts
+ * first, which also ends the wait. Without `ms` there is no deadline and nothing is armed (RFC 0012).
+ */
+export function deadlineOf(clock: Clock, ms: number | undefined, answered: AbortSignal): Deadline {
+  if (ms === undefined) return { struck: () => false };
+  const control = new AbortController();
+  void clock.wait(ms, answered).then(() => {
+    if (!answered.aborted) control.abort();
+  });
+  return { signal: control.signal, struck: () => control.signal.aborted };
+}

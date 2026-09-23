@@ -8,7 +8,7 @@
  */
 import type { Serving } from '@wilanis/core';
 import type { Clock } from './clock.js';
-import { systemClock } from './clock.js';
+import { deadlineOf, systemClock } from './clock.js';
 import { type Fired, fireTick, lineOf, type Tick } from './fire.js';
 import { Holds, type Lease } from './holds.js';
 import { KIND } from './paths.js';
@@ -241,13 +241,18 @@ export class Scheduler {
     this.runs.add(promise);
   }
 
-  /** One run, from the fire to the log line, the mark and the release: a refusal is an answer and is marked too. */
+  /**
+   * One run, from the fire to the log line, the mark and the release: a refusal is an answer and is marked too,
+   * and so is a run the deadline cancelled, since a tick is not refired for one.
+   */
   private async fireAndSettle(schedule: Schedule, tick: Tick): Promise<void> {
     const running = new AbortController();
     const renewing = this.holds.renew(schedule.name, tick.scheduled, running.signal);
+    const deadline = deadlineOf(this.clock, schedule.deadlineMs, running.signal);
     let fired: Fired;
     try {
-      fired = await fireTick(this.serving, schedule.trigger, tick);
+      fired = await fireTick(this.serving, schedule.trigger, tick, deadline.signal);
+      if (deadline.struck()) fired.deadline = true;
     } catch (error) {
       fired = { error: reasonOf(error), ms: 0 };
     } finally {

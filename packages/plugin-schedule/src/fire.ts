@@ -24,6 +24,8 @@ export interface Fired {
   error?: string;
   /** true where the input could not be built, so the tick never reached a graph at all */
   atEdge?: boolean;
+  /** true where the trigger's deadline passed and cancelled the run */
+  deadline?: boolean;
   ms: number;
 }
 
@@ -35,6 +37,7 @@ function outcome(fired: Fired): string {
   if (!report) return '→ failed';
   const refused = refusalOf(report);
   if (refused) return `→ refused ${refused.reason} (${refused.message})`;
+  if (report.status === 'cancelled' && fired.deadline) return '→ cancelled (deadline)';
   if (report.status !== 'done') return `→ ${report.status}`;
   return '→ done';
 }
@@ -48,16 +51,28 @@ export function lineOf(name: string, tick: Tick, fired: Fired): string {
 /**
  * Fire one tick: the runtime builds and judges the input from the context, the gate runs as it does for any
  * trigger, and the run gets a blob scope of its own that is released once it has answered. A trigger that
- * declares no `in` fires with none; an `in` without a `fire.in` is X252 and never reaches here.
+ * declares no `in` fires with none; an `in` without a `fire.in` is X252 and never reaches here. Aborting
+ * `signal` cancels the run, which then answers a `cancelled` report once what was in flight has settled.
  */
-export async function fireTick(serving: Serving, trigger: TriggerDoc, tick: Tick): Promise<Fired> {
+export async function fireTick(
+  serving: Serving,
+  trigger: TriggerDoc,
+  tick: Tick,
+  signal?: AbortSignal,
+): Promise<Fired> {
   const started = Date.now();
   const request = { ...tick } as Record<string, unknown>;
   const built = serving.inputFor(trigger, request);
   if ('error' in built) return { error: built.error, atEdge: true, ms: Date.now() - started };
   const scope = serving.blobs.scope();
   try {
-    const report = await serving.fire({ trigger, input: built.input, request, blobs: scope });
+    const report = await serving.fire({
+      trigger,
+      input: built.input,
+      request,
+      blobs: scope,
+      ...(signal ? { signal } : {}),
+    });
     return { report, ms: Date.now() - started };
   } finally {
     await scope.release();

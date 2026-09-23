@@ -80,12 +80,16 @@ export interface Fired {
   scheduled: string;
   fired: string;
   missed: number;
+  /** whether the run was handed a signal: a trigger with a deadline hands one, one without hands none */
+  signalled: boolean;
 }
 
 /** What a fake run answers, and how long it takes to answer it. */
 export interface Answering {
   /** resolve the run when this is called; absent: the run answers at once */
   hold?: boolean;
+  /** answer `cancelled` once the run's signal aborts, as the engine does, and not before */
+  untilCancelled?: boolean;
   report?: Partial<Report>;
   error?: string;
 }
@@ -135,17 +139,20 @@ export function serving(triggers: TriggerDoc[], answering: () => Answering = () 
   const serving: Serving = {
     triggers: kind => (kind === KIND ? set : []),
     pathOf: doc => paths.get(doc),
-    fire: async ({ trigger, request }: FireArgs) => {
+    fire: async ({ trigger, request, signal }: FireArgs) => {
       const context = request as unknown as Fired;
       fired.push({
         run: trigger.fire.run,
         scheduled: context.scheduled,
         fired: context.fired,
         missed: context.missed,
+        signalled: signal !== undefined,
       });
       const answer = answering();
       if (answer.error) throw new Error(answer.error);
       if (answer.hold) await new Promise<void>(done => open.push(done));
+      if (answer.untilCancelled)
+        await new Promise<void>(done => signal?.addEventListener('abort', () => done(), { once: true }));
       return {
         graph: trigger.fire.run,
         status: 'done',
@@ -154,6 +161,7 @@ export function serving(triggers: TriggerDoc[], answering: () => Answering = () 
         startedAt: 0,
         endedAt: 0,
         ...answer.report,
+        ...(signal?.aborted ? { status: 'cancelled', output: undefined } : {}),
       } as Report;
     },
     types: () => ({}),
