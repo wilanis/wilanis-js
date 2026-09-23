@@ -50,9 +50,14 @@ export type Outcome =
   | { kind: 'blocked'; needs: string[] }
   | { kind: 'cancelled' };
 
-/** The node that ended the run: the first `failed` one a refusal was wanted from, or a fault was. */
+/**
+ * The node that ended the run: the first `failed` one, by when it settled, a refusal was wanted from, or a fault
+ * was. A node that failed after the run had ended -- a map whose elements the ending held back -- is not it.
+ */
 function endedAt(report: Report, refused: boolean): [string, NodeReport] | undefined {
-  const failed = Object.entries(report.nodes).filter(([, node]) => node.status === 'failed');
+  const failed = Object.entries(report.nodes)
+    .filter(([, node]) => node.status === 'failed')
+    .sort(([, one], [, other]) => (one.endedAt ?? 0) - (other.endedAt ?? 0));
   if (refused) return failed.find(([, node]) => node.reason !== undefined);
   return failed.find(([, node]) => node.reason === undefined && node.caught === undefined);
 }
