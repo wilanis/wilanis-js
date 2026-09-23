@@ -98,6 +98,19 @@ function checkInterval(one: Scheduled, refuse: Refuse): void {
     });
 }
 
+/** X251: a deadline a run can be held to: a whole number of milliseconds, at least one. */
+function checkDeadline(one: Scheduled, refuse: Refuse): void {
+  const deadline = one.settings.deadlineMs;
+  if (deadline === undefined || whole(deadline, 1)) return;
+  refuse({
+    code: 'X251',
+    file: one.file,
+    message: `deadlineMs is ${JSON.stringify(deadline)}; it is the most a tick's run may take, so it is a whole number of milliseconds, 1 or more`,
+    at: 'settings/deadlineMs',
+    hint: 'set it to 1 or more, or drop it for no deadline',
+  });
+}
+
 /** X252: an `in` nothing fills, since nothing arrives on a tick. */
 function checkIn(one: Scheduled, refuse: Refuse): void {
   if (!one.doc.in || one.doc.fire?.in) return;
@@ -182,6 +195,7 @@ export function check({ scope, settings, refuse }: PluginCheckContext): void {
       checkCron(one, refuse);
       checkInterval(one, refuse);
     }
+    checkDeadline(one, refuse);
     checkIn(one, refuse);
     checkCatchUp(one, leased, refuse);
   }

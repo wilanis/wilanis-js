@@ -120,6 +120,28 @@ describe('X251: a schedule that is not one', () => {
     expect(found[0].message).toMatch(/not a timezone this runtime knows/);
   });
 
+  it('a deadline of no time, or of part of a millisecond: a whole number of 1 or more', () => {
+    for (const deadlineMs of [0, 1.5]) {
+      const found = at(
+        schedule(doc => {
+          doc.settings.deadlineMs = deadlineMs;
+        }),
+        'X251',
+      );
+      expect(found).toHaveLength(1);
+      expect(found[0].at).toBe('settings/deadlineMs');
+      expect(found[0].message).toMatch(/a whole number of milliseconds, 1 or more/);
+    }
+    expect(
+      at(
+        schedule(doc => {
+          doc.settings.deadlineMs = 1;
+        }),
+        'X251',
+      ),
+    ).toEqual([]);
+  });
+
   it("the plugin's own leaseTtlMs, judged as @http judges a throttle", () => {
     const found = at(
       edit('project.json', doc => {

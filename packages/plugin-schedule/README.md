@@ -64,6 +64,16 @@ and counts it in `missed`; `wait` fires it once that run ends, with one tick wai
 fires it beside the running one. A tick that fell while no process ran is not fired unless `catchUp` says
 so, and `catchUp` needs a lease, since without one nothing remembers what the last tick was.
 
+`deadlineMs` is the most a tick's run may take, counted from the fire. When it passes, the run is cancelled
+(RFC 0012): nothing more starts, what was in flight is told to stop, and the tick is logged
+`→ cancelled (deadline)` once it has settled. An effect that already ran is not undone. Without a deadline a
+run is never cut, so under `overlap: skip` a run that hangs makes every later tick a skip; a deadline is what
+frees the schedule.
+
+```json
+{ "settings": { "cron": "0 3 * * *", "overlap": "skip", "deadlineMs": 600000 } }
+```
+
 A tick with much to do should publish rather than sweep: fire an operation whose graph publishes one message
 per row and answers, and let a worker do the work at its pace.
 
@@ -125,7 +135,7 @@ at run time.
 
 | Code | When |
 |---|---|
-| X251 | a schedule that is not one: both `cron` and `everyMs` or neither, an expression that does not parse, an `everyMs` below 1000, a `timezone` beside an interval or one no runtime knows; and the same for the plugin's own settings |
+| X251 | a schedule that is not one: both `cron` and `everyMs` or neither, an expression that does not parse, an `everyMs` below 1000, a `timezone` beside an interval or one no runtime knows, a `deadlineMs` that is not a whole number of 1 or more; and the same for the plugin's own settings |
 | X252 | an `in` with no `fire.in`: nothing arrives on a tick, so nothing would fill it |
 | X253 | `catchUp` while no `run` step names a `lease`: nothing can remember the last tick |
 | X254 | a `run` step's `lease` naming no connection, or one whose kind does not declare `leases` |

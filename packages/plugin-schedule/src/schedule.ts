@@ -16,6 +16,7 @@ export interface Settings {
   timezone?: string;
   overlap?: Overlap;
   catchUp?: boolean;
+  deadlineMs?: number;
 }
 
 /** One trigger's schedule: the trigger itself, how it is named, and when it fires. */
@@ -35,6 +36,8 @@ export interface Schedule {
   timezone: string;
   /** the interval in milliseconds, where the schedule is an interval one */
   everyMs?: number;
+  /** the most a tick's run may take before it is cancelled; absent: no deadline */
+  deadlineMs?: number;
   /** the schedule as it was written, for a log line */
   says: string;
 }
@@ -59,6 +62,7 @@ export function scheduleOf(trigger: TriggerDoc, path: string, fallbackZone: stri
     settings,
     overlap: settings.overlap ?? 'skip',
     catchUp: settings.catchUp === true,
+    ...(typeof settings.deadlineMs === 'number' ? { deadlineMs: settings.deadlineMs } : {}),
     timezone,
     says,
   };

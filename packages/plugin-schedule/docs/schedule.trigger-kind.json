@@ -33,6 +33,11 @@
         "type": "boolean",
         "required": false,
         "description": "whether a tick that fell while no process ran is fired once at start, as the most recent such tick, with the earlier ones counted in missed; default false. Needs the run step's lease: without a store there is nothing to remember the last tick by (X253)"
+      },
+      "deadlineMs": {
+        "type": "number",
+        "required": false,
+        "description": "the most a tick's run may take, in milliseconds from the fire, before it is cancelled and logged as cancelled (RFC 0012); a whole number of 1 or more. Absent: no deadline, and under overlap skip a run that never ends makes every later tick a skip"
       }
     }
   },
