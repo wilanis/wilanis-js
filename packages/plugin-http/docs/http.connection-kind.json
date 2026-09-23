@@ -18,6 +18,11 @@
         "type": "number",
         "required": false
       },
+      "maxBodyBytes": {
+        "type": "number",
+        "required": false,
+        "description": "the most an answer from this connection may weigh; past it the request node fails as a fault. Absent: no limit"
+      },
       "throttle": {
         "type": {
           "fields": {

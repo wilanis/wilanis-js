@@ -4,6 +4,7 @@
  */
 import type { TriggerDoc } from '@wilanis/core';
 import { type Outcome, outcomeOf, type Report, readPath } from '@wilanis/engine';
+import type { Limits } from './limit.js';
 
 /** A cookie the answer sets: the field of the answer it takes (`from`), or `clear` for one to drop; `omit` keeps the field out of the body. */
 export interface CookieOut {
@@ -17,8 +18,8 @@ export interface CookieOut {
   path?: string;
 }
 
-/** What an http trigger declares. */
-export interface HttpSettings {
+/** What an http trigger declares: where it answers, what it reads and writes, how it answers, and its limits. */
+export interface HttpSettings extends Limits {
   route: string;
   method: string;
   consumes?: string;

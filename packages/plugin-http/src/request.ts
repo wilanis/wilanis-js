@@ -5,13 +5,20 @@
 import { Readable } from 'node:stream';
 import type { BlobStore, Codecs, Type } from '@wilanis/core';
 import { blob, form, json, mediaType, multipart, text } from './codecs.js';
+import { type Bounded, bounded, unbounded } from './limit.js';
 import { doc, ROOT } from './paths.js';
 import { type ThrottleSettings, throttleFor } from './throttle.js';
 
 /** An http connection, as the project declared it. */
 export type Conn = {
   kind: string;
-  settings: { baseUrl: string; headers?: Record<string, string>; timeoutMs?: number; throttle?: ThrottleSettings };
+  settings: {
+    baseUrl: string;
+    headers?: Record<string, string>;
+    timeoutMs?: number;
+    throttle?: ThrottleSettings;
+    maxBodyBytes?: number;
+  };
 };
 
 /** Every codec this plugin ships, by the path of the document that names it. */
@@ -106,8 +113,19 @@ function send(wire: Wire, { canonical, conn, url, init, signal }: Sending) {
   });
 }
 
+/**
+ * The answer's body as a stream, counted against the connection's `maxBodyBytes` when it declares one. Past it the
+ * upstream's stream is dropped, since nothing more of it will be read.
+ */
+function answerStream(sent: ReadableStream<Uint8Array>, conn: Conn): Bounded {
+  const stream = Readable.fromWeb(sent as import('node:stream/web').ReadableStream);
+  const max = conn.settings.maxBodyBytes;
+  if (max === undefined) return unbounded(stream);
+  return bounded(stream, { max, what: 'answer body', rest: 'drop' });
+}
+
 /** The answer's body, decoded by the codec its content type names; a blob codec streams it into the registry. */
-async function readBody(answer: Response, input: Record<string, unknown>, wire: Wire) {
+async function readBody(answer: Response, input: Record<string, unknown>, { wire, conn }: { wire: Wire; conn: Conn }) {
   if (!answer.body || answer.headers.get('content-length') === '0') return undefined;
   const contentType = String(input.produces ?? answer.headers.get('content-type') ?? 'text/plain');
   const codec = wire.codecs[mediaType(contentType)] ?? wire.codecs['text/plain'] ?? text;
@@ -115,12 +133,13 @@ async function readBody(answer: Response, input: Record<string, unknown>, wire: 
   // returns describes a successful answer; an error status carries whatever body the API chose, and judging it would
   // fail the node before a switch on status could decide
   const declared = answer.ok && typeof input.returns === 'string' && resolve ? resolve(input.returns) : undefined;
-  return codec.decode(
-    Readable.fromWeb(answer.body as import('node:stream/web').ReadableStream),
-    contentType,
-    declared,
-    wire.blobs,
-  );
+  const body = answerStream(answer.body, conn);
+  try {
+    return await codec.decode(body.stream, contentType, declared, wire.blobs);
+  } catch (error) {
+    // an answer past the bound fails the node as a fault, whatever the codec made of the cut stream
+    throw body.cut() ?? error;
+  }
 }
 
 /** One outbound request, and what the answer said. */
@@ -147,7 +166,7 @@ export async function request({
     answered[name] = value;
   });
   const out: Record<string, unknown> = { status: answer.status, headers: answered };
-  const body = await readBody(answer, input, wire);
+  const body = await readBody(answer, input, { wire, conn });
   if (body !== undefined) out.body = body;
   return out;
 }

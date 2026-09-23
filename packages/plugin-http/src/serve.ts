@@ -5,10 +5,11 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import type { BlobStore, Hold, Serving, TriggerDoc } from '@wilanis/core';
+import type { BlobStore, Codec, Hold, Serving, TriggerDoc } from '@wilanis/core';
 import type { Handler, Report } from '@wilanis/engine';
 import { compileRoute, encode, fault, type HttpSettings, parseCookies } from './answer.js';
 import { json, mediaType } from './codecs.js';
+import { type Bounded, bounded, type Limits, limitsOf, TooLarge, unbounded, withDeadline } from './limit.js';
 import { doc, ROOT } from './paths.js';
 import { type Heard, hear, heardIn, lineOf, outcomeWords } from './said.js';
 
@@ -23,10 +24,14 @@ interface Route {
   keys: string[];
 }
 
-/** How an answer is written: the codec table to encode with, and the scope a blob answer streams from. */
+/**
+ * How an answer is written: the codec table to encode with, the scope a blob answer streams from, and the limits the
+ * plugin's settings give every route that declares none of its own.
+ */
 interface Writer {
   serving: Serving;
   scope?: BlobStore;
+  defaults: Limits;
 }
 
 /** What an answer says. */
@@ -105,14 +110,28 @@ function queryOf(url: URL): Record<string, string> {
 const hasBody = (headers: Record<string, string>) =>
   Number(headers['content-length'] ?? 0) > 0 || (headers['transfer-encoding'] ?? '').includes('chunked');
 
-/** The body the route's codec reads from the request stream, or why it could not be read. */
-async function readBody(
-  request: IncomingMessage,
-  route: Route,
+/** The request stream a codec reads: counted against the route's bound when it has one, and carrying its headers. */
+function bodyOf(request: IncomingMessage, max: number | undefined): Bounded {
+  if (max === undefined) return unbounded(request);
+  const body = bounded(request, { max, what: 'body', rest: 'drain' });
+  // the blob codec reads a filename off the stream's headers, as it would off the request itself
+  Object.assign(body.stream, { headers: request.headers });
+  return body;
+}
+
+/** The answer to a body past the route's bound. */
+const tooLarge = (cut: TooLarge): { refuse: Answer } => ({ refuse: { status: 413, body: { error: cut.message } } });
+
+/** Whether the sender says the body weighs more than the bound, so it is refused unread. */
+const saysTooLarge = (headers: Record<string, string>, max: number | undefined): max is number =>
+  max !== undefined && Number(headers['content-length'] ?? 0) > max;
+
+/** The codec a body is read with and the content type it is read as, or the 415 of a body the route cannot read. */
+function codecFor(
+  settings: HttpSettings,
   headers: Record<string, string>,
-  { serving, scope }: Writer & { scope: BlobStore },
-): Promise<{ body: unknown } | { refuse: Answer }> {
-  const settings = route.settings;
+  serving: Serving,
+): { codec: Codec; contentType: string } | { refuse: Answer } {
   // a route that declares what it consumes takes nothing else; without a declaration the sender's content type decides
   const sent = headers['content-type'] ? mediaType(headers['content-type']) : undefined;
   if (settings.consumes && sent && sent !== mediaType(settings.consumes))
@@ -120,13 +139,33 @@ async function readBody(
   const contentType = settings.consumes ?? headers['content-type'] ?? 'application/json';
   const codec = serving.codecs(ROOT)[mediaType(contentType)];
   if (!codec) return { refuse: { status: 415, body: { error: `no codec for '${mediaType(contentType)}'` } } };
+  return { codec, contentType };
+}
+
+/** The body the route's codec reads from the request stream, or why it could not be read. */
+async function readBody(
+  request: IncomingMessage,
+  route: Route,
+  headers: Record<string, string>,
+  { serving, scope, defaults }: Writer & { scope: BlobStore },
+): Promise<{ body: unknown } | { refuse: Answer }> {
+  const settings = route.settings;
+  const chosen = codecFor(settings, headers, serving);
+  if ('refuse' in chosen) return chosen;
+  const { codec, contentType } = chosen;
+  // a body that says it is past the bound is refused unread; one that does not say so is cut once it passes it
+  const max = limitsOf(settings, defaults).maxBodyBytes;
+  if (saysTooLarge(headers, max)) return tooLarge(new TooLarge('body', max));
   // settings.body names the body's edge shape; without it the body IS the input. Either way the
   // declared shape judges what arrives, so a closed shape still refuses an undeclared field.
   const declared = settings.body === route.trigger.in || !settings.body ? serving.types(route.trigger).in : undefined;
   // the request stream itself goes to the codec: a blob body is written to the registry as it arrives
+  const body = bodyOf(request, max);
   try {
-    return { body: await codec.decode(request, headers['content-type'] ?? contentType, declared, scope) };
+    return { body: await codec.decode(body.stream, headers['content-type'] ?? contentType, declared, scope) };
   } catch (error) {
+    const cut = body.cut();
+    if (cut) return tooLarge(cut);
     return { refuse: { status: 400, body: { error: (error as Error).message } } };
   }
 }
@@ -197,9 +236,12 @@ async function answerFor(
   const built = writer.serving.inputFor(route.trigger, read.request);
   if ('error' in built)
     return edge({ status: 400, body: { error: `input does not conform: ${built.error}` }, produces });
-  // the runtime gates the run: the guard identifies the caller and the trigger's policies decide before the operation fires
+  // the runtime gates the run: the guard identifies the caller and the trigger's policies decide before the operation
+  // fires. The deadline counts from here, once the body is read and judged: a slow upload is the body's bound, not the run's
+  const { deadlineMs } = limitsOf(route.settings, writer.defaults);
+  const fire = { trigger: route.trigger, input: built.input, request: read.request, blobs: writer.scope };
   const report = await heardIn(heard, () =>
-    writer.serving.fire({ trigger: route.trigger, input: built.input, request: read.request, blobs: writer.scope }),
+    withDeadline(deadlineMs, signal => writer.serving.fire(signal ? { ...fire, signal } : fire)),
   );
   return answerOfRun(route, report, heard);
 }
@@ -209,12 +251,12 @@ async function answerFor(
  * breaking, a blob gone from the registry while the answer streams -- is answered as a fault of the run, and its
  * message goes to the line, never to the caller.
  */
-async function answerRequest(incoming: IncomingMessage, response: ServerResponse, serving: Serving) {
+async function answerRequest(incoming: IncomingMessage, response: ServerResponse, { serving, defaults }: Writer) {
   const started = Date.now();
   const asked = `${incoming.method} ${new URL(incoming.url ?? '/', 'http://local').pathname}`;
   // one blob scope per request: what the body's codec and the graph store through it is released once answered
   const scope = serving.blobs.scope();
-  const writer = { serving, scope };
+  const writer = { serving, scope, defaults };
   const heard: Heard = {};
   try {
     const answer = await answerFor(incoming, writer, heard);
@@ -245,7 +287,12 @@ export const listen: Handler = async ({ in: input, ctx }) => {
   const settings = env.plugins?.[ROOT] ?? {};
   const port = Number(input.port ?? settings.port ?? 8080);
 
-  const server = createServer((incoming, response) => answerRequest(incoming, response, serving));
+  // the limits every route that declares none of its own is held to; X004 has judged them whole numbers of 1 or more
+  const defaults: Limits = {
+    deadlineMs: settings.deadlineMs as number | undefined,
+    maxBodyBytes: settings.maxBodyBytes as number | undefined,
+  };
+  const server = createServer((incoming, response) => answerRequest(incoming, response, { serving, defaults }));
 
   await new Promise<void>((ok, fail) => {
     server.once('error', fail);
