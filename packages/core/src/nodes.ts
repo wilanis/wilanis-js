@@ -27,6 +27,8 @@ export interface SwitchNode {
   in: Values;
   rules: { when: string; to: string; description?: string }[];
   else: string;
+  /** node id -> where this switch routes when that node breaks: its fault is caught, and the run goes on. */
+  catch?: Record<string, string>;
 }
 export interface MapNode {
   type: typeof NODE_MAP;

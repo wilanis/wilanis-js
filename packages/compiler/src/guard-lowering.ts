@@ -10,7 +10,7 @@
  * a `map` over the list with `onItemFailure: 'fail'`, the mechanism a bound graph already runs through, so the
  * first element that violates the rule refuses the whole list with its reason.
  */
-import type { KernelSpec, KMap, KNode, Redact } from '@wilanis/engine';
+import type { KernelSpec, KMap, KNode, KSwitch, Redact } from '@wilanis/engine';
 import {
   type Guard,
   type GuardHandlers,
@@ -55,11 +55,15 @@ function redactOf(node: KNode | undefined): Redact | undefined {
  * would leave the made node running on every branch, including the ones its author routed it away from.
  */
 function reroute(spec: KernelSpec, from: string, to: string): void {
-  for (const node of Object.values(spec.nodes)) {
-    if (node.kind !== 'switch') continue;
-    for (const rule of node.rules) if (rule.to === from) rule.to = to;
-    if (node.else === from) node.else = to;
-  }
+  for (const node of Object.values(spec.nodes)) if (node.kind === 'switch') rerouteSwitch(node, from, to);
+}
+
+/** One switch's routes to `from` sent to `to`: its rules, its fallback, and where a fault it catches goes. */
+function rerouteSwitch(node: KSwitch, from: string, to: string): void {
+  for (const rule of node.rules) if (rule.to === from) rule.to = to;
+  if (node.else === from) node.else = to;
+  const catches = node.catch ?? {};
+  for (const [caught, target] of Object.entries(catches)) if (target === from) catches[caught] = to;
 }
 
 /**
