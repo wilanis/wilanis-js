@@ -1,45 +1,14 @@
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { checkTree } from '@wilanis/compiler';
-import { loadTree, type ResolvedInclude } from '@wilanis/core';
-import auth from '@wilanis/plugin-auth';
-import blobs from '@wilanis/plugin-blob';
-import http from '@wilanis/plugin-http';
-import otel from '@wilanis/plugin-otel';
-import reload from '@wilanis/plugin-reload';
-import schedule from '@wilanis/plugin-schedule';
-import storage from '@wilanis/plugin-storage';
-import memory from '@wilanis/plugin-storage-memory';
-import postgres from '@wilanis/plugin-storage-postgres';
+import { loadTree } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_PLUGINS, describe as describeDoc, fuzz, regress, runTrigger, scaffold } from '../src/index.js';
 import { runSaid } from '../src/run-said.js';
 import { askingTree } from './asking-tree.js';
-import { loadedEditing } from './example-harness.js';
+import { EXAMPLE, INCLUDES, loadedEditing, PLUGINS } from './example-harness.js';
 
-const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
-/** The tree the example includes, as the runtime would resolve it from the example's node_modules. */
-const INCLUDES: ResolvedInclude[] = [
-  {
-    from: '@wilanis/access',
-    dir: fileURLToPath(new URL('../../../libraries/access', import.meta.url)),
-    features: ['access'],
-  },
-];
-const PLUGINS = {
-  ...BUILTIN_PLUGINS,
-  '@http': http,
-  '@blob': blobs,
-  '@reload': reload,
-  '@auth': auth,
-  '@schedule': schedule,
-  '@storage': storage,
-  '@storage-memory': memory,
-  '@storage-postgres': postgres,
-  '@otel': otel,
-};
 const tmp = () => mkdtempSync(join(tmpdir(), 'wilanis-tools-'));
 const read = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
 
