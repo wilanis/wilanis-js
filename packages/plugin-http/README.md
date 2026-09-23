@@ -62,6 +62,22 @@ is dropped. The `check` hook refuses (X003) a throttle that could let nothing th
   "settings": { "baseUrl": "https://api.example/v1", "throttle": { "concurrency": 4, "perSecond": 10 } } }
 ```
 
+A route may bound how long its run takes and how much its body weighs: `deadlineMs` and `maxBodyBytes`, in the
+route's settings or in the plugin's, where they hold for every route that writes none of its own. The route's
+own is its limit; with neither there is none. The deadline counts from the moment the route fires, after the
+body is read and judged: past it the run is cancelled (nothing more starts, what is in flight is told through
+its signal) and the route answers `504 { "error": "cancelled: the deadline passed" }` once the run has settled,
+whatever had settled before. A body past its bound is answered 413 before any codec has finished with it: a
+JSON body is not parsed, an upload is not stored past the cut. A connection's `maxBodyBytes` bounds an answer
+from the upstream the same way, and a request past it fails its node as a fault. The `check` hook refuses
+(X004) a limit that is not a whole number of 1 or more.
+
+```json
+{ "use": "@http", "from": "@wilanis/plugin-http",
+  "settings": { "port": 8080, "deadlineMs": 30000, "maxBodyBytes": 1048576,
+    "codecs": { "application/json": "@http/codecs/json.codec.json" } } }
+```
+
 Depends on `@wilanis/core` and `@wilanis/engine`.
 
 Part of [wilanis](https://github.com/wilanis/wilanis-js). Apache-2.0.

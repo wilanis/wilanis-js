@@ -1,6 +1,7 @@
 /**
  * What only @http can judge. X001: the codec table names something that is not a codec. X002: a content type used
- * anywhere has no codec in the table. X003: a connection's throttle could never let a request through.
+ * anywhere has no codec in the table. X003: a connection's throttle could never let a request through. X004: a
+ * deadline or a body bound, on a route, in the plugin's settings or on a connection, is not a whole number of 1 or more.
  */
 import type { PluginCheckContext } from '@wilanis/core';
 import { doc, ROOT } from './paths.js';
@@ -35,6 +36,42 @@ function checkThrottles(scope: Scope, refuse: Refuse) {
     const throttle = (connection.doc.settings as { throttle?: Record<string, unknown> }).throttle;
     if (throttle) judgeThrottle(throttle, connection.path, refuse);
   }
+}
+
+/** What each limit is, as its refusal says it. */
+const LIMITS: Record<string, string> = {
+  deadlineMs: 'the most a run may take, in milliseconds',
+  maxBodyBytes: 'the most a body may weigh, in bytes',
+};
+
+/** X004: the limits one document declares, each a whole number of 1 or more; `at` is where its settings are. */
+function judgeLimits(
+  settings: Record<string, unknown>,
+  names: string[],
+  where: { file: string; at: string },
+  refuse: Refuse,
+) {
+  for (const name of names)
+    if (name in settings && !(Number.isInteger(settings[name]) && (settings[name] as number) >= 1))
+      refuse({
+        code: 'X004',
+        file: where.file,
+        message: `${name} is ${JSON.stringify(settings[name])}; it is ${LIMITS[name]}, a whole number of 1 or more`,
+        at: `${where.at}/${name}`,
+        hint: 'set it to 1 or more, or drop it for no limit',
+      });
+}
+
+/** X004: the limits of the plugin's settings, of every http trigger, and the answer bound of every http connection. */
+function checkLimits(scope: Scope, settings: Record<string, unknown>, refuse: Refuse) {
+  const both = ['deadlineMs', 'maxBodyBytes'];
+  judgeLimits(settings, both, { file: '@project.json', at: `plugins/${ROOT}/settings` }, refuse);
+  for (const trigger of scope.registry.all('trigger'))
+    if (scope.canon(trigger.doc.kind) === doc('http.trigger-kind.json'))
+      judgeLimits(trigger.doc.settings, both, { file: trigger.path, at: 'settings' }, refuse);
+  for (const connection of scope.registry.all('connection'))
+    if (scope.canon(connection.doc.kind) === doc('http.connection-kind.json'))
+      judgeLimits(connection.doc.settings, ['maxBodyBytes'], { file: connection.path, at: 'settings' }, refuse);
 }
 
 /** X001: every path the codec table names is a codec. */
@@ -102,9 +139,13 @@ function checkGraphCalls(scope: Scope, need: ReturnType<typeof needsCodec>) {
       if ('run' in node && callsHttp(scope, node.run)) checkCall(need, node.in, graph.path, `nodes/${node.id}/in`);
 }
 
-/** Plugin-specific rules: content types are in the table, the table names real codecs, a throttle can let something through. */
+/**
+ * Plugin-specific rules: content types are in the table, the table names real codecs, a throttle can let something
+ * through, and a limit can be met.
+ */
 export function check({ scope, settings, refuse }: PluginCheckContext) {
   checkThrottles(scope, refuse);
+  checkLimits(scope, settings, refuse);
   const table = (settings.codecs ?? {}) as Record<string, string>;
   checkTable(scope, table, refuse);
   const need = needsCodec(new Set(Object.keys(table).map(type => type.toLowerCase())), refuse);

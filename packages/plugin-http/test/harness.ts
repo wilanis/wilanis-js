@@ -99,10 +99,10 @@ function writeUploadForm(dir: string) {
  * so the tests sign in as bo -- an employee holding the registrar role -- through the example's own route and
  * present our token; nothing about access is edited.
  */
-export function localCopy(): string {
+export function localCopy(more?: (edit: Edit) => void): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-http-'));
   cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
-  const edit = (relative: string, change: (doc: any) => void) => {
+  const edit: Edit = (relative, change) => {
     const path = join(dir, relative);
     const doc = JSON.parse(readFileSync(path, 'utf8'));
     change(doc);
@@ -117,8 +117,16 @@ export function localCopy(): string {
       '@http/codecs/multipart.codec.json';
   });
   writeUploadForm(dir);
+  more?.(edit);
   return dir;
 }
+
+/** Rewrite one document of a copy, by its path under the tree. */
+export type Edit = (relative: string, change: (doc: any) => void) => void;
+
+/** The @http plugin's settings in a copy's project.json, to edit in place. */
+export const httpSettings = (project: any): Record<string, unknown> =>
+  project.plugins.find((plugin: any) => plugin.use === '@http').settings;
 
 /** How many DELETEs the upstream is serving right now, and the most it ever served at once. */
 export interface InFlight {
@@ -170,10 +178,12 @@ async function one(
   return { status: 200, value: row };
 }
 
-/** What the fake upstream holds: the rows it serves, and how many deletes are in flight. */
+/** What the fake upstream holds: the rows it serves, how many deletes are in flight, and whether it answers at all. */
 export interface Upstream {
   rows: Record<string, unknown>[];
   inFlight: InFlight;
+  /** Hold every request open and never answer it, the way an upstream that has stopped answering does. */
+  hold?: boolean;
 }
 
 /** What the fake answers: the collection, one row, or nothing it knows. */
@@ -192,6 +202,7 @@ export function fakeUpstream(upstream: Upstream): Server {
   return createServer(async (request: IncomingMessage, response: ServerResponse) => {
     let body = '';
     for await (const chunk of request) body += chunk;
+    if (upstream.hold) return;
     const url = new URL(request.url ?? '/', 'http://local');
     const route = /^\/api\/v1\/customer(?:\/([^/]+))?$/.exec(url.pathname);
     const answer = await answerFor({ request, url, body, route }, upstream);
@@ -207,8 +218,8 @@ export const listening = async (server: Server, port: number) => {
 };
 
 /** Sign in as bo, an employee holding the registrar role, and answer the token. */
-export async function signInAsRegistrar(): Promise<string> {
-  const answer = await fetch('http://localhost:8099/api/v1/auth-employees', {
+export async function signInAsRegistrar(port = 8099): Promise<string> {
+  const answer = await fetch(`http://localhost:${port}/api/v1/auth-employees`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ username: 'bo', password: 'bo-pass' }),
@@ -219,9 +230,9 @@ export async function signInAsRegistrar(): Promise<string> {
 
 /** A call to the tree's own server, with the token when the test presents one. */
 export const caller =
-  (token: () => string) =>
+  (token: () => string, port = 8099) =>
   async (method: string, path: string, body?: unknown, authorized = false) => {
-    const answer = await fetch(`http://localhost:8099${path}`, {
+    const answer = await fetch(`http://localhost:${port}${path}`, {
       method,
       headers: {
         'content-type': 'application/json',

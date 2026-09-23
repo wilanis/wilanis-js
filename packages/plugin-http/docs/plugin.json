@@ -9,6 +9,16 @@
         "required": false,
         "description": "listen port, default 8080"
       },
+      "deadlineMs": {
+        "type": "number",
+        "required": false,
+        "description": "the most a route's run may take, in milliseconds, from firing to answer, for every route that writes no deadlineMs of its own; past it the run is cancelled and answered 504. Absent: a route without its own has none"
+      },
+      "maxBodyBytes": {
+        "type": "number",
+        "required": false,
+        "description": "the most a request body may weigh, for every route that writes no maxBodyBytes of its own; past it the request is answered 413 before the codec finishes. Absent: a route without its own has none"
+      },
       "codecs": {
         "type": {
           "fields": {},
