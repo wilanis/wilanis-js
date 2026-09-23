@@ -19,8 +19,9 @@
  */
 import { expr, type GraphDoc, type InvariantDoc, type Loaded, type Scope } from '@wilanis/core';
 import type { KCall, KernelSpec, KNode, KSwitch } from '@wilanis/engine';
+import { rootsOf } from './check/judge.js';
 import { conjunctsOf } from './check/narrowing.js';
-import { heldWhollyAt, rootsOf } from './check/prove.js';
+import { heldWhollyAt } from './check/prove.js';
 import { type Site, type SiteArity, siteId, sitesOf } from './sites.js';
 
 /** The two native operations a guard is built from; both exist, so the guard adds nothing to any port. */

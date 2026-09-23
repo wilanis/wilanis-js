@@ -10,6 +10,7 @@
  */
 import { expr, isRun, type Node, type Scope, splitPath, type Values, WHOLE_TEMPLATE } from '@wilanis/core';
 import { type Site, siteId } from '../sites.js';
+import { rootsOf } from './judge.js';
 import { conjunctsOf, Narrowing, renamed } from './narrowing.js';
 
 type Expr = expr.Expr;
@@ -88,17 +89,6 @@ export function literalFields(site: ProofSite, conjunct: Expr): Record<string, u
     values[root] = value;
   }
   return values;
-}
-
-/** The field names a conjunct reads: every root of a path or a has(). */
-export function rootsOf(term: Expr, out = new Set<string>()): Set<string> {
-  if (term.kind === 'path' || term.kind === 'has') out.add(term.path[0]);
-  else if (term.kind === 'len' || term.kind === 'not') rootsOf(term.arg, out);
-  else if (term.kind === 'bin') {
-    rootsOf(term.left, out);
-    rootsOf(term.right, out);
-  }
-  return out;
 }
 
 // ---- 2. narrowed ---------------------------------------------------------------------------------
