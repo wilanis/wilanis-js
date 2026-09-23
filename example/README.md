@@ -367,11 +367,11 @@ layer write `customers.csv` (`#write`), which the route streams back as a downlo
 effects, listed in `feature.json`.
 
 `DELETE /customers` takes a body of ids (`{"ids": ["1", "2"]}`) and fires `removeMany`; the domain graph
-`remove-customers` maps `remove` over the ids, so every deletion is issued at once and the answer -- the
-deleted customers, in the order asked -- leaves only after the last one settled. One id that does not exist
-refuses the whole batch as `missing`, a 404. The connection paces this:
-`customers-api.connection.json` declares `"throttle": { "concurrency": 4 }`, so however many ids arrive, at
-most four requests are in flight against the API at a time.
+`remove-customers` maps `remove` over the ids, eight at a time, and the answer -- the deleted customers, in
+the order asked -- leaves only after the last one settled. One id that does not exist refuses the whole batch
+as `missing`, a 404. The connection paces this further: `customers-api.connection.json` declares
+`"throttle": { "concurrency": 4, "perSecond": 3 }`, so under `live` at most four requests are in flight
+against the API at a time, whatever the map allows.
 
 ## Trying again, and for how long
 
@@ -390,6 +390,28 @@ since whether recording a customer is worth trying twice is the profile's busine
 `customer.port.json` promises that `get` is `"idempotent": true`, which a caller that repeats a read leans on.
 `wilanis describe @customers/data/get-row.graph.json` prints the node as `retries 2 (200ms backoff, when
 status >= 500)  timeout 5000ms`, and the viewer badges it.
+
+## When something hangs
+
+Every route has a deadline and every body a size, written in `@http`'s settings in `project.json`:
+`"deadlineMs": 60000` and `"maxBodyBytes": 1048576`. `GET /customers/{id}` writes a deadline of its own,
+`"deadlineMs": 2000`, since a caller waiting on one customer should hear within two seconds. Past a deadline
+the run is cancelled: nothing more starts, what is in flight is told through its signal, and the route answers
+`504 { "error": "cancelled: the deadline passed" }`. The retry on `fetched` lives inside those two seconds: a
+503 answered fast is tried again, and a first try still waiting when the deadline strikes is cut there, three
+seconds before its own `timeoutMs` would have, and not tried again. A minute is the default because the
+largest batch this tree accepts, a hundred removals paced at three a second, takes about thirty-four seconds
+against the API under `live`; a tighter default would cancel a healthy request. `DeleteRequest.shape.json`
+bounds its `ids` with `"maxItems": 100`, so a hundred and one is a 400 (`$.ids: at most 100 items`) before
+anything fires, and `removed` in `remove-customers.graph.json` says `"limit": 100` and `"concurrency": 8`: the
+same hundred as the graph's own promise whoever calls it, and eight removals at a time. A body past a
+megabyte is a 413 before its codec finishes, so a CSV that large is never stored. A cancelled run undoes
+nothing that already ran: a batch removal cut at its deadline leaves the customers it removed removed, and
+the run's report says which. Only an atomic graph rolls back, so an import cut short under `local` or
+`production` leaves the store as it was, and one under `live` leaves what it posted. `wilanis describe` says
+each bound where it applies: `deadline 2000ms` on the trigger, `deadline 60000ms (from @http settings)` on a
+route that writes none, `at most 100 elements  8 at once` on the map, `ids: string[] (at most 100)` on the
+shape.
 
 ## All of it or none of it
 

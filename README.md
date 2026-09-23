@@ -26,6 +26,7 @@ reaches an operation is a trigger, and a trigger is one file. Two of them, from 
     "route": "/customers/{id}",
     "method": "GET",
     "produces": "application/json",
+    "deadlineMs": 2000,
     "response": {
       "refusals": {
         "missing": 404,
@@ -170,6 +171,16 @@ node that makes the call, and the compiler refuses the same retry on a POST (`G0
 been applied) and on any node of a domain graph (`L012`), which says what is done and never how often. A retry
 repeats a fault or a timeout, never a refusal the graph decided, and the run's record shows one node with the
 tries it took.
+
+What happens when something hangs is written down as well. The route above gives up after two seconds
+(`"deadlineMs": 2000`); every other route takes the minute and the megabyte `project.json` gives the http
+plugin (`"deadlineMs": 60000`, `"maxBodyBytes": 1048576`). Past its deadline a run is cancelled: nothing more
+starts, what is in flight is told to stop, and the caller gets a 504 rather than a half answer. A body past its
+size is a 413 before it is parsed or stored. `DELETE /customers` takes at most a hundred ids
+(`"maxItems": 100` on its body's shape, a 400 past that) and its domain graph removes them eight at a time
+(`"limit": 100, "concurrency": 8` on the map), and the checker refuses a route anyone may call whose lists have
+no most. Cancelling undoes nothing that already ran, and the run's record says how far it got; only a graph
+marked atomic rolls back.
 
 ## Why this suits code a model writes
 
