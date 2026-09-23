@@ -104,7 +104,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           files=$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename')
-          gated=$(echo "$files" | grep -E '^(fitness/[^/]+\.fitness\.ts|packages/core/schemas/[^/]+\.json)$' || true)
+          gated=$(echo "$files" | grep -E '^(fitness/[^/]+\.fitness\.ts|packages/core/schemas/.+\.json)$' || true)
           if [ -n "$gated" ]; then
             echo "waits for the maintainer:"; echo "$gated" | sed 's/^/  /'
             echo "gated=true" >> "$GITHUB_OUTPUT"
