@@ -19,6 +19,7 @@ import blob from '@wilanis/plugin-blob';
 import http from '@wilanis/plugin-http';
 import otel from '@wilanis/plugin-otel';
 import reload from '@wilanis/plugin-reload';
+import s3 from '@wilanis/plugin-s3';
 import schedule from '@wilanis/plugin-schedule';
 import storage from '@wilanis/plugin-storage';
 import memory from '@wilanis/plugin-storage-memory';
@@ -54,6 +55,7 @@ const PLUGINS: Record<string, PluginModule> = {
   '@storage-memory': memory,
   '@storage-postgres': postgres,
   '@otel': otel,
+  '@s3': s3,
 };
 
 /** Apply an edit to one document of a copied tree, in place. */

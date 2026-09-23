@@ -366,6 +366,14 @@ as drafts (`@blob/csv.port.json#parse`, typed by `CustomerDraft`) and then regis
 layer write `customers.csv` (`#write`), which the route streams back as a download. Both operations are
 effects, listed in `feature.json`.
 
+The registry keeps those bytes in files under the system temp dir, since `project.json` names no
+`blobs.connection`, so a laptop runs this tree with nothing else installed. A deployment on several instances
+keeps them in a bucket instead: a connection of `@s3/bucket.connection-kind.json` (endpoint, region, bucket,
+and the access key read as `{{secrets.*}}`) and `"blobs": { "connection": "@connections/<it>.connection.json" }`.
+`@s3` is named here already, and nothing under `features/` changes: a graph holds the same handle, and the
+bytes stream to MinIO, or any store speaking the S3 API, and back. `wilanis start` then puts and deletes one
+empty object in the bucket before anything runs, and refuses to start when it cannot.
+
 `DELETE /customers` takes a body of ids (`{"ids": ["1", "2"]}`) and fires `removeMany`; the domain graph
 `remove-customers` maps `remove` over the ids, eight at a time, and the answer -- the deleted customers, in
 the order asked -- leaves only after the last one settled. One id that does not exist refuses the whole batch

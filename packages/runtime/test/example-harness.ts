@@ -13,6 +13,7 @@ import blobs from '@wilanis/plugin-blob';
 import http from '@wilanis/plugin-http';
 import otel from '@wilanis/plugin-otel';
 import reload from '@wilanis/plugin-reload';
+import s3 from '@wilanis/plugin-s3';
 import schedule from '@wilanis/plugin-schedule';
 import storage from '@wilanis/plugin-storage';
 import memory from '@wilanis/plugin-storage-memory';
@@ -31,6 +32,7 @@ export const PLUGINS = {
   '@storage-memory': memory,
   '@storage-postgres': postgres,
   '@otel': otel,
+  '@s3': s3,
 };
 
 /** The tree the example includes, as the runtime would resolve it from the example's node_modules. */

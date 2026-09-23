@@ -94,6 +94,7 @@ describe('the example tree', () => {
       '@http',
       '@otel',
       '@reload',
+      '@s3',
       '@schedule',
       '@std',
       '@storage',

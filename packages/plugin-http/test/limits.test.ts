@@ -13,6 +13,7 @@ import auth from '@wilanis/plugin-auth';
 import blobs from '@wilanis/plugin-blob';
 import otel from '@wilanis/plugin-otel';
 import reload from '@wilanis/plugin-reload';
+import s3 from '@wilanis/plugin-s3';
 import schedule from '@wilanis/plugin-schedule';
 import storage from '@wilanis/plugin-storage';
 import memory from '@wilanis/plugin-storage-memory';
@@ -51,6 +52,7 @@ const PLUGINS = {
   '@storage-memory': memory,
   '@storage-postgres': postgres,
   '@otel': otel,
+  '@s3': s3,
 };
 
 const upstream: Upstream = { rows: [firstRow()], inFlight: { now: 0, peak: 0 } };
