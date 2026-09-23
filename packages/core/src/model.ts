@@ -360,7 +360,8 @@ export interface ScenarioDoc extends Envelope {
   expect: {
     status: 'done' | 'failed' | 'blocked' | 'cancelled';
     output?: unknown;
-    nodes: Record<string, { status: string; handler?: string; out?: unknown; selected?: string }>;
+    /** What each node did; `reason` is the one a node that refused on purpose gave, absent where it answered or broke. */
+    nodes: Record<string, { status: string; handler?: string; out?: unknown; selected?: string; reason?: string }>;
   };
 }
 

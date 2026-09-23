@@ -52,7 +52,7 @@
       "type": "object",
       "properties": {
         "status": {
-          "description": "How the run as a whole ended: done, failed, blocked by a policy or the guard, or cancelled when its signal fired before it finished.",
+          "description": "How the run as a whole ended: done; failed (a refusal -- the graph's, a policy's or the guard's -- or a fault); blocked (a root it reads was never supplied); or cancelled (its signal fired before it finished).",
           "enum": [
             "done",
             "failed",
@@ -82,6 +82,10 @@
               },
               "selected": {
                 "description": "For a switch, the rule it took, so a replay says when routing changed.",
+                "type": "string"
+              },
+              "reason": {
+                "description": "For a node that refused on purpose, the reason it gave; absent for a node that answered or broke. A replay whose reason differs, or whose refusal became a fault, is a diff.",
                 "type": "string"
               }
             },

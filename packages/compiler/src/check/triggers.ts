@@ -3,7 +3,8 @@
  * its edge shapes meet (L006, T002), reads the request into its input (T003), reaches only request.* paths its
  * kind hands (T004) and guarantees the ones a resolver requires (A006), and maps every refusal reason it can
  * reach, and no other (T005, T006). A kind itself is judged once: what it says correlates a run must be a path
- * into its own context (T007). What gates it is judged in access.ts. S scenarios name a trigger (S001).
+ * into its own context (T007). What gates it is judged in access.ts. S scenarios name a trigger (S001)
+ * and pin a reason only on a node that refused (S002).
  */
 import {
   type Field,
@@ -26,15 +27,29 @@ import { type Judge, type Refuser, underProfile } from './judge.js';
 import { opNeeds, type RequestNeed } from './resolvers.js';
 import { assignableWire, atOrBelow, mismatch, requestOnly } from './typing.js';
 
-/** The refusal for a scenario naming a trigger the tree does not have (S001), or nothing when it names one. */
+/**
+ * The refusals a scenario earns: naming a trigger the tree does not have (S001), and pinning a reason on a node
+ * that did not refuse (S002).
+ */
 export function checkScenario(judge: Judge, scenario: Loaded<ScenarioDoc>): void {
-  if (judge.scope.get('trigger', scenario.doc.trigger)) return;
-  judge.refuser(scenario.path)(
-    'S001',
-    `scenario names unknown trigger '${scenario.doc.trigger}'`,
-    'trigger',
-    'wilanis ls trigger',
-  );
+  const refuse = judge.refuser(scenario.path);
+  if (!judge.scope.get('trigger', scenario.doc.trigger)) {
+    refuse('S001', `scenario names unknown trigger '${scenario.doc.trigger}'`, 'trigger', 'wilanis ls trigger');
+  }
+  checkPinnedReasons(scenario.doc, refuse);
+}
+
+/** S002: a reason belongs to a node that refused, and a node that refused ended `failed`. */
+function checkPinnedReasons(scenario: ScenarioDoc, refuse: Refuser): void {
+  for (const [id, node] of Object.entries(scenario.expect.nodes ?? {})) {
+    if (node.reason === undefined || node.status === 'failed') continue;
+    refuse(
+      'S002',
+      `node '${id}' pins reason '${node.reason}' but ended '${node.status}': only a node that refused gives a reason`,
+      `expect/nodes/${id}/reason`,
+      'a reason belongs to a node that refused; drop it, or let wilanis fuzz write the scenario again',
+    );
+  }
 }
 
 /**

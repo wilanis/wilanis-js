@@ -176,7 +176,9 @@ describe('wilanis fuzz and regress', () => {
   it('fuzz writes one scenario per trigger per seed, and regress replays every one as the same', async () => {
     const dir = tmp();
     cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
-    const written = await fuzz(loadTree(dir, PLUGINS, INCLUDES), { runs: 2, profile: 'live' });
+    const { ok, written, lines } = await fuzz(loadTree(dir, PLUGINS, INCLUDES), { runs: 2, profile: 'live' });
+    // the example never faults under stubs, so every run is written
+    expect(ok, lines.join('\n')).toBe(true);
     // seventeen triggers -- the example's and the included access tree's -- two seeds each
     expect(written).toHaveLength(34);
     expect(readdirSync(join(dir, 'scenarios')).sort()).toEqual(written.map(one => one.split('/').pop()!).sort());
