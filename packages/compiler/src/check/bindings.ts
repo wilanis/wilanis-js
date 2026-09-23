@@ -22,7 +22,7 @@ import {
 import { passedInputs } from '../documents.js';
 import { checkCallRetry, checkGraphRetry } from './attempts.js';
 import { checkInputs, reader } from './inputs.js';
-import type { Effects, Judge, JudgedResolver, Refuser, Resolve } from './judge.js';
+import { allowing, type Effects, type Judge, type JudgedResolver, type Refuser, type Resolve } from './judge.js';
 import { resolversFor } from './resolvers.js';
 import { mismatch, readAt } from './typing.js';
 
@@ -245,7 +245,7 @@ class BindingCheck {
         'L003',
         `'${contract.opName}' delegates to effectful '${key}' which the feature does not allow`,
         at,
-        `add "${key}" to ${this.effects.at}`,
+        allowing(this.effects, key),
       );
     }
     let answers = this.judge.type(hit.op.returns, hit.port.path, 'returns');

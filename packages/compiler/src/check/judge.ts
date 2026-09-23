@@ -7,6 +7,7 @@
 import {
   expr,
   type Fields,
+  type Fix,
   isMap,
   type Loaded,
   type Node,
@@ -25,8 +26,11 @@ import {
 } from '@wilanis/core';
 import type { ReachableRefusal } from '../refusals.js';
 
+/** The direction of the fix: the words every refusal carries, and the edits a rule can prove. */
+export type Hint = string | { text: string; fixes: Fix[] };
+
 /** A refusal recorded against one file: the rule, what is wrong, where in the document, and the fix. */
-export type Refuser = (code: string, message: string, at: string | undefined, hint: string) => void;
+export type Refuser = (code: string, message: string, at: string | undefined, hint: Hint) => void;
 
 /**
  * Types the root of a template read in the caller's context. A string answer is the reason it cannot be read;
@@ -57,10 +61,17 @@ export interface LayerSite {
   what: string;
 }
 
-/** The effectful operations a feature allows, canonical, and where the list is, for hints. */
+/** The effectful operations a feature allows, canonical, and where the list is: the document and path a fix edits, and the same in words. */
 export interface Effects {
   allowed: Set<string>;
+  file: string;
+  path: string;
   at: string;
+}
+
+/** What L003 offers for an effect the feature does not allow: the operation added to the feature's list, said and given. */
+export function allowing(effects: Effects, key: string): Hint {
+  return { text: `add "${key}" to ${effects.at}`, fixes: [{ file: effects.file, at: effects.path, add: key }] };
 }
 
 /** Names no resolver, node or constant may take: they are the roots a template reads. */
@@ -140,10 +151,11 @@ export class Judge {
     private readonly refusals: RefusalList,
   ) {}
 
-  /** Refusals against one file. */
+  /** Refusals against one file; a hint that carries fixes is split into the refusal's `hint` and `fixes`. */
   refuser(file: string): Refuser {
     return (code, message, at, hint) => {
-      this.refusals.add({ code, file, message, at, hint });
+      if (typeof hint === 'string') this.refusals.add({ code, file, message, at, hint });
+      else this.refusals.add({ code, file, message, at, hint: hint.text, fixes: hint.fixes });
     };
   }
 
@@ -219,8 +231,9 @@ export class Judge {
   /** The effectful operations a feature allows. */
   effectsOf(feature: string | undefined): Effects {
     const doc = this.scope.registry.get('feature', `@features/${feature}/feature.json`)?.doc;
+    const file = `@features/${feature}/feature.json`;
     const allowed = new Set((doc?.effects ?? []).map(effect => this.canonOp(effect)));
-    return { allowed, at: `@features/${feature}/feature.json → effects` };
+    return { allowed, file, path: 'effects', at: `${file} → effects` };
   }
 
   /** Every reason reachable under any profile, with the first file found refusing with it. */
