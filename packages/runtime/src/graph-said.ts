@@ -16,6 +16,7 @@
  */
 import { atomicOf, type Guard, guardSpecName, guardsOf, idsOf, violatedIds } from '@wilanis/compiler';
 import type { GraphDoc, Loaded, Scope } from '@wilanis/core';
+import { attemptsSaid } from './attempts-said.js';
 import { invariantName } from './invariant-lines.js';
 import { readsLines } from './reads-said.js';
 import { scopeLine } from './scope-said.js';
@@ -51,9 +52,10 @@ function contractLines(graph: GraphDoc, guards: Guard[]): string[] {
 }
 
 /**
- * One node as a reader meets it: what it runs, or the branches it routes to, under whatever id it has once
- * the guards are lowered. A `switch` that routed to a guarded node routes to the node that moved aside, since
- * the value is made where it was made before and the guard stands between it and everything downstream.
+ * One node as a reader meets it: what it runs and how often it is tried, or the branches it routes to, under
+ * whatever id it has once the guards are lowered. A `switch` that routed to a guarded node routes to the node
+ * that moved aside, since the value is made where it was made before and the guard stands between it and
+ * everything downstream.
  */
 function nodeLine(node: GraphDoc['nodes'][number], id: string, made: Map<string, string>): string {
   if (!('run' in node)) {
@@ -62,7 +64,7 @@ function nodeLine(node: GraphDoc['nodes'][number], id: string, made: Map<string,
     const routes = [...rules, otherwise].filter(Boolean).map(to => (to ? (made.get(to) ?? to) : to));
     return `    ${id}  switch → ${routes.join(' | ')}`;
   }
-  return `    ${id}  ${node.run}`;
+  return `    ${id}  ${node.run}${attemptsSaid(node)}`;
 }
 
 // ---- the nodes the compiler lowered, which the file does not have -------------------------------

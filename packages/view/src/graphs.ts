@@ -8,6 +8,7 @@
 import { atomicOf } from '@wilanis/compiler';
 import type { GraphDoc, Loaded, Scope, Type, Values } from '@wilanis/core';
 import { isMap, isRun, isSwitch, show, typeAt } from '@wilanis/core';
+import { attemptsOf } from './attempts.js';
 import { markGuards } from './guards.js';
 import {
   attributePorts,
@@ -222,6 +223,7 @@ class GraphBuilder {
       target: target.target,
       ...(target.target.refuses ? { answeredBy: answeredBy(this.scope, this.graph.path, node.id) } : {}),
       ...this.keeps(node.run, node.in),
+      ...attemptsOf(node),
     });
     wire(this.edges, node.id, node.in, this.resolvers);
   }
@@ -248,6 +250,7 @@ class GraphBuilder {
       bind: node.bind,
       onItemFailure: node.onItemFailure,
       ...this.keeps(node.run, node.in),
+      ...attemptsOf(node),
     });
     wire(this.edges, node.id, { over: node.over, ...(node.in ?? {}) }, this.resolvers);
   }

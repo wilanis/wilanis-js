@@ -5,6 +5,9 @@
 import { checkTree } from '@wilanis/compiler';
 import type { Kind, Layer, Loaded, LoadResult, Outcome, Refusal } from '@wilanis/core';
 import { SCHEMA_BASE } from '@wilanis/core';
+import type { VAttempts, VPromised } from './attempts.js';
+
+export type { VAttempts, VPromised } from './attempts.js';
 
 export interface VPort {
   /** The port's name; an attribute port is its path below the parent, joined with dots (body.id). */
@@ -33,8 +36,8 @@ export interface VPort {
   description?: string;
 }
 
-/** Where a node's operation leads, so a click can follow it. */
-export interface VTarget {
+/** Where a node's operation leads, so a click can follow it, and what the operation promises about a repeated call. */
+export interface VTarget extends VPromised {
   op: string;
   /** The operation's short name. */
   opName: string;
@@ -47,14 +50,15 @@ export interface VTarget {
   /** The operation ends the graph on purpose; the node's `reason` is what the trigger maps. */
   refuses?: boolean;
   /** For a domain port: every binding that meets it, and what each does for this operation. */
-  bindings?: { path: string; label: string; graph?: string; graphLabel?: string; run?: string }[];
+  bindings?: ({ path: string; label: string; graph?: string; graphLabel?: string; run?: string } & VAttempts)[];
   /** Where a click lands: the graph behind the first binding, the binding when it delegates, the port when native. */
   implementation: string;
 }
 
 export type VNodeKind = 'in' | 'const' | 'request' | 'run' | 'map' | 'rule' | 'out';
 
-export interface VNode {
+/** One node as a page draws it; a run or map node carries the retry and the bound its call site declares. */
+export interface VNode extends VAttempts {
   id: string;
   kind: VNodeKind;
   /** The node's label, or its id made readable. */
@@ -266,7 +270,7 @@ export interface DocView {
   implementations?: {
     path: string;
     label: string;
-    operations: Record<string, { graph?: string; graphLabel?: string; run?: string }>;
+    operations: Record<string, { graph?: string; graphLabel?: string; run?: string } & VAttempts>;
   }[];
   /** On a trigger: the port operation it fires, and where that leads. */
   fires?: VTarget;

@@ -19,6 +19,7 @@ import type {
   ResolversDoc,
   ScenarioDoc,
 } from '@wilanis/core';
+import { attemptsSaid } from './attempts-said.js';
 import { type Reader, readersOf, readsLines } from './reads-said.js';
 
 /** One list of paths on one line, as `gates:` says a policy's triggers; nothing where the list is empty. */
@@ -27,7 +28,7 @@ const listLine = (label: string, values: string[] | undefined): string[] =>
 
 /**
  * A binding: the port it meets, the reads its operations take from the request, and how each is answered --
- * by a graph, or by delegating to another operation. The port is said once above, since every row shares it,
+ * by a graph, or by delegating to another operation, and how often and how long it is tried. The port is said once above, since every row shares it,
  * and the reads stand above the operations, since a delegation's `{{name}}` is one of them.
  */
 export function bindingLines(doc: Loaded, scope: Reader): string[] {
@@ -35,7 +36,7 @@ export function bindingLines(doc: Loaded, scope: Reader): string[] {
   const lines = [`meets  ${declared.port}`, ...readsLines(declared.reads, scope)];
   lines.push('answers:');
   for (const [name, op] of Object.entries(declared.operations))
-    lines.push(`    #${name}  ${answeredBy(op)}${op.description ? `  -- ${op.description}` : ''}`);
+    lines.push(`    #${name}  ${answeredBy(op)}${attemptsSaid(op)}${op.description ? `  -- ${op.description}` : ''}`);
   return lines;
 }
 
