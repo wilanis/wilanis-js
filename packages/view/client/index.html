@@ -99,6 +99,8 @@
   /* a node whose effect is inside the graph's one transaction: a dashed rim and a word, so the set is seen at a glance */
   .node.joins > .box { stroke: var(--ok); stroke-dasharray: 4 3; }
   .node .txn { font: 10px var(--sans); fill: var(--ok); }
+  /* a call site that is tried again or bounded (RFC 0011): its policy is a word on the node, the panel says it in full */
+  .node .try { font: 10px var(--sans); fill: var(--type); }
   /* the rule a node is held to: a guard the compiler lowered names the invariant, a proved site says how, lighter */
   .node .inv { font: 10px var(--sans); cursor: pointer; }
   .node .inv .plate { stroke-width: 1; rx: 3; }
@@ -224,6 +226,21 @@
   const schemaBadge = (kind, text, rel) => { const a = el('a', 'badge kind-' + kind, text == null ? (KIND_ONE[kind] || kind) : text); a.href = '#@wilanis/' + rel; a.title = 'the schema: @wilanis/' + rel; return a; };
   const NODE_SCHEMA = { run: 'node/run.schema.json', map: 'node/map.schema.json', rule: 'node/switch.schema.json' };
   const frag = (...nodes) => { const f = document.createDocumentFragment(); for (const n of nodes) f.appendChild(typeof n === 'string' ? document.createTextNode(n) : n); return f; };
+  /** What a call site declares about its tries, as `wilanis describe` says it: `retries 2 (200ms backoff, when status >= 500), timeout 5000ms`; '' where it declares neither. */
+  function attemptsText(site) {
+    const r = site.retry, parts = [];
+    if (r) { const how = [r.backoffMs ? r.backoffMs + 'ms backoff' : '', r.when ? 'when ' + r.when : ''].filter(Boolean); parts.push('retries ' + r.times + (how.length ? ' (' + how.join(', ') + ')' : '')); }
+    if (site.timeoutMs !== undefined) parts.push('timeout ' + site.timeoutMs + 'ms');
+    return parts.join(', ');
+  }
+  /** The badges an operation earns for what it promises about a repeated call: idempotent, idempotent when, or its key. */
+  function promisedBadges(op) {
+    const out = [];
+    if (op.idempotent === true) { const b = el('span', 'badge ok', 'idempotent'); b.title = 'calling it again with the same inputs changes nothing further'; out.push(b); }
+    else if (typeof op.idempotent === 'string') { const b = el('span', 'badge ok', 'idempotent when'); b.title = 'calling it again changes nothing further where its inputs make this hold; a retry is judged against the literal inputs of its call site'; out.push(b, el('code', null, op.idempotent)); }
+    if (op.key) { const b = el('span', 'badge ok', 'key: ' + op.key); b.title = 'a repeated call is recognised by this field: a caller who gives it may try the call again'; out.push(b); }
+    return out;
+  }
 
   // ---- sidebar --------------------------------------------------------------------------------------
   $('filter').oninput = renderList;
@@ -638,11 +655,11 @@
         else if (v.native) { const p = el('p'); p.appendChild(document.createTextNode('Granted by ')); p.appendChild(link(v.native + '/plugin.json')); p.appendChild(document.createTextNode(v.from ? ` (${v.from}), which carries the code behind every operation below.` : ', built into the runtime, which carries the code behind every operation below.')); page.appendChild(p); }
         page.appendChild(el('h2', null, 'Operations'));
         for (const [name, op] of Object.entries(d.operations)) {
-          const h = el('h3', null, readable(name)); h.appendChild(el('code', null, '#' + name)); if (op.pure) h.appendChild(el('span', 'badge ok', 'pure')); else if (v.native) h.appendChild(el('span', 'badge warn', 'effect')); if (op.refuses) h.appendChild(el('span', 'badge warn', 'refuses on purpose')); if (op.transactional) h.appendChild(el('span', 'badge ok', 'transactional')); if (op.holds) h.appendChild(el('span', 'badge warn', 'holds until stopped')); page.appendChild(h);
+          const h = el('h3', null, readable(name)); h.appendChild(el('code', null, '#' + name)); if (op.pure) h.appendChild(el('span', 'badge ok', 'pure')); else if (v.native) h.appendChild(el('span', 'badge warn', 'effect')); if (op.refuses) h.appendChild(el('span', 'badge warn', 'refuses on purpose')); if (op.transactional) h.appendChild(el('span', 'badge ok', 'transactional')); if (op.holds) h.appendChild(el('span', 'badge warn', 'holds until stopped')); for (const b of promisedBadges(op)) h.appendChild(b); page.appendChild(h);
           page.appendChild(el('p', null, op.description));
           if (op.accepts && Object.keys(op.accepts).length) page.appendChild(fieldsTable(op.accepts)); else page.appendChild(el('p', null, 'Takes nothing.'));
           const r = el('p'); r.appendChild(frag('Answers ')); r.appendChild(op.returns ? typeEl(op.returns) : frag('nothing')); page.appendChild(r);
-          for (const i of impls) { const o = i.operations[name]; if (!o) continue; const p = el('p'); p.appendChild(frag(i.label + ': ')); if (o.graph) { p.appendChild(frag('runs the graph ')); p.appendChild(link(o.graph)); } else if (o.run) { p.appendChild(frag('delegates to ')); p.appendChild(link(o.run.split('#')[0], showOp(o.run))); } page.appendChild(p); }
+          for (const i of impls) { const o = i.operations[name]; if (!o) continue; const p = el('p'); p.appendChild(frag(i.label + ': ')); if (o.graph) { p.appendChild(frag('runs the graph ')); p.appendChild(link(o.graph)); } else if (o.run) { p.appendChild(frag('delegates to ')); p.appendChild(link(o.run.split('#')[0], showOp(o.run))); } const tries = attemptsText(o); if (tries) p.appendChild(frag('; ' + tries)); page.appendChild(p); }
         }
         break;
       }
@@ -653,7 +670,7 @@
         const t = el('table'); const hd = el('tr'); for (const h of ['operation', 'how it is met', 'inputs given']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
         for (const [name, op] of Object.entries(d.operations)) {
           const tr = el('tr'); tr.appendChild(el('td', 'name', name));
-          const how = el('td'); if (op.graph) { how.appendChild(frag('runs the graph ')); how.appendChild(link(op.graph)); } else if (op.run) { how.appendChild(frag('delegates to ')); how.appendChild(link(op.run.split('#')[0], showOp(op.run))); } if (op.description) how.appendChild(el('div', 'desc', op.description)); tr.appendChild(how);
+          const how = el('td'); if (op.graph) { how.appendChild(frag('runs the graph ')); how.appendChild(link(op.graph)); } else if (op.run) { how.appendChild(frag('delegates to ')); how.appendChild(link(op.run.split('#')[0], showOp(op.run))); } const tries = attemptsText(op); if (tries) how.appendChild(el('div', 'mono', tries)); if (op.description) how.appendChild(el('div', 'desc', op.description)); tr.appendChild(how);
           const given = el('td'); if (op.in) given.appendChild(valueEl(op.in)); else given.appendChild(el('span', 'desc', op.graph ? 'the caller’s, by name' : 'the caller’s, by name')); tr.appendChild(given);
           t.appendChild(tr);
         }
@@ -878,6 +895,21 @@
     box.appendChild(el('p', null, 'The store scopes this collection, so the compiler puts the scope on every operation over it. No graph writes one and none can forget one; the engine holds every statement to it.'));
   }
 
+  /**
+   * What a call site declares about its tries, said in full: what is tried again, how long it waits, and the most
+   * one call may take. A refusal is the graph deciding and is never tried again, so the panel says so where a retry is.
+   */
+  function triesEl(box, n) {
+    const each = n.kind === 'map' ? 'Each element\u2019s call' : 'The call';
+    box.appendChild(el('h4', null, 'tries'));
+    const r = n.retry;
+    if (r) {
+      const on = r.when ? ', or answers where ' + r.when + ' holds' : '';
+      const wait = r.backoffMs ? ' It waits ' + r.backoffMs + ' ms before the second try and doubles the wait before each further one.' : '';
+      box.appendChild(el('p', null, `${each} is tried again up to ${r.times} more time${r.times === 1 ? '' : 's'} when it faults or times out${on}.${wait} A refusal is never tried again, and the node shows the try that stood.`));
+    }
+    if (n.timeoutMs !== undefined) box.appendChild(el('p', null, `${each} fails as a fault once it has taken ${n.timeoutMs} ms${r ? ', and is tried again like any fault' : ''}; the handler is told through its signal.`));
+  }
   function renderNodeDetails(box, n, v) {
     const color = nodeColors(v.graph).get(n.id);
     const h = el('h3'); const sw = el('span', 'swatch'); sw.style.background = color; h.appendChild(sw); h.appendChild(document.createTextNode(n.label + ' ')); const kindText = { run: 'operation', map: 'for each', rule: 'rule', in: 'input', out: 'output', const: 'constants', request: 'request' }[n.kind]; h.appendChild(NODE_SCHEMA[n.kind] ? schemaBadge(n.kind, kindText, NODE_SCHEMA[n.kind]) : badge(n.kind, kindText)); box.appendChild(h);
@@ -894,6 +926,8 @@
       const t = n.target;
       box.appendChild(el('h4', null, 'runs'));
       const p = el('p'); p.appendChild(link(t.port, t.portLabel + SEP + t.opName)); p.appendChild(document.createTextNode(t.refuses ? ' (ends the graph on purpose; the reason is what the trigger maps)' : t.native ? (t.effect ? ' (a native effect)' : ' (pure, native)') : ' (a domain port)')); box.appendChild(p);
+      const promised = promisedBadges(t); if (promised.length) { const q = el('p'); for (const b of promised) { q.appendChild(b); q.appendChild(frag(' ')); } box.appendChild(q); }
+      if (n.retry || n.timeoutMs !== undefined) triesEl(box, n);
       if (n.keeps) {
         const k = n.keeps;
         box.appendChild(el('h4', null, 'records'));
@@ -1048,6 +1082,22 @@
   const opens = (e, path) => { if (!path) return e; e.classList.add('link'); e.addEventListener('click', ev => { ev.stopPropagation(); go(canon(path)); }); e.addEventListener('dblclick', ev => ev.stopPropagation()); return e; };
   const trunc = (s, n) => s.length > n ? s.slice(0, n - 1) + ELLIPSIS : s;
   const CH = 6.6; // monospace advance at 11px
+  /** A duration as a mark reads it: whole seconds where it is one, else milliseconds. */
+  const shortMs = (ms) => ms >= 1000 && ms % 1000 === 0 ? ms / 1000 + 's' : ms + 'ms';
+  /**
+   * The words a node wears on its subtitle's row, right to left, with the room each takes: an effect, a part in
+   * the transaction (a participant is also rimmed), and a call site's retry and bound (RFC 0011).
+   */
+  function marksOf(n) {
+    const marks = [];
+    if (n.target && n.target.effect) marks.push({ text: 'effect', cls: 'fx', title: 'reaches outside the process', chars: 7, px: 40 });
+    if (n.participates) marks.push({ text: 'txn', cls: 'txn', title: 'this node\u2019s effect is inside the graph\u2019s one transaction: it is undone with the rest unless the graph answers', chars: 5, px: 26 });
+    if (n.retry || n.timeoutMs !== undefined) {
+      const text = [n.retry ? '\u21bb' + n.retry.times : '', n.timeoutMs !== undefined ? '\u2264' + shortMs(n.timeoutMs) : ''].filter(Boolean).join(' ');
+      marks.push({ text, cls: 'try', title: attemptsText(n) + '\na refusal is never tried again', chars: text.length + 2, px: text.length * 6 + 8 });
+    }
+    return marks;
+  }
   const subOf = (n) => {
     if (n.kind === 'rule') return '';
     if (n.kind === 'in' || n.kind === 'out') return showType(n.type);
@@ -1165,11 +1215,10 @@
       else gn.appendChild(withTitle(txt(14, 17, trunc(n.label, 30), 'title'), n.label + (n.description ? '\n' + n.description : '')));
       const sub = subOf(n);
       // the marks share the sub's row from the right: the sub gives up the room each one takes
-      const marks = (n.target && n.target.effect ? 7 : 0) + (n.participates ? 5 : 0);
-      if (sub) gn.appendChild(opens(withTitle(txt(14, 32, trunc(sub, 36 - marks), 'sub'), n.op || n.type || sub), n.type ? shapeOf(n.type) : null));
-      if (n.target && n.target.effect) gn.appendChild(withTitle(txt(b.w - (n.target ? 32 : 14), 32, 'effect', 'fx', { 'text-anchor': 'end' }), 'reaches outside the process'));
-      // a participant is rimmed, and marked beside the effect: what it does is inside the graph's one transaction
-      if (n.participates) gn.appendChild(withTitle(txt(b.w - (n.target && n.target.effect ? 72 : 32), 32, 'txn', 'txn', { 'text-anchor': 'end' }), 'this node\u2019s effect is inside the graph\u2019s one transaction: it is undone with the rest unless the graph answers'));
+      const marks = marksOf(n);
+      if (sub) gn.appendChild(opens(withTitle(txt(14, 32, trunc(sub, 36 - marks.reduce((sum, m) => sum + m.chars, 0)), 'sub'), n.op || n.type || sub), n.type ? shapeOf(n.type) : null));
+      let right = b.w - 32;
+      for (const m of marks) { gn.appendChild(withTitle(txt(right, 32, m.text, m.cls, { 'text-anchor': 'end' }), m.title)); right -= m.px; }
       if (n.guarded || n.proved) gn.appendChild(badgeEl(n, b));
       // a double-click on the request node opens the document behind its first read; a port opens its own
       const goto = n.target ? n.target.implementation : (n.outputs || []).map(p => p.opens).find(Boolean);
@@ -1266,6 +1315,7 @@
     legend.appendChild(el('span', null, 'an edge has the colour of the node it feeds'));
     // the rim is only worth explaining where something wears it
     if (g.atomic) { const t = el('span'); t.appendChild(el('u')); t.appendChild(frag('a rimmed node is in the transaction')); legend.appendChild(t); }
+    if (g.nodes.some(n => n.retry || n.timeoutMs !== undefined)) legend.appendChild(el('span', null, '\u21bbn is tried again n more times, \u2264 bounds how long one call may take'));
     if (g.nodes.some(n => n.guarded || n.proved)) legend.appendChild(el('span', null, 'a badge is a field invariant: named where it is guarded, lighter where it is proved \u2014 double-click to open it'));
     legend.appendChild(el('span', null, ARROW + ' or double-click opens the implementation'));
     main.appendChild(legend);

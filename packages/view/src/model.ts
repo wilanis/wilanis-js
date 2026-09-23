@@ -15,6 +15,7 @@
 import { checkTree } from '@wilanis/compiler';
 import type { GraphDoc, Kind, Loaded, LoadResult, PolicyDoc, Refusal, TriggerDoc } from '@wilanis/core';
 import { policyPath, SCHEMA_BASE, Scope, WILANIS } from '@wilanis/core';
+import { attemptsOf } from './attempts.js';
 import { graphView } from './graphs.js';
 import { invariantView } from './invariants.js';
 import { stemOf, targetOf } from './ports.js';
@@ -88,7 +89,8 @@ function implementationsOf(scope: Scope, path: string) {
     operations: Object.fromEntries(
       Object.entries(binding.doc.operations).map(([name, operation]) => {
         const graph = operation.graph ? scope.get('graph', operation.graph) : undefined;
-        return [name, { graph: graph?.path, graphLabel: graph ? labelOf(graph) : undefined, run: operation.run }];
+        const met = { graph: graph?.path, graphLabel: graph ? labelOf(graph) : undefined, run: operation.run };
+        return [name, { ...met, ...attemptsOf(operation) }];
       }),
     ),
   }));

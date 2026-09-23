@@ -11,12 +11,14 @@ import {
   keeps,
   type Loaded,
   type LoadResult,
+  type Operation,
   type PortDoc,
   type Scope,
   type StoreCollection,
   type StoreDoc,
   show,
 } from '@wilanis/core';
+import { promisedSaid } from './attempts-said.js';
 import { readsLines } from './reads-said.js';
 import { scopedOf, scopeLines } from './scope-said.js';
 import { callsAgainst, engineOf, keyTypeOf } from './stores.js';
@@ -63,18 +65,15 @@ function acceptsLine(
 }
 
 /**
- * What an operation says about itself: whether it is pure, may refuse, may take part in a transaction, or
- * holds something until stopped.
+ * What an operation says about itself: whether it is pure, may refuse, may take part in a transaction, holds
+ * something until stopped, or may be called again -- always, where its inputs say so, or given its key.
  */
-function operationLine(
-  name: string,
-  op: { pure?: boolean; refuses?: unknown; transactional?: boolean; holds?: boolean; description?: string },
-) {
+function operationLine(name: string, op: Operation) {
   const pure = op.pure ? '  (pure)' : '';
   const refuses = op.refuses ? '  (refuses on purpose)' : '';
   const transactional = op.transactional ? '  (transactional)' : '';
   const holds = op.holds ? '  (holds until stopped)' : '';
-  return `#${name}${pure}${refuses}${transactional}${holds}: ${op.description}`;
+  return `#${name}${pure}${refuses}${transactional}${holds}${promisedSaid(op)}: ${op.description}`;
 }
 
 /**

@@ -5,6 +5,7 @@
 import { bindings } from '@wilanis/compiler';
 import type { Operation, Type, Values } from '@wilanis/core';
 import { hasVars, type Scope, show, splitPath, substitute, TEMPLATE, WHOLE_TEMPLATE } from '@wilanis/core';
+import { attemptsOf, promisedOf } from './attempts.js';
 import type { VEdge, VNode, VPort, VTarget } from './types.js';
 import { labelOf, readable } from './types.js';
 
@@ -75,7 +76,7 @@ export function targetOf(scope: Scope, opRef: string): { op?: Operation; target:
   };
   if (hit.port.native) markNative(target, hit.op);
   else markBound(scope, target, hit.path, hit.opName);
-  return { op: hit.op, target };
+  return { op: hit.op, target: { ...target, ...promisedOf(hit.op) } };
 }
 
 /** What a native operation is: pure or an effect, and whether it may refuse. */
@@ -96,6 +97,7 @@ function markBound(scope: Scope, target: VTarget, port: string, opName: string) 
       graph: graph?.path,
       graphLabel: graph ? labelOf(graph) : undefined,
       run: operation?.run,
+      ...(operation ? attemptsOf(operation) : {}),
     };
   });
   const first = target.bindings[0];
