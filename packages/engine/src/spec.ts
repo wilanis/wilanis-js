@@ -46,6 +46,10 @@ export interface KMap {
   /** input name -> path within the element ([] = the whole element). Absent: the element arrives as `item`. */
   bind?: Record<string, string[]>;
   onItemFailure: 'fail' | 'collect';
+  /** The most elements this map runs over; a longer list is a fault of the node before any element starts. Absent: any length. */
+  limit?: number;
+  /** How many elements run at once; the rest wait for a slot, in index order. Absent: every element at once. */
+  concurrency?: number;
   redact?: Redact;
   /** An opaque tag the compiler gives this map, handed to every element's handler as `ctx.site`. The kernel never reads it. */
   site?: string;

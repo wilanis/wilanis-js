@@ -59,6 +59,7 @@ export class Run {
     this.mapHost = {
       values: this.values,
       clock: this.clock,
+      ended: () => this.ending !== undefined,
       call: (node, path, inputs, report) =>
         this.invoke(node.handler, inputs, this.contextFor(node, [...this.root, ...path], report)),
     };
