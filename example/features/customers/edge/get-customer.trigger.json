@@ -1,11 +1,12 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
   "label": "GET /customers/{id}",
-  "description": "GET /customers/{id} → the customer; 404 { reason: missing, message: `no customer {id}` } when there is none, 502 as upstream when the customer API broke. For a signed-in caller only, and only a customer of their tenant: another tenant's id is missing.",
+  "description": "GET /customers/{id} → the customer; 404 { reason: missing, message: `no customer {id}` } when there is none, 502 as upstream when the customer API broke, 504 when no answer came within two seconds. For a signed-in caller only, and only a customer of their tenant: another tenant's id is missing.",
   "settings": {
     "route": "/customers/{id}",
     "method": "GET",
     "produces": "application/json",
+    "deadlineMs": 2000,
     "response": {
       "refusals": {
         "missing": 404,

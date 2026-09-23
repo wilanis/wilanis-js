@@ -113,6 +113,7 @@ describe('one fire, said as spans', () => {
       'customer',
       'noCustomer',
       'upstreamFailed @std/outcome.port.json#refuse',
+      'unreachable',
     ]);
   });
 

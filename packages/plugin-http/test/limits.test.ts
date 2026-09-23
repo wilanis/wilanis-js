@@ -287,10 +287,22 @@ describe("an upstream's answer past the connection's bound", () => {
   it('fails the request node as a fault: 500, and the line says the answer body exceeds 600 bytes', async () => {
     upstream.rows.push({ ...firstRow(), id: 'big', name: 'y'.repeat(1024) });
     try {
-      const answer = await call('GET', '/customers/big', undefined, true);
+      // list-rows catches nothing, so the node the bound broke is the run's fault
+      const answer = await call('GET', '/customers', undefined, true);
       expect(answer.status).toBe(500);
       expect(answer.body).toEqual({ error: 'fault', run: expect.any(String) });
-      expect(lineFor('GET /customers/big', 500)).toContain('answer body exceeds 600 bytes');
+      expect(lineFor('GET /customers', 500)).toContain('answer body exceeds 600 bytes');
+    } finally {
+      upstream.rows.pop();
+    }
+  });
+
+  it('is the declared upstream where a switch catches the node it broke: get-row answers 502', async () => {
+    upstream.rows.push({ ...firstRow(), id: 'big', name: 'y'.repeat(1024) });
+    try {
+      const answer = await call('GET', '/customers/big', undefined, true);
+      expect(answer.status).toBe(502);
+      expect(answer.body).toEqual({ reason: 'upstream', message: 'the customer API could not be reached' });
     } finally {
       upstream.rows.pop();
     }

@@ -3,16 +3,19 @@
  * written; `maxItems` bounds a list and nothing else (C016); a trigger anyone may call bounds every list its edge
  * shapes take (T008); and a scenario cancels its replay only at an effect it stubbed (S003).
  */
-import { rmSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { Compiler } from '@wilanis/compiler';
 import { type PluginModule, Scope } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import {
+  EXAMPLE,
   loadedEditing,
   PLUGINS,
   planted,
   plantedEditingAllAt,
   plantedEditingAllSaying,
+  plantedEditingHinting,
   plantedPointing,
   sabotage,
   sabotageHinting,
@@ -34,6 +37,18 @@ function publicDelete(doc: any): void {
   for (const reason of ['anonymous', 'invalid_credential', 'forbidden']) delete doc.settings.response.refusals[reason];
 }
 
+/** DeleteRequest with its `ids` unbounded: the example bounds them at a hundred. */
+function unboundedIds(doc: any): void {
+  delete doc.fields.ids.maxItems;
+}
+
+/** The example's DeleteRequest as a whole document, with its `ids` unbounded. */
+function unboundedBody(): unknown {
+  const doc = JSON.parse(readFileSync(join(EXAMPLE, DELETE_BODY), 'utf8'));
+  unboundedIds(doc);
+  return doc;
+}
+
 /** Only the refusals of one code, as `code file#at`: a sabotage may earn others the case does not claim. */
 const only = (code: string, refusals: string[]) => refusals.filter(one => one.startsWith(`${code} `));
 
@@ -47,12 +62,14 @@ describe('a map lowers its limit and concurrency', () => {
     return spec;
   };
   it('carries both numbers to the kernel map as written, and checks clean', () => {
-    const bounded = (doc: any) => Object.assign(nodeOf(doc, 'removed'), { limit: 100, concurrency: 8 });
-    expect(sabotage(REMOVE, bounded)).toEqual([]);
-    expect(compiled(bounded).nodes.removed).toMatchObject({ kind: 'map', limit: 100, concurrency: 8 });
+    expect(sabotage(REMOVE, () => {})).toEqual([]);
+    expect(compiled(() => {}).nodes.removed).toMatchObject({ kind: 'map', limit: 100, concurrency: 8 });
   });
   it('adds neither where the document writes neither', () => {
-    const map = compiled(() => {}).nodes.removed;
+    const map = compiled(doc => {
+      delete nodeOf(doc, 'removed').limit;
+      delete nodeOf(doc, 'removed').concurrency;
+    }).nodes.removed;
     expect(map).not.toHaveProperty('limit');
     expect(map).not.toHaveProperty('concurrency');
   });
@@ -80,34 +97,26 @@ describe('C016: maxItems bounds a list', () => {
       `C016 @${LIST_REQUEST}#fields/tier/type/fields/name/maxItems`,
     ]);
   });
-  it('accepts it on a list', () => {
-    expect(
-      sabotage(DELETE_BODY, doc => {
-        doc.fields.ids.maxItems = 100;
-      }),
-    ).toEqual([]);
+  it('accepts it on a list: the example bounds DeleteRequest.ids at a hundred', () => {
+    expect(sabotage(DELETE_BODY, () => {})).toEqual([]);
   });
 });
 
 describe('T008: a public trigger bounds the lists its edge shapes take', () => {
   it("refuses an unbounded list once, at the trigger's in, naming the field and the shape", () => {
-    const refusals = plantedEditingAllAt({}, { [DELETE]: publicDelete });
+    const refusals = plantedEditingAllAt({}, { [DELETE]: publicDelete, [DELETE_BODY]: unboundedIds });
     expect(only('T008', refusals)).toEqual([`T008 @${DELETE}#in`]);
-    expect(sabotageHinting(DELETE, publicDelete)).toContain(
+    expect(plantedEditingHinting({ [DELETE_BODY]: unboundedBody() }, DELETE, publicDelete)).toContain(
       'T008 add "maxItems" to ids in DeleteRequest.shape.json: the most an anonymous caller may send; or gate the trigger with a policy',
     );
   });
   it('accepts the list once it is bounded, and any list behind a policy', () => {
-    const bounded = (doc: any) => {
-      doc.fields.ids.maxItems = 100;
-    };
-    expect(only('T008', plantedEditingAllAt({}, { [DELETE]: publicDelete, [DELETE_BODY]: bounded }))).toEqual([]);
-    // the example's DELETE /customers is gated and its ids unbounded: good manners to bound them, not a refusal
-    expect(sabotage(DELETE, () => {})).toEqual([]);
+    expect(only('T008', plantedEditingAllAt({}, { [DELETE]: publicDelete }))).toEqual([]);
+    // the example's DELETE /customers is gated: bounding its ids is good manners there, and unbounded is no refusal
+    expect(sabotage(DELETE_BODY, unboundedIds)).toEqual([]);
   });
   it('finds a list below the top: a field of an inline object, named by its dotted path', () => {
     const nested = (doc: any) => {
-      doc.fields.ids.maxItems = 100;
       doc.fields.batch = {
         type: { fields: { tags: { type: 'string[]' } } },
         required: false,

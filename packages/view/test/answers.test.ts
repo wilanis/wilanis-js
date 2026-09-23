@@ -48,7 +48,11 @@ describe('how the viewer says a refusal is answered', () => {
       {
         reason: 'upstream',
         answer: 502,
-        from: [{ graph: GET_ROW, graphLabel: 'Get a row', node: 'upstreamFailed', nodeLabel: 'Unexpected answer' }],
+        from: [
+          { graph: GET_ROW, graphLabel: 'Get a row', node: 'upstreamFailed', nodeLabel: 'Unexpected answer' },
+          // the same reason where the API answered nothing at all: the switch catches the GET and routes here
+          { graph: GET_ROW, graphLabel: 'Get a row', node: 'unreachable', nodeLabel: 'No answer' },
+        ],
       },
       // the route is for a signed-in caller: the policy's graph refuses a caller who sent no credential, and the
       // guard itself one whose credential it could not verify, which the viewer names by the plugin that refuses

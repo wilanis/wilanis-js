@@ -1,7 +1,7 @@
 /**
- * Sabotage: what a switch's `catch` may say (RFC 0014). The example's `get-row` is given the guide's catch -- the
+ * Sabotage: what a switch's `catch` may say (RFC 0014). The example's `get-row` declares the guide's catch -- the
  * API answering nothing at all routes to a refusal of `upstream`, which the trigger already maps -- and checks
- * clean; each case then breaks one thing about it. A caught node is one the switch reads and caught by it alone,
+ * clean; each case then rewrites the catch or breaks one thing around it. A caught node is one the switch reads and caught by it alone,
  * routed to another node of the graph (G021); it is an effect, since nothing else breaks but a bug (G024); whatever
  * else reads it runs behind the switch (G022); and nothing behind where its fault goes reads it (G023). Only a data
  * graph catches (L013), and no catch names a node a guard the compiler lowers moves aside (G025). The lowering
@@ -30,15 +30,13 @@ const make = (id: string, value: unknown, type: string) => run(id, '@std/object.
 /** The node of a graph document by id. */
 const nodeOf = (doc: any, id: string) => doc.nodes.find((node: any) => node.id === id);
 
-/** The guide's catch on get-row: `fetched` breaking routes to `unreachable`, which refuses upstream. */
+/** get-row's switch with the catch a case writes; the example's own is `fetched` breaking to `unreachable`. */
 function caught(doc: any, catches: Record<string, string> = { fetched: 'unreachable' }): void {
-  doc.nodes.push(refuse('unreachable', 'the customer API could not be reached'));
-  doc.out.from.push('unreachable');
   nodeOf(doc, 'outcome').catch = catches;
 }
 
 describe('a switch that catches a fault', () => {
-  it('checks clean as the guide writes it: the target refuses a reason the trigger maps, and joins out.from', () => {
+  it('checks clean as the example writes it: the target refuses a reason the trigger maps, and joins out.from', () => {
     expect(sabotage(GET_ROW, doc => caught(doc))).toEqual([]);
   });
   it('lowers onto the kernel switch as written', () => {
