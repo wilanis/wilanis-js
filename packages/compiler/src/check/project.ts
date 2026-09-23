@@ -2,7 +2,8 @@
  * The project document. C connections/settings: plugin settings read secrets only and fit the manifest (C001,
  * C002). B bindings/profiles: a profile names domain ports and bindings that implement them (R001, B003,
  * B004), and every domain port is met under every profile (B002). Startup: each step fires a domain port
- * operation (or a native one that holds) before anything is received (B006, B007, B008). Blobs: the connection
+ * operation (or a native one that holds) before anything is received (B006, B007, B008). A domain operation that
+ * promises `idempotent` keeps the promise under every profile (B011). Blobs: the connection
  * the blob registry keeps bytes behind opens a store some plugin offers (C014).
  */
 import {
@@ -13,6 +14,7 @@ import {
   type PortDoc,
   type StartupStep,
 } from '@wilanis/core';
+import { effectsReachable } from '../refusals.js';
 import { type Judge, underProfile } from './judge.js';
 import { opNeeds } from './resolvers.js';
 import { mismatch } from './typing.js';
@@ -20,7 +22,7 @@ import { mismatch } from './typing.js';
 /**
  * The refusals for the project document: plugin settings read secrets only and fit the manifest (C001, C002),
  * each profile binds a domain port to a binding that implements it (R001, B003, B004), and every domain port
- * is met under every profile (B002).
+ * is met under every profile (B002) and keeps every promise its operations make of being repeated (B011).
  */
 export function checkProject(judge: Judge): void {
   checkPluginSettings(judge);
@@ -29,7 +31,10 @@ export function checkProject(judge: Judge): void {
   }
   for (const port of judge.scope.registry.all('port')) {
     if (port.native) continue;
-    for (const profile of judge.profiles()) checkPortMet(judge, port, profile);
+    for (const profile of judge.profiles()) {
+      checkPortMet(judge, port, profile);
+      checkPromisesKept(judge, port, profile);
+    }
   }
 }
 
@@ -88,6 +93,44 @@ function checkPortMet(judge: Judge, port: Loaded<PortDoc>, profile: string | und
   if (profile)
     judge.refuser(judge.project.path)('B002', `profile '${profile}': ${binding}`, `profiles/${profile}/bindings`, hint);
   else judge.refuser(port.path)('B002', binding, undefined, hint);
+}
+
+/**
+ * B011: a domain operation that promises `idempotent` reaches, under the profile, only effects that are
+ * idempotent where they are made. The promise is the port's and the effects are the binding's, so the refusal is
+ * against the port and names the profile, the binding that meets it there, and the node that breaks it.
+ */
+function checkPromisesKept(judge: Judge, port: Loaded<PortDoc>, profile: string | undefined): void {
+  const binding = judge.scope.bindingFor(port.path, profile);
+  if (typeof binding === 'string') return;
+  for (const [name, op] of Object.entries(port.doc.operations)) {
+    if (op.idempotent === true) checkPromiseKept(judge, { port: port.path, name, binding: binding.path, profile });
+  }
+}
+
+/** One operation's promise under one profile: the port and operation that make it, and the binding that meets it there. */
+interface Promised {
+  port: string;
+  name: string;
+  binding: string;
+  profile: string | undefined;
+}
+
+/** B011 once per effect the promised operation reaches that is not idempotent where it is made. */
+function checkPromiseKept(judge: Judge, promised: Promised): void {
+  const refuse = judge.refuser(promised.port);
+  const run = `${promised.port}#${promised.name}`;
+  const hint =
+    'drop idempotent, or bind the operation under that profile to a graph whose effects are idempotent or keyed';
+  for (const effect of effectsReachable(judge.scope, run, promised.profile)) {
+    const hit = judge.scope.op(effect.key);
+    if (typeof hit === 'string' || hit.op.pure) continue;
+    const reason = judge.idempotentAt(hit, effect.given);
+    if (!reason) continue;
+    const through = effect.through && effect.through !== run ? ` through '${effect.through}'` : '';
+    const message = `'${run}' promises idempotent, but ${promised.binding}${underProfile(promised.profile)} reaches '${effect.node}' in ${effect.file}${through}, which runs '${effect.key}', not idempotent here: ${reason}`;
+    refuse('B011', message, `operations/${promised.name}/idempotent`, hint);
+  }
 }
 
 /**

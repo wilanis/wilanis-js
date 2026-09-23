@@ -166,7 +166,9 @@ unexpected.
 A port operation says whether calling it again changes anything further: `idempotent` (true, or an expression
 over its accepted fields, as `request` says `method == 'GET' || ...`), or the `key` field a repeat is
 recognised by. The words must fit the operation (C015), and a domain operation may promise only
-`idempotent: true`. Where the data layer names an effect -- a data graph's `run` or `map` node, or a binding's
+`idempotent: true`, a promise every profile is held to: each effect the binding that meets it there reaches
+must be idempotent where it is made, or the port is refused naming the profile, the binding and the node
+(B011). Where the data layer names an effect -- a data graph's `run` or `map` node, or a binding's
 operation -- it may say `timeoutMs` and `retry`; a domain graph says neither (L012). The checker refuses a
 retry over what cannot fail transiently, a pure operation or a graph that reaches no effect (G017); over a
 call that is not idempotent where it is made, judged over the literal inputs of the site or, for a binding's
