@@ -192,6 +192,14 @@ Stateless and clockless. It runs all ready nodes concurrently, answers `blocked`
 missing, accepts any node's value pre-supplied (that is replay), nests reports for binding graphs, and redacts
 secrets.
 
+## Scenarios
+
+A `scenario` is a recorded run: `wilanis fuzz` writes one per trigger and seed, under stubs, and `wilanis
+regress` replays it node by node. `fuzz` records the reason a node refused with beside its status
+(`expect.nodes.<id>.reason`) and `regress` diffs it, so a refusal that became a fault reads `reason missing →
+none`. A reason pinned on a node whose status is not `failed` is S002. `fuzz` writes no scenario of a run that
+faults under stubs: it prints `FAULT at '<node>'` and exits 1.
+
 ## Refusal codes
 
 Every refusal carries a code, the file, an `at` path inside it, and a hint naming the command or the edit that
