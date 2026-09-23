@@ -11,7 +11,16 @@
 import type { Scope, Trace, TraceAttributes, TraceLevel } from '@wilanis/core';
 import type { NodeReport, Report } from '@wilanis/engine';
 import { type Decided, type Fired, type Identified, isStarted, type Ran, statusOf } from './fired.js';
-import { addressOf, nodeAttributes, nodeStatus, operationAddressOf, span, valued, type Walk } from './trace-span.js';
+import {
+  addressOf,
+  caughtAt,
+  nodeAttributes,
+  nodeStatus,
+  operationAddressOf,
+  span,
+  valued,
+  type Walk,
+} from './trace-span.js';
 
 /**
  * How much a span carries, and the narrowing of an already-built trace to it. Both are core's, beside the
@@ -23,11 +32,11 @@ export { traceJson, traceText } from './trace-print.js';
 export type Level = TraceLevel;
 
 /**
- * A `switch`: what it routed to. Which of its rules fired is not on the span, because no report carries it --
- * `NodeReport` keeps the node selected and not the rule that chose it, and reading it back from the graph
- * would be the trace guessing rather than saying. It is an engine's to record if it is ever wanted.
+ * A `switch`: what it routed to, and whose fault where it routed one. Which of its rules fired is not on the
+ * span, because no report carries it -- `NodeReport` keeps the node selected and not the rule that chose it,
+ * and reading it back from the graph would be the trace guessing rather than saying.
  */
-function switchSpan(id: string, node: NodeReport, walk: Walk): Trace {
+function switchSpan(id: string, node: NodeReport, walk: Walk, within?: Report): Trace {
   return span({
     name: `${id} switch → ${node.selected ?? 'nothing'}`,
     status: nodeStatus(node),
@@ -35,6 +44,7 @@ function switchSpan(id: string, node: NodeReport, walk: Walk): Trace {
     attributes: {
       ...nodeAttributes(id, node, walk),
       ...(node.selected ? { 'wilanis.selected': node.selected } : {}),
+      ...caughtAt(id, within, walk.scope),
     },
   });
 }
@@ -109,10 +119,10 @@ function nestedSpans(sub: Report, walk: Walk): Trace[] {
 /**
  * One node of a graph, as the kind of node it is. What tells them apart is what the report kept: only a switch
  * routes, only a map has elements. A node that did neither is a call -- including one that never ran, whose
- * report is a status and nothing else.
+ * report is a status and nothing else. `within` is the report it sits in, where a switch finds whose fault it routed.
  */
-function nodeSpan(id: string, node: NodeReport, walk: Walk): Trace {
-  if (node.selected !== undefined) return switchSpan(id, node, walk);
+function nodeSpan(id: string, node: NodeReport, walk: Walk, within?: Report): Trace {
+  if (node.selected !== undefined) return switchSpan(id, node, walk, within);
   return node.items ? mapSpan(id, node, walk) : callSpan(id, node, walk);
 }
 
@@ -129,7 +139,7 @@ function graphSpan(report: Report, walk: Walk): Trace {
 
 /** Every node of one report, in the order the report holds them. */
 function nodesOf(report: Report, walk: Walk): Trace[] {
-  return Object.entries(report.nodes).map(([id, node]) => nodeSpan(id, node, walk));
+  return Object.entries(report.nodes).map(([id, node]) => nodeSpan(id, node, walk, report));
 }
 
 /**

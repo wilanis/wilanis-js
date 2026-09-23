@@ -3,8 +3,8 @@
  * whatever kind of node it is. `trace.ts` walks the run and decides which spans there are; this says what one
  * carries, so the rule for what may leave the process at each level is written once.
  */
-import type { Scope, Trace, TraceAttributes, TraceLevel } from '@wilanis/core';
-import type { NodeReport } from '@wilanis/engine';
+import { isSwitch, type Scope, type Trace, type TraceAttributes, type TraceLevel } from '@wilanis/core';
+import type { NodeReport, Report } from '@wilanis/engine';
 
 /** What a walk of one run carries down: the tree it reads contracts from, and how much a span may say. */
 export interface Walk {
@@ -58,10 +58,32 @@ function looked(node: NodeReport): TraceAttributes {
 /** The one handler whose answer carries a status a reader of a trace expects to find under its own name. */
 const HTTP_REQUEST = '@http/http.port.json#request';
 
-/** How a node ended, in the words a span carries: a refusal says its reason, anything else says its status. */
+/**
+ * How a node ended, in the words a span carries: a refusal says its reason, a fault a switch caught says so --
+ * it broke, and the run went on -- and anything else says its status.
+ */
 export function nodeStatus(node: NodeReport): string {
   if (node.status !== 'failed') return node.status === 'done' ? 'ok' : node.status;
-  return node.reason ? `refused: ${node.reason}` : 'failed';
+  if (node.reason) return `refused: ${node.reason}`;
+  return node.caught ? 'failed (caught)' : 'failed';
+}
+
+/**
+ * The node whose fault a switch routed, as `wilanis.caught`: a node id the author wrote, so it is said at
+ * `summary` beside `wilanis.selected`. Where two of its caught nodes broke, the switch routed on the first in
+ * its `catch`, which the graph document says; a report the tree no longer holds falls back to report order.
+ */
+export function caughtAt(id: string, within: Report | undefined, scope: Scope): TraceAttributes {
+  const caught = Object.keys(within?.nodes ?? {}).filter(other => within?.nodes[other].caught === id);
+  if (!within || caught.length === 0) return {};
+  const routed = catchOrder(within.graph, id, scope).find(one => caught.includes(one)) ?? caught[0];
+  return { 'wilanis.caught': routed };
+}
+
+/** The nodes a switch catches, in the order its document names them; none where the tree does not hold it. */
+function catchOrder(graph: string, id: string, scope: Scope): string[] {
+  const node = scope.get('graph', graph)?.doc.nodes.find(one => one.id === id);
+  return node && isSwitch(node) ? Object.keys(node.catch ?? {}) : [];
 }
 
 /** Whether the operation a node ran is an effect: not `pure`, as the port that declares it says. */
