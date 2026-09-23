@@ -1,31 +1,33 @@
 /**
  * One run of a spec. The scheduler fires every node the instant its sources have settled, all of them
  * concurrently, and answers a report at quiescence. A switch routes and cancels the branches it did not
- * choose; a call runs its handler; a map runs its handler once per element (`map.ts`). When the run's signal
- * fires, nothing more starts: what had not started is cancelled, what was in flight settles as it settles.
+ * choose; a call runs its handler; a map runs its handler once per element (`map.ts`). A node a switch catches
+ * that breaks does not end the run: that switch routes its fault. When the run's signal fires, nothing more
+ * starts: what had not started is cancelled, what was in flight settles as it settles.
  */
 import { type MapHost, runMap } from './map.js';
 import { type Plan, planOf, targetsOf } from './plan.js';
 import { redactEach, redactValue } from './redact.js';
 import { answered, type Ending, initialReport, noteRefusal, reportOf } from './report.js';
 import { nodeRefs, PSEUDO, readAll } from './sources.js';
-import type {
-  Handlers,
-  KCall,
-  KernelSpec,
-  KMap,
-  KNode,
-  KSwitch,
-  NodeReport,
-  Report,
-  RunContext,
-  RunOptions,
+import {
+  type Handlers,
+  isRefusal,
+  type KCall,
+  type KernelSpec,
+  type KMap,
+  type KNode,
+  type KSwitch,
+  type NodeReport,
+  type Report,
+  type RunContext,
+  type RunOptions,
 } from './spec.js';
 
 /**
  * One run of one spec: it fires every node the instant its sources have settled, all of them concurrently,
- * routes and cancels the branches a switch did not choose, and answers at quiescence -- failed with the node
- * that broke or refused, cancelled when its signal fired first, done with the first output candidate that
+ * routes and cancels the branches a switch did not choose, routes a caught node's fault through the switch that
+ * catches it, and answers at quiescence -- failed with the node that broke or refused, cancelled when its signal fired first, done with the first output candidate that
  * settled, or blocked on what was never supplied.
  */
 export class Run {
@@ -117,8 +119,11 @@ export class Run {
     );
   }
 
+  /** Every dependency answered, or -- for a switch -- broke with a fault this switch catches. */
   private dependenciesSettled(id: string): boolean {
-    return [...(this.plan.dependencies.get(id) ?? [])].every(dependency => this.settled(dependency));
+    return [...(this.plan.dependencies.get(id) ?? [])].every(
+      dependency => this.settled(dependency) || this.reports[dependency].caught === id,
+    );
   }
 
   /** A routed node waits for its switch to select it. */
@@ -141,7 +146,7 @@ export class Run {
     if (node.kind !== 'switch') report.handler = node.handler;
     this.running++;
     this.runNode(id, node, report)
-      .catch(error => this.fail(report, error))
+      .catch(error => this.fail(id, report, error))
       .finally(() => {
         report.endedAt = this.clock();
         this.running--;
@@ -162,14 +167,33 @@ export class Run {
     report.status = 'done';
   }
 
-  /** A node broke or refused: the run is over, and nothing still pending starts. */
-  private fail(report: NodeReport, error: unknown): void {
+  /**
+   * A node broke or refused: the run is over, and nothing still pending starts -- unless a switch catches this
+   * node's fault, when the node is marked and the run goes on for that switch to route it.
+   */
+  private fail(id: string, report: NodeReport, error: unknown): void {
     report.status = 'failed';
     report.error = (error as Error).message;
     noteRefusal(report, error);
+    const catcher = this.catcherOf(id, error);
+    if (catcher !== undefined) {
+      report.caught = catcher;
+      return;
+    }
     this.ending ??= 'failed';
     for (const id of Object.keys(this.spec.nodes))
       if (this.status(id) === 'pending') this.reports[id].status = 'cancelled';
+  }
+
+  /**
+   * The switch that catches this node's fault: never a refusal's, and only a switch still to route, or one the
+   * run's cancellation stopped (the fault is marked; nothing routes it). A catcher whose branch was not chosen
+   * routes nothing, so the fault ends the run as it would with no catch.
+   */
+  private catcherOf(id: string, error: unknown): string | undefined {
+    const catcher = this.plan.catchers.get(id);
+    if (catcher === undefined || isRefusal(error)) return undefined;
+    return this.status(catcher) === 'pending' || this.ending === 'cancelled' ? catcher : undefined;
   }
 
   /**
@@ -191,13 +215,20 @@ export class Run {
     for (const dependent of this.plan.dependents.get(id) ?? []) this.cancel(dependent);
   }
 
+  /** A switch routes where a caught fault goes, else to the first rule that holds, else to its fallback. */
   private async runSwitch(id: string, node: KSwitch, report: NodeReport): Promise<void> {
     const inputs = readAll(node.in, this.values);
     report.in = inputs;
-    const selected = node.rules.find(rule => rule.when(inputs))?.to ?? node.else;
+    const selected = this.caughtRoute(id, node) ?? node.rules.find(rule => rule.when(inputs))?.to ?? node.else;
     report.selected = selected;
     this.finish(id, report, selected);
     for (const target of new Set(targetsOf(node))) if (target !== selected) this.cancel(target);
+  }
+
+  /** Where a switch sends the first node in its `catch` whose fault it caught; the rules are then never tried. */
+  private caughtRoute(id: string, node: KSwitch): string | undefined {
+    const broke = Object.entries(node.catch ?? {}).find(([caught]) => this.reports[caught]?.caught === id);
+    return broke?.[1];
   }
 
   private async runCall(id: string, node: KCall, report: NodeReport): Promise<void> {

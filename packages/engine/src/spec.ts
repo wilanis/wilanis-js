@@ -32,6 +32,11 @@ export interface KSwitch {
   in: Record<string, KSource>;
   rules: { when: (values: Record<string, unknown>) => boolean; to: string; label: string }[];
   else: string;
+  /**
+   * node id -> the node this switch routes to when that node breaks. The rules and `else` are then not tried, and
+   * the run goes on. A refusal is never caught: it ends the run as it would anywhere.
+   */
+  catch?: Record<string, string>;
 }
 export interface KMap {
   kind: 'map';
