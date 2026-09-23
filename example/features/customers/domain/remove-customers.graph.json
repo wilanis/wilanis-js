@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Remove customers",
-  "description": "Domain graph behind DELETE /customers. It takes the list of ids itself: one removal per id, all at once, and the graph answers only when every one of them has settled. A missing customer refuses the whole batch; the list answered keeps the order asked.",
+  "description": "Domain graph behind DELETE /customers. It takes the list of ids itself: one removal per id, eight at a time and never more than a hundred in all, and the graph answers only when every one of them has settled. A missing customer refuses the whole batch; the list answered keeps the order asked.",
   "in": "string[]",
   "out": {
     "type": "@customers/domain/Customer.shape.json[]",
@@ -12,9 +12,11 @@
       "type": "@wilanis/node/map.schema.json",
       "id": "removed",
       "label": "Remove each customer",
-      "description": "customer.remove once per id; the element is the id itself",
+      "description": "customer.remove once per id, eight at a time; the element is the id itself",
       "run": "@customers/domain/customer.port.json#remove",
       "over": "{{in}}",
+      "limit": 100,
+      "concurrency": 8,
       "bind": {
         "id": ""
       }

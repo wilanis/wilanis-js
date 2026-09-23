@@ -5,7 +5,9 @@
  * on the document the page already has. The page marks a map that caps or paces its list, says both in the side
  * panel, lists a trigger's bounds with the document that said each, and tags a bounded list field.
  *
- * The example writes none of them yet, so the cases write them into a copy of it.
+ * The example writes each of them once (RFC 0012, step 9): a deadline and a body's size in `@http`'s settings, a
+ * deadline of its own on `get-customer`, a ceiling and a pace on `removed`. The cases that need one absent take
+ * it out of a copy of it.
  */
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -24,12 +26,8 @@ const nodeOf = (view: DocView, id: string): VNode => {
   return node;
 };
 
-/** The edit that writes a default for every route into the http plugin's settings in `project.json`. */
-const httpDefaults = (doc: any) => {
-  const settings = doc.plugins.find((one: { use: string }) => one.use === '@http').settings;
-  settings.deadlineMs = 30000;
-  settings.maxBodyBytes = 1048576;
-};
+/** The `removed` map of remove-customers, in its document. */
+const removedOf = (doc: any) => doc.nodes.find((node: { id: string }) => node.id === 'removed');
 
 /** One function of the page, lifted from its source: the page is one static file with no build step. */
 async function pageFunction(name: string): Promise<(...args: unknown[]) => string> {
@@ -41,18 +39,17 @@ async function pageFunction(name: string): Promise<(...args: unknown[]) => strin
 
 describe("the view model: a map's ceiling and pace", () => {
   it('carries both on the map that declares them', () => {
-    const view = scopedView(REMOVE, {
-      'features/customers/domain/remove-customers.graph.json': doc => {
-        const removed = doc.nodes.find((node: { id: string }) => node.id === 'removed');
-        removed.limit = 100;
-        removed.concurrency = 8;
-      },
-    });
-    expect(nodeOf(view, 'removed')).toMatchObject({ limit: 100, concurrency: 8 });
+    expect(nodeOf(scopedView(REMOVE), 'removed')).toMatchObject({ limit: 100, concurrency: 8 });
   });
 
   it('carries neither on a map that declares neither, so the page draws nothing for it', () => {
-    const removed = nodeOf(scopedView(REMOVE), 'removed');
+    const view = scopedView(REMOVE, {
+      'features/customers/domain/remove-customers.graph.json': doc => {
+        delete removedOf(doc).limit;
+        delete removedOf(doc).concurrency;
+      },
+    });
+    const removed = nodeOf(view, 'removed');
     expect('limit' in removed).toBe(false);
     expect('concurrency' in removed).toBe(false);
   });
@@ -60,24 +57,23 @@ describe("the view model: a map's ceiling and pace", () => {
 
 describe("the view model: a trigger's bounds", () => {
   it("carries the trigger's own", () => {
-    const view = scopedView(GET, {
-      [GET_FILE]: doc => {
-        doc.settings.deadlineMs = 2000;
-      },
-    });
-    expect(view.limits?.deadlineMs).toEqual({ value: 2000 });
+    expect(scopedView(GET).limits?.deadlineMs).toEqual({ value: 2000 });
   });
 
   it("carries the plugin's where the trigger writes none, and names the plugin", () => {
-    const view = scopedView(GET, { 'project.json': httpDefaults });
+    const view = scopedView(GET, {
+      [GET_FILE]: doc => {
+        delete doc.settings.deadlineMs;
+      },
+    });
     expect(view.limits).toEqual({
-      deadlineMs: { value: 30000, from: '@http' },
+      deadlineMs: { value: 60000, from: '@http' },
       maxBodyBytes: { value: 1048576, from: '@http' },
     });
   });
 
   it('carries none on a trigger whose kind takes none', () => {
-    const view = scopedView('@customers/edge/digest.trigger.json', { 'project.json': httpDefaults });
+    const view = scopedView('@customers/edge/digest.trigger.json');
     expect(view.limits).toBeUndefined();
   });
 });
