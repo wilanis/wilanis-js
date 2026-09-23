@@ -4,7 +4,7 @@
  * the request node, and X004 refuses a limit that could never be met. The example is copied with the limits written
  * in, served on a port of its own against a fake upstream that can stop answering.
  */
-import { rmSync } from 'node:fs';
+import { readdirSync, rmSync } from 'node:fs';
 import { Readable } from 'node:stream';
 import { checkTree } from '@wilanis/compiler';
 import { type BlobStore, loadTree } from '@wilanis/core';
@@ -16,7 +16,7 @@ import schedule from '@wilanis/plugin-schedule';
 import storage from '@wilanis/plugin-storage';
 import memory from '@wilanis/plugin-storage-memory';
 import postgres from '@wilanis/plugin-storage-postgres';
-import { BUILTIN_PLUGINS, start } from '@wilanis/runtime';
+import { BUILTIN_PLUGINS, FileBlobStore, start } from '@wilanis/runtime';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { multipart } from '../src/codecs.js';
 import http from '../src/index.js';
@@ -85,6 +85,11 @@ function withLimits(edit: Edit) {
   edit('connections/customers-api.connection.json', connection => {
     connection.settings.baseUrl = `http://localhost:${BACK}/api/v1`;
     connection.settings.maxBodyBytes = 600;
+  });
+  // the example tries a faulted GET again after 200 ms, past the route's 50 ms: without the retry an answer past the
+  // connection's bound is seen as the fault it is, not as the deadline it would otherwise run into
+  edit('features/customers/data/get-row.graph.json', graph => {
+    delete graph.nodes.find((node: { id: string }) => node.id === 'fetched').retry;
   });
 }
 
@@ -242,18 +247,19 @@ describe('a body past its bound', () => {
         await new Promise(done => setTimeout(done, 5));
       }
     }
-    // a registry that reads what it is handed to the end and says how its write ended
+    // the tree's registry on disk, watched: how each write ended
+    const store = new FileBlobStore(dirs[0]);
     const writes: string[] = [];
     const registry = {
-      async put(source: Readable) {
+      async put(source: Readable, meta: { contentType: string; filename?: string }) {
         try {
-          for await (const _ of source);
+          const handle = await store.put(source, meta);
           writes.push('stored');
+          return handle;
         } catch (error) {
           writes.push(`failed: ${(error as Error).message}`);
           throw error;
         }
-        return { id: 'x', contentType: 'text/csv', size: 0 };
       },
     } as unknown as BlobStore;
     const body = bounded(Readable.from(chunks()), { max: 1500, what: 'body', rest: 'drop' });
@@ -262,6 +268,9 @@ describe('a body past its bound', () => {
     ).rejects.toThrow('body exceeds 1500 bytes');
     // the decode waited for the write it began: by the time it rejected, the write had failed too
     expect(writes).toEqual(['failed: body exceeds 1500 bytes']);
+    // and the registry unlinked the half-written file (#581): nothing of the cut part is left on disk
+    expect(readdirSync(store.dir)).toEqual([]);
+    store.destroy();
   });
 
   it('a body under the bound is read as ever', async () => {
