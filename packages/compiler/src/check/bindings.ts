@@ -18,7 +18,6 @@ import {
   substitute,
   type Type,
   typeAt,
-  type Values,
 } from '@wilanis/core';
 import { passedInputs } from '../documents.js';
 import { checkCallRetry, checkGraphRetry } from './attempts.js';
