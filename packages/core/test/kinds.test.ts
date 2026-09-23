@@ -165,6 +165,21 @@ describe('project and feature', () => {
       refused(doc('project', { profiles: { prod: { bindings: { 'tasks.port.json': '@x/b.binding.json' } } } })),
     ).toEqual([at('profiles/prod/bindings', 'domain port path')]);
   });
+  it('a default profile naming a stand-in connection, and a startup step naming its profiles, conform', () => {
+    const connections = { '@connections/api.connection.json': '@connections/api-staging.connection.json' };
+    const profiles = { live: { default: true, bindings: {}, connections } };
+    const step = { run: '@x/p.port.json#op', profiles: ['live'] };
+    expect(refused(doc('project', { profiles, startup: [step] }))).toEqual([]);
+    expect(refused(doc('project', { startup: [{ ...step, profiles: [] }] }))).toEqual([
+      at('startup/0/profiles', 'fewer than 1 items'),
+    ]);
+    expect(refused(doc('project', { profiles: { live: { bindings: {}, default: 'yes' } } }))).toEqual([
+      at('profiles/live/default', 'must be boolean'),
+    ]);
+    expect(
+      refused(doc('project', { profiles: { live: { bindings: {}, connections: { api: '@x/a.json' } } } })),
+    ).toEqual([at('profiles/live/connections', 'A connection path')]);
+  });
   it('a feature lists kebab-case dependencies, exported paths and effect operations', () => {
     expect(refused(doc('feature', { dependsOn: ['Tasks'] }))).toEqual([
       at('dependsOn/0', 'feature folder', 'kebab-case'),

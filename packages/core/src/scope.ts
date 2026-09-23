@@ -1,12 +1,14 @@
 /**
  * The semantic view over a Registry that the checker and compiler share: resolving paths through project
  * aliases with feature visibility, addressing operations as path#operation, choosing a binding for a port
- * under a profile, classifying graphs as domain or data, and typing values with {{templates}}.
+ * and the connection a reference reaches under a profile, classifying graphs as domain or data, and typing
+ * values with {{templates}} (the typing itself in value-reads.ts, which knows nothing of the tree).
  */
 
 import { substitute } from './assign.js';
 import type {
   BindingDoc,
+  ConnectionDoc,
   DocByKind,
   Field,
   Kind,
@@ -18,9 +20,12 @@ import type {
 } from './model.js';
 import { type Loaded, type Registry, splitRef } from './registry.js';
 import type { Resolves } from './resolves.js';
-import { PLACEHOLDER, splitPath, TEMPLATE, WHOLE_TEMPLATE } from './templates.js';
+import { PLACEHOLDER } from './templates.js';
 import { type Read, STRING, type Type, TypeResolver, UNKNOWN } from './types.js';
-import { typeAt, typeOfValue } from './values.js';
+import { type ResolveRoot, templateReads, valueRead } from './value-reads.js';
+import { typeAt } from './values.js';
+
+export type { ResolveRoot } from './value-reads.js';
 
 export type GraphRole = 'domain' | 'data';
 
@@ -32,13 +37,6 @@ export interface OpHit {
   port: Loaded<PortDoc>;
 }
 
-/**
- * Types the root of a template read in the caller's context. A string answer is the reason it cannot be read;
- * undefined means the reason was already reported.
- */
-export type ResolveRoot = (root: string, path: string[]) => Read | string | undefined;
-
-const SCALARS = new Set(['string', 'number', 'boolean', 'unknown']);
 const OPEN_STRINGS: Type = { kind: 'object', fields: {}, open: STRING };
 const OPEN_UNKNOWN: Type = { kind: 'object', fields: {}, open: UNKNOWN };
 
@@ -121,6 +119,21 @@ export class Scope {
     if (all.length === 1) return all[0];
     if (all.length === 0) return `no binding implements port '${portPath}'`;
     return `port '${portPath}' has ${all.length} bindings (${all.map(binding => binding.path).join(', ')}) -- choose one in a project profile`;
+  }
+
+  /**
+   * The connection a reference to a connection reaches under a profile: the stand-in the profile maps it to,
+   * else the connection itself. The mapping is one step, so a stand-in that is itself a key is not followed.
+   */
+  connectionFor(connectionPath: string, profile?: string): Loaded<ConnectionDoc> | string {
+    const path = this.canon(connectionPath);
+    const declared = profile ? this.project?.profiles?.[profile]?.connections : undefined;
+    const standIn = declared ? Object.entries(declared).find(([ref]) => this.canon(ref) === path)?.[1] : undefined;
+    const found = this.get('connection', standIn ?? path);
+    if (found) return found;
+    return standIn
+      ? `profile '${profile}' names unknown connection '${standIn}' for '${path}'`
+      : `unknown connection '${path}'`;
   }
 
   /** The names of the profiles the project declares: the sets of choices a tree may be checked or run under. */
@@ -219,53 +232,7 @@ export class Scope {
    * A string answer is the reason it cannot be typed; undefined means the reason was already reported.
    */
   valueRead(value: unknown, resolve: ResolveRoot): Read | string | undefined {
-    if (typeof value === 'string') return this.stringRead(value, resolve);
-    if (Array.isArray(value)) return this.listRead(value, resolve);
-    if (value && typeof value === 'object') return this.objectRead(value as Record<string, unknown>, resolve);
-    return { type: typeOfValue(value), optional: false };
-  }
-
-  /** A whole template takes the type of what it reads; text with templates is a string, optional when any read is. */
-  private stringRead(value: string, resolve: ResolveRoot): Read | string | undefined {
-    const whole = WHOLE_TEMPLATE.exec(value);
-    if (whole) {
-      const [root, ...path] = splitPath(whole[1]);
-      return resolve(root, path);
-    }
-    let optional = false;
-    for (const match of value.matchAll(TEMPLATE)) {
-      const [root, ...path] = splitPath(match[1]);
-      const read = resolve(root, path);
-      if (typeof read !== 'object') return read;
-      if (!SCALARS.has(read.type.kind))
-        return `{{${match[1]}}} is ${read.type.kind}; only scalars interpolate into text`;
-      optional ||= read.optional;
-    }
-    return { type: value.includes('{{') ? STRING : typeOfValue(value), optional };
-  }
-
-  /** A list types as a list of its first member; every member must type. */
-  private listRead(value: unknown[], resolve: ResolveRoot): Read | string | undefined {
-    if (!value.length) return { type: { kind: 'list', of: UNKNOWN }, optional: false };
-    const first = this.valueRead(value[0], resolve);
-    if (typeof first !== 'object') return first;
-    for (const item of value.slice(1)) {
-      const read = this.valueRead(item, resolve);
-      if (typeof read !== 'object') return read;
-    }
-    return { type: { kind: 'list', of: first.type }, optional: false };
-  }
-
-  /** An object types field by field; a member that may be missing is an optional field. */
-  private objectRead(value: Record<string, unknown>, resolve: ResolveRoot): Read | string | undefined {
-    const fields: Record<string, { type: Type; required: boolean }> = {};
-    for (const [name, item] of Object.entries(value)) {
-      const read = this.valueRead(item, resolve);
-      if (read === undefined) return undefined;
-      if (typeof read === 'string') return `${name}: ${read}`;
-      fields[name] = { type: read.type, required: !read.optional };
-    }
-    return { type: { kind: 'object', fields, open: false }, optional: false };
+    return valueRead(value, resolve);
   }
 
   /**
@@ -282,16 +249,11 @@ export class Scope {
 
   /** Is the value a literal, free of templates? */
   literal(value: unknown): boolean {
-    return this.templateReads(value).length === 0;
+    return templateReads(value).length === 0;
   }
 
   /** All template roots+paths a value reads. */
   templateReads(value: unknown, out: string[][] = []): string[][] {
-    if (typeof value === 'string') for (const match of value.matchAll(TEMPLATE)) out.push(splitPath(match[1]));
-    else if (Array.isArray(value)) for (const item of value) this.templateReads(item, out);
-    else if (value && typeof value === 'object') {
-      for (const item of Object.values(value as Record<string, unknown>)) this.templateReads(item, out);
-    }
-    return out;
+    return templateReads(value, out);
   }
 }
