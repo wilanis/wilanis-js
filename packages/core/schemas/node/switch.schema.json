@@ -55,7 +55,7 @@
       "$ref": "../common.schema.json#/$defs/ident"
     },
     "catch": {
-      "description": "The nodes whose fault this switch routes, and where each goes: when a node named here breaks -- its handler threw something that is not a refusal, the graph it ran broke, its timeout struck -- the run goes on, this switch routes to the node named for it as if a rule had held, and the rules and `else` are not tried. A refusal is never caught. A node named here is one this switch reads (G021), and everything else that reads it is routed by this switch (G022); the node routed to reads nothing of it (G023). Only a data graph catches (L013), and only an effect can be caught (G024).",
+      "description": "The nodes whose fault this switch routes, and where each goes: when a node named here breaks -- its handler threw something that is not a refusal, the graph it ran broke, its timeout struck -- the run goes on, this switch routes to the node named for it as if a rule had held, and the rules and `else` are not tried. A refusal is never caught. A node named here is one this switch reads (G021), and everything else that reads it is routed by this switch (G022); nothing at or behind the node routed to reads it (G023). Only a data graph catches (L013), only an effect can be caught (G024), and a node a guard is lowered at is not caught (G025).",
       "type": "object",
       "propertyNames": {
         "$ref": "../common.schema.json#/$defs/ident"
