@@ -47,6 +47,12 @@ Dataflow. Nodes have explicit types: `@wilanis/node/run.schema.json`, `switch`, 
 sources have settled, and independent nodes run concurrently. `switch` routes to exactly one node and cancels
 the rest; `has(x)` in a rule proves `x` present for the routed node. Reconvergence happens only at `out.from`.
 
+A switch may say `catch` (optional): node id to node id. When a named node breaks (its handler threw something
+that is not a refusal, the graph it ran broke, its timeout struck), the run goes on and the switch routes to the
+node named for it, as if a rule had held; the rules and `else` are not tried. The caught node is one the switch
+reads (G021), read elsewhere only behind the switch (G022), and never read behind where its fault goes (G023);
+only an effect is caught (G024), and only in a data graph (L013).
+
 ## One way in
 
 A node's `in` gives every value an operation takes, in one grammar: a literal as written, or `{{fetched.status}}`
