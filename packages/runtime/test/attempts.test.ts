@@ -159,6 +159,35 @@ describe('a retried call whose run is cancelled', () => {
     expect(tried).toHaveLength(1);
     expect(attempted).toEqual([]);
   });
+
+  it('ends the wait between tries when the run is cancelled, and tries no more', async () => {
+    const run = new AbortController();
+    let tries = 0;
+    const base: Handler = async () => {
+      tries++;
+      throw new Error('the upstream dropped the call');
+    };
+    const attempted: unknown[] = [];
+    const ctx = {
+      nodePath: ['asked'],
+      site: 'asked',
+      signal: run.signal,
+      clock: Date.now,
+      attach: () => {},
+      attempted: (one: unknown) => attempted.push(one),
+      env: {},
+    } as RunContext;
+    const wrapped = attempting(base, new Map([['asked', { times: 2, backoffMs: 60_000 }]]));
+
+    const began = Date.now();
+    const ended = wrapped({ in: { item: 'a' }, ctx });
+    setTimeout(() => run.abort(), 20);
+
+    await expect(ended).rejects.toThrow('the upstream dropped the call');
+    expect(Date.now() - began).toBeLessThan(1000);
+    expect(tries).toBe(1);
+    expect(attempted).toEqual([]);
+  });
 });
 
 describe('a call that says neither word', () => {
