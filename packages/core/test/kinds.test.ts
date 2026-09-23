@@ -135,6 +135,10 @@ describe('trigger, kinds, connection, codec', () => {
     expect(refused(doc('connection-kind', { storage: true }))).toEqual([]);
     expect(refused(doc('connection-kind', { storage: 'yes' }))).toEqual([at('storage', 'must be boolean')]);
   });
+  it('a connection kind names leases as a boolean: a plugin registers a lease keeper for it', () => {
+    expect(refused(doc('connection-kind', { leases: true }))).toEqual([]);
+    expect(refused(doc('connection-kind', { leases: 'yes' }))).toEqual([at('leases', 'must be boolean')]);
+  });
   it('a codec yields declared or a type; the refusal names both', () => {
     expect(refused(doc('codec', { yields: 'maybe' }))).toEqual([at('yields', 'must be "declared", or', 'A type:')]);
     expect(refused(doc('codec', { yields: 'string' }))).toEqual([]);
