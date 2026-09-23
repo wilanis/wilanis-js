@@ -5,7 +5,8 @@
  * cycle (G007); out.from names nodes that answer the out type (G010); everything declared is read (G008,
  * and P005 for the `reads` map); an effect no switch routes is read on every branch (G015); no read is named
  * after a node (P006); constants conform (G013). A domain graph that only forwards its input is refused (L007),
- * and writes no retry or timeout (L012); a data graph's retry is judged in attempts.ts (G017, G018, G019).
+ * and writes no retry or timeout (L012) and catches nothing (L013); a data graph's retry is judged in attempts.ts
+ * (G017, G018, G019), and what its switches catch in graph-nodes.ts (G021 to G024).
  */
 import {
   conforms,
@@ -19,12 +20,13 @@ import {
   type Node,
   type OpHit,
   type RunNode,
+  type SwitchNode,
   show,
   type Type,
 } from '@wilanis/core';
 import { outputCandidates } from '../documents.js';
 import { answersOf, checkCallRetry } from './attempts.js';
-import { checkReason, checkSwitch, elementInputs } from './graph-nodes.js';
+import { checkCatches, checkReason, checkSwitch, elementInputs } from './graph-nodes.js';
 import { GraphReads } from './graph-reads.js';
 import { checkWhole } from './graph-whole.js';
 import { checkInputs } from './inputs.js';
@@ -103,6 +105,7 @@ class GraphCheck {
     });
     this.checkReadNames(resolvers);
     for (const node of this.nodes.values()) this.checkNode(node, reads);
+    if (this.role === 'data') this.checkCatches(reads);
     this.checkReadsUsed(resolvers, reads);
     reads.checkEffectsRouted(this.routedBy, outputCandidates(doc) ?? []);
     checkWhole({ refuse: this.refuse, doc, routedBy: this.routedBy, reads, outType });
@@ -175,12 +178,20 @@ class GraphCheck {
         continue;
       }
       this.nodes.set(node.id, node);
-      if (isSwitch(node)) continue;
-      const hit = this.judge.opAt(node.run, this.graph, `nodes/${node.id}/run`);
-      if (!hit) continue;
-      this.ops.set(node.id, hit);
-      this.checkOperationFits(node, hit);
+      this.checkFits(node);
     }
+  }
+
+  /** What a node may be in this role: a domain graph's switch catches nothing (L013); a call runs what the role may run. */
+  private checkFits(node: Node): void {
+    if (isSwitch(node)) {
+      if (this.role === 'domain' && node.catch) this.refuseCatch(node);
+      return;
+    }
+    const hit = this.judge.opAt(node.run, this.graph, `nodes/${node.id}/run`);
+    if (!hit) return;
+    this.ops.set(node.id, hit);
+    this.checkOperationFits(node, hit);
   }
 
   /**
@@ -225,6 +236,19 @@ class GraphCheck {
         hint,
       );
     }
+  }
+
+  /** G021 to G024, once every node is judged: what a data graph's switches catch. */
+  private checkCatches(reads: GraphReads): void {
+    const { refuse, nodes, routedBy, ops } = this;
+    checkCatches({ refuse, nodes, routedBy, ops, scope: this.judge.scope, dependencies: reads.narrowing.dependencies });
+  }
+
+  /** L013: what an effect breaking means is the data layer's, where the effect runs; a domain graph catches nothing. */
+  private refuseCatch(node: SwitchNode): void {
+    const hint =
+      "the domain says what is done; what an effect breaking means is the data layer's: catch it in the data graph that runs the effect";
+    this.refuse('L013', `domain graph's switch '${node.id}' declares catch`, `nodes/${node.id}/catch`, hint);
   }
 
   /** L012: a domain graph says what is done, never how long a call may take or how often it is tried. */

@@ -213,7 +213,8 @@ export class Compiler {
   private lowerNode(node: Node, roots: Roots, graphPath: string): KNode {
     if (isSwitch(node)) {
       const rules = node.rules.map(rule => ({ when: expr.compilePredicate(rule.when), to: rule.to, label: rule.when }));
-      return { kind: 'switch', in: lowerValues(node.in, roots), rules, else: node.else };
+      const caught = node.catch ? { catch: { ...node.catch } } : {};
+      return { kind: 'switch', in: lowerValues(node.in, roots), rules, else: node.else, ...caught };
     }
     const { handler, op } = this.handlerFor(node.run);
     const inputs = this.withScope(lowerValues(node.in, roots), { key: node.run, given: node.in });

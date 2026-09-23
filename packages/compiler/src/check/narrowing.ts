@@ -5,14 +5,16 @@
  * site the routing already established the rule for is proved, and needs no guard.
  *
  * "Routes to a node only when it held" is the whole claim, so it is asked of the switch as a whole rather
- * than of each rule alone: a node the same switch reaches twice -- by a second rule, or by `else` -- runs
- * both when a rule held and when it did not, and is established nothing. That distinction costs nothing
+ * than of each rule alone: a node the same switch reaches twice -- by a second rule, by `else`, or by a
+ * `catch` -- runs both when a rule held and when it did not, and is established nothing. The node a `catch`
+ * routes to is established nothing of its own either: the rules were never tried. That distinction costs nothing
  * while narrowing only drops an optionality, and drops a guard once an invariant leans on it.
  *
  * A conjunct is kept renamed -- the switch's input names rewritten to the read paths its `in` gives them --
  * so it says the same thing wherever it is asked about, in the one spelling every reader of the graph uses.
  */
 import { expr, isSwitch, type Node, type Scope, type SwitchNode, splitPath, WHOLE_TEMPLATE } from '@wilanis/core';
+import { targetsOf } from './graph-routing.js';
 import { readValuesOf } from './judge.js';
 import { atOrBelow } from './typing.js';
 
@@ -48,15 +50,16 @@ export function renamed(term: expr.Expr, rename: (root: string) => string[] | un
 export type Established = [string, expr.Expr];
 
 /**
- * The nodes one switch routes to by more than one way: a second rule, or a rule and `else` together. Arriving
- * at such a node says nothing about which way brought the run there, so nothing the switch tested is known of
- * it. A graph is free to write one -- two cases answered the same way is a fair thing to say -- and it simply
- * establishes nothing.
+ * The nodes one switch routes to by more than one way: a second rule, a rule and `else` together, or a rule
+ * and a `catch`. Arriving at such a node says nothing about which way brought the run there, so nothing the
+ * switch tested is known of it. A graph is free to write one -- two cases answered the same way is a fair
+ * thing to say -- and it simply establishes nothing. A caught fault routes with no rule tried at all, so a
+ * rule that also routes to its target proves nothing there either.
  */
 function reachedTwice(node: SwitchNode): Set<string> {
   const out = new Set<string>();
   const once = new Set<string>();
-  for (const target of [...node.rules.map(rule => rule.to), node.else]) {
+  for (const target of targetsOf(node)) {
     if (once.has(target)) out.add(target);
     once.add(target);
   }

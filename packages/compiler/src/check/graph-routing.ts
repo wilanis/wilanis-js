@@ -5,8 +5,12 @@
  * answers whether a node sits behind any switch; `branchesOf` answers behind which branch of which; and
  * `readOnSomeBranchesOnly` puts the two together for G015, over the one walk G008 and G010 make.
  */
-import { isSwitch, type Node } from '@wilanis/core';
-import { targetsOf } from './graph-nodes.js';
+import { isSwitch, type Node, type SwitchNode } from '@wilanis/core';
+
+/** Every node a switch can route to: a rule's, the fallback, and where each fault it catches goes. */
+export function targetsOf(node: SwitchNode): string[] {
+  return [...node.rules.map(rule => rule.to), node.else, ...Object.values(node.catch ?? {})];
+}
 
 /** Who routes whom and who reads whom: what every question about a graph's routing is asked over. */
 export interface Routing {

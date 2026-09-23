@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/node/switch.schema.json",
   "title": "node/switch",
-  "description": "Route to exactly one node. Rules are tried in order over this node's inputs; the first that holds names the node that runs, else the fallback. Every other candidate, and everything reachable only through it, is cancelled. Expressions: has(path), comparisons, && || !, len(x).",
+  "description": "Route to exactly one node. Rules are tried in order over this node's inputs; the first that holds names the node that runs, else the fallback; a `catch` routes a named node's fault. Every other candidate, and everything reachable only through it, is cancelled. Expressions: has(path), comparisons, && || !, len(x).",
   "type": "object",
   "properties": {
     "type": {
@@ -53,6 +53,16 @@
     },
     "else": {
       "$ref": "../common.schema.json#/$defs/ident"
+    },
+    "catch": {
+      "description": "The nodes whose fault this switch routes, and where each goes: when a node named here breaks -- its handler threw something that is not a refusal, the graph it ran broke, its timeout struck -- the run goes on, this switch routes to the node named for it as if a rule had held, and the rules and `else` are not tried. A refusal is never caught. A node named here is one this switch reads (G021), and everything else that reads it is routed by this switch (G022); the node routed to reads nothing of it (G023). Only a data graph catches (L013), and only an effect can be caught (G024).",
+      "type": "object",
+      "propertyNames": {
+        "$ref": "../common.schema.json#/$defs/ident"
+      },
+      "additionalProperties": {
+        "$ref": "../common.schema.json#/$defs/ident"
+      }
     }
   },
   "required": [

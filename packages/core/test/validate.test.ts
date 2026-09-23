@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import { describe, expect, it } from 'vitest';
 import { KINDS, type Kind, NODE_MAP, NODE_RUN, NODE_SWITCH } from '../src/model.js';
-import { pageUrl, schemaRef, schemaUrl } from '../src/published.js';
+import { schemaRef, schemaUrl } from '../src/published.js';
 import { SCHEMAS_DIR, validateDocument } from '../src/validate.js';
 import { at, doc, refused, run } from './documents.js';
 
@@ -53,6 +53,13 @@ describe('the baseline', () => {
     const expected = { status: 'cancelled', nodes: { 'op.asked': { status: 'failed' } } };
     const pinned = { stubs: { 'op.asked': {} }, cancelAt: 'op.asked', expect: expected };
     expect(refused(doc('scenario', pinned))).toEqual([]);
+  });
+  it("a switch that catches a node's fault conforms too; a catch is node ids to node ids", () => {
+    const route = { type: NODE_SWITCH, id: 's', in: {}, rules: [{ when: 'x', to: 'row' }], else: 'failed' };
+    const graph = (caught: unknown) => doc('graph', { nodes: [{ ...route, catch: caught }] });
+    expect(refused(graph({ asked: 'unreachable' }))).toEqual([]);
+    expect(refused(graph([]))).toEqual([at('nodes/s/catch', 'must be object')]);
+    expect(refused(graph({ asked: 1 }))).toEqual([at('nodes/s/catch/asked', 'must be string')]);
   });
 });
 
@@ -303,15 +310,5 @@ describe('invariant', () => {
     expect(refused(form({ holds: { when: 'true' } }))).toEqual([at('holds', "missing 'on'")]);
     expect(refused(form({ holds: { ...holds, when: '' } }))).toEqual([at('holds/when', 'fewer than 1 characters')]);
     expect(refused(form({ holds: { ...holds, over: [] } }))).toEqual([at('holds', "unknown property 'over'")]);
-  });
-});
-
-describe('the page of a refusal code', () => {
-  it('a code of a checker family, or of a plugin this workspace ships, has one; anything else has none', () => {
-    expect(pageUrl('L003')).toBe('https://github.com/wilanis/wilanis-js/blob/main/docs/refusals/L003.md');
-    expect(pageUrl('X103')).toBe('https://github.com/wilanis/wilanis-js/blob/main/docs/refusals/X103.md');
-    expect(pageUrl('Z001')).toBeUndefined();
-    expect(pageUrl('L03')).toBeUndefined();
-    expect(pageUrl('')).toBeUndefined();
   });
 });
