@@ -124,7 +124,13 @@ export const multipart: Codec = {
     const found = /boundary=("?)([^";]+)\1/i.exec(ct);
     if (!found) throw new Error('multipart body without boundary');
     const parts = new MultipartParts(found[2], blobs);
-    for await (const chunk of body) parts.feed(chunk as Buffer);
+    try {
+      for await (const chunk of body) parts.feed(chunk as Buffer);
+    } catch (error) {
+      // a body cut mid-part (past its bound, a dropped socket) fails the file being written, not leaves it open
+      await parts.abort(error as Error);
+      throw error;
+    }
     return judge(coerceFields(await parts.end(), declared), declared);
   },
   encode() {
