@@ -40,7 +40,12 @@ export class FileBlobStore implements BlobStore {
     counted.on('data', (chunk: Buffer | string) => {
       size += typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.length;
     });
-    await pipeline(counted, createWriteStream(join(this.dir, id)));
+    const file = join(this.dir, id);
+    // A write cut short never becomes a handle, so no scope would release it: the partial file goes here.
+    await pipeline(counted, createWriteStream(file)).catch(async (error: unknown) => {
+      await unlink(file).catch(() => undefined);
+      throw error;
+    });
     const handle: BlobHandle = {
       id,
       contentType: meta.contentType,
