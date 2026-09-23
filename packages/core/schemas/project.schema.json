@@ -139,6 +139,16 @@
             "description": "Whether serving may proceed when this step refuses. true (the default): serve stops and exits nonzero, so a tree whose database is unreachable never opens its port. false: the refusal is logged, the remaining steps run, and the trigger kinds start anyway.",
             "type": "boolean",
             "default": true
+          },
+          "profiles": {
+            "description": "The profiles this step runs under, by name; absent: every profile. Every name is one project.json declares (B012). The startup list stays one list in one order, so a reader sees at the root what every place starts.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            },
+            "uniqueItems": true,
+            "minItems": 1
           }
         },
         "required": [
@@ -160,7 +170,7 @@
       }
     },
     "profiles": {
-      "description": "Named sets of bindings, so one tree can be met differently in different places: development against a fake, live against the real thing.",
+      "description": "The places a tree runs, so one tree can be met differently in each: which binding meets each domain port, which connection stands in for another, and which profile a start runs under when none is named.",
       "type": "object",
       "propertyNames": {
         "type": "string",
@@ -173,6 +183,22 @@
           "description": {
             "description": "What this profile is for, so a reader knows when to run under it.",
             "type": "string"
+          },
+          "default": {
+            "description": "The profile a start runs under when neither --profile nor WILANIS_PROFILE names one. At most one profile is the default (C017).",
+            "type": "boolean"
+          },
+          "connections": {
+            "description": "Which connection stands in for another under this profile: every reference to the left-hand connection reaches the right-hand one, a different connection document of the same kind (C018). The mapping is one step: a stand-in that is itself a key is not followed.",
+            "type": "object",
+            "propertyNames": {
+              "description": "A connection path (@...) the documents name, replaced under this profile by the connection it maps to.",
+              "type": "string",
+              "pattern": "^@"
+            },
+            "additionalProperties": {
+              "$ref": "common.schema.json#/$defs/path"
+            }
           },
           "bindings": {
             "description": "Which binding meets each domain port under this profile. Every domain port needs exactly one (B002).",

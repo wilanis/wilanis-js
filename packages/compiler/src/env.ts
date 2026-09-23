@@ -39,18 +39,45 @@ class Secrets {
   }
 }
 
+/** One connection as a handler reads it: its kind, and its settings with every secret substituted. */
+interface Connection {
+  kind: string;
+  settings: Settings;
+}
+
 /**
- * The environment handlers see: connections with secrets substituted, plugin settings, a type resolver, and
- * the `resolves` view of the tree a stubbed effect binds its variables through.
+ * Every connection a handler may ask for, keyed by the path the documents name, each answering the settings of
+ * the connection `connectionFor` reaches under the profile. A handler asking for a connection a stand-in
+ * replaces receives the stand-in's settings and never learns a stand-in exists. Every connection is substituted,
+ * so `missing` notes what it noted before profiles chose stand-ins.
  */
-export function buildEnv(scope: Scope, env: NodeJS.ProcessEnv = process.env): { env: Settings; missing: string[] } {
-  const project = scope.project;
-  const secrets = new Secrets(project?.secrets ?? {}, env);
-  const connections: Record<string, { kind: string; settings: Settings }> = {};
+function connectionsOf(scope: Scope, secrets: Secrets, profile: string | undefined): Record<string, Connection> {
+  const own: Record<string, Connection> = {};
   for (const connection of scope.registry.all('connection')) {
     const settings = secrets.substitute(connection.doc.settings) as Settings;
-    connections[connection.path] = { kind: scope.canon(connection.doc.kind), settings };
+    own[connection.path] = { kind: scope.canon(connection.doc.kind), settings };
   }
+  const connections: Record<string, Connection> = {};
+  for (const path of Object.keys(own)) {
+    const reached = scope.connectionFor(path, profile);
+    connections[path] = typeof reached === 'string' ? own[path] : (own[reached.path] ?? own[path]);
+  }
+  return connections;
+}
+
+/**
+ * The environment handlers see under a profile: connections with secrets substituted (a stand-in's under the
+ * name it stands in for), plugin settings, a type resolver, and the `resolves` view of the tree a stubbed
+ * effect binds its variables through.
+ */
+export function buildEnv(
+  scope: Scope,
+  env: NodeJS.ProcessEnv = process.env,
+  profile?: string,
+): { env: Settings; missing: string[] } {
+  const project = scope.project;
+  const secrets = new Secrets(project?.secrets ?? {}, env);
+  const connections = connectionsOf(scope, secrets, profile);
   const plugins: Record<string, Settings> = {};
   for (const use of project?.plugins ?? []) plugins[use.use] = secrets.substitute(use.settings ?? {}) as Settings;
   const resolveType = (ref: string) => scope.types.spec(ref);

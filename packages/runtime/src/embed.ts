@@ -96,7 +96,7 @@ export class Embedder {
     this.clock = opts.clock ?? Date.now;
     this.compiler = new Compiler(scope, plugins, opts);
     const processEnv = opts.env ?? process.env;
-    const built = buildEnv(scope, processEnv);
+    const built = buildEnv(scope, processEnv, opts.profile);
     this.secrets = Object.fromEntries(
       Object.entries(scope.project?.secrets ?? {}).map(([name, value]) => [name, processEnv[value] ?? '']),
     );

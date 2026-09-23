@@ -86,6 +86,24 @@ export interface StartupStep {
   required?: boolean;
   label?: string;
   description?: string;
+  /** The profiles this step runs under; absent, every profile (RFC 0013). */
+  profiles?: string[];
+}
+
+/** Does a startup step run under a profile? A step naming no profiles runs under every one, the unnamed one included. */
+export function runsUnder(step: StartupStep, profile: string | undefined): boolean {
+  return !step.profiles || (profile !== undefined && step.profiles.includes(profile));
+}
+
+/**
+ * One place a tree runs (RFC 0013): which binding meets each domain port, which connection stands in for a
+ * connection the documents name (one step, same kind), and whether a start that names no profile runs this one.
+ */
+export interface ProfileDoc {
+  description?: string;
+  default?: boolean;
+  bindings: Record<string, string>;
+  connections?: Record<string, string>;
 }
 
 export interface ProjectDoc extends Envelope {
@@ -103,7 +121,7 @@ export interface ProjectDoc extends Envelope {
   secrets?: Record<string, string>;
   /** What runs once when the tree is served, in order, after every plugin's postLoad and before any trigger kind starts: `required` (the default) stops serve when the step refuses. */
   startup?: StartupStep[];
-  profiles?: Record<string, { description?: string; bindings: Record<string, string> }>;
+  profiles?: Record<string, ProfileDoc>;
   /** The blob registry's directory; absent: under the system temp dir. */
   /** Where the blob registry keeps bytes: files under `dir`, or behind `connection`, a kind some plugin offers a blob store for. */
   blobs?: { dir?: string; connection?: string };

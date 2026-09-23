@@ -39,7 +39,7 @@ property is described.
 
 | kind | what it is | where |
 |---|---|---|
-| `project` | aliases, plugins (`use`, `from`, `settings` incl. the codecs table), includes (trees whose features load here), secrets, startup, profiles | `project.json` |
+| `project` | aliases, plugins (`use`, `from`, `settings` incl. the codecs table), includes (trees whose features load here), secrets, startup (a step's `profiles` names where it runs; absent, everywhere), profiles (`bindings`; `connections`, a stand-in of the same kind per connection; `default`, the one a start that names none runs) | `project.json` |
 | `feature` | dependsOn, exports, effects allowlist | `features/<name>/feature.json` |
 | `shape` | a named object type; `layer: edge` (the world's) or `core` (ours); a list field may say `maxItems` | `edge/` or `domain/` |
 | `port` | a contract: operations with accepts / returns, each maybe `pure`, `refuses`, `holds` or `transactional`; a field may be `static`; an operation may say `idempotent` (always, or when an expression over its inputs holds) or name its `key` | `domain/` |

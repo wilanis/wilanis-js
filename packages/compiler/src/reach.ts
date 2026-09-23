@@ -17,6 +17,7 @@ import {
   type Loaded,
   type Operation,
   policyPath,
+  runsUnder,
   type Scope,
   splitRef,
   type Values,
@@ -159,9 +160,10 @@ export interface Reach {
 
 /**
  * The reach of one profile, pure over the loaded tree. Its roots are every trigger's `fire`, every policy a
- * trigger attaches, every operation of a port a plugin requires (RFC 0005), and every startup step; a policy
- * no trigger attaches runs nowhere and is not walked. Until RFC 0013 step 2 lands, every step runs under every
- * profile and a connection stands in for itself: `startup[].profiles` and `connectionFor` narrow both there.
+ * trigger attaches, every operation of a port a plugin requires (RFC 0005), and every startup step that runs
+ * under the profile (`startup[].profiles`); a policy no trigger attaches runs nowhere and is not walked. A
+ * connection a site names is the one `connectionFor` reaches under the profile: a stand-in replaces what it
+ * stands in for, and its settings are the ones whose secrets the reach reads.
  */
 export function reachOf(scope: Scope, profile: string | undefined): Reach {
   return rooted(new Reaching(scope, profile)).done();
@@ -191,7 +193,7 @@ class Reaching implements Listener<Root> {
 
   constructor(
     private readonly scope: Scope,
-    profile: string | undefined,
+    private readonly profile: string | undefined,
     /** Where each graph entered is written, for a reader after the graphs rather than the effects. */
     private readonly graphs?: string[],
   ) {
@@ -207,12 +209,19 @@ class Reaching implements Listener<Root> {
   /** A native site: kept where its operation is not pure, with the connection its inputs name. */
   native(site: NativeSite<Root>): void {
     if (site.op.pure === true) return;
-    const connection = connectionOf(this.scope, site.op, site.given);
+    const connection = this.standingIn(connectionOf(this.scope, site.op, site.given));
     const holds = site.op.holds === true;
     const { key, root, binding, file, node } = site;
     this.found.operations.push({ key, root, binding, connection, holds, file, node });
     if (connection && !this.found.connections.includes(connection)) this.found.connections.push(connection);
     if (holds && !this.found.holds.includes(key)) this.found.holds.push(key);
+  }
+
+  /** The connection a named one reaches under the profile: its stand-in, else itself where the stand-in is unknown (R001). */
+  private standingIn(named: string | undefined): string | undefined {
+    if (!named) return undefined;
+    const reached = this.scope.connectionFor(named, this.profile);
+    return typeof reached === 'string' ? named : reached.path;
   }
 
   /** Every trigger's `fire`, and the `decide` of every policy some trigger attaches, each policy once. */
@@ -250,9 +259,10 @@ class Reaching implements Listener<Root> {
     }
   }
 
-  /** Every startup step: what it runs, and the secrets its `in` reads. */
+  /** Every startup step that runs under the profile: what it runs, and the secrets its `in` reads. */
   startup(): void {
     for (const [index, step] of (this.scope.project?.startup ?? []).entries()) {
+      if (!runsUnder(step, this.profile)) continue;
       const root: Root = { kind: 'startup', file: this.projectPath, run: step.run };
       const node = `startup/${index}`;
       this.walk.follow({ run: step.run, given: step.in, file: this.projectPath, node, binding: undefined, root });
