@@ -14,7 +14,7 @@
 
 import { checkTree } from '@wilanis/compiler';
 import type { GraphDoc, Kind, Loaded, LoadResult, PolicyDoc, Refusal, TriggerDoc } from '@wilanis/core';
-import { policyPath, SCHEMA_BASE, Scope, WILANIS } from '@wilanis/core';
+import { pageUrl, policyPath, SCHEMA_BASE, Scope, WILANIS } from '@wilanis/core';
 import { limitsOf } from '@wilanis/runtime';
 import { attemptsOf } from './attempts.js';
 import { graphView } from './graphs.js';
@@ -157,6 +157,15 @@ export function treeReadsOf(load: LoadResult): TreeReads {
   return { scope, index: referenceIndex(load, scope), refusals: checkTree(load).items };
 }
 
+/** A refusal as a page shows it: the checker's, and the `url` of its code's page, absent for a code with none. */
+export type VRefusal = DocView['refusals'][number];
+
+/** A refusal with the page about its code attached, so the page links a code without knowing where pages live. */
+export function refusalView(refusal: Refusal): VRefusal {
+  const url = pageUrl(refusal.code);
+  return url ? { ...refusal, url } : { ...refusal };
+}
+
 /** What every kind carries: where it sits, what it says, and the references it makes and receives. */
 function baseView(reads: TreeReads, doc: Loaded): DocView {
   const { scope, index, refusals } = reads;
@@ -182,7 +191,7 @@ function baseView(reads: TreeReads, doc: Loaded): DocView {
         at: reference.at,
       })),
     callers: callersOf(doc.path, index, scope),
-    refusals: refusals.filter(refusal => refusal.file === doc.path || `@${refusal.file}` === doc.path),
+    refusals: refusals.filter(refusal => refusal.file === doc.path || `@${refusal.file}` === doc.path).map(refusalView),
   };
 }
 

@@ -82,6 +82,8 @@
   .details .desc { color: var(--dim); font-size: 11px; padding: 0 0 4px; }
   .details .ref { display: block; padding: 4px 0; border-bottom: 1px solid #1d242d; } .details .ref .sub { display: block; color: var(--dim); font-size: 11px; font-family: var(--mono); } .details .ref .via { color: #c792ea; }
   .details .refusal { border-left: 3px solid var(--bad); padding: 4px 8px; margin: 6px 0; font-size: 12px; } .details .refusal code { color: var(--bad); } .details .refusal .hint { color: var(--muted); }
+  .details .refusal a.code { text-decoration: none; } .details .refusal a.code:hover code { text-decoration: underline; }
+  .details .refusal .fix { margin-top: 3px; color: var(--ok); } .details .refusal .fix code { color: var(--ok); } .details .refusal .fix ul { margin: 2px 0 0; padding-left: 16px; }
   .details .file { font-family: var(--mono); font-size: 11px; color: var(--dim); overflow-wrap: anywhere; }
   .details .primary { display: inline-block; margin: 6px 0; padding: 5px 12px; border-radius: 6px; background: #223042; color: #fff; } .details .primary:hover { text-decoration: none; background: #2a3b52; }
   .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; }
@@ -127,7 +129,7 @@
     <span class="brand">wilanis</span>
     <button id="back" title="back">&larr;</button>
     <button id="fwd" title="forward">&rarr;</button>
-    <div class="crumb"><span id="kind" class="badge"></span><span id="title" class="title"></span><span id="role" class="badge" hidden></span><span id="atomic" class="badge ok" hidden></span><span id="refusals" class="badge bad" hidden></span><span id="path" class="path"></span></div>
+    <div class="crumb"><span id="kind" class="badge"></span><span id="title" class="title"></span><span id="role" class="badge" hidden></span><span id="atomic" class="badge ok" hidden></span><button id="refusals" class="badge bad" title="list this document's refusals" hidden></button><span id="path" class="path"></span></div>
     <button id="source" title="show the JSON document">{ } source</button>
     <span id="status" class="status"></span>
   </header>
@@ -142,7 +144,7 @@
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
-  const state = { index: null, view: null, selected: null, version: null, transform: { x: 40, y: 40, k: 1 }, current: null, fit: false, source: false };
+  const state = { index: null, view: null, selected: null, version: null, transform: { x: 40, y: 40, k: 1 }, current: null, fit: false, source: false, refusalsOpen: false };
   const ARROW = '↗', ELLIPSIS = '…', SEP = ' › ', TO = ' → ', FROM = '← ';
   /** How one conjunct was established at a site, in the words RFC 0007 asks a reader to be told. */
   const heldSaid = (h) => h.by === 'narrowed' ? "narrowed by '" + h.switch + "'" : h.by === 'through' ? "from '" + h.node + "'" : 'literal';
@@ -189,6 +191,8 @@
   window.addEventListener('hashchange', () => { void route(); });
   $('back').onclick = () => history.back();
   $('fwd').onclick = () => history.forward();
+  // the refusal badge opens the list: the document's own details, scrolled to its refusals
+  $('refusals').onclick = () => { state.refusalsOpen = true; if (currentNode()) go(currentPath()); else renderDetails(); };
   $('source').onclick = () => { state.source = !state.source; $('source').classList.toggle('on', state.source); renderMain(); };
 
   async function route() {
@@ -796,7 +800,7 @@
   function renderDetails() {
     const box = $('details'); box.textContent = '';
     const v = state.view;
-    if (!v || v.error) { if (v && v.refusals && v.refusals.length) { box.appendChild(el('h4', null, 'refusals')); for (const r of v.refusals) box.appendChild(refusalEl(r)); } return; }
+    if (!v || v.error) { if (v && v.refusals) refusalsEl(box, v.refusals); return; }
     const node = state.selected && v.graph ? v.graph.nodes.find(n => n.id === state.selected) : null;
     if (node) { renderNodeDetails(box, node, v); return; }
     box.appendChild(el('h3', null, v.label));
@@ -810,7 +814,7 @@
       return;
     }
     if (v.graph && v.graph.atomic) box.appendChild(atomicEl(v.graph.atomic));
-    if (v.refusals.length) { box.appendChild(el('h4', null, 'refusals')); for (const r of v.refusals) box.appendChild(refusalEl(r)); }
+    refusalsEl(box, v.refusals);
     const callers = v.callers.filter(c => c.kind !== 'project' || v.kind !== 'feature');
     if (v.kind === 'trigger') { box.appendChild(el('h4', null, 'a way in')); box.appendChild(el('p', null, 'A trigger is where a run starts: nothing in the tree calls it.')); }
     else if (v.kind === 'policy') { box.appendChild(el('h4', null, `gates (${(v.gates || []).length})`)); if (!(v.gates || []).length) box.appendChild(el('p', null, 'no trigger names this policy')); for (const g of v.gates || []) { const r = el('div', 'ref'); r.appendChild(badge('trigger')); r.appendChild(document.createTextNode(' ')); r.appendChild(link(g.path, g.label)); box.appendChild(r); } }
@@ -844,12 +848,47 @@
     return p.join(SEP);
   }
 
+  /** A document's refusals under one heading; when the badge asked for them, scrolled into view. */
+  function refusalsEl(box, refusals) {
+    if (!refusals.length) { state.refusalsOpen = false; return; }
+    const h = el('h4', null, `refusals (${refusals.length})`); box.appendChild(h);
+    for (const r of refusals) box.appendChild(refusalEl(r));
+    if (state.refusalsOpen) { state.refusalsOpen = false; h.scrollIntoView({ block: 'start' }); }
+  }
+  /** One refusal: its code linked to the code's page, where in the document, what is wrong, the hint, and the edits that fix it. */
   function refusalEl(r) {
     const d = el('div', 'refusal');
-    d.appendChild(el('code', null, r.code + ' '));
-    d.appendChild(document.createTextNode((r.at ? r.at + ': ' : '') + r.message));
+    const code = el('code', null, r.code);
+    if (r.url) { const a = el('a', 'code'); a.href = r.url; a.target = '_blank'; a.rel = 'noopener'; a.title = 'what ' + r.code + ' refuses, and how to fix it'; a.appendChild(code); d.appendChild(a); }
+    else d.appendChild(code);
+    d.appendChild(document.createTextNode(' ' + (r.at ? r.at + ': ' : '') + r.message));
     if (r.hint) d.appendChild(el('div', 'hint', TO.trim() + ' ' + r.hint));
+    if (r.fixes && r.fixes.length) d.appendChild(fixesEl(r));
     return d;
+  }
+  /** The edits a refusal offers, each enough alone and the first preferred; an edit to another document names it. */
+  function fixesEl(r) {
+    const box = el('div', 'fix');
+    const bare = (file) => file.replace(/^@/, '');
+    const one = (f) => {
+      const s = frag(el('code', null, fixText(f)));
+      if (!('move' in f) && bare(f.file) !== bare(r.file)) s.appendChild(frag(' in ', f.file.startsWith('@') ? link(f.file, f.file) : el('code', null, f.file)));
+      return s;
+    };
+    if (r.fixes.length === 1) { box.appendChild(frag('fix: ', one(r.fixes[0]))); return box; }
+    box.appendChild(frag('fix, any one of:'));
+    const list = el('ul');
+    for (const f of r.fixes) { const li = el('li'); li.appendChild(one(f)); list.appendChild(li); }
+    box.appendChild(list);
+    return box;
+  }
+  /** A fix said as the edit it is: `add "…" to effects`, `set "…" at nodes/asked/run`, `remove nodes/asked/in`, `move to connections/x.connection.json`. */
+  function fixText(f) {
+    if ('move' in f) return 'move to ' + f.move;
+    if ('add' in f) return 'add ' + JSON.stringify(f.add) + ' to ' + f.at;
+    if ('set' in f) return 'set ' + JSON.stringify(f.set) + ' at ' + f.at;
+    if ('remove' in f) return 'remove ' + f.at;
+    return JSON.stringify(f);
   }
 
   /** What one graph's `atomic` means: where the one transaction falls, and every reason that rolls it back. */

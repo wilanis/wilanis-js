@@ -271,7 +271,8 @@ export interface DocView {
   refs: VRef[];
   /** Documents that name this one, with where. */
   callers: VRef[];
-  refusals: Refusal[];
+  /** The checker's refusals of this document, each with the `url` of its code's page, absent for a code with none. */
+  refusals: (Refusal & { url?: string })[];
   graph?: { nodes: VNode[]; edges: VEdge[]; role: 'domain' | 'data'; atomic?: VAtomic };
   /** On a port: every binding that meets it, and what each does per operation. */
   implementations?: {

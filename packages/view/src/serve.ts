@@ -11,9 +11,9 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { PluginModule } from '@wilanis/core';
+import type { LoadResult, PluginModule } from '@wilanis/core';
 import { loadProject } from '@wilanis/runtime';
-import { indexOf, schemaRelOf, schemaViewOf, viewOf } from './model.js';
+import { indexOf, refusalView, schemaRelOf, schemaViewOf, viewOf } from './model.js';
 
 export interface ServeViewOptions {
   port?: number;
@@ -66,6 +66,12 @@ export function versionOf(root: string): string {
   return (hash >>> 0).toString(16);
 }
 
+/** What a path that names no document answers: why, and every refusal of the tree, each with the page about its code. */
+const missing = (path: string, load: LoadResult) => ({
+  error: `no document at '${path}'`,
+  refusals: load.refusals.items.map(refusalView),
+});
+
 /** Serve the viewer for the tree at root. Answers the URL and a way to stop. */
 export async function serveView(root: string, opts: ServeViewOptions = {}): Promise<ViewServer> {
   const log = opts.log ?? (() => {});
@@ -84,7 +90,7 @@ export async function serveView(root: string, opts: ServeViewOptions = {}): Prom
     if (!path) return json(res, 400, { error: 'path is required' });
     const load = await loadProject(root, { plugins: opts.plugins });
     const view = viewOf(load, path);
-    if (!view) return json(res, 404, { error: `no document at '${path}'`, refusals: load.refusals.items });
+    if (!view) return json(res, 404, missing(path, load));
     json(res, 200, view);
   };
   /** One schema, as the page shows it. */
