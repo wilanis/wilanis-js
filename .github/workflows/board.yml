@@ -38,16 +38,22 @@ jobs:
       # cannot write an organization project.
       GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
     steps:
+      # Until the secret exists the job says so and skips, rather than failing every event it runs on.
+      - name: the token is there
+        id: token
+        run: |
+          if [ -n "$GH_TOKEN" ]; then echo "set=true" >> "$GITHUB_OUTPUT"
+          else echo "::warning::the PROJECT_TOKEN secret is not set, so the board is not synced: see .github/board/README.md"; fi
       - uses: actions/checkout@v4
+        if: steps.token.outputs.set == 'true'
         with:
           sparse-checkout: .github/board
       - uses: actions/setup-node@v4
+        if: steps.token.outputs.set == 'true'
         with:
           node-version: 24
-      - name: the token is there
-        run: |
-          [ -n "$GH_TOKEN" ] || { echo "the PROJECT_TOKEN secret is not set: see .github/board/README.md"; exit 1; }
       - name: sync
+        if: steps.token.outputs.set == 'true'
         env:
           EVENT: ${{ github.event_name }}
           ISSUE: ${{ github.event.issue.number }}
