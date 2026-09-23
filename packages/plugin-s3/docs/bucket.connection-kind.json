@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/connection-kind.schema.json",
+  "label": "A bucket of an object store",
+  "description": "One bucket of an object store speaking the S3 API, where the tree's blobs are kept when project.json → blobs.connection names a connection of this kind. Every object is keyed <prefix>/<run id>/<uuid>, so the key says which run put it; a handle whose id is not of that form opens nothing. The credentials are secrets; the rest are facts about this one bucket.",
+  "settings": {
+    "fields": {
+      "endpoint": {
+        "type": "string",
+        "description": "the URL the store answers at, e.g. http://minio.wilanis.svc:9000"
+      },
+      "region": {
+        "type": "string",
+        "description": "the region the store signs requests for; MinIO answers any, and us-east-1 is its default"
+      },
+      "bucket": {
+        "type": "string",
+        "description": "the bucket the blobs are kept in; it must exist, since the plugin never creates one"
+      },
+      "prefix": {
+        "type": "string",
+        "required": false,
+        "description": "the key every object starts with, so one bucket can hold several trees' blobs, e.g. customers/uploads. Absent: objects sit at the root of the bucket"
+      },
+      "accessKeyId": {
+        "type": "string",
+        "secret": true,
+        "description": "the access key the requests are signed with, read as {{secrets.*}}"
+      },
+      "secretAccessKey": {
+        "type": "string",
+        "secret": true,
+        "description": "the secret that goes with the access key, read as {{secrets.*}}"
+      },
+      "forcePathStyle": {
+        "type": "boolean",
+        "required": false,
+        "description": "true: address the bucket as <endpoint>/<bucket> rather than <bucket>.<endpoint>, which MinIO and most stores that are not AWS need. Absent: true"
+      }
+    }
+  }
+}

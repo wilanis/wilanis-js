@@ -1,0 +1,55 @@
+{
+  "name": "@wilanis/plugin-s3",
+  "version": "0.1.0",
+  "description": "The @s3 plugin for wilanis: the tree's blob registry kept in a bucket of an object store speaking the S3 API, streamed in and out.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Rafael Fontes <rfontes1987@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wilanis/wilanis-js.git",
+    "directory": "packages/plugin-s3"
+  },
+  "homepage": "https://github.com/wilanis/wilanis-js/tree/main/packages/plugin-s3#readme",
+  "bugs": "https://github.com/wilanis/wilanis-js/issues",
+  "keywords": [
+    "wilanis",
+    "dataflow",
+    "json-schema",
+    "declarative",
+    "s3",
+    "minio",
+    "blob",
+    "plugin"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@wilanis/core": "0.1.0",
+    "@wilanis/engine": "0.1.0"
+  },
+  "devDependencies": {
+    "@wilanis/compiler": "0.1.0",
+    "@wilanis/plugin-blob": "0.1.0",
+    "@wilanis/runtime": "0.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

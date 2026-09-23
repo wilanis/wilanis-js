@@ -41,6 +41,9 @@
       "path": "packages/plugin-otel"
     },
     {
+      "path": "packages/plugin-s3"
+    },
+    {
       "path": "packages/view"
     }
   ]

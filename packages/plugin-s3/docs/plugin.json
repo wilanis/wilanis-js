@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/plugin.schema.json",
+  "label": "Blobs in a bucket",
+  "description": "Keeps the tree's blob registry in one bucket of an object store speaking the S3 API -- MinIO, or anything else that speaks it -- so a handle written on one instance opens on another. It grants one connection kind and no port: no graph touches bytes, so the store is reached by the runtime when project.json → blobs.connection names a connection of this kind, never by a document. A file is streamed in as a multipart upload and streamed out as the body of a get; nothing is held whole. When the tree's blobs are kept here, the plugin puts and deletes one empty object under the prefix before anything starts, so a bucket it cannot write fails the start rather than the first upload.",
+  "grants": {
+    "connectionKinds": [
+      "@s3/bucket.connection-kind.json"
+    ]
+  }
+}

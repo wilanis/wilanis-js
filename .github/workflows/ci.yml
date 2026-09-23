@@ -62,9 +62,22 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
+      # the bucket store's suite runs against a real object store for the same reason; MinIO is started here
+      # rather than as a service because a service cannot be handed the `server /data` it needs to run
+      - name: an object store speaking the S3 API
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=wilanis -e MINIO_ROOT_PASSWORD=wilanis-secret \
+            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+          for attempt in $(seq 1 30); do
+            curl -sf http://127.0.0.1:9000/minio/health/live && exit 0
+            sleep 1
+          done
+          docker logs minio; exit 1
       - run: npm test
         env:
           WILANIS_TEST_POSTGRES_URL: postgres://postgres:wilanis@127.0.0.1:5432/customers
+          WILANIS_TEST_S3_ENDPOINT: http://127.0.0.1:9000
       - name: the example checks and rehearses, under each of its profiles
         run: |
           npx wilanis check example
