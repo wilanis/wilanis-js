@@ -1,6 +1,6 @@
 # RFC 0014: Outcome semantics: refusals, failures and faults, end to end
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:engine`, `area:core`, `area:compiler`, `area:runtime`, `area:plugin-http`, `area:view`
 - **Tracking issue:** #16
 - **Depends on:** none to accept. The run id a fault's answer quotes is RFC 0006's `Fired.id`, and the span statuses
