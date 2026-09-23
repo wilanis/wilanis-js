@@ -4,7 +4,7 @@
  * retry over something that cannot fail transiently is noise (G017); over a call that may already have been
  * applied, a second charge (G018); and its `when` reads the answer, so it types as boolean over the answer's
  * fields (G019). Whether a call is idempotent where it is made is `Judge.idempotentAt`'s answer, never this
- * module's.
+ * module's. A retry below an atomic graph is refused by G020 in `atomic.ts`, which reads the walk made there.
  */
 import {
   type BindingDoc,
@@ -71,11 +71,14 @@ export function checkCallRetry(judge: Judge, site: RetrySite, call: RetriedCall)
 /**
  * G017, G018, G019 for a binding operation that retries the graph it runs: the graph is judged by every effect
  * it reaches, under each profile that binds this binding (every profile, where none names it), so a domain
- * graph is held to whatever each profile's bindings run for it.
+ * graph is held to whatever each profile's bindings run for it. An atomic graph's transactional effects are
+ * not held to G018: a try that fails rolls them back, so the next try starts from nothing it applied.
  */
 export function checkGraphRetry(judge: Judge, site: RetrySite, binding: Loaded<BindingDoc>, graphPath: string): void {
   const graph = judge.scope.canon(graphPath);
-  judgeReached(judge, site, { what: graph, reach: profile => effectsOfGraph(judge.scope, graph, profile), binding });
+  const rolledBack = judge.scope.registry.get('graph', graph)?.doc.atomic === true;
+  const reach = (profile: string | undefined) => effectsOfGraph(judge.scope, graph, profile);
+  judgeReached(judge, site, { what: graph, reach, binding, rolledBack });
 }
 
 /** The profiles a binding is judged under: those that bind it, or every one when none names it. */
@@ -102,6 +105,8 @@ interface Reached {
   what: string;
   reach: (profile: string | undefined) => ReachedEffect[];
   binding?: Loaded<BindingDoc>;
+  /** The retried graph is atomic, so a transactional effect in it is rolled back by a try that fails. */
+  rolledBack?: boolean;
 }
 
 /** G017 when nothing effectful is reached under any profile; G018 once per effect that is not idempotent. */
@@ -128,11 +133,17 @@ function walkEffects(judge: Judge, reached: Reached): { effectful: boolean; unsa
       const hit = effectfulHit(judge.scope, effect);
       if (!hit) continue;
       effectful = true;
-      const reason = judge.idempotentAt(hit, effect.given);
+      const reason = unsafeAt(judge, reached, hit, effect.given);
       if (reason) noteUnsafe(unsafe, { effect, reason, profiles: [profile] });
     }
   }
   return { effectful, unsafe: [...unsafe.values()] };
+}
+
+/** Why repeating one reached effect is not safe, or nothing: a transaction the try rolls back repeats nothing. */
+function unsafeAt(judge: Judge, reached: Reached, hit: OpHit, given: Values | undefined): string | undefined {
+  if (reached.rolledBack && hit.op.transactional === true) return undefined;
+  return judge.idempotentAt(hit, given);
 }
 
 /** The operation a reached site names, when running it is an effect: native, not pure. */

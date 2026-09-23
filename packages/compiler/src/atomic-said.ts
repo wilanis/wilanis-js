@@ -18,7 +18,7 @@
  * where it reaches nothing transactional, so what is described here is a graph waiting to be bound.
  */
 import type { GraphDoc, Loaded, Scope } from '@wilanis/core';
-import { atomicReachOf, profilesReaching } from './check/atomic.js';
+import { atomicReachOf, profilesReaching } from './check/atomic-reach.js';
 import { refusalsOfGraph } from './refusals.js';
 
 /** What one atomic graph commits, where, and what undoes it. */
