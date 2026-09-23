@@ -8,7 +8,7 @@
 // `--dry` prints each write instead of making it.
 
 import { branches, issues, project, servedBy } from './github.mjs';
-import { cached, context, remember, syncIssue } from './sync.mjs';
+import { cached, context, linkIssue, placeIssue, remember, syncIssue } from './sync.mjs';
 import { claimOf } from './derive.mjs';
 
 const [command, ...rest] = process.argv.slice(2);
@@ -49,7 +49,10 @@ async function syncAll(ctx) {
   const week = new Date(Date.now() - 7 * 86400e3).toISOString().slice(0, 10);
   const all = [...(await issues('is:open')), ...(await issues(`is:closed closed:>=${week}`))];
   remember(ctx, all);
-  for (const issue of all) await syncIssue(ctx, issue);
+  // Every link first: a tracking issue's checklist blocks its steps, and a step placed before its tracking
+  // issue was linked would be placed on blockers it did not have yet.
+  for (const issue of all) await linkIssue(ctx, issue);
+  for (const issue of all) await placeIssue(ctx, issue);
   console.log(`synced ${all.length} issues`);
 }
 
