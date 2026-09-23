@@ -31,7 +31,15 @@ import { checkCatches, checkReason, checkSwitch, elementInputs } from './graph-n
 import { GraphReads } from './graph-reads.js';
 import { checkWhole } from './graph-whole.js';
 import { checkInputs } from './inputs.js';
-import { type Effects, type Judge, type JudgedResolver, RESERVED, type Refuser, type ShapeLayer } from './judge.js';
+import {
+  allowing,
+  type Effects,
+  type Judge,
+  type JudgedResolver,
+  RESERVED,
+  type Refuser,
+  type ShapeLayer,
+} from './judge.js';
 import { resolversFor } from './resolvers.js';
 
 /**
@@ -224,7 +232,7 @@ class GraphCheck {
         'L003',
         `node '${node.id}' runs effectful '${key}' which the feature does not allow`,
         at,
-        `add "${key}" to ${this.effects.at}`,
+        allowing(this.effects, key),
       );
     }
     if (this.role === 'domain') this.checkNoAttempts(node);
