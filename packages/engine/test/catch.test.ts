@@ -143,6 +143,23 @@ describe('a switch that catches a fault', () => {
     expect(report.status).toBe('failed');
     expect(outcomeOf(report)).toEqual({ kind: 'faulted', at: 'asked', error: 'boom' });
   });
+  it('cancelled after it caught the fault routes nothing: the fault still ends the run', async () => {
+    const spec = getRow(call('boom'));
+    spec.nodes.slow = call('sleep', { ms: 30, tag: 'slow' });
+    spec.nodes.gate = {
+      kind: 'switch',
+      in: { slow: { ref: 'slow', path: [] } },
+      rules: [{ when: () => false, to: 'route', label: 'never' }],
+      else: 'elsewhere',
+    };
+    spec.nodes.elsewhere = call('echo', { at: 'elsewhere' });
+    spec.nodes.asked = call('sleepOrBoom', { ms: 1, tag: 'boom' });
+    const report = await kernel.run(spec, { initial });
+    expect(report.nodes.route.status).toBe('cancelled');
+    expect(report.nodes.asked.caught).toBeUndefined();
+    expect(report.status).toBe('failed');
+    expect(outcomeOf(report)).toEqual({ kind: 'faulted', at: 'asked', error: 'boom' });
+  });
 });
 
 describe('a map a switch catches', () => {

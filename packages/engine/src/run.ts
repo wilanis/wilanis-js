@@ -180,6 +180,11 @@ export class Run {
       report.caught = catcher;
       return;
     }
+    this.end();
+  }
+
+  /** The run is over: nothing still pending starts. */
+  private end(): void {
     this.ending ??= 'failed';
     for (const id of Object.keys(this.spec.nodes))
       if (this.status(id) === 'pending') this.reports[id].status = 'cancelled';
@@ -208,11 +213,19 @@ export class Run {
     }
   }
 
-  /** Cancel a pending node and, transitively, whatever waits for it. */
+  /**
+   * Cancel a pending node and, transitively, whatever waits for it. A switch holding a caught fault it will now
+   * never route ends the run with that fault.
+   */
   private cancel(id: string): void {
     if (this.status(id) !== 'pending') return;
     this.reports[id].status = 'cancelled';
     for (const dependent of this.plan.dependents.get(id) ?? []) this.cancel(dependent);
+    for (const report of Object.values(this.reports))
+      if (report.caught === id) {
+        delete report.caught;
+        this.end();
+      }
   }
 
   /** A switch routes where a caught fault goes, else to the first rule that holds, else to its fallback. */
