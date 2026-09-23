@@ -9,10 +9,12 @@ export { type MigrateOptions, type MigrateResult, migrate } from './migrate.js';
 export { type Rehearsal, rehearse } from './rehearse.js';
 export { init, scaffold } from './scaffolds.js';
 export {
+  type CancelAt,
   embedderFor,
   failedBelow,
   failedLeaf,
   generatedFire,
   policyRoots,
+  type StubOptions,
   stubEffects,
 } from './stubbing.js';

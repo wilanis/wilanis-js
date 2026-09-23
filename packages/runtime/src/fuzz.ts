@@ -5,7 +5,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { LoadResult } from '@wilanis/core';
-import { HOME, type ScenarioDoc, schemaUrl } from '@wilanis/core';
+import { HOME, type ScenarioDoc, schemaUrl, type TriggerDoc } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
 import { embedderFor, generatedFire } from './stubbing.js';
 
@@ -112,7 +112,8 @@ export async function regress(
 ): Promise<{ ok: boolean; lines: string[] }> {
   const lines: string[] = [];
   let ok = true;
-  const emb = embedderFor(load, { seed: 0, profile: opts.profile, env: fakeEnvFor(load) });
+  const stubbed = { seed: 0, profile: opts.profile, env: fakeEnvFor(load) };
+  const emb = embedderFor(load, stubbed);
   for (const sc of load.registry.all('scenario')) {
     const trigger = load.registry.all('trigger').find(trigger => trigger.path === load.resolve(sc.doc.trigger));
     // S001 has already refused a scenario whose trigger is gone; skip rather than replay nothing.
@@ -121,12 +122,32 @@ export async function regress(
       lines.push(`${sc.path}: names unknown trigger '${sc.doc.trigger}'`);
       continue;
     }
-    const report: Report = await emb.fire(trigger.doc, sc.doc.in, sc.doc.request ?? {}, { stubs: sc.doc.stubs });
+    const report = sc.doc.cancelAt
+      ? await cancelledReplay(load, stubbed, trigger.doc, sc.doc)
+      : await emb.fire(trigger.doc, sc.doc.in, sc.doc.request ?? {}, { stubs: sc.doc.stubs });
     const diffs = diffOf(report, sc.doc.expect);
     if (diffs.length) ok = false;
     lines.push(`${sc.path}: ${diffs.length ? `DIFF ${diffs.join('; ')}` : 'same'}`);
   }
   return { ok, lines };
+}
+
+/**
+ * A scenario that pins a cancellation, replayed: its `cancelAt` is taken out of the recorded stubs so the run reaches
+ * that effect's stub, which aborts the run's signal there. A node, never a duration, so the replay is the same on
+ * every machine; an embedder of its own, since the stub that aborts is this run's alone.
+ */
+function cancelledReplay(
+  load: LoadResult,
+  stubbed: { seed: number; profile?: string; env: NodeJS.ProcessEnv },
+  trigger: TriggerDoc,
+  sc: ScenarioDoc,
+): Promise<Report> {
+  const path = sc.cancelAt ?? '';
+  const control = new AbortController();
+  const emb = embedderFor(load, { ...stubbed, cancelAt: { path, abort: () => control.abort() } });
+  const { [path]: _, ...stubs } = sc.stubs ?? {};
+  return emb.fire(trigger, sc.in, sc.request ?? {}, { stubs, signal: control.signal });
 }
 
 function fakeEnvFor(load: LoadResult): NodeJS.ProcessEnv {
