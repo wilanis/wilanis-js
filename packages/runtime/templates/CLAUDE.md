@@ -50,7 +50,7 @@ property is described.
 | `invariant` | a rule that must hold: `access` (which policy gates writes to a port) or `holds` (a rule over a core shape's fields) | `domain/` |
 | `resolvers` | named reads of the request (`request.params.id`, `request.headers['user-agent']`, `request.session.id`), for data graphs and bindings to bind under `reads` and read as `{{name}}`; `required` when a policy guarantees the read | `edge/` |
 | `store` | what the feature keeps: a connection and collections of a core shape (or a plugin's shape), each by key, with `unique`, `refs`, `defaults`; `renamed` and `was` record what a field or the collection was called before, so a rename is read as one. A collection may be `scoped` by columns the store keeps, each filled from one read the store binds under `reads` (a `required` resolver over what the guard hands), and a `view` of a scoped collection sees every row `behind` a policy | `data/` |
-| `connection` | a channel to an external system, settings read `{{secrets.*}}` | `connections/` |
+| `connection` | a channel to an external system, settings read `{{secrets.*}}`; one of a kind that `leases` can hold a schedule's lease | `connections/` |
 | `scenario` | a recorded run (fuzz writes, regress replays); `cancelAt` pins a cancellation | `scenarios/` |
 
 ## Layers
