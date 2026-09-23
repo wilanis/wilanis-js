@@ -2,163 +2,19 @@
  * What an atomic graph reaches. A graph that says `atomic` declares that its effects commit or roll back
  * together, and every rule about one is a rule about the set of effects below it: whether each can take part
  * in a transaction (L009), whether they fall on one connection (L010), whether there is any at all (L011),
- * and whether a map among them collects failures the transaction has already ended (G014).
+ * whether a map among them collects failures the transaction has already ended (G014), and whether anything
+ * below it retries a statement the transaction cannot try again (G020).
  *
- * "Reaches" is the walk `refusalsReachable` makes for reasons, asked for effects instead: an effect node of
- * the graph itself, or -- for a domain graph -- an effect node of the graph its operations are bound to under
- * the profile being judged, followed through nested domain operations. It is made per profile, since which
- * binding meets an operation is what a profile chooses.
+ * "Reaches" is the one walk in `atomic-reach.ts`, made per profile, since which binding meets an operation is
+ * what a profile chooses. Every rule here reads it; none walks again.
  */
-import { type GraphDoc, isMap, isSwitch, type Loaded, type Scope, type Values } from '@wilanis/core';
-import { connectionOf } from '../documents.js';
+import type { GraphDoc, Loaded, Scope } from '@wilanis/core';
+import { type AtomicReach, atomicReachOf, profilesReaching } from './atomic-reach.js';
 import { type Judge, underProfiles } from './judge.js';
-
-/** One effect an atomic graph reaches: what it runs, where that call is written, and whether it may take part. */
-export interface Reached {
-  /** The canonical `path#operation` the call names. */
-  key: string;
-  /** The operation as the port declares it, for the flags a rule reads. */
-  transactional: boolean;
-  /** The connection it goes to, where the call says statically; nothing where it says none. */
-  connection: string | undefined;
-  /** The document the call is written in, and the node of it that makes the call. */
-  file: string;
-  node: string;
-  /**
-   * The node of the atomic graph itself that this effect descended from: the node a reader can point at.
-   * For a data graph's own effect it is `node` again; for a domain graph it is the run or map node whose
-   * operation the profile's binding met with the graph the effect is written in.
-   */
-  from: string;
-}
-
-/** A map an atomic graph reaches, and what it does with an element that fails: what G014 judges. */
-export interface ReachedMap {
-  onItemFailure: string | undefined;
-  file: string;
-  node: string;
-}
-
-/** Everything the walk found below one atomic graph: the effects it reaches, and the maps among them. */
-export interface AtomicReach {
-  effects: Reached[];
-  maps: ReachedMap[];
-}
-
-/** One call the walk follows: what it names, what it gives, and where it is written. */
-interface Call {
-  run: string;
-  given: Values | undefined;
-  file: string;
-  node: string;
-  /** The node of the atomic graph this call descended from; a node of the graph itself is its own. */
-  from: string;
-}
-
-/**
- * Everything one atomic graph reaches under one profile. The walk carries what every step of it needs -- the
- * judge, the profile it is made under, the graphs already walked and what has been found -- so that no step
- * has to be handed them one by one.
- */
-export function atomicReachOf(scope: Scope, graph: Loaded<GraphDoc>, profile: string | undefined): AtomicReach {
-  const walk = new Walk(scope, profile);
-  walk.graph(graph, undefined);
-  return walk.found;
-}
-
-/**
- * One walk below one atomic graph. `seen` is over graphs, so a graph reached twice is walked once and a cycle
- * ends rather than recurring -- the same guard `refusalsReachable` keeps.
- */
-class Walk {
-  readonly found: AtomicReach = { effects: [], maps: [] };
-  private readonly seen = new Set<string>();
-
-  constructor(
-    private readonly scope: Scope,
-    private readonly profile: string | undefined,
-  ) {}
-
-  /**
-   * Every node of a graph, each call followed on through whatever meets it. `from` is the node of the atomic
-   * graph the walk descended from, and is nothing at the top: there each node stands for itself.
-   */
-  graph(graph: Loaded<GraphDoc>, from: string | undefined): void {
-    if (this.seen.has(graph.path)) return;
-    this.seen.add(graph.path);
-    for (const node of graph.doc.nodes) {
-      if (isSwitch(node)) continue;
-      if (isMap(node)) this.found.maps.push({ onItemFailure: node.onItemFailure, file: graph.path, node: node.id });
-      this.call({ run: node.run, given: node.in, file: graph.path, node: node.id, from: from ?? node.id });
-    }
-  }
-
-  /**
-   * One call site: a native operation is an effect the set keeps (a pure one is no effect at all), and a
-   * domain operation is followed into whatever the profile's binding meets it with.
-   */
-  private call(call: Call): void {
-    const hit = this.scope.op(call.run);
-    if (typeof hit === 'string') return;
-    if (!hit.port.native) {
-      this.bound(call.run, call.from);
-      return;
-    }
-    if (hit.op.pure === true) return;
-    this.found.effects.push({
-      key: `${hit.path}#${hit.opName}`,
-      transactional: hit.op.transactional === true,
-      connection: connectionOf(this.scope, hit.op, call.given),
-      file: call.file,
-      node: call.node,
-      from: call.from,
-    });
-  }
-
-  /** What a domain operation is met by under this profile: a graph to walk, or another operation to follow. */
-  private bound(opRef: string, from: string): void {
-    const hit = this.scope.op(opRef);
-    if (typeof hit === 'string') return;
-    const binding = this.scope.bindingFor(hit.path, this.profile);
-    if (typeof binding === 'string') return;
-    const bound = binding.doc.operations[hit.opName];
-    if (!bound) return;
-    if (bound.graph) {
-      const graph = this.scope.registry.get('graph', this.scope.canon(bound.graph));
-      if (graph) this.graph(graph, from);
-      return;
-    }
-    if (bound.run) this.call({ run: bound.run, given: bound.in, file: binding.path, node: hit.opName, from });
-  }
-}
 
 /** The graphs of a tree that declare their effects move together: what every rule here is about. */
 const atomicGraphs = (scope: Scope): Loaded<GraphDoc>[] =>
   scope.registry.all('graph').filter(graph => graph.doc.atomic === true);
-
-/**
- * The profiles that reach one graph: those whose chosen binding lists it behind an operation. A profile
- * chooses a binding by naming it, and a port met by exactly one binding is chosen by every profile, so
- * `bindingFor` answers the choice either way.
- *
- * This is the set L009 and L010 are judged under. A profile that never runs a graph has nothing to be
- * refused for: the graph's effects are only reached through a binding, and a binding a profile does not
- * choose is a binding whose graph it never runs. The test is over the bindings rather than over `atomicReachOf`,
- * which walks the document's own nodes and so answers the same under every profile.
- */
-export function profilesReaching(
-  scope: Scope,
-  graph: Loaded<GraphDoc>,
-  profiles: (string | undefined)[],
-): (string | undefined)[] {
-  return profiles.filter(profile =>
-    scope.registry.all('binding').some(binding => {
-      const port = scope.canon(binding.doc.port);
-      if (scope.bindingFor(port, profile) !== binding) return false;
-      return Object.values(binding.doc.operations).some(op => op.graph && scope.canon(op.graph) === graph.path);
-    }),
-  );
-}
 
 /** One fault found by the per-profile walk: where it is, what it says, and the profiles that reached it. */
 interface Fault {
@@ -199,7 +55,7 @@ class Faults {
 /**
  * The refusals over every atomic graph of a tree: an effect that cannot take part (L009), effects on more
  * than one connection (L010), no transactional effect at all (L011), and a map that collects what a failed
- * element has already ended (G014).
+ * element has already ended (G014), and a retry below it (G020).
  *
  * Every rule reads the same per-profile walks, since which binding meets an operation is what a profile
  * chooses. One fault still answers one refusal: L009 and L010 gather what the profiles found by where it is
@@ -209,24 +65,44 @@ class Faults {
  * L009 and L010 are judged only under the profiles that reach the graph, since they ask what one run of it
  * would do and a profile that never runs it has no such run. L011 and G014 are judged over every profile:
  * they ask whether anything below the graph ever rolls back, and a graph no profile reaches would otherwise
- * get an empty union and a misleading L011 rather than the refusal its own contents earn.
+ * get an empty union and a misleading L011 rather than the refusal its own contents earn. G020 is both: a
+ * retry on the graph's own node is judged whoever runs it, one further down only under a profile that does.
  */
 export function checkAtomic(judge: Judge): void {
   const profiles = judge.profiles();
-  for (const graph of atomicGraphs(judge.scope)) {
-    const walk = (profile: string | undefined) => ({ profile, reach: atomicReachOf(judge.scope, graph, profile) });
-    const participants = new Faults();
-    const connections = new Faults();
-    for (const { profile, reach } of profilesReaching(judge.scope, graph, profiles).map(walk)) {
-      checkParticipants(participants, graph, reach, profile);
-      checkOneConnection(connections, graph, reach, profile);
-    }
-    participants.refuse(judge, 'L009');
-    connections.refuse(judge, 'L010');
-    const reaches = profiles.map(profile => walk(profile).reach);
-    checkSomethingToRollBack(judge, graph, reaches);
-    checkCollectingMaps(judge, graph, reaches);
+  for (const graph of atomicGraphs(judge.scope)) checkOneAtomic(judge, graph, profiles);
+}
+
+/** One profile's walk below an atomic graph, and whether that profile runs the graph at all. */
+interface ProfileWalk {
+  profile: string | undefined;
+  reach: AtomicReach;
+  runs: boolean;
+}
+
+/** Every rule over one atomic graph, each profile walked once and every rule reading that walk. */
+function checkOneAtomic(judge: Judge, graph: Loaded<GraphDoc>, profiles: (string | undefined)[]): void {
+  const reaching = profilesReaching(judge.scope, graph, profiles);
+  const walks: ProfileWalk[] = profiles.map(profile => ({
+    profile,
+    reach: atomicReachOf(judge.scope, graph, profile),
+    runs: reaching.includes(profile),
+  }));
+  const participants = new Faults();
+  const connections = new Faults();
+  const retries = new Faults();
+  for (const walk of walks) {
+    checkNoRetryInside(retries, graph, walk);
+    if (!walk.runs) continue;
+    checkParticipants(participants, graph, walk.reach, walk.profile);
+    checkOneConnection(connections, graph, walk.reach, walk.profile);
   }
+  participants.refuse(judge, 'L009');
+  connections.refuse(judge, 'L010');
+  const reaches = walks.map(one => one.reach);
+  checkSomethingToRollBack(judge, graph, reaches);
+  checkCollectingMaps(judge, graph, reaches);
+  retries.refuse(judge, 'G020');
 }
 
 /** L009: every effect an atomic graph reaches can take part in a transaction. */
@@ -300,5 +176,35 @@ function checkCollectingMaps(judge: Judge, graph: Loaded<GraphDoc>, walks: Atomi
         'use "fail", or take the map out of the atomic graph',
       );
     }
+  }
+}
+
+/**
+ * G020: a failed statement has aborted the transaction, so a node below an atomic graph cannot be tried
+ * again, and a binding operation reached inside it would try again on a scope that joined the outer
+ * transaction. The retry that works is on the binding operation that runs the atomic graph, which the walk
+ * never enters: each of its tries is a transaction of its own.
+ *
+ * A node of the atomic graph itself is below it under every profile, so it is judged whoever runs the graph
+ * and its message names none. Anything further down is judged only under a profile that runs the graph, as
+ * L009 is: a profile that never runs it tries nothing inside its transaction.
+ */
+function checkNoRetryInside(found: Faults, graph: Loaded<GraphDoc>, walk: ProfileWalk): void {
+  for (const retry of walk.reach.retries) {
+    const own = retry.file === graph.path;
+    if (!own && !walk.runs) continue;
+    const [where, name] = retry.at.split('/');
+    const what = `${where === 'nodes' ? 'node' : 'operation'} '${name}'`;
+    found.found(
+      `${retry.file}#${retry.at}`,
+      {
+        file: retry.file,
+        at: `${retry.at}/retry`,
+        message: profiles =>
+          `${what} retries inside the transaction of atomic graph '${graph.path}'${own ? '' : profiles}`,
+        hint: 'a statement inside a transaction is not tried again; retry the binding operation that runs the atomic graph, so the transaction is',
+      },
+      walk.profile,
+    );
   }
 }

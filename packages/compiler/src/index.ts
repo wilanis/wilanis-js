@@ -15,7 +15,13 @@ export * from './atomic-said.js';
 export * from './attempts.js';
 // The walk below an atomic graph, named rather than spread: `./atomic.js` beside it is the run scope, and
 // a reader of one import line should not have to know which of the two a name came from.
-export { type AtomicReach, atomicReachOf, type Reached, type ReachedMap } from './check/atomic.js';
+export {
+  type AtomicReach,
+  atomicReachOf,
+  type Reached,
+  type ReachedMap,
+  type ReachedRetry,
+} from './check/atomic-reach.js';
 // The profiles a walk is made under, named rather than spread: `check/judge.ts` is the checker's own and this
 // one question is asked outside it, by everything that walks a tree per profile.
 export { profilesOf } from './check/judge.js';

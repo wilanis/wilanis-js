@@ -2,8 +2,10 @@
  * What a retry is written over (RFC 0011). A port operation's words about repeating it fit the operation (C015);
  * a domain graph never says how often or how long (L012); and a data graph's node or a binding's operation that
  * retries is held to what it repeats: never a pure call or a graph with no effect (G017), never a call that is
- * not idempotent where it is made (G018), and a `when` that reads the answer as a boolean (G019). The cases
- * break the example's own documents, since the guide's retry is written over get-row's GET.
+ * not idempotent where it is made (G018), and a `when` that reads the answer as a boolean (G019). Below an
+ * atomic graph nothing retries at all (G020): the retry that works is on the binding operation that runs the
+ * graph, whose every try is a transaction of its own. The cases break the example's own documents, since the
+ * guide's retry is written over get-row's GET and store-and-latest and register-all already say atomic.
  */
 import http from '@wilanis/plugin-http';
 import { describe, expect, it } from 'vitest';
@@ -102,6 +104,46 @@ describe('sabotage: what a retry is written over (RFC 0011)', () => {
     const csv = { retry: { times: 1, when: 'has(x)' } };
     expect(sabotagePointing(rest, onOperation('toCsv', csv))).toContain(`G019 @${rest}#operations/toCsv/retry/when`);
     expect(sabotage(rest, onOperation('toCsv', csv))).toEqual(['G018', 'G019']);
+  });
+  describe('G020 a retry below an atomic graph', () => {
+    const kept = 'features/customers/data/store-and-latest.graph.json';
+    const store = 'features/customers/data/customers-store.binding.json';
+    const recordAll = '@features/customers/domain/register-all.graph.json';
+    const inside = (graph: string) => `retries inside the transaction of atomic graph '${graph}'`;
+    const g020 = (said: string[]) => said.filter(line => line.startsWith('G020'));
+
+    it('refuses a node of the atomic graph itself, and says so for each atomic graph that reaches it', () => {
+      // store-and-latest is atomic, and register-all reaches it under local through submit and register
+      const broken = sabotageSaying(kept, onNode('stored', once));
+      expect(g020(broken)).toEqual([
+        `G020 node 'stored' ${inside(`@${kept}`)}`,
+        `G020 node 'stored' ${inside(recordAll)} (profile 'local')`,
+      ]);
+      expect(g020(sabotagePointing(kept, onNode('stored', once)))).toEqual([
+        `G020 @${kept}#nodes/stored/retry`,
+        `G020 @${kept}#nodes/stored/retry`,
+      ]);
+    });
+    it('refuses a node of a graph an atomic graph reaches, though that graph is not atomic itself', () => {
+      const broken = sabotageSaying(kept, graph => {
+        delete graph.atomic;
+        onNode('stored', once)(graph);
+      });
+      expect(g020(broken)).toEqual([`G020 node 'stored' ${inside(recordAll)} (profile 'local')`]);
+    });
+    it('refuses a binding operation reached inside the transaction, which would join it', () => {
+      // register runs store-and-latest, which is right on its own, and wrong once register-all is the caller
+      expect(sabotagePointing(store, onOperation('register', once))).toEqual([
+        `G020 @${store}#operations/register/retry`,
+      ]);
+      expect(g020(sabotageSaying(store, onOperation('submit', once)))).toEqual([
+        `G020 operation 'submit' ${inside(recordAll)} (profile 'local')`,
+      ]);
+    });
+    it('accepts the retry the hint names: on the binding operation that runs the atomic graph', () => {
+      // each try is a transaction of its own and a failed one rolled back, so what it repeats is not G018's
+      expect(sabotage(store, onOperation('registerAll', once))).toEqual([]);
+    });
   });
   it("accepts the guide's retry over a GET, and a binding operation whose graph only GETs", () => {
     const guide = { timeoutMs: 5000, retry: { times: 2, backoffMs: 200, when: 'status >= 500' } };
