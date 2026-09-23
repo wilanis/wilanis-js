@@ -187,4 +187,36 @@ describe('G025: a catch of a node a guard moves aside', () => {
     expect(spec.nodes['customers:made']).toMatchObject({ kind: 'call' });
     expect(spec.nodes.anyKept).toMatchObject({ catch: { customers: 'unreachable' } });
   });
+  it('sends a fault routed to a node the lowering moves aside where it went: <id>:made', () => {
+    /** A fresh key caught and routed to `customers`, the guarded site, which is legal: only its catch is G025. */
+    const routedToGuarded = (doc: any) => {
+      doc.nodes.push(
+        run('counted', '@storage/store.port.json#newKey', {
+          store: '@customers/data/customers.store.json',
+          collection: 'customers',
+        }),
+        {
+          type: '@wilanis/node/switch.schema.json',
+          id: 'anyKept',
+          in: { n: '{{counted}}' },
+          rules: [{ when: 'has(n)', to: 'none' }],
+          else: 'none',
+          catch: { counted: 'customers' },
+        },
+        run('none', '@std/outcome.port.json#refuse', {
+          reason: 'upstream',
+          message: 'no key was made',
+          type: `${CUSTOMER}[]`,
+        }),
+      );
+      doc.out.from = ['customers', 'none'];
+    };
+    expect(sabotage(Kept, routedToGuarded)).toEqual([]);
+    const { load, dir } = loadedEditing(Kept, routedToGuarded);
+    const modules = Object.values(PLUGINS) as PluginModule[];
+    const spec = new Compiler(new Scope(load.registry, load.resolve), modules).graph(`@${Kept}`).spec;
+    rmSync(dir, { recursive: true, force: true });
+    expect(spec.nodes['customers:made']).toMatchObject({ kind: 'call' });
+    expect(spec.nodes.anyKept).toMatchObject({ catch: { counted: 'customers:made' } });
+  });
 });
