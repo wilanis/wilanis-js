@@ -284,7 +284,7 @@ function summary(decisions: Decision[], problems: string[], lines: string[], sta
   lines.push(`every branch settled -- ${branches} branch(es), ${decisions.length} decision(s), ${graphs} graph(s).`);
   statedLines(stated, lines);
   lines.push(
-    '"refused on purpose" is a refuse node the graph declares: a designed outcome with a reason the trigger maps, not a fault. Effects are stubbed, so no request left this process.',
+    '"refused on purpose" is a refuse node the graph declares: a designed outcome with a reason the trigger maps, not a fault. A fault a switch catches is the graph deciding what breaking means. Effects are stubbed, so no request left this process.',
   );
   return true;
 }
