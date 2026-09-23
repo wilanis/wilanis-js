@@ -1,0 +1,67 @@
+name: board
+
+# Keeps the Roadmap project a view of the issues: Type, Area, Status and Waiting on derived from labels,
+# assignees, claim branches, pull requests and blocked-by relationships, and the dependencies a body states
+# linked as relationships (.github/board/README.md). It runs on the events that move an issue, and nightly for
+# what no event reports (a relationship edited by hand, a blocker closed in another repository).
+#
+# pull_request_target, not pull_request: a pull request from a fork gets no secrets under pull_request, and
+# this job never checks out or runs the pull request's code, only the base branch's .github/board.
+on:
+  issues:
+    types: [opened, edited, reopened, closed, labeled, unlabeled, assigned, unassigned, milestoned, demilestoned]
+  pull_request_target:
+    types: [opened, reopened, edited, ready_for_review, converted_to_draft, closed]
+  create:
+  delete:
+  schedule:
+    - cron: "41 4 * * *"
+  workflow_dispatch:
+    inputs:
+      issues:
+        description: "issue numbers, space-separated; empty syncs every open issue"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: board-${{ github.event.issue.number || github.event.pull_request.number || github.event.ref || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'create' && github.event_name != 'delete' || github.event.ref_type == 'branch'
+    env:
+      # A token with the organization project's read and write and this repository's issues; GITHUB_TOKEN
+      # cannot write an organization project.
+      GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/board
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: the token is there
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "the PROJECT_TOKEN secret is not set: see .github/board/README.md"; exit 1; }
+      - name: sync
+        env:
+          EVENT: ${{ github.event_name }}
+          ISSUE: ${{ github.event.issue.number }}
+          PR: ${{ github.event.pull_request.number }}
+          REF: ${{ github.event.ref }}
+          ASKED: ${{ github.event.inputs.issues }}
+        run: |
+          case "$EVENT" in
+            issues) node .github/board/board.mjs issue "$ISSUE" ;;
+            pull_request_target) node .github/board/board.mjs pr "$PR" ;;
+            create|delete)
+              n="${REF%%-*}"
+              if echo "$REF" | grep -Eq '^[0-9]+-[a-z0-9-]+$'; then node .github/board/board.mjs issue "$n"; else echo "not a claim: $REF"; fi ;;
+            workflow_dispatch)
+              if [ -n "$ASKED" ]; then node .github/board/board.mjs issue $ASKED; else node .github/board/board.mjs all; fi ;;
+            *) node .github/board/board.mjs all ;;
+          esac

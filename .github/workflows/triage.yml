@@ -1,0 +1,30 @@
+name: triage
+
+# The monthly backlog triage: on the first of the month, one issue labelled `triage` lists what the board
+# cannot settle by itself -- what lacks a type or an area, what has gone quiet for 30 or 60 days, claims with
+# no pull request, ready issues still blocked, RFCs whose steps have all closed, closed issues not Done, and
+# milestones with nothing open or past due. The previous month's triage issue is closed in its favour.
+on:
+  schedule:
+    - cron: "7 7 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/board
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: the token is there
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "the PROJECT_TOKEN secret is not set: see .github/board/README.md"; exit 1; }
+      - run: node .github/board/triage.mjs

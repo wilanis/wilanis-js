@@ -88,6 +88,8 @@ jobs:
       - run: npm ci
       # No build: a fitness function reads this repository's source as text, so it answers in seconds.
       - run: npm run fitness
+      # The board sync's rules (.github/board): plain node, no dependencies, so it rides with the other quick job.
+      - run: node --test .github/board/*.test.mjs
 
   # What the pull request touches, so `decision` can tell whether anything waits for the maintainer. A job
   # cannot read a diff in its own `if:`, so this one reads it and hands the answer on.
