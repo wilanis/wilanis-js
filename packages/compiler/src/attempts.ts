@@ -83,8 +83,9 @@ type Ending = { ok: true; out: unknown; sub?: Report } | { ok: false; error: unk
 
 /**
  * The loop: try, and while the ending is one to try again, tries remain and the run's signal has not aborted,
- * record it, wait, and try once more. A try that ended after the run was cancelled stands, so a cancelled node's
- * attempts are what was tried before the cancellation (RFC 0012).
+ * wait, record it, and try once more. A try that ended after the run was cancelled stands, and so does one whose
+ * wait the cancellation cut short, so a cancelled node's attempts are what was tried before the cancellation and it
+ * settles as soon as the signal fires (RFC 0012).
  */
 async function tried(base: Handler, args: HandlerArgs, policy: Attempts): Promise<unknown> {
   const { ctx } = args;
@@ -93,8 +94,9 @@ async function tried(base: Handler, args: HandlerArgs, policy: Attempts): Promis
     const ending = await once(base, args, policy.timeoutMs);
     const why = attempt < policy.times && !ctx.signal?.aborted ? againBecause(ending, policy) : undefined;
     if (why === undefined) return stand(ending, args);
-    ctx.attempted({ startedAt, endedAt: ctx.clock(), error: why, ...(ending.sub ? { sub: ending.sub } : {}) });
-    await pause(policy.backoffMs * 2 ** attempt);
+    const endedAt = ctx.clock();
+    if (!(await pause(policy.backoffMs * 2 ** attempt, ctx.signal))) return stand(ending, args);
+    ctx.attempted({ startedAt, endedAt, error: why, ...(ending.sub ? { sub: ending.sub } : {}) });
   }
 }
 
@@ -146,7 +148,22 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** Waits `ms` before the next try; nothing at all when it is 0. */
-function pause(ms: number): Promise<void> {
-  return ms > 0 ? new Promise(resolve => setTimeout(resolve, ms)) : Promise.resolve();
+/**
+ * Whether the wait of `ms` before the next try ran out, or false when the run's `signal` aborted first; nothing is
+ * waited when it is 0. It is the run's own signal, not the one a site's timer joins, so a timeout never cuts a wait.
+ */
+function pause(ms: number, signal: AbortSignal | undefined): Promise<boolean> {
+  if (ms <= 0) return Promise.resolve(true);
+  if (signal?.aborted) return Promise.resolve(false);
+  return new Promise(resolve => {
+    const aborted = () => {
+      clearTimeout(handle);
+      resolve(false);
+    };
+    const handle = setTimeout(() => {
+      signal?.removeEventListener('abort', aborted);
+      resolve(true);
+    }, ms);
+    signal?.addEventListener('abort', aborted, { once: true });
+  });
 }
