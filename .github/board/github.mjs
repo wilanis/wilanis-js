@@ -15,7 +15,12 @@ export async function graphql(query, variables = {}) {
     body: JSON.stringify({ query, variables }),
   });
   const answer = await response.json();
-  if (answer.errors?.length) throw new Error(answer.errors.map((e) => e.message).join('; '));
+  if (!response.ok) throw new Error(`GitHub answered ${response.status}: ${answer.message ?? JSON.stringify(answer)}`);
+  if (answer.errors?.length) {
+    // The path names the field refused, so a token missing one permission says which.
+    const said = answer.errors.map((e) => (e.path ? `${e.path.join('.')}: ${e.message}` : e.message));
+    throw new Error(said.join('; '));
+  }
   return answer.data;
 }
 
