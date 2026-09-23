@@ -19,6 +19,7 @@ import {
   show,
 } from '@wilanis/core';
 import { promisedSaid } from './attempts-said.js';
+import { boundSaid } from './limits-said.js';
 import { readsLines } from './reads-said.js';
 import { scopedOf, scopeLines } from './scope-said.js';
 import { callsAgainst, engineOf, keyTypeOf } from './stores.js';
@@ -52,6 +53,7 @@ function acceptsLine(
     binds?: string;
     static?: boolean;
     resolves?: Record<string, string>;
+    maxItems?: number;
     description?: string;
   },
   showType: (spec: unknown) => string,
@@ -61,7 +63,7 @@ function acceptsLine(
   const isStatic = field.static || field.type === 'type' ? '  (static)' : '';
   const allowed = field.enum ? ` ∈ ${field.enum.join('|')}` : '';
   const says = field.description ? `  -- ${field.description}` : '';
-  return `    in  ${name}${optional}: ${type}${isStatic}${bindsOf(field)}${allowed}${says}`;
+  return `    in  ${name}${optional}: ${type}${boundSaid(field)}${isStatic}${bindsOf(field)}${allowed}${says}`;
 }
 
 /**
@@ -122,10 +124,20 @@ export function portLines(doc: Loaded, showType: (spec: unknown) => string): str
   return lines;
 }
 
-/** What one field says about itself: optional, its type, the values it allows, what it binds, and its description. */
+/**
+ * What one field says about itself: optional, its type and the most items a list of it holds, the values it
+ * allows, what it binds, and its description.
+ */
 export function fieldLine(
   name: string,
-  field: { type: unknown; required?: boolean; enum?: string[]; binds?: string; description?: string },
+  field: {
+    type: unknown;
+    required?: boolean;
+    enum?: string[];
+    maxItems?: number;
+    binds?: string;
+    description?: string;
+  },
   showType: (spec: unknown) => string,
 ): string {
   const optional = field.required === false ? '?' : '';
@@ -133,7 +145,7 @@ export function fieldLine(
   const allowed = field.enum ? ` ∈ ${field.enum.join('|')}` : '';
   const binds = field.binds ? ` binds ${field.binds}` : '';
   const says = field.description ? `  -- ${field.description}` : '';
-  return `    ${name}${optional}: ${type}${allowed}${binds}${says}`;
+  return `    ${name}${optional}: ${type}${boundSaid(field)}${allowed}${binds}${says}`;
 }
 
 /** One mark of a collection, as its line reads: the family, and what that family says here. */

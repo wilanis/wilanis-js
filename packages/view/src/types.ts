@@ -5,9 +5,12 @@
 import { checkTree } from '@wilanis/compiler';
 import type { Kind, Layer, Loaded, LoadResult, Outcome, Refusal } from '@wilanis/core';
 import { SCHEMA_BASE } from '@wilanis/core';
+import type { TriggerLimits } from '@wilanis/runtime';
 import type { VAttempts, VPromised } from './attempts.js';
+import type { VFanOut } from './limits.js';
 
 export type { VAttempts, VPromised } from './attempts.js';
+export type { VFanOut } from './limits.js';
 
 export interface VPort {
   /** The port's name; an attribute port is its path below the parent, joined with dots (body.id). */
@@ -57,8 +60,11 @@ export interface VTarget extends VPromised {
 
 export type VNodeKind = 'in' | 'const' | 'request' | 'run' | 'map' | 'rule' | 'out';
 
-/** One node as a page draws it; a run or map node carries the retry and the bound its call site declares. */
-export interface VNode extends VAttempts {
+/**
+ * One node as a page draws it; a run or map node carries the retry and the bound its call site declares, and a
+ * map the most elements it runs over and how many at once.
+ */
+export interface VNode extends VAttempts, VFanOut {
   id: string;
   kind: VNodeKind;
   /** The node's label, or its id made readable. */
@@ -276,6 +282,8 @@ export interface DocView {
   fires?: VTarget;
   /** On a trigger whose kind maps refusals: every reason it can reach or maps, how it is answered, and the nodes that refuse with it. */
   answers?: VAnswer[];
+  /** On a trigger whose kind bounds a run: its deadline and its body's size, and the plugin's settings each came from where the trigger wrote none. */
+  limits?: TriggerLimits;
   /** On a trigger: the policies that gate it, in order, the operation each decides through, and the credentials the attachment gives the guard. */
   policies?: VAttachedPolicy[];
   /** On a policy: the port operation it decides through, and where that leads. */

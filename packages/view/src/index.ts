@@ -19,6 +19,7 @@ export {
   type VAttempts,
   type VCovered,
   type VEdge,
+  type VFanOut,
   type VGuarded,
   type VHeld,
   type VHoldsInvariant,

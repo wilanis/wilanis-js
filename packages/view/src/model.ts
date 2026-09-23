@@ -15,6 +15,7 @@
 import { checkTree } from '@wilanis/compiler';
 import type { GraphDoc, Kind, Loaded, LoadResult, PolicyDoc, Refusal, TriggerDoc } from '@wilanis/core';
 import { policyPath, SCHEMA_BASE, Scope, WILANIS } from '@wilanis/core';
+import { limitsOf } from '@wilanis/runtime';
 import { attemptsOf } from './attempts.js';
 import { graphView } from './graphs.js';
 import { invariantView } from './invariants.js';
@@ -118,11 +119,13 @@ function policiesOf(scope: Scope, trigger: TriggerDoc): VAttachedPolicy[] {
   });
 }
 
-/** What a trigger adds to its view: where it fires, what it answers, and the policies that gate it. */
+/** What a trigger adds to its view: where it fires, what it answers, how its run is bounded, and the policies that gate it. */
 function triggerView(scope: Scope, doc: Loaded, view: DocView) {
   const trigger = doc.doc as TriggerDoc;
   view.fires = targetOf(scope, trigger.fire.run).target;
   view.answers = answersOf(scope, doc as Loaded<TriggerDoc>);
+  const limits = limitsOf(doc as Loaded<TriggerDoc>, scope);
+  if (Object.keys(limits).length) view.limits = limits;
   if (trigger.policies?.length) view.policies = policiesOf(scope, trigger);
 }
 
