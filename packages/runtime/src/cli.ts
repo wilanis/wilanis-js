@@ -146,8 +146,10 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     console.log(
       `writing scenarios to ${join(loaded.root, SCENARIOS)} -- generated, and ignored by git as .wilanis/ is`,
     );
-    const written = await fuzz(loaded, { runs: flags.runs ? Number(flags.runs) : undefined, profile: flags.profile });
-    console.log(written.map(file => `wrote ${file}`).join('\n'));
+    const answer = await fuzz(loaded, { runs: flags.runs ? Number(flags.runs) : undefined, profile: flags.profile });
+    console.log(answer.written.map(file => `wrote ${file}`).join('\n'));
+    if (answer.lines.length) console.error(answer.lines.join('\n'));
+    if (!answer.ok) process.exit(1);
   },
   regress: async ({ flags, rootArg }) => {
     const loaded = await check(rootArg(0));
