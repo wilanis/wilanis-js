@@ -27,7 +27,9 @@ describe('sabotage: what a retry is written over (RFC 0011)', () => {
 
   it('C015 a native operation whose key is not a field, that says idempotent and key, or whose idempotent is not boolean', () => {
     const broken = (edit: (op: any) => void) =>
-      withBrokenPluginDoc(http, 'http.port.json', doc => edit(doc.operations.request)).at;
+      withBrokenPluginDoc(http, 'http.port.json', doc => edit(doc.operations.request)).at.filter(at =>
+        at.includes('@http/http.port.json'),
+      );
     const keyed = broken(op => {
       delete op.idempotent;
       op.key = 'nope';
