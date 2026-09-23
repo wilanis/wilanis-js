@@ -163,6 +163,17 @@ an operation -- the compiler lowers it to a source reference and nothing runs.
 is judged against `returns` only on a 2xx, so an error body reaches the switch. A node fails only on the
 unexpected.
 
+A port operation says whether calling it again changes anything further: `idempotent` (true, or an expression
+over its accepted fields, as `request` says `method == 'GET' || ...`), or the `key` field a repeat is
+recognised by. The words must fit the operation (C015), and a domain operation may promise only
+`idempotent: true`. Where the data layer names an effect -- a data graph's `run` or `map` node, or a binding's
+operation -- it may say `timeoutMs` and `retry`; a domain graph says neither (L012). The checker refuses a
+retry over what cannot fail transiently, a pure operation or a graph that reaches no effect (G017); over a
+call that is not idempotent where it is made, judged over the literal inputs of the site or, for a binding's
+graph, over every effect it reaches under each profile (G018); and a `retry.when` that is not boolean over the
+fields of the answer (G019). A retry repeats a fault or a timeout, and an answer `when` accepts; never a
+refusal.
+
 ## The engine
 
 Stateless and clockless. It runs all ready nodes concurrently, answers `blocked` with `needs` when input is

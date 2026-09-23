@@ -1,10 +1,19 @@
 /**
  * Shapes, ports and connections. A shape's fields resolve and speak their own layer (R001, L001, L005). A
- * port's operations resolve; a domain operation speaks core shapes and fixes no value itself (L001, L006).
+ * port's operations resolve; a domain operation speaks core shapes and fixes no value itself (L001, L006);
+ * what an operation says about repeating it names its own fields and types as boolean (C015).
  * A connection names a kind and its settings fit it, reading secrets only (R001, C001, C002). What a store
  * declares is judged beside it, in `stores.ts`.
  */
-import type { ConnectionDoc, Loaded, Operation, PortDoc, ShapeDoc } from '@wilanis/core';
+import {
+  type ConnectionDoc,
+  expr,
+  type Loaded,
+  type Operation,
+  type PortDoc,
+  type ShapeDoc,
+  show,
+} from '@wilanis/core';
 import type { Judge } from './judge.js';
 import { mismatch } from './typing.js';
 
@@ -30,6 +39,52 @@ export function checkPort(judge: Judge, port: Loaded<PortDoc>): void {
     judge.type(op.returns, port.path, `operations/${name}/returns`);
     if (op.transactional) checkTransactional(judge, port, name, op);
     if (!port.native) checkDomainOperation(judge, port, name, op);
+    else checkRepeatable(judge, port, name, op);
+  }
+}
+
+const REPEATABLE_HINT =
+  'key names one accepted field; idempotent is true, or an expression over the accepted fields that is boolean; a pure operation is idempotent already';
+
+/**
+ * C015: what a native operation says about repeating it is one fact and a sound one. A `key` is a field it
+ * accepts, and is not written beside `idempotent`; a `pure` operation says neither, being idempotent already;
+ * an `idempotent` expression types as boolean over the accepted fields, as a switch rule types over its inputs.
+ */
+function checkRepeatable(judge: Judge, port: Loaded<PortDoc>, name: string, op: Operation): void {
+  const refuse = (message: string, at: string) =>
+    judge.refuser(port.path)('C015', message, `operations/${name}${at}`, REPEATABLE_HINT);
+  for (const [message, at] of repeatableFaults(name, op)) refuse(message, at);
+  if (typeof op.idempotent !== 'string') return;
+  const wrong = notBoolean(judge, op, op.idempotent);
+  if (wrong) refuse(`operation '${name}' is idempotent when ${wrong}`, '/idempotent');
+}
+
+/** What is wrong with how an operation's words about repeating it sit together, each with where below it. */
+function repeatableFaults(name: string, op: Operation): [string, string][] {
+  const faults: [string, string][] = [];
+  const keyed = op.key !== undefined;
+  if (keyed && !(String(op.key) in (op.accepts ?? {})))
+    faults.push([`operation '${name}' names key '${op.key}', which is not a field it accepts`, '/key']);
+  if (keyed && op.idempotent !== undefined) faults.push([`operation '${name}' declares both idempotent and key`, '']);
+  if (op.pure && (op.idempotent !== undefined || keyed))
+    faults.push([`pure operation '${name}' declares ${keyed ? 'key' : 'idempotent'}`, '']);
+  return faults;
+}
+
+/** Why an `idempotent` expression is not a boolean over the operation's accepted fields, or nothing. */
+function notBoolean(judge: Judge, op: Operation, rule: string): string | undefined {
+  const accepts = judge.acceptsType(op);
+  const inputs: expr.Inputs = {};
+  if (accepts?.kind === 'object') {
+    for (const [field, typed] of Object.entries(accepts.fields))
+      inputs[field] = { type: typed.type, optional: !typed.required };
+  }
+  try {
+    const type = expr.check(expr.parse(rule), inputs);
+    return type.kind === 'boolean' ? undefined : `'${rule}', which is ${show(type)}, not boolean`;
+  } catch (error) {
+    return `'${rule}', which cannot be typed: ${(error as Error).message}`;
   }
 }
 
@@ -50,7 +105,11 @@ function checkTransactional(judge: Judge, port: Loaded<PortDoc>, name: string, o
   );
 }
 
-/** A domain operation speaks core shapes (L001) and marks nothing static (L006): a binding fixes values. */
+/**
+ * A domain operation speaks core shapes (L001), marks nothing static (L006) -- a binding fixes values -- and
+ * promises only `idempotent: true` about repeating it (C015): the field a key names, and the inputs an
+ * expression reads, belong to the native operation its binding reaches.
+ */
 function checkDomainOperation(judge: Judge, port: Loaded<PortDoc>, name: string, op: Operation): void {
   const at = `operations/${name}`;
   const accepts = Object.entries(op.accepts ?? {});
@@ -69,6 +128,20 @@ function checkDomainOperation(judge: Judge, port: Loaded<PortDoc>, name: string,
     if (!field.static) continue;
     const message = `domain operation '${name}' marks '${key}' static -- static fields belong to native contracts; a binding fixes values`;
     judge.refuser(port.path)('L006', message, `${at}/accepts/${key}`, 'drop static, or fix the value in the binding');
+  }
+  checkDomainPromise(judge, port, name, op);
+}
+
+/** C015 for a domain operation: a `key`, or an `idempotent` that is an expression, is refused. */
+function checkDomainPromise(judge: Judge, port: Loaded<PortDoc>, name: string, op: Operation): void {
+  const hint =
+    'a domain operation may say "idempotent": true; the field a key names belongs to the native operation its binding reaches';
+  const refuse = judge.refuser(port.path);
+  if (op.key !== undefined)
+    refuse('C015', `domain operation '${name}' declares key '${op.key}'`, `operations/${name}/key`, hint);
+  if (typeof op.idempotent === 'string') {
+    const message = `domain operation '${name}' is idempotent when '${op.idempotent}'; only true is a promise its bindings can be held to`;
+    refuse('C015', message, `operations/${name}/idempotent`, hint);
   }
 }
 

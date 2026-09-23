@@ -5,6 +5,7 @@
  * under, and the reasons an operation can refuse with.
  */
 import {
+  expr,
   type Fields,
   isMap,
   type Loaded,
@@ -20,6 +21,7 @@ import {
   type Type,
   TypeError_,
   type TypeSpec,
+  type Values,
 } from '@wilanis/core';
 import type { ReachableRefusal } from '../refusals.js';
 
@@ -98,6 +100,19 @@ export function underProfiles(profiles: (string | undefined)[]): string {
   const named = profiles.filter((one): one is string => one !== undefined);
   if (named.length === 0) return '';
   return ` (profile${named.length > 1 ? 's' : ''} ${named.map(one => `'${one}'`).join(', ')})`;
+}
+
+/** The roots an expression reads: the first segment of every path and `has` in it. */
+function rootsOf(rule: expr.Expr, out = new Set<string>()): Set<string> {
+  if (rule.kind === 'path' || rule.kind === 'has') out.add(rule.path[0]);
+  else if (rule.kind === 'len' || rule.kind === 'not') rootsOf(rule.arg, out);
+  else if (rule.kind === 'bin') rootsOf(rule.right, rootsOf(rule.left, out));
+  return out;
+}
+
+/** How a reason names what a site gave a field: written out, or not given. */
+function gave(name: string, value: unknown): string {
+  return value === undefined ? `${name} is not given` : `${name} is ${JSON.stringify(value)}`;
 }
 
 /** Every type reference in a spec, with where it sits. */
@@ -215,6 +230,41 @@ export class Judge {
       for (const refusal of reach(profile)) if (!reasons.has(refusal.reason)) reasons.set(refusal.reason, refusal.file);
     }
     return reasons;
+  }
+
+  // ---- repeating a call ---------------------------------------------------------------------------
+
+  /**
+   * Why a call of `hit` given `given` is not idempotent where it is made, or nothing when it is (RFC 0011): a
+   * pure operation, one that declares itself so, one whose expression holds over the site's literal inputs, or
+   * one whose key the site gives. Every rule about repeating a call asks this, so none can disagree.
+   */
+  idempotentAt(hit: OpHit, given: Values | undefined): string | undefined {
+    const { op } = hit;
+    if (op.pure === true || op.idempotent === true) return undefined;
+    if (typeof op.idempotent === 'string') return this.holdsAt(op.idempotent, given ?? {});
+    if (op.key) return given?.[op.key] === undefined ? `'${op.key}' is not given` : undefined;
+    if (op.idempotent === false) return `'${hit.path}#${hit.opName}' declares it is not idempotent`;
+    return `'${hit.path}#${hit.opName}' declares neither idempotent nor key`;
+  }
+
+  /** Why an `idempotent` expression does not hold over what a site gives, or nothing when it does. */
+  private holdsAt(rule: string, given: Values): string | undefined {
+    let parsed: expr.Expr;
+    try {
+      parsed = expr.parse(rule);
+    } catch (error) {
+      return `its idempotent rule '${rule}' cannot be judged: ${(error as Error).message}`;
+    }
+    const roots = [...rootsOf(parsed)];
+    for (const root of roots) {
+      const value = given[root];
+      if (value === undefined || this.scope.literal(value)) continue;
+      const read = typeof value === 'string' ? value : JSON.stringify(value);
+      return `${root} is read from ${read}; write it as a literal`;
+    }
+    if (expr.evaluate(parsed, given)) return undefined;
+    return roots.map(root => gave(root, given[root])).join(', ');
   }
 
   // ---- values -------------------------------------------------------------------------------------
