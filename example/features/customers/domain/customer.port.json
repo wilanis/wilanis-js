@@ -22,6 +22,7 @@
     },
     "get": {
       "description": "One customer by id. Fails when there is no such customer.",
+      "idempotent": true,
       "accepts": {
         "id": {
           "type": "string"

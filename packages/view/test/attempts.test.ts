@@ -4,7 +4,8 @@
  * promises -- `idempotent`, `key` -- on the target a node runs; the page draws a mark on a node that is tried
  * again or bounded, says the policy in the side panel, and lists the promises among an operation's flags.
  *
- * The example declares no retry yet, so the cases write one into a copy of it.
+ * The example's own get-row graph retries its request and bounds it, and its REST binding retries `listAll`;
+ * the case that reads a binding operation's tries writes another into a copy.
  */
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -14,18 +15,9 @@ import { scopedView } from './scoped-harness.js';
 
 const PAGE = fileURLToPath(new URL('../client/index.html', import.meta.url));
 const GET_ROW = '@customers/data/get-row.graph.json';
+const LIST_ROWS = '@customers/data/list-rows.graph.json';
 const REST = '@features/customers/data/customers-rest.binding.json';
 const RETRY = { times: 2, backoffMs: 200, when: 'status >= 500' };
-
-/** The copy of the example with the guide's retry and bound on get-row's request. */
-const retried = () =>
-  scopedView(GET_ROW, {
-    'features/customers/data/get-row.graph.json': doc => {
-      const fetched = doc.nodes.find((node: { id: string }) => node.id === 'fetched');
-      fetched.retry = RETRY;
-      fetched.timeoutMs = 5000;
-    },
-  });
 
 const nodeOf = (view: DocView, id: string): VNode => {
   const node = view.graph?.nodes.find(one => one.id === id);
@@ -35,13 +27,13 @@ const nodeOf = (view: DocView, id: string): VNode => {
 
 describe('the view model: what a call site declares', () => {
   it('carries the retry and the bound on the node that declares them', () => {
-    const fetched = nodeOf(retried(), 'fetched');
+    const fetched = nodeOf(scopedView(GET_ROW), 'fetched');
     expect(fetched.retry).toEqual(RETRY);
     expect(fetched.timeoutMs).toBe(5000);
   });
 
   it('carries neither on a node that declares neither, so the page draws nothing for it', () => {
-    const fetched = nodeOf(scopedView(GET_ROW), 'fetched');
+    const fetched = nodeOf(scopedView(LIST_ROWS), 'fetched');
     expect('retry' in fetched).toBe(false);
     expect('timeoutMs' in fetched).toBe(false);
   });
@@ -56,7 +48,7 @@ describe('the view model: what a call site declares', () => {
     const port = scopedView('@customers/domain/customer.port.json', edits);
     const rest = port.implementations?.find(one => one.path === REST);
     expect(rest?.operations.listEvery).toMatchObject({ retry: { times: 1 }, timeoutMs: 8000 });
-    expect('retry' in (rest?.operations.listAll ?? {})).toBe(false);
+    expect('retry' in (rest?.operations.get ?? {})).toBe(false);
     // a domain graph's node running customer.listEvery is told, per binding, how each meets it
     const target = nodeOf(scopedView('@customers/domain/digest.graph.json', edits), 'all').target;
     expect(target?.bindings?.find(one => one.path === REST)).toMatchObject({ retry: { times: 1 }, timeoutMs: 8000 });

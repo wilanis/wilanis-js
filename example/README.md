@@ -373,6 +373,24 @@ refuses the whole batch as `missing`, a 404. The connection paces this:
 `customers-api.connection.json` declares `"throttle": { "concurrency": 4 }`, so however many ids arrive, at
 most four requests are in flight against the API at a time.
 
+## Trying again, and for how long
+
+The read of one customer tries again when the API stumbles. Its node `fetched` in `get-row.graph.json` says
+`"timeoutMs": 5000` and `"retry": { "times": 2, "backoffMs": 200, "when": "status >= 500" }`: a request that
+faults, takes longer than five seconds or is answered 5xx is sent again, at most twice more, after 200 ms and
+then 400 ms. The checker accepts it because `@http/http.port.json#request` declares itself idempotent when its
+method is GET, HEAD, PUT or DELETE, and the method here is the literal `GET`. The connection's own
+`timeoutMs: 10000` still applies, and the tighter bound wins. An answer `when` accepts on the last try stands,
+so a 503 three times over still reaches the switch and is refused as `upstream`. The binding retries `listAll`
+whole, once, within eight seconds (`"retry": { "times": 1 }, "timeoutMs": 8000`), since every request
+`list-rows.graph.json` reaches is a GET; a retry repeats a fault and never a refusal, so a graph that refused
+`upstream` is not run again. The same retry on `posted` in `create-row.graph.json` is refused as `G018`
+(`method is "POST"`: a POST that failed may have been applied), and on a node of a domain graph as `L012`,
+since whether recording a customer is worth trying twice is the profile's business, not the domain's. And
+`customer.port.json` promises that `get` is `"idempotent": true`, which a caller that repeats a read leans on.
+`wilanis describe @customers/data/get-row.graph.json` prints the node as `retries 2 (200ms backoff, when
+status >= 500)  timeout 5000ms`, and the viewer badges it.
+
 ## All of it or none of it
 
 Two graphs say `"atomic": true`, and that one word is the whole declaration: every effect the graph reaches
