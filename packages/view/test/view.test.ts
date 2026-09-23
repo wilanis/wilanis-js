@@ -1,8 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { type Fix, pageUrl } from '@wilanis/core';
 import { loadProject } from '@wilanis/runtime';
 import { describe, expect, it } from 'vitest';
-import { type DocView, indexOf, viewOf } from '../src/index.js';
+import { type DocView, indexOf, refusalView, viewOf } from '../src/index.js';
+import { treeReadsOf } from '../src/model.js';
+import { scopedView } from './scoped-harness.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 const PAGE = fileURLToPath(new URL('../client/index.html', import.meta.url));
@@ -258,5 +261,55 @@ describe("the store page's marks the database has not caught up with", () => {
       'scoped',
       'views',
     ]);
+  });
+});
+
+// RFC 0019: a document's refusals, each code linked to its page and a fix said as the edit it is
+describe("a document's refusals", () => {
+  const File = 'features/customers/data/get-row.graph.json';
+  const Feature = '@features/customers/feature.json';
+
+  it('lists the refusals of a refused graph, each with the page about its code', () => {
+    const refused = scopedView(GET_ROW, {
+      [File]: doc => {
+        doc.nodes.find((node: any) => node.id === 'fetched').run = '@http/http.port.json#requst';
+      },
+    });
+    expect(refused.refusals.map(refusal => refusal.code)).toContain('R001');
+    for (const refusal of refused.refusals) expect(refusal.url).toBe(pageUrl(refusal.code));
+    expect(refused.refusals.find(refusal => refusal.code === 'R001')?.url).toMatch(/\/docs\/refusals\/R001\.md$/);
+  });
+
+  it('carries the fixes a refusal offers, and the page says each as its edit', async () => {
+    const load = await loadProject(EXAMPLE);
+    const reads = treeReadsOf(load);
+    const fixes: Fix[] = [
+      { file: Feature, at: 'effects', add: '@http/http.port.json#request' },
+      { file: GET_ROW, at: 'nodes/fetched/run', set: '@http/http.port.json#request' },
+      { file: GET_ROW, at: 'nodes/fetched/in', remove: true },
+      { file: File, move: 'features/customers/edge/get-row.graph.json' },
+    ];
+    reads.refusals.push({ code: 'L003', file: GET_ROW, at: 'nodes/fetched', message: 'm', hint: 'h', fixes });
+    expect(viewOf(load, GET_ROW, reads)?.refusals).toEqual([
+      { code: 'L003', file: GET_ROW, at: 'nodes/fetched', message: 'm', hint: 'h', fixes, url: pageUrl('L003') },
+    ]);
+    const page = await readFile(PAGE, 'utf8');
+    const source = page.match(/function fixText\(f\) \{[\s\S]*?\n {2}\}/)?.[0];
+    expect(source).toBeDefined();
+    const fixText = new Function(`${source}; return fixText;`)() as (fix: Fix) => string;
+    expect(fixes.map(fixText)).toEqual([
+      'add "@http/http.port.json#request" to effects',
+      'set "@http/http.port.json#request" at nodes/fetched/run',
+      'remove nodes/fetched/in',
+      'move to features/customers/edge/get-row.graph.json',
+    ]);
+    // the code links to its page, the badge opens the list, and a fix to another document names it
+    expect(page).toMatch(/function refusalEl\(r\)[\s\S]*?a\.href = r\.url/);
+    expect(page).toMatch(/\$\('refusals'\)\.onclick = /);
+    expect(page).toMatch(/function fixesEl\(r\)[\s\S]*?bare\(f\.file\) !== bare\(r\.file\)/);
+  });
+
+  it('attaches no url to a code that has no page', () => {
+    expect(refusalView({ code: 'Z001', file: GET_ROW, message: 'm', hint: 'h' })).not.toHaveProperty('url');
   });
 });
