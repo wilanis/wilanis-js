@@ -47,7 +47,8 @@ only.
 
 The workflows need a `PROJECT_TOKEN` secret: a fine-grained token owned by the organization with **Projects:
 read and write** on the organization and **Issues: read and write**, **Pull requests: read** and **Contents:
-read** on this repository. `GITHUB_TOKEN` cannot write an organization project.
+read** on this repository. `GITHUB_TOKEN` cannot write an organization project. Without the secret both workflows
+say so as a warning and skip, so an unset token never fails a pull request's checks.
 
 ```
 GH_TOKEN=$(gh auth token) node .github/board/board.mjs issue 195 173 --dry   # what a sync would write
