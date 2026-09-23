@@ -132,6 +132,35 @@ describe('a binding operation that says retry', () => {
   });
 });
 
+describe('a retried call whose run is cancelled', () => {
+  it('records no second try when the run is cancelled during its first', async () => {
+    const run = new AbortController();
+    const tried: unknown[] = [];
+    const base: Handler = ({ ctx }) => {
+      tried.push(ctx.signal);
+      return new Promise((_, reject) => ctx.signal?.addEventListener('abort', () => reject(new Error('stopped'))));
+    };
+    const attempted: unknown[] = [];
+    const ctx = {
+      nodePath: ['asked'],
+      site: 'asked',
+      signal: run.signal,
+      clock: Date.now,
+      attach: () => {},
+      attempted: (one: unknown) => attempted.push(one),
+      env: {},
+    } as RunContext;
+    const wrapped = attempting(base, new Map([['asked', { times: 2, backoffMs: 0 }]]));
+
+    const ended = wrapped({ in: { item: 'a' }, ctx });
+    run.abort();
+
+    await expect(ended).rejects.toThrow('stopped');
+    expect(tried).toHaveLength(1);
+    expect(attempted).toEqual([]);
+  });
+});
+
 describe('a call that says neither word', () => {
   it('runs once and its report carries nothing new', async () => {
     const upstream = scripted(['fault']);
