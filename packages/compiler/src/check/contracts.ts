@@ -1,13 +1,15 @@
 /**
  * Shapes, ports and connections. A shape's fields resolve and speak their own layer (R001, L001, L005). A
  * port's operations resolve; a domain operation speaks core shapes and fixes no value itself (L001, L006);
- * what an operation says about repeating it names its own fields and types as boolean (C015).
+ * what an operation says about repeating it names its own fields and types as boolean (C015). A field of
+ * either bounds its length with maxItems only where it is a list (C016).
  * A connection names a kind and its settings fit it, reading secrets only (R001, C001, C002). What a store
  * declares is judged beside it, in `stores.ts`.
  */
 import {
   type ConnectionDoc,
   expr,
+  type Fields,
   type Loaded,
   type Operation,
   type PortDoc,
@@ -25,6 +27,7 @@ import { mismatch } from './typing.js';
 export function checkShape(judge: Judge, shape: Loaded<ShapeDoc>): void {
   const spec = { fields: shape.doc.fields, open: shape.doc.open };
   judge.type(spec, shape.path, 'fields');
+  checkMaxItems(judge, shape.path, shape.doc.fields, 'fields');
   if (!shape.native)
     judge.checkLayer({ spec, from: shape, at: 'fields', layer: shape.doc.layer, what: `shape '${shape.path}'` });
 }
@@ -37,9 +40,31 @@ export function checkPort(judge: Judge, port: Loaded<PortDoc>): void {
   for (const [name, op] of Object.entries(port.doc.operations)) {
     judge.fieldsType(op.accepts, port.path, `operations/${name}/accepts`);
     judge.type(op.returns, port.path, `operations/${name}/returns`);
+    checkMaxItems(judge, port.path, op.accepts, `operations/${name}/accepts`);
+    if (typeof op.returns === 'object')
+      checkMaxItems(judge, port.path, op.returns.fields, `operations/${name}/returns/fields`);
     if (op.transactional) checkTransactional(judge, port, name, op);
     if (!port.native) checkDomainOperation(judge, port, name, op);
     else checkRepeatable(judge, port, name, op);
+  }
+}
+
+/**
+ * C016: `maxItems` bounds a list, so a field that says it is one, at any depth of inline objects. A field whose
+ * type does not resolve is R001's, and is not judged again here.
+ */
+function checkMaxItems(judge: Judge, file: string, fields: Fields | undefined, at: string): void {
+  for (const [name, field] of Object.entries(fields ?? {})) {
+    const where = `${at}/${name}`;
+    if (typeof field.type === 'object') checkMaxItems(judge, file, field.type.fields, `${where}/type/fields`);
+    const type = field.maxItems === undefined ? undefined : judge.quiet(field.type);
+    if (!type || type.kind === 'list') continue;
+    judge.refuser(file)(
+      'C016',
+      `field '${name}' says maxItems but is ${show(type)}, not a list`,
+      `${where}/maxItems`,
+      `maxItems bounds a list; this field is ${show(type)}: drop maxItems, or make the field a list`,
+    );
   }
 }
 

@@ -3,8 +3,8 @@
  * its edge shapes meet (L006, T002), reads the request into its input (T003), reaches only request.* paths its
  * kind hands (T004) and guarantees the ones a resolver requires (A006), and maps every refusal reason it can
  * reach, and no other (T005, T006). A kind itself is judged once: what it says correlates a run must be a path
- * into its own context (T007). What gates it is judged in access.ts. S scenarios name a trigger (S001)
- * and pin a reason only on a node that refused (S002).
+ * into its own context (T007). A public trigger bounds every list its edge shapes take (T008). What gates it is
+ * judged in access.ts; what a scenario of it pins, in scenarios.ts.
  */
 import {
   type Field,
@@ -12,7 +12,6 @@ import {
   type Operation,
   type PolicyDoc,
   policyPath,
-  type ScenarioDoc,
   show,
   splitPath,
   type TriggerDoc,
@@ -23,34 +22,10 @@ import {
 import { readPath } from '@wilanis/engine';
 import { refusalsOfTrigger } from '../refusals.js';
 import { checkAccess } from './access.js';
+import { shapeName, unboundedLists } from './bounds.js';
 import { type Judge, type Refuser, underProfile } from './judge.js';
 import { opNeeds, type RequestNeed } from './resolvers.js';
 import { assignableWire, atOrBelow, mismatch, requestOnly } from './typing.js';
-
-/**
- * The refusals a scenario earns: naming a trigger the tree does not have (S001), and pinning a reason on a node
- * that did not refuse (S002).
- */
-export function checkScenario(judge: Judge, scenario: Loaded<ScenarioDoc>): void {
-  const refuse = judge.refuser(scenario.path);
-  if (!judge.scope.get('trigger', scenario.doc.trigger)) {
-    refuse('S001', `scenario names unknown trigger '${scenario.doc.trigger}'`, 'trigger', 'wilanis ls trigger');
-  }
-  checkPinnedReasons(scenario.doc, refuse);
-}
-
-/** S002: a reason belongs to a node that refused, and a node that refused ended `failed`. */
-function checkPinnedReasons(scenario: ScenarioDoc, refuse: Refuser): void {
-  for (const [id, node] of Object.entries(scenario.expect.nodes ?? {})) {
-    if (node.reason === undefined || node.status === 'failed') continue;
-    refuse(
-      'S002',
-      `node '${id}' pins reason '${node.reason}' but ended '${node.status}': only a node that refused gives a reason`,
-      `expect/nodes/${id}/reason`,
-      'a reason belongs to a node that refused; drop it, or let wilanis fuzz write the scenario again',
-    );
-  }
-}
 
 /**
  * Every refusal a trigger can earn: the kind and settings it names (R001, T001), the domain port it fires and
@@ -105,6 +80,7 @@ class TriggerCheck {
       return;
     }
     this.checkSettings(kind);
+    this.checkPublicLists(kind);
     if (this.doc.in)
       this.judge.checkLayer({ spec: this.doc.in, from: this.trigger, at: 'in', layer: 'edge', what: 'in' });
     if (this.doc.out)
@@ -154,6 +130,37 @@ class TriggerCheck {
     }
     if (this.judge.type(value, this.file, at)) {
       this.judge.checkLayer({ spec: value, from: this.trigger, at, layer: 'edge', what: `settings.${name}` });
+    }
+  }
+
+  /**
+   * T008: a trigger with no policies is called by anyone, so every list its edge shapes take -- its in, and each
+   * setting of its kind typed `type` -- says the most it may hold. An unbounded list from an anonymous caller is
+   * the request-shaped denial of service, and the edge judges `maxItems` before anything fires.
+   */
+  private checkPublicLists(kind: Loaded<TriggerKindDoc>): void {
+    if (this.doc.policies?.length) return;
+    const typeSettings = Object.entries(kind.doc.settings.fields).filter(
+      ([, field]) => this.judge.quiet(field.type)?.kind === 'type',
+    );
+    const edges: [string, unknown][] = [
+      ['in', this.doc.in],
+      ...typeSettings.map(([name]): [string, unknown] => [`settings/${name}`, this.doc.settings[name]]),
+    ];
+    const judged = new Set<unknown>();
+    for (const [at, ref] of edges) {
+      // a shape written twice (the body and the in) is refused once, where it is written first
+      const type = typeof ref === 'string' && !judged.has(ref) ? this.judge.quiet(ref) : undefined;
+      judged.add(ref);
+      for (const list of type ? unboundedLists(type) : []) {
+        const leaf = list.field.split('.').pop();
+        this.refuse(
+          'T008',
+          `public trigger takes '${ref}', whose field '${list.field}' is a list with no maxItems`,
+          at,
+          `add "maxItems" to ${leaf} in ${shapeName(list.shape)}: the most an anonymous caller may send; or gate the trigger with a policy`,
+        );
+      }
     }
   }
 

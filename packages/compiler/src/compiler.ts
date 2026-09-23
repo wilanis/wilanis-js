@@ -230,6 +230,8 @@ export class Compiler {
       onItemFailure: node.onItemFailure ?? 'fail',
       redact,
       bind: bindPaths(node.bind),
+      ...(node.limit === undefined ? {} : { limit: node.limit }),
+      ...(node.concurrency === undefined ? {} : { concurrency: node.concurrency }),
       ...site,
     };
   }

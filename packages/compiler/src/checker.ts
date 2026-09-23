@@ -8,7 +8,7 @@
  *   C connections and settings (project.ts, contracts.ts)
  *   C stores: what they keep and what they once called it (stores.ts), and who may see it (scopes.ts)
  *   atomic graphs, which are L and G rules over what one reaches (atomic.ts)
- *   S scenarios (triggers.ts)   X plugin-specific (each plugin's own `check`)
+ *   S scenarios (scenarios.ts)   X plugin-specific (each plugin's own `check`)
  */
 import { type LoadResult, type PluginModule, RefusalList, Scope } from '@wilanis/core';
 import { checkPolicy } from './check/access.js';
@@ -21,9 +21,10 @@ import { Judge } from './check/judge.js';
 import { checkBlobStore, checkProject, checkStartup } from './check/project.js';
 import { checkRequired } from './check/required.js';
 import { checkResolversDoc } from './check/resolvers.js';
+import { checkScenario } from './check/scenarios.js';
 import { checkStoreScoping } from './check/scopes.js';
 import { checkStore } from './check/stores.js';
-import { checkScenario, checkTrigger, checkTriggerKind } from './check/triggers.js';
+import { checkTrigger, checkTriggerKind } from './check/triggers.js';
 
 /** Every refusal of a loaded tree: the loader's, then every rule family's, then each plugin's own. */
 export function checkTree(load: LoadResult): RefusalList {
