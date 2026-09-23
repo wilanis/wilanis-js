@@ -399,3 +399,10 @@ Steps 1 to 4 need nothing from RFC 0002 and can land first.
   `refuse` is refused alongside one that delegates to a refusing operation: both end the run on purpose, and
   the plugin firing the port expects an answer or a failure from either.
 - Whether `@s3`'s `postLoad` probe is a `HeadBucket` or a `put`/`drop` of one byte under the prefix.
+  *Decided:* a `put` and a `drop` of one empty object under the prefix, keyed like any other. Those are the
+  calls the store makes, so a key allowed only object calls under the prefix passes. `HeadBucket` needs
+  `s3:ListBucket`, which such a key lacks, and it would pass a bucket the key can read but not write. The
+  probe runs only when `blobs.connection` names the plugin's kind, so a tree that ships a bucket connection
+  and keeps files never reaches the bucket.
+- Whether `@s3` speaks the API through an SDK. *Decided:* no. It sends six calls, each signed with Signature
+  Version 4 over `fetch`, and nothing else from an SDK would be used.
