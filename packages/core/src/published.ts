@@ -20,8 +20,8 @@ export const SCHEMA_BASE = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/
 export const schemaRef = (kind: Kind) => `${WILANIS}/${kind}.schema.json`;
 /** Where a kind's schema is fetched from, so an editor or an agent can resolve what the short form names. */
 export const schemaUrl = (kind: Kind) => `${SCHEMA_BASE}/${kind}.schema.json`;
-/** A code that has a page: one of the ten checker families, or X, what a plugin of this workspace refuses with. */
-const CODE_WITH_PAGE = /^[DRLGPBTACSX][0-9]{3}$/;
+/** A code that has a page: one of the eleven checker families, or X, what a plugin of this workspace refuses with. */
+const CODE_WITH_PAGE = /^[DRLGPBTAICSX][0-9]{3}$/;
 /** Where a refusal code's page is read, so a diagnostic can link its long form; undefined for a code of no family. */
 export const pageUrl = (code: string) =>
   CODE_WITH_PAGE.test(code) ? `https://github.com/${REPO}/blob/${BRANCH}/docs/refusals/${code}.md` : undefined;
