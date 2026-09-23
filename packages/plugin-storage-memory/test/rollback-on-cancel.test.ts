@@ -56,6 +56,27 @@ function abortAfterFirstWrite(control: AbortController) {
   });
 }
 
+/** The ends of the one transaction the run opens, so the test sees which way the scope settled it. */
+function endsOfTransaction() {
+  const begin = MemoryEngine.prototype.begin;
+  const ends = { commit: vi.fn(), rollback: vi.fn() };
+  vi.spyOn(MemoryEngine.prototype, 'begin').mockImplementation(async function (this: MemoryEngine, at) {
+    const opened = await begin.call(this, at);
+    return {
+      ...opened,
+      commit: async () => {
+        ends.commit();
+        await opened.commit();
+      },
+      rollback: async () => {
+        ends.rollback();
+        await opened.rollback();
+      },
+    };
+  });
+  return ends;
+}
+
 /** The keys of what the store keeps, read back through the tree's own `all`. */
 async function kept(tree: Awaited<ReturnType<typeof serving>>): Promise<string[]> {
   const listed = await tree.run('all');
@@ -74,8 +95,11 @@ describe('an atomic graph whose run is cancelled', () => {
   it('writes both entries when nothing cancels it', async () => {
     const tree = await serving();
     close = tree.stop;
+    const ends = endsOfTransaction();
     const written = await tree.run('pair', { first: 'a', second: 'b' });
     expect(written.status).toBe('done');
+    expect(ends.commit).toHaveBeenCalledTimes(1);
+    expect(ends.rollback).not.toHaveBeenCalled();
     expect(await kept(tree)).toEqual(['a', 'b']);
   });
 
@@ -83,12 +107,15 @@ describe('an atomic graph whose run is cancelled', () => {
     const tree = await serving();
     close = tree.stop;
     const control = new AbortController();
+    const ends = endsOfTransaction();
     const put = abortAfterFirstWrite(control);
     const written = await tree.run('pair', { first: 'a', second: 'b' }, control.signal);
     // the first write ran and answered, the second never started, and the run says it was cancelled
     expect(put).toHaveBeenCalledTimes(1);
     expect(written.status).toBe('cancelled');
     expect(written.output).toBeUndefined();
+    expect(ends.rollback).toHaveBeenCalledTimes(1);
+    expect(ends.commit).not.toHaveBeenCalled();
     expect(await kept(tree)).toEqual([]);
   });
 
