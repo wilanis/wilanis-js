@@ -53,7 +53,7 @@ describe('the view server', () => {
         await fetch(`${server.url}api/doc?path=${encodeURIComponent('@customers/data/get-row.graph.json')}`)
       ).json()) as DocView;
       expect(doc.path).toBe(GET_ROW);
-      expect(doc.graph?.nodes.length).toBe(8);
+      expect(doc.graph?.nodes.length).toBe(9);
       const missing = await fetch(`${server.url}api/doc?path=${encodeURIComponent('@features/nope.json')}`);
       expect(missing.status).toBe(404);
       const none = await fetch(`${server.url}api/doc`);

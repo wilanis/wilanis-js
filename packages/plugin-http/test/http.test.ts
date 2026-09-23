@@ -293,12 +293,17 @@ describe('files through the blob registry', () => {
 });
 
 describe('an upstream that answers nothing', () => {
-  it('is a fault: a 500 that names the run and says nothing of the node or the platform message', async () => {
+  it('is the upstream a switch catches it as, and a fault that says nothing of what broke where none does', async () => {
     await stopUpstream();
     try {
-      const answer = await fetch('http://localhost:8099/customers/1', {
-        headers: { authorization: `Bearer ${token}` },
-      });
+      const headers = { authorization: `Bearer ${token}` };
+      // get-row catches the GET that got no answer and routes it to its refusal of upstream, which the route maps
+      const caught = await fetch('http://localhost:8099/customers/1', { headers });
+      expect(caught.status).toBe(502);
+      expect(await caught.json()).toEqual({ reason: 'upstream', message: 'the customer API could not be reached' });
+      expect(lineFor('GET /customers/1', 502)).toContain('customer.port.json#get refused: upstream');
+      // list-rows catches nothing, so the same outage is the kind's one answer: the run named, nothing of the node
+      const answer = await fetch('http://localhost:8099/customers', { headers });
       expect(answer.status).toBe(500);
       const text = await answer.text();
       const body = JSON.parse(text);
@@ -306,8 +311,8 @@ describe('an upstream that answers nothing', () => {
       expect(runs).toContain(body.run);
       expect(text).not.toContain('fetch');
       // the log line is where the operator finds what broke, under the id the caller was handed
-      const line = lineFor('GET /customers/1', 500);
-      expect(line).toMatch(/customer\.port\.json#get failed at '[^']+': /);
+      const line = lineFor('GET /customers', 500);
+      expect(line).toMatch(/customer\.port\.json#list failed at '[^']+': /);
       expect(line.endsWith(`  run=${body.run}`)).toBe(true);
     } finally {
       stopUpstream = await listening(fakeUpstream({ rows, inFlight }), UPSTREAM);

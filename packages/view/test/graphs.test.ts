@@ -21,7 +21,17 @@ describe('the view model of a graph', () => {
   it('draws a data graph: in, every node, out, with typed ports', async () => {
     const seen = await view(GET_ROW);
     const ids = seen.graph!.nodes.map(node => node.id);
-    expect(ids).toEqual(['in', 'fetched', 'outcome/1', 'outcome/2', 'customer', 'noCustomer', 'upstreamFailed', 'out']);
+    expect(ids).toEqual([
+      'in',
+      'fetched',
+      'outcome/1',
+      'outcome/2',
+      'customer',
+      'noCustomer',
+      'upstreamFailed',
+      'unreachable',
+      'out',
+    ]);
     const fetched = seen.graph!.nodes.find(node => node.id === 'fetched')!;
     expect(fetched.kind).toBe('run');
     expect(fetched.label).toBe('GET the row');
@@ -88,6 +98,7 @@ describe('the view model of a graph', () => {
       then: 'noCustomer',
       otherwise: 'outcome/2',
       last: false,
+      catch: { fetched: 'unreachable' },
     });
     // a condition is said in words, one clause per line, each input named so the page can point at its port
     expect(second.label).toBe('if status is 200 and body exists');

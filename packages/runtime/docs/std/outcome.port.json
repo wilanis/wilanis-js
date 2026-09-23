@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/port.schema.json",
   "label": "Outcomes",
-  "description": "Outcomes dataflow alone cannot state. `refuse` ends the graph on purpose: the branch a decision routed here is a declared refusal, not a bug. It names its outcome with a `reason`, one word the trigger kind maps to an answer; the graph never says how the trigger answers.",
+  "description": "Outcomes dataflow alone cannot state. `refuse` ends the graph on purpose: the branch a decision routed here is a declared refusal, not a bug. It names its outcome with a `reason`, one word the trigger kind maps to an answer; the graph never says how the trigger answers. A node that breaks where the graph declares nothing is a fault, which a data graph's switch may `catch` and route here.",
   "operations": {
     "refuse": {
       "description": "Refuse: the graph fails on purpose. `reason` is one word for the outcome (missing, conflict, upstream), written as a literal so the checker can see every reason a trigger may reach and require the kind to map each (T005); `message`, {{templates}} in it reading what any value may, is what the caller is told. Answers nothing, but declares a type so it can stand as an out.from candidate opposite the node that answers. A rehearsal reports it as refused on purpose.",

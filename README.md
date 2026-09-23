@@ -170,7 +170,9 @@ DELETE. The data layer may then write `"retry": { "times": 2, "backoffMs": 200 }
 node that makes the call, and the compiler refuses the same retry on a POST (`G018`: a call that failed may have
 been applied) and on any node of a domain graph (`L012`), which says what is done and never how often. A retry
 repeats a fault or a timeout, never a refusal the graph decided, and the run's record shows one node with the
-tries it took.
+tries it took. And a data graph's switch may `catch` a node that broke: when the customer API answers nothing at
+all, `get-row.graph.json` routes the fault to the `upstream` refusal its route already answers 502, instead
+of a 500 that says only `fault`.
 
 What happens when something hangs is written down as well. The route above gives up after two seconds
 (`"deadlineMs": 2000`); every other route takes the minute and the megabyte `project.json` gives the http

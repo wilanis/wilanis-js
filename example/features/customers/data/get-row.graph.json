@@ -1,14 +1,15 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Get a row",
-  "description": "Data graph behind customer.get: GET the row. 200 is the customer, 404 is the declared refusal for an id that does not exist, anything else is a failure.",
+  "description": "Data graph behind customer.get: GET the row. 200 is the customer, 404 is the declared refusal for an id that does not exist, anything else the API says is upstream, and so is the API saying nothing at all.",
   "in": "@customers/domain/CustomerRef.shape.json",
   "out": {
     "type": "@customers/domain/Customer.shape.json",
     "from": [
       "customer",
       "noCustomer",
-      "upstreamFailed"
+      "upstreamFailed",
+      "unreachable"
     ]
   },
   "nodes": [
@@ -49,7 +50,10 @@
           "to": "customer"
         }
       ],
-      "else": "upstreamFailed"
+      "else": "upstreamFailed",
+      "catch": {
+        "fetched": "unreachable"
+      }
     },
     {
       "type": "@wilanis/node/run.schema.json",
@@ -80,6 +84,17 @@
       "in": {
         "reason": "upstream",
         "message": "the customer API answered {{fetched.status}}",
+        "type": "@customers/domain/Customer.shape.json"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "unreachable",
+      "label": "No answer",
+      "run": "@std/outcome.port.json#refuse",
+      "in": {
+        "reason": "upstream",
+        "message": "the customer API could not be reached",
         "type": "@customers/domain/Customer.shape.json"
       }
     }
