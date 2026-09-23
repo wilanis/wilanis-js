@@ -101,6 +101,8 @@
   .node .txn { font: 10px var(--sans); fill: var(--ok); }
   /* a call site that is tried again or bounded (RFC 0011): its policy is a word on the node, the panel says it in full */
   .node .try { font: 10px var(--sans); fill: var(--type); }
+  /* a for-each that caps its list or paces its elements (RFC 0012): the numbers on the node, the panel says them in full */
+  .node .fan { font: 10px var(--sans); fill: var(--type); }
   /* the rule a node is held to: a guard the compiler lowered names the invariant, a proved site says how, lighter */
   .node .inv { font: 10px var(--sans); cursor: pointer; }
   .node .inv .plate { stroke-width: 1; rx: 3; }
@@ -232,6 +234,19 @@
     if (r) { const how = [r.backoffMs ? r.backoffMs + 'ms backoff' : '', r.when ? 'when ' + r.when : ''].filter(Boolean); parts.push('retries ' + r.times + (how.length ? ' (' + how.join(', ') + ')' : '')); }
     if (site.timeoutMs !== undefined) parts.push('timeout ' + site.timeoutMs + 'ms');
     return parts.join(', ');
+  }
+  /** What a for-each declares about its fan-out, as `wilanis describe` says it: `at most 100 elements, 8 at once`; '' where it declares neither. */
+  function fanOutText(n) {
+    const parts = [];
+    if (n.limit !== undefined) parts.push('at most ' + n.limit + ' elements');
+    if (n.concurrency !== undefined) parts.push(n.concurrency + ' at once');
+    return parts.join(', ');
+  }
+  /** One bound a trigger ends up with, as `wilanis describe` says it: `deadline 2000ms`, `deadline 30000ms (from @http settings)`, `deadline none`. */
+  function limitText(name, l) {
+    const from = l.from ? ' (from ' + l.from + ' settings)' : '';
+    if (name === 'deadlineMs') return 'deadline ' + (l.value === undefined ? 'none' : l.value + 'ms') + from;
+    return 'body ' + (l.value === undefined ? 'of any size' : 'at most ' + l.value + ' bytes') + from;
   }
   /** The badges an operation earns for what it promises about a repeated call: idempotent, idempotent when, or its key. */
   function promisedBadges(op) {
@@ -370,6 +385,7 @@
       const ty = el('td', 'type'); ty.appendChild(f.type === 'type' ? frag('a type reference' + (f.binds ? ' (binds ' + f.binds + ')' : '')) : typeEl(f.type)); tr.appendChild(ty);
       const tags = el('td');
       if (f.enum) tags.appendChild(el('span', 'tag', 'one of ' + f.enum.join(', ')));
+      if (f.maxItems !== undefined) { const b = el('span', 'tag', 'at most ' + f.maxItems); b.title = 'the most items a list may hold; a longer one is refused wherever the type is judged, a body at the edge among them'; tags.appendChild(b); }
       if (f.static || f.type === 'type') tags.appendChild(el('span', 'tag', 'static: written, never read'));
       if (f.secret) tags.appendChild(el('span', 'tag secret', 'secret'));
       tr.appendChild(tags);
@@ -589,6 +605,7 @@
           page.appendChild(el('p', null, 'Each policy decides over what the kind and the guard hand; the first that does not allow answers, and the operation never fires.'));
           for (const [i, pol] of v.policies.entries()) { const c = el('div', 'card'); c.appendChild(el('div', 'k', String(i + 1))); const vv = el('div', 'v'); vv.appendChild(link(pol.path, pol.label)); if (pol.required) vv.appendChild(requiredEl(pol.required)); if (pol.gives) vv.appendChild(el('small', null, 'gives the guard: ' + Object.keys(pol.gives).join(', '))); if (pol.decide) { vv.appendChild(el('small', null, 'decides through ')); vv.appendChild(link(pol.decide.split('#')[0], showOp(pol.decide))); } c.appendChild(vv); page.appendChild(c); }
         }
+        if (v.limits) limitsEl(page, v.limits);
         page.appendChild(el('h2', null, 'Settings the kind judges')); page.appendChild(valuesTable(d.settings));
         if (v.answers) {
           page.appendChild(el('h2', null, 'Refusals it answers'));
@@ -910,6 +927,31 @@
     }
     if (n.timeoutMs !== undefined) box.appendChild(el('p', null, `${each} fails as a fault once it has taken ${n.timeoutMs} ms${r ? ', and is tried again like any fault' : ''}; the handler is told through its signal.`));
   }
+  /**
+   * What a for-each declares about its fan-out, said in full: the most elements it runs over, and how many run at
+   * once while the rest wait their turn. The elements a cancelled run never started are cancelled, not failed.
+   */
+  function fanOutEl(box, n) {
+    box.appendChild(el('h4', null, 'fans out'));
+    if (n.limit !== undefined) box.appendChild(el('p', null, `It runs over at most ${n.limit} element${n.limit === 1 ? '' : 's'}: a longer list fails the node as a fault before any element starts.`));
+    if (n.concurrency !== undefined) box.appendChild(el('p', null, `${n.concurrency} element${n.concurrency === 1 ? ' runs' : 's run'} at once; the rest wait for a slot, in index order, and one the run never started is cancelled.`));
+  }
+  /**
+   * The bounds a trigger's run ends up with: the trigger's own, else the plugin's settings in project.json, else
+   * none. A deadline is counted from the fire to the answer, and a run past it is cancelled; the table names
+   * which document said each, so a reader of a route sees the tree's default where the route writes none.
+   */
+  function limitsEl(page, limits) {
+    page.appendChild(el('h2', null, 'Bounds'));
+    page.appendChild(el('p', null, 'How long its run may take, from the fire to the answer, and the most its body may weigh. A run past its deadline is cancelled: nothing more starts, what was in flight is told to stop, and what already ran stays done.'));
+    const t = el('table'); const hd = el('tr'); for (const h of ['bound', 'said by']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
+    for (const [name, l] of Object.entries(limits)) {
+      const tr = el('tr'); tr.appendChild(el('td', l.value === undefined ? 'miss' : 'val', limitText(name, l)));
+      const by = el('td'); if (l.from) by.appendChild(link(l.from + '/plugin.json', l.from + '’s settings in project.json')); else by.appendChild(frag(l.value !== undefined ? 'this trigger' : 'nothing: the kind takes one, and neither this trigger nor its plugin\u2019s settings write it'));
+      tr.appendChild(by); t.appendChild(tr);
+    }
+    page.appendChild(t);
+  }
   function renderNodeDetails(box, n, v) {
     const color = nodeColors(v.graph).get(n.id);
     const h = el('h3'); const sw = el('span', 'swatch'); sw.style.background = color; h.appendChild(sw); h.appendChild(document.createTextNode(n.label + ' ')); const kindText = { run: 'operation', map: 'for each', rule: 'rule', in: 'input', out: 'output', const: 'constants', request: 'request' }[n.kind]; h.appendChild(NODE_SCHEMA[n.kind] ? schemaBadge(n.kind, kindText, NODE_SCHEMA[n.kind]) : badge(n.kind, kindText)); box.appendChild(h);
@@ -927,6 +969,7 @@
       box.appendChild(el('h4', null, 'runs'));
       const p = el('p'); p.appendChild(link(t.port, t.portLabel + SEP + t.opName)); p.appendChild(document.createTextNode(t.refuses ? ' (ends the graph on purpose; the reason is what the trigger maps)' : t.native ? (t.effect ? ' (a native effect)' : ' (pure, native)') : ' (a domain port)')); box.appendChild(p);
       const promised = promisedBadges(t); if (promised.length) { const q = el('p'); for (const b of promised) { q.appendChild(b); q.appendChild(frag(' ')); } box.appendChild(q); }
+      if (n.limit !== undefined || n.concurrency !== undefined) fanOutEl(box, n);
       if (n.retry || n.timeoutMs !== undefined) triesEl(box, n);
       if (n.keeps) {
         const k = n.keeps;
@@ -1086,12 +1129,17 @@
   const shortMs = (ms) => ms >= 1000 && ms % 1000 === 0 ? ms / 1000 + 's' : ms + 'ms';
   /**
    * The words a node wears on its subtitle's row, right to left, with the room each takes: an effect, a part in
-   * the transaction (a participant is also rimmed), and a call site's retry and bound (RFC 0011).
+   * the transaction (a participant is also rimmed), a for-each's ceiling and pace (RFC 0012), and a call site's
+   * retry and bound (RFC 0011).
    */
   function marksOf(n) {
     const marks = [];
     if (n.target && n.target.effect) marks.push({ text: 'effect', cls: 'fx', title: 'reaches outside the process', chars: 7, px: 40 });
     if (n.participates) marks.push({ text: 'txn', cls: 'txn', title: 'this node\u2019s effect is inside the graph\u2019s one transaction: it is undone with the rest unless the graph answers', chars: 5, px: 26 });
+    if (n.limit !== undefined || n.concurrency !== undefined) {
+      const text = [n.limit !== undefined ? 'n\u2264' + n.limit : '', n.concurrency !== undefined ? '\u00d7' + n.concurrency : ''].filter(Boolean).join(' ');
+      marks.push({ text, cls: 'fan', title: fanOutText(n), chars: text.length + 2, px: text.length * 6 + 8 });
+    }
     if (n.retry || n.timeoutMs !== undefined) {
       const text = [n.retry ? '\u21bb' + n.retry.times : '', n.timeoutMs !== undefined ? '\u2264' + shortMs(n.timeoutMs) : ''].filter(Boolean).join(' ');
       marks.push({ text, cls: 'try', title: attemptsText(n) + '\na refusal is never tried again', chars: text.length + 2, px: text.length * 6 + 8 });
@@ -1315,6 +1363,7 @@
     legend.appendChild(el('span', null, 'an edge has the colour of the node it feeds'));
     // the rim is only worth explaining where something wears it
     if (g.atomic) { const t = el('span'); t.appendChild(el('u')); t.appendChild(frag('a rimmed node is in the transaction')); legend.appendChild(t); }
+    if (g.nodes.some(n => n.limit !== undefined || n.concurrency !== undefined)) legend.appendChild(el('span', null, 'n\u2264 caps the elements a for-each runs over, \u00d7 says how many run at once'));
     if (g.nodes.some(n => n.retry || n.timeoutMs !== undefined)) legend.appendChild(el('span', null, '\u21bbn is tried again n more times, \u2264 bounds how long one call may take'));
     if (g.nodes.some(n => n.guarded || n.proved)) legend.appendChild(el('span', null, 'a badge is a field invariant: named where it is guarded, lighter where it is proved \u2014 double-click to open it'));
     legend.appendChild(el('span', null, ARROW + ' or double-click opens the implementation'));

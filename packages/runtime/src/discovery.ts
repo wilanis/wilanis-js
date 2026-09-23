@@ -24,6 +24,7 @@ import {
 } from './doc-said.js';
 import { graphLines } from './graph-said.js';
 import { holdsLines, invariantLines } from './invariant-lines.js';
+import { LIMIT_SETTINGS, limitLines } from './limits-said.js';
 import { fieldLine, portLines, shower, storeLines } from './lines.js';
 import { requiredByLines, requiresLines } from './required-said.js';
 import { viewsOfTrigger } from './scope-said.js';
@@ -118,14 +119,16 @@ function policyLines(doc: Loaded, load: LoadResult): string[] {
 }
 
 /**
- * A trigger: the document, the policies it attaches, what each gives the guard, and the invariants that hold
- * over it -- a rule stated once elsewhere is a rule about this trigger, and a reader of the trigger sees it.
+ * A trigger: the document, the bounds its run ends up with and where each came from, the policies it attaches,
+ * what each gives the guard, and the invariants that hold over it -- a rule stated once elsewhere is a rule about
+ * this trigger, and a reader of the trigger sees it.
  */
 function triggerLines(doc: Loaded, scope: Scope): string[] {
   const declared = doc.doc as TriggerDoc;
   return [
     `kind  ${declared.kind}`,
     ...settingLines(declared.settings),
+    ...limitLines(doc as Loaded<TriggerDoc>, scope),
     ...crossesLines(declared),
     ...fireLines(declared),
     ...gatedLines(declared),
@@ -177,10 +180,14 @@ const nested = (value: unknown): value is Record<string, unknown> =>
 
 /**
  * What a trigger's kind is configured with, a setting to a line, and a setting with parts of its own opened
- * one level -- which is where a reader looks for the status a kind answers with and the refusals it maps.
+ * one level -- which is where a reader looks for the status a kind answers with and the refusals it maps. A
+ * bound is said on its own line below, with where it came from, so it is not said here as well.
  */
 function settingLines(settings: Record<string, unknown> | undefined): string[] {
-  const entries = Object.entries(settings ?? {});
+  const bounds: readonly string[] = LIMIT_SETTINGS;
+  const entries = Object.entries(settings ?? {}).filter(
+    ([name, value]) => !(bounds.includes(name) && typeof value === 'number'),
+  );
   if (!entries.length) return [];
   const lines = ['settings:'];
   for (const [name, value] of entries) {

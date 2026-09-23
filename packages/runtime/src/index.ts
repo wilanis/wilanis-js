@@ -28,6 +28,7 @@ export {
   type Started,
   statusOf,
 } from './fired.js';
+export { LIMIT_SETTINGS, type Limit, type LimitSetting, limitsOf, type TriggerLimits } from './limits-said.js';
 export { cli as cliTriggers } from './plugins/cli-trigger.js';
 export { BUILTIN_PLUGINS } from './plugins/index.js';
 export { std } from './plugins/std.js';

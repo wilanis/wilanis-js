@@ -10,6 +10,7 @@ import type { GraphDoc, Loaded, Scope, Type, Values } from '@wilanis/core';
 import { isMap, isRun, isSwitch, show, typeAt } from '@wilanis/core';
 import { attemptsOf } from './attempts.js';
 import { markGuards } from './guards.js';
+import { fanOutOf } from './limits.js';
 import {
   attributePorts,
   fieldPorts,
@@ -250,6 +251,7 @@ class GraphBuilder {
       bind: node.bind,
       onItemFailure: node.onItemFailure,
       ...this.keeps(node.run, node.in),
+      ...fanOutOf(node),
       ...attemptsOf(node),
     });
     wire(this.edges, node.id, { over: node.over, ...(node.in ?? {}) }, this.resolvers);
