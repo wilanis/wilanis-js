@@ -1,6 +1,6 @@
 # RFC 0001: The RFC process
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** area:process
 - **Tracking issue:** #1
 - **Depends on:** none
