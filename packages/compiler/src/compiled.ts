@@ -30,11 +30,12 @@ export interface Compiled {
 /**
  * Why a nested run did not answer. A refusal is the nested graph's declared outcome: it passes up as it is,
  * reason and message, so the trigger can answer it; a fault is named by the graph and node it broke in; a
- * blocked run names what it needed.
+ * blocked run names what it needed; a cancelled run says so, since its signal and not its graph ended it.
  */
 export function nestedFailure(spec: KernelSpec, report: Report): Error {
   const outcome = outcomeOf(report);
   if (outcome.kind === 'blocked') return new Error(`${spec.name}: blocked, needs ${outcome.needs.join(', ')}`);
+  if (outcome.kind === 'cancelled') return new Error(`${spec.name}: cancelled`);
   if (outcome.kind === 'refused') return new Refusal(outcome.reason, outcome.message, outcome.detail);
   if (outcome.kind === 'faulted' && outcome.at) return new Error(`${spec.name}: ${outcome.at}: ${outcome.error}`);
   return new Error(`${spec.name}: failed`);

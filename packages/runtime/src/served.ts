@@ -154,7 +154,7 @@ export class Served {
           .filter(trigger => held.load.resolve(trigger.doc.kind) === kind)
           .map(trigger => trigger.doc),
       pathOf: trigger => held.load.registry.all('trigger').find(one => one.doc === trigger)?.path,
-      fire: ({ trigger, input, request, blobs }) => held.emb.fire(trigger, input, request, { blobs }),
+      fire: ({ trigger, input, request, blobs, signal }) => held.emb.fire(trigger, input, request, { blobs, signal }),
       types: trigger => held.emb.types(trigger),
       inputFor: (trigger, request) => held.emb.inputFor(trigger, request),
       codecs: root => held.emb.codecsOf(root),

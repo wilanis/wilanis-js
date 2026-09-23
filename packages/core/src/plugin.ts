@@ -193,6 +193,11 @@ export interface FireArgs {
   request: Record<string, unknown>;
   /** The blob scope of this run: what the graph stores through it is released when the kind has answered. */
   blobs?: BlobStore;
+  /**
+   * Aborting it cancels the run: nothing more starts, what was in flight is told through `ctx.signal`, and the
+   * report says `cancelled`. A kind with a deadline holds the timer and hands this; a kind with none hands nothing.
+   */
+  signal?: AbortSignal;
 }
 
 export interface TriggerRuntime {
