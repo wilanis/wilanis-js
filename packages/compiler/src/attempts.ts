@@ -81,13 +81,17 @@ export async function bounded<T>(
 /** One try's ending: what it answered, or what it threw, and the nested run it attached when it ran a graph. */
 type Ending = { ok: true; out: unknown; sub?: Report } | { ok: false; error: unknown; sub?: Report };
 
-/** The loop: try, and while the ending is one to try again and tries remain, record it, wait, and try once more. */
+/**
+ * The loop: try, and while the ending is one to try again, tries remain and the run's signal has not aborted,
+ * record it, wait, and try once more. A try that ended after the run was cancelled stands, so a cancelled node's
+ * attempts are what was tried before the cancellation (RFC 0012).
+ */
 async function tried(base: Handler, args: HandlerArgs, policy: Attempts): Promise<unknown> {
   const { ctx } = args;
   for (let attempt = 0; ; attempt++) {
     const startedAt = ctx.clock();
     const ending = await once(base, args, policy.timeoutMs);
-    const why = attempt < policy.times ? againBecause(ending, policy) : undefined;
+    const why = attempt < policy.times && !ctx.signal?.aborted ? againBecause(ending, policy) : undefined;
     if (why === undefined) return stand(ending, args);
     ctx.attempted({ startedAt, endedAt: ctx.clock(), error: why, ...(ending.sub ? { sub: ending.sub } : {}) });
     await pause(policy.backoffMs * 2 ** attempt);
