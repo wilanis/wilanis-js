@@ -15,7 +15,7 @@
  * the same sites the compiler lowers at, so what a reader is told and what the tree was held to are one answer.
  */
 import { atomicOf, type Guard, guardSpecName, guardsOf, idsOf, violatedIds } from '@wilanis/compiler';
-import { type GraphDoc, isMap, type Loaded, type Scope } from '@wilanis/core';
+import { type GraphDoc, isMap, isSwitch, type Loaded, type Scope, type SwitchNode } from '@wilanis/core';
 import { attemptsSaid } from './attempts-said.js';
 import { invariantName } from './invariant-lines.js';
 import { fanOutSaid } from './limits-said.js';
@@ -53,17 +53,25 @@ function contractLines(graph: GraphDoc, guards: Guard[]): string[] {
 }
 
 /**
+ * Where a switch routes a node that broke (RFC 0014), after its rules: `catches asked → unreachable`. A catch is
+ * routing about an outcome rather than a value, so it stands beside the rules on the switch's line and not among
+ * them, and a target a guard moved aside is named where the value is now made, as a rule's is.
+ */
+function catchesSaid(node: SwitchNode, made: Map<string, string>): string {
+  const catches = Object.entries(node.catch ?? {}).map(([broke, to]) => `${broke} → ${made.get(to) ?? to}`);
+  return catches.length ? `  catches ${catches.join(', ')}` : '';
+}
+
+/**
  * One node as a reader meets it: what it runs, how far a map fans out and how often it is tried, or the branches
  * it routes to, under whatever id it has once the guards are lowered. A `switch` that routed to a guarded node
  * routes to the node that moved aside, since the value is made where it was made before and the guard stands
  * between it and everything downstream.
  */
 function nodeLine(node: GraphDoc['nodes'][number], id: string, made: Map<string, string>): string {
-  if (!('run' in node)) {
-    const rules = (node as unknown as { rules: { to: string }[] }).rules.map(rule => rule.to);
-    const otherwise = (node as unknown as { else?: string }).else;
-    const routes = [...rules, otherwise].filter(Boolean).map(to => (to ? (made.get(to) ?? to) : to));
-    return `    ${id}  switch → ${routes.join(' | ')}`;
+  if (isSwitch(node)) {
+    const routes = [...node.rules.map(rule => rule.to), node.else].filter(Boolean).map(to => made.get(to) ?? to);
+    return `    ${id}  switch → ${routes.join(' | ')}${catchesSaid(node, made)}`;
   }
   const fanOut = isMap(node) ? fanOutSaid(node) : '';
   return `    ${id}  ${node.run}${fanOut}${attemptsSaid(node)}`;

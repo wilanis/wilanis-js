@@ -128,6 +128,7 @@ function triggerLines(doc: Loaded, scope: Scope): string[] {
   return [
     `kind  ${declared.kind}`,
     ...settingLines(declared.settings),
+    ...faultLines(declared, scope),
     ...limitLines(doc as Loaded<TriggerDoc>, scope),
     ...crossesLines(declared),
     ...fireLines(declared),
@@ -135,6 +136,18 @@ function triggerLines(doc: Loaded, scope: Scope): string[] {
     ...viewLines(doc as Loaded<TriggerDoc>, scope),
     ...holdsLines(doc as Loaded<TriggerDoc>, scope),
   ];
+}
+
+/**
+ * What a trigger's refusal table leaves out (RFC 0014): a node that breaks where no switch catches it gives no
+ * reason to map. The viewer's trigger page closes its table with the same sentence.
+ */
+export const UNCAUGHT_FAULT =
+  "Anything that breaks and no switch catches is a fault: answered the kind's one way, never mapped.";
+
+/** The line closing the refusal table, which the settings print, where the trigger's kind maps refusals at all. */
+function faultLines(declared: TriggerDoc, scope: Scope): string[] {
+  return scope.get('trigger-kind', declared.kind)?.doc.refusals ? [UNCAUGHT_FAULT] : [];
 }
 
 /**

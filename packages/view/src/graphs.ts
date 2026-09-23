@@ -9,6 +9,7 @@ import { atomicOf } from '@wilanis/compiler';
 import type { GraphDoc, Loaded, Scope, Type, Values } from '@wilanis/core';
 import { isMap, isRun, isSwitch, show, typeAt } from '@wilanis/core';
 import { attemptsOf } from './attempts.js';
+import { markCatches } from './catches.js';
 import { markGuards } from './guards.js';
 import { fanOutOf } from './limits.js';
 import {
@@ -68,6 +69,7 @@ class GraphBuilder {
       role: this.scope.roleOf(this.graph.path),
     };
     this.markAtomic(view);
+    markCatches(this.doc, view);
     markGuards(this.scope, this.graph, view.nodes);
     return view;
   }
