@@ -76,19 +76,41 @@ export interface StubOptions {
   types?: Record<string, Type>;
   /** The effect that, when reached, aborts the run's signal and rejects as an aborted call does (RFC 0012). */
   cancelAt?: CancelAt;
+  /**
+   * The nodes that break, by dotted node path: an effect stubbed at one of them, or anywhere in the graph one of
+   * them runs, throws `broke in rehearsal` -- how the rehearsal walks the branch a switch's `catch` routes to (RFC 0014).
+   */
+  broken?: ReadonlySet<string>;
 }
 
 /**
  * Every effectful native operation answers a generated value of its declared type, deterministic per seed and node
- * path -- except the one `cancelAt` names, which aborts the run and rejects with `cancelled at <path>`.
+ * path -- except the one `cancelAt` names, which aborts the run and rejects with `cancelled at <path>`, and the ones
+ * at or under a `broken` path, which throw `broke in rehearsal`. Nothing else a stub does throws.
  */
 export function stubEffects(seed: number, opts: StubOptions = {}) {
   return (info: EffectInfo): Handler =>
     async ({ in: input, ctx }) => {
       const key = ctx.nodePath.join('.');
       if (opts.cancelAt?.path === key) throw aborted(opts.cancelAt);
+      if (isBroken(opts.broken, key)) throw new Error('broke in rehearsal');
       return generated(seed, key, answerType(info, input, ctx.env.resolving as Resolves | undefined), opts);
     };
+}
+
+/**
+ * Whether a dotted node path is one of the broken ones, or inside the graph one of them runs: a caught node met by a
+ * delegation or a binding reaches its effect a level or more below its own path.
+ */
+function isBroken(broken: ReadonlySet<string> | undefined, key: string): boolean {
+  if (!broken?.size) return false;
+  const segments = key.split('.');
+  return segments.some((_, at) => broken.has(segments.slice(0, at + 1).join('.')));
+}
+
+/** The stubs a run is given with every one at or under a broken path taken out, so nothing answers for what breaks. */
+export function unbroken(stubs: Record<string, unknown>, broken: ReadonlySet<string>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(stubs).filter(([key]) => !isBroken(broken, key)));
 }
 
 /** The value a stubbed effect answers at one node path, written down where the options ask for it. */
@@ -119,6 +141,8 @@ export function embedderFor(
     types?: Record<string, Type>;
     /** The stubbed effect at which a replay cancels its run; only with a seed. */
     cancelAt?: CancelAt;
+    /** The nodes whose stubbed effects break; only with a seed. */
+    broken?: ReadonlySet<string>;
     profile?: string;
     env?: NodeJS.ProcessEnv;
     /** What every stamp of every run is read from; `Date.now` unless given, so a test can freeze time. */
@@ -131,7 +155,12 @@ export function embedderFor(
     profile: opts.profile,
     stubEffects:
       opts.seed !== undefined
-        ? stubEffects(opts.seed, { record: opts.record, types: opts.types, cancelAt: opts.cancelAt })
+        ? stubEffects(opts.seed, {
+            record: opts.record,
+            types: opts.types,
+            cancelAt: opts.cancelAt,
+            broken: opts.broken,
+          })
         : undefined,
     env,
     root: load.root,
@@ -205,17 +234,24 @@ export function policyRoots(load: LoadResult): Loaded<TriggerDoc>[] {
 
 type FailedNode = Report['nodes'][string] & { id: string };
 
-/** The innermost failed node of a report, through nested runs and through the elements of a map. */
+/**
+ * The innermost failed node of a report, through nested runs and through the elements of a map. A node whose fault a
+ * switch caught did not end the run, so it is never the one named.
+ */
 export function failedLeaf(report: Report): FailedNode | undefined {
   for (const [id, node] of Object.entries(report.nodes)) {
-    if (node.status !== 'failed') continue;
+    if (node.status !== 'failed' || node.caught !== undefined) continue;
     return failedBelow(id, node) ?? { ...node, id };
   }
   return undefined;
 }
 
-/** The failure strictly inside a failed node: in the graph it ran, or in the element of a map that failed. */
+/**
+ * The failure strictly inside a failed node: in the graph it ran, or in the element of a map that failed. Nothing
+ * inside a caught node: its fault was routed, and what broke in it ended nothing.
+ */
 export function failedBelow(id: string, node: Report['nodes'][string]): FailedNode | undefined {
+  if (node.caught !== undefined) return undefined;
   if (node.sub) return failedLeaf(node.sub);
   const at = node.items?.findIndex(item => item.status === 'failed') ?? -1;
   const failed = at < 0 ? undefined : node.items?.[at];

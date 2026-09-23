@@ -11,7 +11,7 @@ import { type Case, casesFor, type FoundSwitch, nonEmpty, type Stubbing, setPath
 import type { Embedder } from './embed.js';
 import { type Decision, format, gather, type Plain, statedOf, stateName } from './rehearsal-report.js';
 import { atomicAt, declaredAt, rootGraph, specBehind, type Where, whereOf } from './rehearse-where.js';
-import { embedderFor, failedBelow, generatedFire, policyRoots } from './stubbing.js';
+import { embedderFor, failedBelow, generatedFire, policyRoots, unbroken } from './stubbing.js';
 
 // ---- rehearse ----------------------------------------------------------------------------------------
 
@@ -195,16 +195,22 @@ interface Walk {
   probe: Embedder;
 }
 
+/** What steers a run: the stubs it is given, the patches to the trigger's input, and the nodes made to break. */
+interface Steering {
+  stubs: Record<string, unknown>;
+  input: { path: string[]; value: unknown }[];
+  broken: string[];
+}
+
 /**
- * The stubs and input that route every switch enclosing `sw` towards the node that contains it. A nested switch is
- * otherwise cancelled before it runs, and its own case would land on a dead path.
+ * The stubs and input that route every switch enclosing `sw` towards the node that contains it -- and the nodes to
+ * break, where only an enclosing switch's catch routes there. A nested switch is otherwise cancelled before it runs,
+ * and its own case would land on a dead path.
  */
-function reach(
-  walk: Walk,
-  sw: FoundSwitch,
-): { stubs: Record<string, unknown>; input: { path: string[]; value: unknown }[] } {
+function reach(walk: Walk, sw: FoundSwitch): Steering {
   const stubs: Record<string, unknown> = {};
   const patches: { path: string[]; value: unknown }[] = [];
+  const broken: string[] = [];
   // a switch inside a mapped operation runs only when the list it maps over has an element to run for
   for (const list of sw.lists) {
     const need = nonEmpty(list, walk.stubbing);
@@ -216,8 +222,9 @@ function reach(
     if (!want) continue;
     Object.assign(stubs, want.stubs);
     patches.push(...(want.input ?? []));
+    broken.push(...(want.broken ?? []));
   }
-  return { stubs, input: patches };
+  return { stubs, input: patches, broken };
 }
 
 /** The case of the switch that governs an enclosing call, which routes into it. */
@@ -241,8 +248,9 @@ async function warmUp(walk: Walk, sw: FoundSwitch, record: Record<string, unknow
   const pre = reach(walk, sw);
   let warm = walk.input;
   for (const patch of pre.input) warm = setPath(warm, patch.path, patch.value);
-  const emb = embedderFor(walk.load, { seed: walk.seed, record, types, profile: walk.profile });
-  await emb.fire(walk.trigger.doc, warm, walk.request, { stubs: pre.stubs });
+  const broken = new Set(pre.broken);
+  const emb = embedderFor(walk.load, { seed: walk.seed, record, types, profile: walk.profile, broken });
+  await emb.fire(walk.trigger.doc, warm, walk.request, { stubs: unbroken(pre.stubs, broken) });
 }
 
 /**
@@ -314,10 +322,7 @@ async function branchOf(
   walk: Walk,
   sw: FoundSwitch,
   one: Case,
-  steer: {
-    pre: { stubs: Record<string, unknown>; input: { path: string[]; value: unknown }[] };
-    downstream: Record<string, unknown>;
-  },
+  steer: { pre: Steering; downstream: Record<string, unknown> },
 ): Promise<Decision['branches'][number]> {
   const at = { when: one.branch.when, to: one.branch.to };
   if (one.branch.unsolved) return { ...at, uncovered: one.branch.unsolved };
@@ -326,12 +331,14 @@ async function branchOf(
       ...at,
       uncovered: `${one.unreachable.join(', ')} is the trigger's own input and the rehearsal cannot vary it`,
     };
-  const emb = embedderFor(walk.load, { seed: walk.seed, profile: walk.profile });
+  // a caught node breaks for real: its stubbed effect throws, and nothing recorded answers in its place
+  const broken = new Set([...steer.pre.broken, ...(one.broken ?? [])]);
+  const emb = embedderFor(walk.load, { seed: walk.seed, profile: walk.profile, broken });
   // a demand on the graph's own input is met by firing with a patched input, not by a stub
   let fired = walk.input;
   for (const patch of [...steer.pre.input, ...(one.input ?? [])]) fired = setPath(fired, patch.path, patch.value);
   const report = await emb.fire(walk.trigger.doc, fired, walk.request, {
-    stubs: { ...steer.downstream, ...steer.pre.stubs, ...one.stubs },
+    stubs: unbroken({ ...steer.downstream, ...steer.pre.stubs, ...one.stubs }, broken),
   });
   return { ...at, settled: settle(report, sw, one.branch.to) };
 }

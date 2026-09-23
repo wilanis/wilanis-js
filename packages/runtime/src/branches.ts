@@ -51,6 +51,8 @@ export interface Case {
   input?: { path: string[]; value: unknown }[];
   /** Demands that could not be routed to anything the rehearsal can set. */
   unreachable?: string[];
+  /** The dotted paths of the nodes made to break, for the branch a `catch` routes a fault to (RFC 0014). */
+  broken?: string[];
 }
 
 /** A switch found in a spec, with the position it occupies in the run. */
@@ -104,6 +106,8 @@ export interface KSwitchLike {
   in: Record<string, unknown>;
   rules: { to: string; label: string }[];
   else: string;
+  /** The nodes whose fault this switch routes, and where each goes. */
+  catch?: Record<string, string>;
 }
 
 /** Where a switch input reads from: a node in the same spec, and the path within that node's output. */
@@ -220,8 +224,8 @@ function forwardsIn(node: Record<string, unknown>): boolean {
 
 /**
  * The rehearsal cases for one switch: one per rule plus the else, each with the stubs that steer the run
- * into that branch. `generated` answers what the seed produced for a node path, so a case only overrides
- * the fields its rule reads.
+ * into that branch, and one per node the switch catches, which makes that node break. `generated` answers
+ * what the seed produced for a node path, so a case only overrides the fields its rule reads.
  */
 export function casesFor(found: FoundSwitch, from: Stubbing): Case[] {
   const { generated, typeOf = () => undefined, seed = 1, inputSeed, inType } = from;
@@ -231,7 +235,24 @@ export function casesFor(found: FoundSwitch, from: Stubbing): Case[] {
     node.rules.map(rule => ({ when: rule.label, to: rule.to })),
     node.else,
   );
-  return branches.map(branch => steer(branch, found, { generated, typeOf, seed, inputSeed, inType }, steerable));
+  const ruled = branches.map(branch => steer(branch, found, { generated, typeOf, seed, inputSeed, inType }, steerable));
+  return [...ruled, ...caughtCases(found)];
+}
+
+/** The rule index a catch branch carries: neither a rule nor the else, since no rule is tried when a node broke. */
+export const CAUGHT = -2;
+
+/**
+ * One case per node the switch catches, labelled `<node> broke`: nothing is demanded of the switch's inputs, since
+ * the rules are not tried, and the caught node is made to break so its fault routes where the catch says.
+ */
+function caughtCases(found: FoundSwitch): Case[] {
+  return Object.entries(found.node.catch ?? {}).map(([node, to]) => ({
+    at: found.at,
+    branch: { rule: CAUGHT, when: `${node} broke`, to, demands: {} },
+    stubs: {},
+    broken: [[...found.prefix, node].join('.')],
+  }));
 }
 
 /** Where a switch stands: the switch itself, where its siblings are stubbed, and how its `in` can be steered. */

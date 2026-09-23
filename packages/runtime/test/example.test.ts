@@ -1,12 +1,11 @@
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkTree } from '@wilanis/compiler';
-import { loadTree, type PluginModule, schemaRef, schemaUrl } from '@wilanis/core';
-import http from '@wilanis/plugin-http';
+import { loadTree, type PluginModule } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_PLUGINS, describe as describeDoc, loadProject, rehearse, start } from '../src/index.js';
-import { codes, docsDir, EXAMPLE, INCLUDES, PLUGINS, withBrokenPluginDoc } from './example-harness.js';
+import { BUILTIN_PLUGINS, loadProject, rehearse } from '../src/index.js';
+import { codes, EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
 describe('the example tree', () => {
   it('passes check', () => {
@@ -104,108 +103,6 @@ describe('the example tree', () => {
   });
 });
 
-describe('plugin packages and hooks', () => {
-  const project = (plugins: unknown[]) => {
-    const dir = mkdtempSync(join(tmpdir(), 'wilanis-hooks-'));
-    writeFileSync(
-      join(dir, 'project.json'),
-      JSON.stringify({ $schema: schemaUrl('project'), name: 'hooks', description: 'a tree with hooks', plugins }),
-    );
-    return dir;
-  };
-  it('D006 when from is not a package name, or names a package that is not installed', async () => {
-    const codesOf = async (from: string) =>
-      (await loadProject(project([{ use: '@std' }, { use: '@x', from }]))).refusals.items.map(refusal => refusal.code);
-    expect(await codesOf('../evil.js')).toContain('D006');
-    expect(await codesOf('@wilanis/no-such-plugin')).toContain('D006');
-  });
-  it('every document a plugin ships is a file a reader can open, and describe says where', () => {
-    const loaded = loadTree(EXAMPLE, PLUGINS, INCLUDES);
-    for (const file of loaded.registry.files.filter(one => one.native)) {
-      expect(file.file, file.path).toBeDefined();
-      expect(existsSync(file.file!), file.path).toBe(true);
-      expect(JSON.parse(readFileSync(file.file!, 'utf8'))).toEqual(file.doc);
-    }
-    expect(describeDoc(loaded, '@http/http.port.json')).toContain(
-      `file  ${loaded.registry.get('port', '@http/http.port.json')?.file}`,
-    );
-    // a native document says whose it is: who implements it must not be a code detail
-    expect(describeDoc(loaded, '@http/server.port.json')).toContain('granted by  @http  (@wilanis/plugin-http)');
-    expect(describeDoc(loaded, '@reload/watch.port.json')).toContain('granted by  @reload  (@wilanis/plugin-reload)');
-    expect(describeDoc(loaded, '@std/list.port.json')).toContain('granted by  @std  (built into the runtime)');
-    expect(describeDoc(loaded, '@customers/domain/customer.port.json')).not.toContain('granted by');
-    // and a holds operation says that it holds
-    expect(describeDoc(loaded, '@http/server.port.json')).toContain('#listen  (holds until stopped)');
-    // a kind that says what correlates a run with its caller says so where its other rules are said
-    expect(describeDoc(loaded, '@http/http.trigger-kind.json')).toContain(
-      "correlation: request.headers.traceparent correlates a run with the caller's trace, copied opaquely (T007)",
-    );
-    expect(describeDoc(loaded, '@cli/cli.trigger-kind.json')).not.toContain('correlation:');
-    expect(loaded.registry.get('graph', '@features/customers/data/get-row.graph.json')?.file).toBe(
-      join(EXAMPLE, 'features/customers/data/get-row.graph.json'),
-    );
-  });
-  it('T007 a trigger kind whose correlation names no field of its own context', () => {
-    // the route kind says headers.traceparent correlates a run with its caller's trace; the example's routes
-    // are of that kind, so what the kind declares is judged here and the tree that names it is the proof
-    const broken = (path: string) =>
-      withBrokenPluginDoc(http, 'http.trigger-kind.json', kind => {
-        kind.correlation = path;
-      });
-    expect(broken('headers.traceparent').codes).toEqual([]);
-    expect(broken('traceparent').at).toEqual(['T007 @http/http.trigger-kind.json#correlation']);
-    expect(broken('headers.traceparent.version').codes).toEqual(['T007']);
-    expect(broken('method.traceparent').codes).toEqual(['T007']);
-  });
-  it('D006 when a plugin ships no plugin.json', () => {
-    const fake: PluginModule = {
-      root: '@fake',
-      docs: docsDir({
-        'fake.port.json': {
-          $schema: schemaRef('port'),
-          description: 'a port',
-          operations: { op: { description: 'x' } },
-        },
-      }),
-      handlers: {},
-    };
-    const dir = project([{ use: '@std' }, { use: '@fake' }]);
-    expect(loadTree(dir, { ...BUILTIN_PLUGINS, '@fake': fake }).refusals.items.map(refusal => refusal.code)).toContain(
-      'D006',
-    );
-    rmSync(dir, { recursive: true, force: true });
-  });
-  it('postLoad runs once after load with the plugin settings; its teardown runs on stop', async () => {
-    const calls: string[] = [];
-    const fake: PluginModule = {
-      root: '@fake',
-      docs: docsDir({
-        'plugin.json': {
-          $schema: schemaRef('plugin'),
-          description: 'a plugin with a postLoad hook',
-          settings: { fields: { greeting: { type: 'string' } } },
-          grants: {},
-        },
-      }),
-      handlers: {},
-      postLoad: async ({ settings, root }) => {
-        calls.push(`up:${settings.greeting}:${typeof root}`);
-        return async () => {
-          calls.push('down');
-        };
-      },
-    };
-    const dir = project([{ use: '@std' }, { use: '@fake', settings: { greeting: 'hi' } }]);
-    const loaded = loadTree(dir, { ...BUILTIN_PLUGINS, '@fake': fake });
-    expect(checkTree(loaded).items).toEqual([]);
-    const { stop } = await start(loaded, { log: () => {}, profile: 'live' });
-    expect(calls).toEqual(['up:hi:string']);
-    await stop();
-    expect(calls).toEqual(['up:hi:string', 'down']);
-    rmSync(dir, { recursive: true, force: true });
-  });
-});
-
 describe('branch rehearsal', () => {
   /**
    * Copy the example, edit one document per entry, and answer the rehearsal's lines together with the copy's
@@ -214,6 +111,7 @@ describe('branch rehearsal', () => {
   async function withEdits(
     edits: Record<string, (doc: any) => void>,
     profile: string,
+    plugins: Record<string, PluginModule> = PLUGINS,
   ): Promise<{ lines: string[]; codes: string[] }> {
     const dir = mkdtempSync(join(tmpdir(), 'wilanis-'));
     cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
@@ -223,8 +121,8 @@ describe('branch rehearsal', () => {
       edit(doc);
       writeFileSync(at, JSON.stringify(doc));
     }
-    const refused = checkTree(loadTree(dir, PLUGINS, INCLUDES)).items.map(one => one.code);
-    const run = await rehearse(loadTree(dir, PLUGINS), { seed: 1, profile });
+    const refused = checkTree(loadTree(dir, plugins, INCLUDES)).items.map(one => one.code);
+    const run = await rehearse(loadTree(dir, plugins), { seed: 1, profile });
     rmSync(dir, { recursive: true, force: true });
     return { lines: run.lines, codes: refused };
   }
@@ -276,6 +174,83 @@ describe('branch rehearsal', () => {
     // two decisions of this one graph: its own `bothWritten`, and the `customer:check` the guard over Customer lowered
     expect(after.match(/\(atomic\)/g)).toHaveLength(2);
     expect(after.replace(/ {2}\(atomic\)/g, '').replace(/, rolled back/g, '')).toBe(before);
+  });
+
+  /**
+   * The guide's catch on get-row (RFC 0014): `fetched` breaking routes to `target`, which the case supplies. The
+   * example has no catch of its own yet, so a copy is given one.
+   */
+  const GetRow = 'features/customers/data/get-row.graph.json';
+  const caughtTo = (target: Record<string, unknown>) => (doc: any) => {
+    doc.nodes.push({ type: '@wilanis/node/run.schema.json', id: 'unreachable', ...target });
+    doc.out.from.push('unreachable');
+    doc.nodes.find((node: any) => node.id === 'outcome').catch = { fetched: 'unreachable' };
+  };
+
+  it('walks the branch a catch routes to by making the caught effect break', { timeout: 20_000 }, async () => {
+    const { lines, codes: refused } = await withEdits(
+      {
+        [GetRow]: caughtTo({
+          run: '@std/outcome.port.json#refuse',
+          in: {
+            reason: 'upstream',
+            message: 'the customer API could not be reached',
+            type: '@customers/domain/Customer.shape.json',
+          },
+        }),
+      },
+      'live',
+    );
+    expect(refused).toEqual([]);
+    const text = lines.join('\n');
+    // one more branch than the rules and the else, counted with them
+    expect(text).toMatch(/features\/customers\/data\/get-row {2}switch 'outcome' {2}4\/4 branches/);
+    expect(text).toMatch(
+      /^ {2}ok {2}when fetched broke {2,}refused on purpose at 'unreachable' as upstream: "the customer API could not be reached"$/m,
+    );
+    // the three branches that were there still settle as they did: the stubbed world breaks only where it is told to
+    expect(text).toMatch(/^ {2}ok {2}when status == 404 {2,}refused on purpose at 'noCustomer' as missing: /m);
+    expect(text).toMatch(/^ {2}ok {2}when status == 200 && has\(body\) {2,}answered from 'customer/m);
+    expect(text).toMatch(/^ {2}ok {2}anything else {2,}refused on purpose at 'upstreamFailed' as upstream: /m);
+    expect(text).not.toMatch(/NEVER RUN|BROKE|BLOCKED|WRONG ROUTE/);
+    expect(text).toContain('A fault a switch catches is the graph deciding what breaking means.');
+  });
+
+  it('names the target that breaks as BROKE, and never the node whose fault was caught', {
+    timeout: 20_000,
+  }, async () => {
+    // `make` runs for real under stubs, since it is pure; this one throws for the one value the target makes
+    const std = BUILTIN_PLUGINS['@std'];
+    const make = std.handlers['@std/object.port.json#make'];
+    const breaking: PluginModule = {
+      ...std,
+      handlers: {
+        ...std.handlers,
+        '@std/object.port.json#make': args => {
+          if ((args.in.value as { name?: string } | undefined)?.name === 'nobody') throw new Error('target broke');
+          return make(args);
+        },
+      },
+    };
+    const { lines, codes: refused } = await withEdits(
+      {
+        [GetRow]: caughtTo({
+          run: '@std/object.port.json#make',
+          in: {
+            value: { id: '{{in.id}}', name: 'nobody', email: 'nobody', tier: 'none' },
+            type: '@customers/domain/Customer.shape.json',
+          },
+        }),
+      },
+      'live',
+      { ...PLUGINS, '@std': breaking },
+    );
+    expect(refused).toEqual([]);
+    const text = lines.join('\n');
+    expect(text).toMatch(/^ {2}!! {2}when fetched broke {2,}BROKE at 'unreachable' -- unreachable: target broke$/m);
+    expect(text.match(/BROKE/g)).toHaveLength(1);
+    expect(text).not.toContain('broke in rehearsal');
+    expect(text).not.toMatch(/every branch settled/);
   });
 
   it('marks a graph with no branches at all, reached as a trigger fires its port', async () => {

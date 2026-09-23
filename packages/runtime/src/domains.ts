@@ -28,9 +28,9 @@ export type Demands = Record<string, Domain>;
 
 /** The values one branch needs, and whether they could be solved at all. */
 export interface Branch {
-  /** The switch rule this case exercises, by index; -1 is the else. */
+  /** The switch rule this case exercises, by index; -1 is the else, -2 a fault the switch catches. */
   rule: number;
-  /** The rule's source text, or 'else'. */
+  /** The rule's source text, 'else', or '<node> broke' for a caught fault. */
   when: string;
   /** The node the switch routes to in this case. */
   to: string;
