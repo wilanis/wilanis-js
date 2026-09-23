@@ -17,6 +17,12 @@
       "id": "fetched",
       "label": "GET the row",
       "run": "@http/http.port.json#request",
+      "timeoutMs": 5000,
+      "retry": {
+        "times": 2,
+        "backoffMs": 200,
+        "when": "status >= 500"
+      },
       "in": {
         "connection": "@connections/customers-api.connection.json",
         "method": "GET",

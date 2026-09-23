@@ -163,6 +163,14 @@ ships. Every run leaves a complete record, and `--trace` says it out loud in the
 a span are the paths in the documents. [`docs/demo.md`](docs/demo.md) is each of those commands with the
 output it answered, and [wilanis.dev/demo/](https://wilanis.dev/demo/) is one such run, kept.
 
+What happens when an effect fails for real is declared too, and checked. A port operation says whether calling
+it again changes anything: `@http/http.port.json#request` is idempotent when its method is GET, HEAD, PUT or
+DELETE. The data layer may then write `"retry": { "times": 2, "backoffMs": 200 }` and `"timeoutMs": 5000` on the
+node that makes the call, and the compiler refuses the same retry on a POST (`G018`: a call that failed may have
+been applied) and on any node of a domain graph (`L012`), which says what is done and never how often. A retry
+repeats a fault or a timeout, never a refusal the graph decided, and the run's record shows one node with the
+tries it took.
+
 ## Why this suits code a model writes
 
 Every file has a schema, so a key is either allowed or refused and there is no free-form syntax to invent

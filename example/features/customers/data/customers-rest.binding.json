@@ -5,7 +5,11 @@
   "port": "@customers/domain/customer.port.json",
   "operations": {
     "listAll": {
-      "graph": "@customers/data/list-rows.graph.json"
+      "graph": "@customers/data/list-rows.graph.json",
+      "retry": {
+        "times": 1
+      },
+      "timeoutMs": 8000
     },
     "listEvery": {
       "graph": "@customers/data/list-rows.graph.json"
