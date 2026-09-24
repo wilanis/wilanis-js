@@ -147,6 +147,12 @@ describe('describe: a port names the shape it works in once', () => {
     expect(said()).toContain('    returns blob');
   });
 
+  it('says `takes <shape>` for an operation whose accepts names one, and spells its fields nowhere', () => {
+    const update = said().split('#update')[1].split('\n#')[0];
+    expect(update).toContain('    takes @features/customers/domain/CustomerUpdate.shape.json');
+    expect(update).not.toContain('    in  ');
+  });
+
   it('hoists nothing where the shared answer is a structural type, which already reads as itself', () => {
     // `works in {record?: $T}` above `returns it` would make the store port harder to read, not easier
     const store = describeDoc(example, '@storage/store.port.json');

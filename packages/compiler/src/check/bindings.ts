@@ -119,7 +119,7 @@ class BindingCheck {
       );
       return;
     }
-    const accepts = this.judge.fieldsType(op.accepts, this.port.path, `${at}/accepts`);
+    const accepts = this.judge.acceptsTypeAt(op, this.port.path, `${at}/accepts`);
     const returns = this.judge.type(op.returns, this.port.path, `${at}/returns`);
     const contract: Contract = { opName, op, at, accepts: accepts?.kind === 'object' ? accepts : undefined, returns };
     if (bound.graph) this.graphMeets(contract, bound.graph, bound.retry);
@@ -152,7 +152,7 @@ class BindingCheck {
 
   private acceptsFitGraph(contract: Contract, graphRef: string, graphIn: Type | undefined): void {
     const at = `${contract.at}/graph`;
-    const names = Object.keys(contract.op.accepts ?? {});
+    const names = Object.keys(contract.accepts?.fields ?? {});
     if (!graphIn) {
       if (names.length)
         this.refuse(
@@ -249,7 +249,7 @@ class BindingCheck {
       );
     }
     let answers = this.judge.type(hit.op.returns, hit.port.path, 'returns');
-    const passed = passedInputs(hit.op, contract.op, bound.in);
+    const passed = passedInputs(this.judge.scope, hit.op, contract.op, bound.in);
     const subst = checkInputs(this.judge, {
       given: passed,
       accepts: hit.op.accepts,

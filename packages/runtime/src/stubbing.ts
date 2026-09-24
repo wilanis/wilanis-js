@@ -5,6 +5,7 @@
 import type { EffectInfo } from '@wilanis/compiler';
 import type { LoadResult } from '@wilanis/core';
 import {
+  acceptedFields,
   generate,
   hasVars,
   type Loaded,
@@ -40,7 +41,7 @@ const hash = (text: string) => {
  */
 function boundHere(info: EffectInfo, given: Record<string, unknown>, tree: Resolves) {
   const subst: Record<string, Type> = resolvedHere(info.op.accepts, given, tree);
-  for (const [name, field] of Object.entries(info.op.accepts ?? {})) {
+  for (const [name, field] of Object.entries(acceptedFields(info.op.accepts, tree.document))) {
     if (!field.binds || field.type !== 'type' || typeof given[name] !== 'string') continue;
     try {
       subst[field.binds] = tree.type(given[name] as string);

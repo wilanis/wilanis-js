@@ -681,7 +681,8 @@
         for (const [name, op] of Object.entries(d.operations)) {
           const h = el('h3', null, readable(name)); h.appendChild(el('code', null, '#' + name)); if (op.pure) h.appendChild(el('span', 'badge ok', 'pure')); else if (v.native) h.appendChild(el('span', 'badge warn', 'effect')); if (op.refuses) h.appendChild(el('span', 'badge warn', 'refuses on purpose')); if (op.transactional) h.appendChild(el('span', 'badge ok', 'transactional')); if (op.holds) h.appendChild(el('span', 'badge warn', 'holds until stopped')); for (const b of promisedBadges(op)) h.appendChild(b); page.appendChild(h);
           page.appendChild(el('p', null, op.description));
-          if (op.accepts && Object.keys(op.accepts).length) page.appendChild(fieldsTable(op.accepts)); else page.appendChild(el('p', null, 'Takes nothing.'));
+          if (typeof op.accepts === 'string') { const t = el('p'); t.appendChild(frag('Takes ')); t.appendChild(typeEl(op.accepts)); t.appendChild(frag(', its fields given one by one.')); page.appendChild(t); }
+          else if (op.accepts && Object.keys(op.accepts).length) page.appendChild(fieldsTable(op.accepts)); else page.appendChild(el('p', null, 'Takes nothing.'));
           const r = el('p'); r.appendChild(frag('Answers ')); r.appendChild(op.returns ? typeEl(op.returns) : frag('nothing')); page.appendChild(r);
           for (const i of impls) { const o = i.operations[name]; if (!o) continue; const p = el('p'); p.appendChild(frag(i.label + ': ')); if (o.graph) { p.appendChild(frag('runs the graph ')); p.appendChild(link(o.graph)); } else if (o.run) { p.appendChild(frag('delegates to ')); p.appendChild(link(o.run.split('#')[0], showOp(o.run))); } const tries = attemptsText(o); if (tries) p.appendChild(frag('; ' + tries)); page.appendChild(p); }
         }

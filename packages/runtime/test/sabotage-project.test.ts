@@ -48,6 +48,24 @@ describe('sabotage: the project, its plugins and its startup', () => {
       }),
     ).toContain('B005');
   });
+  it('B005 an operation that takes a shape, bound to a graph whose in is a shape it does not fit', () => {
+    const at = 'B005 @features/customers/data/customers-store.binding.json#operations/update/graph';
+    const takingIn = (shape: string) =>
+      sabotagePointing('features/customers/data/kept-update.graph.json', graph => {
+        graph.in = `@customers/domain/${shape}.shape.json`;
+      });
+    // update takes CustomerUpdate, which says nothing of who registered the customer: CustomerRecord requires it
+    expect(takingIn('CustomerRecord')).toContain(at);
+    // the shape's type is compared as an object type is, field by field: every field Customer adds is optional
+    expect(takingIn('Customer')).not.toContain(at);
+  });
+  it('R001 an operation whose accepts names a type that is not a shape', () => {
+    expect(
+      sabotagePointing('features/customers/domain/customer.port.json', port => {
+        port.operations.update.accepts = 'string';
+      }),
+    ).toContain('R001 @features/customers/domain/customer.port.json#operations/update/accepts');
+  });
   it('B006 a startup step naming an operation the port does not have', () => {
     expect(
       sabotage('project.json', project => {

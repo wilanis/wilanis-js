@@ -66,6 +66,12 @@ function acceptsLine(
   return `    in  ${name}${optional}: ${type}${boundSaid(field)}${isStatic}${bindsOf(field)}${allowed}${says}`;
 }
 
+/** What one operation takes: the shape it names, said once, or each field it writes. */
+function acceptsLines(op: Operation, showType: (spec: unknown) => string): string[] {
+  if (typeof op.accepts === 'string') return [`    takes ${showType(op.accepts)}`];
+  return Object.entries(op.accepts ?? {}).map(([field, accepts]) => acceptsLine(field, accepts, showType));
+}
+
 /**
  * What an operation says about itself: whether it is pure, may refuse, may take part in a transaction, holds
  * something until stopped, or may be called again -- always, where its inputs say so, or given its key.
@@ -118,7 +124,7 @@ export function portLines(doc: Loaded, showType: (spec: unknown) => string): str
   const lines = shape ? [`works in  ${shape}`, ''] : [];
   for (const [name, op] of Object.entries(port.operations)) {
     lines.push(operationLine(name, op));
-    for (const [field, accepts] of Object.entries(op.accepts ?? {})) lines.push(acceptsLine(field, accepts, showType));
+    lines.push(...acceptsLines(op, showType));
     if (op.returns) lines.push(returnsLine(showType(op.returns), shape));
   }
   return lines;

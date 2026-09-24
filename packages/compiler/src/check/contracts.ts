@@ -38,9 +38,10 @@ export function checkShape(judge: Judge, shape: Loaded<ShapeDoc>): void {
  */
 export function checkPort(judge: Judge, port: Loaded<PortDoc>): void {
   for (const [name, op] of Object.entries(port.doc.operations)) {
-    judge.fieldsType(op.accepts, port.path, `operations/${name}/accepts`);
+    judge.acceptsTypeAt(op, port.path, `operations/${name}/accepts`);
     judge.type(op.returns, port.path, `operations/${name}/returns`);
-    checkMaxItems(judge, port.path, op.accepts, `operations/${name}/accepts`);
+    // an accepts that names a shape is bounded where the shape is judged
+    if (typeof op.accepts !== 'string') checkMaxItems(judge, port.path, op.accepts, `operations/${name}/accepts`);
     if (typeof op.returns === 'object')
       checkMaxItems(judge, port.path, op.returns.fields, `operations/${name}/returns/fields`);
     if (op.transactional) checkTransactional(judge, port, name, op);
@@ -79,17 +80,17 @@ const REPEATABLE_HINT =
 function checkRepeatable(judge: Judge, port: Loaded<PortDoc>, name: string, op: Operation): void {
   const refuse = (message: string, at: string) =>
     judge.refuser(port.path)('C015', message, `operations/${name}${at}`, REPEATABLE_HINT);
-  for (const [message, at] of repeatableFaults(name, op)) refuse(message, at);
+  for (const [message, at] of repeatableFaults(name, op, judge.accepted(op))) refuse(message, at);
   if (typeof op.idempotent !== 'string') return;
   const wrong = notBoolean(judge, op, op.idempotent);
   if (wrong) refuse(`operation '${name}' is idempotent when ${wrong}`, '/idempotent');
 }
 
 /** What is wrong with how an operation's words about repeating it sit together, each with where below it. */
-function repeatableFaults(name: string, op: Operation): [string, string][] {
+function repeatableFaults(name: string, op: Operation, accepted: Fields): [string, string][] {
   const faults: [string, string][] = [];
   const keyed = op.key !== undefined;
-  if (keyed && !(String(op.key) in (op.accepts ?? {})))
+  if (keyed && !(String(op.key) in accepted))
     faults.push([`operation '${name}' names key '${op.key}', which is not a field it accepts`, '/key']);
   if (keyed && op.idempotent !== undefined) faults.push([`operation '${name}' declares both idempotent and key`, '']);
   if (op.pure && (op.idempotent !== undefined || keyed))
@@ -120,7 +121,8 @@ function notBoolean(judge: Judge, op: Operation, rule: string): string | undefin
  * a value only known at run time could not be judged at all.
  */
 function checkTransactional(judge: Judge, port: Loaded<PortDoc>, name: string, op: Operation): void {
-  const says = (field: string) => op.accepts?.[field]?.static === true;
+  const accepted = judge.accepted(op);
+  const says = (field: string) => accepted[field]?.static === true;
   if (says('connection') || says('store')) return;
   judge.refuser(port.path)(
     'C009',
@@ -137,7 +139,10 @@ function checkTransactional(judge: Judge, port: Loaded<PortDoc>, name: string, o
  */
 function checkDomainOperation(judge: Judge, port: Loaded<PortDoc>, name: string, op: Operation): void {
   const at = `operations/${name}`;
-  const accepts = Object.entries(op.accepts ?? {});
+  if (typeof op.accepts === 'string')
+    judge.checkLayer({ spec: op.accepts, from: port, at: `${at}/accepts`, layer: 'core', what: `${name}.accepts` });
+  // a shape named whole is judged as a shape; only fields written here can mark themselves static
+  const accepts = typeof op.accepts === 'string' ? [] : Object.entries(op.accepts ?? {});
   for (const [key, field] of accepts) {
     judge.checkLayer({
       spec: field.type,

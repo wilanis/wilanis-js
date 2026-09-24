@@ -55,25 +55,7 @@
     },
     "update": {
       "description": "Replace who one customer is. Fails when there is no such customer.",
-      "accepts": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "email": {
-          "type": "string"
-        },
-        "tier": {
-          "type": "string",
-          "enum": [
-            "bronze",
-            "silver",
-            "gold"
-          ]
-        }
-      },
+      "accepts": "@customers/domain/CustomerUpdate.shape.json",
       "returns": "@customers/domain/Customer.shape.json"
     },
     "remove": {

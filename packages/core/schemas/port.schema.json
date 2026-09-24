@@ -38,7 +38,15 @@
             "minLength": 1
           },
           "accepts": {
-            "$ref": "common.schema.json#/$defs/fields"
+            "description": "What the operation takes: its fields by name, or the path of a shape whose fields it takes (\"@customers/domain/CustomerUpdate.shape.json\"), so a shape the operation takes whole is stated once. Either way a call site gives the fields under in one by one.",
+            "oneOf": [
+              {
+                "$ref": "common.schema.json#/$defs/fields"
+              },
+              {
+                "$ref": "common.schema.json#/$defs/typeRef"
+              }
+            ]
           },
           "returns": {
             "$ref": "common.schema.json#/$defs/type"
