@@ -47,6 +47,12 @@ export const editing = (file: string, change: (doc: any) => void) => (dir: strin
   writeFileSync(onDisk(dir, file), JSON.stringify(doc));
 };
 
+/** A change to a copied tree: one document moved from one tree-relative path to another. */
+export const moving = (from: string, to: string) => (dir: string) => {
+  mkdirSync(dirname(join(dir, to)), { recursive: true });
+  renameSync(join(dir, from), join(dir, to));
+};
+
 /** A change to a copied tree: documents written at tree-relative paths it does not have, then `and` applied. */
 export const planting =
   (docs: Record<string, unknown>, and: (dir: string) => void = () => {}) =>

@@ -15,6 +15,7 @@ import {
   afterFixing,
   type Check,
   editing,
+  moving,
   planting,
   readDoc,
   refusalsAfter,
@@ -165,6 +166,88 @@ describe('sabotage: R001 fixes', () => {
     const put = r001After(kv).filter(one => one.file === GET_ROW);
     expect(put.map(one => one.message)).toEqual([expect.stringContaining("no operation 'put'")]);
     expect(put[0].fixes).toBeUndefined();
+  });
+});
+
+const CONNECTION = 'connections/customers-api.connection.json';
+const PORT = 'features/customers/domain/customer.port.json';
+const SHAPE = 'features/customers/domain/Customer.shape.json';
+
+/** A scenario of get-customer that checks clean where it belongs, under scenarios/. */
+const SCENARIO = {
+  $schema: 'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json',
+  description: 'A hand-written scenario of GET /customers/{id}.',
+  trigger: '@features/customers/edge/get-customer.trigger.json',
+  seed: 1,
+  expect: { status: 'done', nodes: { op: { status: 'failed', reason: 'upstream' } } },
+};
+
+/** The D008 refusals a broken copy answers. */
+const d008After = (change: (dir: string) => void) => refusalsAfter(change).filter(one => one.code === 'D008');
+
+/** Every fix the D008 refusals offer, the first of each: what an agent applies. */
+const firstD008 = (refusals: Refusal[]) =>
+  refusals.filter(one => one.code === 'D008').flatMap(one => one.fixes?.slice(0, 1) ?? []);
+
+/** Each sabotage whose D008 offers one move, with the move it offers. */
+const MOVES: [string, (dir: string) => void, string, string][] = [
+  [
+    'a connection under a feature',
+    moving(CONNECTION, 'features/customers/data/customers-api.connection.json'),
+    'features/customers/data/customers-api.connection.json',
+    CONNECTION,
+  ],
+  [
+    'a port in the edge layer',
+    moving(PORT, 'features/customers/edge/customer.port.json'),
+    'features/customers/edge/customer.port.json',
+    PORT,
+  ],
+  [
+    'a trigger in no layer',
+    moving('features/customers/edge/digest.trigger.json', 'features/customers/digest.trigger.json'),
+    'features/customers/digest.trigger.json',
+    'features/customers/edge/digest.trigger.json',
+  ],
+  [
+    'a scenario under a feature',
+    planting({ 'features/customers/data/pinned.scenario.json': SCENARIO }),
+    'features/customers/data/pinned.scenario.json',
+    'scenarios/pinned.scenario.json',
+  ],
+  [
+    'a shape in the data layer',
+    moving(SHAPE, 'features/customers/data/Customer.shape.json'),
+    'features/customers/data/Customer.shape.json',
+    SHAPE,
+  ],
+];
+
+describe('sabotage: D008 fixes', () => {
+  for (const [what, change, file, move] of MOVES) {
+    it(`D008 ${what} offers the one move to where its kind lives`, () => {
+      expect(d008After(change).map(one => one.fixes)).toEqual([[{ file, move }]]);
+    });
+    it(`D008 applying the move for ${what} leaves nothing refused`, () => {
+      expect(afterFixing(change, firstD008, codes)).toEqual([]);
+    });
+  }
+  it('D008 a shape whose layer disagrees with its directory offers the layer set, and no move', () => {
+    const disagrees = editing(SHAPE, shape => {
+      shape.layer = 'edge';
+    });
+    expect(d008After(disagrees).map(one => one.fixes)).toEqual([[{ file: SHAPE, at: 'layer', set: 'core' }]]);
+    expect(afterFixing(disagrees, firstD008, codes)).toEqual([]);
+  });
+  it('D008 offers nothing for a kind with two layers, or outside any feature', () => {
+    const graph = moving('features/customers/data/get-row.graph.json', 'features/customers/edge/get-row.graph.json');
+    const unlayered = moving(SHAPE, 'features/customers/Customer.shape.json');
+    const rootless = moving(PORT, 'customer.port.json');
+    for (const change of [graph, unlayered, rootless]) {
+      const refusals = d008After(change);
+      expect(refusals).toHaveLength(1);
+      expect(refusals[0].fixes).toBeUndefined();
+    }
   });
 });
 
