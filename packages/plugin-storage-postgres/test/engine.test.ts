@@ -4,11 +4,12 @@
  * promise in a README. If a filter answers different records here than in memory, one of these cases fails.
  *
  * It needs a database, so it is skipped without `WILANIS_TEST_POSTGRES_URL` -- a suite that silently passes
- * without one would be worse than no suite. To run it:
+ * without one would be worse than no suite. CI starts no database, so it runs by hand:
  *
  *   docker run -d --rm --name wilanis-pg -e POSTGRES_PASSWORD=wilanis -e POSTGRES_DB=wilanis \
  *     -p 55432:5432 postgres:16-alpine
- *   WILANIS_TEST_POSTGRES_URL=postgres://postgres:wilanis@127.0.0.1:55432/wilanis npm test
+ *   WILANIS_TEST_POSTGRES_URL=postgres://postgres:wilanis@127.0.0.1:55432/wilanis \
+ *     npx vitest run packages/plugin-storage-postgres
  *
  * Every case keeps its records in a collection of its own and prepares it with `ensure` itself, so the whole
  * suite runs against one database without the cases reaching each other.

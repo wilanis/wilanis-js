@@ -86,13 +86,15 @@ no SDK. Requests are not retried: a part that fails fails the upload, and the ru
 ## Tests
 
 The suite runs against an in-process fake that speaks the same six calls, so it needs nothing installed. One
-file runs against a real store, and is skipped without one:
+file, `test/bucket.test.ts`, runs against a real store and is skipped without one. CI starts none, so run it
+by hand before changing how the plugin speaks to a store. Any server speaking the S3 API will do;
+[versitygw](https://github.com/versity/versitygw) passes it unchanged:
 
 ```
-docker run -d --rm --name wilanis-minio -p 59000:9000 \
-  -e MINIO_ROOT_USER=wilanis -e MINIO_ROOT_PASSWORD=wilanis-secret \
-  quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
-WILANIS_TEST_S3_ENDPOINT=http://127.0.0.1:59000 npm test
+docker run -d --rm --name wilanis-s3 -p 59000:7070 \
+  -e ROOT_ACCESS_KEY=wilanis -e ROOT_SECRET_KEY=wilanis-secret \
+  versity/versitygw:v1.8.0 posix /tmp
+WILANIS_TEST_S3_ENDPOINT=http://127.0.0.1:59000 npx vitest run packages/plugin-s3
 ```
 
 Part of [wilanis](https://github.com/wilanis/wilanis-js). Apache-2.0.

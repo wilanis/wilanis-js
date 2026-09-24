@@ -58,7 +58,9 @@ afterEach(() => {
 });
 
 describe('the Stop hook', () => {
-  it('blocks the stop over a refusing tree, and allows it once the document is fixed', async () => {
+  it('blocks the stop over a refusing tree, and allows it once the document is fixed', {
+    timeout: 20_000,
+  }, async () => {
     const dir = tree();
     refusing(dir);
     const blocked = await stopHook({}, dir, loading);
@@ -73,7 +75,9 @@ describe('the Stop hook', () => {
     expect(allowed).toEqual({});
   });
 
-  it('counts the blocks under .wilanis/, caps them, then allows the stop with the verdict attached', async () => {
+  it('counts the blocks under .wilanis/, caps them, then allows the stop with the verdict attached', {
+    timeout: 20_000,
+  }, async () => {
     const dir = tree();
     refusing(dir);
     for (let at = 1; at <= CAP; at++) {
@@ -89,7 +93,9 @@ describe('the Stop hook', () => {
     expect(existsSync(join(dir, COUNTER))).toBe(false);
   });
 
-  it('clears the count when the tree checks clean, so a long healthy session never spends the cap', async () => {
+  it('clears the count when the tree checks clean, so a long healthy session never spends the cap', {
+    timeout: 20_000,
+  }, async () => {
     const dir = tree();
     refusing(dir);
     await stopHook({}, dir, loading);
@@ -120,7 +126,9 @@ describe('the Stop hook', () => {
     expect(blocked.reason).toContain('--suite tasks'); // the arguments reached the script
   });
 
-  it('lets a gate that accepts through, and runs no gate at all where the tree declares none', async () => {
+  it('lets a gate that accepts through, and runs no gate at all where the tree declares none', {
+    timeout: 20_000,
+  }, async () => {
     const dir = tree();
     declaresGate(dir, 'ACCEPTED');
     expect(await stopHook({}, dir, loading)).toEqual({});

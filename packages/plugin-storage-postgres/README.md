@@ -101,12 +101,16 @@ error later:
 ## Tests
 
 The shared suite -- what every engine must answer alike -- runs against a real database, and is skipped
-without one, since a suite that silently passed without a database would be worse than no suite:
+without one, since a suite that silently passed without a database would be worse than no suite. CI starts
+no database, so run it by hand before changing the engine:
 
 ```
 docker run -d --rm --name wilanis-pg -e POSTGRES_PASSWORD=wilanis -e POSTGRES_DB=wilanis \
   -p 55432:5432 postgres:16-alpine
-WILANIS_TEST_POSTGRES_URL=postgres://postgres:wilanis@127.0.0.1:55432/wilanis npm test
+WILANIS_TEST_POSTGRES_URL=postgres://postgres:wilanis@127.0.0.1:55432/wilanis npx vitest run packages/plugin-storage-postgres
 ```
+
+The same variable runs the runtime's shared-state case against the database rather than memory
+(`npx vitest run packages/runtime/test/shared-state.test.ts`), and `npm test` with it set runs both.
 
 Part of [wilanis](https://github.com/wilanis/wilanis-js). Apache-2.0.
