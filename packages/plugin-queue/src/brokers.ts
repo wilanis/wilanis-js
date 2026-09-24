@@ -9,6 +9,7 @@
  * use by whichever side reaches it first -- so the order plugins are named in `project.json` cannot bite, and a
  * reload, which builds a new environment, starts with a table of its own.
  */
+import type { Atomic } from '@wilanis/core';
 
 /** One message as a broker hands it to the worker. */
 export interface Delivery {
@@ -49,8 +50,18 @@ export type Handle = (delivery: Delivery) => Promise<Answer>;
 export interface Broker {
   /** Create what the broker needs to keep queues on the connection, altering nothing that exists; idempotent. */
   ensure(connection: string): Promise<void>;
-  /** Put one message on the queue, answering the id every delivery of it will carry. */
-  publish(connection: string, queue: string, message: Message): Promise<{ id: string }>;
+  /**
+   * Put one message on the queue, answering the id every delivery of it will carry.
+   *
+   * `atomic` is the transaction of the atomic graph the publish runs in, and is handed only where the
+   * connection's kind is marked `storage`: the queue is then kept in the store, and the broker keeps the
+   * message on the transaction's session through `atomic.join(connection, ...)`, so it exists exactly when the
+   * graph's writes commit. One transaction is one connection, so the broker joins with what the storage engine
+   * of that connection begins, and a store call after the publish is handed the same participant. A broker of
+   * any other kind is never handed one -- X405 refuses the atomic graph, and the handler the run that reaches it
+   * -- so a broker that keeps no queue in a store may leave the parameter off.
+   */
+  publish(connection: string, queue: string, message: Message, atomic?: Atomic): Promise<{ id: string }>;
   /**
    * Hand every message of the queue to `handle`, at most `concurrency` at once, and do with each what the answer
    * says: `ack` forgets it, `retry` delivers it again with `attempt` one higher no sooner than `backoffMs` from

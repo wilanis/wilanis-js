@@ -113,6 +113,13 @@ connection -- a table -- and changes nothing that exists.
 No message carries a blob (X404): a handle names bytes in one process's blob registry. Publish the handle's
 id and read the bytes where the message is consumed.
 
+**Inside an atomic graph.** `publish` is `transactional`, as `@storage`'s operations are. Where the
+connection's kind is marked `storage` -- the queue is a table in the store the graph writes -- the message
+joins the graph's transaction: it exists exactly when the writes commit, and a rollback leaves nothing
+published. A broker of any other kind keeps its queue outside that transaction, so an atomic graph publishing
+to one is refused (X405), and one that reaches such a publish through a domain call fails the node before the
+broker keeps anything. Publish after the atomic graph instead, in its caller, on a node that reads its answer.
+
 ## What a broker implements
 
 A broker is a plugin package of its own. It grants a connection kind that declares how it delivers, and
@@ -149,13 +156,19 @@ about one connection -- its canonical path, whose settings the broker reads off 
 | Method | What it does |
 |---|---|
 | `ensure(connection)` | create what the broker needs to keep queues there, altering nothing that exists |
-| `publish(connection, queue, { body, headers, delayMs? })` | keep one message, answering the id every delivery of it carries |
+| `publish(connection, queue, { body, headers, delayMs? }, atomic?)` | keep one message, answering the id every delivery of it carries; `atomic` is the graph's transaction, handed only where the kind is marked `storage` |
 | `consume(connection, queue, handle, { concurrency })` | hand every message to `handle`, at most `concurrency` at once, and answer the way to stop |
 
 `handle` answers `{ outcome, backoffMs? }`: `ack` forgets the message, `retry` delivers it again with
 `attempt` one higher no sooner than `backoffMs` from now, `dead` parks it. A `handle` that throws is a retry
 with no wait, so the worker's own failure loses nothing. The stop takes no further message and resolves once
 every delivery in flight has been answered and what the answer says has been done.
+
+A broker whose kind is marked `storage` keeps its queue in the store, and `publish` hands it the atomic
+graph's transaction: it enqueues on the transaction's session through `atomic.join(connection, ...)`, opening
+it with what the storage engine of that connection begins, since one transaction is one connection and a store
+call after the publish is handed the same participant. Any other broker is never handed one and may leave the
+parameter off.
 
 "This is a broker" has one executable meaning: the suite a broker's tests import and run.
 
@@ -177,5 +190,6 @@ and consume, retry with backoff, park the dead, bound concurrency and drain on s
 | X402 | a `retry` outcome, or `onFault` left at `retry`, on a trigger whose connection's kind delivers at most once |
 | X403 | a `publish` of a type the queue trigger consuming that connection and queue does not accept |
 | X404 | a message type, a trigger's or a `publish`'s, with a `blob` field at any depth |
+| X405 | a `publish` in an atomic graph to a connection whose kind is not marked `storage` |
 
 Each is described, with an example and its fix, under [`docs/refusals`](../../docs/refusals/README.md).

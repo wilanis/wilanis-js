@@ -4,9 +4,9 @@
  * `enqueue`, a command-line trigger to fire that by hand, and a startup step working the queues. Every case
  * copies it, edits one document, and answers the refusal codes, as `packages/plugin-schedule/test` does.
  *
- * The broker is the fake of `fake-broker.ts`, granted by a plugin of this file under two connection kinds --
- * one delivering at least once and one at most once -- and registered from its `postLoad` exactly as a broker
- * package registers itself.
+ * The broker is the fake of `fake-broker.ts`, granted by a plugin of this file under three connection kinds --
+ * one delivering at least once, one at most once, and one marked `storage` whose queue a transaction can take
+ * in -- and registered from its `postLoad` exactly as a broker package registers itself.
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,8 +21,10 @@ import { FakeBroker } from './fake-broker.js';
 export const FAKE = '@fake-broker';
 export const AT_LEAST_ONCE = `${FAKE}/fake.connection-kind.json`;
 export const AT_MOST_ONCE = `${FAKE}/once.connection-kind.json`;
+export const IN_STORE = `${FAKE}/table.connection-kind.json`;
 export const JOBS = '@connections/jobs.connection.json';
 export const ONCE = '@connections/once.connection.json';
+export const TABLE = '@connections/table.connection.json';
 export const TRIGGER = 'features/customers/edge/removals.trigger.json';
 export const PUBLISHING = 'features/customers/data/publish-removal.graph.json';
 export const ID_REQUEST = '@features/customers/edge/IdRequest.shape.json';
@@ -37,8 +39,9 @@ function docsDir(docs: Record<string, unknown>): string {
 const BROKER_DOCS = docsDir({
   'plugin.json': {
     $schema: schemaRef('plugin'),
-    description: 'A broker for tests: two kinds of connection, one redelivering and one not, kept in a Map.',
-    grants: { connectionKinds: [AT_LEAST_ONCE, AT_MOST_ONCE] },
+    description:
+      'A broker for tests: three kinds of connection, one redelivering, one not, one in a store, kept in a Map.',
+    grants: { connectionKinds: [AT_LEAST_ONCE, AT_MOST_ONCE, IN_STORE] },
   },
   'fake.connection-kind.json': {
     $schema: schemaRef('connection-kind'),
@@ -52,9 +55,16 @@ const BROKER_DOCS = docsDir({
     delivery: 'at-most-once',
     settings: { fields: {} },
   },
+  'table.connection-kind.json': {
+    $schema: schemaRef('connection-kind'),
+    description: 'A broker whose queue is a table in the store, so a message joins the transaction of an atomic graph.',
+    storage: true,
+    delivery: 'at-least-once',
+    settings: { fields: {} },
+  },
 });
 
-/** The broker plugin, registering `broker` for both its kinds every time the tree is loaded; `none` registers nothing. */
+/** The broker plugin, registering `broker` for all its kinds every time the tree is loaded; `none` registers nothing. */
 export function brokerPlugin(broker: FakeBroker | 'none' = new FakeBroker()): PluginModule {
   return {
     root: FAKE,
@@ -64,6 +74,7 @@ export function brokerPlugin(broker: FakeBroker | 'none' = new FakeBroker()): Pl
       if (broker === 'none') return;
       brokers(env).register(AT_LEAST_ONCE, broker);
       brokers(env).register(AT_MOST_ONCE, broker);
+      brokers(env).register(IN_STORE, broker);
     },
   };
 }
@@ -104,6 +115,7 @@ function base(): Docs {
     },
     'connections/jobs.connection.json': connection('the broker removals go through', AT_LEAST_ONCE),
     'connections/once.connection.json': connection('a broker that never redelivers', AT_MOST_ONCE),
+    'connections/table.connection.json': connection('a broker kept in the store', IN_STORE),
     'features/customers/feature.json': {
       $schema: schemaRef('feature'),
       description: 'who the registry keeps',

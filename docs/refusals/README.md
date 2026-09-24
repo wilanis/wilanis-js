@@ -203,6 +203,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [X402](X402.md) | X | live | a `retry` outcome, or `onFault` left at retry, on a queue trigger whose connection's kind delivers at most once |
 | [X403](X403.md) | X | live | a `publish` of a type the queue trigger consuming that connection and queue does not accept |
 | [X404](X404.md) | X | live | a queue trigger's message type, or a `publish`'s, carrying a blob at any depth |
+| [X405](X405.md) | X | live | a `publish` in an atomic graph to a connection whose kind is not marked `storage`, which cannot join its transaction |
 
 ## The page template
 

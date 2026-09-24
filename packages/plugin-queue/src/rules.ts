@@ -1,5 +1,5 @@
 /**
- * What only @queue can judge: X401 to X404, its own band. Each rule reads a word the generic families cannot --
+ * What only @queue can judge: X401 to X405, its own band. Each rule reads a word the generic families cannot --
  * an outcome is a string to the type system and an instruction to a broker here, and the queue a `publish`
  * names is a string to G005 and the other end of a queue trigger here.
  *
@@ -13,11 +13,14 @@
  * X402 a retry on a connection whose kind delivers at most once: nothing will deliver the message again.
  * X403 a publish of a type the trigger consuming that queue does not accept (`publishes.ts`).
  * X404 a message type carrying a blob, whose handle means nothing in another process (`publishes.ts`).
+ * X405 a publish in an atomic graph to a broker whose kind is not marked storage, which cannot join the
+ *      transaction. It sees the graph that carries the node; an atomic graph that reaches such a publish
+ *      through a domain call is refused at run time by the handler, before the broker keeps anything.
  */
 import type { ConnectionKindDoc, PluginCheckContext } from '@wilanis/core';
 import { OUTCOMES } from './outcome.js';
 import { checkPublished, checkTriggerMessage } from './publishes.js';
-import { consumeSteps, type Queued, queued } from './sites.js';
+import { consumeSteps, published, type Queued, queued } from './sites.js';
 
 type Scope = PluginCheckContext['scope'];
 type Refuse = PluginCheckContext['refuse'];
@@ -77,21 +80,34 @@ function checkConcurrency(scope: Scope, refuse: Refuse): void {
   }
 }
 
+/** One connection a document names, as it stands under the tree or one profile: its path, its kind, and the kind's document. */
+interface Behind {
+  profile: string | undefined;
+  connection: string;
+  kind: string;
+  doc: ConnectionKindDoc | undefined;
+}
+
 /**
- * The connection a queue trigger receives from, under the tree and under every profile, that delivers at most
- * once: a profile may put a stand-in of another kind behind the connection, and a retry is a lie under any
- * profile whose broker will not redeliver.
+ * What a named connection is under the tree and under every profile: a profile may put a stand-in of another
+ * kind behind it, and a rule about what the kind can do is broken under any profile whose kind cannot. A name
+ * that is no connection answers nothing; the rules that judge the name say so.
  */
-function atMostOnce(scope: Scope, named: string): { connection: string; kind: string } | undefined {
+function behind(scope: Scope, named: string): Behind[] {
+  const found: Behind[] = [];
   for (const profile of [undefined, ...scope.profiles()]) {
     const connection = scope.connectionFor(named, profile);
-    if (typeof connection === 'string') continue; // the T rules say a connection is not one
+    if (typeof connection === 'string') continue;
     const kind = scope.get('connection-kind', connection.doc.kind);
-    if ((kind?.doc as ConnectionKindDoc | undefined)?.delivery === 'at-most-once')
-      return { connection: connection.path, kind: kind?.path ?? connection.doc.kind };
+    const doc = kind?.doc as ConnectionKindDoc | undefined;
+    found.push({ profile, connection: connection.path, kind: kind?.path ?? connection.doc.kind, doc });
   }
-  return undefined;
+  return found;
 }
+
+/** The connection a queue trigger receives from, under the tree or any profile, that delivers at most once, since a retry is a lie there. */
+const atMostOnce = (scope: Scope, named: string) =>
+  behind(scope, named).find(one => one.doc?.delivery === 'at-most-once');
 
 /** Where a queue trigger asks for a retry: each outcome that says so, and onFault, which says so unless told otherwise. */
 function retriesOf(one: Queued): string[] {
@@ -119,7 +135,29 @@ function checkRetryDelivers(scope: Scope, one: Queued, refuse: Refuse): void {
     });
 }
 
-/** What only @queue can judge: X401 a setting a worker cannot act on, X402 a retry nothing redelivers, X403 a publish its consumer does not accept, X404 a blob in a message. */
+/**
+ * X405: a publish written in an atomic graph, to a broker whose kind -- under the tree or any profile -- is not
+ * marked `storage`. Such a broker keeps its queue outside the store, so it cannot join the transaction, and a
+ * message it kept would survive the rollback of the writes it announces.
+ */
+function checkAtomicPublish(scope: Scope, refuse: Refuse): void {
+  for (const call of published(scope)) {
+    const named = call.given.connection;
+    if (!call.atomic || typeof named !== 'string') continue; // G005 holds a publish's connection to a literal
+    const outside = behind(scope, named).find(one => one.doc?.storage !== true);
+    if (!outside) continue;
+    const under = outside.profile ? ` under profile '${outside.profile}'` : '';
+    refuse({
+      code: 'X405',
+      file: call.file,
+      message: `an atomic graph publishes to '${outside.connection}', of kind '${outside.kind}'${under}, which is not marked storage: a broker outside the store cannot join the graph's transaction, so the message would outlive a rollback`,
+      at: `${call.at}/connection`,
+      hint: 'publish after the atomic graph, in its caller, reached by a data dependency on its answer',
+    });
+  }
+}
+
+/** What only @queue can judge: X401 a setting a worker cannot act on, X402 a retry nothing redelivers, X403 a publish its consumer does not accept, X404 a blob in a message, X405 a publish an atomic graph's transaction cannot take in. */
 export function check({ scope, refuse }: PluginCheckContext): void {
   checkConcurrency(scope, refuse);
   const triggers = queued(scope);
@@ -130,4 +168,5 @@ export function check({ scope, refuse }: PluginCheckContext): void {
     checkTriggerMessage(scope, one, refuse);
   }
   checkPublished(scope, triggers, refuse);
+  checkAtomicPublish(scope, refuse);
 }

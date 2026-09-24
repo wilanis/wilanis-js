@@ -4,7 +4,8 @@
   "description": "What a data graph asks of a broker: put a message on a queue, and prepare what the broker needs to keep one. Both are effects, listed under a feature's effects and stubbed by a rehearsal, so nothing leaves the process until the tree is served.",
   "operations": {
     "publish": {
-      "description": "Put one message on a queue of a broker: the body is the message, of the edge type `type` names, and the headers ride beside it, where a credential for the consuming trigger's policies goes. A queue trigger of this tree that consumes the same connection and queue must accept that type (X403). Answers the broker's id for the message.",
+      "description": "Put one message on a queue of a broker: the body is the message, of the edge type `type` names, and the headers ride beside it, where a credential for the consuming trigger's policies goes. A queue trigger of this tree that consumes the same connection and queue must accept that type (X403). Answers the broker's id for the message. Inside an atomic graph it takes part in the transaction where the connection's kind is marked storage: the queue is kept in the store, and the message exists exactly when the graph's writes commit. A broker of any other kind cannot join, and X405 refuses the atomic graph.",
+      "transactional": true,
       "accepts": {
         "connection": {
           "type": "string",
