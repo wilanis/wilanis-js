@@ -34,6 +34,7 @@ export { cli as cliTriggers } from './plugins/cli-trigger.js';
 export { BUILTIN_PLUGINS } from './plugins/index.js';
 export { std } from './plugins/std.js';
 export { postLoad } from './post-load.js';
+export { activeProfile, PROFILE_VARIABLE, secretsRefusal, unsetSecrets } from './profile.js';
 export { loadProject, type PluginResolution, resolveIncludes, resolvePlugins } from './project.js';
 export { contentTypeOf, runStartup, runTrigger, start } from './serve.js';
 export { Served } from './served.js';

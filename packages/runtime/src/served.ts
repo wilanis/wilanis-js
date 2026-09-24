@@ -1,9 +1,10 @@
 /** The tree behind a listener: what every request is answered from, and what a reload puts there instead. */
 import { checkTree } from '@wilanis/compiler';
-import type { LoadResult, Serving, Trace } from '@wilanis/core';
+import { type LoadResult, Scope, type Serving, type Trace } from '@wilanis/core';
 import type { Embedder } from './embed.js';
 import type { Ran } from './fired.js';
 import { postLoad } from './post-load.js';
+import { secretsRefusal } from './profile.js';
 import { loadProject } from './project.js';
 import { embedderFor } from './tools.js';
 import { traceOf } from './trace.js';
@@ -33,10 +34,14 @@ export class Served {
    */
   private readonly listeners = new Set<(trace: Trace) => void>();
 
+  /**
+   * `under` is the profile this process started with and the environment it read: a reload never changes
+   * profile, and holds the tree it loads to the variables that profile's reach reads in that environment.
+   */
   constructor(
     private current: { load: LoadResult; emb: Embedder },
     readonly log: (line: string) => void,
-    private readonly profile?: string,
+    private readonly under: { profile?: string; env?: NodeJS.ProcessEnv } = {},
   ) {}
 
   /** Take what the plugins of this tree set up, so a reload can replace it and stopping can undo it. */
@@ -126,8 +131,12 @@ export class Served {
     const load = await loadProject(this.load.root, { plugins });
     const refusals = checkTree(load);
     if (!refusals.ok) return { refusals: refusals.format() };
-    const emb = embedderFor(load, { profile: this.profile });
-    if (emb.missingSecrets.length) return { refusals: `missing secrets: ${emb.missingSecrets.join(', ')}` };
+    const { profile, env = process.env } = this.under;
+    // the same profile's reach, re-derived from the tree as it now stands: a reload that makes it read a
+    // variable nobody set is refused as a start would be, and the last good tree keeps serving
+    const missing = secretsRefusal(new Scope(load.registry, load.resolve), profile, env);
+    if (missing) return { refusals: missing };
+    const emb = embedderFor(load, { profile, env });
     emb.serve(this);
     // what the old embedder held is still running and still ours: the new one answers for it when we stop
     emb.held.push(...this.emb.held);

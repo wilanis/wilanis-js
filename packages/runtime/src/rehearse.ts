@@ -9,6 +9,7 @@ import type { Report } from '@wilanis/engine';
 import { outcomeOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, nonEmpty, type Stubbing, setPath, switchesOf } from './branches.js';
 import type { Embedder } from './embed.js';
+import { activeProfile } from './profile.js';
 import { type Decision, format, gather, type Plain, statedOf, stateName } from './rehearsal-report.js';
 import { atomicAt, declaredAt, rootGraph, specBehind, type Where, whereOf } from './rehearse-where.js';
 import { embedderFor, failedBelow, generatedFire, policyRoots, unbroken } from './stubbing.js';
@@ -100,19 +101,23 @@ function whyFailed(local: Report): Partial<Settled> {
  * A branch is acceptable when it settles: the graph answers, or it fails at a #refuse node it declared.
  * It is a problem when the graph blocks (an input nothing supplies), fails somewhere it did not declare,
  * routes somewhere other than where its rule points, or when no inputs can reach the branch at all.
+ *
+ * It runs under the profile `activeProfile` picks, as `start` would, so the bindings it stubs are the ones
+ * that place runs; being stubbed, it needs no variable set.
  */
 export async function rehearse(
   load: LoadResult,
   opts: { seed?: number; profile?: string; verbose?: boolean } = {},
 ): Promise<Rehearsal> {
   const seed = opts.seed ?? 1;
+  const profile = activeProfile(load.registry.project?.doc, { flag: opts.profile, env: process.env });
   const lines: string[] = [];
   const decisions: Decision[] = [];
   const settledGraphs: Plain[] = [];
   // every trigger, and every policy as a trigger of each kind that attaches it: a decision is walked like any other graph
   for (const trigger of [...load.registry.all('trigger'), ...policyRoots(load)]) {
-    const found = await rehearseTrigger(load, trigger, { seed, profile: opts.profile }, decisions);
-    if (!found) settledGraphs.push(await wholeOf(load, trigger, seed, opts.profile));
+    const found = await rehearseTrigger(load, trigger, { seed, profile }, decisions);
+    if (!found) settledGraphs.push(await wholeOf(load, trigger, seed, profile));
   }
   // the invariants the tree states, counted over the whole tree rather than per trigger: a rule is stated once.
   // A scope of its own rather than an embedder's: what is asked of it reads documents and runs nothing.

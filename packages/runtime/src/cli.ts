@@ -25,12 +25,13 @@ const REPEATABLE = ['branch'];
 
 const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a stateless engine
 
-  wilanis check    [root] [--profile word]            judge the whole tree; exit 1 with every refusal
+  wilanis check    [root]                          judge the whole tree, under every profile; exit 1 with every refusal
   wilanis rehearse [root] [--seed n] [-v]          run every trigger, and every branch of every switch
   wilanis fuzz     [root] [--runs n]               write one scenario per trigger per seed to scenarios/
   wilanis regress  [root]                          replay every scenario and diff node by node
   wilanis start    [root] [--profile word] [--trace[=text|json]] [--level summary|full]
-                   run postLoad and the project's startup steps; what listens is what those steps say
+                   refuse a variable the profile reads that is unset, then run postLoad and the profile's
+                   startup steps; what listens is what those steps say
   wilanis run      <trigger> [root] [--in json] [--file path] [--out path] [--trace[=text|json]] [--flag=v ...]
                    fire one cli trigger; --file hands a file as request.file, --out receives a blob answer;
                    --trace prints what the run did, span by span, on stderr
@@ -49,6 +50,8 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
   wilanis init     [root]                          write CLAUDE.md and agent hooks into a tree
   wilanis stop-hook [root]                         the Stop hook: judge the tree, answer the harness on stdout
 
+rehearse, fuzz, regress, start and run take --profile word, and run under it; else under WILANIS_PROFILE, else
+under the profile project.json marks "default": true. A project that declares no profile runs its one unnamed one.
 Every path is @-rooted (@features/tasks/tasks.port.json) or through a project alias.
 Plugins beyond @std and @cli are npm packages named by "from" in project.json.`;
 

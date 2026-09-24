@@ -155,6 +155,7 @@
   "profiles": {
     "live": {
       "description": "The real customer API, and the directories written in the connections. A production profile binds identity.port.json to a binding whose connections are an OIDC issuer and LDAP; nothing else changes.",
+      "default": true,
       "bindings": {
         "@customers/domain/customer.port.json": "@customers/data/customers-rest.binding.json",
         "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",

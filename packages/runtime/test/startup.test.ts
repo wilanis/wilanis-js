@@ -1,105 +1,15 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkTree } from '@wilanis/compiler';
-import { loadTree, type PluginModule, schemaRef, schemaUrl, type Trace } from '@wilanis/core';
+import { loadTree, type PluginModule, schemaRef, type Trace } from '@wilanis/core';
 import { Refusal } from '@wilanis/engine';
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_PLUGINS, start } from '../src/index.js';
+import { start } from '../src/index.js';
 import { docsDir, sabotage } from './example-harness.js';
+import { bootTree, profiledTree } from './startup-harness.js';
 
 describe("the project's startup steps", () => {
-  /**
-   * A tree whose one domain port is met by a native operation the test watches, and whose plugin grants a
-   * `holds` operation standing in for a listener. `calls` records the order of the plugin's postLoad, each
-   * startup step, and the moment the listener opened -- so the tests can say what started, and whether.
-   */
-  const tree = (startup: unknown[], onBoot: () => unknown, onDown?: () => void, stuck?: number) => {
-    const calls: string[] = [];
-    /** What the fake listener was given as `env.serving`: the way a test asks the tree to load itself again. */
-    let serving: { reload: () => Promise<{ ok: boolean }> } | undefined;
-    const fake: PluginModule = {
-      root: '@fake',
-      docs: docsDir({
-        'plugin.json': {
-          $schema: schemaRef('plugin'),
-          description: 'a plugin behind the boot port',
-          grants: { ports: ['@fake/boot.port.json', '@fake/server.port.json'] },
-        },
-        'boot.port.json': {
-          $schema: schemaRef('port'),
-          description: 'what the tree does before it serves',
-          operations: {
-            open: { description: 'open the connection', accepts: { name: { type: 'string' } }, returns: 'string' },
-          },
-        },
-        'server.port.json': {
-          $schema: schemaRef('port'),
-          description: 'the listener this tree may open',
-          operations: { listen: { description: 'answer requests until the process stops', holds: true } },
-        },
-      }),
-      handlers: {
-        '@fake/boot.port.json#open': async ({ in: input }: any) => {
-          calls.push(`open:${input.name}`);
-          return onBoot();
-        },
-        '@fake/server.port.json#listen': async ({ ctx }: any) => {
-          calls.push('listening');
-          serving = ctx.env.serving;
-          // the listeners are counted from 1 in the order they opened; the `stuck` one will not stop
-          const nth = calls.filter(call => call === 'listening').length;
-          ctx.env.hold({
-            label: `fake listener ${nth}`,
-            stop: async () => {
-              if (nth === stuck) throw new Error(`listener ${nth} is stuck`);
-              calls.push(stuck === undefined ? 'stopped' : `stopped ${nth}`);
-            },
-          });
-          return undefined;
-        },
-      },
-      postLoad: async () => {
-        calls.push('postLoad');
-        return async () => {
-          calls.push('postLoadDown');
-          onDown?.();
-        };
-      },
-    };
-    const dir = mkdtempSync(join(tmpdir(), 'wilanis-startup-'));
-    mkdirSync(join(dir, 'features/boot/domain'), { recursive: true });
-    mkdirSync(join(dir, 'features/boot/data'), { recursive: true });
-    const put = (rel: string, doc: unknown) => writeFileSync(join(dir, rel), JSON.stringify(doc));
-    put('project.json', {
-      $schema: schemaUrl('project'),
-      name: 'boot',
-      description: 'a tree with startup steps',
-      plugins: [{ use: '@std' }, { use: '@fake' }],
-      startup,
-    });
-    put('features/boot/feature.json', {
-      $schema: schemaRef('feature'),
-      description: 'the boot feature',
-      effects: ['@fake/boot.port.json#open'],
-    });
-    put('features/boot/domain/ready.port.json', {
-      $schema: schemaRef('port'),
-      description: 'what the tree needs before it serves',
-      operations: {
-        warm: { description: 'warm the connection', accepts: { name: { type: 'string' } }, returns: 'string' },
-      },
-    });
-    put('features/boot/data/ready.binding.json', {
-      $schema: schemaRef('binding'),
-      description: 'met by the fake connection',
-      port: '@features/boot/domain/ready.port.json',
-      operations: {
-        warm: { run: '@fake/boot.port.json#open', in: { name: '{{in.name}}' } },
-      },
-    });
-    return { dir, calls, plugins: { ...BUILTIN_PLUGINS, '@fake': fake }, serving: () => serving };
-  };
+  const tree = bootTree;
 
   const step = (extra: Record<string, unknown> = {}) => ({
     run: '@features/boot/domain/ready.port.json#warm',
@@ -302,6 +212,124 @@ describe("the project's startup steps", () => {
     expect(calls).toEqual(['postLoad', 'listening', 'listening', 'stopped 1', 'postLoadDown']);
     expect(logs).toContain('stopping fake listener 2: listener 2 is stuck');
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  describe('under a profile (RFC 0013)', () => {
+    const laptopOnly = step({ label: 'Warm the laptop', in: { name: 'laptop' }, profiles: ['live'] });
+    const steps = [step({ label: 'Warm the store', in: { name: '{{secrets.shared}}' } }), laptopOnly, listen];
+    /** Every variable the tree reads set, but for those named; nothing else of the process is read. */
+    const envWithout = (...unset: string[]) =>
+      Object.fromEntries(
+        ['SHARED_KEY', 'PRIMARY_KEY', 'PRODUCTION_KEY', 'LAPTOP_KEY']
+          .filter(name => !unset.includes(name))
+          .map(name => [name, `${name.toLowerCase()}-value`]),
+      );
+    const started = async (tree: ReturnType<typeof profiledTree>, opts: Parameters<typeof start>[1] = {}) => {
+      const loaded = loadTree(tree.dir, tree.plugins);
+      expect(checkTree(loaded).items).toEqual([]);
+      const lines: string[] = [];
+      const run = start(loaded, { log: line => lines.push(line), ...opts });
+      return { run, lines };
+    };
+
+    it('refuses a tree that declares profiles and names none, before any postLoad', async () => {
+      const tree = profiledTree(steps);
+      const { run } = await started(tree, { env: envWithout() });
+      await expect(run).rejects.toThrow(
+        'which profile? project.json declares live, production and marks none default\n' +
+          '→ --profile <name>, or set WILANIS_PROFILE, or mark one profile "default": true',
+      );
+      expect(tree.calls).toEqual([]);
+      rmSync(tree.dir, { recursive: true, force: true });
+    });
+
+    it('refuses a profile the project does not declare, listing the ones it does', async () => {
+      const tree = profiledTree(steps, { withDefault: true });
+      const { run } = await started(tree, { profile: 'staging', env: envWithout() });
+      await expect(run).rejects.toThrow("no profile 'staging'; project.json declares: live (default), production");
+      expect(tree.calls).toEqual([]);
+      rmSync(tree.dir, { recursive: true, force: true });
+    });
+
+    it('says the profile first: WILANIS_PROFILE picks it, --profile beside it wins, the default is the last resort', async () => {
+      const tree = profiledTree(steps, { withDefault: true });
+      for (const [opts, said] of [
+        [{ env: { ...envWithout(), WILANIS_PROFILE: 'production' } }, 'profile production'],
+        [{ profile: 'live', env: { ...envWithout(), WILANIS_PROFILE: 'production' } }, 'profile live'],
+        [{ env: envWithout() }, 'profile live'],
+      ] as const) {
+        const { run, lines } = await started(tree, opts);
+        await (await run).stop();
+        expect(lines[0]).toBe(said);
+      }
+      rmSync(tree.dir, { recursive: true, force: true });
+    });
+
+    it("refuses a variable the profile's reach reads and nobody set, naming it and its reader, before any postLoad", async () => {
+      const tree = profiledTree(steps);
+      const { run, lines } = await started(tree, { profile: 'production', env: envWithout('PRODUCTION_KEY') });
+      // the whole message: SHARED_KEY is set, PRIMARY_KEY's connection is stood in for, and no value is ever said
+      const refused = await run.then(
+        () => undefined,
+        (error: Error) => error.message,
+      );
+      expect(refused).toBe(
+        'missing secrets: PRODUCTION_KEY (production, read by @connections/primary-production.connection.json); nothing is serving',
+      );
+      expect(lines).toEqual(['profile production']);
+      expect(tree.calls).toEqual([]);
+      rmSync(tree.dir, { recursive: true, force: true });
+    });
+
+    it('starts where only a variable another profile reaches is unset, and a step reading one is named by its place', async () => {
+      const tree = profiledTree(steps);
+      // LAPTOP_KEY is live's alone, and PRIMARY_KEY is read by a connection production's stand-in replaces
+      const { run } = await started(tree, { profile: 'production', env: envWithout('LAPTOP_KEY', 'PRIMARY_KEY') });
+      await (await run).stop();
+      expect(tree.calls[0]).toBe('postLoad');
+      const shared = await started(tree, { profile: 'live', env: envWithout('SHARED_KEY') });
+      await expect(shared.run).rejects.toThrow(
+        'missing secrets: SHARED_KEY (shared, read by @project.json → startup/0); nothing is serving',
+      );
+      rmSync(tree.dir, { recursive: true, force: true });
+    });
+
+    it('runs the steps its profile names, numbered over those: production two, live three', async () => {
+      const tree = profiledTree(steps);
+      const production = await started(tree, { profile: 'production', env: envWithout() });
+      await (await production.run).stop();
+      expect(production.lines.filter(line => line.startsWith('startup'))).toEqual([
+        'startup 1/2 Warm the store: ok',
+        'startup 2/2 @fake/server.port.json#listen: ok',
+      ]);
+      const live = await started(tree, { profile: 'live', env: envWithout() });
+      await (await live.run).stop();
+      expect(live.lines.filter(line => line.startsWith('startup'))).toEqual([
+        'startup 1/3 Warm the store: ok',
+        'startup 2/3 Warm the laptop: ok',
+        'startup 3/3 @fake/server.port.json#listen: ok',
+      ]);
+      rmSync(tree.dir, { recursive: true, force: true });
+    });
+
+    it('refuses a reload that makes the same profile read a variable nobody set, and keeps serving', async () => {
+      const tree = profiledTree(steps);
+      const { run } = await started(tree, { profile: 'production', env: envWithout('LAPTOP_KEY') });
+      const { stop } = await run;
+      // production now meets the port on the laptop, whose key this process was never given
+      const project = JSON.parse(readFileSync(join(tree.dir, 'project.json'), 'utf8'));
+      project.profiles.production.bindings['@features/boot/domain/ready.port.json'] =
+        '@features/boot/data/ready-live.binding.json';
+      writeFileSync(join(tree.dir, 'project.json'), JSON.stringify(project));
+      const again = await tree.serving()?.reload();
+      expect(again).toEqual({
+        ok: false,
+        refusals: 'missing secrets: LAPTOP_KEY (laptop, read by @connections/laptop.connection.json)',
+      });
+      expect(tree.calls.filter(call => call === 'postLoad')).toHaveLength(1);
+      await stop();
+      rmSync(tree.dir, { recursive: true, force: true });
+    });
   });
 
   it('L008 a graph may not run what outlives the run', () => {
