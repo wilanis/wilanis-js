@@ -184,6 +184,18 @@ size is a 413 before it is parsed or stored. `DELETE /customers` takes at most a
 no most. Cancelling undoes nothing that already ran, and the run's record says how far it got; only a graph
 marked atomic rolls back.
 
+The clock is a way in as well. A trigger of kind `@schedule/schedule.trigger-kind.json` fires at every instant a
+five-field `cron` expression names in its `timezone`, or at every multiple of an `everyMs` interval, into a domain
+port operation like any route. The tick's instant reaches the graph as `request.scheduled`, a string read through
+`fire.in`, so nothing in the tree calls a clock and a rehearsal runs a scheduled trigger's branches as it runs a
+route's. It takes a `deadlineMs` as a route does, and a tick whose run passes it is cancelled and logged as such.
+Nobody is calling on a tick, so the trigger gives the guard nothing: a policy that reads the caller is refused on
+it (`A005`), and what a store keeps per tenant is out of its reach. The schedule runs only while
+`project.json → startup` names `@schedule/scheduler.port.json#run`, as the port opens only while a step names
+`listen`, and every process that names the step fires every tick. The example names it and writes no scheduled
+trigger yet, so its schedule is empty; [`packages/plugin-schedule`](packages/plugin-schedule/README.md) says
+what a trigger's settings may be and what the plugin refuses.
+
 ## Why this suits code a model writes
 
 Every file has a schema, so a key is either allowed or refused and there is no free-form syntax to invent

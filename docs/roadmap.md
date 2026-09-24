@@ -89,8 +89,11 @@ run is cancelled and still answers a report. Draws on RFC 0011, RFC 0012 and RFC
 
 ## M10 Work off the request
 
-The digest is computed by a scheduled job and imports are processed by a worker fed from a queue, beside
-the routes. Draws on RFC 0009 and RFC 0010.
+Imports are processed by a worker fed from a queue, and a scheduled trigger fires on the clock, both beside
+the routes: `wilanis start` logs the next tick of each scheduled trigger and one line per tick it fires. Draws
+on RFC 0009 and RFC 0010. Which job the example schedules is not yet chosen. This row named the digest, and
+the digest reads the customers of every tenant: a tick has no caller for its tenant or its policy to be about,
+so the example's nightly run of it was taken out, and its `Keep the schedule` step schedules nothing.
 
 After M09, not before it: RFC 0009 accepts after RFC 0011 and its step 1 lands before RFC 0009's step 2,
 and RFC 0010's `deadlineMs` setting waits on RFC 0012's `FireArgs.signal`. Both are M09's RFCs. A worker
