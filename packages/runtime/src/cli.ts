@@ -24,6 +24,7 @@ import {
   rehearse,
   SCENARIOS,
   scaffold,
+  withMigration,
   withRegression,
   withRehearsal,
 } from './tools.js';
@@ -66,8 +67,8 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
   wilanis init     [root]                          write CLAUDE.md and agent hooks into a tree
   wilanis stop-hook [root]                         the Stop hook: judge the tree, answer the harness on stdout
 
-check, rehearse and regress take --json: one JSON object on stdout (RFC 0019's envelope, packages/runtime/schemas/
-diagnostics.schema.json), the refusals as data on a refused tree whichever was asked, and the same exit codes.
+check, rehearse, regress and migrate take --json: one JSON object on stdout (RFC 0019's envelope, packages/runtime/
+schemas/diagnostics.schema.json), the refusals as data on a refused tree whichever was asked, and the same exit codes.
 rehearse, fuzz, regress, start and run take --profile word, and run under it; else under WILANIS_PROFILE, else
 under the profile project.json marks "default": true. A project that declares no profile runs its one unnamed one.
 Every path is @-rooted (@features/tasks/tasks.port.json) or through a project alias.
@@ -239,13 +240,6 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
       console.error(`wilanis migrate: unknown flag(s) ${unknown.map(name => `--${name}`).join(', ')}\n\n${USAGE}`);
       process.exit(2);
     }
-    if (flags.json) {
-      // the envelope exists (diagnostics.ts); what migrate answers is not yet mapped into it (RFC 0017, issue #618)
-      console.error(
-        'wilanis migrate --json waits on issue #618: its result is not yet mapped into the diagnostics envelope; run without --json',
-      );
-      process.exit(2);
-    }
     // migrate judges the tree itself, so that a caller without the command line gets the same guarantee
     const loaded = await load(rootArg(0));
     const answer = await migrate(loaded, {
@@ -254,8 +248,13 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
       allowDestructive: flags['allow-destructive'] ? flags['allow-destructive'].split(',') : [],
       adopt: Boolean(flags.adopt),
       history: Boolean(flags.history),
+      // under --json stdout carries the one envelope and nothing else, so what postLoad says goes unsaid
+      log: flags.json ? () => {} : undefined,
     });
-    console.log(answer.lines.join('\n'));
+    if (flags.json) {
+      const diag = diagnosticsOf(loaded, { items: answer.refusals }, { command: 'migrate', root: rootArg(0) });
+      console.log(printed(withMigration(diag, answer)));
+    } else console.log(answer.lines.join('\n'));
     if (answer.code) process.exit(answer.code);
   },
   ls: async ({ positional }) => {

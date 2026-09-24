@@ -5,7 +5,16 @@
  * when told, and tears the plugins down. It runs no startup step and builds no `Served`: nothing listens.
  */
 import { checkTree } from '@wilanis/compiler';
-import type { Applied, LoadResult, MigrateContext, Plan, PlanTarget, PluginModule } from '@wilanis/core';
+import type {
+  Applied,
+  LoadResult,
+  MigrateContext,
+  Plan,
+  PlanStep,
+  PlanTarget,
+  PluginModule,
+  Refusal,
+} from '@wilanis/core';
 import { FileBlobStore } from './blobs.js';
 import type { Embedder } from './embed.js';
 import { historyLines, summaryLine, targetLines } from './migrate-lines.js';
@@ -23,13 +32,34 @@ export interface MigrateOptions {
   log?: (line: string) => void;
 }
 
+/** One step as `--json` prints it: the plugin's step, why it did not apply where it did not, and whether it did. */
+export interface MigratedStep extends Omit<PlanStep, 'refused'> {
+  /** The plugin's reason, or the flag a destructive step nobody allowed needs; absent where the step may apply. */
+  refused?: string;
+  applied: boolean;
+}
+
+/** One connection's plan as `--json` prints it: the target, each step judged as the lines judge it. */
+export interface MigratedTarget extends Omit<PlanTarget, 'steps'> {
+  steps: MigratedStep[];
+}
+
 /** What one run of the command answers: the lines it printed and the code the process exits with. */
 export interface MigrateResult {
   lines: string[];
   /** 0 when the plan was empty or applied in full; 1 when a step was refused, not allowed, or a connection drifted. */
   code: 0 | 1;
   plan: Plan;
+  /** What was applied and recorded; under `--history`, every plan the record holds. */
   applied: Applied[];
+  /** The profile every plugin's migrate member was handed. */
+  profile: string;
+  /** Whether this run read the record (`--history`) rather than planning. */
+  history: boolean;
+  /** The plan's targets in the order printed, each step judged: refused or not, applied or not. */
+  targets: MigratedTarget[];
+  /** The checker's refusals of the tree, empty when it was accepted; a refused tree ran no plugin. */
+  refusals: Refusal[];
 }
 
 /** Whether the operator allowed a destructive step, by the pair of connection and target that names it. */
@@ -44,26 +74,56 @@ function ordered(plans: { plugin: PluginModule; plan: Plan }[]): { plugin: Plugi
     .sort((one, other) => one.target.connection.localeCompare(other.target.connection));
 }
 
+/** Why one step will not apply: the plugin's refusal, else the flag a destructive step needs; nothing where it may. */
+function blockedBy(step: PlanStep, connection: string, allowed: string[]): string | undefined {
+  if (step.refused) return step.refused;
+  if (step.class === 'destructive' && !allowing(connection, allowed)(step.target))
+    return `needs --allow-destructive ${connection}/${step.target}`;
+  return undefined;
+}
+
 /** Whether every step of a target may apply: a refused or unallowed step refuses the whole connection, since a plan is one transaction. */
 function applicable(target: PlanTarget, allowed: string[]): boolean {
   if (target.skipped || target.drifted?.length) return false;
-  const may = allowing(target.connection, allowed);
-  return target.steps.every(step => !step.refused && (step.class !== 'destructive' || may(step.target)));
+  return target.steps.every(step => !blockedBy(step, target.connection, allowed));
 }
 
 /** How many steps would apply and how many would not, over every target of a run. */
 function counted(targets: PlanTarget[], allowed: string[]): { would: number; refused: number } {
   let would = 0;
   let refused = 0;
-  for (const target of targets) {
-    const may = allowing(target.connection, allowed);
+  for (const target of targets)
     for (const step of target.steps) {
-      const blocked = step.refused || (step.class === 'destructive' && !may(step.target));
-      if (blocked) refused += 1;
+      if (blockedBy(step, target.connection, allowed)) refused += 1;
       else would += 1;
     }
-  }
   return { would, refused };
+}
+
+/** Every target as `--json` prints it, each step judged as its line is: why it was blocked, and whether it applied. */
+function judged(targets: PlanTarget[], opts: MigrateOptions): MigratedTarget[] {
+  const allowed = opts.allowDestructive ?? [];
+  return targets.map(target => {
+    const took = Boolean(opts.apply) && applicable(target, allowed);
+    const steps = target.steps.map(step => {
+      const { refused: _, ...rest } = step;
+      const refused = blockedBy(step, target.connection, allowed);
+      return { ...rest, ...(refused === undefined ? {} : { refused }), applied: took };
+    });
+    return { ...target, steps };
+  });
+}
+
+/** The profile a `migrate` member is handed: the flag's, else `default`. */
+const profileOf = (opts: MigrateOptions) => opts.profile ?? 'default';
+
+/** A run's answer: what it said and how it exits, over a run that planned nothing, applied nothing and was not refused. */
+function answered(
+  opts: MigrateOptions,
+  said: Pick<MigrateResult, 'lines' | 'code'> & Partial<MigrateResult>,
+): MigrateResult {
+  const empty = { plan: { targets: [] }, applied: [], targets: [], refusals: [] };
+  return { ...empty, profile: profileOf(opts), history: Boolean(opts.history), ...said };
 }
 
 /** The context every `migrate` member is handed: what postLoad saw, plus what the command line said. */
@@ -76,7 +136,7 @@ function contextOf(load: LoadResult, emb: Embedder, plugin: PluginModule, opts: 
     settings,
     env: emb.env,
     log: opts.log ?? (() => {}),
-    profile: opts.profile ?? 'default',
+    profile: profileOf(opts),
     allowDestructive: opts.allowDestructive ?? [],
     adopt: opts.adopt ?? false,
   };
@@ -98,7 +158,7 @@ async function printHistory(load: LoadResult, emb: Embedder, opts: MigrateOption
     }
   }
   if (!lines.length) lines.push('no migration has been applied to this tree');
-  return { lines, code: 0, plan: { targets: [] }, applied };
+  return answered(opts, { lines, code: 0, applied });
 }
 
 /** Ask every plugin for its plan and print the lot, ordered by connection path and steps in declaration order. */
@@ -169,15 +229,14 @@ function report(
  */
 export async function migrate(load: LoadResult, opts: MigrateOptions = {}): Promise<MigrateResult> {
   const log = opts.log ?? ((line: string) => console.log(line));
-  const judged = checkTree(load);
+  const checked = checkTree(load);
   // a tree that refuses runs nothing: a plan against documents the checker will not stand behind is a guess
-  if (!judged.ok)
-    return {
-      lines: [judged.format(), `\n${judged.items.length} refusal(s)`],
+  if (!checked.ok)
+    return answered(opts, {
+      lines: [checked.format(), `\n${checked.items.length} refusal(s)`],
       code: 1,
-      plan: { targets: [] },
-      applied: [],
-    };
+      refusals: checked.items,
+    });
   const emb = embedderFor(load, { profile: opts.profile });
   if (emb.missingSecrets.length) throw new Error(`missing secrets: ${emb.missingSecrets.join(', ')}`);
   const down = await postLoad(load, emb, log);
@@ -186,7 +245,8 @@ export async function migrate(load: LoadResult, opts: MigrateOptions = {}): Prom
     const targets = await planned(load, emb, opts);
     const applied = opts.apply ? await applying(load, emb, opts, targets) : [];
     const { lines, code } = report(targets, opts, applied);
-    return { lines, code, plan: { targets: targets.map(one => one.target) }, applied };
+    const plan = { targets: targets.map(one => one.target) };
+    return answered(opts, { lines, code, plan, applied, targets: judged(plan.targets, opts) });
   } finally {
     await down();
     if (emb.blobs instanceof FileBlobStore) emb.blobs.destroy();

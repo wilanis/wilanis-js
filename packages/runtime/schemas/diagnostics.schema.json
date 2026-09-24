@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/runtime/schemas/diagnostics.schema.json",
   "title": "diagnostics",
-  "description": "What `wilanis check --json`, `rehearse --json` and `regress --json` print (RFC 0019): one object on stdout, the checker's refusals as data, and beside them what the command computed. A refused tree prints this envelope whichever command was asked, with `command` saying which. From 1.0 a field is added, never removed or retyped; before 1.0 nothing is promised.",
+  "description": "What `wilanis check --json`, `rehearse --json`, `regress --json` and `migrate --json` print (RFC 0019, RFC 0017): one object on stdout, the checker's refusals as data, and beside them what the command computed. A refused tree prints this envelope whichever command was asked, with `command` saying which. From 1.0 a field is added, never removed or retyped; before 1.0 nothing is promised.",
   "type": "object",
   "required": ["format", "runtime", "command", "root", "ok", "documents", "refusals"],
   "properties": {
@@ -15,7 +15,7 @@
       "type": "string"
     },
     "command": {
-      "description": "The command that was asked: check, rehearse or regress. A refused tree says the one asked, not check.",
+      "description": "The command that was asked: check, rehearse, regress or migrate. A refused tree says the one asked, not check.",
       "type": "string"
     },
     "root": {
@@ -23,7 +23,7 @@
       "type": "string"
     },
     "ok": {
-      "description": "Whether the command passed: no refusal, and, for rehearse and regress, every branch settled or every scenario replayed the same. The exit code says the same thing: 0 when true, 1 when false.",
+      "description": "Whether the command passed: no refusal, and, for rehearse and regress, every branch settled or every scenario replayed the same; for migrate, no step refused or left unallowed and no connection drifted. The exit code says the same thing: 0 when true, 1 when false.",
       "type": "boolean"
     },
     "documents": {
@@ -55,8 +55,26 @@
       "type": "array",
       "items": { "$ref": "#/$defs/result" }
     },
+    "profile": {
+      "description": "migrate: the profile every plugin's migrate member was handed, which decides the connection settings it read.",
+      "type": "string"
+    },
+    "applied": {
+      "description": "migrate: whether any connection's plan was applied and recorded on this run; false without --apply.",
+      "type": "boolean"
+    },
+    "targets": {
+      "description": "migrate: every connection a plugin planned, ordered by connection path as printed, its steps in the order the plugin declared them.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/migrationTarget" }
+    },
+    "migrations": {
+      "description": "migrate --history: every plan the record holds as applied, latest first as each plugin gives them; empty when none was.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/migration" }
+    },
     "lines": {
-      "description": "rehearse and regress: the words the command prints without --json, from the same objects as the fields beside them.",
+      "description": "rehearse, regress and migrate: the words the command prints without --json, from the same objects as the fields beside them.",
       "type": "array",
       "items": { "type": "string" }
     }
@@ -309,6 +327,116 @@
         },
         "diffs": {
           "description": "Each difference in words, empty when same: the status, the output, and every node that changed, went or is new.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "migrationTarget": {
+      "description": "One connection's plan: what is behind it, and what would be done to it or why nothing would.",
+      "type": "object",
+      "required": ["connection", "engine", "steps"],
+      "properties": {
+        "connection": {
+          "description": "The canonical path of the connection the plan is against.",
+          "type": "string"
+        },
+        "engine": {
+          "description": "What is behind the connection, in the plugin's words, for the operator to read.",
+          "type": "string"
+        },
+        "skipped": {
+          "description": "Why the connection was not planned at all; a skipped connection is not a failure and leaves ok as it is.",
+          "type": "string"
+        },
+        "drifted": {
+          "description": "What the world holds that the record does not agree with, one line each; a drifted connection plans nothing and makes ok false.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "notes": {
+          "description": "What the plugin has to say about the connection that is not a change to make; printed and judged by nothing.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "steps": {
+          "description": "The steps, in the order the plugin declared them; empty when the connection is up to date, skipped or drifted.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/migrationStep" }
+        }
+      }
+    },
+    "migrationStep": {
+      "description": "One thing the plan would do to the world, judged: whether it may apply, and whether it did.",
+      "type": "object",
+      "required": ["do", "target", "class", "says", "applied"],
+      "properties": {
+        "do": {
+          "description": "The verb, in the plugin's words: what would be done.",
+          "type": "string"
+        },
+        "target": {
+          "description": "What it would be done to, in the plugin's words.",
+          "type": "string"
+        },
+        "at": {
+          "description": "The part of the target it is about, where it is about one.",
+          "type": "string"
+        },
+        "class": {
+          "description": "additive always applies; transformative applies under --apply; destructive needs --allow-destructive naming its connection and target.",
+          "enum": ["additive", "transformative", "destructive"]
+        },
+        "says": {
+          "description": "The one line an operator reads to know what the step does. Its wording is not promised.",
+          "type": "string"
+        },
+        "loses": {
+          "description": "What the step would destroy, said plainly, where it would destroy anything.",
+          "type": "string"
+        },
+        "rows": {
+          "description": "How many rows the step touches, where the plugin counted them.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "refused": {
+          "description": "Why the step will not apply: the plugin's reason, or `needs --allow-destructive <connection>/<target>` for a destructive step nobody allowed. Absent where it may apply. A refused step refuses its whole connection, since a plan is one transaction.",
+          "type": "string"
+        },
+        "applied": {
+          "description": "Whether the step was applied on this run: under --apply, and only where no step of its connection was refused.",
+          "type": "boolean"
+        }
+      }
+    },
+    "migration": {
+      "description": "One plan that was applied, as the world records it.",
+      "type": "object",
+      "required": ["id", "appliedAt", "by", "tree", "connection", "targets"],
+      "properties": {
+        "id": {
+          "description": "The migration's number in the record of its connection.",
+          "type": "integer"
+        },
+        "appliedAt": {
+          "description": "When it was applied, as the plugin recorded it.",
+          "type": "string"
+        },
+        "by": {
+          "description": "Who ran it, as the plugin recorded them.",
+          "type": "string"
+        },
+        "tree": {
+          "description": "The tree the plan came from: project.json → name.",
+          "type": "string"
+        },
+        "connection": {
+          "description": "The connection it was applied to; each connection applies in its own transaction and records its own migration.",
+          "type": "string"
+        },
+        "targets": {
+          "description": "The targets it touched, in the plugin's words.",
           "type": "array",
           "items": { "type": "string" }
         }
