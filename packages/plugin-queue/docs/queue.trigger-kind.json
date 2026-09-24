@@ -4,6 +4,7 @@
   "description": "A message on a queue, consumed while a startup step names @queue/worker.port.json#consume. The body is decoded as JSON into request.message (typed by settings.message); the message's headers, its id, the queue and how many times it has been delivered are in the context too, and the guarding plugin adds the caller it identified from a credential the trigger reads out of the headers. The trigger's input mapping picks what the graph gets; its policies decide before the graph runs. The answer is judged against out and recorded; nobody receives it. A refusal is acknowledged, retried or dead-lettered as settings.outcomes maps its reason; every reason the trigger can reach must be mapped (T005). A fault becomes settings.onFault, retry by default. A retry past maxAttempts is dead. A message whose input does not conform is dead at once, since delivering it again cannot help.",
   "connection": "connection",
   "refusals": "outcomes",
+  "correlation": "headers.traceparent",
   "settings": {
     "fields": {
       "connection": {
