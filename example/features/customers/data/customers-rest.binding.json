@@ -20,10 +20,17 @@
     "get": {
       "graph": "@customers/data/get-row.graph.json"
     },
+    "nextId": {
+      "graph": "@customers/data/row-key.graph.json"
+    },
     "register": {
       "graph": "@customers/data/create-row.graph.json"
     },
     "update": {
+      "description": "The business graph that loads the customer, lays the change over them, and keeps the result whole.",
+      "graph": "@customers/domain/update-customer.graph.json"
+    },
+    "keep": {
       "graph": "@customers/data/update-row.graph.json"
     },
     "remove": {

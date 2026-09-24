@@ -73,12 +73,12 @@ describe('describe: an access invariant that names the policy', () => {
 
   it('gives every way in, not only the one a refusal would name first', () => {
     // the checker stops at the first covered operation a trigger reaches, since one is enough to refuse; a
-    // reader has opened the invariant and is owed all of them. Nine ways in, across five trigger lines.
+    // reader has opened the invariant and is owed all of them. Ten ways in, across five trigger lines.
     const ways = said()
       .split('\n')
       .filter(line => line.includes('.trigger.json  #'))
       .flatMap(line => line.slice(line.indexOf('  #') + 2).split(', '));
-    expect(ways).toHaveLength(9);
+    expect(ways).toHaveLength(10);
   });
 
   it("names an operation reached through another, which is the RFC's own reason for the rule", () => {
@@ -240,7 +240,7 @@ describe('describe: one trigger meeting nothing among others that do', () => {
       '    @features/customers/edge/delete-customer.trigger.json  #remove  -- met by nothing, which I001 refuses',
     );
     expect(said()).toContain(
-      `    @features/customers/edge/update-customer.trigger.json  #update  -- met by ${CAN_RECORD}`,
+      `    @features/customers/edge/update-customer.trigger.json  #update, #keep (through #update)  -- met by ${CAN_RECORD}`,
     );
   });
 });

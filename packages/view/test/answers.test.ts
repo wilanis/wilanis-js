@@ -110,10 +110,17 @@ describe('how the viewer says a refusal is answered', () => {
   it('tells a refusing node which triggers reach it and how each answers its reason', async () => {
     const missing = (await view(GET_ROW)).graph!.nodes.find(node => node.id === 'noCustomer')!;
     expect(missing.target?.refuses).toBe(true);
+    // PUT /customers/{id} reaches it too: update loads the customer through get before it lays the change over them
     expect(missing.answeredBy).toEqual([
       {
         trigger: '@features/customers/edge/get-customer.trigger.json',
         triggerLabel: 'GET /customers/{id}',
+        maps: true,
+        answer: 404,
+      },
+      {
+        trigger: '@features/customers/edge/update-customer.trigger.json',
+        triggerLabel: 'PUT /customers/{id}',
         maps: true,
         answer: 404,
       },

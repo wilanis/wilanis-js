@@ -150,7 +150,7 @@ describe('describe: the engine behind a store', () => {
   it('names every graph that runs an operation against it, with the operation and the collection', () => {
     expect(said()).toContain('run against by (the operation each runs):');
     expect(said()).toContain('    @features/customers/data/kept-get.graph.json#storedCustomer  get (customers)');
-    expect(said()).toContain('    @features/customers/data/store-and-latest.graph.json#key  newKey (customers)');
+    expect(said()).toContain('    @features/customers/data/next-id.graph.json#key  newKey (customers)');
     expect(said()).toContain('    @features/customers/data/store-and-latest.graph.json#stored  put (customers)');
     expect(said()).toContain('    @features/customers/data/store-and-latest.graph.json#latest  put (latest)');
   });

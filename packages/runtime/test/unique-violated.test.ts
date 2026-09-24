@@ -85,7 +85,7 @@ describe('registering a customer the store already keeps', () => {
   });
 
   it('two rows of one email answer 409 as conflict, naming the unique they repeat, and register nothing', async () => {
-    const answer = await imported(['Bo,bo@twice.example,silver', 'Bo again,bo@twice.example,gold']);
+    const answer = await imported(['Bo,bo@twice.example,silver', 'Bo again,bo@twice.example,bronze']);
     expect(answer).toEqual({
       status: 409,
       body: {

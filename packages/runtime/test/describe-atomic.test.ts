@@ -40,12 +40,12 @@ describe('describe: a data graph whose effects move together', () => {
   });
 
   it('names the nodes that take part, in the order the document writes them', () => {
-    // key, stored and latest run @storage operations; route, row and failed reach no store at all
-    expect(said()).toContain('    taken part in by  key, stored, latest');
+    // stored and latest run @storage operations; tierLatest, bothWritten and customer reach no store at all
+    expect(said()).toContain('    taken part in by  stored, latest');
   });
 
   it('says none of it of a graph that does not declare it, however many effects it reaches', () => {
-    expect(describeDoc(example, '@customers/data/kept-update.graph.json')).not.toContain('atomic:');
+    expect(describeDoc(example, '@customers/data/keep-customer.graph.json')).not.toContain('atomic:');
   });
 });
 
@@ -75,8 +75,9 @@ describe('describe: an operation that can take part in one', () => {
 });
 
 describe('map: where the tree names an atomic graph', () => {
-  // kept-update is the one atomic-able graph the map's walk reaches, since it walks what a trigger fires
-  const marked = loadedEditing('features/customers/data/kept-update.graph.json', (doc: any) => {
+  // update-customer is a graph the map's walk reaches and that says nothing of atomic, since the walk follows what a
+  // trigger fires, through the bindings, one graph down
+  const marked = loadedEditing('features/customers/domain/update-customer.graph.json', (doc: any) => {
     doc.atomic = true;
   });
   afterAll(() => {
@@ -84,13 +85,17 @@ describe('map: where the tree names an atomic graph', () => {
   });
 
   it('marks it where a binding leads to it, so the transaction is seen without opening the document', () => {
-    const lines = map(marked.load).filter(line => line.trim().startsWith('@features/customers/data/kept-update.'));
+    const lines = map(marked.load).filter(line =>
+      line.trim().startsWith('@features/customers/domain/update-customer.'),
+    );
     expect(lines.length).toBeGreaterThan(0);
     for (const line of lines) expect(line).toContain('[atomic]');
   });
 
   it('marks only the graph that says so', () => {
-    expect(map(marked.load).filter(line => line.includes('[atomic]') && !line.includes('kept-update.'))).toEqual([]);
+    expect(
+      map(marked.load).filter(line => line.includes('[atomic]') && !line.includes('update-customer.graph')),
+    ).toEqual([]);
   });
 
   it('does not make it an orphan: a mark beside the path is not a different path', () => {

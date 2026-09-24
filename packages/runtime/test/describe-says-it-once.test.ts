@@ -70,7 +70,7 @@ describe('describe: no kind answers with the document as JSON', () => {
 
   it('says what a graph does, its nodes among them, rather than printing the graph', () => {
     const said = describeDoc(example, '@customers/data/store-and-latest.graph.json');
-    expect(said).toContain('takes   @customers/domain/CustomerRecord.shape.json');
+    expect(said).toContain('takes   @customers/domain/Customer.shape.json');
     // `customer` is guarded, so the graph also answers with the guard's refusal and whatever routed `customer` routes
     // the node it moved aside to: the lines say the graph a run walks, not the one the file spells
     expect(said).toContain(
@@ -136,8 +136,10 @@ describe('describe: a port names the shape it works in once', () => {
     expect(said()).toContain('    returns a list of them');
   });
 
-  it('names the path twice at most, where it named it twelve times', () => {
-    expect(said().split('@features/customers/domain/Customer.shape.json')).toHaveLength(3);
+  it('names the path only where an operation takes it, where it named it twelve times', () => {
+    // once hoisted over every answer, and once for each of register and keep, which take a customer whole, and
+    // toCsv, which takes a list of them: what an operation takes is its own line and is never hoisted
+    expect(said().split('@features/customers/domain/Customer.shape.json')).toHaveLength(5);
   });
 
   it('leaves every operation answering in something else naming its own, so nothing is lost', () => {

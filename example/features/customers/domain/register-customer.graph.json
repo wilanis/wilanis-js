@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Register a customer",
-  "description": "Domain graph behind POST /customers: every customer registered through this API is attributed to this registrar; the domain decides that, not the client.",
+  "description": "Domain graph behind POST /customers: every customer registered through this API is attributed to this registrar; the domain decides that, not the client. The customer is made whole here, under a key nextId gave, before anything is written, so the invariant over Customer is judged on 'customer' and 'registered' never runs when it does not hold.",
   "constants": {
     "registrar": {
       "type": "string",
@@ -17,14 +17,39 @@
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
+      "id": "id",
+      "label": "A key for them",
+      "run": "@customers/domain/customer.port.json#nextId"
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "customer",
+      "label": "Who they are",
+      "run": "@std/object.port.json#make",
+      "in": {
+        "value": {
+          "id": "{{id}}",
+          "name": "{{in.name}}",
+          "email": "{{in.email}}",
+          "tier": "{{in.tier}}",
+          "registrar": "{{const.registrar}}"
+        },
+        "type": "@customers/domain/Customer.shape.json"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
       "id": "registered",
       "label": "Store them",
       "run": "@customers/domain/customer.port.json#register",
       "in": {
-        "name": "{{in.name}}",
-        "email": "{{in.email}}",
-        "tier": "{{in.tier}}",
-        "registrar": "{{const.registrar}}"
+        "id": "{{customer.id}}",
+        "name": "{{customer.name}}",
+        "email": "{{customer.email}}",
+        "tier": "{{customer.tier}}",
+        "registrar": "{{customer.registrar}}",
+        "active": "{{customer.active}}",
+        "note": "{{customer.note}}"
       }
     }
   ]

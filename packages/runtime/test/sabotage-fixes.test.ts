@@ -111,7 +111,7 @@ const misdelegated = editing(REST, binding => {
 
 /** The registrar invariant covering a misspelled `submit`, through the alias the example writes it with. */
 const miscovered = editing(WRITES, invariant => {
-  invariant.access.over[4] = '@customers/domain/customer.port.json#submt';
+  invariant.access.over[5] = '@customers/domain/customer.port.json#submt';
 });
 
 describe('sabotage: R001 fixes', () => {
@@ -133,7 +133,7 @@ describe('sabotage: R001 fixes', () => {
     expect(delegated.fixes).toEqual([{ file: REST, at: 'operations/prepare/run', set: REQUEST }]);
     const [covered] = r001After(miscovered);
     expect(covered.fixes).toEqual([
-      { file: WRITES, at: 'access/over/4', set: '@customers/domain/customer.port.json#submit' },
+      { file: WRITES, at: 'access/over/5', set: '@customers/domain/customer.port.json#submit' },
     ]);
   });
   it('R001 applying the fix at a binding or an invariant leaves nothing refused', () => {

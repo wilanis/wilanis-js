@@ -13,6 +13,7 @@ import { fuzz, regress } from '../src/index.js';
 import { copyOfExample, INCLUDES, PLUGINS, planted, plantedPointing } from './example-harness.js';
 
 const TRIGGER = '@features/customers/edge/get-customer.trigger.json';
+const UPDATE = '@features/customers/edge/update-customer.trigger.json';
 const GRAPH = 'features/customers/data/get-row.graph.json';
 const SCENARIO = 'scenarios/get-customer.1.scenario.json';
 const read = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
@@ -89,9 +90,13 @@ describe('fuzz writes no scenario of a fault', () => {
     editRefusal(dir, '{{fetched.status}}');
     const fuzzed = await fuzz(loadTree(dir, PLUGINS, INCLUDES), { runs: 1, profile: 'live' });
     expect(fuzzed.ok).toBe(false);
-    expect(fuzzed.lines).toHaveLength(1);
+    // get-row is behind GET /customers/{id}, and behind PUT /customers/{id} too, which loads the customer before
+    // it lays the change over them: each trigger that reaches the fault says so, and neither writes a scenario
+    expect(fuzzed.lines).toHaveLength(2);
     expect(fuzzed.lines[0]).toMatch(new RegExp(`^${TRIGGER} under seed 1: FAULT at 'op': .+`));
+    expect(fuzzed.lines[1]).toMatch(new RegExp(`^${UPDATE} under seed 1: FAULT at 'op': .+`));
     expect(fuzzed.written.some(file => file.endsWith('get-customer.1.scenario.json'))).toBe(false);
+    expect(fuzzed.written.some(file => file.endsWith('update-customer.1.scenario.json'))).toBe(false);
     expect(fuzzed.written.length).toBeGreaterThan(0);
     rmSync(dir, { recursive: true, force: true });
   });

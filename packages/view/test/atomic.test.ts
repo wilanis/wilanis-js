@@ -42,7 +42,7 @@ describe('the view model of an atomic data graph', () => {
 
   it('marks the nodes that take part, and only those', () => {
     const nodes = view(LATEST).graph!.nodes;
-    expect(nodes.filter(node => node.participates).map(node => node.id)).toEqual(['key', 'stored', 'latest']);
+    expect(nodes.filter(node => node.participates).map(node => node.id)).toEqual(['stored', 'latest']);
     // bothWritten is a switch, customer makes an object, nothingWritten refuses: none of them reaches the store
     for (const id of ['in', 'bothWritten/1', 'customer', 'nothingWritten', 'out']) {
       expect(nodes.find(node => node.id === id)?.participates).toBeUndefined();
@@ -50,7 +50,7 @@ describe('the view model of an atomic data graph', () => {
   });
 
   it('carries nothing on a graph that does not declare it, however many effects it reaches', () => {
-    const plain = view('@features/customers/data/kept-update.graph.json').graph!;
+    const plain = view('@features/customers/data/keep-customer.graph.json').graph!;
     expect(plain.atomic).toBeUndefined();
     expect(plain.nodes.every(node => node.participates === undefined)).toBe(true);
   });

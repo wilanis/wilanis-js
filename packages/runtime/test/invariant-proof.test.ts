@@ -239,7 +239,7 @@ describe('the proof rules of a field invariant', () => {
       const guarded = sites.filter(site =>
         [...heldAt(scope, sites, site, when).values()].some(proof => proof.by === 'guarded'),
       );
-      expect([sites.length, guarded.length]).toEqual([16, 16]);
+      expect([sites.length, guarded.length]).toEqual([23, 23]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

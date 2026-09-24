@@ -173,9 +173,16 @@ describe('withRehearsal and withRegression: what rehearse and regress computed, 
       'sign-out',
     ]);
     for (const branch of all) {
+      // a guard an enclosing graph already judged on this path is held there and never run (RFC 0035): under live,
+      // update-row's in:check behind update-customer's customer:check, which says where it was held, not how it settled
+      if (branch.held) {
+        expect(branch.settled).toBeUndefined();
+        continue;
+      }
       expect(branch.settled).toMatchObject({ status: expect.any(String), blocked: expect.any(Boolean) });
       expect(branch.settled).not.toHaveProperty('ms');
     }
+    expect(all.some(branch => branch.held)).toBe(true);
     expect(JSON.stringify(withRehearsal(checked(loaded, 'rehearse'), await run()))).toBe(JSON.stringify(envelope));
   });
 

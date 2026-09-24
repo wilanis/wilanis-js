@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Create a row",
-  "description": "Data graph behind customer.register: POST the record, take the row the API answers with 201. The caller's own user agent is forwarded to the API as a header; the row itself is attributed to the registrar the domain chose.",
+  "description": "Data graph behind customer.register over the REST API: POST the customer, take the row the API answers with 201. The customer arrives made whole in the domain; the API names a row's key itself, so the record sent is who they are and who registered them, and the row answered carries the key the API gave. The caller's own user agent is forwarded to the API as a header.",
   "reads": {
     "agent": "@customers/edge/request.resolvers.json#agent"
   },
@@ -17,7 +17,7 @@
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "posted",
-      "label": "POST the record",
+      "label": "POST the customer",
       "run": "@http/http.port.json#request",
       "in": {
         "body": "{{in}}",

@@ -26,11 +26,11 @@ export const RESOLVERS = 'features/customers/edge/request.resolvers.json';
 export const POSTGRES_STORE = 'features/customers/data/customers-postgres.store.json';
 /** The session shape the guard's settings.session names, in the included access tree. */
 export const SESSION = 'features/access/domain/Session.shape.json';
-/** The data graphs over the collection: one read by key, one find, the find over the view, and the write that mints a key first. */
+/** The data graphs over the collection: one read by key, one find, the find over the view, and the one that mints a key. */
 export const GET = 'features/customers/data/kept-get.graph.json';
 export const LIST = 'features/customers/data/kept-list.graph.json';
 export const LIST_EVERY = 'features/customers/data/kept-list-every.graph.json';
-export const WRITE = 'features/customers/data/store-and-latest.graph.json';
+export const NEXT_ID = 'features/customers/data/next-id.graph.json';
 /** The two triggers whose policies prove the scope's read and open the view: one per rule a policy answers. */
 export const GET_TRIGGER = 'features/customers/edge/get-customer.trigger.json';
 export const DIGEST_TRIGGER = 'features/customers/edge/digest.trigger.json';

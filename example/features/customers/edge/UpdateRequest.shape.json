@@ -16,6 +16,11 @@
     "tier": {
       "type": "string",
       "enum": ["bronze", "silver", "gold"]
+    },
+    "note": {
+      "type": "string",
+      "required": false,
+      "description": "why the customer is of their tier; a gold customer carries one"
     }
   }
 }

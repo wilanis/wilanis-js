@@ -1,0 +1,48 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "Update a customer",
+  "description": "Domain graph behind customer.update: load the customer, lay the change over them, and keep the result whole. The customer is made here, before anything is written, so the invariant over Customer is judged on 'customer' and 'kept' never runs when it does not hold. A note the caller did not send stays whatever it was, since the change lays only the fields it has.",
+  "in": "@customers/domain/CustomerUpdate.shape.json",
+  "out": {
+    "type": "@customers/domain/Customer.shape.json",
+    "from": "kept"
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "current",
+      "label": "The customer as kept",
+      "description": "refuses missing where there is no such customer, as customer.get does",
+      "run": "@customers/domain/customer.port.json#get",
+      "in": {
+        "id": "{{in.id}}"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "customer",
+      "label": "Who they now are",
+      "run": "@std/object.port.json#merge",
+      "in": {
+        "base": "{{current}}",
+        "over": "{{in}}",
+        "type": "@customers/domain/Customer.shape.json"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "kept",
+      "label": "Keep them",
+      "run": "@customers/domain/customer.port.json#keep",
+      "in": {
+        "id": "{{customer.id}}",
+        "name": "{{customer.name}}",
+        "email": "{{customer.email}}",
+        "tier": "{{customer.tier}}",
+        "registrar": "{{customer.registrar}}",
+        "active": "{{customer.active}}",
+        "note": "{{customer.note}}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "Keep a customer",
+  "description": "Data graph behind customer.keep under the production profile: write the record whole, under its own key. The customer arrived made; what this graph adds is the store. The record is read whole from in, so the invariant over Customer is judged where it is taken, before the write, whoever the caller is. The same graph as @customers/data/keep-customer.graph.json, against the store kept in PostgreSQL: a store is named statically at a call site, so pointing these at another connection is a copy until a profile may swap one.",
+  "in": "@customers/domain/Customer.shape.json",
+  "out": {
+    "type": "@customers/domain/Customer.shape.json",
+    "from": [
+      "kept",
+      "repeated",
+      "nothingWritten"
+    ]
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "stored",
+      "label": "Write the record",
+      "run": "@storage/store.port.json#put",
+      "in": {
+        "store": "@customers/data/customers-postgres.store.json",
+        "collection": "customers",
+        "record": "{{in}}"
+      }
+    },
+    {
+      "type": "@wilanis/node/switch.schema.json",
+      "id": "outcome",
+      "label": "Was it written, or did a constraint stop it?",
+      "in": {
+        "record": "{{stored.record}}",
+        "violated": "{{stored.violated}}"
+      },
+      "rules": [
+        {
+          "when": "has(violated)",
+          "to": "repeated"
+        },
+        {
+          "when": "has(record)",
+          "to": "kept"
+        }
+      ],
+      "else": "nothingWritten"
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "kept",
+      "label": "The record as kept",
+      "run": "@std/object.port.json#make",
+      "in": {
+        "value": "{{stored.record}}",
+        "type": "@customers/domain/Customer.shape.json"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "repeated",
+      "label": "Another customer holds that address",
+      "description": "The store honoured the unique [email] it declares and wrote nothing: a conflict with what is kept, refused as one.",
+      "run": "@std/outcome.port.json#refuse",
+      "in": {
+        "reason": "conflict",
+        "message": "a customer already uses {{in.email}} ({{stored.violated}})",
+        "type": "@customers/domain/Customer.shape.json"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "nothingWritten",
+      "label": "Nothing was written",
+      "description": "The store answered neither a record nor a violated constraint, which no engine promises to do.",
+      "run": "@std/outcome.port.json#refuse",
+      "in": {
+        "reason": "upstream",
+        "message": "the store answered no record for {{in.id}}",
+        "type": "@customers/domain/Customer.shape.json"
+      }
+    }
+  ]
+}

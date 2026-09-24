@@ -51,11 +51,11 @@ describe('sabotage: the project, its plugins and its startup', () => {
   it('B005 an operation that takes a shape, bound to a graph whose in is a shape it does not fit', () => {
     const at = 'B005 @features/customers/data/customers-store.binding.json#operations/update/graph';
     const takingIn = (shape: string) =>
-      sabotagePointing('features/customers/data/kept-update.graph.json', graph => {
+      sabotagePointing('features/customers/domain/update-customer.graph.json', graph => {
         graph.in = `@customers/domain/${shape}.shape.json`;
       });
-    // update takes CustomerUpdate, which says nothing of who registered the customer: CustomerRecord requires it
-    expect(takingIn('CustomerRecord')).toContain(at);
+    // update takes CustomerUpdate, which says nothing of the customer a tier's latest names: TierLatest requires it
+    expect(takingIn('TierLatest')).toContain(at);
     // the shape's type is compared as an object type is, field by field: every field Customer adds is optional
     expect(takingIn('Customer')).not.toContain(at);
   });

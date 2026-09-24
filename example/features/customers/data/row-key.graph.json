@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "No key before the row",
+  "description": "Data graph behind customer.nextId over the REST API: the API names a row's key itself when it creates the row, and offers no way to ask for one before, so this answers the empty key. The customer the domain makes with it is judged whole all the same, since no rule over a customer reads its id, and create-row sends everything but the key and answers the row under the one the API gave.",
+  "constants": {
+    "unnamed": {
+      "type": "string",
+      "value": "",
+      "description": "the key a customer carries until the API names one"
+    }
+  },
+  "out": {
+    "type": "string",
+    "from": "key"
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "key",
+      "label": "The key the API has not named yet",
+      "run": "@std/object.port.json#make",
+      "in": {
+        "value": "{{const.unnamed}}",
+        "type": "string"
+      }
+    }
+  ]
+}

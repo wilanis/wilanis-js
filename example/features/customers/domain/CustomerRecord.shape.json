@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
   "label": "Customer record",
   "layer": "core",
-  "description": "What customer.register takes: a draft plus the registrar the domain chose.",
+  "description": "A customer as the customer API is sent one when it creates the row: who they are and who registered them, without the key, which the API gives the row itself.",
   "fields": {
     "name": {
       "type": "string"
@@ -11,11 +11,12 @@
       "type": "string"
     },
     "tier": {
-      "type": "string",
-      "enum": ["bronze", "silver", "gold"]
+      "type": "string"
     },
     "registrar": {
-      "type": "string"
+      "type": "string",
+      "required": false,
+      "description": "who registered this customer"
     }
   }
 }

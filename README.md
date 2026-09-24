@@ -126,6 +126,7 @@ the rule out loud, in a file of its own:
     "over": [
       "@customers/domain/customer.port.json#register",
       "@customers/domain/customer.port.json#update",
+      "@customers/domain/customer.port.json#keep",
       "@customers/domain/customer.port.json#remove",
       "@customers/domain/customer.port.json#removeMany",
       "@customers/domain/customer.port.json#submit",
