@@ -3,9 +3,9 @@
  * profile from `reachOf` -- binds, stands in, reaches, holds, starts, needs -- and `describe <connection>` says
  * what a connection stands in for, or what replaces it, and under which profile.
  *
- * The example as written declares three profiles and no stand-in, so a copy adds what it lacks: `live` marked the
- * default, a `staging` profile whose customers API is a stand-in reading a key of its own, and the watcher run
- * under `live` alone.
+ * The example as written declares three profiles, `live` the default, and no stand-in, so a copy adds what it
+ * lacks: a `staging` profile whose customers API is a stand-in reading a key of its own, and the watcher run under
+ * `live` alone.
  */
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -19,7 +19,7 @@ const API = '@connections/customers-api.connection.json';
 const STAGING_API = '@connections/customers-api-staging.connection.json';
 const example = loadTree(EXAMPLE, PLUGINS, INCLUDES);
 
-/** The example with a default, a stand-in under `staging`, and a step run under `live` alone. */
+/** The example with a stand-in under `staging`, and a step run under `live` alone. */
 function withStandIn(): string {
   const dir = copyOfExample();
   const api = JSON.parse(readFileSync(join(dir, 'connections/customers-api.connection.json'), 'utf8'));
@@ -27,7 +27,6 @@ function withStandIn(): string {
   api.settings = { ...api.settings, headers: { 'x-api-key': '{{secrets.customerKey}}' } };
   writeFileSync(join(dir, 'connections/customers-api-staging.connection.json'), JSON.stringify(api));
   const project = JSON.parse(readFileSync(join(dir, 'project.json'), 'utf8'));
-  project.profiles.live.default = true;
   project.profiles.staging = {
     description: 'The live bindings against the staging API.',
     bindings: project.profiles.live.bindings,
@@ -81,11 +80,16 @@ describe('wilanis describe project.json: a block per profile', () => {
     expect(production.some(line => line.startsWith('  stands in'))).toBe(false);
   });
 
-  it('marks the default on its first line, and says what a stand-in replaces', () => {
-    expect(checkTree(standing).items).toEqual([]);
-    const said = describeDoc(standing, 'project.json');
+  it('marks the default on its first line, and no other profile', () => {
+    const said = describeDoc(example, 'project.json');
     expect(block(said, 'live')[0]).toMatch(/^profile live {2}\(default\) {2}-- /);
     expect(block(said, 'local')[0]).not.toContain('(default)');
+    expect(block(said, 'production')[0]).not.toContain('(default)');
+  });
+
+  it('says what a stand-in replaces, and reaches it in its place', () => {
+    expect(checkTree(standing).items).toEqual([]);
+    const said = describeDoc(standing, 'project.json');
     const staging = block(said, 'staging');
     expect(staging).toContain(`  stands in  ${API}  → ${STAGING_API}`);
     expect(staging).toContain(`             @http/http.port.json#request  via ${STAGING_API}`);

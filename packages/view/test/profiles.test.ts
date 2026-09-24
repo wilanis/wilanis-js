@@ -35,7 +35,6 @@ describe("the project page's profiles", () => {
   it('marks the default, and starts under a profile only the steps that run there', () => {
     const project = scopedView('@project.json', {
       'project.json': doc => {
-        doc.profiles.live.default = true;
         doc.startup.find((step: any) => step.label === 'Watch for changes').profiles = ['live'];
       },
     });
