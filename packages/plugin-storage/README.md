@@ -98,6 +98,19 @@ rather than from a driver's error text. What "being an engine" means is executab
 `@wilanis/plugin-storage/suite` exports the cases every engine must answer alike, as plain `{ name, run }`
 pairs your own `it` can run -- the constraint cases among them.
 
+An engine whose connection kind also declares `"leases": true` keeps the hold `@schedule` takes for a tick on
+several instances. It implements `Leases` from this package -- `acquire`, `release`, `lastFired`, `markFired` --
+and registers it from the same `postLoad`, beside the engine, through `leases(env)`:
+
+```
+leases(ctx.env).register('@your-engine/your.connection-kind.json', makeKeeper(ctx));
+```
+
+`@wilanis/plugin-storage-postgres` does this with `TableLeases`, one row per trigger in `wilanis_schedule`.
+Whether a hold has expired is judged by the database's clock, never the process's: `TableLeases` asks `now()` of
+the server every instance shares, so two instances whose clocks drift still agree on who holds a tick. That is
+what the postgres engine promises, and what a keeper of another store should promise too.
+
 Every operation is an effect, so each lives in a data graph and is listed in the feature's `effects`. A
 rehearsal stubs them and reaches no engine at all.
 
