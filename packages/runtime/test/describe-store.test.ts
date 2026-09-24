@@ -119,11 +119,12 @@ const KEPT = '@features/customers/data/customers.store.json';
 
 describe('ls: the stores of a tree', () => {
   it('lists a store under its kind, as every other kind is listed', () => {
-    // two, since the example keeps its customers in memory under one profile and in PostgreSQL under another,
-    // and a profile swaps bindings rather than connections
+    // the customers twice, since the example keeps them in memory under one profile and in PostgreSQL under
+    // another, and a profile swaps bindings rather than connections; and the guard's memory under production
     expect(ls(example, 'store')).toEqual([
       'store            @features/customers/data/customers-postgres.store.json',
       `store            ${KEPT}`,
+      'store            @features/state/data/auth.store.json',
     ]);
   });
 

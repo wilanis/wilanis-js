@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/store.schema.json",
+  "label": "The guard's memory",
+  "description": "Sessions and challenges of the @auth plugin, kept in production's one database beside the customers, so every instance behind the load balancer reads the session another wrote. Only the production profile binds state.port.json to this store; the laptop's profiles keep one file per record under .wilanis/auth.",
+  "connection": "@connections/customers-postgres.connection.json",
+  "collections": {
+    "sessions": {
+      "description": "one session per sign-in, keyed by the sid its tokens carry; the guard ends one whose refresh has expired when it next reads it",
+      "of": "@auth/SessionRecord.shape.json",
+      "key": "id"
+    },
+    "challenges": {
+      "description": "one open challenge per gated call awaiting a code; the guard removes it once answered, expired or out of attempts",
+      "of": "@auth/ChallengeRecord.shape.json",
+      "key": "id"
+    }
+  }
+}

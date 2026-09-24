@@ -290,9 +290,14 @@ stop verifying and the cookie is cleared.
 
 Where the sessions and the challenges themselves are kept is a binding too. `features/state` meets the
 plugin's `state.port.json` with one JSON file each under `.wilanis/auth/`, which is what lets a server and
-the `wilanis run` calls of the one-time code flow share them. Many instances would bind that port to a store
-instead. A startup step reads one session through it before the port opens, so a tree whose memory is
-unreachable refuses to serve rather than refusing every signed-in caller.
+the `wilanis run` calls of the one-time code flow share them. That is the laptop's binding, under `live` and
+`local`. Production runs behind a load balancer, where a caller who signs in on one instance sends the next
+request to another, so `production` binds the same port to `auth-storage.binding.json` instead: sessions and
+challenges are records of `auth.store.json`, two collections of the shapes `@auth` grants, kept in the
+database the customers use. Not one document the guard reads changes. A startup step under `production`
+alone, `memory.port.json#prepare`, creates the two collections before anything reads them, and a step under
+every profile reads one session before the port opens, so a tree whose memory is unreachable refuses to serve
+rather than refusing every signed-in caller.
 
 ## The one-time code
 

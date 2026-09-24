@@ -1,0 +1,50 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/binding.schema.json",
+  "label": "The guard's memory in a store",
+  "description": "Sessions and challenges as records of auth.store.json: every instance of the tree sees the same ones, so a caller who signs in on one instance is recognised by the next. The production profile binds state.port.json here; key and record pass through by name.",
+  "port": "@auth/state.port.json",
+  "operations": {
+    "getSession": {
+      "run": "@storage/store.port.json#get",
+      "in": {
+        "store": "@features/state/data/auth.store.json",
+        "collection": "sessions"
+      }
+    },
+    "putSession": {
+      "run": "@storage/store.port.json#put",
+      "in": {
+        "store": "@features/state/data/auth.store.json",
+        "collection": "sessions"
+      }
+    },
+    "endSession": {
+      "run": "@storage/store.port.json#remove",
+      "in": {
+        "store": "@features/state/data/auth.store.json",
+        "collection": "sessions"
+      }
+    },
+    "getChallenge": {
+      "run": "@storage/store.port.json#get",
+      "in": {
+        "store": "@features/state/data/auth.store.json",
+        "collection": "challenges"
+      }
+    },
+    "putChallenge": {
+      "run": "@storage/store.port.json#put",
+      "in": {
+        "store": "@features/state/data/auth.store.json",
+        "collection": "challenges"
+      }
+    },
+    "removeChallenge": {
+      "run": "@storage/store.port.json#remove",
+      "in": {
+        "store": "@features/state/data/auth.store.json",
+        "collection": "challenges"
+      }
+    }
+  }
+}

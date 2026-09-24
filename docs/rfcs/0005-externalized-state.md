@@ -1,6 +1,6 @@
 # RFC 0005: Externalized state: every store behind a port the project binds
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:plugin-auth`, `area:plugin-blob`, `area:runtime`, `area:plugin-storage`
 - **Tracking issue:** #7
 - **Depends on:** RFC 0002 (the `@storage` plugin: records of a declared shape behind a connection)
@@ -404,5 +404,13 @@ Steps 1 to 4 need nothing from RFC 0002 and can land first.
   `s3:ListBucket`, which such a key lacks, and it would pass a bucket the key can read but not write. The
   probe runs only when `blobs.connection` names the plugin's kind, so a tree that ships a bucket connection
   and keeps files never reaches the bucket.
+- Which connection the example's `auth.store.json` sits on, and how its collections are created. *Decided:*
+  on `customers-postgres.connection.json`, production's one database, rather than a `state.connection.json` of
+  its own: only `production` binds `state.port.json` to the store, and a second database for one profile would
+  be a second secret for nothing. The collections are created as the customers' are, by `ensure` from a startup
+  step; since a startup step fires a domain port and `state.port.json` is the plugin's, the state feature
+  declares `memory.port.json#prepare`, met by one binding that delegates to `@storage/storage.port.json#ensure`,
+  and the step runs under `"profiles": ["production"]`. X201 needed no change: it already accepted a shape a
+  plugin grants, and a case in `plugin-storage/test/rules.test.ts` now holds it there.
 - Whether `@s3` speaks the API through an SDK. *Decided:* no. It sends six calls, each signed with Signature
   Version 4 over `fetch`, and nothing else from an SDK would be used.

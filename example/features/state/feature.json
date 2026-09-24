@@ -1,11 +1,15 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/feature.schema.json",
   "label": "State",
-  "description": "Where this deployment keeps its memory: the @auth plugin's sessions and challenges, through the state.port.json it requires. Not beside identity in directories/: who a caller is and where the process remembers them change for unrelated reasons.",
+  "description": "Where this deployment keeps its memory: the @auth plugin's sessions and challenges, through the state.port.json it requires: one file per record on a laptop, records in production's database behind the load balancer. Not beside identity in directories/: who a caller is and where the process remembers them change for unrelated reasons.",
   "exports": [],
   "effects": [
     "@auth/files.port.json#get",
     "@auth/files.port.json#put",
-    "@auth/files.port.json#remove"
+    "@auth/files.port.json#remove",
+    "@storage/store.port.json#get",
+    "@storage/store.port.json#put",
+    "@storage/store.port.json#remove",
+    "@storage/storage.port.json#ensure"
   ]
 }

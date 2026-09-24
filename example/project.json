@@ -123,6 +123,15 @@
       "required": true
     },
     {
+      "label": "Prepare the guard's memory",
+      "description": "Create the collections auth.store.json declares, once, before anything reads them. It runs under production alone, where the guard's sessions and challenges are records in the database every instance shares; the laptop's profiles keep one file per record and have nothing to create.",
+      "run": "@features/state/domain/memory.port.json#prepare",
+      "profiles": [
+        "production"
+      ],
+      "required": true
+    },
+    {
       "label": "Reach the guard's memory",
       "description": "Read one session through @auth/state.port.json before the HTTP server opens, so a tree whose sessions and challenges cannot be reached refuses to serve rather than refusing every signed-in caller. No session is kept under this key, so a reachable store answers nothing; the profile's binding decides which store that is.",
       "run": "@auth/state.port.json#getSession",
@@ -180,7 +189,7 @@
       "bindings": {
         "@customers/domain/customer.port.json": "@customers/data/customers-postgres.binding.json",
         "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
-        "@auth/state.port.json": "@features/state/data/auth-files.binding.json"
+        "@auth/state.port.json": "@features/state/data/auth-storage.binding.json"
       },
       "connections": {
         "@connections/employees.connection.json": "@connections/employees-production.connection.json"

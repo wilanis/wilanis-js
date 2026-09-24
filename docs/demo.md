@@ -38,10 +38,10 @@ npx wilanis check .
 ```
 
 ```
-ok: 201 documents
+ok: 205 documents
 ```
 
-Every one of the 201 is a JSON document; there is no JavaScript in the tree, and `check` judged every
+Every one of the 205 is a JSON document; there is no JavaScript in the tree, and `check` judged every
 profile at once. Open the viewer on the rule and search for *Writes are for registrars*:
 
 ```
@@ -207,7 +207,7 @@ npx wilanis check .
 ```
 
 ```
-ok: 202 documents
+ok: 206 documents
 ```
 
 Three rounds of write, check, edit, and the agent read no manual.
@@ -387,7 +387,7 @@ route, policy, shape or business graph differs from `local`, and beat 1 judged i
 over the route (`cp $DEMO/archive-customer.step2.trigger.json features/customers/edge/archive-customer.trigger.json`):
 the log prints `reload refused, still serving the last good tree:` with the two A006 and the I001, hints and all, while
 `curl` keeps answering 401, so an agent editing a live tree cannot make the write public for one request.
-Paste the finished file back and it prints `reload: 202 documents, serving the new tree`. It needs nothing
+Paste the finished file back and it prints `reload: 206 documents, serving the new tree`. It needs nothing
 beyond what this script already runs; `build.mjs` runs it as its last step.
 
 ## Reset

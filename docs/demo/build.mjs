@@ -43,14 +43,14 @@ const REGISTRATION = '{"name":"Ada Lovelace","email":"ada@example.com","tier":"b
 function step0(ctx) {
   const title = "The tree and its two rules";
   const out = check(ctx);
-  assert(title, out === "ok: 201 documents", out, "check answers ok: 201 documents");
+  assert(title, out === "ok: 205 documents", out, "check answers ok: 205 documents");
   return {
     number: 0,
     title,
     summary: out,
     does: [{ text: "Nothing yet. The tree is the example as it ships, and it is judged before anyone touches it.", pre: "npx wilanis check ." }],
     answers: [{ pre: out }],
-    why: "Every one of the 201 is a JSON document and none is code, so there is nothing an agent can write that the checker does not read whole. The two sentences above are the rules a human wrote; step 1 is where the first is caught, step 7 the second. Neither is repeated anywhere else in the tree.",
+    why: "Every one of the 205 is a JSON document and none is code, so there is nothing an agent can write that the checker does not read whole. The two sentences above are the rules a human wrote; step 1 is where the first is caught, step 7 the second. Neither is repeated anywhere else in the tree.",
   };
 }
 
@@ -121,7 +121,7 @@ function step4(ctx) {
   const title = "The finished route";
   paste(ctx, "archive-customer.step3.trigger.json");
   const out = check(ctx);
-  assert(title, out === "ok: 202 documents", out, "check answers ok: 202 documents");
+  assert(title, out === "ok: 206 documents", out, "check answers ok: 206 documents");
   return {
     number: 4,
     title,
