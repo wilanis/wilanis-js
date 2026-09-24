@@ -36,6 +36,16 @@ pool are facts about one database, so they sit on the connection rather than in 
 engine-wide: `statementTimeout`, in seconds, and `keyType` -- `uuidv7` (the default), what `newKey` answers
 for a string key, or `identity`, one past the highest, for a number key.
 
+## The lease it keeps
+
+The kind is also marked `"leases": true`: a `run` step of `@schedule` may name a connection of it as its
+`lease`, and the plugin registers a keeper for it from `postLoad` through `leases(env)` from
+`@wilanis/plugin-storage`, beside its engine. The keeper keeps one row per scheduled trigger in
+`wilanis_schedule` (`name`, `holder`, `held_until`, `last_fired`), created on first contact as
+`wilanis_migrations` is and never by a plan. A hold is taken by one insert-or-update statement, judged by the
+database's clock, and granted to nobody once a tick at or after it is recorded fired, so several instances
+behind one database fire each tick once.
+
 ## How a shape becomes a table
 
 | the shape says | the column is |

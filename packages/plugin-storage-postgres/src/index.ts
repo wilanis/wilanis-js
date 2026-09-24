@@ -4,17 +4,20 @@
  * package of its own because every engine is a plugin, and the second engine obeying that is what keeps the
  * claim honest rather than decorative.
  *
- * It registers itself from `postLoad`, opening nothing: the first operation against a connection makes its
- * pool. The teardown destroys every pool it made, so a reload leaves no socket behind.
+ * It registers itself from `postLoad`, opening nothing, twice: as @storage's engine for the kind it grants, and
+ * as the lease keeper @schedule holds a tick through (RFC 0010). The first operation against a connection makes
+ * its pool. The teardown destroys every pool it made, so a reload leaves no socket behind.
  */
 import { fileURLToPath } from 'node:url';
 import type { PluginModule } from '@wilanis/core';
-import { engines } from '@wilanis/plugin-storage';
+import { engines, leases } from '@wilanis/plugin-storage';
 import { PostgresEngine } from './engine.js';
+import { TableLeases } from './leases.js';
 import { closePools, type Settings } from './pool.js';
 import { check } from './rules.js';
 
 export { PostgresEngine } from './engine.js';
+export { TableLeases } from './leases.js';
 export type { Settings } from './pool.js';
 
 const ROOT = '@storage-postgres';
@@ -26,7 +29,9 @@ const plugin: PluginModule = {
   handlers: {},
   check,
   async postLoad(ctx) {
-    engines(ctx.env).register(ctx.scope.canon(KIND), new PostgresEngine(ctx.settings as Settings));
+    const kind = ctx.scope.canon(KIND);
+    engines(ctx.env).register(kind, new PostgresEngine(ctx.settings as Settings));
+    leases(ctx.env).register(kind, new TableLeases(ctx.env, ctx.settings as Settings));
     return closePools;
   },
 };
