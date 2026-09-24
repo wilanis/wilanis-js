@@ -5,10 +5,10 @@
  * written with a placeholder of their type; a kind that requires none, as one taking either of two settings,
  * gets the first it declares, so the author sees where the setting goes and `wilanis check` says what it takes.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
-import type { Field, PluginModule } from '@wilanis/core';
+import { dirname, join } from 'node:path';
+import type { Field } from '@wilanis/core';
 import { BUILTIN_PLUGINS } from './plugins/index.js';
 
 /** The kind a trigger is scaffolded as when `--kind` names none. */
@@ -17,7 +17,20 @@ export const ROUTE_KIND = '@http/http.trigger-kind.json';
 /** A route's settings, written out: the demo's scaffold and every fresh project's first trigger. */
 const ROUTE_SETTINGS = { route: '/todo', method: 'GET', produces: 'application/json' };
 
-/** Where one plugin's documents live: a builtin's own, or the `docs` a package the project names declares. */
+/**
+ * The directory a package's entry sits under: the nearest one holding a package.json. Resolving the entry finds
+ * the package without loading it, so no plugin's code runs to scaffold a document.
+ */
+function packageDir(entry: string): string | undefined {
+  for (let dir = dirname(entry); dir !== dirname(dir); dir = dirname(dir))
+    if (existsSync(join(dir, 'package.json'))) return dir;
+  return undefined;
+}
+
+/**
+ * Where one plugin's documents live: a builtin's own, or the `docs/` directory a plugin package ships beside its
+ * package.json -- the directory its `PluginModule.docs` names and its `files` publishes.
+ */
 function docsOf(root: string, use: string): string | undefined {
   if (BUILTIN_PLUGINS[use]) return BUILTIN_PLUGINS[use].docs;
   const project = JSON.parse(readFileSync(join(root, 'project.json'), 'utf8')) as {
@@ -25,8 +38,8 @@ function docsOf(root: string, use: string): string | undefined {
   };
   const from = project.plugins?.find(plugin => plugin.use === use)?.from;
   if (!from) return undefined;
-  const mod = createRequire(join(root, 'package.json'))(from) as { default?: PluginModule };
-  return mod.default?.docs;
+  const dir = packageDir(createRequire(join(root, 'package.json')).resolve(from));
+  return dir ? join(dir, 'docs') : undefined;
 }
 
 /** The settings one trigger kind declares, read off its document; a kind the tree cannot reach is said to be so. */
