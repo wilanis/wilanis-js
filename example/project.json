@@ -124,10 +124,11 @@
     },
     {
       "label": "Prepare the guard's memory",
-      "description": "Create the collections auth.store.json declares, once, before anything reads them. It runs under production alone, where the guard's sessions and challenges are records in the database every instance shares; the laptop's profiles keep one file per record and have nothing to create.",
+      "description": "Create the collections auth.store.json declares, once, before anything reads them. It runs under production and production-scheduler, where the guard's sessions and challenges are records in the database every instance shares, and whichever process starts first creates them; the laptop's profiles keep one file per record and have nothing to create.",
       "run": "@features/state/domain/memory.port.json#prepare",
       "profiles": [
-        "production"
+        "production",
+        "production-scheduler"
       ],
       "required": true
     },
@@ -159,14 +160,14 @@
       ]
     },
     {
-      "label": "Keep the schedule across instances",
-      "description": "The same scheduler under production, where several instances run behind the load balancer and each names the same ticks. Each tick is held in the customer database, which declares leases, so whichever instance reaches it first fires it and the others find it taken: one run per tick, however many instances there are.",
+      "label": "Keep the schedule in one process",
+      "description": "The same scheduler, run by the one process started under production-scheduler, while the instances behind the load balancer run production and only listen: one process schedules, so a tick is fired once however many instances serve the routes. Each tick is still held in the customer database, which declares leases, so the moment a rolling deploy runs an old scheduler beside its replacement, whichever reaches a tick first fires it and the other finds it taken.",
       "run": "@schedule/scheduler.port.json#run",
       "in": {
         "lease": "@connections/customers-postgres.connection.json"
       },
       "profiles": [
-        "production"
+        "production-scheduler"
       ]
     },
     {
@@ -177,8 +178,13 @@
     },
     {
       "label": "Listen",
-      "description": "Open the HTTP port and answer this tree's routes. Delete this step and nothing listens: a tree serves because it says so, never because a trigger exists.",
-      "run": "@http/server.port.json#listen"
+      "description": "Open the HTTP port and answer this tree's routes. Delete this step and nothing listens: a tree serves because it says so, never because a trigger exists. It runs under every profile but production-scheduler, the process that keeps the schedule and serves no route.",
+      "run": "@http/server.port.json#listen",
+      "profiles": [
+        "live",
+        "local",
+        "production"
+      ]
     }
   ],
   "profiles": {
@@ -200,7 +206,18 @@
       }
     },
     "production": {
-      "description": "Behind the load balancer, started with `wilanis start example --profile production`: the customers in PostgreSQL, the one operator account in place of the laptop's employees, and nothing watched. The same routes, policies, shapes and business graphs as every other profile, and not one document under features/ changes: another binding meets customer.port.json, and every reference to employees.connection.json reaches employees-production.connection.json instead. The startup steps prepare the database before the port opens, so a tree whose database is unreachable refuses to serve rather than answering every route with a fault.",
+      "description": "Behind the load balancer, started with `wilanis start example --profile production`: the customers in PostgreSQL, the one operator account in place of the laptop's employees, and nothing watched. The same routes, policies, shapes and business graphs as every other profile, and not one document under features/ changes: another binding meets customer.port.json, and every reference to employees.connection.json reaches employees-production.connection.json instead. The startup steps prepare the database before the port opens, so a tree whose database is unreachable refuses to serve rather than answering every route with a fault. It listens and keeps no schedule: run as many of it as the load needs, and one process under production-scheduler beside them.",
+      "bindings": {
+        "@customers/domain/customer.port.json": "@customers/data/customers-postgres.binding.json",
+        "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
+        "@auth/state.port.json": "@features/state/data/auth-storage.binding.json"
+      },
+      "connections": {
+        "@connections/employees.connection.json": "@connections/employees-production.connection.json"
+      }
+    },
+    "production-scheduler": {
+      "description": "The one process that keeps the schedule beside production, started with `wilanis start example --profile production-scheduler`: production's bindings and connections, so a tick reaches what a route there reaches, and production's startup but for the listener, which it never opens. Run one of it and as many production instances as the load needs; those listen and schedule nothing.",
       "bindings": {
         "@customers/domain/customer.port.json": "@customers/data/customers-postgres.binding.json",
         "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
