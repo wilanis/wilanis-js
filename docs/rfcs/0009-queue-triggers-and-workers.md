@@ -703,7 +703,10 @@ Nothing else must be decided before `accepted`. Decided during implementation:
 1. The table broker's polling interval and visibility timeout, as settings on the postgres plugin, and whether
    the backoff gains jitter -- with RFC 0011's answer for its own backoff.
 2. Whether `wilanis run <queue trigger> --in '{"id":"golf"}'` fills `request.message`, so a queue trigger can be
-   fired by hand against a real broker, or whether publishing is the one way.
+   fired by hand against a real broker, or whether publishing is the one way. Where the answer goes is settled by
+   RFC 0010's step 8: a kind builds its own `wilanis run` context through the optional `TriggerRuntime.requestOf`,
+   so filling `request.message` from `--in` is the queue kind's `requestOf`, and leaving it out keeps the command
+   line's context and publishing as the one way.
 3. Whether `publish` stamps a `traceparent` from the run into a message that carries none, once RFC 0006 says
    how a handler learns the run's id.
 4. The exact log line of a delivery, and whether `dead` messages get a `wilanis` command to list and requeue

@@ -3,7 +3,7 @@
  *
  * What runs the schedule is the `holds` operation a project's startup list names, not this module's own
  * doing: a tree that names no step schedules nothing, as a tree that names no listener serves nothing. The
- * trigger kind's runtime is here for `encode` alone -- `wilanis run` and the tick's log line then say the
+ * trigger kind's runtime is here for `encode` and `requestOf` -- `wilanis run` and the tick's log line then say the
  * same thing about the same report.
  */
 import { fileURLToPath } from 'node:url';
@@ -26,6 +26,24 @@ export { Scheduler } from './scheduler.js';
 
 const DOCS = fileURLToPath(new URL('../docs', import.meta.url));
 
+/** An ISO 8601 date and time with its offset: `2026-09-11T03:00:00Z`, `2026-09-11T05:00+02:00`. */
+const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/;
+
+/**
+ * The tick `wilanis run <scheduled trigger> --at <time>` hands: `scheduled` the instant `--at` names, in UTC,
+ * `fired` now, `missed` 0. Without `--at` there is no `scheduled`, and a `fire.in` that reads it is refused at
+ * the edge with the field named, as it always was.
+ */
+export function tickOf(flags: Record<string, string>, now: Date = new Date()): Record<string, unknown> {
+  const at = flags.at;
+  const tick: Record<string, unknown> = { fired: now.toISOString(), missed: 0 };
+  if (at === undefined) return tick;
+  const instant = ISO_TIME.test(at) ? new Date(at) : undefined;
+  if (!instant || Number.isNaN(instant.getTime()))
+    throw new Error(`--at '${at}' is not an ISO 8601 time; write the tick as 2026-09-11T03:00:00Z`);
+  return { scheduled: instant.toISOString(), ...tick };
+}
+
 const runtime: TriggerRuntime = {
   // the work is the `run` step's: the runtime does not call this hook today, and a schedule that started
   // itself here would fire on a tree that never asked to be scheduled
@@ -39,6 +57,8 @@ const runtime: TriggerRuntime = {
     const refused = refusalOf(report);
     return refused ? { reason: refused.reason, message: refused.message, ...(refused.detail ?? {}) } : report.output;
   },
+  // `wilanis run` fires a tick by hand: the kind's context, from --at
+  requestOf: (_trigger, { flags }) => tickOf(flags),
 };
 
 const schedule: PluginModule = {
