@@ -28,6 +28,11 @@
     "context": {
       "$ref": "common.schema.json#/$defs/inlineObject"
     },
+    "connection": {
+      "description": "The dotted path, within a trigger's settings, of the connection a trigger of this kind receives from (e.g. connection). Declared: that setting names a connection document whose kind declares delivery, and how many times that kind may deliver one message is how many times the trigger may fire its operation for it. Absent: triggers of this kind receive from no connection (a route, a command line).",
+      "type": "string",
+      "minLength": 1
+    },
     "correlation": {
       "description": "The dotted path, within this kind's context, of the value that correlates a run with the caller's own trace (e.g. headers.traceparent). It must name a field this kind's context hands (T007). The runtime copies it into the trace as an opaque string; parsing it is the exporter's business. Absent: runs of this kind carry no correlation.",
       "type": "string",
