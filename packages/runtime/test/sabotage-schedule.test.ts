@@ -127,10 +127,22 @@ describe('sabotage: what a tick cannot fill or remember -- X252, X253, X254', ()
       }),
     ).toEqual([`X252 ${AT}#in`]);
   });
-  it("X253 catchUp while the example's run step names no lease", () => {
+  it("catchUp checks clean, since production's run step keeps its lease in the customer database", () => {
     expect(
       pointing(trigger => {
         trigger.settings.catchUp = true;
+      }),
+    ).toEqual([]);
+  });
+  it('X253 catchUp once no run step names a lease', () => {
+    expect(
+      plantedEditingAllAt(PLANT, {
+        [NIGHTLY]: trigger => {
+          trigger.settings.catchUp = true;
+        },
+        'project.json': project => {
+          for (const step of project.startup) if (step.in?.lease) step.in = undefined;
+        },
       }),
     ).toEqual([`X253 ${AT}#settings/catchUp`]);
   });
