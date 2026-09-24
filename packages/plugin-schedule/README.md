@@ -98,10 +98,11 @@ and it is why the operation a schedule fires must be safe to repeat.
 
 A lease keeper is the plugin that granted a connection kind declaring `leases`. It implements one contract
 for the connections of that kind and registers itself from its `postLoad`, exactly as a storage engine
-registers with `@storage`:
+registers with `@storage`. The contract lives in `@wilanis/plugin-storage`, beside the store contract, since a
+keeper is a storage engine and a plugin may import another only where that other is a contract it implements:
 
 ```ts
-import { leases, type Leases } from '@wilanis/plugin-schedule';
+import { leases, type Leases } from '@wilanis/plugin-storage';
 
 const keeper: Leases = {
   /** true when this process holds `name` for the tick `scheduled` until now + ttlMs, freshly or renewed. */
@@ -127,7 +128,8 @@ clock asks for it. `markFired` records the tick whatever the run's status: a ref
 that tick, and a tick is not refired for one. The table is per environment, created on first use by
 whichever side reaches it first, so plugin order in `project.json` cannot bite and a reload starts clean.
 
-The plugin depends on `@wilanis/core` and `@wilanis/engine` only, and carries no external dependency: the
+The plugin depends on `@wilanis/core`, `@wilanis/engine` and `@wilanis/plugin-storage` (for the lease
+contract alone), and carries no external dependency: the
 cron parser is its own, since the same parser judges an expression at check time and computes the next tick
 at run time.
 

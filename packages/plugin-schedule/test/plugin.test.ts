@@ -4,9 +4,9 @@
  */
 
 import type { Report } from '@wilanis/engine';
+import { leases } from '@wilanis/plugin-storage';
 import { describe, expect, it } from 'vitest';
 import schedule from '../src/index.js';
-import { leases } from '../src/leases.js';
 import { KIND, RUN } from '../src/paths.js';
 
 const runtime = schedule.triggers?.[KIND];

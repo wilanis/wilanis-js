@@ -320,9 +320,11 @@ assumption and is kept: a digest run three times at deploy is wrong, and an auth
 handled has `request.missed` to fan the work out from. Without `catchUp` a tick that fell while no process ran is
 not fired, which is what cron does and what a tree without a store can do.
 
-**Lease keepers** (`packages/plugin-schedule/src/leases.ts`, new). `@schedule` speaks no store's language. A lease
+**Lease keepers** (`packages/plugin-storage/src/leases.ts`, new). `@schedule` speaks no store's language. A lease
 keeper is the plugin that granted a connection kind declaring `leases`, filling one contract for the connections of
-that kind; the contract and the table follow RFC 0002's `engines(env)` and RFC 0009's `brokers(env)` line for line:
+that kind; the contract and the table follow RFC 0002's `engines(env)` and RFC 0009's `brokers(env)` line for line.
+The contract lives in `@storage`, beside `engines(env)`, and `@schedule` imports it from there: a keeper is a storage
+engine, and `CLAUDE.md` lets a plugin import another only where that other is a contract plugin it implements.
 
 ```ts
 /** What a storage engine does for the scheduler on one connection of the kind it registered; the connection is the canonical path. */
@@ -349,7 +351,8 @@ reload starts clean, for the reasons RFC 0002 gives at length. The first keeper 
 `"storage": true`, so a tree with a store needs no second service to schedule on several instances. The postgres
 engine keeps one table
 `wilanis_schedule` -- `name` (text, primary key: the trigger's canonical path), `holder` (text), `held_until`,
-`last_fired` (timestamptz) -- created by the engine's `ensure`; `acquire` is one statement,
+`last_fired` (timestamptz) -- created by the keeper on first contact, as `wilanis_migrations` is, and not by
+`ensure`, which since RFC 0017 goes over the planner and plans only what a store declares; `acquire` is one statement,
 `INSERT … ON CONFLICT (name) DO UPDATE SET holder = $me, held_until = now() + $ttl WHERE (wilanis_schedule.held_until < now() OR wilanis_schedule.holder = $me) AND (wilanis_schedule.last_fired IS NULL OR wilanis_schedule.last_fired < $scheduled) RETURNING holder`,
 so two instances never both hold one trigger, and a tick that `last_fired` already covers is granted to nobody
 however late a clock asks for it. `markFired` sets `last_fired = greatest(last_fired, $scheduled)`; `release` sets
@@ -414,8 +417,8 @@ shutdown signal, once it exists, is what cuts a run that will not end; this RFC 
 `PluginModule` in `packages/core/src/plugin.ts` does not change; neither does `Serving`, `FireArgs`,
 `TriggerRuntime`, `Hold` or `Guard`. The scheduler reaches the runtime through `env.serving` and `env.hold` inside a
 `holds` operation the project's startup list names, as the listener, the watcher and RFC 0009's worker do. A storage
-engine reaches `@schedule` through a table `@schedule` exports and the engine fills from `postLoad`, as an engine
-reaches `@storage` and a broker reaches `@queue`. The guard is not consulted, changed or told.
+engine reaches `@schedule` through a table `@storage` exports, which `@schedule` reads and the engine fills from
+`postLoad`, as an engine reaches `@storage` and a broker reaches `@queue`. The guard is not consulted, changed or told.
 
 ## Compatibility
 
@@ -486,7 +489,7 @@ example's scheduled trigger page.
    baseline in `validate.test.ts`, the template's `connection` row. `good first issue`.
 2. **`@wilanis/plugin-schedule`** (`area:plugin-schedule`, new label): the package, `docs/` (plugin.json,
    scheduler.port.json, schedule.trigger-kind.json without `deadlineMs`), `cron.ts` with its table tests,
-   `scheduler.ts` over a `Clock`, `leases.ts` with the contract and the table, `run.ts` (the handler), `rules.ts` with
+   `scheduler.ts` over a `Clock`, `leases.ts` with the contract and the table (moved to `@storage` by step 6), `run.ts` (the handler), `rules.ts` with
    X0n1 to X0n4 (X0n4 reads step 1's marker), the trigger runtime, a README saying what a lease keeper implements.
    Workspace member; added to `npm run release` after `plugin-auth`. The parser and its tests can be taken first and
    alone: `good first issue`.
@@ -526,8 +529,10 @@ kind from RFC 0030 is the obvious keeper that is not a store. The alternative of
 `@lock` port with `acquire` and `release` operations -- was considered and not taken: a hold across nodes is state
 the stateless engine cannot carry, a lock inside business logic is what RFC 0004's atomic graphs exist to make
 unnecessary for storage, and the scheduler is the one consumer, behind a `holds` step. A contract-only package for
-the interface was not taken either: it is not a plugin by this repository's definition (nothing under `docs/`), and
-every cross-plugin contract in the workspace lives with its consumer and is depended on by its implementers.
+the interface was not taken either: it is not a plugin by this repository's definition (nothing under `docs/`). The
+contract lives in `@storage`, the contract plugin a keeper already answers, and not with its consumer: a keeper is a
+storage engine, and `CLAUDE.md` lets a plugin import another only where that other is a contract, which `@schedule`,
+shipping the scheduler and the kind, is not.
 
 **A package, not a plugin built into the runtime.** The stub put the kind beside `@std` and `@cli` because it
 carries no external dependency. Three facts moved it. The lease contract must be importable by a storage engine,
@@ -573,7 +578,7 @@ Settled here, with the reasoning in the text: **overlap** is a setting, `skip` |
 *Drawbacks*, fifth item). **Missed ticks after downtime** are fired once with `request.missed` saying how many, and
 only when `catchUp` says so and a lease store remembers the last tick (X0n3); without one, they are not fired, which
 is what cron does. **Multiple instances** are decided by a lease on a connection whose kind declares `leases`, named by
-the `run` step's `lease`, through a contract `@schedule` exports and the kind's plugin fills from `postLoad` as
+the `run` step's `lease`, through a contract `@storage` exports and the kind's plugin fills from `postLoad` as
 RFC 0002's `engines(env)` and RFC 0009's `brokers(env)` are, the storage engine being the first keeper; the hold is
 for one tick of one trigger and is refused once that
 tick is recorded fired, so a tick is taken once whatever the clocks, and interval ticks are aligned to the epoch so

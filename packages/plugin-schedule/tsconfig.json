@@ -2,5 +2,5 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "rootDir": "src", "outDir": "dist" },
   "include": ["src"],
-  "references": [{ "path": "../engine" },{ "path": "../core" }]
+  "references": [{ "path": "../engine" },{ "path": "../core" },{ "path": "../plugin-storage" }]
 }

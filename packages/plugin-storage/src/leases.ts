@@ -1,13 +1,14 @@
 /**
- * What a lease keeper is, and how @schedule finds one. @schedule speaks no store's language: a keeper is the
- * plugin that granted a connection kind declaring `leases`, filling one contract for the connections of that
- * kind. It depends on this package for the contract while this package depends on no keeper -- the arrow
- * points the way every other arrow in the workspace does.
+ * What a lease keeper is, and how @schedule finds one: the contract a storage engine answers to keep the
+ * scheduler's hold. It lives here, in the contract plugin, as the store contract in `engine.ts` does, because a
+ * keeper is a storage engine and a plugin may import another only where that other is a contract it
+ * implements. @schedule consumes it, an engine fills it, and neither imports the other.
  *
- * The seam is the hook plugins already have: a keeper's `postLoad` registers itself, under the connection
- * kind it grants, in a table the environment carries. The table is created on first use by whichever side
- * reaches it first, so nothing has to be said in `project.json` about the order the plugins are named in.
+ * The seam is the one engines already use: a keeper's `postLoad` registers itself, under the connection kind
+ * it grants, in a table the environment carries. The table is created on first use by whichever side reaches
+ * it first, so nothing has to be said in `project.json` about the order the plugins are named in.
  */
+import { keyOf } from './engine.js';
 
 /**
  * What a lease keeper does for the scheduler on one connection of the kind it registered; the connection is
@@ -53,20 +54,10 @@ export class Keepers {
 const tables = new WeakMap<object, Keepers>();
 
 /**
- * What one environment is keyed by. The embedder hands a handler `{ ...env, blobs }` whenever a run carries a
- * blob scope, so the object a handler is given is not the object a keeper registered on. `connections` is
- * built once for the tree by `buildEnv` and carried by every copy, so it names the environment where the copy
- * does not. An environment without one is keyed by itself.
- */
-function keyOf(env: object): object {
-  const connections = (env as { connections?: unknown }).connections;
-  return connections && typeof connections === 'object' ? connections : env;
-}
-
-/**
  * The lease keepers of one environment, created on first use by whichever side reaches it first. @schedule
  * builds nothing in a `postLoad` of its own, so a keeper that registers before @schedule is loaded finds no
- * emptier a table than one that registers after.
+ * emptier a table than one that registers after. It is keyed as `engines(env)` is, by `keyOf`, so a handler
+ * given a copy of the environment finds the table the keeper registered in.
  */
 export function leases(env: object): Keepers {
   const key = keyOf(env);
