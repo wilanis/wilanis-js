@@ -394,7 +394,8 @@ export interface PluginModule {
   /**
    * The directory of the documents this plugin ships. Every *.json under it is loaded as `${root}/<relative path>`
    * and judged like any tree document; it must hold plugin.json. Absolute, so a package points it at itself:
-   * fileURLToPath(new URL('../docs', import.meta.url)).
+   * fileURLToPath(new URL('../docs', import.meta.url)). A package ships its documents as `docs/` beside its
+   * package.json, which `wilanis new` reads without loading the plugin.
    */
   docs: string;
   /** 'path#operation' -> handler */

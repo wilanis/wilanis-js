@@ -161,7 +161,8 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   `schemas-v1` tag stays (RFC 0008).
 - **A new plugin.** A new package under `packages/`, depending on core and engine only -- and, where it implements one, the contract plugin it answers -- exporting its
   `PluginModule` as default: `root`, `docs` (the directory of the JSON documents it ships, with
-  `plugin.json`; listed in the package's `files`), `handlers`, and optionally `triggers`, `codecs`, `check`
+  `plugin.json`; listed in the package's `files`, and always `docs/` beside its package.json, which `wilanis new`
+  reads without loading the plugin), `handlers`, and optionally `triggers`, `codecs`, `check`
   (its X rules; it refuses with a `Refusal` object: code, file, message, at, hint),
   `postLoad`, and -- for at most one plugin of a tree -- `guard`. Every port, kind, codec or shape a plugin grants is a file under `docs/`, never an object in
   code: what the DSL names, a reader can open. A project names the plugin in `plugins[].from`. Plugins that
