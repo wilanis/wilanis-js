@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url';
 import { describe as describeDoc, groupSaid, loadProject, needSaid } from '@wilanis/runtime';
 import { describe, expect, it } from 'vitest';
 import { viewOf } from '../src/index.js';
-import { scopedView } from './scoped-harness.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 const PAGE = fileURLToPath(new URL('../client/index.html', import.meta.url));
@@ -23,7 +22,17 @@ describe("the project page's profiles", () => {
     for (const group of [...(production?.reaches ?? []), ...(production?.holds ?? [])])
       expect(said).toContain(groupSaid(group));
     for (const need of production?.needs ?? []) expect(said).toContain(needSaid(need));
-    expect(production?.needs.map(need => need.variable)).toEqual(['CUSTOMERS_DATABASE_URL', 'CUSTOMERS_JWT_SECRET']);
+    expect(production?.needs.map(need => need.variable)).toEqual([
+      'CUSTOMERS_DATABASE_URL',
+      'CUSTOMERS_JWT_SECRET',
+      'CUSTOMERS_OPERATOR_PASSWORD_HASH',
+    ]);
+    expect(production?.standsIn).toEqual([
+      {
+        named: '@connections/employees.connection.json',
+        standIn: '@connections/employees-production.connection.json',
+      },
+    ]);
     expect(production?.reaches).toContainEqual({
       port: '@storage/store.port.json',
       operations: ['find', 'get', 'newKey', 'patch', 'put', 'remove'],
@@ -32,17 +41,13 @@ describe("the project page's profiles", () => {
     expect(production?.holds.map(group => group.port)).toContain('@http/server.port.json');
   });
 
-  it('marks the default, and starts under a profile only the steps that run there', () => {
-    const project = scopedView('@project.json', {
-      'project.json': doc => {
-        doc.startup.find((step: any) => step.label === 'Watch for changes').profiles = ['live'];
-      },
-    });
-    const [live, local] = project.profiles ?? [];
-    expect([live.default, local.default]).toEqual([true, false]);
-    expect(live.starts.map(step => step.label)).toContain('Watch for changes');
-    expect(local.starts.map(step => step.label)).not.toContain('Watch for changes');
-    expect(local.holds.map(group => group.port)).not.toContain('@reload/watch.port.json');
+  it('marks the default, and starts under a profile only the steps that run there', async () => {
+    const project = viewOf(await loadProject(EXAMPLE), '@project.json');
+    const [live, local, production] = project?.profiles ?? [];
+    expect([live.default, local.default, production.default]).toEqual([true, false, false]);
+    for (const laptop of [live, local]) expect(laptop.starts.map(step => step.label)).toContain('Watch for changes');
+    expect(production.starts.map(step => step.label)).not.toContain('Watch for changes');
+    expect(production.holds.map(group => group.port)).not.toContain('@reload/watch.port.json');
   });
 
   it('draws the six rows describe prints, and the default as a badge', async () => {
