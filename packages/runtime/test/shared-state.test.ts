@@ -57,7 +57,8 @@ function copyServing(port: number, edits: Record<string, Edit>): string {
 
 /**
  * Production's database as the memory engine, since a stand-in may not change a connection's kind (C018). The
- * memory engine keeps no lease, so production's scheduler names none here (X254 otherwise).
+ * copy drops the scheduler's lease: the memory kind declares no `leases` (RFC 0010, open question 3), so X254
+ * would refuse it; the example sets no catchUp, so X253 stays quiet; and the PostgreSQL case keeps the lease.
  */
 const OVER_MEMORY: Record<string, Edit> = {
   'connections/customers-postgres.connection.json': connection => {

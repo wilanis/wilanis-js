@@ -449,8 +449,8 @@ Sabotage tests in `packages/runtime/test/sabotage.test.ts` and `sabotage-project
 |---|---|
 | X0n1 | `settings.cron: "0 3 * * * *"` (six fields); `"61 3 * * *"`; `"0 3 * * mon-fry"`; `"@daily"`; both `cron` and `everyMs: 60000`; neither; `everyMs: 500`; `everyMs: 60000` with `timezone: "UTC"`; `timezone: "Mars/Olympus"`; `deadlineMs: 0`; the plugin's `settings.leaseTtlMs: 10` |
 | X0n2 | `in: "@customers/edge/ListRequest.shape.json"` with no `fire.in` |
-| X0n3 | `settings.catchUp: true` with the example's `run` step as written (no `lease`) |
-| X0n4 | `startup[2].in.lease: "@connections/customers-api.connection.json"` (an http kind, no `leases`); `"@connections/nope.connection.json"`; and none with a fake kind under `docsDir` declaring `"leases": true` |
+| X0n3 | `settings.catchUp: true` with every `run` step's `lease` removed (as written, production's step names one, so `catchUp` checks clean) |
+| X0n4 | `startup[6].in.lease` (the laptop's `run` step, the first that names the scheduler) set to `"@connections/customers-api.connection.json"` (an http kind, no `leases`); `"@connections/nope.connection.json"`; and none with a fake kind under `docsDir` declaring `"leases": true` |
 | T001 | `settings.overlap: "sometimes"`; `settings.cron: 3` |
 | T003 | `fire.in: { "before": "{{request.body.since}}" }` after adding `in` -- the kind hands no `body` |
 | T004 | `fire.run: "@customers/domain/customer.port.json#submit"` with `fire.in: { "name": "Ada", "email": "ada@x.example", "tier": "bronze" }` and the matching `in`: `register-customer.graph.json` reaches `create-row.graph.json`, which reads the `agent` resolver (`request.headers['user-agent']`), and the schedule kind hands no `headers` |
