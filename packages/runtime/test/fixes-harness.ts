@@ -47,6 +47,17 @@ export const editing = (file: string, change: (doc: any) => void) => (dir: strin
   writeFileSync(onDisk(dir, file), JSON.stringify(doc));
 };
 
+/** A change to a copied tree: documents written at tree-relative paths it does not have, then `and` applied. */
+export const planting =
+  (docs: Record<string, unknown>, and: (dir: string) => void = () => {}) =>
+  (dir: string) => {
+    for (const [file, doc] of Object.entries(docs)) {
+      mkdirSync(dirname(join(dir, file)), { recursive: true });
+      writeFileSync(join(dir, file), JSON.stringify(doc));
+    }
+    and(dir);
+  };
+
 /**
  * What the guard says of a broken copy's refusals once `alter` has had its way with them: how a case proves
  * the guard bites, by handing it a fix the rule never offered.
