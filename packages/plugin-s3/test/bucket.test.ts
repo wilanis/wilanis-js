@@ -2,12 +2,13 @@
  * The bucket store against a real object store speaking the S3 API: put as a multipart upload, get, delete,
  * a scope's release, the probe, and the signature every request carries. It needs one, so it is skipped
  * without `WILANIS_TEST_S3_ENDPOINT` -- a suite that silently passed against nothing would be worse than none.
- * CI runs it against MinIO; by hand:
+ * CI starts no object store, so it runs by hand, against any server speaking the API; versitygw is one that
+ * passes it unchanged:
  *
- *   docker run -d --rm --name wilanis-minio -p 59000:9000 \
- *     -e MINIO_ROOT_USER=wilanis -e MINIO_ROOT_PASSWORD=wilanis-secret \
- *     quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
- *   WILANIS_TEST_S3_ENDPOINT=http://127.0.0.1:59000 npm test
+ *   docker run -d --rm --name wilanis-s3 -p 59000:7070 \
+ *     -e ROOT_ACCESS_KEY=wilanis -e ROOT_SECRET_KEY=wilanis-secret \
+ *     versity/versitygw:v1.8.0 posix /tmp
+ *   WILANIS_TEST_S3_ENDPOINT=http://127.0.0.1:59000 npx vitest run packages/plugin-s3
  *
  * The bucket is made here if it is missing, since the plugin itself never makes one.
  */
