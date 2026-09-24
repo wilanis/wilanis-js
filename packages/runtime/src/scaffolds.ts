@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { type AnyDoc, featureOf, type Kind, misplaced, schemaUrl } from '@wilanis/core';
 import { graphScaffold } from './scaffold-graph.js';
+import { ROUTE_KIND, triggerSettings } from './scaffold-trigger.js';
 
 // ---- scaffolds -------------------------------------------------------------------------------------
 
@@ -178,15 +179,17 @@ const SCAFFOLDS: Record<string, Build> = {
       ],
     ];
   },
-  trigger: (target, opts) => {
+  trigger: (target, opts, root) => {
+    // a route unless --kind names another; that kind's settings are read off its own document (scaffold-trigger.ts)
+    const kind = opts.kind ?? ROUTE_KIND;
     return [
       [
         into(target, 'edge', 'trigger'),
         {
           $schema: schemaOf('trigger'),
           description: 'TODO',
-          kind: opts.kind ?? '@http/http.trigger-kind.json',
-          settings: { route: '/todo', method: 'GET', produces: 'application/json' },
+          kind,
+          settings: triggerSettings(root, kind),
           fire: { run: opts.run ?? '@features/TODO/domain/TODO.port.json#todo' },
         },
       ],

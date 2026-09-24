@@ -278,6 +278,11 @@ export interface DocView {
     label: string;
     operations: Record<string, { graph?: string; graphLabel?: string; run?: string } & VAttempts>;
   }[];
+  /**
+   * On a trigger: what fires it, in the words of its kind's settings as written (`cron "0 3 * * *", timezone "UTC"`),
+   * the same words `wilanis map` prints beside the kind; absent where it writes none that fit in a line.
+   */
+  firedBy?: string;
   /** On a trigger: the port operation it fires, and where that leads. */
   fires?: VTarget;
   /** On a trigger whose kind maps refusals: every reason it can reach or maps, how it is answered, and the nodes that refuse with it. */

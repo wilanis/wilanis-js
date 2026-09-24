@@ -141,7 +141,9 @@ describe('map: the invariants under each trigger', () => {
   const lines = map(example);
 
   it('prints the holds line under the gates of every trigger an invariant reaches', () => {
-    const at = lines.indexOf('@features/customers/edge/delete-customer.trigger.json  (@http/http.trigger-kind.json)');
+    const at = lines.indexOf(
+      '@features/customers/edge/delete-customer.trigger.json  (@http/http.trigger-kind.json)  route "/customers/{id}", method "DELETE", produces "application/json"',
+    );
     expect(at).toBeGreaterThan(-1);
     // the gates first, then what those gates are held to: an invariant is a rule about the gates, not another gate
     expect(lines[at + 1]).toContain('gated by @features/access/edge/employees-only.policy.json');
@@ -151,7 +153,10 @@ describe('map: the invariants under each trigger', () => {
 
   it('prints one for every write trigger, and none for a read', () => {
     expect(lines.filter(line => line.includes(`holds  ${WRITES}`))).toHaveLength(5);
-    const at = lines.indexOf('@features/customers/edge/list-customers.trigger.json  (@http/http.trigger-kind.json)');
+    const at = lines.indexOf(
+      '@features/customers/edge/list-customers.trigger.json  (@http/http.trigger-kind.json)  route "/customers", method "GET", produces "application/json"',
+    );
+    expect(at).toBeGreaterThan(-1);
     expect(lines[at + 1]).not.toContain('holds  ');
   });
 });

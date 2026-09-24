@@ -100,3 +100,4 @@ export {
   withRehearsal,
 } from './tools.js';
 export { atLevel, type Level, traceJson, traceOf, traceText } from './trace.js';
+export { settingsSaid } from './trigger-said.js';

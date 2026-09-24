@@ -593,7 +593,8 @@
       case 'trigger': {
         const f = v.fires;
         const chain = el('div', 'chain');
-        chain.appendChild(step('fired by', link(d.kind)));
+        const by = el('span'); by.appendChild(link(d.kind)); if (v.firedBy) by.appendChild(document.createTextNode(', ' + v.firedBy));
+        chain.appendChild(step('fired by', by));
         if (d.in) chain.appendChild(step('takes', typeEl(d.in)));
         if (f) { const c = el('span'); c.appendChild(link(f.port, f.portLabel)); c.appendChild(document.createTextNode(SEP + f.opName)); chain.appendChild(step('fires the operation', c)); }
         for (const b of (f && f.bindings) || []) {
