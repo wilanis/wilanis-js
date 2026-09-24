@@ -20,7 +20,12 @@
       "label": "POST the customer",
       "run": "@http/http.port.json#request",
       "in": {
-        "body": "{{in}}",
+        "body": {
+          "name": "{{in.name}}",
+          "email": "{{in.email}}",
+          "tier": "{{in.tier}}",
+          "registrar": "{{in.registrar}}"
+        },
         "connection": "@connections/customers-api.connection.json",
         "method": "POST",
         "path": "/customer",

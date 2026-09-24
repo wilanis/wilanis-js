@@ -22,8 +22,8 @@ unpin.record}}`): each is optional on the other's branch, and the checker refuse
 right to.
 
 When you need a shape, find the nearest graph already in the tree and copy it: `npx wilanis ls graph .`, then
-`npx wilanis describe <path> .`. In this tree `features/customers/data/kept-update.graph.json` is the write
-after a read.
+`npx wilanis describe <path> .`. In this tree `features/customers/domain/update-customer.graph.json` is the read
+then write, and `features/customers/data/keep-customer.graph.json` is the write.
 
 ## The shape: read, decide, write
 
