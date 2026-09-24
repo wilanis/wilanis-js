@@ -186,7 +186,11 @@ is empty. Had it "fixed" the G011s by rewriting the rules, it would have broken 
 
 A kind with one home gets the move. A graph in `edge/` gets none: its hint says `domain/ or data/`, and which is right
 is a decision about the graph -- a data graph moved to `domain/` would only trade D008 for L002 -- so the rule offers
-nothing it cannot prove, and the hint does the talking. That is the one rule of `fixes`: **a fix is offered only where
+nothing it cannot prove, and the hint does the talking. A shape whose `layer` disagrees with its directory gets the
+`set` of `layer` alone: moving the file leaves every reference to its old path refused as R001, and placement cannot
+tell a mis-set `layer` from a mis-placed file, so it offers the edit that makes the directory win. A shape in `data/`,
+where no shape lives, gets the move to the layer it declares, and its hint drops the `or set "layer": "core"`
+alternative, which cannot repair a shape there. That is the one rule of `fixes`: **a fix is offered only where
 the test suite proves that applying it to the sabotaged example removes the refusal and adds none.** D001 shows why
 the rule is worth having. The schema validator knows "the one value a `const` wanted", and every `const` in the
 schemas is a discriminator inside a `oneOf` -- a node's `type` is `run`, `switch` or `map`, a codec's is `declared`
@@ -339,7 +343,7 @@ None new. No code changes meaning. Three rules gain `fixes`, made where the rule
 |---|---|---|---|
 | L003 | `check/graph.ts`, `check/bindings.ts` | `{ file: <feature.json>, at: "effects", add: <operation> }` | always; `Effects` in `judge.ts` gains `file` and `path` beside the prose `at` it carries today, so the hint and the fix are spelled from one source |
 | R001 | `Judge.opAt` in `check/judge.ts` | `{ file, at, set: "<port>#<nearest>" }` | the port exists and exactly one of its operations is within Levenshtein distance 2 of the name written; `nearest(word, candidates)` is a pure function in `check/nearest.ts`. An unknown *port* offers nothing: the space of ports is the tree's, and a wrong alias is not a typo |
-| D008 | `packages/core/src/placement.ts` | `{ file, move }` for `wrongDirectory` and for `wrongLayer` when the kind has one layer; for a shape whose `layer` disagrees with its directory, two alternatives: `{ file, at: "layer", set: <the directory's layer> }` then `{ file, move }` | never for a kind with two layers (`domain/` or `data/`): which is right is the author's |
+| D008 | `packages/core/src/placement.ts` | `{ file, move }` for `misplacedDir` (a connection to `connections/`, a scenario to `scenarios/`) and for `wrongLayer` when the kind has one layer; for a shape in `edge/` or `domain/` whose `layer` disagrees with its directory, `{ file, at: "layer", set: <the directory's layer, "edge" or "core"> }` alone; for a shape in `data/`, `{ file, move }` to the layer its `layer` declares | never for a kind with two layers (a graph, or a shape in no layer directory): which is right is the author's; never for `outsideFeature`, which has no feature to move into |
 
 **`Refuser`** in `check/judge.ts` keeps its four parameters (the house rule) and widens the last:
 
@@ -435,7 +439,7 @@ takes the same promise when it lands and is not embedded here.
 **Core**, `packages/core/test/validate.test.ts`: a graph with a wrong-typed `in` on its second node is refused as D001
 at `nodes/<second id>/in`, not `nodes/1/in`; a node without an `id` keeps its index; a node of an unknown `type` is
 refused as D001 with no `fixes`; `pageUrl('L003')` is the blob URL and `pageUrl('Z001')` is undefined. D008's fixes
-are tested where D008 is tested today, through `relocate` in the runtime's sabotage suite (below).
+are tested in the runtime's `sabotage-fixes.test.ts`, moving a document of the example the way `relocate` does (below).
 
 **Compiler**, through the sabotage suites in `packages/runtime/test/` as every family, in a new
 `sabotage-fixes.test.ts`. The harness (`example-harness.ts`) gains `refusalsAfter(change)` (the `Refusal[]`, not
@@ -446,7 +450,7 @@ only the codes) and `applyFix(dir, fix)` -- `set`, `add`, `remove` on the parsed
 |---|---|---|
 | L003 | `@http/http.port.json#request` removed from the customers feature's `effects` | six refusals, each with the one fix `{ file: '@features/customers/feature.json', at: 'effects', add: '@http/http.port.json#request' }`; applying `fixes[0]` of the first leaves `codes` empty; applying all six leaves `effects` with the value once |
 | R001 | `get-row`'s `asked` runs `#requst`; then `#reqeust`; then `#xyz`; then a planted port with `get` and `set` and a node running `#sit` | `set: '@http/http.port.json#request'` for the first two and applying it leaves `codes` empty (the G011s go with it); no `fixes` for the third and fourth |
-| D008 | `customers-api.connection.json` relocated under `features/customers/data/`; `get-row.graph.json` relocated to `edge/`; `Customer.shape.json` given `"layer": "edge"` | one `move` and applying it leaves `codes` empty; no `fixes`; two alternatives in that order, and applying either leaves `codes` empty |
+| D008 | `customers-api.connection.json` relocated under `features/customers/data/`; `get-row.graph.json` relocated to `edge/`; `Customer.shape.json` given `"layer": "edge"` | one `move` and applying it leaves `codes` empty (likewise for a port in `edge/`, a trigger in no layer, a scenario under a feature and a shape in `data/`); no `fixes` (likewise for a shape in no layer and a port outside any feature); the one `set` of `layer` to `"core"`, and applying it leaves `codes` empty |
 | every rule | the whole suite | no refusal of any sabotage in the existing suites carries a `fixes` that, applied, leaves a refusal of the same code behind -- a guard that the rule of `fixes` holds for whatever a later pull request adds |
 
 **Runtime**, `packages/runtime/test/tools.test.ts`, on copies of the example:
@@ -486,7 +490,8 @@ the four sections.
    `graph.ts` and `bindings.ts`; the harness's `refusalsAfter` and `applyFix`; `sabotage-fixes.test.ts` with L003 and
    the every-rule guard.
 3. Compiler: `nearest.ts`; R001's fix in `Judge.opAt`; its tests.
-4. Core: D008's fixes in `placement.ts`; their tests through `relocate` and `sabotage`.
+4. Core: D008's fixes in `placement.ts` (the move home, or the set of a shape's `layer`); their tests in
+   `sabotage-fixes.test.ts`.
 5. Runtime: `diagnostics.ts` and `diagnostics.schema.json`; `Rehearsal.decisions` and `plain`; `regress`'s `results`;
    `--json` on `check`, `rehearse` and `regress` and in `check()`; USAGE; the runtime and CLI tests.
    `scenarios --check --json` (`withStaleness`, its schema members, its test) follows once RFC 0018's step 7 has landed
