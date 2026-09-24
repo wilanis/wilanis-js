@@ -8,10 +8,15 @@
 import { describe, expect, it } from 'vitest';
 import { sabotage, sabotageHinting, sabotagePointing, sabotageSaying } from './example-harness.js';
 
-const GRAPH = 'features/customers/data/kept-update.graph.json';
+const GRAPH = 'features/customers/data/keep-customer.graph.json';
 const STORE = '@storage/store.port.json';
 const CUSTOMERS = '@customers/data/customers.store.json';
 const CUSTOMER = '@customers/domain/Customer.shape.json';
+/**
+ * What the toggles read of the customer: its key and who it is. keep-customer takes the whole record, and a toggle
+ * that writes some fields of it leaves the rest unread, which is G008's and not the claim here.
+ */
+const TAKES = '@customers/domain/RawCustomer.shape.json';
 
 const run = (id: string, op: string, input: Record<string, unknown>) => ({
   type: '@wilanis/node/run.schema.json',
@@ -69,6 +74,7 @@ const shared = (active: string, inactive: string) => ({
 /** The issue's toggle: the flag switch routes to each branch's check, and both writes sit beside it. */
 const toggle = (graph: any) => {
   const { before, after, from } = shared('checkActivate', 'checkDeactivate');
+  graph.in = TAKES;
   graph.nodes = [...before, patch('activate', true), patch('deactivate', false), ...after];
   graph.out.from = from;
 };
@@ -76,12 +82,14 @@ const toggle = (graph: any) => {
 /** The same toggle as the other agents wrote it: the flag switch routes to the write, and the check reads it. */
 const routedToggle = (graph: any) => {
   const { before, after, from } = shared('activate', 'deactivate');
+  graph.in = TAKES;
   graph.nodes = [...before, patch('activate', true), patch('deactivate', false), ...after];
   graph.out.from = from;
 };
 
 /** One write beside the presence switch, checked under both of its branches: read on every run. */
 const checkedEverywhere = (graph: any) => {
+  graph.in = TAKES;
   graph.nodes = [
     get,
     decide('check', { record: '{{get.record}}' }, [{ when: 'has(record)', to: 'wasThere' }], 'wasNot'),

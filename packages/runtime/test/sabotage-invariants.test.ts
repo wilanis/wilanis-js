@@ -5,8 +5,9 @@
  * invariant says a customer is always reachable, so breaking the rule itself (I004), or writing a
  * value that contradicts it where every read is a literal (I005), is what the site rules answer.
  */
+import { schemaUrl } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
-import { sabotage, sabotageSaying } from './example-harness.js';
+import { plantedEditing, sabotage, sabotageSaying } from './example-harness.js';
 
 const WRITES = 'features/customers/domain/writes-are-for-registrars.invariant.json';
 const SESSIONS = 'features/directories/domain/the-session-is-the-callers.invariant.json';
@@ -131,9 +132,17 @@ describe('sabotage: invariants, the field form', () => {
   });
 
   it('I003 a rule over a core shape no graph makes or takes', () => {
+    // every core shape of the example is made or taken somewhere, so the case plants one nothing names
+    const unmade = {
+      $schema: schemaUrl('shape'),
+      label: 'Unmade',
+      layer: 'core',
+      description: 'A shape no graph makes or takes.',
+      fields: { tier: { type: 'string' } },
+    };
     expect(
-      sabotage(REACHABLE, invariant => {
-        invariant.holds.on = '@customers/domain/TierLatest.shape.json';
+      plantedEditing({ 'features/customers/domain/Unmade.shape.json': unmade }, REACHABLE, invariant => {
+        invariant.holds.on = '@customers/domain/Unmade.shape.json';
         invariant.holds.when = 'len(tier) > 0';
       }),
     ).toEqual([...UNGUARDED, 'I003']);

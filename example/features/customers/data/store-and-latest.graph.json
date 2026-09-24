@@ -2,8 +2,8 @@
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Store a customer and their tier's latest",
   "atomic": true,
-  "description": "Data graph behind customer.register: the customer is stored and the latest registration of their tier is written beside it, and the graph answers only when both are in. The two writes move together -- a reader asking who was registered into gold most recently can never be told a customer that was not stored, and no customer can be stored without their tier's latest catching up. That is what atomic buys here, and it is one word rather than a graph that undoes what it wrote.",
-  "in": "@customers/domain/CustomerRecord.shape.json",
+  "description": "Data graph behind customer.register: the customer, made whole in the domain and handed in as in, is stored and the latest registration of their tier is written beside it, and the graph answers only when both are in. The two writes move together -- a reader asking who was registered into gold most recently can never be told a customer that was not stored, and no customer can be stored without their tier's latest catching up. That is what atomic buys here, and it is one word rather than a graph that undoes what it wrote.",
+  "in": "@customers/domain/Customer.shape.json",
   "out": {
     "type": "@customers/domain/Customer.shape.json",
     "from": [
@@ -15,29 +15,27 @@
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "key",
-      "label": "A key no record has",
-      "run": "@storage/store.port.json#newKey",
-      "in": {
-        "store": "@customers/data/customers.store.json",
-        "collection": "customers"
-      }
-    },
-    {
-      "type": "@wilanis/node/run.schema.json",
       "id": "stored",
-      "label": "Write the customer under that key",
+      "label": "Write the customer",
       "run": "@storage/store.port.json#put",
       "in": {
         "store": "@customers/data/customers.store.json",
         "collection": "customers",
-        "record": {
-          "id": "{{key}}",
-          "name": "{{in.name}}",
-          "email": "{{in.email}}",
+        "record": "{{in}}"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "tierLatest",
+      "label": "The tier's latest",
+      "run": "@std/object.port.json#make",
+      "in": {
+        "value": {
           "tier": "{{in.tier}}",
-          "registrar": "{{in.registrar}}"
-        }
+          "email": "{{in.email}}",
+          "customer": "{{in.id}}"
+        },
+        "type": "@customers/domain/TierLatest.shape.json"
       }
     },
     {
@@ -49,11 +47,7 @@
       "in": {
         "store": "@customers/data/customers.store.json",
         "collection": "latest",
-        "record": {
-          "tier": "{{in.tier}}",
-          "email": "{{in.email}}",
-          "customer": "{{key}}"
-        }
+        "record": "{{tierLatest}}"
       }
     },
     {

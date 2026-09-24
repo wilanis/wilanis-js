@@ -4,7 +4,7 @@
  * whose draft is the trigger's own input, and the CSV import, which maps `submit` over the drafts a data graph read
  * from the file. Its switch reads only what the store answered. Planting the form the issue shows, a pure node
  * composing the record from the whole of `in` before the write, must leave every branch settling: `in` is a
- * `CustomerRecord`, whose fields are all required, and the same graph answers when it runs for real.
+ * `Customer`, made whole in the domain before it is handed down, and the same graph answers when it runs for real.
  *
  * What broke was the import's path. To reach the switch at all the walk stubs the list the map runs over with one
  * element, and the node holding that list is a call into a graph, which no stub records a type for; the element
@@ -31,7 +31,7 @@ function composeBeforeTheWrite(dir: string) {
     run: '@std/object.port.json#make',
     in: {
       value: {
-        id: '{{key}}',
+        id: '{{in.id}}',
         name: '{{in.name}}',
         email: '{{in.email}}',
         tier: '{{in.tier}}',

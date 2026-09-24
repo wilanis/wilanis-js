@@ -40,7 +40,7 @@ describe("the project page's profiles", () => {
     ]);
     expect(production?.reaches).toContainEqual({
       port: '@storage/store.port.json',
-      operations: ['find', 'get', 'newKey', 'patch', 'put', 'remove'],
+      operations: ['find', 'get', 'newKey', 'put', 'remove'],
       connections: ['@connections/customers-postgres.connection.json'],
     });
     expect(production?.holds.map(group => group.port)).toContain('@http/server.port.json');

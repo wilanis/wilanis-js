@@ -9,10 +9,15 @@
 import { describe, expect, it } from 'vitest';
 import { sabotageHinting, sabotagePointing } from './example-harness.js';
 
-const GRAPH = 'features/customers/data/kept-update.graph.json';
+const GRAPH = 'features/customers/data/keep-customer.graph.json';
 const STORE = '@storage/store.port.json';
 const STORE_DOC = '@customers/data/customers.store.json';
 const CUSTOMER = '@customers/domain/Customer.shape.json';
+/**
+ * What the toggle reads of the customer: its key and who it is. keep-customer takes the whole record, and a toggle
+ * that writes some fields of it leaves the rest unread, which is G008's and not the claim here.
+ */
+const TAKES = '@customers/domain/RawCustomer.shape.json';
 
 const run = (id: string, op: string, input: Record<string, unknown>) => ({
   type: '@wilanis/node/run.schema.json',
@@ -43,8 +48,10 @@ const missing = run('noCustomer', '@std/outcome.port.json#refuse', {
   type: CUSTOMER,
 });
 
-/** kept-update rewritten as the toggle from the issue: both writes beside the switch, their answers ORed. */
+/** keep-customer rewritten as the toggle from the issue: both writes beside the switch, their answers ORed. */
 const toggle = (graph: any) => {
+  graph.in = TAKES;
+  graph.out.from = ['customer', 'noCustomer'];
   graph.nodes = [
     get,
     decide('check', [{ when: 'has(record)', to: 'customer' }], 'noCustomer'),
@@ -92,6 +99,7 @@ describe('sabotage: a graph written as control flow', () => {
 
   it('G008 keeps its hint at an effect a switch routes and nothing reads: it already runs on one branch', () => {
     const hints = sabotageHinting(GRAPH, graph => {
+      graph.in = TAKES;
       graph.nodes = [
         get,
         decide('check', [{ when: 'has(record)', to: 'pin' }], 'noCustomer'),
@@ -104,7 +112,7 @@ describe('sabotage: a graph written as control flow', () => {
   });
 
   it('G004 keeps its hint where one read of the wrong type feeds the input', () => {
-    // the example's own customer, handed the id where it made the record
+    // the example's own record as kept, handed the id where it made the record
     const hints = sabotageHinting(GRAPH, graph => {
       graph.nodes[2].in.value = '{{in.id}}';
     });

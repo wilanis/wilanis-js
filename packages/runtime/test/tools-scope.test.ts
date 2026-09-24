@@ -99,9 +99,10 @@ describe('wilanis describe and map: the scope a store keeps its rows under', () 
   });
 
   it('prints no scope under a newKey, whose key is global to the table whatever the scope', () => {
-    const said = linesOf('@customers/data/store-and-latest.graph.json');
+    const said = linesOf('@customers/data/next-id.graph.json');
     const key = said.indexOf('    key  @storage/store.port.json#newKey');
-    expect(said[key + 1]).not.toContain('scope tenant');
+    expect(key).toBeGreaterThanOrEqual(0);
+    expect(said.slice(key + 1).join('\n')).not.toContain('scope tenant');
   });
 
   it('prints no scope under a node over a collection that keeps its rows for everyone', () => {

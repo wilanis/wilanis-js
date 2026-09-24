@@ -9,7 +9,7 @@ describe('sabotage: graphs, layers and triggers', () => {
   it('G003 a deep path that does not exist', () => {
     expect(
       sabotage('features/customers/domain/register-customer.graph.json', graph => {
-        graph.nodes[0].in.email = '{{in.emaill}}';
+        graph.nodes.find((node: { id: string }) => node.id === 'customer').in.value.email = '{{in.emaill}}';
       }),
     ).toContain('G003');
   });
@@ -23,7 +23,7 @@ describe('sabotage: graphs, layers and triggers', () => {
   it('G005 a required input left unwired', () => {
     expect(
       sabotage('features/customers/domain/register-customer.graph.json', graph => {
-        delete graph.nodes[0].in.email;
+        delete graph.nodes.find((node: { id: string }) => node.id === 'registered').in.email;
       }),
     ).toContain('G005');
   });

@@ -116,6 +116,7 @@ describe('the view of an access invariant', () => {
     expect(seen.covers.map(one => one.opName)).toEqual([
       'register',
       'update',
+      'keep',
       'remove',
       'removeMany',
       'submit',
@@ -171,7 +172,7 @@ describe('the view of an access invariant', () => {
     // either. A page that said "satisfied by" where wilanis check refuses I001 would be worse than silent,
     // and the rule now lives in one place -- metBy in the compiler, judged as TriggerGate.unmet judges it
     const seen = await access(WRITES);
-    expect(seen.reached.length).toBe(9);
+    expect(seen.reached.length).toBe(10);
     expect(new Set(seen.reached.map(one => one.trigger)).size).toBe(5);
     // the example meets its own invariants, so every way in is met and none is left unjudged
     for (const one of seen.reached) {
@@ -211,11 +212,17 @@ describe('the view of a field invariant', () => {
   it('tables every site of the shape, read from the compiler and never worked out here', () => {
     const seen = holds('len(name) > 0');
     expect(Object.keys(seen).sort()).toEqual(['fields', 'form', 'on', 'onLabel', 'sites', 'when']);
-    // the sites are `sitesOf`'s, which is what the checker judges (I005) and the compiler guards by: sixteen
-    // places a value of Customer comes into being in the example, fifteen nodes that make one and one graph that
-    // takes a list. The viewer counts none of them itself; it asks the one function that already knows.
-    expect(seen.sites.length).toBe(16);
+    // the sites are `sitesOf`'s, which is what the checker judges (I005) and the compiler guards by: twenty-three
+    // places a value of Customer comes into being in the example, seventeen nodes that make one, five data graphs
+    // that take one whole to write it, and one that takes a list. The viewer counts none of them itself; it asks
+    // the one function that already knows.
+    expect(seen.sites.length).toBe(23);
     expect(seen.sites.filter(site => site.kind === 'taken').map(site => [site.graph, site.node, site.arity])).toEqual([
+      ['@features/customers/data/keep-customer-postgres.graph.json', 'in', 'one'],
+      ['@features/customers/data/keep-customer.graph.json', 'in', 'one'],
+      ['@features/customers/data/store-and-latest-postgres.graph.json', 'in', 'one'],
+      ['@features/customers/data/store-and-latest.graph.json', 'in', 'one'],
+      ['@features/customers/data/update-row.graph.json', 'in', 'one'],
       ['@features/customers/data/write-csv.graph.json', 'in', 'list'],
     ]);
     // none of the example's sites proves this rule, so every one is guarded and none carries a `held`

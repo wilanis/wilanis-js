@@ -243,6 +243,16 @@ describe('sabotage: what a store holds its records to', () => {
   });
 });
 
+/** The data graph behind customer.keep, whose one write puts the whole record. */
+const KEEP = 'features/customers/data/keep-customer.graph.json';
+
+/** keep-customer's write turned into a patch of the customer it takes, changing these fields. */
+const patching = (changes: Record<string, unknown>) => (doc: any) => {
+  const { store, collection } = doc.nodes[0].in;
+  doc.nodes[0].run = '@storage/store.port.json#patch';
+  doc.nodes[0].in = { store, collection, key: '{{in.id}}', changes };
+};
+
 /**
  * What a call means once the store is understood: which fields a patch may change, where `ensure` is reached
  * from, and whose records a feature keeps. These break the example's own documents, since RFC 0002 step 8
@@ -250,24 +260,15 @@ describe('sabotage: what a store holds its records to', () => {
  */
 describe('what a call may do to the records', () => {
   it('X211 a patch that changes the key: a key identifies, so it is never patched', () => {
-    const found = sabotage('features/customers/data/kept-update.graph.json', doc => {
-      doc.nodes[0].in.changes.id = 'other';
-    });
-    expect(found).toContain('X211');
+    expect(sabotage(KEEP, patching({ id: 'other' }))).toContain('X211');
   });
 
   it('X211 a patch that changes a field the shape does not have', () => {
-    const found = sabotage('features/customers/data/kept-update.graph.json', doc => {
-      doc.nodes[0].in.changes.nope = 'x';
-    });
-    expect(found).toContain('X211');
+    expect(sabotage(KEEP, patching({ nope: 'x' }))).toContain('X211');
   });
 
   it('X211 a patch whose value the field would not accept', () => {
-    const found = sabotage('features/customers/data/kept-update.graph.json', doc => {
-      doc.nodes[0].in.changes.url = 7;
-    });
-    expect(found).toContain('X211');
+    expect(sabotage(KEEP, patching({ active: 7 }))).toContain('X211');
   });
 
   it('X212 ensure run by a graph node: it prepares the engine once, before the port opens', () => {

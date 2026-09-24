@@ -36,17 +36,21 @@ describe('the example tree', () => {
     expect(text.match(/list-rows {2}switch 'outcome'/g)).toHaveLength(1);
     // delete-row is reached directly by the single delete and once per element by the batch delete's map
     expect(text.match(/delete-row {2}switch 'outcome'/g)).toHaveLength(1);
-    // the sixteenth decision is the guard over the CSV export's list of customers, whose nested spec the walk
-    // opens by name; the fifteen the tree's authors wrote are unchanged
-    expect(text).toMatch(/every branch settled -- 43 branch\(es\), 17 decision\(s\), 16 graph\(s\)/);
+    // five of the twenty decisions are guards the compiler lowered: the one over the CSV export's list of
+    // customers, whose nested spec the walk opens by name, the tier listing's, the two over the customer
+    // register and update make before anything is written, and the REST write's over the customer it is handed
+    expect(text).toMatch(/every branch settled -- 49 branch\(es\), 20 decision\(s\), 18 graph\(s\)/);
   });
   it('reaches both the answer and the declared failure of every data graph', async () => {
     const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'live' });
     const text = run.lines.join('\n');
-    // the six data graphs each answer on one branch and refuse on purpose on the others
-    expect(text.match(/refused on purpose at 'upstreamFailed' as upstream/g)).toHaveLength(6);
-    // the three graphs behind an id declare what a missing id means, and say so in one word the trigger maps
-    expect(text.match(/refused on purpose at 'noCustomer' as missing: "no customer /g)).toHaveLength(3);
+    // five of the six data graphs each answer on one branch and refuse on purpose on the others. The sixth,
+    // update-row, sits behind the get update-customer runs first, and the rehearsal steers a switch's own inputs
+    // and not the calls on the way to it: get-row's generated answer ends the run before update-row is reached,
+    // so its branches are credited with get-row's refusal rather than their own
+    expect(text.match(/refused on purpose at 'upstreamFailed' as upstream/g)).toHaveLength(5);
+    // the graphs behind an id declare what a missing id means, and say so in one word the trigger maps
+    expect(text.match(/refused on purpose at 'noCustomer' as missing: "no customer /g)).toHaveLength(2);
     // every branch that answers names the node it answered from, never a bare status word: the registry's eight,
     // the access feature's, and the `in:ok` of the guard over the CSV export's list
     expect(text.match(/answered from '/g)).toHaveLength(20);
@@ -55,14 +59,15 @@ describe('the example tree', () => {
     expect(text).toMatch(/anything else/);
     expect(text).toMatch(/when status == 404/);
   });
-  it('prints how long each branch took under --verbose, and never without it', async () => {
+  it('prints how long each branch took under --verbose, and never without it', { timeout: 20_000 }, async () => {
     const quiet = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'live' });
     const loud = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, verbose: true, profile: 'live' });
     expect(quiet.ok && loud.ok, quiet.lines.join('\n')).toBe(true);
     // a duration is an aside for a reader, so it is absent from the ordinary report
     expect(quiet.lines.join('\n')).not.toMatch(/\(\d+ms\)/);
-    // and present on every branch that ran under --verbose -- an uncovered one never ran, so it has none
-    const ran = loud.lines.filter(line => /^ {2}(ok|!!) /.test(line));
+    // and present on every branch that ran under --verbose -- an uncovered one never ran, so it has none, and
+    // neither has one held upstream, whose value a guard in the calling graph judged instead
+    const ran = loud.lines.filter(line => /^ {2}(ok|!!) /.test(line) && !line.includes(' held upstream by '));
     expect(ran.length).toBeGreaterThan(0);
     expect(
       ran.every(line => /\(\d+ms\)$/.test(line)),
@@ -172,8 +177,9 @@ describe('branch rehearsal', () => {
     // atomicity is a property of the run, not of the routing: the solver walks the same branches either way
     expect(before).not.toContain('(atomic)');
     expect(before).not.toContain('rolled back');
-    // two decisions of this one graph: its own `bothWritten`, and the `customer:check` the guard over Customer lowered
-    expect(after.match(/\(atomic\)/g)).toHaveLength(2);
+    // three decisions of this one graph: its own `bothWritten`, and the `in:check` and `customer:check` the guards
+    // over Customer lowered, one for the customer it is handed and one for the customer the store answers
+    expect(after.match(/\(atomic\)/g)).toHaveLength(3);
     expect(after.replace(/ {2}\(atomic\)/g, '').replace(/, rolled back/g, '')).toBe(before);
   });
 

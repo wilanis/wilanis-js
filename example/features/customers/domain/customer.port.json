@@ -30,32 +30,23 @@
       },
       "returns": "@customers/domain/Customer.shape.json"
     },
+    "nextId": {
+      "description": "A key no customer has yet, for a customer about to be registered, so the domain can make the whole record before anything is written.",
+      "returns": "string"
+    },
     "register": {
-      "description": "Store a new customer and answer them with their id.",
-      "accepts": {
-        "name": {
-          "type": "string"
-        },
-        "email": {
-          "type": "string"
-        },
-        "tier": {
-          "type": "string",
-          "enum": [
-            "bronze",
-            "silver",
-            "gold"
-          ]
-        },
-        "registrar": {
-          "type": "string"
-        }
-      },
+      "description": "Store a new customer, made whole upstream with the key nextId gave, and answer them as kept. Fails as conflict when another customer holds the address.",
+      "accepts": "@customers/domain/Customer.shape.json",
       "returns": "@customers/domain/Customer.shape.json"
     },
     "update": {
       "description": "Replace who one customer is. Fails when there is no such customer.",
       "accepts": "@customers/domain/CustomerUpdate.shape.json",
+      "returns": "@customers/domain/Customer.shape.json"
+    },
+    "keep": {
+      "description": "Keep one customer as given, the whole record, under their own id. Fails as conflict when another customer holds the address.",
+      "accepts": "@customers/domain/Customer.shape.json",
       "returns": "@customers/domain/Customer.shape.json"
     },
     "remove": {

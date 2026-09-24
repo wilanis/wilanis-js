@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "A key for a new customer",
+  "description": "Data graph behind customer.nextId under the production profile: a key no customer of the store has, asked for before the customer is made, so the domain holds the whole record before anything is written. The same graph as @customers/data/next-id.graph.json, against the store kept in PostgreSQL: a store is named statically at a call site, so pointing these at another connection is a copy until a profile may swap one.",
+  "out": {
+    "type": "string",
+    "from": "key"
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "key",
+      "label": "A key no record has",
+      "run": "@storage/store.port.json#newKey",
+      "in": {
+        "store": "@customers/data/customers-postgres.store.json",
+        "collection": "customers"
+      }
+    }
+  ]
+}

@@ -31,6 +31,12 @@ const CUSTOMER = '@customers/domain/Customer.shape.json';
 /** The example rehearsed under the profile whose bindings reach the store, where the guards are lowered. */
 const localRun = () => rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'local' });
 
+/**
+ * Whether a line heads a guard's decision. A branch held upstream names the guard that held it too, indented
+ * beneath its own header, so a header is the unindented line.
+ */
+const isGuard = (line: string) => !line.startsWith(' ') && line.includes(" guard '");
+
 /** The lines of a decision: its header and every branch under it, up to the next header. */
 function decision(lines: string[], head: string): string[] {
   const at = lines.findIndex(line => line.includes(head));
@@ -72,7 +78,7 @@ describe('the rehearsal reports a guard', () => {
   it('solves both branches of every guard, at every seed: a guard is a switch and nothing new is solved', async () => {
     for (const seed of [1, 2, 3, 7]) {
       const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed, profile: 'local' });
-      const guards = run.lines.filter(line => line.includes(" guard '"));
+      const guards = run.lines.filter(isGuard);
       expect(guards.length).toBeGreaterThan(0);
       for (const line of guards) expect(line).toContain('2/2 branches');
     }
@@ -80,30 +86,35 @@ describe('the rehearsal reports a guard', () => {
 
   /**
    * How many guards the walk reaches, named rather than counted loosely, because "every guard it found settles
-   * 2/2" is true of a walk that finds one of them and of a walk that finds them all. It reaches eight, which is
-   * every guard this profile can run: `local` binds eight of the sixteen guarded sites -- the four of arity
-   * `one` at `<id>:check`, and four of arity `list` (the listing, the listing across tenants, the listing by
-   * tier and the CSV export), whose guard is the `in:check` of the nested spec the compiler keys as
-   * `guard:<graph>#<id>` and the walk now opens by that name (#437). Seven of the other eight are the
-   * `-postgres` copies of the same graphs, which only the `production` profile binds, and the last is the REST
-   * listing by tier, which only `live` binds, so no run under this one reaches them; the summary's sixteen
-   * counts sites over the whole tree and is not a per-profile number.
+   * 2/2" is true of a walk that finds one of them and of a walk that finds them all. It reaches twelve, which is
+   * every guard this profile can run: `local` binds twelve of the twenty-three guarded sites -- six made sites
+   * of arity `one` at `<id>:check` (the five named `customer`, and `kept` behind keep-customer's write), two
+   * taken ones at `in:check` (the whole customer store-and-latest and keep-customer are handed to write), and
+   * four of arity `list` (the listing, the listing across tenants, the listing by tier and the CSV export),
+   * whose guard is the `in:check` of the nested spec the compiler keys as `guard:<graph>#<id>` and the walk
+   * opens by that name (#437). Nine of the other eleven are the `-postgres` copies of the same graphs, which only
+   * the `production` profile binds, and the last two are the REST listing by tier and the REST write, which only
+   * `live` binds, so no run under this one reaches them; the summary's twenty-three counts sites over the whole
+   * tree and is not a per-profile number. The two taken sites are judged on this path by the made site of the
+   * domain graph that handed the customer down, so they are reported held there rather than run (RFC 0035).
    *
    * The two counts are therefore different questions and neither is loosened here: change either only when the
    * example gains or loses a guarded site, and say which of the two moved.
    */
   it('reaches every guard the profile binds, whatever the arity of its site', async () => {
     const run = await localRun();
-    const guards = run.lines.filter(line => line.includes(" guard '"));
-    expect(guards).toHaveLength(8);
-    // the four made sites of a single value, at the `<id>:check` the RFC names
-    expect(guards.filter(line => line.includes("guard 'customer:check'"))).toHaveLength(4);
-    // and the four lists, each judged element by element inside a nested spec whose ids are the fixed `in:*`
-    expect(guards.filter(line => line.includes("guard 'in:check'"))).toHaveLength(4);
+    const guards = run.lines.filter(isGuard);
+    expect(guards).toHaveLength(12);
+    // the six made sites of a single value, at the `<id>:check` the RFC names
+    expect(guards.filter(line => line.includes("guard 'customer:check'"))).toHaveLength(5);
+    expect(guards.filter(line => line.includes("guard 'kept:check'"))).toHaveLength(1);
+    // the two taken customers and the four lists, the lists judged element by element inside a nested spec
+    // whose ids are the fixed `in:*`
+    expect(guards.filter(line => line.includes("guard 'in:check'"))).toHaveLength(6);
     // every one of them walks both branches, a list's exactly as a single value's
     for (const line of guards) expect(line).toContain('2/2 branches');
     // while the summary counts every site the checker could not prove, over the tree rather than the profile
-    expect(stated(run.lines)).toContain('  A customer is reachable  proved at 0 site(s), guarded at 16');
+    expect(stated(run.lines)).toContain('  A customer is reachable  proved at 0 site(s), guarded at 23');
   });
 
   it("labels a list guard's branches holds and violated, as a guard of arity one's are", async () => {
@@ -125,18 +136,19 @@ describe('the rehearsal reports a guard', () => {
     expect(said).toContain('  Writes are for registrars  holds at 5 trigger(s)');
     expect(said).toContain("  The session is the caller's  holds at 3 trigger(s)");
     // and the field form counts its sites: every site of Customer in the example is one the checker could not prove
-    expect(said).toContain('  A customer is reachable  proved at 0 site(s), guarded at 16');
+    expect(said).toContain('  A customer is reachable  proved at 0 site(s), guarded at 23');
   });
 
   it('counts the same invariants under a profile that reaches almost none of the guarded sites', async () => {
     // an invariant is stated over the tree, not over a profile: the sites are the same however the tree is bound
     const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'live' });
     expect(run.ok).toBe(true);
-    expect(stated(run.lines)).toContain('  A customer is reachable  proved at 0 site(s), guarded at 16');
-    // while the walk reaches only the two guards this profile binds -- the CSV export, whose graph every profile
-    // shares, and the tier listing's empty answer -- which is the difference between what a tree states and what
-    // one profile's run can exercise
-    expect(run.lines.filter(line => line.includes(" guard '"))).toHaveLength(2);
+    expect(stated(run.lines)).toContain('  A customer is reachable  proved at 0 site(s), guarded at 23');
+    // while the walk reaches only the five guards this profile binds -- the CSV export, whose graph every profile
+    // shares, the tier listing's empty answer, the two domain graphs that make a customer before it is written,
+    // and the REST write's own guard on the customer it is handed -- which is the difference between what a tree
+    // states and what one profile's run can exercise
+    expect(run.lines.filter(isGuard)).toHaveLength(5);
   });
 
   /**
@@ -202,7 +214,7 @@ describe('the rehearsal reports a guard', () => {
       const said = stated((await rehearse(load, { seed: 1, profile: 'local' })).lines);
       const line = said.find(one => one.includes('A customer is reachable'));
       // one more site than the example has, and it is the proved one: the other sixteen still carry a guard
-      expect(line).toBe('  A customer is reachable  proved at 1 site(s), guarded at 16');
+      expect(line).toBe('  A customer is reachable  proved at 1 site(s), guarded at 23');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

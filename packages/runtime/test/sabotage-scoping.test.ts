@@ -23,6 +23,7 @@ import {
   GET_TRIGGER,
   LIST,
   LIST_EVERY,
+  NEXT_ID,
   RESOLVERS,
   SESSION,
   STORE,
@@ -30,7 +31,6 @@ import {
   scopedHinting,
   scopedPointing,
   scopedSaying,
-  WRITE,
 } from './scoping-harness.js';
 
 /** get-customer with the signed-in policy dropped: nothing then proves the session the store's scope reads. */
@@ -235,10 +235,8 @@ describe('sabotage: how a store is scoped', () => {
   it('X214 a scope on newKey, which mints a key across every scope and takes none', () => {
     // a key is global: one tenant is never handed a key another already holds, so there is no scope to mint
     // one under, and the port declares no `scope` on the operation at all
-    const broken = { [WRITE]: (graph: any) => (graph.nodes[0].in.scope = { tenant: 'acme' }) };
-    expect(scopedPointing(broken)).toContain(
-      'X214 @features/customers/data/store-and-latest.graph.json#nodes/key/in/scope',
-    );
+    const broken = { [NEXT_ID]: (graph: any) => (graph.nodes[0].in.scope = { tenant: 'acme' }) };
+    expect(scopedPointing(broken)).toContain('X214 @features/customers/data/next-id.graph.json#nodes/key/in/scope');
   });
   it("X208 a where naming the scope column: a scope is the store's column, never a field to filter on", () => {
     // the column is not a field of Customer, so the filter names something the shape does not have -- which is

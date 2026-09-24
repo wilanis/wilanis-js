@@ -387,7 +387,9 @@ in the scaffold for a collection no invariant reads or goes altogether; and the 
    the record is taken whole, and the shape is stated once, so the rewrite in step 1 is written against it.
    The comparison is structural, as it is for fields: `CustomerUpdate` fits a graph whose `in` is `Customer`,
    since every field `Customer` adds is optional, so the sabotage test binds `update` to a graph whose `in`
-   is `CustomerRecord`, which requires `registrar`.
+   is `CustomerRecord`, which requires `registrar`. (Step 1 makes `CustomerRecord` what the REST API is sent,
+   whose `registrar` is as optional as `Customer`'s, and the case moves to `TierLatest`, which requires
+   `customer`.)
 2. **An `accepts` string that names no shape is R001.** The schema's alternative is `typeRef`, which also admits
    `string` or `Customer.shape.json[]`; only a shape has fields to give one by one, so `Judge.acceptsTypeAt`
    refuses any other type at `operations/<op>/accepts` under the code an unresolved type already takes. No code

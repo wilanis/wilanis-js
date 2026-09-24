@@ -91,7 +91,7 @@ describe('map under a profile', () => {
     expect(lines).toContain(`unreached under local  @features/customers/data/delete-row.graph.json  bound by ${REST}`);
     // one line per graph the other profiles' bindings run, after the triggers and before any orphan
     const unreached = lines.filter(line => line.startsWith('unreached under local  '));
-    expect(unreached).toHaveLength(6);
+    expect(unreached).toHaveLength(4);
     expect(unreached.every(line => line.includes(`bound by ${POSTGRES}`) || line.includes(`bound by ${REST}`))).toBe(
       true,
     );

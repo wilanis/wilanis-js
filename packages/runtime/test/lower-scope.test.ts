@@ -45,7 +45,7 @@ describe('the scope the lowering fills, which no document writes', () => {
     expect(nodes.stored.in.scope).toEqual({ object: { tenant } });
     expect(nodes.latest.in.scope).toBeUndefined();
     // and newKey takes none, because it declares none: a key is global to the table whatever the scope
-    expect(nodes.key.in.scope).toBeUndefined();
+    expect(nodesOf('@features/customers/data/next-id.graph.json').key.in.scope).toBeUndefined();
   });
   it('carries none to the find over a view, which sees every row of the collection it views', () => {
     // the digest's graph: the one site of the example that reads across tenants, and no scope is put on it

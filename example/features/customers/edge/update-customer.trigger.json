@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
   "label": "PUT /customers/{id}",
-  "description": "PUT /customers/{id}: the id from the route, who the customer now is from the body → the customer; 404 as missing when there is none, 502 as upstream when the customer API broke. Employees holding the registrar role only: 401 as anonymous without a token or as invalid_credential with a bad one, 403 as forbidden for a customer or an employee without the role.",
+  "description": "PUT /customers/{id}: the id from the route, who the customer now is from the body → the customer; 404 as missing when there is none, 409 as conflict when another customer holds the address, 500 as invariant when who they now are is not a customer this tree keeps (a gold customer without a note), 502 as upstream when the customer API broke. Employees holding the registrar role only: 401 as anonymous without a token or as invalid_credential with a bad one, 403 as forbidden for a customer or an employee without the role.",
   "settings": {
     "route": "/customers/{id}",
     "method": "PUT",
@@ -15,7 +15,8 @@
         "anonymous": 401,
         "invalid_credential": 401,
         "forbidden": 403,
-        "invariant": 500
+        "invariant": 500,
+        "conflict": 409
       }
     }
   },
@@ -40,7 +41,8 @@
       "id": "{{request.params.id}}",
       "name": "{{request.body.name}}",
       "email": "{{request.body.email}}",
-      "tier": "{{request.body.tier}}"
+      "tier": "{{request.body.tier}}",
+      "note": "{{request.body.note}}"
     }
   }
 }

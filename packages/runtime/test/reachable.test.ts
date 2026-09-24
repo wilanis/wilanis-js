@@ -48,12 +48,13 @@ describe('operationsReachable: what an operation calls', () => {
 
   it.each(PROFILES)('reaches #register from #import transitively, under %s', profile => {
     // import -> import-customers.graph -> #registerAll -> register-all|register-each.graph -> #submit
-    //        -> register-customer.graph -> #register. Three bindings deep, and no document of the edge names it.
+    //        -> register-customer.graph -> #nextId, #register. Three bindings deep, and no document of the edge names it.
     expect(reaches(`${CUSTOMER}#import`, profile)).toEqual([
       '#import',
       '#parseDrafts',
       '#registerAll',
       '#submit',
+      '#nextId',
       '#register',
     ]);
   });
@@ -70,8 +71,8 @@ describe('operationsReachable: what an operation calls', () => {
   it('follows the profile, since a profile chooses which graph meets an operation', () => {
     // #registerAll is bound to register-each under live and register-all under local: both map #submit, and the
     // walk arrives at #register either way. A rule about the port cannot be answered under one profile alone.
-    expect(reaches(`${CUSTOMER}#registerAll`, 'live')).toEqual(['#registerAll', '#submit', '#register']);
-    expect(reaches(`${CUSTOMER}#registerAll`, 'local')).toEqual(['#registerAll', '#submit', '#register']);
+    expect(reaches(`${CUSTOMER}#registerAll`, 'live')).toEqual(['#registerAll', '#submit', '#nextId', '#register']);
+    expect(reaches(`${CUSTOMER}#registerAll`, 'local')).toEqual(['#registerAll', '#submit', '#nextId', '#register']);
   });
 
   it('records no native operation: a native port is not a way into the domain', () => {

@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
-  "label": "Update a row",
-  "description": "Data graph behind customer.update: PUT the new call. 200 is the updated customer, 404 is the declared refusal for an id that does not exist, anything else is a failure.",
-  "in": "@customers/domain/CustomerUpdate.shape.json",
+  "label": "Put a row",
+  "description": "Data graph behind customer.keep: PUT the whole customer under their id. 200 is the row as kept, 404 is the declared refusal for an id that does not exist, anything else is a failure. The id is the route's, so the body carries every other field of the customer.",
+  "in": "@customers/domain/Customer.shape.json",
   "out": {
     "type": "@customers/domain/Customer.shape.json",
     "from": [
@@ -15,13 +15,16 @@
     {
       "type": "@wilanis/node/run.schema.json",
       "id": "updated",
-      "label": "PUT the row",
+      "label": "PUT the customer",
       "run": "@http/http.port.json#request",
       "in": {
         "body": {
           "name": "{{in.name}}",
           "email": "{{in.email}}",
-          "tier": "{{in.tier}}"
+          "tier": "{{in.tier}}",
+          "registrar": "{{in.registrar}}",
+          "active": "{{in.active}}",
+          "note": "{{in.note}}"
         },
         "connection": "@connections/customers-api.connection.json",
         "method": "PUT",

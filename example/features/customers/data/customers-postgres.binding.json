@@ -16,12 +16,19 @@
     "get": {
       "graph": "@customers/data/kept-get-postgres.graph.json"
     },
+    "nextId": {
+      "graph": "@customers/data/next-id-postgres.graph.json"
+    },
     "register": {
       "description": "The data graph that stores the customer and its method’s latest as one transaction.",
       "graph": "@customers/data/store-and-latest-postgres.graph.json"
     },
     "update": {
-      "graph": "@customers/data/kept-update-postgres.graph.json"
+      "description": "The business graph that loads the customer, lays the change over them, and keeps the result whole.",
+      "graph": "@customers/domain/update-customer.graph.json"
+    },
+    "keep": {
+      "graph": "@customers/data/keep-customer-postgres.graph.json"
     },
     "remove": {
       "graph": "@customers/data/kept-remove-postgres.graph.json"

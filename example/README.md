@@ -364,8 +364,8 @@ domain port operations, so whichever binding the profile chose is what gets chec
 
 ## The port, and what meets it
 
-`customer.port.json` is what the domain needs: `listAll`, `listByTier`, `get`, `register`, `update`,
-`remove`, `removeMany`, `submit`, `registerAll`, `list`, `digest`, `parseDrafts`, `toCsv`, `import`,
+`customer.port.json` is what the domain needs: `listAll`, `listByTier`, `get`, `nextId`, `register`, `update`,
+`keep`, `remove`, `removeMany`, `submit`, `registerAll`, `list`, `digest`, `parseDrafts`, `toCsv`, `import`,
 `export`, `prepare`. `customers-rest.binding.json` meets the data operations with a data graph each, which
 issues one declared request and decides with a `switch` on `status` what the answer means: the row, the
 declared refusal `no customer {id}` with reason `missing` when the API answers 404, or the refusal `upstream`
@@ -373,7 +373,9 @@ for anything else. The http triggers map those words to statuses (`"refusals": {
 502 }`, and `"conflict": 409` on the writes a store may refuse), so the graphs never mention HTTP and a
 client is told `{ "reason": "missing", "message": "no customer 7" }` with a 404. The rest are met by domain
 graphs that compose those operations: `list` routes on whether a tier filter is present, `submit` attributes
-the customer to the registrar that registered them and registers it, `removeMany` maps `remove` over the ids,
+the customer to the registrar that registered them and registers it, whole, under a key `nextId` gave, `update`
+loads the customer, lays the change over them with `@std/object.port.json#merge` and hands the result to `keep`,
+so the rule over a customer is judged before anything is written (RFC 0035), `removeMany` maps `remove` over the ids,
 `digest` counts the customers and lays them out as text. The API's own `createdAt` lives in the edge shape
 `CustomerRow` and never reaches the domain.
 

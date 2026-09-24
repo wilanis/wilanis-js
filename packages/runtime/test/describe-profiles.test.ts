@@ -37,7 +37,7 @@ describe('wilanis describe project.json: a block per profile', () => {
       '  binds      @customers/domain/customer.port.json  → @customers/data/customers-postgres.binding.json',
     );
     expect(production).toContain(
-      '             @storage/store.port.json#find, #get, #newKey, #patch, #put, #remove  via @connections/customers-postgres.connection.json',
+      '             @storage/store.port.json#find, #get, #newKey, #put, #remove  via @connections/customers-postgres.connection.json',
     );
     expect(production).toContain(
       `             @auth/identity.port.json#verify  via @connections/people.connection.json, ${OPERATOR}`,

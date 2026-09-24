@@ -48,8 +48,10 @@ describe('a scope, and the view across it', () => {
     expect(keeping.find(node => node.id === 'stored')?.keeps?.scope?.by[0].column).toBe('tenant');
     expect(keeping.find(node => node.id === 'latest')?.keeps?.scope).toBeUndefined();
     // and newKey declares no `scope` input at all, because a key is global to the table whatever the scope
-    expect(keeping.find(node => node.id === 'key')?.keeps).toMatchObject({ op: 'newKey', collection: 'customers' });
-    expect(keeping.find(node => node.id === 'key')?.keeps?.scope).toBeUndefined();
+    const minting = scopedView('@features/customers/data/next-id.graph.json').graph?.nodes ?? [];
+    const key = minting.find(node => node.id === 'key')?.keeps;
+    expect(key).toMatchObject({ op: 'newKey', collection: 'customers' });
+    expect(key?.scope).toBeUndefined();
   });
 
   it('the store page draws its reads as a request node, one port per name, opening the document that declares it', () => {
