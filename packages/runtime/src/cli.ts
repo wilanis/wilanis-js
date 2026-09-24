@@ -239,8 +239,10 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
       process.exit(2);
     }
     if (flags.json) {
-      // RFC 0019's envelope, and its field names, are settled by issue #228, which is still open.
-      console.error('wilanis migrate --json waits on the envelope of RFC 0019 (issue #228); run without --json');
+      // the envelope exists (diagnostics.ts); what migrate answers is not yet mapped into it (RFC 0017, issue #618)
+      console.error(
+        'wilanis migrate --json waits on issue #618: its result is not yet mapped into the diagnostics envelope; run without --json',
+      );
       process.exit(2);
     }
     // migrate judges the tree itself, so that a caller without the command line gets the same guarantee
