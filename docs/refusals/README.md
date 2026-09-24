@@ -125,6 +125,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [B009](B009.md) | B | live | a binding of a port a plugin requires declares reads or reaches a read of the request |
 | [B010](B010.md) | B | live | a binding of a port a plugin requires reaches a refuse or something that holds past the run |
 | [B011](B011.md) | B | live | a domain operation promising idempotent reaches, under a profile, an effect that is not |
+| [B012](B012.md) | B | live | a startup step naming a profile the project does not declare |
 | [T001](T001.md) | T | live | a trigger's settings that do not fit its kind's, or a type setting not written as a shape path |
 | [T002](T002.md) | T | live | a trigger's in or out that does not meet the contract of the domain operation it fires |
 | [T003](T003.md) | T | live | a trigger's fire.in that reads outside what its kind hands, or does not fit the trigger's in |
@@ -163,6 +164,9 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [C014](C014.md) | C | live | a `blobs.connection` that is no connection, or of a kind no named plugin offers a blob store for |
 | [C015](C015.md) | C | live | an operation's `key`, `idempotent` and `pure` that do not make one sound fact about repeating it |
 | [C016](C016.md) | C | live | a `maxItems` on a field that is not a list |
+| [C017](C017.md) | C | live | more than one profile marked `default` |
+| [C018](C018.md) | C | live | a profile standing a connection in for itself, or for one of another kind |
+| [C019](C019.md) | C | live | a declared secret that no plugin's or connection's settings and no startup step reads |
 | [S001](S001.md) | S | live | a scenario naming a trigger the tree does not have |
 | [S002](S002.md) | S | live | a scenario pinning a reason on a node whose status is not failed |
 | [S003](S003.md) | S | live | a `cancelAt` that is not a key of the scenario's `stubs` |
