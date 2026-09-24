@@ -1,0 +1,35 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/port.schema.json",
+  "label": "Queue worker",
+  "description": "What works this tree's queues. A project's startup list names `consume` to start it: nothing consumes a queue on its own, so a tree that does not ask to work its queues does not. The queues are the queue triggers themselves -- this operation names none of them.",
+  "operations": {
+    "consume": {
+      "description": "Consume every queue a queue trigger of this tree receives from until the process stops: each message fires its trigger's operation, gated like a request, and is acknowledged, retried or dead-lettered as the trigger's outcomes say. Stopping takes no further message and waits for every one in flight to be answered. Answers what it started, so a startup report says how many queues on how many connections.",
+      "holds": true,
+      "accepts": {
+        "concurrency": {
+          "type": "number",
+          "required": false,
+          "description": "how many messages of one queue run at once, a whole number of 1 or more; absent: 1"
+        },
+        "queues": {
+          "type": "string[]",
+          "required": false,
+          "description": "the names of the queues this process works; absent: every queue a queue trigger receives from"
+        }
+      },
+      "returns": {
+        "fields": {
+          "queues": {
+            "type": "number",
+            "description": "how many queues are consumed"
+          },
+          "connections": {
+            "type": "number",
+            "description": "how many broker connections they are consumed on"
+          }
+        }
+      }
+    }
+  }
+}

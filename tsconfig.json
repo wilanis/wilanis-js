@@ -38,6 +38,9 @@
       "path": "packages/plugin-schedule"
     },
     {
+      "path": "packages/plugin-queue"
+    },
+    {
       "path": "packages/plugin-otel"
     },
     {

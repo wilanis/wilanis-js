@@ -1,0 +1,78 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger-kind.schema.json",
+  "label": "Queue message",
+  "description": "A message on a queue, consumed while a startup step names @queue/worker.port.json#consume. The body is decoded as JSON into request.message (typed by settings.message); the message's headers, its id, the queue and how many times it has been delivered are in the context too, and the guarding plugin adds the caller it identified from a credential the trigger reads out of the headers. The trigger's input mapping picks what the graph gets; its policies decide before the graph runs. The answer is judged against out and recorded; nobody receives it. A refusal is acknowledged, retried or dead-lettered as settings.outcomes maps its reason; every reason the trigger can reach must be mapped (T005). A fault becomes settings.onFault, retry by default. A retry past maxAttempts is dead. A message whose input does not conform is dead at once, since delivering it again cannot help.",
+  "connection": "connection",
+  "refusals": "outcomes",
+  "settings": {
+    "fields": {
+      "connection": {
+        "type": "string",
+        "description": "a connection document whose kind declares delivery: the broker"
+      },
+      "queue": {
+        "type": "string",
+        "description": "the queue's name on that broker"
+      },
+      "message": {
+        "type": "type",
+        "binds": "$Message",
+        "description": "the edge type of the message body, request.message; a shape with no blob field at any depth (X404)"
+      },
+      "maxAttempts": {
+        "type": "number",
+        "required": false,
+        "description": "deliveries before retry becomes dead, a whole number of 1 or more; default 5"
+      },
+      "backoffMs": {
+        "type": "number",
+        "required": false,
+        "description": "the wait before the second delivery, doubled before each further one, a whole number of 0 or more; default 1000"
+      },
+      "onFault": {
+        "type": "string",
+        "enum": [
+          "retry",
+          "dead"
+        ],
+        "required": false,
+        "description": "what a fault -- a node that broke with no reason -- becomes; default retry"
+      },
+      "outcomes": {
+        "type": {
+          "fields": {},
+          "open": "string"
+        },
+        "required": false,
+        "description": "reason -> ack | retry | dead: what each refusal the run can reach means to the message, e.g. { \"missing\": \"ack\", \"upstream\": \"retry\" }"
+      }
+    }
+  },
+  "context": {
+    "fields": {
+      "id": {
+        "type": "string",
+        "description": "the broker's id for this message"
+      },
+      "attempt": {
+        "type": "number",
+        "description": "1 on the first delivery, one more on each redelivery"
+      },
+      "queue": {
+        "type": "string",
+        "description": "the queue the message arrived on"
+      },
+      "headers": {
+        "type": {
+          "fields": {},
+          "open": "string"
+        },
+        "description": "what the publisher put beside the body; where a credential rides"
+      },
+      "message": {
+        "type": "$Message",
+        "description": "the message body, of the type settings.message names"
+      }
+    }
+  }
+}

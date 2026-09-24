@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/plugin.schema.json",
+  "label": "Queue",
+  "description": "Messages on named queues, as triggers and as effects. A queue trigger fires a domain port operation for every message that arrives on its queue, gated like a request, and maps each refusal the run can reach to what becomes of the message: acknowledged, retried, or dead-lettered. A data graph publishes through queue.port.json, as an effect. The queues are consumed only while a project's startup list names `@queue/worker.port.json#consume`, so a tree that names none consumes nothing. This plugin says what a queue is and what may be asked of one; which broker keeps it is a connection, of a kind a broker plugin grants and declares `delivery` on, and @queue speaks no broker's language.",
+  "grants": {
+    "ports": [
+      "@queue/queue.port.json",
+      "@queue/worker.port.json"
+    ],
+    "triggerKinds": [
+      "@queue/queue.trigger-kind.json"
+    ]
+  }
+}
