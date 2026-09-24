@@ -48,7 +48,7 @@ history rather than a clean slate.
 | I | invariants |
 | C | connections, settings and stores |
 | S | scenarios |
-| X | what a plugin of this workspace judges in its own `check`, numbered by plugin: `@http` X0xx, `@auth` X1xx, `@storage` X2xx (`@schedule` from X251), `@otel` X3xx |
+| X | what a plugin of this workspace judges in its own `check`, numbered by plugin: `@http` X0xx, `@auth` X1xx, `@storage` X2xx (`@storage-postgres` X22x, `@schedule` from X251), `@otel` X3xx |
 
 Numbers with no page: no rule makes D002, G002 or L004, and nothing shipped under them. L004 refused a graph both
 fired by a trigger and bound by a binding until the directory became the layer, before the first release. X104 is a
@@ -187,6 +187,9 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [X212](X212.md) | X | live | `ensure` is run by a graph, or delegated to by a binding no startup step reaches |
 | [X213](X213.md) | X | live | a graph or binding of one feature names another feature's store |
 | [X214](X214.md) | X | live | a call site writes a `scope`, which only the store says and the compiler fills |
+| [X221](X221.md) | X | live | a field of a collection kept in postgres that is a blob, which this engine has no column for |
+| [X222](X222.md) | X | live | a postgres collection's key that is neither string nor number, or that the plugin's keyType cannot generate |
+| [X223](X223.md) | X | live | a postgres collection name that is no legal table name, or folds to the same table as another's |
 | [X251](X251.md) | X | live | a schedule that is not one: cron and everyMs both or neither, a bad cron, interval or zone, or a bad setting |
 | [X252](X252.md) | X | live | a scheduled trigger declares `in` with no `fire.in`, and nothing arrives on a tick |
 | [X253](X253.md) | X | live | `catchUp` is set while no scheduler run step names a lease |
@@ -204,7 +207,10 @@ file's code, then the four header lines, then the four sections in this order.
 - **Family:** L -- layers, effects and visibility
 - **Status:** live, since 0.1.0
 - **Made in:** `packages/compiler/src/check/graph.ts`, `packages/compiler/src/check/bindings.ts`
-- **Proved by:** `packages/runtime/test/sabotage.test.ts` (`L003 an effect the feature does not allow`)
+- **Proved by:** `packages/runtime/test/sabotage.test.ts` (`L003 an effect the feature does not allow`);
+  `packages/runtime/test/sabotage-fixes.test.ts` (`L003 offers the effect added to the feature, on every refusal, graph
+  node and binding alike`, `L003 applying the first refusal’s fix leaves nothing refused`, `L003 applying all nine adds
+  the effect once`)
 
 ## Refuses when
 
@@ -222,7 +228,7 @@ L003  @features/customers/data/get-row.graph.json#nodes/fetched
 
 ## Fix
 
-The edit that repairs it, and when the hint's edit is the wrong one.
+The edit that repairs it, the fix the refusal offers where it offers one, and when the hint's edit is the wrong one.
 
 ## History
 
