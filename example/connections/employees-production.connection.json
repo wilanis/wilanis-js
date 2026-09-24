@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/connection.schema.json",
+  "label": "Employee directory (production)",
+  "description": "What stands in for the employee directory under the production profile. bo and cy are laptop accounts and do not exist here: the one employee is the operator, in the registrar group, whose scrypt hash the environment supplies, so no credential that works in production is written in this repository. A tree with a real directory binds identity.port.json to an OIDC issuer or LDAP instead, which is another connection kind and so another binding, not a stand-in.",
+  "kind": "@auth/directory.connection-kind.json",
+  "settings": {
+    "users": [
+      {
+        "username": "operator",
+        "passwordHash": "{{secrets.operatorPasswordHash}}",
+        "name": "Operator",
+        "groups": [
+          "registrar"
+        ]
+      }
+    ]
+  }
+}

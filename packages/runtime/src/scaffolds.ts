@@ -106,6 +106,14 @@ const SCAFFOLDS: Record<string, Build> = {
             },
           ],
           secrets: {},
+          // one place to run, the default, so `wilanis start .` needs no --profile (RFC 0013)
+          profiles: {
+            local: {
+              description: 'This machine. Bind each domain port here as the tree grows one.',
+              default: true,
+              bindings: {},
+            },
+          },
         },
       ],
     ];

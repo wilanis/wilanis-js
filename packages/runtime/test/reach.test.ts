@@ -1,4 +1,4 @@
-import { type Reach, reachOf } from '@wilanis/compiler';
+import { buildEnv, type Reach, reachOf } from '@wilanis/compiler';
 import { loadTree, Scope } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
@@ -56,6 +56,7 @@ describe('the reach of a profile', () => {
     expect(said('production')).toEqual([
       'CUSTOMERS_DATABASE_URL (customersDatabase, read by @connections/customers-postgres.connection.json)',
       'CUSTOMERS_JWT_SECRET (jwt, read by @auth settings)',
+      'CUSTOMERS_OPERATOR_PASSWORD_HASH (operatorPasswordHash, read by @connections/employees-production.connection.json)',
     ]);
     // because the connection behind the customers is what the binding changes
     expect(reach('local').connections).toContain('@connections/customers.connection.json');
@@ -64,6 +65,38 @@ describe('the reach of a profile', () => {
     // and nothing a profile does not run is walked: live prepares with a request, the two stores with ensure
     expect(keys(reach('live'))).not.toContain('@storage/storage.port.json#ensure');
     expect(keys(reach('local'))).toContain('@storage/storage.port.json#ensure');
+  });
+
+  it('production reaches the operator directory in place of the employees, and watches nothing', () => {
+    // the example's own stand-in: every document still names employees.connection.json, and production reaches
+    // the connection that stands in for it -- the directories verify reaches are the only thing it changes there
+    const production = reach('production');
+    expect(via(production, '@auth/identity.port.json#verify')).toEqual([
+      '@connections/employees-production.connection.json',
+      '@connections/people.connection.json',
+    ]);
+    expect(production.connections).not.toContain('@connections/employees.connection.json');
+    for (const laptop of ['live', 'local']) {
+      expect(reach(laptop).connections).toContain('@connections/employees.connection.json');
+      expect(reach(laptop).holds).toContain('@reload/watch.port.json#watch');
+    }
+    // the watcher is a laptop's step; what production holds open is what serves and reports, nothing that reloads
+    expect(production.holds).toEqual([
+      '@schedule/scheduler.port.json#run',
+      '@otel/exporter.port.json#export',
+      '@http/server.port.json#listen',
+    ]);
+    // a handler asks for the connection by the name the documents use, and is handed the stand-in's settings
+    const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);
+    const scope = new Scope(load.registry, load.resolve);
+    const variables = { CUSTOMERS_OPERATOR_PASSWORD_HASH: 'scrypt:salt:hash' };
+    const users = (profile: string) =>
+      (buildEnv(scope, variables, profile).env.connections as any)['@connections/employees.connection.json'].settings
+        .users;
+    expect(users('production')).toEqual([
+      { username: 'operator', passwordHash: 'scrypt:salt:hash', name: 'Operator', groups: ['registrar'] },
+    ]);
+    expect(users('live').map((one: any) => one.username)).toEqual(['bo', 'cy']);
   });
 
   it('roots the guard at its manifest and the routes at their triggers, and answers the same twice', () => {

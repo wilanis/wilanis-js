@@ -1,6 +1,6 @@
 # RFC 0013: A deployment model: profiles, environments and what a tree needs to run
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:core` (three additive keys on `project.schema.json`; `ProjectDoc`; `Scope.connectionFor`),
   `area:compiler` (`reach.ts`, the walk from a profile to what it reaches; four rules in `check/project.ts`),
   `area:runtime` (the active profile, what `start` verifies and in which order, `describe`), `area:view` (the
@@ -397,3 +397,11 @@ None before `accepted`.
 **Left to implementation, deliberately:** the exact wording of `describe project.json`, and whether `reaches` groups
 by port or by connection; and whether `reachOf` walks a policy that no trigger attaches, which this RFC says it does
 not, since the reach is what runs and an unattached policy runs nowhere.
+
+**What the example became.** By the time step 4 landed, `production` bound `customer.port.json` to PostgreSQL
+(RFC 0002), so nothing under it reached `customers-api.connection.json` and a stand-in for it would have been
+reached by nothing. The example stands in the connection production does reach through the identity binding:
+`employees-production.connection.json` for `employees.connection.json`, a directory of one operator account
+whose hash is read from `{{secrets.operatorPasswordHash}}` (`CUSTOMERS_OPERATOR_PASSWORD_HASH`). The watch step
+names `live` and `local`, the two laptop profiles, and `wilanis new project` writes one profile, `local`, as the
+default.

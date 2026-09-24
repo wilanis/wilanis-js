@@ -4,7 +4,15 @@ import { join } from 'node:path';
 import { checkTree } from '@wilanis/compiler';
 import { loadTree } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_PLUGINS, describe as describeDoc, fuzz, regress, runTrigger, scaffold } from '../src/index.js';
+import {
+  activeProfile,
+  BUILTIN_PLUGINS,
+  describe as describeDoc,
+  fuzz,
+  regress,
+  runTrigger,
+  scaffold,
+} from '../src/index.js';
 import { runSaid } from '../src/run-said.js';
 import { askingTree } from './asking-tree.js';
 import { EXAMPLE, INCLUDES, loadedEditing, PLUGINS } from './example-harness.js';
@@ -16,7 +24,12 @@ describe('wilanis new', () => {
   it('writes a project that loads, and refuses to overwrite', () => {
     const dir = tmp();
     expect(scaffold(dir, 'project', 'board', {})).toEqual(['package.json', 'project.json']);
-    expect(read(join(dir, 'project.json')).plugins.map((plugin: any) => plugin.use)).toEqual(['@std', '@cli', '@http']);
+    const project = read(join(dir, 'project.json'));
+    expect(project.plugins.map((plugin: any) => plugin.use)).toEqual(['@std', '@cli', '@http']);
+    // one profile, the default, so `wilanis start .` runs with nothing named and nothing set (RFC 0013)
+    expect(Object.keys(project.profiles)).toEqual(['local']);
+    expect(activeProfile(project, { env: {} })).toBe('local');
+    expect(checkTree(loadTree(dir, PLUGINS)).items).toEqual([]);
     expect(() => scaffold(dir, 'project', 'board', {})).toThrow('package.json exists');
     rmSync(dir, { recursive: true, force: true });
   });

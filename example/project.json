@@ -100,7 +100,8 @@
   ],
   "secrets": {
     "jwt": "CUSTOMERS_JWT_SECRET",
-    "customersDatabase": "CUSTOMERS_DATABASE_URL"
+    "customersDatabase": "CUSTOMERS_DATABASE_URL",
+    "operatorPasswordHash": "CUSTOMERS_OPERATOR_PASSWORD_HASH"
   },
   "startup": [
     {
@@ -132,8 +133,12 @@
     },
     {
       "label": "Watch for changes",
-      "description": "Serve the tree again whenever a document changes, without closing the port. A change that does not pass wilanis check is reported and the last good tree keeps answering.",
-      "run": "@reload/watch.port.json#watch"
+      "description": "Serve the tree again whenever a document changes, without closing the port. A change that does not pass wilanis check is reported and the last good tree keeps answering. It runs on the laptop, under live and local; production serves the documents it started with, and a new version is a new process.",
+      "run": "@reload/watch.port.json#watch",
+      "profiles": [
+        "live",
+        "local"
+      ]
     },
     {
       "label": "Keep the schedule",
@@ -154,7 +159,7 @@
   ],
   "profiles": {
     "live": {
-      "description": "The real customer API, and the directories written in the connections. A production profile binds identity.port.json to a binding whose connections are an OIDC issuer and LDAP; nothing else changes.",
+      "description": "The laptop, and the default, so `npx wilanis start example` names no profile: the customers through their REST API, the directories written in the connections, and a reload on every saved document.",
       "default": true,
       "bindings": {
         "@customers/domain/customer.port.json": "@customers/data/customers-rest.binding.json",
@@ -163,7 +168,7 @@
       }
     },
     "local": {
-      "description": "Everything in this process: the customers kept in memory, and the directories written in the connections. Nothing reaches the network, so `wilanis start example --profile local` serves the same routes with no upstream at all.",
+      "description": "Everything in this process: the customers kept in memory, the directories written in the connections, and a reload on every saved document. Nothing reaches the network, so `wilanis start example --profile local` serves the same routes with no upstream at all.",
       "bindings": {
         "@customers/domain/customer.port.json": "@customers/data/customers-store.binding.json",
         "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
@@ -171,11 +176,14 @@
       }
     },
     "production": {
-      "description": "The customers in PostgreSQL, and the directories written in the connections. The same routes, policies, shapes and business graphs as every other profile: what changes is which binding meets customer.port.json, and through it which connection the records live behind. The startup step prepares the database before the port opens, so a tree whose database is unreachable refuses to serve rather than answering every route with a fault.",
+      "description": "Behind the load balancer, started with `wilanis start example --profile production`: the customers in PostgreSQL, the one operator account in place of the laptop's employees, and nothing watched. The same routes, policies, shapes and business graphs as every other profile, and not one document under features/ changes: another binding meets customer.port.json, and every reference to employees.connection.json reaches employees-production.connection.json instead. The startup steps prepare the database before the port opens, so a tree whose database is unreachable refuses to serve rather than answering every route with a fault.",
       "bindings": {
         "@customers/domain/customer.port.json": "@customers/data/customers-postgres.binding.json",
         "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
         "@auth/state.port.json": "@features/state/data/auth-files.binding.json"
+      },
+      "connections": {
+        "@connections/employees.connection.json": "@connections/employees-production.connection.json"
       }
     }
   }
