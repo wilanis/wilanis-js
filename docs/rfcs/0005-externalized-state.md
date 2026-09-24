@@ -411,6 +411,6 @@ Steps 1 to 4 need nothing from RFC 0002 and can land first.
   step; since a startup step fires a domain port and `state.port.json` is the plugin's, the state feature
   declares `memory.port.json#prepare`, met by one binding that delegates to `@storage/storage.port.json#ensure`,
   and the step runs under `"profiles": ["production"]`. X201 needed no change: it already accepted a shape a
-  plugin grants, and a case in `plugin-storage/test/rules.test.ts` now holds it there.
+  plugin grants, and a case in `packages/plugin-storage/test/granted-shape.test.ts` now holds it there.
 - Whether `@s3` speaks the API through an SDK. *Decided:* no. It sends six calls, each signed with Signature
   Version 4 over `fetch`, and nothing else from an SDK would be used.
