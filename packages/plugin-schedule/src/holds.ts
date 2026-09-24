@@ -8,8 +8,9 @@
  * cannot be taken is let go and said out loud, and the schedule goes on. One transient failure must never be
  * the end of scheduling.
  */
+
+import type { Leases } from '@wilanis/plugin-storage';
 import type { Clock } from './clock.js';
-import type { Leases } from './leases.js';
 
 /** How the scheduler takes a hold, where the run step named a lease. */
 export interface Lease {

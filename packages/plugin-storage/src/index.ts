@@ -29,6 +29,8 @@ export type {
 } from './engine.js';
 export { engines } from './engine.js';
 export { ensureStore } from './ensure.js';
+export type { Leases } from './leases.js';
+export { Keepers, leases } from './leases.js';
 export { applyStores, historyOfStores, planStores } from './migrate.js';
 export type {
   CollectionMarks,

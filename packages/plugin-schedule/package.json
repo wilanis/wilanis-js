@@ -38,7 +38,8 @@
   },
   "dependencies": {
     "@wilanis/core": "0.1.0",
-    "@wilanis/engine": "0.1.0"
+    "@wilanis/engine": "0.1.0",
+    "@wilanis/plugin-storage": "0.1.0"
   },
   "publishConfig": {
     "access": "public"

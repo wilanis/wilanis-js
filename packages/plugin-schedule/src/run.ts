@@ -6,8 +6,8 @@
  */
 import type { Hold, Serving } from '@wilanis/core';
 import type { Handler } from '@wilanis/engine';
+import { leases } from '@wilanis/plugin-storage';
 import type { Lease } from './holds.js';
-import { leases } from './leases.js';
 import { ROOT, RUN } from './paths.js';
 import { Scheduler } from './scheduler.js';
 

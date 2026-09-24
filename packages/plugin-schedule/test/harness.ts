@@ -5,8 +5,8 @@
  */
 import type { BlobScope, BlobStore, FireArgs, Serving, TriggerDoc } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
+import type { Leases } from '@wilanis/plugin-storage';
 import type { Clock } from '../src/clock.js';
-import type { Leases } from '../src/leases.js';
 import { KIND } from '../src/paths.js';
 
 /** A clock a test steps: nothing waits on real time, and a wait ends when the clock passes its instant. */
