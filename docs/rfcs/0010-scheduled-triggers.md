@@ -360,9 +360,7 @@ engine keeps one table
 `INSERT … ON CONFLICT (name) DO UPDATE SET holder = $me, held_until = now() + $ttl WHERE (wilanis_schedule.held_until < now() OR wilanis_schedule.holder = $me) AND (wilanis_schedule.last_fired IS NULL OR wilanis_schedule.last_fired < $scheduled) RETURNING holder`,
 so two instances never both hold one trigger, and a tick that `last_fired` already covers is granted to nobody
 however late a clock asks for it. `markFired` sets `last_fired = greatest(last_fired, $scheduled)`; `release` sets
-`held_until = now()`. One row per trigger, whatever the number of ticks. This step is blocked on RFC 0002's implementation and marked so in the
-plan. Whether `@wilanis/plugin-storage-memory` declares `leases` too, with a keeper that always grants, is left to
-implementation (*Open questions*). Where `lease` names a connection whose kind registered no keeper, `run` throws
+`held_until = now()`. One row per trigger, whatever the number of ticks. The memory engine declares no `leases` (*Open questions*, 3). Where `lease` names a connection whose kind registered no keeper, `run` throws
 before holding anything, naming the connection and the kind (X0n4 has judged the tree; this message is for a
 plugin that declared the marker and did not register, or did not load), and a startup step that throws stops the
 start (`runStartup`).
@@ -511,8 +509,9 @@ example's scheduled trigger page.
    `wilanis new trigger --kind` scaffold, the viewer's trigger page and view model. `good first issue`.
 5. **`deadlineMs`** on the kind and the `AbortController` per tick: blocked on RFC 0012's `FireArgs.signal`.
 6. **The lease keeper in the storage engine** (`area:plugin-storage`): `"leases": true` on the postgres kind,
-   `wilanis_schedule` in `ensure`, `tableLeases()` registered from `postLoad`, the postgres test behind the
-   environment variable, and the example's `lease` under its storage profile. Blocked on RFC 0002's implementation.
+   `wilanis_schedule` created by the keeper on first contact (not by `ensure`, *Lease keepers*), `tableLeases()`
+   registered from `postLoad`, the postgres test behind the environment variable, and the example's `lease` under
+   its storage profile (*Open questions*, 3). RFC 0002 is implemented, so the step is no longer blocked.
 7. **A process that runs only the schedule** (`area:runtime`): blocked on RFC 0013. See *Drawbacks*, first item.
 8. **`wilanis run --at`**: decided during implementation (*Open questions*); one small pull request either way.
 9. **README**: a paragraph beside "Every branch runs before you deploy" on the clock as a way in, and the roadmap's
@@ -617,5 +616,13 @@ Nothing else must be decided before `accepted`. Decided during implementation:
 3. Whether `@wilanis/plugin-storage-memory` declares `leases` and registers a keeper that always grants, so a
    tree written for a storage profile checks and runs under the memory profile with `lease` and `catchUp` set --
    X0n3 and X0n4 would then hold under both profiles -- or whether `lease` is simply absent under the memory profile.
+
+   **Decided (step 6): absent.** The memory engine declares no `leases` and registers no keeper. The example
+   runs the `run` step twice in its startup list, each under its own profiles: under `live` and `local` with no
+   `lease`, as the one process there is, and under `production` with `"lease":
+   "@connections/customers-postgres.connection.json"`. X0n3 stays tree-wide, as written: a `catchUp` trigger checks
+   once any `run` step names a lease, and under a profile whose step names none the scheduler does not catch up,
+   which is what one process with no memory of its last tick can do. A keeper that always grants would have let a
+   laptop profile claim a memory it does not have.
 4. Whether `nextTick` honours `L` and `W` (last day, nearest weekday) or the parser stays at the five standard field
    forms.
