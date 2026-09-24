@@ -129,6 +129,10 @@ describe('trigger, kinds, connection, codec', () => {
       refused(doc('trigger-kind', { settings: { fields: { route: { type: 'string', binds: 'Params' } } } })),
     ).toEqual([at('settings/fields/route/binds', 'Native contracts only')]);
   });
+  it('a trigger kind may name the setting that holds the connection it receives from', () => {
+    expect(refused(doc('trigger-kind', { connection: 'connection' }))).toEqual([]);
+    expect(refused(doc('trigger-kind', { connection: '' }))).toEqual([at('connection', 'fewer than 1 characters')]);
+  });
   it('a connection kind has settings; a connection names a kind; storage says the kind reaches an engine', () => {
     expect(refused(doc('connection-kind', { settings: {} }))).toEqual([at('settings', "missing 'fields'")]);
     expect(refused(doc('connection', { kind: 'postgres' }))).toEqual([at('kind', 'A document path')]);
@@ -138,6 +142,12 @@ describe('trigger, kinds, connection, codec', () => {
   it('a connection kind names leases as a boolean: a plugin registers a lease keeper for it', () => {
     expect(refused(doc('connection-kind', { leases: true }))).toEqual([]);
     expect(refused(doc('connection-kind', { leases: 'yes' }))).toEqual([at('leases', 'must be boolean')]);
+  });
+  it('a connection kind says how many times it may deliver one message: at least once or at most once', () => {
+    const delivering = (delivery: unknown) => refused(doc('connection-kind', { delivery }));
+    expect(delivering('at-least-once')).toEqual([]);
+    expect(delivering('at-most-once')).toEqual([]);
+    expect(delivering('exactly-once')).toEqual([at('delivery', '"at-least-once", "at-most-once"')]);
   });
   it('a codec yields declared or a type; the refusal names both', () => {
     expect(refused(doc('codec', { yields: 'maybe' }))).toEqual([at('yields', 'must be "declared", or', 'A type:')]);

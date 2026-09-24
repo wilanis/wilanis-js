@@ -32,6 +32,13 @@
     "leases": {
       "description": "true: a connection of this kind can keep a lease -- a named hold one process of several takes for a while, and the record of what was last done under it. The plugin that grants the kind registers a lease keeper for it; the scheduler's `run` step names such a connection as its `lease` (X254). Absent: a connection of this kind keeps no lease (an HTTP upstream, a directory).",
       "type": "boolean"
+    },
+    "delivery": {
+      "description": "How many times a connection of this kind may hand one message to a trigger that receives from it. at-least-once: a message the process did not acknowledge is delivered again, so what it fires may run twice. at-most-once: a message is handed once and never again, so what it fires may not run at all. The plugin that grants the kind registers the broker behind it. Absent: a connection of this kind delivers nothing (an HTTP upstream, a directory).",
+      "enum": [
+        "at-least-once",
+        "at-most-once"
+      ]
     }
   },
   "required": [

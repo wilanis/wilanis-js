@@ -265,6 +265,8 @@ export interface PolicyDoc extends Envelope {
 export interface TriggerKindDoc extends Envelope {
   settings: InlineObject;
   context: InlineObject;
+  /** The dotted settings path of the connection a trigger of this kind receives from; that connection's kind declares `delivery`. */
+  connection?: string;
   /** The dotted context path of the value correlating a run with the caller's own trace, copied opaquely; it must be a path this kind's context hands (T007). */
   correlation?: string;
   refusals?: string;
@@ -275,6 +277,8 @@ export interface ConnectionKindDoc extends Envelope {
   storage?: boolean;
   /** `leases`: a connection of this kind can keep a named hold and the record of what was last done under it; the granting plugin registers the keeper. */
   leases?: boolean;
+  /** `delivery`: how many times a connection of this kind may hand one message to a trigger that receives from it; absent, it delivers nothing. */
+  delivery?: 'at-least-once' | 'at-most-once';
 }
 export interface ConnectionDoc extends Envelope {
   kind: string;
