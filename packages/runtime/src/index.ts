@@ -71,7 +71,11 @@ export {
 } from './stores.js';
 export {
   type CancelAt,
+  DIAGNOSTICS_SCHEMA,
+  type Diagnostic,
+  type Diagnostics,
   describe,
+  diagnosticsOf,
   embedderFor,
   failedLeaf,
   fuzz,
@@ -83,11 +87,16 @@ export {
   map,
   migrate,
   policyRoots,
+  printed,
+  type Regression,
   type Rehearsal,
+  type Replayed,
   regress,
   rehearse,
   type StubOptions,
   scaffold,
   stubEffects,
+  withRegression,
+  withRehearsal,
 } from './tools.js';
 export { atLevel, type Level, traceJson, traceOf, traceText } from './trace.js';

@@ -151,32 +151,44 @@ function diffOf(report: Report, expect: ScenarioDoc['expect']): string[] {
   return diffs;
 }
 
+/** One scenario replayed: whether the run matched what it recorded, and each difference said in words. */
+export interface Replayed {
+  scenario: string;
+  same: boolean;
+  diffs: string[];
+}
+
+/** What `regress` answers: whether every scenario replayed the same, one line and one result per scenario. */
+export interface Regression {
+  ok: boolean;
+  lines: string[];
+  results: Replayed[];
+}
+
 /** Replay every scenario with its recorded stubs, under the profile `activeProfile` picks, and diff the report node by node. */
-export async function regress(
-  load: LoadResult,
-  opts: { profile?: string } = {},
-): Promise<{ ok: boolean; lines: string[] }> {
-  const lines: string[] = [];
-  let ok = true;
+export async function regress(load: LoadResult, opts: { profile?: string } = {}): Promise<Regression> {
   const profile = activeProfile(load.registry.project?.doc, { flag: opts.profile, env: process.env });
   const stubbed = { seed: 0, profile, env: fakeEnvFor(load) };
   const emb = embedderFor(load, stubbed);
+  const results: Replayed[] = [];
+  const lines: string[] = [];
   for (const sc of load.registry.all('scenario')) {
     const trigger = load.registry.all('trigger').find(trigger => trigger.path === load.resolve(sc.doc.trigger));
     // S001 has already refused a scenario whose trigger is gone; skip rather than replay nothing.
     if (!trigger) {
-      ok = false;
-      lines.push(`${sc.path}: names unknown trigger '${sc.doc.trigger}'`);
+      const gone = `names unknown trigger '${sc.doc.trigger}'`;
+      results.push({ scenario: sc.path, same: false, diffs: [gone] });
+      lines.push(`${sc.path}: ${gone}`);
       continue;
     }
     const report = sc.doc.cancelAt
       ? await cancelledReplay(load, stubbed, trigger.doc, sc.doc)
       : await emb.fire(trigger.doc, sc.doc.in, sc.doc.request ?? {}, { stubs: sc.doc.stubs });
     const diffs = diffOf(report, sc.doc.expect);
-    if (diffs.length) ok = false;
+    results.push({ scenario: sc.path, same: diffs.length === 0, diffs });
     lines.push(`${sc.path}: ${diffs.length ? `DIFF ${diffs.join('; ')}` : 'same'}`);
   }
-  return { ok, lines };
+  return { ok: results.every(one => one.same), lines, results };
 }
 
 /**

@@ -34,6 +34,7 @@
     "docs",
     "bin",
     "templates",
+    "schemas",
     "README.md",
     "LICENSE"
   ],
@@ -55,7 +56,8 @@
     "@wilanis/plugin-schedule": "0.1.0",
     "@wilanis/plugin-storage": "0.1.0",
     "@wilanis/plugin-storage-memory": "0.1.0",
-    "@wilanis/plugin-storage-postgres": "0.1.0"
+    "@wilanis/plugin-storage-postgres": "0.1.0",
+    "ajv": "^8.17.1"
   },
   "publishConfig": {
     "access": "public"
