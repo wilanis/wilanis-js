@@ -53,17 +53,21 @@ export function misplaced(placement: Placement): Refusal | null {
   return wrongLayer(placement, layers, layer, home.why);
 }
 
+/** A kind with a top-level directory outside it: moved into that directory, the one place it may live. */
 function misplacedDir(placement: Placement, dir: string, why: string): Refusal | null {
   const { kind, file } = placement;
   if (file.split('/')[0] === dir) return null;
+  const to = `${dir}/${stem(file)}.${kind}.json`;
   return {
     code: 'D008',
     file,
     message: `a ${kind} lives under ${dir}/`,
-    hint: `${why}; move it to ${dir}/${stem(file)}.${kind}.json`,
+    hint: `${why}; move it to ${to}`,
+    fixes: [{ file, move: to }],
   };
 }
 
+/** A layered kind outside any feature: no fix, since which feature it belongs to is the author's to say. */
 function outsideFeature(placement: Placement, layers: Layer[], why: string): Refusal {
   const { kind, file } = placement;
   return {
@@ -74,29 +78,45 @@ function outsideFeature(placement: Placement, layers: Layer[], why: string): Ref
   };
 }
 
-/** A shape says its layer twice -- in `layer` and in the directory. They must agree, and the directory wins. */
+/**
+ * A shape says its layer twice -- in `layer` and in the directory. They must agree, and the directory wins: in
+ * `edge/` or `domain/` the fix is `layer` set to the directory's, since a move would leave every reference to
+ * the shape behind; in `data/`, where no shape lives, the one fix is the move to the layer it declares.
+ */
 function shapeDisagrees(placement: Placement, layer: Layer): Refusal | null {
+  const { file, feature } = placement;
   const written = (placement.doc as { layer?: string }).layer;
   const declared = written === 'edge' ? 'edge' : 'domain';
   if (declared === layer) return null;
-  const setTo = layer === 'edge' ? 'edge' : 'core';
-  return {
+  const refusal = {
     code: 'D008',
-    file: placement.file,
+    file,
     at: 'layer',
     message: `shape declares layer '${written}' but sits in ${layer}/`,
-    hint: `a shape's layer is where it lives; move it to features/${placement.feature}/${declared}/, or set "layer": "${setTo}"`,
+  };
+  if (layer === 'data') {
+    const to = `features/${feature}/${declared}/${stem(file)}.shape.json`;
+    return { ...refusal, hint: `a shape lives in edge/ or domain/; move it to ${to}`, fixes: [{ file, move: to }] };
+  }
+  const setTo = layer === 'edge' ? 'edge' : 'core';
+  return {
+    ...refusal,
+    hint: `a shape's layer is where it lives; move it to features/${feature}/${declared}/, or set "layer": "${setTo}"`,
+    fixes: [{ file, at: 'layer', set: setTo }],
   };
 }
 
+/** A document in no layer, or in one its kind may not live in: moved home when the kind has one layer, else the author's call. */
 function wrongLayer(placement: Placement, layers: Layer[], layer: Layer | undefined, why: string): Refusal {
   const { kind, file, feature } = placement;
+  const to = `features/${feature}/${layers[0]}/${stem(file)}.${kind}.json`;
   return {
     code: 'D008',
     file,
     message: layer
       ? `a ${kind} may not live in the ${layer} layer`
       : `a ${kind} must sit in a layer directory (${layers.join(', ')})`,
-    hint: `${why}; move it to features/${feature}/${layers[0]}/${stem(file)}.${kind}.json`,
+    hint: `${why}; move it to ${to}`,
+    ...(layers.length === 1 ? { fixes: [{ file, move: to }] } : {}),
   };
 }
