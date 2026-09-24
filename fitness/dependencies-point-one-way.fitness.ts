@@ -24,10 +24,11 @@ const PLUGIN_MAY_IMPORT = ['@wilanis/core', '@wilanis/engine'];
  * The plugins that are a contract rather than an implementation of one: one plugin says what may be asked,
  * and others answer it. A plugin may import the contract it implements, and a contract imports no
  * implementation, so the arrow still points one way. RFC 0002 introduces the first -- @storage says what a
- * store is, and an engine is a plugin that keeps one. Like ORDER, this is a list rather than a decision:
- * naming the next contract here is not a change of what the claim holds.
+ * store is, and an engine is a plugin that keeps one -- and RFC 0009 the second: @queue says what a queue is,
+ * and a broker is a plugin that keeps one. Like ORDER, this is a list rather than a decision: naming the next
+ * contract here is not a change of what the claim holds.
  */
-const CONTRACT_PLUGINS = ['@wilanis/plugin-storage'];
+const CONTRACT_PLUGINS = ['@wilanis/plugin-storage', '@wilanis/plugin-queue'];
 
 /** Declared once at the workspace root, so no package names it and every test may import it. */
 const ROOT_DEV = ['vitest'];
@@ -135,7 +136,7 @@ export const sabotage = [
       { dependencies: ['@wilanis/runtime'] },
     ),
     violation:
-      'packages/plugin-http/src/index.ts imports @wilanis/runtime; a plugin imports only @wilanis/core and @wilanis/engine, and a contract it implements (@wilanis/plugin-storage)',
+      'packages/plugin-http/src/index.ts imports @wilanis/runtime; a plugin imports only @wilanis/core and @wilanis/engine, and a contract it implements (@wilanis/plugin-storage, @wilanis/plugin-queue)',
   },
   {
     input: reaching(
@@ -144,7 +145,7 @@ export const sabotage = [
       { dependencies: ['@wilanis/plugin-http'] },
     ),
     violation:
-      'packages/plugin-blob/src/index.ts imports @wilanis/plugin-http; a plugin imports only @wilanis/core and @wilanis/engine, and a contract it implements (@wilanis/plugin-storage)',
+      'packages/plugin-blob/src/index.ts imports @wilanis/plugin-http; a plugin imports only @wilanis/core and @wilanis/engine, and a contract it implements (@wilanis/plugin-storage, @wilanis/plugin-queue)',
   },
   {
     input: reaching(
