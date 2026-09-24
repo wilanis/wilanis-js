@@ -184,14 +184,19 @@ describe('sabotage: the reads a document takes from the request', () => {
     const named = (doc: any) => {
       doc.reads = { ...doc.reads, in: '@customers/edge/request.resolvers.json#agent' };
     };
+    // create-row reads fields of in, and a read named `in` stands in for them too, so T004 refuses each field as a
+    // header the kind never hands; those follow from the name, and P006 is the one that says what to change
+    const p006 = (said: string[]) => said.filter(one => one.startsWith('P006'));
     for (const file of [
       'features/customers/data/create-row.graph.json',
       'features/customers/data/customers-rest.binding.json',
       'features/customers/data/customers.store.json',
     ]) {
-      expect(sabotageSaying(file, named)).toEqual(["P006 read name 'in' is reserved"]);
-      expect(sabotagePointing(file, named)).toEqual([`P006 @${file}#reads/in`]);
-      expect(sabotageHinting(file, named)).toEqual(['P006 in, const, request, secrets are roots; pick another name']);
+      expect(p006(sabotageSaying(file, named))).toEqual(["P006 read name 'in' is reserved"]);
+      expect(p006(sabotagePointing(file, named))).toEqual([`P006 @${file}#reads/in`]);
+      expect(p006(sabotageHinting(file, named))).toEqual([
+        'P006 in, const, request, secrets are roots; pick another name',
+      ]);
     }
   });
   it('P004 a resolvers document of another feature that does not export it', () => {
