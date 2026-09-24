@@ -8,6 +8,7 @@
  */
 import { type Type, typeAt } from '@wilanis/core';
 import type { Branch, Domain } from './domains.js';
+import { listHolder, sourceOf } from './frames.js';
 import { branchesOf } from './solve.js';
 import { getPath, satisfy, setPath } from './stubs.js';
 
@@ -75,6 +76,11 @@ export interface FoundSwitch {
    * element and is rehearsed through the first one, so each enclosing list must hold at least one element.
    */
   lists: FoundList[];
+  /**
+   * The calls entered to reach the spec this switch stands in since the last map, outermost first: where its `in`
+   * came from, which is how a guard on `in` is traced back to the value an enclosing graph handed it.
+   */
+  from?: Frame[];
 }
 
 /** One call the walk descended through: its dotted path, and the sources the call was given by name. */
@@ -110,15 +116,6 @@ export interface KSwitchLike {
   catch?: Record<string, string>;
 }
 
-/** Where a switch input reads from: a node in the same spec, and the path within that node's output. */
-function sourceOf(spec_: unknown): { ref: string; path: string[] } | undefined {
-  if (!spec_ || typeof spec_ !== 'object') return undefined;
-  const object = spec_ as Record<string, unknown>;
-  if (typeof object.ref === 'string' && Array.isArray(object.path))
-    return { ref: object.ref, path: object.path as string[] };
-  return undefined; // list/object/value/concat sources are composed, not a single stubbable node
-}
-
 /**
  * Every switch reachable from a spec, including those inside graph-bound calls. `nested` resolves a
  * call's handler to the spec it runs, so the walk does not need the compiler's private caches.
@@ -151,6 +148,7 @@ function atNode(
         via,
         fromTriggerIn,
         lists,
+        from: entered,
       },
     ];
   const handler = typeof node.handler === 'string' ? node.handler : undefined;
@@ -265,47 +263,6 @@ interface At {
 }
 
 /**
- * Which node's output holds the list a map runs over, and where in it. A sibling of the map, usually; but a map
- * whose `over` reads `in` iterates what the frame was handed, so the answer is one hop out -- the call that
- * entered the frame, and the source it was given under that name. Nothing when the list is composed, literal,
- * the request's or the trigger's own: a composed list is no single node's output to stub, and the trigger's
- * input the rehearsal steers is met before this is asked.
- */
-function listHolder(list: FoundList): { target: string; path: string[] } | undefined {
-  let src = sourceOf(list.over);
-  let at = list.at;
-  // `in` is whatever the frame was handed, so a frame that declares where it got it is a hop outwards; one that
-  // declares nothing -- the wrapper a binding lowers to, which hands its caller's value straight on -- is a hop
-  // that changes nothing, and the search carries on with the same source one frame further out.
-  for (let frame = list.from.length - 1; src?.ref === 'in' && frame >= 0; frame--) {
-    const outer = list.from[frame];
-    at = outer.at;
-    const given = passedAs(outer.in, src.path);
-    if (given === 'opaque') return undefined;
-    if (given) src = given;
-  }
-  if (!src || src.ref === 'in' || src.ref === 'request' || src.ref === 'const') return undefined;
-  return { target: [...at.split('.').slice(0, -1), src.ref].join('.'), path: src.path };
-}
-
-/**
- * What a call was given under the name the value arrives as: the source one frame further out, nothing where the
- * call declares no inputs at all and so hands its caller's value straight on, and `opaque` where it names the
- * input but composes it, since a composed value is no one node's output to steer.
- */
-function passedAs(
-  given: Record<string, unknown>,
-  path: string[],
-): { ref: string; path: string[] } | 'opaque' | undefined {
-  const names = Object.keys(given);
-  if (!names.length) return undefined;
-  const name = path[0] ?? names[0];
-  if (!(name in given)) return 'opaque';
-  const src = sourceOf(given[name]);
-  return src ? { ref: src.ref, path: [...src.path, ...path.slice(1)] } : 'opaque';
-}
-
-/**
  * A demand on `in` where `in` is an element a map handed in, met by writing that element into the list the map
  * runs over. The first element stands for all of them, as it does everywhere else in the walk, so the demand
  * lands at index 0.
@@ -356,6 +313,19 @@ function stubTarget(prefix: string[], ref: string, from: Pick<Required<Stubbing>
   return bare && (from.generated(deeper) !== undefined || from.typeOf(deeper)) ? deeper : direct;
 }
 
+/**
+ * What a stub starts from before a demand is written into it: what the seed recorded there, else a value of the type
+ * the node declares. A node the seed never records -- a pure one, such as the `#make` a made site's guard moves aside
+ * to `<id>:made` -- would otherwise start from nothing, and the stub would hold only the fields the rule reads: the
+ * guard judges it and routes where it was steered, and the next node to read the value fails its shape instead.
+ */
+function standIn(target: string, from: Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>>): unknown {
+  const recorded = from.generated(target);
+  if (recorded !== undefined) return recorded;
+  const type = from.typeOf(target);
+  return type ? satisfy({ present: true }, undefined, type, from.seed) : undefined;
+}
+
 /** One demand written into the stub it steers, on top of what earlier demands already wrote there. */
 function write(
   stubs: Record<string, unknown>,
@@ -363,7 +333,7 @@ function write(
   from: Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>>,
 ) {
   const { target, path } = stub;
-  const base = target in stubs ? stubs[target] : from.generated(target);
+  const base = target in stubs ? stubs[target] : standIn(target, from);
   const want = satisfy(stub.value as Domain, getPath(base, path), typeAtPath(from.typeOf(target), path), from.seed);
   stubs[target] = setPath(base, path, want);
 }

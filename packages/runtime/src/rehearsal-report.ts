@@ -27,7 +27,11 @@ export interface Decision {
   guard?: { for: string; answers: string };
   /** The triggers whose runs reach this switch. */
   triggers: string[];
-  branches: { when: string; to: string; settled?: Settled; uncovered?: string }[];
+  /**
+   * Each branch, and what became of it: how it settled, why nothing can reach it, or -- for a guard whose value an
+   * enclosing graph already judged on this path (RFC 0035) -- where it was held instead, which is not a problem.
+   */
+  branches: { when: string; to: string; settled?: Settled; uncovered?: string; held?: string }[];
 }
 
 /**
@@ -88,6 +92,12 @@ function mergeBranch(into: Decision['branches'], branch: Decision['branches'][nu
     at.uncovered = branch.uncovered;
     at.settled = undefined;
   }
+  // held on one path and run on another: the run says more, so it stands for the branch
+  if (branch.settled && at.held) {
+    at.settled = branch.settled;
+    at.held = undefined;
+    return;
+  }
   const worse = branch.settled?.error || branch.settled?.blocked || branch.settled?.misrouted;
   if (branch.settled && at.settled && worse) at.settled = branch.settled;
 }
@@ -121,7 +131,7 @@ function verdict(status: string): string {
 }
 
 /** A graph's path as the report shows it. */
-const short = (path: string) => path.replace(/^@/, '').replace(/\.graph\.json$/, '');
+export const short = (path: string) => path.replace(/^@/, '').replace(/\.graph\.json$/, '');
 
 /** How one branch settled: the line the report shows, and the problem it names when something is wrong. */
 function branchLine(
@@ -136,6 +146,7 @@ function branchLine(
       line: `  ??  ${when}  NEVER RUN -- ${branch.uncovered}`,
       problem: `${where}: the '${branch.when}' branch to ${branch.to} can never run -- ${branch.uncovered}`,
     };
+  if (branch.held) return { line: `  ok  ${when}  held upstream ${branch.held}` };
   const settled = branch.settled;
   const answered = { line: `  ok  ${when}  answered from '${branch.to}'` };
   const said = settled ? (settledLine(settled, branch, { when, where, atomic: at.atomic }) ?? answered) : answered;

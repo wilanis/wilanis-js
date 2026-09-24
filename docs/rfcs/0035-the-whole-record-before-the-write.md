@@ -242,6 +242,28 @@ None in the engine, the handlers or the storage plugin. A run report of `update`
 refused. `rehearse` reports the guard on `customer` as it reports every guard; it cannot see the difference, and
 does not need to, since the difference is now in the documents rather than in what the effect did.
 
+The second guard, at `in:ok` in `keep-customer`, is a different matter for the rehearsal (#625). Its value is
+whatever the caller handed down, so nothing the rehearsal sets can steer it, and on the path through `update` it
+judges the value `customer:check` already judged, so it cannot refuse there. `rehearse` follows each input the
+guard reads off `in` out through the calls that handed it down; where every one of them is the same field of one
+node of an enclosing graph, and that node is a site of the same shape -- a guarded one, read by the ids the compiler
+gave it, or a proved one -- both branches are reported as held there, naming the upstream guard, and neither is a
+problem:
+
+```
+features/customers/data/keep-customer  guard 'in:check' A customer is reachable  2/2 branches
+  ok  holds     held upstream by guard 'customer:check' in features/customers/domain/update-customer, which judged this value first
+  ok  violated  held upstream by guard 'customer:check' in features/customers/domain/update-customer, which judged this value first
+```
+
+This is a statement about one run path, not a proof: the guard stays in the lowered spec, and a caller that hands
+the data graph a value no guard judged -- a trigger firing `keep` directly, a field composed on the way -- is
+steered through it, or reported as a branch that can never run, as before. Where one path holds the guard and
+another runs it, the run is what the report shows. And where the rehearsal steers a guard at a made site, such as
+`customer` itself, the value it stands in for `customer:made` is one of the type the `#make` is given, with only the
+fields the rule reads changed, so the branch that holds answers and the one that does not reaches
+`customer:violated` rather than failing at the next node that reads the value.
+
 ### Discoverability
 
 `wilanis describe <port>` prints `takes @customers/domain/CustomerUpdate.shape.json` for an operation whose
