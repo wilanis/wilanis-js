@@ -7,6 +7,10 @@ the file, the rule and the fix.
 ## The loop
 
 1. Edit or add documents. After every edit the hook runs `wilanis check`. Read the refusal, fix it, do not work around it.
+   `wilanis check --json` gives the same refusals as data. A refusal that carries `fixes` is repaired by applying the
+   first fix as written (`set`, `add` or `remove` the value at its `at` in its `file`, or `move` the file); one that
+   carries none, by reading its `hint`. After every edit, check again. In one file, fix the first refusal before the
+   ones below it, since a later one is often the first one's shadow.
 2. Before you stop, `wilanis rehearse` runs every trigger with stubbed effects, and every branch of every `switch` it
    reaches -- each rule solved from its own expression, so no branch is left to chance. Read the last line: it either
    says every branch settled, or lists the problems. `ok` lines are fine, including `refused on purpose`, which is a fail
