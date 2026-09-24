@@ -155,8 +155,12 @@ in a `timezone`) or `everyMs`, reads the tick as `request.scheduled`, and fires 
 `@schedule/scheduler.port.json#run`"; the `connection` row gains "a connection whose kind declares `leases` can
 keep the scheduler's hold, so one instance of several fires a tick"; the *What the tree starts* paragraph gains the
 step beside `listen` and `watch`; the X list gains `@schedule: X0n1 a schedule that is not one, X0n2 an in nothing fills, X0n3 catchUp with
-nothing to remember by`. `wilanis new trigger` (`SCAFFOLDS` in `packages/runtime/src/scaffolds.ts`) gains
-`--kind @schedule/schedule.trigger-kind.json`, writing `settings: { cron: "0 3 * * *" }` and no `in`.
+nothing to remember by`. `wilanis new trigger --kind <kind>` (`SCAFFOLDS` in `packages/runtime/src/scaffolds.ts`,
+`scaffold-trigger.ts` beside it) writes the settings that kind's document declares, not http's: those it requires,
+each with a placeholder of its type, or the first it declares when it requires none. For
+`@schedule/schedule.trigger-kind.json`, which requires neither `cron` nor `everyMs`, that is
+`settings: { cron: "TODO" }` and no `in`; an example expression is nowhere in the kind document, so the scaffold
+does not invent one, and X0n1's hint gives it.
 
 ### Ports, operations and kinds granted
 
@@ -400,14 +404,20 @@ shutdown signal, once it exists, is what cuts a run that will not end; this RFC 
 
 - `wilanis describe @schedule/scheduler.port.json#run` prints `granted by @schedule (@wilanis/plugin-schedule)` and
   `(holds until stopped)`, as `operationLine` in `packages/runtime/src/discovery.ts` prints for `listen` today.
-- `wilanis describe <scheduled trigger>` prints the schedule as written -- `cron 0 3 * * * (UTC)` or `every 60000 ms`
-  -- and `overlap`, `catchUp` and `deadlineMs` where set, the way it prints a route's settings. It prints no next
+- `wilanis describe <scheduled trigger>` prints the schedule as written, a setting to a line (`cron: "0 3 * * *"`,
+  `timezone: "UTC"`, `overlap`, `catchUp`), and `deadlineMs` as the run's deadline, the way it prints a route's settings. It prints no next
   tick: `describe` is a pure reading of the tree and does not consult a clock; `start` logs the next tick.
-- `wilanis map` prints a scheduled trigger the way it prints a route:
-  `schedule 0 3 * * * UTC → @customers/edge/nightly-digest.trigger.json → customer.port.json#digest → …`.
+- `wilanis map` prints, beside every trigger's kind, the settings the kind declares as a string, a number or a
+  boolean and the trigger writes, in the kind's order and as written, the same for every kind:
+  `@customers/edge/nightly-digest.trigger.json  (@schedule/schedule.trigger-kind.json)  cron "0 3 * * *", timezone "UTC", overlap "skip"`,
+  as a route reads `route "/customers", method "GET", produces "application/json"`. A form that led with the
+  schedule (`schedule 0 3 * * * UTC → …`) would need the runtime to know which of a kind's settings say when, and
+  the runtime learns no kind's vocabulary; what is said is read off the kind's document (`settingsSaid` in
+  `packages/runtime/src/trigger-said.ts`).
 - `wilanis start` logs each scheduled trigger and its next tick at the `run` step, and one line per tick.
 - The viewer's trigger page (`renderDocPage`, `case 'trigger'` in `packages/view/client/index.html`) shows the
-  schedule in the chain's `fired by` step -- `@schedule/schedule.trigger-kind.json, at 0 3 * * * UTC` -- and the
+  schedule in the chain's `fired by` step, in the map's words -- `@schedule/schedule.trigger-kind.json, cron "0 3 * * *", timezone "UTC"`,
+  carried on the view model as `firedBy` -- and the
   settings as it shows a route's. No new page: a scheduled trigger is an existing kind.
 - RFC 0026's manifest gains its `scheduled` rows from these triggers -- `{ trigger, cron | everyMs, timezone,
   fires }` -- and lists `@schedule/scheduler.port.json#run` under `holds`. That RFC owns the shape; this one gives it
