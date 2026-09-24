@@ -23,8 +23,8 @@
  * same type. A port document that writes a path outside the grammar is refused when the plugin loads
  * (D011, `contracts.ts`).
  */
-import type { Field, Fields, Values } from './model.js';
-import { isTypeRef, type Type, TypeError_ } from './types.js';
+import type { Field, Fields, TypeRef, Values } from './model.js';
+import { acceptedFields, isTypeRef, type Type, TypeError_ } from './types.js';
 
 /** Where a segment takes its key from: an input of the same call, or a field beside the one just read. */
 export type KeyFrom = 'input' | 'sibling';
@@ -186,9 +186,13 @@ export function resolvedBy(field: Field, value: unknown, given: Values, tree: Re
 }
 
 /** Every variable an operation's inputs bind through `resolves`, at one call site. */
-export function resolvedHere(accepts: Fields | undefined, given: Values, tree: Resolves): Record<string, Type> {
+export function resolvedHere(
+  accepts: Fields | TypeRef | undefined,
+  given: Values,
+  tree: Resolves,
+): Record<string, Type> {
   const subst: Record<string, Type> = {};
-  for (const [name, field] of Object.entries(accepts ?? {})) {
+  for (const [name, field] of Object.entries(acceptedFields(accepts, tree.document))) {
     if (!field.resolves) continue;
     Object.assign(subst, resolvedBy(field, given[name], given, tree));
   }

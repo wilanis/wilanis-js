@@ -88,7 +88,7 @@ export class Compiler {
     const op: KCall = {
       kind: 'call',
       handler: this.nativeHandler(hit),
-      in: inputsByName(Object.keys(hit.op.accepts ?? {})),
+      in: inputsByName(Object.keys(this.scope.types.accepted(hit.op.accepts))),
     };
     return { name: `${hit.path}#${hit.opName}`, nodes: { op }, output: hit.op.returns ? ['op'] : undefined };
   }
@@ -261,7 +261,7 @@ export class Compiler {
     this.handlers[handler] ??= this.attempting(
       this.nestedRunner(this.lowerGraph(graph), whole, graph.doc.atomic === true),
     );
-    const names = Object.keys(op.accepts ?? {});
+    const names = Object.keys(this.scope.types.accepted(op.accepts));
     const passIn = whole ? { in: { ref: 'in', path: [names[0]] } } : inputsByName(names);
     return { kind: 'call', handler, in: passIn };
   }
@@ -270,7 +270,7 @@ export class Compiler {
   private delegateCall(binding: Loaded<BindingDoc>, bound: BindingOp, op: Operation): KCall {
     if (!bound.run) throw new Error(`${binding.path}: an operation binds a graph or a run`);
     const { handler, op: target } = this.handlerFor(bound.run);
-    const given = passedInputs(target, op, bound.in);
+    const given = passedInputs(this.scope, target, op, bound.in);
     const roots: Roots = { resolvers: this.resolverRoots(binding.doc.reads) };
     const inputs = this.withScope(lowerValues(given, roots), { key: bound.run, given: bound.in });
     return { kind: 'call', handler, in: inputs, redact: redactOf(this.scope, target, given) };

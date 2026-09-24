@@ -71,7 +71,7 @@ function acceptsOf(binding: Loaded<BindingDoc>, name: string, scope: Scope): Typ
   const hit = scope.op(`${binding.doc.port}#${name}`);
   if (typeof hit === 'string') return undefined; // R001, where the binding is judged
   try {
-    return scope.types.fields(hit.op.accepts);
+    return scope.types.accepts(hit.op.accepts);
   } catch {
     return undefined;
   }

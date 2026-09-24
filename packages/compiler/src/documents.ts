@@ -22,7 +22,7 @@ import {
  */
 export function bindings(scope: Scope, op: Operation, given: Values | undefined): Record<string, Type> {
   const subst: Record<string, Type> = resolvedHere(op.accepts, given ?? {}, scope.resolving());
-  for (const [name, field] of Object.entries(op.accepts ?? {})) {
+  for (const [name, field] of Object.entries(scope.types.accepted(op.accepts))) {
     if (!field.binds || field.type !== 'type') continue;
     const value = given?.[name];
     if (typeof value !== 'string') continue;
@@ -39,10 +39,11 @@ export function bindings(scope: Scope, op: Operation, given: Values | undefined)
  * What a delegation hands its target: the statement's own values, and for every input it does not give that
  * the bound operation also accepts, the caller's value by name.
  */
-export function passedInputs(target: Operation, op: Operation, given: Values | undefined): Values {
+export function passedInputs(scope: Scope, target: Operation, op: Operation, given: Values | undefined): Values {
   const out: Values = { ...(given ?? {}) };
-  for (const name of Object.keys(target.accepts ?? {})) {
-    if (!(name in out) && op.accepts?.[name]) out[name] = `{{in.${name}}}`;
+  const ours = scope.types.accepted(op.accepts);
+  for (const name of Object.keys(scope.types.accepted(target.accepts))) {
+    if (!(name in out) && ours[name]) out[name] = `{{in.${name}}}`;
   }
   return out;
 }
@@ -87,6 +88,8 @@ interface Address {
  */
 function addressing(port: PortDoc): Address | undefined {
   for (const op of Object.values(port.operations)) {
+    // a shape named whole carries no `resolves`: those are a native contract's own fields
+    if (typeof op.accepts === 'string') continue;
     for (const [named, field] of Object.entries(op.accepts ?? {})) {
       const by = keyedBy(field);
       if (by) return { named, by };
@@ -136,9 +139,10 @@ export function collectionOf(scope: Scope, site: CallSite): CollectionSite | und
  * fault answers one refusal rather than the same fault told twice.
  */
 export function connectionOf(scope: Scope, op: Operation, given: Values | undefined): string | undefined {
+  const accepted = scope.types.accepted(op.accepts);
   const named = (field: string): string | undefined => {
     const value = given?.[field];
-    return op.accepts?.[field]?.static && typeof value === 'string' ? value : undefined;
+    return accepted[field]?.static && typeof value === 'string' ? value : undefined;
   };
   const direct = named('connection');
   if (direct) return scope.get('connection', direct) ? scope.canon(direct) : undefined;

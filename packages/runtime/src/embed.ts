@@ -210,9 +210,9 @@ export class Embedder {
   types(trigger: TriggerDoc): { in?: Type; out?: Type } {
     const accepts = () => {
       const operation = this.scope.op(trigger.fire.run);
-      return typeof operation === 'string' || !Object.keys(operation.op.accepts ?? {}).length
-        ? undefined
-        : this.scope.types.fields(operation.op.accepts);
+      if (typeof operation === 'string') return undefined;
+      const taken = operation.op.accepts;
+      return typeof taken === 'string' || Object.keys(taken ?? {}).length ? this.scope.types.accepts(taken) : undefined;
     };
     const inType = () => {
       if (trigger.in) return this.scope.types.ref(trigger.in);

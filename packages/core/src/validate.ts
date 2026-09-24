@@ -70,7 +70,17 @@ function groupByPath(errors: ErrorObject[]): Map<string, ErrorObject[]> {
     group.push(error);
     byPath.set(at, group);
   }
+  for (const [at, group] of byPath) if (typedBelow(at, group, byPath)) byPath.delete(at);
   return byPath;
+}
+
+/**
+ * Whether a path's errors only say it is not the JSON type of some alternative while errors below it say what
+ * is wrong inside the alternative it is: an object `accepts` whose field is malformed is not asked to be a string.
+ */
+function typedBelow(at: string, group: ErrorObject[], byPath: Map<string, ErrorObject[]>): boolean {
+  if (!at || !group.every(error => error.keyword === 'type')) return false;
+  return [...byPath.keys()].some(other => other.startsWith(`${at}/`));
 }
 
 /** The one value a const error wanted, or the JSON type a type error wanted. */

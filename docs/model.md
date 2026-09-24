@@ -40,7 +40,9 @@ C016.
 
 ## Ports and bindings
 
-A **port** is a contract: operations with `accepts` and `returns`. Granted by a plugin it is *native* -- the
+A **port** is a contract: operations with `accepts` and `returns`. `accepts` is fields by name, or the path of
+a shape whose fields the operation takes, so a record taken whole is stated once; a call site gives the fields
+one by one either way. Granted by a plugin it is *native* -- the
 plugin implements it. Declared in a feature it is a *domain* port, and a **binding** meets it, per operation:
 a data graph, or a delegation (`run` + `in`). Swap the binding and the same domain runs against a different
 store, a fake, or a queue. A profile in `project.json` chooses the bindings.

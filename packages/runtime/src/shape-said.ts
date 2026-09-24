@@ -57,7 +57,7 @@ function declaredAs(run: string, given: Record<string, unknown> | undefined, sha
   const found = scope.op(run);
   if (typeof found === 'string') return [];
   const keys: string[] = [];
-  for (const [name, field] of Object.entries(found.op.accepts ?? {}))
+  for (const [name, field] of Object.entries(scope.types.accepted(found.op.accepts)))
     if (typeof field.type === 'string' && scope.canon(field.type) === shape && given?.[name] !== undefined)
       keys.push(...keysOf(given[name]), '');
   return keys;

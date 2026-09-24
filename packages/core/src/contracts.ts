@@ -30,7 +30,8 @@ class Contract {
 
   judge(): Refusal[] {
     for (const [opName, op] of Object.entries(this.doc.operations)) {
-      this.accepts = op.accepts ?? {};
+      // an accepts that names a shape writes no field of its own here: the shape's fields are the shape's
+      this.accepts = typeof op.accepts === 'string' ? {} : (op.accepts ?? {});
       for (const [name, field] of Object.entries(this.accepts)) {
         if (!field.resolves) continue;
         this.at = `operations/${opName}/accepts/${name}/resolves`;

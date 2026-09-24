@@ -193,10 +193,29 @@ export class Judge {
     }
   }
 
-  /** What an operation takes, as one type, quietly; nothing when it accepts nothing. */
+  /** What an operation takes, as one type, quietly: its fields, or the shape it names; nothing when it accepts nothing. */
   acceptsType(op: Operation): Type | undefined {
     const accepts = op.accepts ?? {};
+    if (typeof accepts === 'string') return this.quiet(accepts);
     return Object.keys(accepts).length ? this.quiet({ fields: accepts }) : undefined;
+  }
+
+  /**
+   * What an operation takes, as one type: its fields, or the shape it names. R001 when a field's type or the
+   * shape does not resolve, or when the string names a type that is not a shape, since only a shape has fields.
+   */
+  acceptsTypeAt(op: Operation, file: string, at: string): Type | undefined {
+    if (typeof op.accepts !== 'string') return this.fieldsType(op.accepts, file, at);
+    const type = this.type(op.accepts, file, at);
+    if (!type || (type.kind === 'object' && type.name)) return type;
+    const message = `accepts names '${op.accepts}', which is not a shape; an operation takes a shape's fields or fields of its own`;
+    this.refuser(file)('R001', message, at, 'name a shape (wilanis ls shape), or write the fields under accepts');
+    return undefined;
+  }
+
+  /** The fields an operation takes one by one: its own, or those of the shape it names. */
+  accepted(op: Operation): Fields {
+    return this.scope.types.accepted(op.accepts);
   }
 
   // ---- documents ----------------------------------------------------------------------------------

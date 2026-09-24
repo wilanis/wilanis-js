@@ -330,7 +330,8 @@ The storage suite is untouched: `patch` is still what it was, and the engines ar
    implementation" gains entry 8: a guarded shape is written whole and made upstream of the write, so a site is
    never downstream of the effect that stores its value; `docs/rfcs/README.md` rows for both.
 
-Steps 2 and 3 need 1. Step 4 needs nothing. Step 5 needs 1 for the example it shows. Step 6 is last.
+Steps 2 and 3 need 1. Step 4 needs nothing. Step 1 needs step 4, and #625 for the rehearsal over the guard it
+moves upstream. Step 5 needs 1 for the example it shows. Step 6 is last.
 
 ## Drawbacks and alternatives
 
@@ -375,3 +376,19 @@ site stays guarded ("Guide-level explanation", at `keep-customer`).
 
 Decided during implementation: the three codes; the names `keep` and `nextId`; whether `--read-then patch` stays
 in the scaffold for a collection no invariant reads or goes altogether; and the exact wording of the three hints.
+
+## Decided during implementation
+
+1. **Step 4 precedes step 1.** B005 (`acceptsFitGraph` in `check/bindings.ts`) compares an operation's
+   accepts with a graph's `in` as two object types, field by field. Written as fields, `keep: { customer:
+   Customer }` bound to a graph whose `in` is `Customer` is refused: `Customer` has no field `customer`, and
+   the `id` it requires is not one `keep` accepts. The one-field-whole form (`wholeFitsGraph`) reaches only a
+   graph whose `in` is not a shape. Once `accepts` may name `Customer`, the shape's type is what B005 compares,
+   the record is taken whole, and the shape is stated once, so the rewrite in step 1 is written against it.
+   The comparison is structural, as it is for fields: `CustomerUpdate` fits a graph whose `in` is `Customer`,
+   since every field `Customer` adds is optional, so the sabotage test binds `update` to a graph whose `in`
+   is `CustomerRecord`, which requires `registrar`.
+2. **An `accepts` string that names no shape is R001.** The schema's alternative is `typeRef`, which also admits
+   `string` or `Customer.shape.json[]`; only a shape has fields to give one by one, so `Judge.acceptsTypeAt`
+   refuses any other type at `operations/<op>/accepts` under the code an unresolved type already takes. No code
+   is added.

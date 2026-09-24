@@ -151,6 +151,26 @@ export class TypeResolver {
   fields(fields: Fields | undefined): Type {
     return this.inline({ fields: fields ?? {} });
   }
+
+  /** What an operation's accepts takes, as one type: its fields as one object, or the shape it names. */
+  accepts(accepts: Fields | TypeRef | undefined): Type {
+    return typeof accepts === 'string' ? this.ref(accepts) : this.fields(accepts);
+  }
+
+  /** The fields an operation's accepts takes one by one: its own, or those of the shape it names. */
+  accepted(accepts: Fields | TypeRef | undefined): Fields {
+    return acceptedFields(accepts, ref => this.shapes(this.canon(ref)));
+  }
+}
+
+/**
+ * The fields an operation's accepts takes one by one: the fields it writes, or those of the shape its string
+ * names -- none where the string names no shape, which is refused where the port is judged (R001).
+ */
+export function acceptedFields(accepts: Fields | TypeRef | undefined, shapeOf: (ref: string) => unknown): Fields {
+  if (typeof accepts !== 'string') return accepts ?? {};
+  const doc = shapeOf(accepts) as Partial<ShapeDoc> | undefined;
+  return doc?.fields && typeof doc.fields === 'object' ? doc.fields : {};
 }
 
 /**

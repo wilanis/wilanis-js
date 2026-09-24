@@ -158,7 +158,8 @@ export function inputPorts(
   const ports: VPort[] = [];
   const subst = op ? bindings(scope, op, given) : {};
   const typeOf = (field: { type: unknown; enum?: string[] }) => fieldType(scope, field, subst);
-  for (const [name, field] of Object.entries(op?.accepts ?? {})) {
+  const accepted = scope.types.accepted(op?.accepts);
+  for (const [name, field] of Object.entries(accepted)) {
     const how = howGiven(scope, given?.[name], bind, name);
     ports.push({
       name,
@@ -170,7 +171,7 @@ export function inputPorts(
     });
   }
   for (const [name, value] of Object.entries(given ?? {}))
-    if (!op?.accepts?.[name]) ports.push({ name, ...written(scope, value) });
+    if (!accepted[name]) ports.push({ name, ...written(scope, value) });
   return ports;
 }
 

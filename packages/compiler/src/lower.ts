@@ -123,7 +123,7 @@ export function lowerScope(scope: Scope, site: CallSite): KSource | undefined {
 export function takesScope(scope: Scope, key: string): boolean {
   const hit = scope.op(key);
   if (typeof hit === 'string' || !hit.port.native) return false;
-  return Boolean(hit.op.accepts?.[SCOPE]);
+  return Boolean(scope.types.accepted(hit.op.accepts)[SCOPE]);
 }
 
 /** A store's `reads`: local name -> the segments read below request, as a graph's `reads` lower. */
@@ -161,7 +161,7 @@ export function redactOf(scope: Scope, op: Operation, given: Values | undefined)
   let inType: Type | undefined;
   let outType: Type | undefined;
   try {
-    inType = scope.types.fields(op.accepts);
+    inType = scope.types.accepts(op.accepts);
     outType = op.returns ? scope.types.spec(op.returns) : undefined;
     if (outType && hasVars(outType)) outType = substitute(outType, bindings(scope, op, given));
   } catch {

@@ -162,11 +162,12 @@ export interface PluginDoc extends Envelope {
  * `transactional`: running it can take part in the transaction of an atomic graph, which it finds through the
  * static `connection` or `store` field it accepts. `idempotent`: calling it again with the same inputs changes
  * nothing further -- always, or when an expression over its accepted fields holds. `key`: the accepted field a
- * repeated call is recognised by, so a caller who gives it makes the call safe to repeat.
+ * repeated call is recognised by, so a caller who gives it makes the call safe to repeat. `accepts`: the fields it
+ * takes, or the path of a shape whose fields it takes, so a record taken whole is stated once.
  */
 export interface Operation {
   description: string;
-  accepts?: Fields;
+  accepts?: Fields | TypeRef;
   returns?: TypeSpec;
   pure?: boolean;
   refuses?: boolean;

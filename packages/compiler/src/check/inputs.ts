@@ -18,6 +18,7 @@ import {
   resolvedHere,
   substitute,
   type Type,
+  type TypeRef,
 } from '@wilanis/core';
 import { secretPaths } from '../lower.js';
 import { type Judge, RESERVED, type Reader, type Refuser, type Resolve, type ShapeLayer } from './judge.js';
@@ -25,7 +26,8 @@ import { type Judge, RESERVED, type Reader, type Refuser, type Resolve, type Sha
 /** Where an operation is called: what is given, what it accepts, and how a value given there is typed. */
 export interface CallSite {
   given: Record<string, unknown>;
-  accepts: Fields | undefined;
+  /** the operation's accepts as written: its fields, or the shape whose fields it takes */
+  accepts: Fields | TypeRef | undefined;
   read: Reader;
   file: string;
   at: string;
@@ -92,7 +94,7 @@ class InputCheck {
     private readonly site: CallSite,
   ) {
     this.refuse = judge.refuser(site.file);
-    this.accepts = site.accepts ?? {};
+    this.accepts = judge.scope.types.accepted(site.accepts);
     this.extra = site.extra ?? {};
   }
 
