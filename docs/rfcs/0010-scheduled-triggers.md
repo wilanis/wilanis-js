@@ -380,7 +380,8 @@ rehearsal is for, and a scenario written by `fuzz` records the context it used. 
 `wilanis run <scheduled trigger>` builds a command line's context (`requestOf` in `packages/runtime/src/serve.ts`:
 `flags`, `args`, `cwd`, `body`, `file`), which hands no `scheduled`; a trigger whose `fire.in` reads it is refused
 at the edge with the field named. Whether `wilanis run … --at 2026-09-11T03:00:00Z` should fill the context is left
-to implementation, with a recommendation (*Open questions*).
+to implementation, with a recommendation (*Open questions*); step 8 took the recommendation, and `--at` fills it
+through the kind's `requestOf`.
 
 **Traces (RFC 0006).** Every tick is one fire and one trace, rooted `fire <trigger path>`, with no `correlation`:
 a tick has no incoming trace to continue. The scheduler's log line is the kind's answer, as a route's status is
@@ -415,7 +416,8 @@ shutdown signal, once it exists, is what cuts a run that will not end; this RFC 
 ### Plugin contract
 
 `PluginModule` in `packages/core/src/plugin.ts` does not change; neither does `Serving`, `FireArgs`,
-`TriggerRuntime`, `Hold` or `Guard`. The scheduler reaches the runtime through `env.serving` and `env.hold` inside a
+`TriggerRuntime`, `Hold` or `Guard`, save the optional `TriggerRuntime.requestOf` step 8 added for `wilanis run
+--at` (*Open questions*, 1). The scheduler reaches the runtime through `env.serving` and `env.hold` inside a
 `holds` operation the project's startup list names, as the listener, the watcher and RFC 0009's worker do. A storage
 engine reaches `@schedule` through a table `@storage` exports, which `@schedule` reads and the engine fills from
 `postLoad`, as an engine reaches `@storage` and a broker reaches `@queue`. The guard is not consulted, changed or told.
@@ -594,6 +596,12 @@ Nothing else must be decided before `accepted`. Decided during implementation:
    change this RFC would make, and the recommendation, since RFC 0009's queue kind asked the same question of
    `--in` -- or nothing, with `wilanis run` refusing at the edge as it does today. Whichever lands answers both
    RFCs' question in one place.
+
+   **Decided (step 8): the hook.** `TriggerRuntime.requestOf?(trigger, { flags, args })` builds the context
+   `wilanis run` hands a trigger of that kind, and a kind without it keeps the command line's context; `@schedule`'s
+   builds `{ scheduled, fired: now, missed: 0 }` from `--at`, refuses a value that is not an ISO 8601 time with the
+   flag named, and leaves `scheduled` out when `--at` is absent, so a `fire.in` reading it is refused at the edge as
+   before.
 2. The exact log lines, and whether the tick line prints the answer whole, its first line, or nothing beyond the
    status.
 3. Whether `@wilanis/plugin-storage-memory` declares `leases` and registers a keeper that always grants, so a

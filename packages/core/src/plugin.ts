@@ -221,6 +221,12 @@ export interface TriggerRuntime {
   ): Promise<() => Promise<void>>;
   /** Encode a report the way this kind would answer, for `wilanis run` and rehearsal. */
   encode?(trigger: TriggerDoc, report: Report): unknown;
+  /**
+   * The context `wilanis run` hands one of this kind's triggers, built from the command line's flags and
+   * arguments in the kind's own vocabulary; throws, naming the flag, where a flag cannot be read. A kind without
+   * it is handed a command line's context (`flags`, `args`, `cwd`, `body` from `--in`, `file` from `--file`).
+   */
+  requestOf?(trigger: TriggerDoc, given: { flags: Record<string, string>; args: string[] }): Record<string, unknown>;
 }
 
 /**

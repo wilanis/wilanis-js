@@ -1,4 +1,4 @@
-/** wilanis start: run every plugin's postLoad, then the project's startup steps -- what listens is what those steps say. wilanis run: fire one cli trigger. */
+/** wilanis start: run every plugin's postLoad, then the project's startup steps -- what listens is what those steps say. wilanis run: fire one trigger from the command line. */
 import { createReadStream } from 'node:fs';
 import { basename, extname } from 'node:path';
 import type { Readable } from 'node:stream';
@@ -11,6 +11,7 @@ import {
   Scope,
   type Trace,
   type TriggerDoc,
+  type TriggerRuntime,
 } from '@wilanis/core';
 import { type Outcome, outcomeOf, type Report } from '@wilanis/engine';
 import { FileBlobStore } from './blobs.js';
@@ -149,19 +150,40 @@ const BY_EXTENSION: Record<string, string> = {
 /** The content type a file on disk is taken to have, read off its extension; anything unknown is a stream of bytes. */
 export const contentTypeOf = (file: string) => BY_EXTENSION[extname(file).toLowerCase()] ?? 'application/octet-stream';
 
-/** What a run answers: what the trigger kind's runtime encodes, or the report's own output. */
-function encoded(load: LoadResult, trigger: Loaded<TriggerDoc>, report: Report) {
-  const runtime = load.plugins
+/** The runtime of the kind a trigger is of, where a plugin registered one. */
+function runtimeOf(load: LoadResult, trigger: TriggerDoc): TriggerRuntime | undefined {
+  return load.plugins
     .flatMap(plugin => Object.entries(plugin.triggers ?? {}))
-    .find(([kind]) => kind === load.resolve(trigger.doc.kind))?.[1];
-  return runtime?.encode ? runtime.encode(trigger.doc, report) : report.output;
+    .find(([kind]) => kind === load.resolve(trigger.kind))?.[1];
 }
 
-/** What a command line hands a trigger: its flags and arguments, a body from --in, and a file streamed into the registry. */
+/** What a run answers: what the trigger kind's runtime encodes, or the report's own output. */
+function encoded(runtime: TriggerRuntime | undefined, trigger: TriggerDoc, report: Report) {
+  return runtime?.encode ? runtime.encode(trigger, report) : report.output;
+}
+
+/** The blob scope a command line's `--file` is streamed into. */
+type Puts = { put: (source: Readable, meta: { contentType: string; filename: string }) => Promise<BlobHandle> };
+
+/**
+ * What a command line hands a trigger: the context its kind builds from the flags and arguments (`requestOf`),
+ * else a command line's own. The runtime never learns a kind's vocabulary; the kind says what its flags mean.
+ */
 async function requestOf(
+  runtime: TriggerRuntime | undefined,
+  trigger: TriggerDoc,
+  given: { flags: Record<string, string>; args: string[] },
+  blobs: Puts,
+): Promise<Record<string, unknown>> {
+  if (runtime?.requestOf) return runtime.requestOf(trigger, given);
+  return commandLine(given.flags, given.args, blobs);
+}
+
+/** A command line's own context: its flags and arguments, a body from --in, and a file streamed into the registry. */
+async function commandLine(
   flags: Record<string, string>,
   args: string[],
-  blobs: { put: (source: Readable, meta: { contentType: string; filename: string }) => Promise<BlobHandle> },
+  blobs: Puts,
 ): Promise<Record<string, unknown>> {
   const request: Record<string, unknown> = { flags, args, cwd: process.cwd() };
   if (flags.in !== undefined) request.body = JSON.parse(flags.in);
@@ -226,11 +248,12 @@ export async function runTrigger(
   const { found, emb, down } = await readied(load, ref, { ...opts, log });
   const blobs = emb.blobs.scope();
   try {
-    const request = await requestOf(given.flags ?? {}, given.args ?? [], blobs);
+    const runtime = runtimeOf(load, found.doc);
+    const request = await requestOf(runtime, found.doc, { flags: given.flags ?? {}, args: given.args ?? [] }, blobs);
     const built = emb.inputFor(found.doc, request);
     if ('error' in built) throw new Error(`input: ${built.error}`);
     const report = await emb.fire(found.doc, built.input, request, { blobs });
-    const answer = encoded(load, found, report);
+    const answer = encoded(runtime, found.doc, report);
     if (isBlobHandle(answer) && opts.deliver) await opts.deliver(blobs.open(answer), answer);
     return { report, answer };
   } finally {
