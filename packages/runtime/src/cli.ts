@@ -6,12 +6,27 @@ import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { checkTree } from '@wilanis/compiler';
 import type { BlobHandle, Trace } from '@wilanis/core';
-import { KINDS, type Kind, type LoadResult } from '@wilanis/core';
+import { KINDS, type Kind, type LoadResult, RefusalList } from '@wilanis/core';
 import { loadProject } from './project.js';
 import { runSaid } from './run-said.js';
 import { runTrigger, start } from './serve.js';
 import { type StopInput, stopHook } from './stopping.js';
-import { describe, fuzz, init, ls, map, migrate, regress, rehearse, SCENARIOS, scaffold } from './tools.js';
+import {
+  describe,
+  diagnosticsOf,
+  fuzz,
+  init,
+  ls,
+  map,
+  migrate,
+  printed,
+  regress,
+  rehearse,
+  SCENARIOS,
+  scaffold,
+  withRegression,
+  withRehearsal,
+} from './tools.js';
 import { atLevel, type Level, traceJson, traceText } from './trace.js';
 
 /** Every flag `wilanis migrate` knows; anything else is exit 2, since a misspelt flag must never silently plan. */
@@ -25,10 +40,10 @@ const REPEATABLE = ['branch'];
 
 const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a stateless engine
 
-  wilanis check    [root]                          judge the whole tree, under every profile; exit 1 with every refusal
-  wilanis rehearse [root] [--seed n] [-v]          run every trigger, and every branch of every switch
+  wilanis check    [root] [--json]                 judge the whole tree, under every profile; exit 1 with every refusal
+  wilanis rehearse [root] [--seed n] [-v] [--json] run every trigger, and every branch of every switch
   wilanis fuzz     [root] [--runs n]               write one scenario per trigger per seed to scenarios/
-  wilanis regress  [root]                          replay every scenario and diff node by node
+  wilanis regress  [root] [--json]                 replay every scenario and diff node by node
   wilanis start    [root] [--profile word] [--trace[=text|json]] [--level summary|full]
                    refuse a variable the profile reads that is unset, then run postLoad and the profile's
                    startup steps; what listens is what those steps say
@@ -50,6 +65,8 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
   wilanis init     [root]                          write CLAUDE.md and agent hooks into a tree
   wilanis stop-hook [root]                         the Stop hook: judge the tree, answer the harness on stdout
 
+check, rehearse and regress take --json: one JSON object on stdout (RFC 0019's envelope, packages/runtime/schemas/
+diagnostics.schema.json), the refusals as data on a refused tree whichever was asked, and the same exit codes.
 rehearse, fuzz, regress, start and run take --profile word, and run under it; else under WILANIS_PROFILE, else
 under the profile project.json marks "default": true. A project that declares no profile runs its one unnamed one.
 Every path is @-rooted (@features/tasks/tasks.port.json) or through a project alias.
@@ -107,16 +124,27 @@ async function load(root: string): Promise<LoadResult> {
   return loadProject(abs);
 }
 
-async function check(root: string): Promise<LoadResult> {
+/**
+ * Load and judge the tree, and stop at a refusal: in words on stderr, or, under `--json`, as the envelope on stdout
+ * with `command` set to what was asked, so a refused tree reads the same whichever command met it.
+ */
+async function check(root: string, json?: string): Promise<LoadResult> {
   const loaded = await load(root);
   const answer = checkTree(loaded);
   if (!answer.ok) {
-    console.error(answer.format());
-    console.error(`\n${answer.items.length} refusal(s)`);
+    if (json) console.log(printed(diagnosticsOf(loaded, answer, { command: json, root })));
+    else console.error(`${answer.format()}\n\n${answer.items.length} refusal(s)`);
     process.exit(1);
   }
   return loaded;
 }
+
+/** The envelope of a tree the checker accepted, for a command to add what it computed to. */
+const accepted = (loaded: LoadResult, command: string, root: string) =>
+  diagnosticsOf(loaded, new RefusalList(), { command, root });
+
+/** The command's name when `--json` was given, which is what `check` needs to print the envelope; else nothing. */
+const jsonOf = (flags: Record<string, string>, command: string) => (flags.json ? command : undefined);
 
 /** What the command line gave: the flags, the words, and the root each command reads from. */
 interface Given {
@@ -129,18 +157,20 @@ interface Given {
 
 /** What each command does. Every one works from a loaded, checked tree; `wilanis <cmd> --help` prints USAGE. */
 const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
-  check: async ({ rootArg }) => {
-    const loaded = await check(rootArg(0));
-    console.log(`ok: ${loaded.registry.files.length} documents`);
+  check: async ({ flags, rootArg }) => {
+    const loaded = await check(rootArg(0), jsonOf(flags, 'check'));
+    if (flags.json) console.log(printed(accepted(loaded, 'check', rootArg(0))));
+    else console.log(`ok: ${loaded.registry.files.length} documents`);
   },
   rehearse: async ({ flags, rootArg }) => {
-    const loaded = await check(rootArg(0));
+    const loaded = await check(rootArg(0), jsonOf(flags, 'rehearse'));
     const answer = await rehearse(loaded, {
       seed: flags.seed ? Number(flags.seed) : undefined,
       profile: flags.profile,
       verbose: Boolean(flags.verbose),
     });
-    console.log(answer.lines.join('\n'));
+    if (flags.json) console.log(printed(withRehearsal(accepted(loaded, 'rehearse', rootArg(0)), answer)));
+    else console.log(answer.lines.join('\n'));
     if (!answer.ok) process.exit(1);
   },
   fuzz: async ({ flags, rootArg }) => {
@@ -155,9 +185,10 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     if (!answer.ok) process.exit(1);
   },
   regress: async ({ flags, rootArg }) => {
-    const loaded = await check(rootArg(0));
+    const loaded = await check(rootArg(0), jsonOf(flags, 'regress'));
     const answer = await regress(loaded, { profile: flags.profile });
-    console.log(answer.lines.join('\n') || 'no scenarios -- run wilanis fuzz first');
+    if (flags.json) console.log(printed(withRegression(accepted(loaded, 'regress', rootArg(0)), answer)));
+    else console.log(answer.lines.join('\n') || 'no scenarios -- run wilanis fuzz first');
     if (!answer.ok) process.exit(1);
   },
   start: async ({ flags, rootArg }) => {

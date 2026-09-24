@@ -43,7 +43,7 @@ export interface Stated {
 }
 
 /** A graph with no branches at all: what it ran, how it ended, and whether it was atomic. */
-export interface Plain {
+export interface PlainRun {
   trigger: string;
   graph: string;
   atomic?: boolean;
@@ -213,7 +213,7 @@ function aside(run: { declared?: string; error?: string }): string {
  */
 export function format(
   decisions: Decision[],
-  plain: Plain[],
+  plain: PlainRun[],
   lines: string[],
   said: { verbose?: boolean; stated?: Stated[] } = {},
 ): boolean {
@@ -225,7 +225,7 @@ export function format(
 }
 
 /** A graph with no branches: what it answered, and the problem it names when it did not. */
-function plainLines(run: Plain, lines: string[]): string[] {
+function plainLines(run: PlainRun, lines: string[]): string[] {
   lines.push(`${short(run.graph)}${marked(run.atomic)}  (no branches)`);
   const rolled = run.declared ? undone(run.atomic) : '';
   lines.push(`  ${verdict(run.status)}${aside(run)}${rolled}`);

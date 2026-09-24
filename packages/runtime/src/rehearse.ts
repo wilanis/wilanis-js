@@ -10,16 +10,22 @@ import { outcomeOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, nonEmpty, type Stubbing, setPath, switchesOf } from './branches.js';
 import type { Embedder } from './embed.js';
 import { activeProfile } from './profile.js';
-import { type Decision, format, gather, type Plain, statedOf, stateName } from './rehearsal-report.js';
+import { type Decision, format, gather, type PlainRun, statedOf, stateName } from './rehearsal-report.js';
 import { atomicAt, declaredAt, rootGraph, specBehind, type Where, whereOf } from './rehearse-where.js';
 import { embedderFor, failedBelow, generatedFire, policyRoots, unbroken } from './stubbing.js';
 
 // ---- rehearse ----------------------------------------------------------------------------------------
 
-/** One line per outcome, and whether the whole rehearsal is acceptable. */
+/** One line per outcome, and whether the whole rehearsal is acceptable; beside them, what the lines were said from. */
 export interface Rehearsal {
   ok: boolean;
   lines: string[];
+  /** The seed every run was generated under. */
+  seed: number;
+  /** Every switch reached, once per graph that declares it, with what each branch settled to. */
+  decisions: Decision[];
+  /** Every trigger with no switch under it, run once. */
+  plain: PlainRun[];
 }
 
 /** What one run of one branch settled to, judged at the graph that owns the decision. */
@@ -113,16 +119,16 @@ export async function rehearse(
   const profile = activeProfile(load.registry.project?.doc, { flag: opts.profile, env: process.env });
   const lines: string[] = [];
   const decisions: Decision[] = [];
-  const settledGraphs: Plain[] = [];
+  const plain: PlainRun[] = [];
   // every trigger, and every policy as a trigger of each kind that attaches it: a decision is walked like any other graph
   for (const trigger of [...load.registry.all('trigger'), ...policyRoots(load)]) {
     const found = await rehearseTrigger(load, trigger, { seed, profile }, decisions);
-    if (!found) settledGraphs.push(await wholeOf(load, trigger, seed, profile));
+    if (!found) plain.push(await wholeOf(load, trigger, seed, profile));
   }
   // the invariants the tree states, counted over the whole tree rather than per trigger: a rule is stated once.
   // A scope of its own rather than an embedder's: what is asked of it reads documents and runs nothing.
   const said = { verbose: opts.verbose, stated: statedOf(new Scope(load.registry, load.resolve)) };
-  return { ok: format(decisions, settledGraphs, lines, said), lines };
+  return { ok: format(decisions, plain, lines, said), lines, seed, decisions, plain };
 }
 
 /** What broke, when a run failed without declaring a refusal: the node, and what it threw. */

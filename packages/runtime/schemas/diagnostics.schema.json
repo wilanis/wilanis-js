@@ -1,0 +1,318 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/runtime/schemas/diagnostics.schema.json",
+  "title": "diagnostics",
+  "description": "What `wilanis check --json`, `rehearse --json` and `regress --json` print (RFC 0019): one object on stdout, the checker's refusals as data, and beside them what the command computed. A refused tree prints this envelope whichever command was asked, with `command` saying which. From 1.0 a field is added, never removed or retyped; before 1.0 nothing is promised.",
+  "type": "object",
+  "required": ["format", "runtime", "command", "root", "ok", "documents", "refusals"],
+  "properties": {
+    "format": {
+      "description": "Which envelope this is. 1 until a change a reader could not ignore, which takes the next number.",
+      "const": 1
+    },
+    "runtime": {
+      "description": "The version of @wilanis/runtime that printed it; the workspace pins every sibling package to it.",
+      "type": "string"
+    },
+    "command": {
+      "description": "The command that was asked: check, rehearse or regress. A refused tree says the one asked, not check.",
+      "type": "string"
+    },
+    "root": {
+      "description": "The tree's root as given on the command line, `.` when none was given.",
+      "type": "string"
+    },
+    "ok": {
+      "description": "Whether the command passed: no refusal, and, for rehearse and regress, every branch settled or every scenario replayed the same. The exit code says the same thing: 0 when true, 1 when false.",
+      "type": "boolean"
+    },
+    "documents": {
+      "description": "How many documents the tree loaded, plugins' and included trees' among them. A count to read, not one to rely on.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "refusals": {
+      "description": "Every checker refusal, sorted by file, then at (the whole-file refusal first), then code, then message; empty when the tree is accepted.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/refusal" }
+    },
+    "seed": {
+      "description": "rehearse: the seed every run was generated under; the same seed prints the same envelope.",
+      "type": "integer"
+    },
+    "decisions": {
+      "description": "rehearse: every switch the triggers reach, once per graph that declares it, with what each branch settled to.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/decision" }
+    },
+    "plain": {
+      "description": "rehearse: every trigger with no switch under it, run once, and how it ended.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/plainRun" }
+    },
+    "results": {
+      "description": "regress: every scenario replayed, in the order the tree loads them, and whether it answered as recorded.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/result" }
+    },
+    "lines": {
+      "description": "rehearse and regress: the words the command prints without --json, from the same objects as the fields beside them.",
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "refusal": {
+      "description": "One reason the checker will not accept the tree.",
+      "type": "object",
+      "required": ["code", "family", "file", "message", "hint"],
+      "properties": {
+        "code": {
+          "description": "The rule's name: a family letter and three digits. From 1.0 a code names one rule and is never reused.",
+          "type": "string",
+          "pattern": "^[A-Z][0-9]{3}$"
+        },
+        "family": {
+          "description": "The code's first letter: the family of rules it belongs to (X for a plugin's own rules).",
+          "type": "string",
+          "pattern": "^[A-Z]$"
+        },
+        "file": {
+          "description": "The document the refusal is about: @-rooted when the loader named it, tree-relative when it had not yet.",
+          "type": "string"
+        },
+        "at": {
+          "description": "Where in the file: a path from the document's root, segments joined by /, a graph's node by its id. Absent when the refusal is about the file as a whole.",
+          "type": "string"
+        },
+        "message": {
+          "description": "What is wrong, in words. Its wording is not promised.",
+          "type": "string"
+        },
+        "hint": {
+          "description": "The direction of the fix, in words: the edit or the command that removes it. Its wording is not promised.",
+          "type": "string"
+        },
+        "url": {
+          "description": "The page about the code, its long form. Absent for an X code where a plugin from outside this workspace may have made it.",
+          "type": "string"
+        },
+        "fixes": {
+          "description": "Edits that remove the refusal, each sufficient alone, the first preferred; present only where the rule can prove one.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/fix" }
+        }
+      }
+    },
+    "fix": {
+      "description": "One edit to one document, or one file moved: exactly one of set, add, remove or move.",
+      "type": "object",
+      "required": ["file"],
+      "properties": {
+        "file": {
+          "description": "The document the edit is made to, spelled as the refusal spells files.",
+          "type": "string"
+        },
+        "at": {
+          "description": "The path the edit is made at, in the grammar of a refusal's at: the value to set, the list to add to, the member or element to remove.",
+          "type": "string"
+        },
+        "set": {
+          "description": "The value to write at `at`, replacing what is there."
+        },
+        "add": {
+          "description": "The value to append to the list at `at`, created when absent; nothing is appended when the value is already there."
+        },
+        "remove": {
+          "description": "Remove the member or element at `at`.",
+          "const": true
+        },
+        "move": {
+          "description": "The tree-relative path to move the file to.",
+          "type": "string"
+        }
+      },
+      "oneOf": [
+        { "required": ["at", "set"] },
+        { "required": ["at", "add"] },
+        { "required": ["at", "remove"] },
+        { "required": ["move"] }
+      ]
+    },
+    "decision": {
+      "description": "One switch, or one guard the compiler lowered, and every branch the rehearsal tried.",
+      "type": "object",
+      "required": ["graph", "node", "triggers", "branches"],
+      "properties": {
+        "graph": {
+          "description": "The graph document that declares the switch.",
+          "type": "string"
+        },
+        "node": {
+          "description": "The switch's node id within that graph.",
+          "type": "string"
+        },
+        "atomic": {
+          "description": "Whether that graph says atomic, so every branch that does not answer undoes what it wrote.",
+          "type": "boolean"
+        },
+        "guard": {
+          "description": "Present where the decision is a guard the compiler lowered for an invariant it could not prove (RFC 0007), not a switch the author wrote.",
+          "type": "object",
+          "required": ["for", "answers"],
+          "properties": {
+            "for": {
+              "description": "The invariants it guards, their labels joined.",
+              "type": "string"
+            },
+            "answers": {
+              "description": "The node it answers the value at: the one branch that reads holds.",
+              "type": "string"
+            }
+          }
+        },
+        "triggers": {
+          "description": "The names of the triggers whose runs reach this switch.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "branches": {
+          "description": "Every rule of the switch and its else, in order.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/branch" }
+        }
+      }
+    },
+    "branch": {
+      "description": "One branch: the rule, where it routes, and what the run steered onto it settled to, or why no run could reach it.",
+      "type": "object",
+      "required": ["when", "to"],
+      "properties": {
+        "when": {
+          "description": "The rule's expression, or else.",
+          "type": "string"
+        },
+        "to": {
+          "description": "The node the rule routes to.",
+          "type": "string"
+        },
+        "settled": {
+          "description": "What the run settled to, judged at the graph that owns the switch. Absent when the branch is uncovered.",
+          "$ref": "#/$defs/settled"
+        },
+        "uncovered": {
+          "description": "Why no inputs could reach the branch; present only then.",
+          "type": "string"
+        }
+      }
+    },
+    "settled": {
+      "description": "How one run ended at the graph that owns the decision. It carries no time, so the same seed prints the same bytes.",
+      "type": "object",
+      "required": ["status", "blocked"],
+      "properties": {
+        "status": {
+          "description": "done, failed, or BLOCKED.",
+          "type": "string"
+        },
+        "blocked": {
+          "description": "Whether the run blocked: an input nothing supplies.",
+          "type": "boolean"
+        },
+        "declared": {
+          "description": "The failure the graph declared, when it refused on purpose.",
+          "type": "object",
+          "required": ["reason", "message"],
+          "properties": {
+            "reason": {
+              "description": "The word the refusal names.",
+              "type": "string"
+            },
+            "message": {
+              "description": "What the refusal said.",
+              "type": "string"
+            }
+          }
+        },
+        "error": {
+          "description": "A failure the graph did not declare, where it broke and what it threw: a bug, not a designed outcome.",
+          "type": "string"
+        },
+        "propagated": {
+          "description": "A declared failure that came from a graph this one calls, and the node it came through.",
+          "type": "object",
+          "required": ["node", "reason", "error"],
+          "properties": {
+            "node": {
+              "description": "The node of this graph the failure arrived through.",
+              "type": "string"
+            },
+            "reason": {
+              "description": "The word the called graph refused with.",
+              "type": "string"
+            },
+            "error": {
+              "description": "What the called graph said.",
+              "type": "string"
+            }
+          }
+        },
+        "misrouted": {
+          "description": "The node the switch actually routed to, when it is not the one the branch aimed at.",
+          "type": "string"
+        }
+      }
+    },
+    "plainRun": {
+      "description": "A trigger with no switch under it: one run is the whole of it.",
+      "type": "object",
+      "required": ["trigger", "graph", "status"],
+      "properties": {
+        "trigger": {
+          "description": "The trigger's name.",
+          "type": "string"
+        },
+        "graph": {
+          "description": "The operation the trigger fires.",
+          "type": "string"
+        },
+        "atomic": {
+          "description": "Whether the graph that meets it says atomic.",
+          "type": "boolean"
+        },
+        "status": {
+          "description": "done, failed, or BLOCKED.",
+          "type": "string"
+        },
+        "declared": {
+          "description": "The refusal it declared, as reason: \"message\".",
+          "type": "string"
+        },
+        "error": {
+          "description": "A failure it did not declare: where it broke and what it threw.",
+          "type": "string"
+        }
+      }
+    },
+    "result": {
+      "description": "One scenario replayed with its recorded stubs.",
+      "type": "object",
+      "required": ["scenario", "same", "diffs"],
+      "properties": {
+        "scenario": {
+          "description": "The scenario document, @-rooted.",
+          "type": "string"
+        },
+        "same": {
+          "description": "Whether the run answered as the scenario recorded, node by node.",
+          "type": "boolean"
+        },
+        "diffs": {
+          "description": "Each difference in words, empty when same: the status, the output, and every node that changed, went or is new.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}
