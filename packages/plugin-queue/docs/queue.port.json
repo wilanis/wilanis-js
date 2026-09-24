@@ -1,0 +1,71 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/port.schema.json",
+  "label": "Queue",
+  "description": "What a data graph asks of a broker: put a message on a queue, and prepare what the broker needs to keep one. Both are effects, listed under a feature's effects and stubbed by a rehearsal, so nothing leaves the process until the tree is served.",
+  "operations": {
+    "publish": {
+      "description": "Put one message on a queue of a broker: the body is the message, of the edge type `type` names, and the headers ride beside it, where a credential for the consuming trigger's policies goes. A queue trigger of this tree that consumes the same connection and queue must accept that type (X403). Answers the broker's id for the message.",
+      "accepts": {
+        "connection": {
+          "type": "string",
+          "static": true,
+          "description": "a connection document whose kind declares delivery: the broker"
+        },
+        "queue": {
+          "type": "string",
+          "static": true,
+          "description": "the queue's name on that broker"
+        },
+        "type": {
+          "type": "type",
+          "binds": "$Message",
+          "description": "the edge type of the message; a shape with no blob field at any depth, since a blob's handle is process-local (X404)"
+        },
+        "message": {
+          "type": "$Message",
+          "description": "the message body, written in place or read from a node"
+        },
+        "headers": {
+          "type": {
+            "fields": {},
+            "open": "string"
+          },
+          "required": false,
+          "description": "what rides beside the body, by name; the consuming trigger reads them as request.headers"
+        },
+        "delayMs": {
+          "type": "number",
+          "required": false,
+          "description": "how long the message is held before it may be delivered, in milliseconds; absent: at once"
+        }
+      },
+      "returns": {
+        "fields": {
+          "id": {
+            "type": "string",
+            "description": "the broker's id for the message, which the consuming trigger reads as request.id"
+          }
+        }
+      }
+    },
+    "ensure": {
+      "description": "Create what the broker needs to keep queues on this connection -- a table, say -- and never alter what exists; a broker that needs nothing does nothing. A startup step reaches it through a domain port bound to a data graph, so what a tree prepares is what its project.json says it prepares.",
+      "idempotent": true,
+      "accepts": {
+        "connection": {
+          "type": "string",
+          "static": true,
+          "description": "a connection document whose kind declares delivery: the broker"
+        }
+      },
+      "returns": {
+        "fields": {
+          "ready": {
+            "type": "boolean",
+            "description": "true once the broker can keep queues on the connection"
+          }
+        }
+      }
+    }
+  }
+}
