@@ -4,9 +4,10 @@
 
 A wilanis project: a registry of customers kept per tenant, with sign-in, sessions and policies over its writes, and a
 command-line greeting gated by a one-time code. Everything in this directory is JSON; `package.json` installs
-the runtime and the plugin packages it uses. Two secrets are named in `project.json`: `CUSTOMERS_JWT_SECRET`,
-the key our tokens are signed with, which `start` and `run` need in the environment, and
-`CUSTOMERS_DATABASE_URL`, which only the `production` profile reads.
+the runtime and the plugin packages it uses. Three secrets are named in `project.json`: `CUSTOMERS_JWT_SECRET`,
+the key our tokens are signed with, which `start` and `run` need in the environment under every profile, and
+`CUSTOMERS_DATABASE_URL` and `CUSTOMERS_OPERATOR_PASSWORD_HASH`, which only the `production` profile reads.
+`start` asks for the variables its profile reads and no other.
 
 **Where the customers are kept is a profile's choice, and nothing else changes.** `live` binds
 `customer.port.json` to `customers-rest.binding.json` and the routes talk to a public REST API
@@ -48,8 +49,9 @@ it, since the REST API declares no such thing.
 
 The `production` profile's startup step prepares the database before the port opens, so a tree whose database
 is unreachable refuses to serve rather than answering every route with a fault. That there are two store
-documents rather than one connection swapped under a profile is the seam RFC 0002 settled and RFC 0005 will
-close: a profile swaps bindings, and a store names its connection in the document.
+documents rather than one connection swapped under a profile is the seam RFC 0002 settled and RFC 0013 kept:
+a profile may stand one connection in for another only when both are of the same kind, so memory here and
+PostgreSQL there stay two bindings the profile chooses between.
 
 **Both stores keep their customers per tenant, and no graph says so.** `customers` is
 `"scoped": { "tenant": "{{tenant}}" }`, and the store's `reads` binds `tenant` to the resolver of that name in
@@ -65,8 +67,9 @@ parameter is refused (`A007`), since the caller chose it. The one way across is 
 policy (`A008`). `latest` is not scoped; its key is the tier, one row for every tenant, and nothing reads it
 back. Under `live` the customers are the REST API's, which knows no tenants, and nothing is scoped.
 
-Because the port has three bindings, **a command that runs the tree names a profile**: `--profile local`,
-`--profile live` or `--profile production`. `wilanis check` needs none -- it judges every profile.
+The port has three bindings, so **a command that runs the tree runs it under a profile**: `--profile local`,
+`--profile live` or `--profile production`, else `WILANIS_PROFILE`, else `live`, the one `project.json` marks
+`"default": true`. `wilanis check` needs none -- it judges every profile.
 
 ```
 npm install
@@ -249,8 +252,13 @@ bo-pass holds the `registrar` group and may write customers; cy / cy-pass holds 
 (`connections/people.connection.json`: ana / ana-pass in the tenant `acme`, dee / dee-pass in `globex`). The registry's *records* are customers; the people
 who sign in there are the account holders those records are about. An account holder gets a perfectly valid
 token of our own and can read their preferences and their tenant's customers with it, and no write route will take it. Both directories
-are written in the connection, for development; a production profile binds the same `identity.port.json` to
-an OIDC issuer or LDAP, in `features/directories`, and nothing in the included tree changes.
+are written in the connection, for development. Under `production`, `project.json → profiles.production.connections`
+stands `connections/employees-production.connection.json` in for the employee directory: the same kind, one
+account, `operator` in `registrar`, whose scrypt hash comes from `CUSTOMERS_OPERATOR_PASSWORD_HASH`, so no
+credential that works there is written here. The binding still names `employees.connection.json`; the profile
+decides which document that reaches. A real deployment binds the same `identity.port.json` to an OIDC issuer or
+LDAP instead, another kind and so another binding in `features/directories`, and nothing in the included tree
+changes.
 
 Either way the caller gets **our** token, signed by the `@auth` plugin: the sign-in graph writes the realm
 (`employee`, `customer`) and the directory's groups as roles, and that is the domain's decision, not the
@@ -334,11 +342,12 @@ over an empty walk, which is what lets one step serve every profile. `customer.p
 the customers of every tenant -- nobody is calling yet, so there is no tenant to read (`B008`) -- so a tree whose storage is unreachable refuses to serve rather than answering every route with
 a fault. `@auth/state.port.json#getSession`
 does the same for the guard's memory. `@reload/watch.port.json#watch` serves the tree again whenever a
-document changes, without closing the port. `@schedule/scheduler.port.json#run` keeps the schedule, which is empty here.
+document changes, without closing the port; it names `"profiles": ["live", "local"]`, so it watches on a laptop
+and production runs every other step and not that one. `@schedule/scheduler.port.json#run` keeps the schedule, which is empty here.
 `@otel/exporter.port.json#export` sends every run as spans to a collector on :4318; it is the one step marked
 `"required": false`, since no collector is running when you clone this, and what it cannot send is said once
 in the log rather than delaying the run. `@http/server.port.json#listen` opens :8099 -- **delete that step
-and nothing listens**, since no runtime opens a port merely because http triggers exist. The first three are
+and nothing listens**, since no runtime opens a port merely because http triggers exist. The first four are
 domain port operations, so whichever binding the profile chose is what gets checked; the last four are
 `holds` operations, which a plugin grants and the runtime stops when the process ends.
 `wilanis describe @http/server.port.json` says which plugin grants it.

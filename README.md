@@ -222,6 +222,14 @@ export CUSTOMERS_JWT_SECRET=$(openssl rand -base64 32)
 npx wilanis start example --profile local      # serve it on :8099, customers kept in memory
 ```
 
+A profile is one place the tree runs. `npx wilanis start example` with no `--profile` runs `live`, the one
+`project.json` marks `"default": true`: the customers through the test API, a reload on every saved document.
+`--profile local` keeps them in memory and reaches no network; `WILANIS_PROFILE` names one too, and the flag
+wins. `--profile production` is the deployment: the customers in PostgreSQL, one operator account standing in
+for the laptop's employee directory, and no watcher, since the watch step names `live` and `local` and a step
+without `profiles` runs everywhere. Started without its variables, it prints `profile production` and then
+every variable that profile reads and nobody set, with the document that reads it, before anything opens.
+
 [`example/README.md`](example/README.md) walks through what it serves and who may do what.
 
 ## The rest

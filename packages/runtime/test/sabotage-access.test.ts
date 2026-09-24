@@ -107,6 +107,7 @@ describe('sabotage: access, as the example attaches the included policies', () =
       '@connections/customers-api.connection.json',
       '@connections/customers-postgres.connection.json',
       '@connections/customers.connection.json',
+      '@connections/employees-production.connection.json',
       '@connections/employees.connection.json',
       '@connections/people.connection.json',
     ]);

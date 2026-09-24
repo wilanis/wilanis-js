@@ -43,9 +43,9 @@ const documents = () => load().registry.files.length;
 const paste = (name: string) => copyFileSync(join(DEMO, name), join(dir, ROUTE));
 
 describe('beat 1, the hook: the tree as it ships, and what the rule reaches', () => {
-  it('checks ok at 200 documents, and describe computes the five routes the rule reaches', () => {
+  it('checks ok at 201 documents, and describe computes the five routes the rule reaches', () => {
     expect(refusalsAt(dir)).toEqual([]);
-    expect(documents()).toBe(200);
+    expect(documents()).toBe(201);
     const said = describeDoc(load(), '@customers/domain/writes-are-for-registrars.invariant.json').split('\n');
     expect(said).toContain('access: every trigger reaching these domain operations is gated');
     expect(said).toContain(`requires: attaches ${POLICY}`);
@@ -127,10 +127,10 @@ describe('beat 3, following the hints', () => {
       `A005 write { "policy": "${POLICY}", "in": { "token": "{{request.headers.authorization}}" } } -- the read is where this kind hands the credential`,
     );
   });
-  it('the finished route yields ok, at 201 documents', () => {
+  it('the finished route yields ok, at 202 documents', () => {
     paste('archive-customer.step3.trigger.json');
     expect(refusalsAt(dir)).toEqual([]);
-    expect(documents()).toBe(201);
+    expect(documents()).toBe(202);
   });
 });
 

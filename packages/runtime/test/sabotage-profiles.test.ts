@@ -7,8 +7,9 @@ import { EXAMPLE, loadedWith, plantedAll, sabotage, sabotageSaying } from './exa
 
 /**
  * A profile is one place a tree runs (RFC 0013): at most one is the default, a connection may stand in for
- * another of its kind under it, and a startup step may say which profiles run it. The stand-in below is planted:
- * which profiles the example declares and names is step 4's to settle.
+ * another of its kind under it, and a startup step may say which profiles run it. The stand-in below is planted
+ * under live, beside the one production already names (employees-production), so these cases own every line
+ * they change.
  */
 describe('sabotage: profiles, their stand-ins, and the steps they run', () => {
   const api = '@connections/customers-api.connection.json';
