@@ -35,6 +35,16 @@ export { BUILTIN_PLUGINS } from './plugins/index.js';
 export { std } from './plugins/std.js';
 export { postLoad } from './post-load.js';
 export { activeProfile, PROFILE_VARIABLE, secretsRefusal, unsetSecrets } from './profile.js';
+export {
+  groupSaid,
+  needSaid,
+  type ProfileNeed,
+  type ProfileReach,
+  profilesOf,
+  type ReachedGroup,
+  type StandIn,
+  standInsOf,
+} from './profiles-said.js';
 export { loadProject, type PluginResolution, resolveIncludes, resolvePlugins } from './project.js';
 export { contentTypeOf, runStartup, runTrigger, start } from './serve.js';
 export { Served } from './served.js';

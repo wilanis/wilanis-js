@@ -15,7 +15,7 @@
 import { checkTree } from '@wilanis/compiler';
 import type { GraphDoc, Kind, Loaded, LoadResult, PolicyDoc, Refusal, TriggerDoc } from '@wilanis/core';
 import { pageUrl, policyPath, SCHEMA_BASE, Scope, WILANIS } from '@wilanis/core';
-import { limitsOf } from '@wilanis/runtime';
+import { limitsOf, profilesOf } from '@wilanis/runtime';
 import { attemptsOf } from './attempts.js';
 import { graphView } from './graphs.js';
 import { invariantView } from './invariants.js';
@@ -27,6 +27,7 @@ import { storeView } from './stores.js';
 import type { DocView, VAttachedPolicy } from './types.js';
 import { labelOf, readable } from './types.js';
 
+export * from './tree-index.js';
 export * from './types.js';
 
 // ---- schemas --------------------------------------------------------------------------------------
@@ -210,5 +211,6 @@ export function viewOf(load: LoadResult, ref: string, reads: TreeReads = treeRea
   if (doc.kind === 'policy') policyView(scope, doc, view);
   if (doc.kind === 'store') view.store = storeView(scope, load, doc);
   if (doc.kind === 'invariant') view.invariant = invariantView(scope, doc);
+  if (doc.kind === 'project') view.profiles = profilesOf(scope);
   return view;
 }

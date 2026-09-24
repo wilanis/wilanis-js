@@ -581,7 +581,7 @@
         if (d.aliases && Object.keys(d.aliases).length) { page.appendChild(el('h2', null, 'Aliases')); page.appendChild(valuesTable(d.aliases, ['alias', 'stands for'])); }
         if (d.secrets && Object.keys(d.secrets).length) { page.appendChild(el('h2', null, 'Secrets')); page.appendChild(valuesTable(d.secrets, ['secret', 'environment variable'])); }
         if (d.startup && d.startup.length) { page.appendChild(el('h2', null, 'Startup')); page.appendChild(el('p', null, 'What runs once when the tree is served, in this order, before any trigger listens. Each step fires a domain port operation, so the profile decides how it is met.')); for (const [i, s] of d.startup.entries()) { const c = el('div', 'card'); c.appendChild(el('div', 'k', (i + 1) + '. ' + (s.required === false ? 'optional' : 'required'))); const vv = el('div', 'v'); vv.appendChild(link(s.run.split('#')[0], showOp(s.run))); if (s.label) vv.appendChild(el('small', null, s.label)); c.appendChild(vv); if (s.description) c.appendChild(el('p', null, s.description)); if (s.in && Object.keys(s.in).length) c.appendChild(valuesTable(s.in)); page.appendChild(c); } }
-        if (d.profiles) { page.appendChild(el('h2', null, 'Profiles')); for (const [name, p] of Object.entries(d.profiles)) { const h = el('h3', null, name); page.appendChild(h); if (p.description) page.appendChild(el('p', null, p.description)); const t = el('table'); const hd = el('tr'); hd.appendChild(el('th', null, 'port')); hd.appendChild(el('th', null, 'bound to')); t.appendChild(hd); for (const [port, b] of Object.entries(p.bindings)) { const tr = el('tr'); tr.appendChild(el('td')).appendChild(link(port)); tr.appendChild(el('td')).appendChild(link(b)); t.appendChild(tr); } page.appendChild(t); } }
+        if (v.profiles) profilesEl(page, v.profiles);
         break;
       }
       case 'feature': {
@@ -992,6 +992,42 @@
       tr.appendChild(by); t.appendChild(tr);
     }
     page.appendChild(t);
+  }
+  /**
+   * A block per profile (RFC 0013), the rows `wilanis describe project.json` prints: what it binds and stands in,
+   * and what the tree reaches, holds, starts and needs there. Reaches and holds are grouped by port, the
+   * operations of one port reached with the same connections on one row with those connections beside them.
+   */
+  function profilesEl(page, profiles) {
+    page.appendChild(el('h2', null, 'Profiles'));
+    page.appendChild(el('p', null, 'Each profile is one place the tree runs. What it reaches is derived from its choices, not written: every effectful operation the tree runs there, the connections those name, what it holds open, and the variables it needs set before it starts.'));
+    for (const p of profiles) {
+      const h = el('h3', null, p.name === undefined ? 'none declared' : p.name); if (p.default) h.appendChild(el('span', 'badge ok', 'default')); page.appendChild(h);
+      page.appendChild(el('p', null, p.name === undefined ? 'The project declares no profile: each port is met by its one binding.' : (p.description || '')));
+      const t = el('table');
+      const row = (label, items, none) => { const tr = el('tr'); tr.appendChild(el('td', 'name', label)); const td = el('td'); if (!items.length) td.appendChild(el('span', 'miss', none)); items.forEach((it, i) => { if (i) td.appendChild(el('br')); td.appendChild(it); }); tr.appendChild(td); t.appendChild(tr); };
+      const pair = (from, to) => frag(link(from), TO, link(to));
+      row('binds', p.binds.map(b => pair(b.port, b.binding)), 'each port’s one binding');
+      if (p.standsIn.length) row('stands in', p.standsIn.map(s => pair(s.named, s.standIn)), '');
+      row('reaches', p.reaches.map(groupEl), 'nothing effectful');
+      row('holds', p.holds.map(groupEl), 'nothing open');
+      row('starts', p.starts.length ? [frag(...p.starts.flatMap((s, i) => [...(i ? [' · '] : []), link(s.run.split('#')[0], s.label || showOp(s.run))]))] : [], 'nothing');
+      row('needs', p.needs.map(needEl), 'no variable');
+      page.appendChild(t);
+    }
+  }
+  /** Operations of one port reached with the same connections: the port, each operation, and the connections. */
+  function groupEl(g) {
+    const f = frag(link(g.port), ' ' + g.operations.map(op => '#' + op).join(', '));
+    g.connections.forEach((c, i) => { f.appendChild(document.createTextNode(i ? ', ' : '  via ')); f.appendChild(link(c)); });
+    return f;
+  }
+  /** One variable a profile needs: the variable, the secret it answers, and who reads it. */
+  function needEl(n) {
+    const f = frag(el('span', 'mono', n.variable || '{{secrets.' + n.key + '}}'), ' (' + n.key + (n.variable ? '' : ', undeclared') + ', read by ');
+    n.readBy.forEach((r, i) => { if (i) f.appendChild(document.createTextNode(', ')); f.appendChild(r.startsWith('@') && !r.includes(' ') ? link(r) : document.createTextNode(r)); });
+    f.appendChild(document.createTextNode(')'));
+    return f;
   }
   /** A node a switch catches (RFC 0014): its fault is routed on rather than ending the run, and to where. */
   function caughtEl(box, n, g) {

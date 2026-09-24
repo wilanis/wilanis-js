@@ -18,8 +18,10 @@ import type {
   ProjectDoc,
   ResolversDoc,
   ScenarioDoc,
+  Scope,
 } from '@wilanis/core';
 import { attemptsSaid } from './attempts-said.js';
+import { profilesLines, standInLines } from './profiles-said.js';
 import { type Reader, readersOf, readsLines } from './reads-said.js';
 
 /** One list of paths on one line, as `gates:` says a policy's triggers; nothing where the list is empty. */
@@ -82,15 +84,18 @@ export function featureLines(doc: Loaded): string[] {
   return lines.length ? lines : ['names no other feature, exports nothing, and allows no effect'];
 }
 
-/** A connection: the kind that gives it meaning, and the settings it is configured with. */
-export function connectionLines(doc: Loaded): string[] {
+/**
+ * A connection: the kind that gives it meaning, the settings it is configured with, and, where a profile names
+ * it under `connections`, what it stands in for or what replaces it there -- a reader of the connection a data
+ * graph names learns it is not what every profile reaches.
+ */
+export function connectionLines(doc: Loaded, scope: Scope): string[] {
   const declared = doc.doc as ConnectionDoc;
   const lines = [`kind  ${declared.kind}`];
   const settings = Object.entries(declared.settings ?? {});
-  if (!settings.length) return lines;
-  lines.push('settings:');
+  if (settings.length) lines.push('settings:');
   for (const [name, value] of settings) lines.push(`    ${name}: ${JSON.stringify(value)}`);
-  return lines;
+  return [...lines, ...standInLines(scope, doc.path)];
 }
 
 /** A codec: what it yields, which is either the type a call declares or one type it always answers in. */
@@ -143,29 +148,19 @@ function startupLines(declared: ProjectDoc): string[] {
     'starts, in order:',
     ...declared.startup.map(step => {
       const must = step.required ? '  (required: serving stops if it refuses)' : '  (serving proceeds if it refuses)';
-      return `    ${step.run}${must}${step.label ? `  -- ${step.label}` : ''}`;
+      const only = step.profiles ? `  (under ${step.profiles.join(', ')} only)` : '';
+      return `    ${step.run}${must}${only}${step.label ? `  -- ${step.label}` : ''}`;
     }),
   ];
 }
 
-/** Each profile and the bindings it chooses, since which binding meets a port is a profile's choice. */
-function profileLines(declared: ProjectDoc): string[] {
-  const profiles = Object.entries(declared.profiles ?? {});
-  if (!profiles.length) return [];
-  const lines = ['profiles (each names the binding it meets a port with):'];
-  for (const [name, profile] of profiles) {
-    lines.push(`    ${name}${profile.description ? `  -- ${profile.description}` : ''}`);
-    for (const [port, binding] of Object.entries(profile.bindings ?? {})) lines.push(`        ${port} → ${binding}`);
-  }
-  return lines;
-}
-
 /**
  * The project: what it is called, what it loads, what it includes, the aliases it gives every reference, what
- * it starts and how each profile binds its ports. The last two are what the document is chiefly for -- nothing
- * a tree starts is decided by the runtime -- so neither may be left for a reader to open the file to find.
+ * it starts, and a block per profile saying what the tree binds, stands in, reaches, holds, starts and needs
+ * there (RFC 0013). The last two are what the document is chiefly for -- nothing a tree starts is decided by
+ * the runtime -- so neither may be left for a reader to open the file, or run the tree, to find.
  */
-export function projectLines(doc: Loaded): string[] {
+export function projectLines(doc: Loaded, scope: Scope): string[] {
   const declared = doc.doc as ProjectDoc;
   const aliases = Object.entries(declared.aliases ?? {}).map(([name, target]) => `${name} → ${target}`);
   return [
@@ -175,6 +170,6 @@ export function projectLines(doc: Loaded): string[] {
     ...listLine('aliases  ', aliases),
     ...listLine('secrets  ', Object.keys(declared.secrets ?? {})),
     ...startupLines(declared),
-    ...profileLines(declared),
+    ...profilesLines(scope),
   ];
 }

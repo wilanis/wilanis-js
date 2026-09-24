@@ -108,12 +108,12 @@ describe('describe: no kind answers with the document as JSON', () => {
 
   it('says how each profile binds its ports, since which binding meets a port is a profile s choice', () => {
     const said = describeDoc(example, '@project.json');
-    expect(said).toContain('profiles (each names the binding it meets a port with):');
+    expect(said).toMatch(/^profile local {2}-- /m);
     expect(said).toContain(
-      '        @customers/domain/customer.port.json → @customers/data/customers-store.binding.json',
+      '  binds      @customers/domain/customer.port.json  → @customers/data/customers-store.binding.json',
     );
     expect(said).toContain(
-      '        @customers/domain/customer.port.json → @customers/data/customers-postgres.binding.json',
+      '  binds      @customers/domain/customer.port.json  → @customers/data/customers-postgres.binding.json',
     );
   });
 
