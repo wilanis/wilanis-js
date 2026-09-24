@@ -55,7 +55,10 @@ function copyServing(port: number, edits: Record<string, Edit>): string {
   return dir;
 }
 
-/** Production's database as the memory engine, since a stand-in may not change a connection's kind (C018). */
+/**
+ * Production's database as the memory engine, since a stand-in may not change a connection's kind (C018). The
+ * memory engine keeps no lease, so production's scheduler names none here (X254 otherwise).
+ */
 const OVER_MEMORY: Record<string, Edit> = {
   'connections/customers-postgres.connection.json': connection => {
     connection.kind = '@storage-memory/memory.connection-kind.json';
@@ -63,6 +66,7 @@ const OVER_MEMORY: Record<string, Edit> = {
   },
   'project.json': project => {
     delete project.secrets.customersDatabase;
+    for (const step of project.startup) if (step.in?.lease) step.in = undefined;
   },
 };
 

@@ -151,8 +151,23 @@
     },
     {
       "label": "Keep the schedule",
-      "description": "Fire the scheduled triggers of this tree, each at the instants its cron expression names. This tree declares none: its customers are kept per tenant, and a tick has no caller to be a tenant of, so a scheduled trigger could reach neither them nor the view across them. Delete this step and nothing is scheduled: a scheduled trigger fires because project.json asks for a scheduler, never because the trigger exists. One process runs it here; several instances would give it a lease.",
-      "run": "@schedule/scheduler.port.json#run"
+      "description": "Fire the scheduled triggers of this tree, each at the instants its cron expression names. This tree declares none: its customers are kept per tenant, and a tick has no caller to be a tenant of, so a scheduled trigger could reach neither them nor the view across them. Delete this step and nothing is scheduled: a scheduled trigger fires because project.json asks for a scheduler, never because the trigger exists. It runs on the laptop, under live and local, where one process is the only one there is, so it holds nothing.",
+      "run": "@schedule/scheduler.port.json#run",
+      "profiles": [
+        "live",
+        "local"
+      ]
+    },
+    {
+      "label": "Keep the schedule across instances",
+      "description": "The same scheduler under production, where several instances run behind the load balancer and each names the same ticks. Each tick is held in the customer database, which declares leases, so whichever instance reaches it first fires it and the others find it taken: one run per tick, however many instances there are.",
+      "run": "@schedule/scheduler.port.json#run",
+      "in": {
+        "lease": "@connections/customers-postgres.connection.json"
+      },
+      "profiles": [
+        "production"
+      ]
     },
     {
       "label": "Export traces",
