@@ -41,6 +41,9 @@
       "path": "packages/plugin-queue"
     },
     {
+      "path": "packages/plugin-queue-memory"
+    },
+    {
       "path": "packages/plugin-otel"
     },
     {
