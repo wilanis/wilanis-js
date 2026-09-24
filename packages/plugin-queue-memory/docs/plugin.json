@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/plugin.schema.json",
+  "label": "Queue in memory",
+  "description": "An @queue broker that keeps its queues in arrays for as long as the process lives. It grants one connection kind and no port: what may be asked of a queue is @queue's business, and this plugin only answers it. Nothing is written to disk and nothing survives a restart, which is what makes it right for development, for tests and for the trees under libraries/ -- and wrong for any message that must still be there tomorrow.",
+  "grants": {
+    "connectionKinds": [
+      "@queue-memory/memory.connection-kind.json"
+    ]
+  }
+}

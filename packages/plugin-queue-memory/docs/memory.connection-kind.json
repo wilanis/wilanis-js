@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/connection-kind.schema.json",
+  "label": "In-process queue",
+  "description": "A broker that lives as long as the process: queues are arrays, a retry is re-enqueued after its backoff, and nothing survives a restart. For development, tests and libraries/. It delivers at least once on purpose, so a tree that checks against it checks against what production will do.",
+  "delivery": "at-least-once",
+  "settings": {
+    "fields": {}
+  }
+}
