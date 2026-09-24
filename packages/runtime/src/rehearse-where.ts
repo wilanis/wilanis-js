@@ -11,8 +11,17 @@
  * graph -- and the guarded site -- it belongs to, and to the type its node declares it answers. `rehearse.ts`
  * beside it walks and runs; nothing here runs anything or reads a report.
  */
-import { guardSpecAt } from '@wilanis/compiler';
-import { type BindingDoc, hasVars, type Loaded, type Operation, type TriggerDoc, type Type } from '@wilanis/core';
+import { bindings, guardSpecAt } from '@wilanis/compiler';
+import {
+  type BindingDoc,
+  hasVars,
+  type Loaded,
+  type Operation,
+  substitute,
+  type TriggerDoc,
+  type Type,
+  type Values,
+} from '@wilanis/core';
 import type { Embedder } from './embed.js';
 
 /** A lowered spec as this walk reads one: its nodes by id, whatever each of them turns out to be. */
@@ -81,17 +90,30 @@ function operationOf(emb: Embedder, handler: string): Operation | undefined {
   return typeof hit === 'string' ? undefined : hit.op;
 }
 
-/** What a handler declares it answers, where the declaration is closed: no type variable a call site binds. */
-function answeredBy(emb: Embedder, handler: string): Type | undefined {
+/**
+ * What a handler declares it answers at one call site: the declaration, with the type variables the call binds in
+ * literals filled in -- `@std/object.port.json#make` answers `$T`, and the `type` it is given says what `$T` is.
+ * Nothing where a variable is left open, since a value built for an open type would be a guess.
+ */
+function answeredBy(emb: Embedder, node: SpecNode & { handler: string }): Type | undefined {
+  const { handler } = node;
   try {
-    const spec = handler.startsWith('graph:')
-      ? emb.scope.get('graph', handler.slice('graph:'.length))?.doc.out?.type
-      : operationOf(emb, handler)?.returns;
+    const op = handler.startsWith('graph:') ? undefined : operationOf(emb, handler);
+    const spec = op ? op.returns : emb.scope.get('graph', handler.slice('graph:'.length))?.doc.out?.type;
     const type = spec ? emb.scope.types.spec(spec) : undefined;
-    return type && !hasVars(type) ? type : undefined;
+    const bound = type && op && hasVars(type) ? substitute(type, bindings(emb.scope, op, literalsOf(node))) : type;
+    return bound && !hasVars(bound) ? bound : undefined;
   } catch {
     return undefined;
   }
+}
+
+/** The inputs a lowered node is given as literals, by name: what binds a type variable at the call site. */
+function literalsOf(node: SpecNode): Values {
+  const out: Values = {};
+  for (const [name, source] of Object.entries(node.in ?? {}))
+    if (source && typeof source === 'object' && 'value' in source) out[name] = (source as { value: unknown }).value;
+  return out;
 }
 
 /**
@@ -102,11 +124,12 @@ function answeredBy(emb: Embedder, handler: string): Type | undefined {
  */
 export function declaredAt(emb: Embedder, root: Spec, nodePath: string): Type | undefined {
   const node = nodeAt(emb, root, nodePath.split('.'));
-  return node && node.kind !== 'map' && typeof node.handler === 'string' ? answeredBy(emb, node.handler) : undefined;
+  if (!node || node.kind === 'map' || typeof node.handler !== 'string') return undefined;
+  return answeredBy(emb, { ...node, handler: node.handler });
 }
 
 /** A node of a lowered spec, as far as a walk down a path reads one. */
-type SpecNode = { kind?: string; handler?: unknown };
+type SpecNode = { kind?: string; handler?: unknown; in?: Record<string, unknown> };
 
 /** The node a dotted path ends at: the spec behind each call stepped into, and a map's element index stepped over. */
 function nodeAt(emb: Embedder, root: Spec, segments: string[]): SpecNode | undefined {

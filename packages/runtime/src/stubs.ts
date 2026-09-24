@@ -48,8 +48,27 @@ function withMembers(domain: Domain, generated: unknown, type: Type | undefined,
   return kept;
 }
 
+/**
+ * A string of the length the domain asks for, where the value is one: `len` reads a string as well as a list, and a
+ * rule such as `len(name) > 0` over a field declared `string` is met by a name, not by a list of one null -- which
+ * the rule would accept and every reader of the value after it would refuse as the wrong type.
+ */
+function withChars(domain: Domain, generated: unknown): string {
+  const base = typeof generated === 'string' ? generated : '';
+  const least = domain.minLen ?? 0;
+  const most = domain.maxLen ?? Infinity;
+  if (base.length > most) return base.slice(0, most);
+  return base.length >= least ? base : base.padEnd(least, PLACEHOLDER);
+}
+
+/** A value of the length the domain asks for: a string where the value is one, a list otherwise. */
+function withLength(domain: Domain, generated: unknown, type: Type | undefined, seed: number): unknown {
+  if (typeof generated === 'string' || type?.kind === 'string') return withChars(domain, generated);
+  return listOfLength(domain, generated, type, seed);
+}
+
 /** A list of the length the domain asks for: cut when too long, padded with its first element when too short. */
-function withLength(domain: Domain, generated: unknown, type: Type | undefined, seed: number): unknown[] {
+function listOfLength(domain: Domain, generated: unknown, type: Type | undefined, seed: number): unknown[] {
   const base = Array.isArray(generated) ? generated : baseList({}, generated, type, seed);
   const want =
     domain.minLen !== undefined ? Math.max(base.length, domain.minLen) : Math.min(base.length, domain.maxLen ?? 0);

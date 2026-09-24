@@ -102,6 +102,13 @@ describe('turning a demand into a value', () => {
     expect(satisfy({ minLen: 3, present: true }, ['a'])).toHaveLength(3);
     expect(satisfy({ maxLen: 1, present: true }, ['a', 'b', 'c'])).toHaveLength(1);
   });
+  it('meets a length on a string with a string, not a list, so its readers still see the declared type (#625)', () => {
+    const text = { kind: 'string' } as const;
+    expect(satisfy({ minLen: 1, present: true }, undefined, text)).toBe('x');
+    expect(satisfy({ minLen: 1, present: true }, 'Ada', text)).toBe('Ada');
+    expect(satisfy({ maxLen: 0, present: true }, 'Ada', text)).toBe('');
+    expect(satisfy({ minLen: 3, present: true }, 'a')).toBe('axx');
+  });
   it('generates a value of the declared type for a bare presence', () => {
     const list = satisfy({ present: true }, undefined, { kind: 'list', of: { kind: 'string' } });
     expect(Array.isArray(list)).toBe(true);

@@ -2,7 +2,7 @@
  * `wilanis rehearse`: every branch of every decision a trigger can reach, walked until each is answered, and what it
  * took to get there said in words. It runs against stubbed effects, so nothing leaves the process.
  */
-import { guardsOf, idsOf, TAKEN_IDS } from '@wilanis/compiler';
+import { type Guard, guardsOf, idsOf, TAKEN_IDS } from '@wilanis/compiler';
 import type { Loaded, LoadResult, TriggerDoc, Type } from '@wilanis/core';
 import { Scope } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
@@ -11,6 +11,7 @@ import { type Case, casesFor, type FoundSwitch, nonEmpty, type Stubbing, setPath
 import type { Embedder } from './embed.js';
 import { activeProfile } from './profile.js';
 import { type Decision, format, gather, type PlainRun, statedOf, stateName } from './rehearsal-report.js';
+import { heldUpstream } from './rehearse-held.js';
 import { atomicAt, declaredAt, rootGraph, specBehind, type Where, whereOf } from './rehearse-where.js';
 import { embedderFor, failedBelow, generatedFire, policyRoots, unbroken } from './stubbing.js';
 
@@ -286,8 +287,8 @@ function downstreamOf(walk: Walk, sw: FoundSwitch): Record<string, unknown> {
 }
 
 /**
- * The invariants a decision guards, and the node it answers the value at, where the switch is one the compiler
- * lowered rather than one the author wrote (RFC 0007); nothing where it is an ordinary switch. Which sites
+ * The guard a decision is, where the switch is one the compiler lowered rather than one the author wrote (RFC 0007);
+ * nothing where it is an ordinary switch. Which sites
  * carry a guard is never re-derived here: `guardsOf` is the compiler's own answer, and the ids it occupies are
  * the contract the report, the describe and the viewer all read a guard by, so a node id that is one of them
  * is one.
@@ -295,19 +296,20 @@ function downstreamOf(walk: Walk, sw: FoundSwitch): Record<string, unknown> {
  * A list site's guard is matched by the site the walk descended through rather than by the node id, because
  * inside the nested spec that guard's switch is the fixed `in:check` whatever the site was called; the id
  * alone would name the site's own guard for a taken site and nothing at all for a made one. Its value answers
- * at the fixed `in:ok` for the same reason.
+ * at the fixed `in:ok` for the same reason (`guardSaid`).
  */
-function guardAt(emb: Embedder, at: Where, node: string): Decision['guard'] {
+function guardAt(emb: Embedder, at: Where, node: string): Guard | undefined {
   const doc = emb.scope.get('graph', at.graph);
   if (!doc) return undefined;
   const guards = guardsOf(emb.scope, doc);
-  const guard = at.site ? guards.find(one => one.id === at.site) : guards.find(one => idsOf(one).check === node);
-  if (!guard) return undefined;
-  return {
-    for: guard.unproved.map(one => stateName(one.invariant)).join('; '),
-    answers: at.site ? TAKEN_IDS.ok : idsOf(guard).ok,
-  };
+  return at.site ? guards.find(one => one.id === at.site) : guards.find(one => idsOf(one).check === node);
 }
+
+/** A guard as a decision says it: the invariants it stands for, and the node its `holds` branch answers at. */
+const guardSaid = (guard: Guard, at: Where): Decision['guard'] => ({
+  for: guard.unproved.map(one => stateName(one.invariant)).join('; '),
+  answers: at.site ? TAKEN_IDS.ok : idsOf(guard).ok,
+});
 
 /** One switch as a decision: every branch, and what each settled to. */
 async function decisionFor(walk: Walk, sw: FoundSwitch): Promise<Decision> {
@@ -315,16 +317,22 @@ async function decisionFor(walk: Walk, sw: FoundSwitch): Promise<Decision> {
   const downstream = downstreamOf(walk, sw);
   const at = whereOf(walk.probe, walk.trigger, sw.prefix);
   const node = sw.at.split('.').pop() ?? '';
+  const guard = guardAt(walk.probe, at, node);
   const decision: Decision = {
     graph: at.graph,
     node,
     atomic: atomicAt(walk.probe, at.graph),
-    guard: guardAt(walk.probe, at, node),
+    guard: guard && guardSaid(guard, at),
     triggers: [walk.trigger.name],
     branches: [],
   };
+  // a guard whose value an enclosing graph already judged on this path is held there: neither branch is steered,
+  // since what reaches it is what the caller handed down, and the one that refuses cannot be reached on this path
+  const held = guard && heldUpstream(walk.probe, walk.trigger, sw, guard);
   for (const one of casesFor(sw, walk.stubbing))
-    decision.branches.push(await branchOf(walk, sw, one, { pre, downstream }));
+    decision.branches.push(
+      held ? { when: one.branch.when, to: one.branch.to, held } : await branchOf(walk, sw, one, { pre, downstream }),
+    );
   return decision;
 }
 
