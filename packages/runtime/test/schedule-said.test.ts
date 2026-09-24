@@ -111,7 +111,18 @@ describe('wilanis new trigger --kind', () => {
   it('refuses a kind whose plugin the project does not name, and writes nothing', () => {
     const root = scheduledProject();
     expect(() => scaffold(root, 'trigger', 'features/jobs/tick', { kind: '@queue/queue.trigger-kind.json' })).toThrow(
-      "cannot read the trigger kind '@queue/queue.trigger-kind.json'; name its plugin in project.json → plugins (with from) and npm install it",
+      "no plugin '@queue' in project.json → plugins; name it with its from and npm install it",
+    );
+    expect(existsSync(join(root, 'features/jobs/edge/tick.trigger.json'))).toBe(false);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('refuses a kind its installed plugin does not ship, naming the describe that lists its kinds', () => {
+    const root = scheduledProject();
+    expect(() =>
+      scaffold(root, 'trigger', 'features/jobs/tick', { kind: '@schedule/shedule.trigger-kind.json' }),
+    ).toThrow(
+      `'@schedule' ships no shedule.trigger-kind.json under its docs; run wilanis describe @schedule/plugin.json ${root} to see the kinds it grants`,
     );
     expect(existsSync(join(root, 'features/jobs/edge/tick.trigger.json'))).toBe(false);
     rmSync(root, { recursive: true, force: true });

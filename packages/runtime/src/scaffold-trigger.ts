@@ -38,24 +38,35 @@ function docsOf(root: string, use: string): string | undefined {
   };
   const from = project.plugins?.find(plugin => plugin.use === use)?.from;
   if (!from) return undefined;
-  const dir = packageDir(createRequire(join(root, 'package.json')).resolve(from));
-  return dir ? join(dir, 'docs') : undefined;
+  try {
+    const dir = packageDir(createRequire(join(root, 'package.json')).resolve(from));
+    return dir ? join(dir, 'docs') : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
-/** The settings one trigger kind declares, read off its document; a kind the tree cannot reach is said to be so. */
+/** The settings fields one kind document declares, or undefined where the document cannot be read. */
+function fieldsAt(file: string): Record<string, Field> | undefined {
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'))?.settings?.fields;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The settings one trigger kind declares, read off its document. A plugin the tree cannot reach and a kind its
+ * plugin does not ship are refused apart, since each is fixed by a different edit.
+ */
 function declaredSettings(root: string, kind: string): Record<string, Field> {
   const [use, ...rest] = kind.split('/');
-  let fields: Record<string, Field> | undefined;
-  try {
-    const docs = docsOf(root, use);
-    const doc = docs ? JSON.parse(readFileSync(join(docs, ...rest), 'utf8')) : undefined;
-    fields = doc?.settings?.fields;
-  } catch {
-    fields = undefined;
-  }
+  const docs = docsOf(root, use);
+  if (!docs) throw new Error(`no plugin '${use}' in project.json → plugins; name it with its from and npm install it`);
+  const fields = fieldsAt(join(docs, ...rest));
   if (!fields)
     throw new Error(
-      `cannot read the trigger kind '${kind}'; name its plugin in project.json → plugins (with from) and npm install it`,
+      `'${use}' ships no ${rest.join('/')} under its docs; run wilanis describe ${use}/plugin.json ${root} to see the kinds it grants`,
     );
   return fields;
 }
