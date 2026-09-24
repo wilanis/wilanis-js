@@ -81,10 +81,11 @@ describe('the reach of a profile', () => {
       expect(reach(laptop).holds).toContain('@reload/watch.port.json#watch');
     }
     // the watcher is a laptop's step; what production holds open is what serves and reports, nothing that reloads
-    expect(production.holds).toEqual([
+    // and nothing that schedules, which is production-scheduler's alone, and that one opens no port (RFC 0010)
+    expect(production.holds).toEqual(['@otel/exporter.port.json#export', '@http/server.port.json#listen']);
+    expect(reach('production-scheduler').holds).toEqual([
       '@schedule/scheduler.port.json#run',
       '@otel/exporter.port.json#export',
-      '@http/server.port.json#listen',
     ]);
     // a handler asks for the connection by the name the documents use, and is handed the stand-in's settings
     const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);

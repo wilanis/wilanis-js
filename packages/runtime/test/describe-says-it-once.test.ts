@@ -100,7 +100,9 @@ describe('describe: no kind answers with the document as JSON', () => {
     // loses more than it saves: the raw JSON this replaced did show it
     const said = describeDoc(example, '@project.json');
     expect(said).toContain('starts, in order:');
-    expect(said).toContain('    @http/server.port.json#listen  (serving proceeds if it refuses)  -- Listen');
+    expect(said).toContain(
+      '    @http/server.port.json#listen  (serving proceeds if it refuses)  (under live, local, production only)  -- Listen',
+    );
     expect(said).toContain(
       '    @customers/domain/customer.port.json#prepare  (required: serving stops if it refuses)  -- Prepare the customer store',
     );

@@ -58,12 +58,12 @@ function step1(ctx) {
   const title = "The agent scaffolds a route";
   const made = wilanis(ctx, "new", "trigger", "features/customers/edge/archive-customer", ".", "--run", "@customers/domain/customer.port.json#remove", "--kind", "@http/http.trigger-kind.json").text;
   const out = check(ctx);
-  const want = ["T002", "T002", "A006", "A006", "T005", "T005", "T005", "I001"];
-  assert(title, codesOf(out).join(" ") === want.join(" ") && out.endsWith("8 refusal(s)"), out, `check answers ${want.join(", ")} and 8 refusal(s)`);
+  const want = ["T002", "T002", "A006", "A006", "A006", "T005", "T005", "T005", "I001"];
+  assert(title, codesOf(out).join(" ") === want.join(" ") && out.endsWith("9 refusal(s)"), out, `check answers ${want.join(", ")} and 9 refusal(s)`);
   return {
     number: 1,
     title,
-    summary: `${codesOf(out).join(" ")}, 8 refusal(s)`,
+    summary: `${codesOf(out).join(" ")}, 9 refusal(s)`,
     does: [
       { text: "The task is one line: add a way to archive a customer. The agent finds the <code>remove</code> operation on the customer port and scaffolds a route that fires it.", pre: `npx wilanis new trigger features/customers/edge/archive-customer . \\\n  --run '@customers/domain/customer.port.json#remove' --kind '@http/http.trigger-kind.json'\n${made}` },
       { text: `What it wrote, <code>${ROUTE}</code>:`, pre: read(ctx, ROUTE) },
@@ -78,17 +78,17 @@ function step2(ctx) {
   const title = "The agent follows the hints";
   paste(ctx, "archive-customer.step2.trigger.json");
   const out = check(ctx);
-  assert(title, codesOf(out).join(" ") === "A006 A006 I001" && out.endsWith("3 refusal(s)"), out, "check answers A006, A006, I001 and 3 refusal(s)");
+  assert(title, codesOf(out).join(" ") === "A006 A006 A006 I001" && out.endsWith("4 refusal(s)"), out, "check answers A006, A006, A006, I001 and 4 refusal(s)");
   return {
     number: 2,
     title,
-    summary: "A006 A006 I001, 3 refusal(s)",
+    summary: "A006 A006 A006 I001, 4 refusal(s)",
     does: [
-      { text: "Five of the eight hints are shape and status: the agent declares what the route takes and answers and maps the three reasons the operation can end with. It leaves the policy alone, since nothing yet told it why.", pre: read(ctx, ROUTE) },
+      { text: "Five of the nine hints are shape and status: the agent declares what the route takes and answers and maps the three reasons the operation can end with. It leaves the policy alone, since nothing yet told it why.", pre: read(ctx, ROUTE) },
       CHECK,
     ],
     answers: [{ pre: out, codes: true }],
-    why: "One round of edits took five refusals to zero and touched nothing else, because each hint said where and what. What remains is not about the route's shape but about who may call it: I001, a rule of the tree, says the same thing it said before, since the rule did not move; and the two A006 say the customer stores keep each tenant's rows apart, so the route needs a policy that proves the caller's session carries a tenant. All three point at <code>#policies</code>.",
+    why: "One round of edits took five refusals to zero and touched nothing else, because each hint said where and what. What remains is not about the route's shape but about who may call it: I001, a rule of the tree, says the same thing it said before, since the rule did not move; and the three A006, one per profile with a store, say the customer stores keep each tenant's rows apart, so the route needs a policy that proves the caller's session carries a tenant. All four point at <code>#policies</code>.",
   };
 }
 

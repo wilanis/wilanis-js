@@ -13,6 +13,8 @@ RFC 0001, `docs/rfcs/0001-the-rfc-process.md`; this page is the short form.
    A task that is unblocked and unclaimed is `status:ready`; `help wanted` means we would like someone
    outside to take it; `good first issue` means it needs no prior knowledge of the code.
 3. **A task becomes a pull request** that closes it. `npm test` must pass: lint, build and every test.
+   CI starts no database or object store, so the suites that need one skip there; a change to the Postgres
+   engine or the S3 plugin runs them locally, as those packages' READMEs say.
 4. **A fix that changes no rule and makes no promise** needs no RFC: open a `bug` issue or just a pull
    request.
 

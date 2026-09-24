@@ -192,7 +192,10 @@ route's. It takes a `deadlineMs` as a route does, and a tick whose run passes it
 Nobody is calling on a tick, so the trigger gives the guard nothing: a policy that reads the caller is refused on
 it (`A005`), and what a store keeps per tenant is out of its reach. The schedule runs only while
 `project.json → startup` names `@schedule/scheduler.port.json#run`, as the port opens only while a step names
-`listen`, and every process that names the step fires every tick. The example names it and writes no scheduled
+`listen`, and every process that names the step fires every tick, unless the step names a `lease` that lets one
+instance of several take each tick. A step names the profiles it runs under, so the example schedules on the
+laptop and, in production, in the one process started under `production-scheduler`, which opens no port, while the
+instances under `production` only listen. The example names the step and writes no scheduled
 trigger yet, so its schedule is empty; [`packages/plugin-schedule`](packages/plugin-schedule/README.md) says
 what a trigger's settings may be and what the plugin refuses.
 
@@ -227,7 +230,8 @@ A profile is one place the tree runs. `npx wilanis start example` with no `--pro
 `--profile local` keeps them in memory and reaches no network; `WILANIS_PROFILE` names one too, and the flag
 wins. `--profile production` is the deployment: the customers in PostgreSQL, one operator account standing in
 for the laptop's employee directory, and no watcher, since the watch step names `live` and `local` and a step
-without `profiles` runs everywhere. Started without its variables, it prints `profile production` and then
+without `profiles` runs everywhere. Nor does it schedule: `--profile production-scheduler` is the one process that
+does, with production's bindings and no listener. Started without its variables, it prints `profile production` and then
 every variable that profile reads and nobody set, with the document that reads it, before anything opens.
 
 [`example/README.md`](example/README.md) walks through what it serves and who may do what.

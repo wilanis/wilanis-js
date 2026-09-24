@@ -68,7 +68,7 @@ policy (`A008`). `latest` is not scoped; its key is the tier, one row for every 
 back. Under `live` the customers are the REST API's, which knows no tenants, and nothing is scoped.
 
 The port has three bindings, so **a command that runs the tree runs it under a profile**: `--profile local`,
-`--profile live` or `--profile production`, else `WILANIS_PROFILE`, else `live`, the one `project.json` marks
+`--profile live`, `--profile production` or `--profile production-scheduler`, else `WILANIS_PROFILE`, else `live`, the one `project.json` marks
 `"default": true`. `wilanis check` needs none -- it judges every profile.
 
 ```
@@ -348,7 +348,12 @@ the customers of every tenant -- nobody is calling yet, so there is no tenant to
 a fault. `@auth/state.port.json#getSession`
 does the same for the guard's memory. `@reload/watch.port.json#watch` serves the tree again whenever a
 document changes, without closing the port; it names `"profiles": ["live", "local"]`, so it watches on a laptop
-and production runs every other step and not that one. `@schedule/scheduler.port.json#run` keeps the schedule, which is empty here.
+and production runs every other step and not that one. `@schedule/scheduler.port.json#run` keeps the schedule, which is empty here:
+on the laptop in the one process there is, and behind the load balancer in one process alone. `production-scheduler`
+binds what `production` binds and starts what it starts but the listener, and the run step names it with a lease
+in the customer database, while `listen` names every profile but that one. So the instances run under `production`
+only listen, one process under `production-scheduler` only schedules, and `wilanis describe project.json` prints
+under each profile what it holds and starts.
 `@otel/exporter.port.json#export` sends every run as spans to a collector on :4318; it is the one step marked
 `"required": false`, since no collector is running when you clone this, and what it cannot send is said once
 in the log rather than delaying the run. `@http/server.port.json#listen` opens :8099 -- **delete that step
