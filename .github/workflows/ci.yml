@@ -40,21 +40,8 @@ jobs:
     strategy:
       matrix:
         node: [22, 24]
-    # the storage suite runs against a real database rather than a mock, so CI gives it one; without it the
-    # postgres engine's tests skip, and a suite that silently skips is one nobody notices the loss of
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_PASSWORD: wilanis
-          POSTGRES_DB: customers
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    # CI starts no vendor service: the suites that need a database or an object store skip here, as they do
+    # anywhere their variable is unset, and are run locally (the Postgres engine's and the S3 plugin's READMEs)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -62,22 +49,7 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      # the bucket store's suite runs against a real object store for the same reason; MinIO is started here
-      # rather than as a service because a service cannot be handed the `server /data` it needs to run
-      - name: an object store speaking the S3 API
-        run: |
-          docker run -d --name minio -p 9000:9000 \
-            -e MINIO_ROOT_USER=wilanis -e MINIO_ROOT_PASSWORD=wilanis-secret \
-            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
-          for attempt in $(seq 1 30); do
-            curl -sf http://127.0.0.1:9000/minio/health/live && exit 0
-            sleep 1
-          done
-          docker logs minio; exit 1
       - run: npm test
-        env:
-          WILANIS_TEST_POSTGRES_URL: postgres://postgres:wilanis@127.0.0.1:5432/customers
-          WILANIS_TEST_S3_ENDPOINT: http://127.0.0.1:9000
       - name: the example checks and rehearses, under each of its profiles
         run: |
           npx wilanis check example
