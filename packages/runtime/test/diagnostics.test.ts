@@ -244,6 +244,10 @@ describe('--json on the command line', () => {
       expect(envelope.command).toBe('rehearse');
       expect(envelope.refusals).toEqual(JSON.parse(check.stdout).refusals);
       expect(envelope).not.toHaveProperty('decisions');
+      const migrated = wilanis(dir, 'migrate', '--json');
+      expect(migrated.code).toBe(1);
+      expect(migrated.stderr).toBe('');
+      expect(JSON.parse(migrated.stdout)).toEqual({ ...JSON.parse(check.stdout), command: 'migrate', root: '.' });
     });
   });
 

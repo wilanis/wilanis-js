@@ -582,3 +582,10 @@ During implementation:
 - The `--json` envelope's exact field names, settled beside RFC 0019's when the two meet in code.
 - Whether `--allow-destructive` names a collection alone, as written, or the pair of connection and collection: a
   table is the pair (RFC 0002), and two connections of one tree may each hold a `notes`.
+
+Decided during implementation:
+
+- The `--json` envelope (#618): the members *Discoverability* lists, plus a target's `notes`, a migration's
+  `connection` and the `lines` RFC 0019's other commands carry; a destructive step nobody allowed carries `refused:
+  "needs --allow-destructive <connection>/<target>"`, so `ok` reads off the steps; `profile` is the one every
+  `migrate` member is handed (`--profile`, else `default`).

@@ -1,11 +1,13 @@
 /**
  * What `--json` prints (RFC 0019): one envelope per command, the checker's refusals sorted and carried with their
  * family, their page and the fixes a rule proved, and beside them what `rehearse` or `regress` computed before it
- * rendered it as lines. Every command prints the same envelope on a refused tree, so one parser serves them all.
+ * rendered it as lines, or what `migrate` planned and applied. Every command prints the same envelope on a refused
+ * tree, so one parser serves them all.
  */
 import { createRequire } from 'node:module';
 import { type Fix, type LoadResult, pageUrl, type Refusal } from '@wilanis/core';
 import type { Regression, Replayed } from './fuzz.js';
+import type { MigratedTarget, MigrateResult } from './migrate.js';
 import type { Decision, PlainRun } from './rehearsal-report.js';
 import type { Rehearsal, Settled } from './rehearse.js';
 
@@ -50,7 +52,21 @@ export interface Diagnostics {
   decisions?: PrintedDecision[];
   plain?: PlainRun[];
   results?: Replayed[];
+  profile?: string;
+  applied?: boolean;
+  targets?: MigratedTarget[];
+  migrations?: Migration[];
   lines?: string[];
+}
+
+/** One applied plan as `--history --json` prints it: the record the plugin kept of it. */
+export interface Migration {
+  id: number;
+  appliedAt: string;
+  by: string;
+  tree: string;
+  connection: string;
+  targets: string[];
 }
 
 /** Code units, never a locale: the same tree sorts the same on every machine. */
@@ -128,6 +144,30 @@ export function withRehearsal(diag: Diagnostics, rehearsal: Rehearsal): Diagnost
 /** The envelope with a regression's results, scenario by scenario, and its lines; `ok` becomes the regression's. */
 export function withRegression(diag: Diagnostics, regression: Regression): Diagnostics {
   return { ...diag, ok: diag.ok && regression.ok, results: regression.results, lines: regression.lines };
+}
+
+/**
+ * The envelope with what `migrate` answered: the profile, whether anything applied, and every connection's judged
+ * plan, or under `--history` every migration the record holds; `ok` becomes the plan's (no refused step and no
+ * drift). A refused tree ran no plugin and adds nothing, so its envelope is the check's.
+ */
+export function withMigration(diag: Diagnostics, result: MigrateResult): Diagnostics {
+  if (!diag.ok) return diag;
+  const { profile, lines } = result;
+  const ok = result.code === 0;
+  if (result.history) {
+    // picked member by member: a plugin's record may carry more than the envelope promises
+    const migrations = result.applied.map(({ id, appliedAt, by, tree, connection, targets }) => ({
+      id,
+      appliedAt,
+      by,
+      tree,
+      connection,
+      targets,
+    }));
+    return { ...diag, ok, profile, migrations, lines };
+  }
+  return { ...diag, ok, profile, applied: result.applied.length > 0, targets: result.targets, lines };
 }
 
 /** The envelope as `--json` prints it: two-space indentation, nothing else. */
