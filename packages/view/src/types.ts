@@ -1,11 +1,9 @@
 /**
  * What a page reads: the shapes of the view model. Nothing here computes; these are the types every other module of
- * the view fills in, plus the tree index and the labels a reader sees.
+ * the view fills in, and the labels a reader sees. The tree index is `tree-index.ts`.
  */
-import { checkTree } from '@wilanis/compiler';
-import type { Kind, Layer, Loaded, LoadResult, Outcome, Refusal } from '@wilanis/core';
-import { SCHEMA_BASE } from '@wilanis/core';
-import type { TriggerLimits } from '@wilanis/runtime';
+import type { Kind, Layer, Loaded, Outcome, Refusal } from '@wilanis/core';
+import type { ProfileReach, TriggerLimits } from '@wilanis/runtime';
 import type { VAttempts, VPromised } from './attempts.js';
 import type { VCatches, VCaught } from './catches.js';
 import type { VFanOut } from './limits.js';
@@ -300,6 +298,11 @@ export interface DocView {
   store?: VStore;
   /** On an invariant: the form it takes, and what it holds -- the ways in it gates, or the shape and rule it is about. */
   invariant?: VInvariant;
+  /**
+   * On the project: a block per profile (the one unnamed profile where none is declared) -- what it binds and
+   * stands in, and what the tree reaches, holds, starts and needs there -- as `wilanis describe project.json` says it.
+   */
+  profiles?: ProfileReach[];
 }
 
 /**
@@ -459,19 +462,6 @@ export interface VAnsweredBy {
   answer?: unknown;
 }
 
-export interface IndexEntry {
-  path: string;
-  kind: Kind;
-  name: string;
-  label: string;
-  feature?: string;
-  layer?: Layer;
-  native?: string;
-  included?: string;
-  file?: string;
-  description: string;
-}
-
 /** A document's label, or its file name made readable (get-row → Get row). */
 export function labelOf(doc: Loaded | undefined): string {
   return doc?.doc.label ?? readable(doc?.name ?? '');
@@ -484,42 +474,4 @@ export function readable(id: string): string {
     .trim()
     .toLowerCase();
   return words ? words[0].toUpperCase() + words.slice(1) : id;
-}
-
-export interface TreeIndex {
-  root: string;
-  project?: string;
-  /** Every alias in force -- the project's and the includes' -- so a page can canonicalise a reference written through one. */
-  aliases: Record<string, string>;
-  /** Where the schemas are published, so a page can recognise a $schema written as a URL. */
-  schemaBase: string;
-  docs: IndexEntry[];
-  refusals: Refusal[];
-}
-
-/** Every document of the tree and every refusal, for the document list. */
-export function indexOf(load: LoadResult): TreeIndex {
-  const refusals = checkTree(load).items;
-  const docs = load.registry.files
-    .slice()
-    .sort((one, other) => one.kind.localeCompare(other.kind) || one.path.localeCompare(other.path))
-    .map(file => ({
-      path: file.path,
-      kind: file.kind,
-      name: file.name,
-      label: labelOf(file),
-      feature: file.feature,
-      layer: file.layer,
-      native: file.native,
-      file: file.file,
-      description: file.doc.description,
-    }));
-  return {
-    root: load.root,
-    project: load.registry.project?.doc.name,
-    aliases: load.aliases,
-    schemaBase: SCHEMA_BASE,
-    docs,
-    refusals,
-  };
 }

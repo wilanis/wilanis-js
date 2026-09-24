@@ -236,10 +236,10 @@ function plainBody(doc: Loaded, load: LoadResult, scope: Scope): string[] {
   if (doc.kind === 'binding') return bindingLines(doc, scope);
   if (doc.kind === 'resolvers') return resolversLines(doc, load);
   if (doc.kind === 'feature') return featureLines(doc);
-  if (doc.kind === 'connection') return connectionLines(doc);
+  if (doc.kind === 'connection') return connectionLines(doc, scope);
   if (doc.kind === 'codec') return codecLines(doc);
   if (doc.kind === 'scenario') return scenarioLines(doc);
-  if (doc.kind === 'project') return projectLines(doc);
+  if (doc.kind === 'project') return projectLines(doc, scope);
   return [];
 }
 
@@ -253,7 +253,8 @@ function grantLine(doc: { native?: string; included?: string }, from: string | u
 export function describe(load: LoadResult, ref: string): string {
   const scope = new Scope(load.registry, load.resolve);
   const { path } = splitRef(ref.includes('#') ? ref : `${ref}#`);
-  const doc = scope.any(path || ref);
+  // the project is `@project.json` in the registry and `project.json` on disk and in every sentence about it
+  const doc = scope.any(path || ref) ?? (ref === 'project.json' ? load.registry.project : undefined);
   if (!doc) return `no document at '${ref}'`;
   // one native or required document is one plugin's: say which, and the package it came from, so who implements it is not one code detail
   const owner = doc.native ?? doc.requiredBy;
