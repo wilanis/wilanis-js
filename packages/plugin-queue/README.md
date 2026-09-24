@@ -64,7 +64,9 @@ The context hands the graph what the message carries, read like any input throug
 
 A message is gated like a request: a policy attachment gives the guard a token read from the headers
 (`"in": { "token": "{{request.headers.authorization}}" }`), and a queue trigger with no policies is public to
-whoever can publish to the broker. The answer is judged against `out` and logged; nobody receives it.
+whoever can publish to the broker. The answer is judged against `out` and logged; nobody receives it. The
+kind declares `correlation: headers.traceparent`, as the route kind does, so a publisher that puts its W3C
+`traceparent` in the headers finds the run it caused under its own trace.
 
 **What becomes of a message** is the trigger's `outcomes` table, reason by reason, exactly as a route's
 `response.refusals` maps a reason to a status: `ack` (the work is done, or not worth doing), `retry` (deliver
