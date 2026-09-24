@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/binding.schema.json",
+  "label": "The guard's memory, prepared",
+  "description": "What memory.port.json means where the guard's memory is a store: ensure the store's collections. It is the one binding of the port, so every profile reaches it, and only the production profile's startup step fires it; the laptop's file store has nothing to create.",
+  "port": "@features/state/domain/memory.port.json",
+  "operations": {
+    "prepare": {
+      "description": "Create the collections auth.store.json declares, and leave alone any that are there.",
+      "run": "@storage/storage.port.json#ensure",
+      "in": {
+        "store": "@features/state/data/auth.store.json"
+      }
+    }
+  }
+}

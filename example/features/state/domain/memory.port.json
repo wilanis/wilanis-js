@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/port.schema.json",
+  "label": "Where this deployment keeps things",
+  "description": "What this tree asks of the place it keeps its own memory, apart from what @auth asks of it through state.port.json: that it be made ready before anything is served. A startup step fires it, under the profile whose memory needs preparing.",
+  "operations": {
+    "prepare": {
+      "description": "Make the guard's memory ready to answer, once, before the port opens: create the collections auth.store.json declares, and leave alone any that are there."
+    }
+  }
+}
