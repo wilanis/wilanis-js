@@ -5,20 +5,25 @@
  *   and the viewer draws them. A property with no description is a field a reader must guess at from its name
  *   and its type. The sentence was stated and never held: 93 of 198 properties said nothing, 12 of them by
  *   pointing at a definition that said nothing either, so three sentences on `common.schema.json`'s `$defs`
- *   cleared twelve violations at once.
+ *   cleared twelve violations at once. The envelope `wilanis check --json` prints is read the same way: its
+ *   schema lives in the runtime, since it is what the runtime's commands print rather than a kind a tree holds
+ *   (RFC 0019), and an agent parsing a refusal reads its descriptions as it reads a kind's.
  * Retire when: the descriptions are generated from the `*Doc` interfaces in `model.ts`, or a schema is no
  *   longer what a reader consults to write a document, and an RFC says what is. A `$ref` to a described
  *   definition stays a description: repeating what `common.schema.json` says once is not the goal.
  */
 import { type Property, propertiesOf } from './lib/schemas.js';
 
-/** The directories holding the schemas core serves, which is every kind a tree may write. */
-const SCHEMAS = ['packages/core/schemas', 'packages/core/schemas/node'];
+/**
+ * The directories holding the schemas `main` serves: core's, which is every kind a tree may write, and the
+ * runtime's, which is every envelope a command prints.
+ */
+const SCHEMAS = ['packages/core/schemas', 'packages/core/schemas/node', 'packages/runtime/schemas'];
 
 /** The claim this module holds, and the title the runner gives its test. */
 export const claim = 'a schema describes every property';
 
-/** Every property and definition of every schema core serves, with whether each says what it is. */
+/** Every property and definition of every schema served, with whether each says what it is. */
 export const gather = (): Property[] => propertiesOf(SCHEMAS);
 
 /** Every property that says nothing about itself, one sentence each, naming the path and the fix. */
@@ -32,7 +37,10 @@ function sentence(property: Property): string {
   return `${where} points at ${property.ref}, which describes nothing; describe that definition once, or describe this property`;
 }
 
-/** The proof that the judge bites: a plain property, one described only by reference, and a definition. */
+/**
+ * The proof that the judge bites: a plain property, one described only by reference, a definition, and a
+ * property of the runtime's envelope.
+ */
 export const sabotage = [
   {
     input: [{ file: 'packages/core/schemas/graph.schema.json', path: '/properties/out', described: false, ref: null }],
@@ -55,5 +63,17 @@ export const sabotage = [
     input: [{ file: 'packages/core/schemas/common.schema.json', path: '/$defs/values', described: false, ref: null }],
     violation:
       'packages/core/schemas/common.schema.json/$defs/values has no description; say in one line what a reader should write here',
+  },
+  {
+    input: [
+      {
+        file: 'packages/runtime/schemas/diagnostics.schema.json',
+        path: '/$defs/refusal/properties/url',
+        described: false,
+        ref: null,
+      },
+    ],
+    violation:
+      'packages/runtime/schemas/diagnostics.schema.json/$defs/refusal/properties/url has no description; say in one line what a reader should write here',
   },
 ];
