@@ -7,11 +7,25 @@
  * It polls its own arrays every few milliseconds, as a broker that polls a table would; nothing waits on a
  * clock of its own beyond that.
  */
+import type { Atomic, Participant } from '@wilanis/core';
 import type { Answer, Broker, Delivery, Handle, Message } from '../src/brokers.js';
 
 /** One message as the fake keeps it: what a delivery carries, and when it may next be handed out. */
 interface Kept extends Delivery {
   availableAt: number;
+}
+
+/** The fake's side of one transaction: the messages published inside it, kept on commit and forgotten on rollback. */
+class Staged implements Participant {
+  readonly pending: (() => void)[] = [];
+
+  async commit(): Promise<void> {
+    for (const keep of this.pending.splice(0)) keep();
+  }
+
+  async rollback(): Promise<void> {
+    this.pending.length = 0;
+  }
 }
 
 const POLL_MS = 5;
@@ -22,6 +36,8 @@ export class FakeBroker implements Broker {
   readonly ensured: string[] = [];
   /** Every answer the fake was given, in order, so a test can say what the worker decided. */
   readonly answers: (Answer & { id: string; attempt: number })[] = [];
+  /** The transaction every publish was handed, in order: undefined outside an atomic graph. */
+  readonly transactions: (Atomic | undefined)[] = [];
   private made = 0;
 
   private listOf<T>(table: Map<string, T[]>, connection: string, queue: string): T[] {
@@ -38,17 +54,25 @@ export class FakeBroker implements Broker {
     this.ensured.push(connection);
   }
 
-  async publish(connection: string, queue: string, message: Message): Promise<{ id: string }> {
+  /**
+   * Keep the message at once, or -- handed an atomic graph's transaction -- once the transaction commits, and
+   * never if it rolls back, as a broker whose queue is a table in the store would. The transaction is recorded
+   * in `transactions` whichever way it came, so a test can say what the handler handed over.
+   */
+  async publish(connection: string, queue: string, message: Message, atomic?: Atomic): Promise<{ id: string }> {
+    this.transactions.push(atomic);
     this.made++;
     const id = `m${this.made}`;
-    const availableAt = Date.now() + (message.delayMs ?? 0);
-    this.listOf(this.queued, connection, queue).push({
+    const kept: Kept = {
       id,
       attempt: 1,
       headers: message.headers,
       body: message.body,
-      availableAt,
-    });
+      availableAt: Date.now() + (message.delayMs ?? 0),
+    };
+    const keep = () => this.listOf(this.queued, connection, queue).push(kept);
+    if (!atomic) keep();
+    else (await atomic.join(connection, async () => new Staged())).pending.push(keep);
     return { id };
   }
 

@@ -23,11 +23,13 @@ export interface Queued {
   doc: TriggerDoc;
 }
 
-/** One call of publish: the document it is written in, where in it, and what it was given. */
+/** One call of publish: the document it is written in, where in it, what it was given, and whether it sits in an atomic graph. */
 export interface Published {
   file: string;
   at: string;
   given: Values;
+  /** True for a node of a graph marked `atomic`; a binding's delegation is never inside one of its own. */
+  atomic: boolean;
 }
 
 /** Every queue trigger of the tree, by the path each is written at. */
@@ -47,13 +49,16 @@ function canonical(run: string | undefined, scope: Scope): string {
 
 /** Every graph node that runs publish, itself or once per element. */
 function graphCalls(scope: Scope): Published[] {
-  return scope.registry
-    .all('graph')
-    .flatMap(graph =>
-      graph.doc.nodes
-        .filter(node => (isRun(node) || isMap(node)) && canonical(node.run, scope) === PUBLISH)
-        .map(node => ({ file: graph.path, at: `nodes/${node.id}/in`, given: (node as { in?: Values }).in ?? {} })),
-    );
+  return scope.registry.all('graph').flatMap(graph =>
+    graph.doc.nodes
+      .filter(node => (isRun(node) || isMap(node)) && canonical(node.run, scope) === PUBLISH)
+      .map(node => ({
+        file: graph.path,
+        at: `nodes/${node.id}/in`,
+        given: (node as { in?: Values }).in ?? {},
+        atomic: graph.doc.atomic === true,
+      })),
+  );
 }
 
 /** Every binding operation that delegates to publish. */
@@ -61,7 +66,12 @@ function bindingCalls(scope: Scope): Published[] {
   return scope.registry.all('binding').flatMap(binding =>
     Object.entries(binding.doc.operations)
       .filter(([, operation]) => canonical(operation.run, scope) === PUBLISH)
-      .map(([name, operation]) => ({ file: binding.path, at: `operations/${name}/in`, given: operation.in ?? {} })),
+      .map(([name, operation]) => ({
+        file: binding.path,
+        at: `operations/${name}/in`,
+        given: operation.in ?? {},
+        atomic: false,
+      })),
   );
 }
 

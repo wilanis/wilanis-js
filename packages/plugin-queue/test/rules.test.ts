@@ -7,7 +7,7 @@
  * judges.
  */
 import { describe, expect, it } from 'vitest';
-import { codes, editing, ID_REQUEST, ONCE, PUBLISHING, refusals, TRIGGER, tree } from './tree.js';
+import { codes, editing, ID_REQUEST, JOBS, ONCE, PUBLISHING, refusals, TABLE, TRIGGER, tree } from './tree.js';
 
 const edit = (file: string, change: (doc: any) => void) => refusals(editing(file, change));
 const trigger = (change: (doc: any) => void) => edit(TRIGGER, change);
@@ -168,6 +168,48 @@ describe('X404: a message carrying a blob', () => {
       'X404',
     );
     expect(found.map(one => one.at)).toEqual(['nodes/published/in/type']);
+  });
+});
+
+describe('X405: a publish in an atomic graph to a broker outside the store', () => {
+  it('a broker whose kind is not marked storage: the one refusal, at the connection', () => {
+    const found = refusals(
+      editing(PUBLISHING, doc => {
+        doc.atomic = true;
+      }),
+    );
+    expect(found.map(one => one.code)).toEqual(['X405']);
+    expect(found[0].file).toBe('@features/customers/data/publish-removal.graph.json');
+    expect(found[0].at).toBe('nodes/published/in/connection');
+    expect(found[0].message).toMatch(
+      /publishes to '@connections\/jobs\.connection\.json', of kind '@fake-broker\/fake\.connection-kind\.json', which is not marked storage/,
+    );
+    expect(found[0].hint).toBe(
+      'publish after the atomic graph, in its caller, reached by a data dependency on its answer',
+    );
+  });
+
+  it('a broker kept in the store joins the transaction, so nothing is refused', () => {
+    const found = publishing(doc => {
+      doc.atomic = true;
+      doc.nodes[0].in.connection = TABLE;
+    });
+    expect(found).toEqual([]);
+  });
+
+  it('a profile that stands a broker outside the store in for the one inside it', () => {
+    const docs = editing(PUBLISHING, doc => {
+      doc.atomic = true;
+      doc.nodes[0].in.connection = TABLE;
+    });
+    (docs['project.json'] as any).profiles = { lean: { bindings: {}, connections: { [TABLE]: JOBS } } };
+    const found = at(refusals(docs), 'X405');
+    expect(found).toHaveLength(1);
+    expect(found[0].message).toMatch(/of kind '@fake-broker\/fake\.connection-kind\.json' under profile 'lean'/);
+  });
+
+  it('a publish outside an atomic graph is not judged, whatever the broker', () => {
+    expect(at(refusals(tree()), 'X405')).toEqual([]);
   });
 });
 
