@@ -25,6 +25,7 @@ import {
   type Values,
 } from '@wilanis/core';
 import type { ReachableRefusal } from '../refusals.js';
+import { nearest } from './nearest.js';
 
 /** The direction of the fix: the words every refusal carries, and the edits a rule can prove. */
 export type Hint = string | { text: string; fixes: Fix[] };
@@ -215,11 +216,26 @@ export class Judge {
   opAt(opRef: string, from: Loaded, at: string): OpHit | undefined {
     const hit = this.scope.op(opRef);
     if (typeof hit === 'string') {
-      this.refuser(from.path)('R001', hit, at, 'wilanis ls port');
+      this.refuser(from.path)('R001', hit, at, this.misspelt(opRef, from, at));
       return undefined;
     }
     this.visible(from, hit.port, at);
     return hit;
+  }
+
+  /**
+   * What R001 offers for an operation reference that names nothing: the reference as written with the
+   * operation set to the one of its port the name is a small misspelling of (`nearest`), or only the words
+   * when the port is unknown, hidden from `from`, or no one operation is near. A wrong port is not a typo; the
+   * ports are the tree's, and a fix that traded R001 for L005 would repair nothing.
+   */
+  private misspelt(opRef: string, from: Loaded, at: string): Hint {
+    const text = 'wilanis ls port';
+    const { path, op } = splitRef(opRef);
+    const port = opRef.includes('#') && path && op ? this.scope.get('port', path) : undefined;
+    if (!port || this.scope.visibility(from, port)) return text;
+    const meant = nearest(op, Object.keys(port.doc.operations));
+    return meant ? { text, fixes: [{ file: from.path, at, set: `${path}#${meant}` }] } : text;
   }
 
   /** path#operation with the path made canonical. */
