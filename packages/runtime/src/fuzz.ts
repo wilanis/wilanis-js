@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import type { Loaded, LoadResult } from '@wilanis/core';
 import { HOME, type ScenarioDoc, schemaUrl, type TriggerDoc } from '@wilanis/core';
 import { outcomeOf, type Report } from '@wilanis/engine';
+import { activeProfile } from './profile.js';
 import { embedderFor, generatedFire } from './stubbing.js';
 
 // ---- fuzz / regress ----------------------------------------------------------------------------------
@@ -92,11 +93,12 @@ export async function fuzz(
 ): Promise<{ ok: boolean; written: string[]; lines: string[] }> {
   const written: string[] = [];
   const lines: string[] = [];
+  const profile = activeProfile(load.registry.project?.doc, { flag: opts.profile, env: process.env });
   const dir = join(load.root, opts.out ?? SCENARIOS);
   mkdirSync(dir, { recursive: true });
   for (const trigger of load.registry.all('trigger')) {
     for (let seed = 1; seed <= (opts.runs ?? 5); seed++) {
-      const run = await fuzzed(load, trigger, seed, opts.profile);
+      const run = await fuzzed(load, trigger, seed, profile);
       const outcome = outcomeOf(run.report);
       if (outcome.kind === 'faulted') {
         lines.push(`${trigger.path} under seed ${seed}: FAULT at '${outcome.at}': ${outcome.error}`);
@@ -149,14 +151,15 @@ function diffOf(report: Report, expect: ScenarioDoc['expect']): string[] {
   return diffs;
 }
 
-/** Replay every scenario with its recorded stubs and diff the report node by node. */
+/** Replay every scenario with its recorded stubs, under the profile `activeProfile` picks, and diff the report node by node. */
 export async function regress(
   load: LoadResult,
   opts: { profile?: string } = {},
 ): Promise<{ ok: boolean; lines: string[] }> {
   const lines: string[] = [];
   let ok = true;
-  const stubbed = { seed: 0, profile: opts.profile, env: fakeEnvFor(load) };
+  const profile = activeProfile(load.registry.project?.doc, { flag: opts.profile, env: process.env });
+  const stubbed = { seed: 0, profile, env: fakeEnvFor(load) };
   const emb = embedderFor(load, stubbed);
   for (const sc of load.registry.all('scenario')) {
     const trigger = load.registry.all('trigger').find(trigger => trigger.path === load.resolve(sc.doc.trigger));

@@ -106,7 +106,7 @@ describe('plugin packages and hooks', () => {
     const dir = project([{ use: '@std' }, { use: '@fake', settings: { greeting: 'hi' } }]);
     const loaded = loadTree(dir, { ...BUILTIN_PLUGINS, '@fake': fake });
     expect(checkTree(loaded).items).toEqual([]);
-    const { stop } = await start(loaded, { log: () => {}, profile: 'live' });
+    const { stop } = await start(loaded, { log: () => {} });
     expect(calls).toEqual(['up:hi:string']);
     await stop();
     expect(calls).toEqual(['up:hi:string', 'down']);
