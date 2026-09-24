@@ -256,7 +256,7 @@ nested domain calls. This is the archive-customer block of a 2026-09-21 run with
 bind left out; check it against the real output once #481 lands. -->
 
 ```
-@features/customers/edge/archive-customer.trigger.json  (@http/http.trigger-kind.json)
+@features/customers/edge/archive-customer.trigger.json  (@http/http.trigger-kind.json)  route "/customers/{id}/archive", method "POST", produces "application/json"
   gated by @features/access/edge/can-register.policy.json → @access/domain/access.port.json#requireRegistrar  given token
   holds  @features/customers/domain/writes-are-for-registrars.invariant.json  through @features/access/edge/can-register.policy.json
   @customers/domain/customer.port.json#remove

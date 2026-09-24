@@ -34,9 +34,10 @@ const { load: planted, dir: plantedDir } = loadedWith({
   },
 });
 afterAll(() => rmSync(plantedDir, { recursive: true, force: true }));
-const DELETE = '@features/customers/edge/delete-customer.trigger.json  (@http/http.trigger-kind.json)';
+const DELETE =
+  '@features/customers/edge/delete-customer.trigger.json  (@http/http.trigger-kind.json)  route "/customers/{id}", method "DELETE", produces "application/json"';
 /** Fires a domain graph that calls the customer port again, which is where a binding has to be chosen mid-walk. */
-const DIGEST = '@features/customers/edge/digest.trigger.json  (@cli/cli.trigger-kind.json)';
+const DIGEST = '@features/customers/edge/digest.trigger.json  (@cli/cli.trigger-kind.json)  command "digest"';
 const CHOOSE = 'has 3 bindings';
 /** The lines the map draws under one trigger, up to the next. */
 function under(lines: string[], trigger: string): string[] {

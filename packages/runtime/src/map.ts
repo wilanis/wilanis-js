@@ -9,6 +9,7 @@ import { type BindingDoc, type Loaded, policyPath, Scope, type TriggerDoc } from
 import { holdsLines } from './invariant-lines.js';
 import { scopeTail } from './scope-said.js';
 import { storeTail } from './stores.js';
+import { settingsSaid } from './trigger-said.js';
 
 // ---- the walk ----------------------------------------------------------------------------------------
 
@@ -137,7 +138,9 @@ function walked(load: LoadResult, scope: Scope, profile?: string): { lines: stri
   const lines: string[] = [];
   const reach: Reach = new Map();
   for (const trigger of load.registry.all('trigger')) {
-    lines.push(`${trigger.path}  (${trigger.doc.kind})`);
+    // what fires it, beside the kind, in the kind's own words: a route's path, a schedule's expression
+    const said = settingsSaid(trigger, scope);
+    lines.push(`${trigger.path}  (${trigger.doc.kind})${said ? `  ${said}` : ''}`);
     lines.push(...gateLines(trigger, scope));
     // under the gates, since an invariant is a rule about what those gates must be, not another gate
     lines.push(...holdsLines(trigger, scope));
