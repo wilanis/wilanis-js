@@ -53,7 +53,7 @@ describe('sabotage: access, as the example attaches the included policies', () =
         delete trigger.policies;
         delete trigger.settings.response.refusals.invalid_credential;
       }),
-    ).toEqual(['A006', 'A006', 'A006', 'A006', 'T006', 'T006', 'I001']);
+    ).toEqual(['A006', 'A006', 'A006', 'A006', 'A006', 'A006', 'T006', 'T006', 'I001']);
   });
   it('R001 a trigger naming a policy that is not there', () => {
     expect(

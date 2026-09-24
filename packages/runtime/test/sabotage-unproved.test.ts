@@ -79,12 +79,12 @@ describe('sabotage: ports, bindings and secrets', () => {
     ).toEqual(['B001']);
   });
   it('B003 a binding that names a native port the plugin binds', () => {
-    // B002 comes with it: the operations the binding names are not the native port's
+    // B002 comes with it, once under each profile: the operations the binding names are not the native port's
     expect(
       sabotage('features/hello/data/greeting.binding.json', binding => {
         binding.port = '@http/http.port.json';
       }),
-    ).toEqual(['B002', 'B002', 'B002', 'B003']);
+    ).toEqual(['B002', 'B002', 'B002', 'B002', 'B003']);
   });
   it('C001 settings that read anything but a secret', () => {
     expect(

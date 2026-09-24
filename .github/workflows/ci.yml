@@ -57,6 +57,7 @@ jobs:
           npx wilanis rehearse example --profile local
           npx wilanis rehearse example --profile live
           npx wilanis rehearse example --profile production
+          npx wilanis rehearse example --profile production-scheduler
         env:
           CUSTOMERS_JWT_SECRET: ci-only-not-a-secret
           CUSTOMERS_DATABASE_URL: postgres://postgres:wilanis@127.0.0.1:5432/customers

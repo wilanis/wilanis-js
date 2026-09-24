@@ -1,6 +1,6 @@
 # RFC 0010: Scheduled triggers
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** a new plugin `@wilanis/plugin-schedule` (the kind, the scheduler, the cron parser, its X rules), `area:core` (one optional field on the connection-kind schema: `leases`), `area:runtime` (the example, `describe`, `map`, the template), `area:view`, and `area:plugin-storage` for the lease keeper a storage engine registers. No change to the compiler or the engine.
 - **Tracking issue:** #12
 - **Depends on:** none to accept. RFC 0012 (the `deadlineMs` setting waits for `FireArgs.signal`; that step is marked in the plan). RFC 0002 (the lease that lets one instance of several fire a tick, and the memory of the last tick that `catchUp` needs, are a table in the storage engine's connection; that step is blocked on its implementation). RFC 0006's traces and RFC 0007's access invariants need nothing here and apply to a scheduled trigger as they apply to a route. RFC 0013 is what a process that runs *only* the schedule waits on (*Drawbacks*, first item). RFC 0009 is the neighbour: a tick that fans work out publishes messages, and this RFC says where the seam is.
@@ -512,7 +512,8 @@ example's scheduled trigger page.
    `wilanis_schedule` created by the keeper on first contact (not by `ensure`, *Lease keepers*), `tableLeases()`
    registered from `postLoad`, the postgres test behind the environment variable, and the example's `lease` under
    its storage profile (*Open questions*, 3). RFC 0002 is implemented, so the step is no longer blocked.
-7. **A process that runs only the schedule** (`area:runtime`): blocked on RFC 0013. See *Drawbacks*, first item.
+7. **A process that runs only the schedule** (`area:runtime`): RFC 0013 is implemented, so a startup step names the
+   profiles it runs under and the step is no longer blocked. See *Drawbacks*, first item, and *Open questions*, 5.
 8. **`wilanis run --at`**: decided during implementation (*Open questions*); one small pull request either way.
 9. **README**: a paragraph beside "Every branch runs before you deploy" on the clock as a way in, and the roadmap's
    M10 row updated with the example's nightly digest.
@@ -530,7 +531,8 @@ same tick instants as the others (cron is wall clock, intervals are the epoch's)
 granted it only when nobody holds the trigger and nobody has fired that tick -- so clocks a little apart do not
 double a tick, a rolling deploy does not double one, and a pod killed mid-run gives its tick up after
 `leaseTtlMs` to the next that asks. The manifest (RFC 0026) prints the scheduled triggers per profile so a reviewer sees
-what fires where.
+what fires where. RFC 0013 has since given a startup step its `profiles`, and the third answer is the example's
+(*Open questions*, 5): the scheduler runs under a profile of its own and the listener does not.
 
 **The connection kind declares `leases`, not the scheduler and not the store.** The stub asked whether a lease
 in the storage plugin makes this RFC depend on RFC 0002. It does not, because the ability to keep a lease is the
@@ -626,3 +628,20 @@ Nothing else must be decided before `accepted`. Decided during implementation:
    laptop profile claim a memory it does not have.
 4. Whether `nextTick` honours `L` and `W` (last day, nearest weekday) or the parser stays at the five standard field
    forms.
+5. How the example shows a process that runs only the schedule, once RFC 0013 lets a startup step name its profiles.
+
+   **Decided (step 7): a profile of its own.** `production-scheduler` binds and stands in exactly as `production`
+   does, so a tick reaches what a route there reaches, and the startup list gives each its part: the `run` step
+   with its `lease` names `production-scheduler` alone, and `listen` names `live`, `local` and `production`, so the
+   instances behind the load balancer only listen and one process schedules. The other shape, `production` keeping
+   both and a second profile that only listens, was not taken: every production instance would still schedule, and
+   "the others only listen" would be false of the profile a deployment names first. The lease stays on the one
+   scheduler, since a rolling deploy runs an old scheduler beside its replacement for a while, and X253's `catchUp`
+   needs it wherever a scheduled trigger asks. The steps that prepare and reach the guard's memory run under both,
+   since either process may start first against an empty database. The cost is a fourth profile the checker judges
+   every trigger under, so a refusal a production binding causes is said under both production profiles, in one
+   refusal where the rule names every profile (L009, L010, A008) and in one per profile where it names one (A006):
+   the demo's scaffolded route now meets three A006 and nine refusals. `wilanis describe project.json` already
+   prints, per profile, what each starts and holds, and the viewer's project page draws the same rows, so no
+   command changes. The manifest's per-profile `scheduled` and `holds` lines land with RFC 0026, which is accepted and
+   not implemented; this step gives it the facts in the startup list.

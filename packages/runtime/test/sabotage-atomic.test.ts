@@ -64,12 +64,12 @@ describe('a graph that says it is atomic', () => {
 
   it('answers one refusal for one fault, naming every profile that reached it -- L009', () => {
     // parse-drafts is a data graph, so every profile's walk reaches the same @blob node: one fault, one
-    // refusal, and the message says the three profiles rather than the refusal being repeated three times
+    // refusal, and the message says the four profiles rather than the refusal being repeated four times
     const said = sabotageSaying(IMPORT, doc => {
       doc.atomic = true;
     }).filter(one => one.startsWith('L009') && one.includes('@blob/csv.port.json#parse'));
     expect(said).toEqual([
-      "L009 atomic graph '@features/customers/domain/import-customers.graph.json' reaches '@blob/csv.port.json#parse', which cannot take part in a transaction (profiles 'live', 'local', 'production')",
+      "L009 atomic graph '@features/customers/domain/import-customers.graph.json' reaches '@blob/csv.port.json#parse', which cannot take part in a transaction (profiles 'live', 'local', 'production', 'production-scheduler')",
     ]);
   });
 
@@ -153,16 +153,16 @@ describe('an atomic graph over more than one connection', () => {
 
   it('names the profiles whose bindings put the effects on two connections -- L010', () => {
     // register-customer fires customer.register, which the local profile meets in memory and the production
-    // profile in PostgreSQL: two connections, each different from the notes one, so both profiles refuse.
+    // profiles in PostgreSQL: two connections, each different from the notes one, so every such profile refuses.
     // The live profile meets it over HTTP, which is L009 and not a second connection at all.
     const broken = plantedEditingSaying(ELSEWHERE, RECORD, doc => {
       doc.atomic = true;
       doc.nodes.push(NOTED);
     });
-    // each profile's fault is said once, naming that profile and the connections it put the effects on
+    // each fault is said once, naming the profiles that reached it and the connections it put the effects on
     expect([...new Set(broken.filter(one => one.startsWith('L010')))]).toEqual([
       "L010 atomic graph reaches effects on 2 connections (@connections/customers.connection.json, @connections/notes.connection.json) (profile 'local')",
-      "L010 atomic graph reaches effects on 2 connections (@connections/customers-postgres.connection.json, @connections/notes.connection.json) (profile 'production')",
+      "L010 atomic graph reaches effects on 2 connections (@connections/customers-postgres.connection.json, @connections/notes.connection.json) (profiles 'production', 'production-scheduler')",
     ]);
     // and it is said by each graph that promised a transaction over it: record-all reaches record-entry
     // through submit and is atomic itself, so two promises answer for the one fault, each naming itself
