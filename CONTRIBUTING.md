@@ -68,6 +68,13 @@ git fetch --prune
 Biome enforces, and how to add a rule, a kind, a plugin. Read it before changing anything. A rule that
 bites is a design signal, not an obstacle.
 
+Every refusal code has a page, `docs/refusals/<CODE>.md`, and a row in the index `docs/refusals/README.md`; a new
+code comes with both. A code names one rule and is never reused: a rule that changes what it is about takes the
+next code, and the old one keeps its page as `retired`. From 1.0, when the `schemas-v1` tag is cut, the codes, the
+`at` grammar, the four verbs of a fix and the fields of the envelope `--json` prints are promised stable; the
+wording of a message or a hint is not. Before 1.0 nothing is promised, and a page records under *History* what
+changed. `docs/refusals/README.md` states the promise in full.
+
 ## Commits and pull requests
 
 A commit message says what changed and why, in the imperative, in plain words. No generated trailers,
