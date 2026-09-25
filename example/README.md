@@ -352,7 +352,7 @@ document changes, without closing the port; it names `"profiles": ["live", "loca
 and production runs every other step and not that one. `@schedule/scheduler.port.json#run` keeps the schedule, which is empty here:
 on the laptop in the one process there is, and behind the load balancer in one process alone. `production-scheduler`
 binds what `production` binds and starts what it starts but the listener, and the run step names it with a lease
-in the customer database, while `listen` names every profile but that one. So the instances run under `production`
+in the customer database, while `listen` names neither it nor `production-worker`. So the instances run under `production`
 only listen, one process under `production-scheduler` only schedules, and `wilanis describe project.json` prints
 under each profile what it holds and starts.
 `@otel/exporter.port.json#export` sends every run as spans to a collector on :4318; it is the one step marked
