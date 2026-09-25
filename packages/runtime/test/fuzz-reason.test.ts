@@ -49,7 +49,10 @@ describe('fuzz owns scenarios/fuzz and marks what it writes', () => {
     }
     // scenarios/ itself holds only the directory fuzz owns: what a person keeps there is theirs
     expect(readdirSync(join(dir, 'scenarios'))).toEqual(['fuzz']);
-    expect(read(join(dir, FUZZED)).description).toContain('regenerate it, do not edit it');
+    const { description } = read(join(dir, FUZZED));
+    expect(description).toContain('regenerate it, do not edit it');
+    // a pinned copy says why it is kept, so it never reads as a leftover of an older fuzz
+    expect(description).toContain('give it a description of its own, and drop generated');
     rmSync(dir, { recursive: true, force: true });
   });
 
