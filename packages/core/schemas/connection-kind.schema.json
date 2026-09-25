@@ -39,6 +39,11 @@
         "at-least-once",
         "at-most-once"
       ]
+    },
+    "endpoint": {
+      "description": "Which of this kind's settings holds the address a connection of this kind reaches: a dotted path into `settings` (`baseUrl`, `broker.url`) naming a string setting (C020). Declared: a deployment lists the connection among what the environment must provide. Absent: a connection of this kind reaches nothing outside the tree, or reaches something no deployment provisions.",
+      "type": "string",
+      "pattern": "^[a-z][A-Za-z0-9_]*(\\.[a-z][A-Za-z0-9_]*)*$"
     }
   },
   "required": [

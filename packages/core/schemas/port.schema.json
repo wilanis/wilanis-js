@@ -63,6 +63,56 @@
             "description": "True when running it starts something that keeps running after the run has answered: a listener, a watcher, a subscription. Such an operation is named by a project's startup list, never by a graph; it answers what it started, and the runtime holds its teardown until the process stops.",
             "type": "boolean"
           },
+          "listens": {
+            "description": "Where the address this operation binds comes from. Declared: the operation opens a TCP socket, and each part of its address is the named `in` value of the startup step that runs it, else the named setting of the plugin that grants the port, else `default`. Absent: the operation opens no socket, or opens one no deployment needs to reach. Only an operation that `holds` may declare it (L014).",
+            "type": "object",
+            "properties": {
+              "port": {
+                "description": "Where the port it binds comes from.",
+                "type": "object",
+                "properties": {
+                  "input": {
+                    "description": "The input of the startup step that runs this operation which gives the port, when the step writes it: a field this operation accepts, of type number (L015).",
+                    "$ref": "common.schema.json#/$defs/ident"
+                  },
+                  "setting": {
+                    "description": "The setting of the plugin that grants this port which gives the port when the step writes no input: a field of that plugin's settings.",
+                    "$ref": "common.schema.json#/$defs/ident"
+                  },
+                  "default": {
+                    "description": "The port when neither the step's input nor the plugin's setting is written.",
+                    "type": "number"
+                  }
+                },
+                "minProperties": 1,
+                "additionalProperties": false
+              },
+              "host": {
+                "description": "Where the interface it binds comes from. With nothing written and no `default`, nothing fixes the interface and the operation binds every one, on both address families.",
+                "type": "object",
+                "properties": {
+                  "input": {
+                    "description": "The input of the startup step that runs this operation which gives the interface, when the step writes it: a field this operation accepts, of type string (L015).",
+                    "$ref": "common.schema.json#/$defs/ident"
+                  },
+                  "setting": {
+                    "description": "The setting of the plugin that grants this port which gives the interface when the step writes no input: a field of that plugin's settings.",
+                    "$ref": "common.schema.json#/$defs/ident"
+                  },
+                  "default": {
+                    "description": "The interface when neither the step's input nor the plugin's setting is written.",
+                    "type": "string"
+                  }
+                },
+                "minProperties": 1,
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "port"
+            ],
+            "additionalProperties": false
+          },
           "transactional": {
             "description": "True when running it can take part in the transaction of an atomic graph. Such an operation accepts a static field the checker resolves a connection from: `connection`, the path of a connection document, or `store`, the path of a store document that names one. A plugin grants it.",
             "type": "boolean"

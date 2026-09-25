@@ -6,11 +6,27 @@
     "listen": {
       "description": "Open the port and answer every http trigger in the tree until the process stops. Answers what it opened, so a startup report says the port and how many routes it carries.",
       "holds": true,
+      "listens": {
+        "port": {
+          "input": "port",
+          "setting": "port",
+          "default": 8080
+        },
+        "host": {
+          "input": "host",
+          "setting": "host"
+        }
+      },
       "accepts": {
         "port": {
           "type": "number",
           "required": false,
           "description": "the port to listen on; absent: the @http plugin's settings.port, and 8080 when that is absent too"
+        },
+        "host": {
+          "type": "string",
+          "required": false,
+          "description": "the interface to bind: an address of this host (127.0.0.1, 192.168.1.12); absent: the @http plugin's settings.host, and every interface, on both address families, when that is absent too"
         }
       },
       "returns": {

@@ -288,7 +288,13 @@ whose bound graph does -- is refused before it ever runs (B007, B008).
 A step may also name a `holds` operation: one that starts something outliving the run -- a listener, a watcher,
 a subscription. A plugin grants it, `wilanis describe` marks it `(holds until stopped)`, and the runtime stops
 what it started, in reverse, when the process ends. A graph may never run one (L008): what answers a request
-cannot start a server.
+cannot start a server. One that opens a socket also says `listens`: where each part of the address it binds
+comes from, the step's `in`, else a setting of the plugin that grants it, else a default (`@http`'s `listen`
+takes `in.port`, else `settings.port`, else 8080, and `in.host`, else `settings.host`, else every interface).
+Only a `holds` operation may listen (L014), and the inputs it names are ones it accepts, of the right type (L015).
+The outbound half is the connection kind's: `endpoint` names the setting that holds the address a connection
+of the kind reaches (`baseUrl` for `@http/http.connection-kind.json`), and must be a string setting it declares
+(C020).
 
 A step that refuses stops the start and exits nonzero: a tree whose database is unreachable never opens its
 port, rather than answering every route with a fault. Say `"required": false` for a step the tree can serve
