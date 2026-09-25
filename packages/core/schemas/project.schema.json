@@ -211,6 +211,21 @@
             "additionalProperties": {
               "$ref": "common.schema.json#/$defs/path"
             }
+          },
+          "permits": {
+            "description": "What this place allows the tree to reach: effectful native operations as path#operation, whole native ports as path, and connections as path. Absent: everything. Present: exactly what the profile reaches (C021, C022, C023) -- an operation or connection reached and not listed is refused, and so is a customer nothing reaches.",
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/opRef"
+                },
+                {
+                  "$ref": "common.schema.json#/$defs/path"
+                }
+              ]
+            },
+            "uniqueItems": true
           }
         },
         "required": [

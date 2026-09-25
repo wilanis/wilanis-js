@@ -174,6 +174,9 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [C017](C017.md) | C | live | more than one profile marked `default` |
 | [C018](C018.md) | C | live | a profile standing a connection in for itself, or for one of another kind, unless the replaced one is a broker alone and the stand-in delivers as it does |
 | [C019](C019.md) | C | live | a declared secret that no plugin's or connection's settings and no startup step reads |
+| [C021](C021.md) | C | live | an operation or connection a profile reaches that its `permits` does not permit |
+| [C022](C022.md) | C | live | a `permits` entry that permits nothing the profile reaches |
+| [C023](C023.md) | C | live | a `permits` entry naming a domain port or its operation, a pure operation, a port with nothing effectful, or a connection the profile replaces |
 | [S001](S001.md) | S | live | a scenario naming a trigger the tree does not have |
 | [S002](S002.md) | S | live | a scenario pinning a reason on a node whose status is not failed |
 | [S003](S003.md) | S | live | a `cancelAt` that is not a key of the scenario's `stubs` |
