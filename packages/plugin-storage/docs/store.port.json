@@ -212,6 +212,7 @@
     "remove": {
       "description": "Remove one record by its key, and answer the record that was removed -- absent where the collection held none under it. A record another collection still references by a declared refs is kept rather than orphaned: removed is false and referencedBy names the reference, so a graph routes on that rather than on a failure.",
       "transactional": true,
+      "idempotent": true,
       "accepts": {
         "store": {
           "type": "string",
