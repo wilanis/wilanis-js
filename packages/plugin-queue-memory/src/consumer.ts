@@ -57,10 +57,10 @@ export class Consumer {
     this.sleep();
   }
 
-  /** Arm the one timer: for the soonest message waiting, or for the idle beat when none is. */
+  /** Arm the one timer: for the soonest message waiting while there is room for it, else for the idle beat. */
   private sleep(): void {
     clearTimeout(this.timer);
-    const next = this.queue.nextAt();
+    const next = this.inFlight.size < this.concurrency ? this.queue.nextAt() : undefined;
     const wait = next === undefined ? IDLE_MS : Math.min(IDLE_MS, Math.max(0, next - Date.now()));
     this.timer = setTimeout(() => this.pump(), wait);
   }
