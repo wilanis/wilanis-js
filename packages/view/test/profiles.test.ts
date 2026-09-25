@@ -37,6 +37,10 @@ describe("the project page's profiles", () => {
         named: '@connections/employees.connection.json',
         standIn: '@connections/employees-production.connection.json',
       },
+      {
+        named: '@connections/jobs.connection.json',
+        standIn: '@connections/customers-postgres.connection.json',
+      },
     ]);
     expect(production?.reaches).toContainEqual({
       port: '@storage/store.port.json',

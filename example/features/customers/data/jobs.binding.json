@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/binding.schema.json",
+  "label": "The customers' queued work, prepared",
+  "description": "What jobs.port.json means under every profile: ensure the broker jobs.connection.json reaches. It is the one binding of the port, so every profile reaches it; only the production profiles' startup fires it, since there jobs.connection.json stands for the customer database and the queue is a table, and the in-process broker the laptop's profiles keep has nothing to create.",
+  "port": "@customers/domain/jobs.port.json",
+  "operations": {
+    "prepare": {
+      "description": "Create the queue table on the connection where the broker keeps one, and leave it alone where it is there.",
+      "run": "@queue/queue.port.json#ensure",
+      "in": {
+        "connection": "@connections/jobs.connection.json"
+      }
+    }
+  }
+}

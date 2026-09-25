@@ -17,7 +17,8 @@
     "@storage/store.port.json#remove",
     "@storage/store.port.json#newKey",
     "@storage/storage.port.json#ensure",
-    "@queue/queue.port.json#publish"
+    "@queue/queue.port.json#publish",
+    "@queue/queue.port.json#ensure"
   ],
   "dependsOn": [
     "access"

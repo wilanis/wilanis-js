@@ -415,13 +415,17 @@ refusal means to the message is its `outcomes`: `missing` is acknowledged, since
 `upstream` is retried, a second later and then doubling, and dead after five deliveries; a token that does not
 verify, or a caller who may not remove, is dead at once, since delivering it again cannot help. The route
 takes the token from the header only, not the session cookie, because the header is what the message carries.
-The broker is `@queue-memory`'s, in the process: a queue lives as long as the process whose route published to
-it, so the `Work the queues` step runs wherever `Listen` does, and `production-scheduler`, which serves no
-route, consumes nothing. Like every broker a production would use, it delivers at least once, so `remove` may
-run twice for one message, and `remove` promises `idempotent`: under `live` its one effect is a DELETE, which
-HTTP declares idempotent, and under the store profiles it is `@storage/store.port.json#remove`, which now
-promises the same. B011 holds the promise under every profile, and dropping the word is T009 on
-`remove-queued.trigger.json`. `wilanis start` logs `queue: consuming removals on @connections/jobs.connection.json → @customers/domain/customer.port.json#remove`
+On the laptop the broker is `@queue-memory`'s, in the process: a queue lives as long as the process whose route
+published to it, so the `Work the queues` step runs wherever `Listen` does, and `production-scheduler`, which
+serves no route, consumes nothing. Under `production` and `production-scheduler`, `jobs.connection.json` stands
+for `customers-postgres.connection.json`, and the queue is a table, `wilanis_queue`, beside the customers: every
+instance behind the load balancer publishes to and works the one queue, and the `Prepare the queues` step creates
+the table before the port opens. The two brokers are different kinds, and one may stand in for the other because
+both deliver at least once (C018). Since either may deliver a message twice, `remove` may run twice for one
+message, and `remove` promises `idempotent`: under `live` its one effect is a DELETE, which HTTP declares
+idempotent, and under the store profiles it is `@storage/store.port.json#remove`, which now promises the same.
+B011 holds the promise under every profile, and dropping the word is T009 on `remove-queued.trigger.json`.
+`wilanis start` logs `queue: consuming removals on @connections/jobs.connection.json → @customers/domain/customer.port.json#remove`
 beside the listener, and one line per delivery:
 
 ```
