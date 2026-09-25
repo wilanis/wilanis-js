@@ -418,9 +418,10 @@ takes the token from the header only, not the session cookie, because the header
 The broker is `@queue-memory`'s, in the process: a queue lives as long as the process whose route published to
 it, so the `Work the queues` step runs wherever `Listen` does, and `production-scheduler`, which serves no
 route, consumes nothing. Like every broker a production would use, it delivers at least once, so `remove` may
-run twice for one message; under `live` its one effect is a DELETE, which HTTP declares idempotent, but under
-the store profiles it is `@storage/store.port.json#remove`, which declares no such promise yet, so `remove` does
-not claim `idempotent` today. `wilanis start` logs `queue: consuming removals on @connections/jobs.connection.json → @customers/domain/customer.port.json#remove`
+run twice for one message, and `remove` promises `idempotent`: under `live` its one effect is a DELETE, which
+HTTP declares idempotent, and under the store profiles it is `@storage/store.port.json#remove`, which now
+promises the same. B011 holds the promise under every profile, and dropping the word is T009 on
+`remove-queued.trigger.json`. `wilanis start` logs `queue: consuming removals on @connections/jobs.connection.json → @customers/domain/customer.port.json#remove`
 beside the listener, and one line per delivery:
 
 ```

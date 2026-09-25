@@ -107,7 +107,8 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   ports, connections), `resolvers.ts` (P), `inputs.ts` (a call site's inputs), `bindings.ts` (B), `required.ts` (B009, B010: what a binding of a port a plugin requires may read and may
   reach), `graph.ts` with `graph-nodes.ts`, `graph-reads.ts`, `graph-whole.ts`, `graph-routing.ts` (where a
   node sits in the routing, which G015 judges an effect by) and `narrowing.ts` (G), `triggers.ts` (T) with
-  `bounds.ts` for the lists T008 finds unbounded, `scenarios.ts` (S),
+  `bounds.ts` for the lists T008 finds unbounded and `delivery.ts` (T009, T010: what a trigger's connection
+  delivers), `scenarios.ts` (S),
   `access.ts` (A), `invariants.ts` (I: what an invariant states
   once and the whole tree is held to) with `invariant-holds.ts` beside it for the field form and `prove.ts`
   for whether a rule already holds where a value is made -- what the checker and the guard the compiler
