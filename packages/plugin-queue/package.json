@@ -51,7 +51,10 @@
     "node": ">=22"
   },
   "devDependencies": {
+    "@wilanis/access": "0.1.0",
     "@wilanis/compiler": "0.1.0",
+    "@wilanis/plugin-auth": "0.1.0",
+    "@wilanis/plugin-http": "0.1.0",
     "@wilanis/runtime": "0.1.0"
   }
 }
