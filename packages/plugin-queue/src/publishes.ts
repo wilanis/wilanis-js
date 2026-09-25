@@ -8,6 +8,7 @@
  * already held both to static values, so a template there is refused before this runs.
  */
 import { assignable, type PluginCheckContext, type Type } from '@wilanis/core';
+import { receives } from './deliver.js';
 import { type Published, published, type Queued, typeOf } from './sites.js';
 
 type Scope = PluginCheckContext['scope'];
@@ -73,13 +74,8 @@ export function checkTriggerMessage(scope: Scope, one: Queued, refuse: Refuse): 
 function consumersOf(scope: Scope, call: Published, triggers: Queued[]): Queued[] {
   const { connection, queue } = call.given;
   if (typeof connection !== 'string' || typeof queue !== 'string') return [];
-  const at = scope.canon(connection);
-  return triggers.filter(
-    one =>
-      typeof one.settings.connection === 'string' &&
-      scope.canon(one.settings.connection) === at &&
-      one.settings.queue === queue,
-  );
+  const at = { connection: scope.canon(connection), queue };
+  return triggers.filter(one => receives(one.doc, at, scope.canon));
 }
 
 /** What the pairing of publishes with their consumers is judged against: the tree, its queue triggers, and the way to refuse. */

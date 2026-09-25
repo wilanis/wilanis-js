@@ -4,16 +4,16 @@
  * works none.
  *
  * The queues are the queue triggers themselves, grouped by the canonical connection and the queue each receives
- * from, and each is consumed once however many triggers name it -- as one socket answers every route. Every
+ * from, and each is consumed once, as one socket answers every route; one trigger receives from each (X406). Every
  * broker is found before anything is consumed, so a tree naming a kind no broker registered stops the start
  * with nothing half-held. The trigger a message fires is found afresh on every delivery (`deliver.ts`), so a
  * reload is seen by the next message; which queues are consumed is fixed when the step runs, so a queue a
  * reload adds is consumed from the next start.
  */
-import type { Hold, Serving, TriggerDoc } from '@wilanis/core';
+import type { Hold, Serving } from '@wilanis/core';
 import type { Handler } from '@wilanis/engine';
 import { brokerFor, type Delivery, type Reached } from './brokers.js';
-import { type Consumed, deliver, triggerFor, type Worked } from './deliver.js';
+import { type Consumed, deliver, placeOf, triggerFor, type Worked } from './deliver.js';
 import { CONSUME, KIND } from './paths.js';
 
 /** What a tree hands a held operation, and what this one reads of it. */
@@ -30,22 +30,16 @@ function concurrencyOf(given: unknown): number {
   throw new Error(`'${CONSUME}' was given concurrency ${JSON.stringify(given)}; it is a whole number, 1 or more`);
 }
 
-/** Where a queue trigger receives from, where its settings name both a connection and a queue. */
-function placeOf(trigger: TriggerDoc): { connection: string; queue: string } | undefined {
-  const { connection, queue } = (trigger.settings ?? {}) as { connection?: unknown; queue?: unknown };
-  return typeof connection === 'string' && typeof queue === 'string' ? { connection, queue } : undefined;
-}
-
 /** The queues this step works, by canonical connection: every queue a queue trigger receives from, narrowed to `queues`. */
 function queuesOf(worked: Worked, wanted: unknown): Map<string, string[]> {
   const narrowed = Array.isArray(wanted) ? new Set(wanted.map(String)) : undefined;
   const byConnection = new Map<string, string[]>();
-  for (const place of worked.serving.triggers(KIND).map(placeOf)) {
+  for (const trigger of worked.serving.triggers(KIND)) {
+    const place = placeOf(trigger, worked.canon);
     if (!place || (narrowed && !narrowed.has(place.queue))) continue;
-    const canonical = worked.canon(place.connection);
-    const queues = byConnection.get(canonical) ?? [];
+    const queues = byConnection.get(place.connection) ?? [];
     if (!queues.includes(place.queue)) queues.push(place.queue);
-    byConnection.set(canonical, queues);
+    byConnection.set(place.connection, queues);
   }
   return byConnection;
 }

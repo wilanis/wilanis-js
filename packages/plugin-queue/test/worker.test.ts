@@ -116,12 +116,12 @@ describe('what the step consumes, and when', () => {
     const triggers = [
       trigger(),
       trigger({ queue: 'receipts' }),
-      trigger({}, '@customers/domain/customer.port.json#purge'),
+      trigger({ queue: 'purges' }, '@customers/domain/customer.port.json#purge'),
       trigger({ connection: '@connections/other.connection.json', queue: 'digests' }),
     ];
     const all = await consuming(serving(triggers).serving);
     try {
-      expect(all.answer).toEqual({ queues: 3, connections: 2 });
+      expect(all.answer).toEqual({ queues: 4, connections: 2 });
       expect(all.held.map((one: Held) => one.label)).toEqual([
         `queue ${JOBS}`,
         'queue @connections/other.connection.json',

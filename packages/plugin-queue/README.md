@@ -68,6 +68,10 @@ whoever can publish to the broker. The answer is judged against `out` and logged
 kind declares `correlation: headers.traceparent`, as the route kind does, so a publisher that puts its W3C
 `traceparent` in the headers finds the run it caused under its own trace.
 
+One trigger receives from a queue. A message fires one trigger, so a second trigger on the same connection and
+queue would never run, and it is refused (X406); work that should happen twice for one message is one operation
+that does both, or a second queue the publisher also sends to.
+
 **What becomes of a message** is the trigger's `outcomes` table, reason by reason, exactly as a route's
 `response.refusals` maps a reason to a status: `ack` (the work is done, or not worth doing), `retry` (deliver
 it again later), `dead` (park it where an operator can find it). Every reason the run can reach must be mapped
@@ -191,5 +195,6 @@ and consume, retry with backoff, park the dead, bound concurrency and drain on s
 | X403 | a `publish` of a type the queue trigger consuming that connection and queue does not accept |
 | X404 | a message type, a trigger's or a `publish`'s, with a `blob` field at any depth |
 | X405 | a `publish` in an atomic graph to a connection whose kind is not marked `storage` |
+| X406 | a second queue trigger receiving from a connection and queue another already receives from |
 
 Each is described, with an example and its fix, under [`docs/refusals`](../../docs/refusals/README.md).
