@@ -43,7 +43,7 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
 
   wilanis check    [root] [--json]                 judge the whole tree, under every profile; exit 1 with every refusal
   wilanis rehearse [root] [--seed n] [-v] [--json] run every trigger, and every branch of every switch
-  wilanis fuzz     [root] [--runs n]               write one scenario per trigger per seed to scenarios/
+  wilanis fuzz     [root] [--runs n]               write one scenario per trigger per seed to scenarios/fuzz/
   wilanis regress  [root] [--json]                 replay every scenario and diff node by node
   wilanis start    [root] [--profile word] [--trace[=text|json]] [--level summary|full]
                    refuse a variable the profile reads that is unset, then run postLoad and the profile's
