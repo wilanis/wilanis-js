@@ -17,6 +17,7 @@ import type { GraphDoc, Kind, Loaded, LoadResult, PolicyDoc, Refusal, TriggerDoc
 import { pageUrl, policyPath, SCHEMA_BASE, Scope, WILANIS } from '@wilanis/core';
 import { limitsOf, profilesOf, settingsSaid } from '@wilanis/runtime';
 import { attemptsOf } from './attempts.js';
+import { deliveryView, receivesView } from './delivery.js';
 import { graphView } from './graphs.js';
 import { invariantView } from './invariants.js';
 import { stemOf, targetOf } from './ports.js';
@@ -120,16 +121,24 @@ function policiesOf(scope: Scope, trigger: TriggerDoc): VAttachedPolicy[] {
   });
 }
 
-/** What a trigger adds to its view: what fires it, where it fires, what it answers, how its run is bounded, and the policies that gate it. */
+/** What a trigger adds to its view: what fires it, the connection it receives from, where it fires, what it answers, how its run is bounded, and the policies that gate it. */
 function triggerView(scope: Scope, doc: Loaded, view: DocView) {
   const trigger = doc.doc as TriggerDoc;
   const said = settingsSaid(doc as Loaded<TriggerDoc>, scope);
   if (said) view.firedBy = said;
+  const receives = receivesView(scope, doc as Loaded<TriggerDoc>);
+  if (receives) view.receives = receives;
   view.fires = targetOf(scope, trigger.fire.run).target;
   view.answers = answersOf(scope, doc as Loaded<TriggerDoc>);
   const limits = limitsOf(doc as Loaded<TriggerDoc>, scope);
   if (Object.keys(limits).length) view.limits = limits;
   if (trigger.policies?.length) view.policies = policiesOf(scope, trigger);
+}
+
+/** What a connection adds to its view, where its kind declares `delivery`: who receives from it and who sends to it. */
+function connectionView(scope: Scope, doc: Loaded, view: DocView) {
+  const delivery = deliveryView(scope, doc);
+  if (delivery) view.delivery = delivery;
 }
 
 /** What a policy adds to its view: what decides it, what it can answer, and the triggers it gates. */
@@ -214,5 +223,6 @@ export function viewOf(load: LoadResult, ref: string, reads: TreeReads = treeRea
   if (doc.kind === 'store') view.store = storeView(scope, load, doc);
   if (doc.kind === 'invariant') view.invariant = invariantView(scope, doc);
   if (doc.kind === 'project') view.profiles = profilesOf(scope);
+  if (doc.kind === 'connection') connectionView(scope, doc, view);
   return view;
 }

@@ -13,6 +13,7 @@ import {
   type TriggerDoc,
   type TriggerKindDoc,
 } from '@wilanis/core';
+import { deliveryKindLines, receivingLines } from './delivery-said.js';
 import {
   bindingLines,
   codecLines,
@@ -119,8 +120,8 @@ function policyLines(doc: Loaded, load: LoadResult): string[] {
 }
 
 /**
- * A trigger: the document, the bounds its run ends up with and where each came from, the policies it attaches,
- * what each gives the guard, and the invariants that hold over it -- a rule stated once elsewhere is a rule about
+ * A trigger: the document, the bounds its run ends up with and where each came from, the connection it receives
+ * from and who sends to it there, the policies it attaches, what each gives the guard, and the invariants that hold over it -- a rule stated once elsewhere is a rule about
  * this trigger, and a reader of the trigger sees it.
  */
 function triggerLines(doc: Loaded, scope: Scope): string[] {
@@ -130,6 +131,7 @@ function triggerLines(doc: Loaded, scope: Scope): string[] {
     ...settingLines(declared.settings),
     ...faultLines(declared, scope),
     ...limitLines(doc as Loaded<TriggerDoc>, scope),
+    ...receivingLines(doc as Loaded<TriggerDoc>, scope),
     ...crossesLines(declared),
     ...fireLines(declared),
     ...gatedLines(declared),
@@ -221,7 +223,8 @@ function settingLines(settings: Record<string, unknown> | undefined): string[] {
 function kindBody(doc: Loaded, load: LoadResult, scope: Scope, showType: (spec: unknown) => string): string[] {
   if (doc.kind === 'port') return portLines(doc, showType);
   if (doc.kind === 'plugin') return [...kindLines(doc, showType), ...requiresLines(doc, scope)];
-  if (doc.kind === 'trigger-kind' || doc.kind === 'connection-kind') return kindLines(doc, showType);
+  if (doc.kind === 'trigger-kind') return kindLines(doc, showType);
+  if (doc.kind === 'connection-kind') return [...deliveryKindLines(doc), ...kindLines(doc, showType)];
   if (doc.kind === 'shape') return shapeLines(doc, scope, load, showType);
   if (doc.kind === 'store') return storeLines(doc, load, scope);
   if (doc.kind === 'policy') return policyLines(doc, load);

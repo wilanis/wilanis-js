@@ -6,6 +6,7 @@
 import { graphsReachedBy, profilesOf } from '@wilanis/compiler';
 import type { LoadResult } from '@wilanis/core';
 import { type BindingDoc, type Loaded, policyPath, Scope, type TriggerDoc } from '@wilanis/core';
+import { sendTail, sentByLines } from './delivery-said.js';
 import { holdsLines } from './invariant-lines.js';
 import { scopeTail } from './scope-said.js';
 import { storeTail } from './stores.js';
@@ -52,7 +53,8 @@ function nodeLines(node: Record<string, unknown>, indent: string, walk: Walk): {
   if (found.port.native) {
     const effect = found.op.pure ? '' : '  (effect)';
     const given = node.in as Record<string, unknown>;
-    const tail = `${storeTail(run, given, scope)}${scopeTail(run, given, scope)}`;
+    const sends = sendTail({ file: '', where: id, run, given }, scope);
+    const tail = `${storeTail(run, given, scope)}${scopeTail(run, given, scope)}${sends}`;
     return { lines: [`${indent}  ${id} ${run}${effect}${tail}`] };
   }
   const binding = scope.bindingFor(found.path, walk.profile);
@@ -141,6 +143,8 @@ function walked(load: LoadResult, scope: Scope, profile?: string): { lines: stri
     // what fires it, beside the kind, in the kind's own words: a route's path, a schedule's expression
     const said = settingsSaid(trigger, scope);
     lines.push(`${trigger.path}  (${trigger.doc.kind})${said ? `  ${said}` : ''}`);
+    // the other end of its queue, where a call of this tree sends what it receives
+    lines.push(...sentByLines(trigger, scope));
     lines.push(...gateLines(trigger, scope));
     // under the gates, since an invariant is a rule about what those gates must be, not another gate
     lines.push(...holdsLines(trigger, scope));
