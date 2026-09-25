@@ -1,8 +1,8 @@
 /**
  * The project's profiles: the places a tree runs (RFC 0013). At most one is the default (C017); each binds a
  * domain port to a binding that implements it (R001, B003, B004) and lets a connection stand in for another
- * of the same kind (R001, C018); every domain port is met under every profile (B002) and keeps every promise
- * its operations make of being repeated (B011).
+ * of the same kind, or of another kind delivering messages as it does (R001, C018); every domain port is met
+ * under every profile (B002) and keeps every promise its operations make of being repeated (B011).
  */
 import type { Loaded, PortDoc, ProfileDoc } from '@wilanis/core';
 import { effectsReachable } from '../refusals.js';
@@ -75,7 +75,11 @@ function checkProfileBinding(judge: Judge, name: string, [portRef, bindingRef]: 
 
 /**
  * R001, C018: a stand-in maps one connection of the tree to another connection of the tree, of the same kind.
- * A connection's kind stays a fact about the connection: a different kind is a different binding.
+ * A connection's kind stays a fact about the connection: a different kind is a different binding. The one
+ * exception is a broker: where both kinds declare `delivery` and declare it alike, what was judged of the
+ * connection a trigger receives from -- the rules that read that word, and X405, which reads the `storage`
+ * marker a stand-in can only add -- still holds of the stand-in. Swapping brokers is then swapping the
+ * connection's kind, as RFC 0009 says, and the rule reads a word of core's and names no plugin.
  */
 function checkProfileConnection(judge: Judge, name: string, [fromRef, toRef]: [string, string]): void {
   const refuse = judge.refuser(judge.project.path);
@@ -87,19 +91,40 @@ function checkProfileConnection(judge: Judge, name: string, [fromRef, toRef]: [s
   if (!to) refuse('R001', `profile '${name}' names unknown connection '${toRef}'`, at, 'wilanis ls connection');
   if (!from || !to) return;
   const kind = judge.scope.canon(from.doc.kind);
-  const hint = `a stand-in is another connection of kind '${kind}'; to reach a different kind, bind the port to another binding`;
+  const hint = `a stand-in is another connection of kind '${kind}'${broadly(judge, kind)}; to reach a different kind, bind the port to another binding`;
   if (from.path === to.path) {
     refuse('C018', `profile '${name}' maps '${fromRef}' to itself`, at, hint);
     return;
   }
   const other = judge.scope.canon(to.doc.kind);
-  if (other !== kind)
-    refuse(
-      'C018',
-      `profile '${name}' maps '${fromRef}', of kind '${kind}', to '${toRef}', of kind '${other}'`,
-      at,
-      hint,
-    );
+  if (standsIn(judge, kind, other)) return;
+  const message = `profile '${name}' maps '${fromRef}', of kind '${kind}', to '${toRef}', of kind '${other}'`;
+  refuse('C018', `${message}${disagreement(judge, kind, other)}`, at, hint);
+}
+
+/** Whether a connection of one kind may stand in for one of another: the same kind, or brokers delivering alike. */
+function standsIn(judge: Judge, kind: string, other: string): boolean {
+  if (other === kind) return true;
+  const delivery = deliveryOf(judge, kind);
+  return delivery !== undefined && deliveryOf(judge, other) === delivery;
+}
+
+/** What the hint adds for a broker: any kind that delivers as it does may stand in too. */
+function broadly(judge: Judge, kind: string): string {
+  const delivery = deliveryOf(judge, kind);
+  return delivery ? `, or of any kind that also delivers ${delivery}` : '';
+}
+
+/** What the message adds for a broker: what each side delivers, since that is why the kinds do not agree. */
+function disagreement(judge: Judge, kind: string, other: string): string {
+  const delivery = deliveryOf(judge, kind);
+  if (!delivery) return '';
+  return ` (which delivers ${deliveryOf(judge, other) ?? 'nothing'}, where the other delivers ${delivery})`;
+}
+
+/** How many times a connection kind hands one message to a trigger, where it is a broker; nothing where it is not. */
+function deliveryOf(judge: Judge, kind: string): string | undefined {
+  return judge.scope.get('connection-kind', kind)?.doc.delivery;
 }
 
 /** B002: a domain port has one binding under a profile; a port a plugin requires names the plugin, since the tree never wrote it. */
