@@ -77,9 +77,9 @@ function checkProfileBinding(judge: Judge, name: string, [portRef, bindingRef]: 
  * R001, C018: a stand-in maps one connection of the tree to another connection of the tree, of the same kind.
  * A connection's kind stays a fact about the connection: a different kind is a different binding. The one
  * exception is a broker: where both kinds declare `delivery` and declare it alike, what was judged of the
- * connection a trigger receives from -- the rules that read that word, and X405, which reads the `storage`
- * marker a stand-in can only add -- still holds of the stand-in. Swapping brokers is then swapping the
- * connection's kind, as RFC 0009 says, and the rule reads a word of core's and names no plugin.
+ * connection a trigger receives from -- T009, T010 and X402, which read that word, and X405, which reads the
+ * `storage` marker a stand-in can only add -- still holds of the stand-in. Swapping brokers is then swapping
+ * the connection's kind, as RFC 0009 says, and the rule reads a word of core's and names no plugin.
  */
 function checkProfileConnection(judge: Judge, name: string, [fromRef, toRef]: [string, string]): void {
   const refuse = judge.refuser(judge.project.path);

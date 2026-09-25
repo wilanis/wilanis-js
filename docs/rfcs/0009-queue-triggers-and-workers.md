@@ -312,9 +312,9 @@ no broker: a tree in development names `@queue-memory` for that.
 How the example swaps brokers (step 10). A queue trigger names its connection in its settings, and no binding
 chooses it, so a profile reaches another broker by standing one connection in for another. C018 refused a stand-in
 of another kind, so step 10 widens it by one clause: where both kinds declare `delivery` and declare it alike, the
-stand-in is admitted. Nothing judged of the connection it replaces stops holding -- the rules that read the
-kind's `delivery` read the same word of the stand-in, and X405, which reads `storage`, is only relaxed by a
-stand-in marked `storage` -- and the rule reads a word of core's and names no plugin. The example's
+stand-in is admitted. Nothing judged of the connection it replaces stops holding -- T009, T010 and X402, which
+read the kind's `delivery`, read the same word of the stand-in, and X405, which reads `storage`, is only relaxed
+by a stand-in marked `storage` -- and the rule reads a word of core's and names no plugin. The example's
 `jobs.connection.json` is the in-process broker as written; under `production` and `production-scheduler` it
 stands for `customers-postgres.connection.json`, so the removals queue is a table beside the customers, and a
 startup step under both fires `@customers/domain/jobs.port.json#prepare`, whose one binding runs
