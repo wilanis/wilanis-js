@@ -15,6 +15,8 @@ import { forgetScopes } from './scoping.js';
 export interface Settings {
   statementTimeout?: number;
   keyType?: 'uuidv7' | 'identity';
+  /** Seconds a queue delivery holds its message before another worker may take it. */
+  queueVisibility?: number;
 }
 
 /** The connection settings a store's connection document carries. */

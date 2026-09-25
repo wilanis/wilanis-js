@@ -89,6 +89,11 @@ function changed(changes: Record_, at: At): Record<string, unknown> {
 /** The columns a select asks for: every field the shape has, and nothing the table may also hold. */
 const columns = (at: At) => fieldsOf(at.shape).map(field => folded(field.name));
 
+/** A transaction this engine opened, with the session it runs on, which a publish in it writes to. */
+export interface Opened extends Transaction {
+  trx: Kysely<never>;
+}
+
 /** An @storage engine keeping records in PostgreSQL tables. */
 export class PostgresEngine implements Engine {
   /**
@@ -351,12 +356,18 @@ export class PostgresEngine implements Engine {
    * BEGIN on one session of the connection's pool, and answer the engine that runs on it. The session is the
    * pool's until the transaction ends, which is what keeps a concurrent run from seeing what this one has
    * written: exclusivity is the pool's, and ordinary isolation does the rest.
+   *
+   * It takes the connection alone, since a transaction is per connection, and answers the session too: the
+   * table broker keeps a message published in an atomic graph on it, so whichever of a store call and a
+   * publish opens the transaction, the other joins the same one.
    */
-  async begin(at: At): Promise<Transaction> {
+  async begin(at: On): Promise<Opened> {
     const { db } = poolFor(at, this.settings);
     const trx = await db.startTransaction().execute();
+    const on = trx as unknown as Kysely<never>;
     return {
-      engine: new PostgresEngine(this.settings, trx as unknown as Kysely<never>),
+      trx: on,
+      engine: new PostgresEngine(this.settings, on),
       commit: () => trx.commit().execute(),
       rollback: () => trx.rollback().execute(),
     };
