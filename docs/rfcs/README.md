@@ -14,7 +14,7 @@ accepted. Statuses: draft, accepted, implemented, withdrawn.
 | [0006](0006-run-reports-as-traces.md) | Observability: the run report as a trace | implemented |
 | [0007](0007-invariants.md) | Invariants: what must hold, declared once and judged by the checker | implemented |
 | [0008](0008-ir-versioning.md) | Versioning the intermediate representation | accepted |
-| [0009](0009-queue-triggers-and-workers.md) | Queue messages as triggers, and workers | accepted |
+| [0009](0009-queue-triggers-and-workers.md) | Queue messages as triggers, and workers | implemented |
 | [0010](0010-scheduled-triggers.md) | Scheduled triggers | implemented |
 | [0011](0011-effect-semantics-retry-idempotency-timeout.md) | Retry, idempotency and timeout as declared properties of an operation | implemented |
 | [0012](0012-limits-and-cancellation.md) | Resource limits, timeouts and cancellation of a run | implemented |
