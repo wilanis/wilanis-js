@@ -318,9 +318,9 @@ is a broker and nothing else, nothing judged of it stops holding -- T009, T010 a
 marked `storage` -- and the rule reads core's words and names no plugin. The replaced kind must be a broker alone
 because a store's connection and a lease's are judged as written (X203, X254): a store's connection stood in for
 by a broker that keeps no store would pass both and fail every store call, so C018 still refuses it. The example's
-`jobs.connection.json` is the in-process broker as written; under `production` and `production-scheduler` it
+`jobs.connection.json` is the in-process broker as written; under the three production profiles it
 stands for `customers-postgres.connection.json`, so the removals queue is a table beside the customers, and a
-startup step under both fires `@customers/domain/jobs.port.json#prepare`, whose one binding runs
+startup step under all three fires `@customers/domain/jobs.port.json#prepare`, whose one binding runs
 `@queue/queue.port.json#ensure` on it. A handler asking for `jobs.connection.json` is handed the stand-in's kind
 and settings under its own name, so the stand-in keeps its own pool: an atomic graph that writes the customers
 and publishes to `jobs.connection.json` would name two connections to `Atomic.join`, and the example has none
