@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/port.schema.json",
+  "label": "The customers' queued work",
+  "description": "What the customers ask of the broker their queued work goes through, jobs.connection.json, apart from publishing to it: that it be made ready before anything publishes to it or consumes it. A startup step fires it, under the profiles whose broker is a table.",
+  "operations": {
+    "prepare": {
+      "description": "Make the broker behind jobs.connection.json ready to keep queues, once, before the port opens: create what it needs, and leave alone what is there."
+    }
+  }
+}

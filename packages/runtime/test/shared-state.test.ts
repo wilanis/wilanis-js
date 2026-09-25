@@ -68,6 +68,9 @@ const OVER_MEMORY: Record<string, Edit> = {
   'project.json': project => {
     delete project.secrets.customersDatabase;
     for (const step of project.startup) if (step.in?.lease) step.in = undefined;
+    // a memory store is no broker, so the jobs queue stays in the process rather than standing for it
+    for (const profile of Object.values(project.profiles) as { connections?: Record<string, string> }[])
+      delete profile.connections?.['@connections/jobs.connection.json'];
   },
 };
 
