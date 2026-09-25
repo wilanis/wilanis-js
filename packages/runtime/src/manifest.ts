@@ -2,7 +2,8 @@
  * What `wilanis manifest` prints (RFC 0026): what a tree is, as one JSON document a machine reads and two runs diff
  * to nothing. `manifestOf` is pure over a tree that passed the checker: it reads the registry, the Scope and the
  * versions the runtime resolved the packages at, never the environment, the clock or a secret's value, and every
- * list it answers is sorted, so the same tree is the same string however it was walked.
+ * list it answers is sorted but a trigger's policies, the startup steps and the arrays inside settings, which keep
+ * the order their documents give them, so the same tree is the same string however it was walked.
  */
 import { type LoadResult, SCHEMA_BASE, Scope } from '@wilanis/core';
 import {
