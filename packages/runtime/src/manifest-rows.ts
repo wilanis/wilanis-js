@@ -1,9 +1,10 @@
 /**
  * The inventory half of the manifest (RFC 0026): one row per document, plugin, include, feature, trigger, port,
  * policy, connection and startup step, read off the registry with the values the documents wrote. Every reference a
- * row holds is printed canonical, so it names a document by the path `documents` lists it under; every list is
- * sorted by code units, except the two whose order is meaning: a trigger's policies and the startup steps; and every
- * object's keys are, settings' at every depth among them.
+ * row holds outside its settings is printed canonical, so it names a document by the path `documents` lists it
+ * under; every list is sorted by code units, except the two whose order is meaning (a trigger's policies and the
+ * startup steps) and the arrays inside settings, which keep their own; and every object's keys are, settings' at
+ * every depth among them.
  */
 import {
   type Kind,
