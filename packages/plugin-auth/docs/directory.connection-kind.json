@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/connection-kind.schema.json",
   "label": "Directory in the connection",
-  "description": "A directory written in the connection itself: the accounts, their passwords or hashes, their groups. For development and tests; a profile binds the same domain port to a real directory (an OIDC issuer, LDAP) in production, and nothing else changes.",
+  "description": "A directory written in the connection itself: the accounts, their passwords or hashes, their groups. For development and tests; a profile binds the same domain port to a real directory (an OIDC issuer, LDAP) in production, and nothing else changes. It declares no endpoint: its users are written in the document, so a connection of this kind reaches no host.",
   "settings": {
     "fields": {
       "users": {

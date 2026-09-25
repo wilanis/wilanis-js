@@ -3,11 +3,14 @@
  * port's operations resolve; a domain operation speaks core shapes and fixes no value itself (L001, L006);
  * what an operation says about repeating it names its own fields and types as boolean (C015). A field of
  * either bounds its length with maxItems only where it is a list (C016).
- * A connection names a kind and its settings fit it, reading secrets only (R001, C001, C002). What a store
+ * An operation that says it `listens` holds (L014), and the inputs its address reads are ones it accepts, of
+ * the type each part takes (L015). A connection names a kind and its settings fit it, reading secrets only
+ * (R001, C001, C002); a connection kind's `endpoint` names a string setting of its own (C020). What a store
  * declares is judged beside it, in `stores.ts`.
  */
 import {
   type ConnectionDoc,
+  type ConnectionKindDoc,
   expr,
   type Fields,
   type Loaded,
@@ -15,6 +18,7 @@ import {
   type PortDoc,
   type ShapeDoc,
   show,
+  type Type,
 } from '@wilanis/core';
 import type { Judge } from './judge.js';
 import { mismatch } from './typing.js';
@@ -44,10 +48,16 @@ export function checkPort(judge: Judge, port: Loaded<PortDoc>): void {
     if (typeof op.accepts !== 'string') checkMaxItems(judge, port.path, op.accepts, `operations/${name}/accepts`);
     if (typeof op.returns === 'object')
       checkMaxItems(judge, port.path, op.returns.fields, `operations/${name}/returns/fields`);
-    if (op.transactional) checkTransactional(judge, port, name, op);
-    if (!port.native) checkDomainOperation(judge, port, name, op);
-    else checkRepeatable(judge, port, name, op);
+    checkOperationWords(judge, port, name, op);
   }
+}
+
+/** What an operation says about itself beyond its types: a transaction, an address, a promise about repeating it. */
+function checkOperationWords(judge: Judge, port: Loaded<PortDoc>, name: string, op: Operation): void {
+  if (op.transactional) checkTransactional(judge, port, name, op);
+  if (op.listens) checkListens(judge, port, name, op);
+  if (!port.native) checkDomainOperation(judge, port, name, op);
+  else checkRepeatable(judge, port, name, op);
 }
 
 /**
@@ -190,4 +200,72 @@ export function checkConnection(judge: Judge, connection: Loaded<ConnectionDoc>)
   const read = judge.settingsRead(connection.doc.settings, connection.path, 'settings');
   const bad = mismatch(read?.type, declared);
   if (bad) refuse('C002', `settings: ${bad}`, 'settings', `wilanis describe ${connection.doc.kind}`);
+}
+
+/**
+ * L014 and L015: what an operation says about the address it binds. Only something that keeps running can listen,
+ * so `listens` rides on `holds`; and each part's `input` is a field the operation accepts, of the type that part
+ * takes -- a number for the port, a string for the interface -- since the startup step writes it under `in`.
+ */
+function checkListens(judge: Judge, port: Loaded<PortDoc>, name: string, op: Operation): void {
+  const refuse = judge.refuser(port.path);
+  const at = `operations/${name}`;
+  if (!op.holds) {
+    const message = `operation '${name}' declares 'listens' but not 'holds' -- only something that keeps running can listen`;
+    refuse('L014', message, at, 'add "holds": true, or drop "listens"');
+  }
+  const accepts = judge.acceptsType(op);
+  const fields = accepts?.kind === 'object' ? accepts.fields : {};
+  const parts: [string, string | undefined, 'number' | 'string'][] = [
+    ['port', op.listens?.port.input, 'number'],
+    ['host', op.listens?.host?.input, 'string'],
+  ];
+  for (const [part, input, kind] of parts) {
+    if (input === undefined || fields[input]?.type.kind === kind) continue;
+    const found = fields[input] ? `is ${show(fields[input].type)}, not ${kind}` : 'is not a field it accepts';
+    const list = Object.keys(fields).filter(field => fields[field].type.kind === kind);
+    refuse(
+      'L015',
+      `operation '${name}' reads its ${part} from in.${input}, which ${found}`,
+      `${at}/listens/${part}/input`,
+      `name a ${kind} field this operation accepts: ${list.length ? list.join(', ') : 'none -- accept one, or drop "input"'}`,
+    );
+  }
+}
+
+/**
+ * The refusals for a connection kind, judged on its own rather than only when a connection names it: its
+ * `endpoint` is a dotted path to a string setting it declares (C020).
+ */
+export function checkConnectionKind(judge: Judge, kind: Loaded<ConnectionKindDoc>): void {
+  const { endpoint } = kind.doc;
+  if (endpoint === undefined) return;
+  const settings = judge.quiet(kind.doc.settings);
+  const found = typeAtPath(settings, endpoint.split('.'));
+  if (found?.kind === 'string') return;
+  const strings = stringPaths(settings, '');
+  const message = found
+    ? `'endpoint' names '${endpoint}', which is ${show(found)}, not a string`
+    : `'endpoint' names '${endpoint}', which this kind's settings do not declare`;
+  const list = strings.length ? strings.join(', ') : 'none -- declare one, or drop "endpoint"';
+  judge.refuser(kind.path)('C020', message, 'endpoint', `name a string setting of this kind: ${list}`);
+}
+
+/** The type a dotted path reaches inside an object type, or nothing where a segment names no field. */
+function typeAtPath(type: Type | undefined, path: string[]): Type | undefined {
+  let here = type;
+  for (const segment of path) {
+    if (here?.kind !== 'object') return undefined;
+    here = here.fields[segment]?.type;
+  }
+  return here;
+}
+
+/** Every dotted path to a string field inside an object type, in the order the fields are declared. */
+function stringPaths(type: Type | undefined, prefix: string): string[] {
+  if (type?.kind !== 'object') return [];
+  return Object.entries(type.fields).flatMap(([name, field]) => {
+    const path = `${prefix}${name}`;
+    return field.type.kind === 'string' ? [path] : stringPaths(field.type, `${path}.`);
+  });
 }

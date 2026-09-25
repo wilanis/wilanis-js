@@ -15,6 +15,12 @@ npm install @wilanis/plugin-http
     "codecs": { "application/json": "@http/codecs/json.codec.json" } } }
 ```
 
+The server opens where a startup step names `@http/server.port.json#listen`. Its address is the step's
+`in.port` and `in.host`, else the plugin's `settings.port` and `settings.host`, else port 8080 on every interface,
+as the operation's `listens` declares and `wilanis describe @http/server.port.json` prints. A host nothing fixes
+binds every interface on both address families; `"host": "127.0.0.1"` keeps a laptop's server to itself, and the
+startup line says which happened (`http: listening on 127.0.0.1:8080`, or `:8080`).
+
 Which codec handles which content type is the project's explicit table. Triggers say `consumes` and
 `produces`; the plugin's `check` hook refuses (X001, X002) any content type the table does not cover.
 `wilanis describe @http/http.trigger-kind.json` lays out the settings and the context a route hands.
