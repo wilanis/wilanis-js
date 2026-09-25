@@ -478,9 +478,10 @@ a `dead` array a test can read. `ensure` does nothing.
 startup step reaches through a domain operation the way RFC 0002's `prepare` reaches `storage.port.json#ensure`.
 Receive: `SELECT … WHERE queue = $1 AND dead_at IS NULL AND available_at <= now() AND (locked_until IS NULL OR locked_until < now()) ORDER BY available_at LIMIT $2 FOR UPDATE SKIP LOCKED`,
 then `UPDATE … SET locked_until = now() + visibility`, in one short transaction. A worker that dies holding a
-lock loses it at `locked_until`, which is the redelivery. Polling interval and visibility are the broker's
-settings on the plugin (`plugin.json → settings`, RFC 0002's `statementTimeout` is the precedent), not a
-document's.
+lock loses it at `locked_until`, which is the redelivery. Nothing polls: a publish or a retry notifies on commit
+(`LISTEN`/`NOTIFY`), and a consumer looks when it is notified, when one of its own deliveries ends, and when the
+soonest waiting message falls due. The visibility window, `queueVisibility`, is the broker's one setting, on the
+plugin (`plugin.json → settings`, RFC 0002's `statementTimeout` is the precedent), not a document's.
 
 **The trigger kind's runtime** (`packages/plugin-queue/src/index.ts`): `start` starts nothing and logs how
 many queue triggers the tree has, as `@cli`'s does (`packages/runtime/src/plugins/cli-trigger.ts`); the
@@ -711,8 +712,9 @@ access library's to add, and whether a token belongs in a message body at all is
 queue, as `listen` answers every route on one socket. A `consume` per trigger would put a startup step per
 queue in `project.json`, which is the routes-in-the-startup-list the http design refused.
 
-**Polling.** The table broker polls; the memory broker polls its array. A LISTEN/NOTIFY wake-up is an
-optimisation inside `@wilanis/plugin-storage-postgres` and changes no document.
+**Polling.** Neither broker keeps a fixed beat. The memory broker looks at its array when a message is put, a
+delivery is answered, or the soonest message falls due; the table broker wakes on LISTEN/NOTIFY, inside
+`@wilanis/plugin-storage-postgres`, and changes no document.
 
 **Cost.** Two packages, two READMEs, two customers in `npm run release`; a third when the table broker lands.
 Two optional fields in core. The worker holds one blob scope per delivery and one `Fired` per delivery, as the
