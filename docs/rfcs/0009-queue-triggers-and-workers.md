@@ -500,19 +500,34 @@ other, and `maxAttempts` counts deliveries, never tries.
 
 ### Discoverability
 
-- `wilanis describe @queue/worker.port.json#consume` prints `granted by @queue (@wilanis/plugin-queue)` and
-  `(holds until stopped)`, as `operationLine` in `packages/runtime/src/discovery.ts` prints for `listen` today.
-- `wilanis describe <connection kind>` prints `delivery: at-least-once` when declared; `describe <connection>`
-  prints it under the kind, and lists the queue triggers receiving from it and the graphs publishing to it, by
-  queue name -- the pairing X0n3 judges.
-- `wilanis describe <queue trigger>` prints the connection, the queue, the message type, and the outcomes
-  table the way it prints a route's settings.
-- `wilanis map` prints a queue the way it prints a route: `queue removals (@connections/jobs.connection.json) → @customers/edge/remove-queued.trigger.json → customer.port.json#remove → …`,
-  and under the publishing graph `→ publish removals`.
-- The viewer's trigger page (`renderDocPage`, `case 'trigger'` in `packages/view/client/index.html`) shows a
-  queue trigger's connection, queue and outcomes as it shows a route's; the connection page lists its queues.
-  The view model (`packages/view/src/model.ts`) carries `delivery` on a connection customer. No new page: a
-  queue trigger is an existing kind.
+None of it knows a queue. A trigger receives from the connection its kind's `connection` names among its
+settings; a call sends to one when the static `connection` it is given names a connection whose kind declares
+`delivery`, and the other static strings it is given (`queue "removals"`) say where on it; a trigger receives
+what a call sends when both name the same connection and the trigger's settings of those names say the same.
+That is the pairing X403 judges, read off the documents, in `packages/runtime/src/delivery.ts`, which
+`describe`, `map` and the view model all ask. A call that names the connection and nothing on it (`ensure`)
+prepares the broker and sends nothing.
+
+- `wilanis describe @queue/worker.port.json` prints `granted by  @queue  (@wilanis/plugin-queue)` and
+  `#consume  (holds until stopped)`, as it prints `listen`.
+- `wilanis describe <connection kind>` prints `delivery: at-least-once -- <what it means>` when declared;
+  `describe <connection>` prints `delivery  at-least-once -- …` under the kind, then `received by:` with each
+  trigger receiving from it and the settings `map` says beside it, less the connection, and `sent to by:` with
+  each call as `<graph>#<node>  queue "removals" → <the trigger receiving it>`, or `→ no trigger of this tree`,
+  since another tree may.
+- `wilanis describe <queue trigger>` prints the connection, the queue, the message type and the outcomes table
+  as it prints any trigger's settings, and then `receives from  <connection>, which delivers at-least-once` and
+  `sent by  <graph>#<node>` (or `nothing in this tree`).
+- `wilanis map` prints a queue trigger as it prints a route, with the settings its kind declares beside the
+  kind (`connection "@connections/jobs.connection.json", queue "removals", …`, RFC 0010's rule, since a line
+  leading with the queue would need the runtime to know which setting names one), and `  sent by <graph>#<node>`
+  under it; the publishing node ends `→ @connections/jobs.connection.json queue "removals" → <the trigger>`, as
+  a store call ends at its store.
+- The viewer's trigger page (`renderDocPage`, `case 'trigger'`) gains a `receives from` step after `fired by`,
+  naming the connection and what it delivers, and a `Sent by` list; the connection page says what it delivers
+  and lists `Received by` and `Sent to by`, each call with where on the connection and who receives it. The view
+  model carries `delivery` on a connection and `receives` on a trigger. No new page: a queue trigger is an
+  existing kind.
 
 ### Plugin contract
 
