@@ -1710,25 +1710,25 @@
       "path": "@features/access/edge/auth-customers.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": {
-        "route": "/api/v1/auth-customers",
+        "body": "@access/edge/Credentials.shape.json",
+        "consumes": "application/json",
         "method": "POST",
         "produces": "application/json",
-        "consumes": "application/json",
-        "body": "@access/edge/Credentials.shape.json",
         "response": {
-          "refusals": {
-            "bad_credentials": 401,
-            "directory_unavailable": 503
-          },
           "cookies": {
             "session": {
               "from": "accessToken",
               "httpOnly": true,
-              "sameSite": "lax",
-              "maxAge": 900
+              "maxAge": 900,
+              "sameSite": "lax"
             }
+          },
+          "refusals": {
+            "bad_credentials": 401,
+            "directory_unavailable": 503
           }
-        }
+        },
+        "route": "/api/v1/auth-customers"
       },
       "fires": "@features/access/domain/access.port.json#signInCustomer",
       "policies": [],
@@ -1739,25 +1739,25 @@
       "path": "@features/access/edge/auth-employees.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": {
-        "route": "/api/v1/auth-employees",
+        "body": "@access/edge/Credentials.shape.json",
+        "consumes": "application/json",
         "method": "POST",
         "produces": "application/json",
-        "consumes": "application/json",
-        "body": "@access/edge/Credentials.shape.json",
         "response": {
-          "refusals": {
-            "bad_credentials": 401,
-            "directory_unavailable": 503
-          },
           "cookies": {
             "session": {
               "from": "accessToken",
               "httpOnly": true,
-              "sameSite": "lax",
-              "maxAge": 900
+              "maxAge": 900,
+              "sameSite": "lax"
             }
+          },
+          "refusals": {
+            "bad_credentials": 401,
+            "directory_unavailable": 503
           }
-        }
+        },
+        "route": "/api/v1/auth-employees"
       },
       "fires": "@features/access/domain/access.port.json#signInEmployee",
       "policies": [],
@@ -1768,7 +1768,6 @@
       "path": "@features/access/edge/get-preferences.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": {
-        "route": "/api/v1/me/preferences",
         "method": "GET",
         "produces": "application/json",
         "response": {
@@ -1776,7 +1775,8 @@
             "anonymous": 401,
             "invalid_credential": 401
           }
-        }
+        },
+        "route": "/api/v1/me/preferences"
       },
       "fires": "@features/access/domain/access.port.json#preferences",
       "policies": [
@@ -1800,24 +1800,24 @@
       "path": "@features/access/edge/refresh.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": {
-        "route": "/api/v1/token/refresh",
+        "body": "@access/edge/RefreshRequest.shape.json",
+        "consumes": "application/json",
         "method": "POST",
         "produces": "application/json",
-        "consumes": "application/json",
-        "body": "@access/edge/RefreshRequest.shape.json",
         "response": {
-          "refusals": {
-            "invalid_refresh": 401
-          },
           "cookies": {
             "session": {
               "from": "accessToken",
               "httpOnly": true,
-              "sameSite": "lax",
-              "maxAge": 900
+              "maxAge": 900,
+              "sameSite": "lax"
             }
+          },
+          "refusals": {
+            "invalid_refresh": 401
           }
-        }
+        },
+        "route": "/api/v1/token/refresh"
       },
       "fires": "@features/access/domain/access.port.json#refresh",
       "policies": [],
@@ -1828,17 +1828,17 @@
       "path": "@features/access/edge/set-preferences.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": {
-        "route": "/api/v1/me/preferences",
+        "body": "@access/edge/PreferencesUpdate.shape.json",
+        "consumes": "application/json",
         "method": "PUT",
         "produces": "application/json",
-        "consumes": "application/json",
-        "body": "@access/edge/PreferencesUpdate.shape.json",
         "response": {
           "refusals": {
             "anonymous": 401,
             "invalid_credential": 401
           }
-        }
+        },
+        "route": "/api/v1/me/preferences"
       },
       "fires": "@features/access/domain/access.port.json#savePreferences",
       "policies": [
@@ -1851,20 +1851,20 @@
       "path": "@features/access/edge/sign-out.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": {
-        "route": "/api/v1/sign-out",
         "method": "POST",
         "produces": "application/json",
         "response": {
-          "refusals": {
-            "anonymous": 401,
-            "invalid_credential": 401
-          },
           "cookies": {
             "session": {
               "clear": true
             }
+          },
+          "refusals": {
+            "anonymous": 401,
+            "invalid_credential": 401
           }
-        }
+        },
+        "route": "/api/v1/sign-out"
       },
       "fires": "@features/access/domain/access.port.json#signOut",
       "policies": [
@@ -1877,19 +1877,19 @@
       "path": "@features/customers/edge/delete-customer.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": {
-        "route": "/customers/{id}",
         "method": "DELETE",
         "produces": "application/json",
         "response": {
           "refusals": {
-            "missing": 404,
-            "upstream": 502,
             "anonymous": 401,
-            "invalid_credential": 401,
             "forbidden": 403,
-            "invariant": 500
+            "invalid_credential": 401,
+            "invariant": 500,
+            "missing": 404,
+            "upstream": 502
           }
-        }
+        },
+        "route": "/customers/{id}"
       },
       "fires": "@features/customers/domain/customer.port.json#remove",
       "policies": [
@@ -1903,21 +1903,21 @@
       "path": "@features/customers/edge/delete-customers.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": {
-        "route": "/customers",
-        "method": "DELETE",
-        "consumes": "application/json",
-        "produces": "application/json",
         "body": "@customers/edge/DeleteRequest.shape.json",
+        "consumes": "application/json",
+        "method": "DELETE",
+        "produces": "application/json",
         "response": {
           "refusals": {
-            "missing": 404,
-            "upstream": 502,
             "anonymous": 401,
-            "invalid_credential": 401,
             "forbidden": 403,
-            "invariant": 500
+            "invalid_credential": 401,
+            "invariant": 500,
+            "missing": 404,
+            "upstream": 502
           }
-        }
+        },
+        "route": "/customers"
       },
       "fires": "@features/customers/domain/customer.port.json#removeMany",
       "policies": [
@@ -1944,19 +1944,19 @@
       "path": "@features/customers/edge/enqueue-removal.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": {
-        "route": "/customers/{id}/removal",
         "method": "POST",
         "produces": "application/json",
         "response": {
-          "status": {
-            "default": 202
-          },
           "refusals": {
             "anonymous": 401,
-            "invalid_credential": 401,
-            "forbidden": 403
+            "forbidden": 403,
+            "invalid_credential": 401
+          },
+          "status": {
+            "default": 202
           }
-        }
+        },
+        "route": "/customers/{id}/removal"
       },
       "fires": "@features/customers/domain/customer.port.json#enqueueRemoval",
       "policies": [
@@ -1970,17 +1970,17 @@
       "path": "@features/customers/edge/export-customers.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": {
-        "route": "/customers.csv",
         "method": "GET",
         "produces": "text/csv",
         "response": {
           "refusals": {
-            "upstream": 502,
-            "invariant": 500,
             "anonymous": 401,
-            "invalid_credential": 401
+            "invalid_credential": 401,
+            "invariant": 500,
+            "upstream": 502
           }
-        }
+        },
+        "route": "/customers.csv"
       },
       "fires": "@features/customers/domain/customer.port.json#export",
       "policies": [
@@ -1993,19 +1993,19 @@
       "path": "@features/customers/edge/get-customer.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": {
-        "route": "/customers/{id}",
+        "deadlineMs": 2000,
         "method": "GET",
         "produces": "application/json",
-        "deadlineMs": 2000,
         "response": {
           "refusals": {
-            "missing": 404,
-            "upstream": 502,
-            "invariant": 500,
             "anonymous": 401,
-            "invalid_credential": 401
+            "invalid_credential": 401,
+            "invariant": 500,
+            "missing": 404,
+            "upstream": 502
           }
-        }
+        },
+        "route": "/customers/{id}"
       },
       "fires": "@features/customers/domain/customer.port.json#get",
       "policies": [
@@ -2018,24 +2018,24 @@
       "path": "@features/customers/edge/import-customers.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": {
-        "route": "/customers.csv",
-        "method": "POST",
-        "consumes": "text/csv",
-        "produces": "application/json",
         "body": "blob",
+        "consumes": "text/csv",
+        "method": "POST",
+        "produces": "application/json",
         "response": {
+          "refusals": {
+            "anonymous": 401,
+            "conflict": 409,
+            "forbidden": 403,
+            "invalid_credential": 401,
+            "invariant": 500,
+            "upstream": 502
+          },
           "status": {
             "default": 201
-          },
-          "refusals": {
-            "upstream": 502,
-            "conflict": 409,
-            "anonymous": 401,
-            "invalid_credential": 401,
-            "forbidden": 403,
-            "invariant": 500
           }
-        }
+        },
+        "route": "/customers.csv"
       },
       "fires": "@features/customers/domain/customer.port.json#import",
       "policies": [
@@ -2049,17 +2049,17 @@
       "path": "@features/customers/edge/list-customers.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": {
-        "route": "/customers",
         "method": "GET",
         "produces": "application/json",
         "response": {
           "refusals": {
-            "upstream": 502,
-            "invariant": 500,
             "anonymous": 401,
-            "invalid_credential": 401
+            "invalid_credential": 401,
+            "invariant": 500,
+            "upstream": 502
           }
-        }
+        },
+        "route": "/customers"
       },
       "fires": "@features/customers/domain/customer.port.json#list",
       "policies": [
@@ -2072,24 +2072,24 @@
       "path": "@features/customers/edge/register-customer.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": {
-        "route": "/customers",
-        "method": "POST",
+        "body": "@customers/edge/RegisterRequest.shape.json",
         "consumes": "application/json",
+        "method": "POST",
         "produces": "application/json",
         "response": {
+          "refusals": {
+            "anonymous": 401,
+            "conflict": 409,
+            "forbidden": 403,
+            "invalid_credential": 401,
+            "invariant": 500,
+            "upstream": 502
+          },
           "status": {
             "default": 201
-          },
-          "refusals": {
-            "upstream": 502,
-            "conflict": 409,
-            "anonymous": 401,
-            "invalid_credential": 401,
-            "forbidden": 403,
-            "invariant": 500
           }
         },
-        "body": "@customers/edge/RegisterRequest.shape.json"
+        "route": "/customers"
       },
       "fires": "@features/customers/domain/customer.port.json#submit",
       "policies": [
@@ -2103,19 +2103,19 @@
       "path": "@features/customers/edge/remove-queued.trigger.json",
       "kind": "@queue/queue.trigger-kind.json",
       "settings": {
-        "connection": "@connections/jobs.connection.json",
-        "queue": "removals",
-        "message": "@customers/edge/IdRequest.shape.json",
-        "maxAttempts": 5,
         "backoffMs": 1000,
+        "connection": "@connections/jobs.connection.json",
+        "maxAttempts": 5,
+        "message": "@customers/edge/IdRequest.shape.json",
         "outcomes": {
-          "missing": "ack",
-          "upstream": "retry",
           "anonymous": "dead",
-          "invalid_credential": "dead",
           "forbidden": "dead",
-          "invariant": "dead"
-        }
+          "invalid_credential": "dead",
+          "invariant": "dead",
+          "missing": "ack",
+          "upstream": "retry"
+        },
+        "queue": "removals"
       },
       "fires": "@features/customers/domain/customer.port.json#remove",
       "policies": [
@@ -2129,22 +2129,22 @@
       "path": "@features/customers/edge/update-customer.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": {
-        "route": "/customers/{id}",
-        "method": "PUT",
-        "consumes": "application/json",
-        "produces": "application/json",
         "body": "@customers/edge/UpdateBody.shape.json",
+        "consumes": "application/json",
+        "method": "PUT",
+        "produces": "application/json",
         "response": {
           "refusals": {
-            "missing": 404,
-            "upstream": 502,
             "anonymous": 401,
-            "invalid_credential": 401,
+            "conflict": 409,
             "forbidden": 403,
+            "invalid_credential": 401,
             "invariant": 500,
-            "conflict": 409
+            "missing": 404,
+            "upstream": 502
           }
-        }
+        },
+        "route": "/customers/{id}"
       },
       "fires": "@features/customers/domain/customer.port.json#update",
       "policies": [
@@ -2918,11 +2918,11 @@
       "kind": "@http/http.connection-kind.json",
       "settings": {
         "baseUrl": "https://6aa009e23e0d88d3d7e5525d.mockapi.io/api/v1",
-        "timeoutMs": 10000,
         "throttle": {
           "concurrency": 4,
           "perSecond": 3
-        }
+        },
+        "timeoutMs": 10000
       },
       "secrets": []
     },
@@ -2948,12 +2948,12 @@
       "settings": {
         "users": [
           {
-            "username": "operator",
-            "passwordHash": "{{secrets.operatorPasswordHash}}",
-            "name": "Operator",
             "groups": [
               "registrar"
-            ]
+            ],
+            "name": "Operator",
+            "passwordHash": "{{secrets.operatorPasswordHash}}",
+            "username": "operator"
           }
         ]
       },
@@ -2967,20 +2967,20 @@
       "settings": {
         "users": [
           {
-            "username": "bo",
-            "passwordHash": "scrypt:c2FsdC1iby0wMDAwMDAwMQ:JtqRTYo_UPXAncXpIxTIsOiye-IOkOUeWKeLt81AZTA",
-            "name": "Bo",
             "groups": [
               "registrar"
-            ]
+            ],
+            "name": "Bo",
+            "passwordHash": "scrypt:c2FsdC1iby0wMDAwMDAwMQ:JtqRTYo_UPXAncXpIxTIsOiye-IOkOUeWKeLt81AZTA",
+            "username": "bo"
           },
           {
-            "username": "cy",
-            "passwordHash": "scrypt:c2FsdC1jeS0wMDAwMDAwMQ:K29QYBs5NHAlTXIcm2SagPjbJurjANyMfcoO0z2k8Aw",
-            "name": "Cy",
             "groups": [
               "viewer"
-            ]
+            ],
+            "name": "Cy",
+            "passwordHash": "scrypt:c2FsdC1jeS0wMDAwMDAwMQ:K29QYBs5NHAlTXIcm2SagPjbJurjANyMfcoO0z2k8Aw",
+            "username": "cy"
           }
         ]
       },
@@ -2998,26 +2998,26 @@
       "settings": {
         "users": [
           {
-            "username": "ana",
-            "passwordHash": "scrypt:c2FsdC1hbmEtMDAwMDAwMQ:sFkuzjzEGVI3rUhiD0_oBkeRkhMeZH71meOkdSmBXSo",
-            "name": "Ana",
-            "groups": [
-              "customer"
-            ],
             "attributes": {
               "tenant": "acme"
-            }
-          },
-          {
-            "username": "dee",
-            "passwordHash": "scrypt:c2FsdC1kZWUtMDAwMDAwMQ:aguoYf1e0yklfWOJltQ6T6WZKUnyRv5aY-Se1ZNSbK8",
-            "name": "Dee",
+            },
             "groups": [
               "customer"
             ],
+            "name": "Ana",
+            "passwordHash": "scrypt:c2FsdC1hbmEtMDAwMDAwMQ:sFkuzjzEGVI3rUhiD0_oBkeRkhMeZH71meOkdSmBXSo",
+            "username": "ana"
+          },
+          {
             "attributes": {
               "tenant": "globex"
-            }
+            },
+            "groups": [
+              "customer"
+            ],
+            "name": "Dee",
+            "passwordHash": "scrypt:c2FsdC1kZWUtMDAwMDAwMQ:aguoYf1e0yklfWOJltQ6T6WZKUnyRv5aY-Se1ZNSbK8",
+            "username": "dee"
           }
         ]
       },

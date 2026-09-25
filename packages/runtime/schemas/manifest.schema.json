@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/runtime/schemas/manifest.schema.json",
   "title": "manifest",
-  "description": "What `wilanis manifest` prints (RFC 0026): what a tree is, as one JSON object on stdout, computed by the runtime's pure `manifestOf` from a tree the checker accepted. It never reads the environment, the clock or a secret's value. Every array is sorted by its first key, in code units, except a trigger's policies and the startup steps, whose order is meaning; so the same tree prints the same bytes, and a diff of two manifests is a diff of what the tree does. From 1.0 a field is added, never removed or retyped, and the sort is part of the promise; before 1.0 nothing is promised.",
+  "description": "What `wilanis manifest` prints (RFC 0026): what a tree is, as one JSON object on stdout, computed by the runtime's pure `manifestOf` from a tree the checker accepted. It never reads the environment, the clock or a secret's value. Every reference is canonical (@features/<feature>/..., never an alias), every array is sorted by its first key, in code units, except a trigger's policies and the startup steps, whose order is meaning, and every object's keys are in code-unit order; so the same tree prints the same bytes, and a diff of two manifests is a diff of what the tree does. From 1.0 a field is added, never removed or retyped, and the sort is part of the promise; before 1.0 nothing is promised.",
   "type": "object",
   "required": ["format", "runtime", "ir", "name", "root", "plugins", "includes", "features", "documents", "triggers", "ports", "policies", "connections", "secrets", "startup"],
   "additionalProperties": false,
@@ -202,7 +202,7 @@
           "type": "string"
         },
         "settings": {
-          "description": "Its settings as the document wrote them: an http trigger's route and method, a queue's or a schedule's own. Their shape is the kind's schema's, not restated here.",
+          "description": "Its settings with the values the document wrote, templates unresolved, and every object's keys in code-unit order: an http trigger's route and method, a queue's or a schedule's own. Their shape is the kind's schema's, not restated here.",
           "type": "object"
         },
         "fires": {
@@ -357,7 +357,7 @@
           "type": "string"
         },
         "settings": {
-          "description": "Its settings as the document wrote them: a template reading a secret stays {{secrets.<key>}} text, and a secret's value never appears.",
+          "description": "Its settings with the values the document wrote and every object's keys in code-unit order: a template reading a secret stays {{secrets.<key>}} text, and a secret's value never appears.",
           "type": "object"
         },
         "secrets": {

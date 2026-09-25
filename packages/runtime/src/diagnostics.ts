@@ -63,7 +63,7 @@ export interface Migration {
 }
 
 /** Code units, never a locale: the same tree sorts the same on every machine. */
-const byUnits = (one: string, other: string) => (one < other ? -1 : Number(one > other));
+export const byUnits = (one: string, other: string) => (one < other ? -1 : Number(one > other));
 
 /** The envelope's order: by file, then `at` with the whole-file refusal first, then code, then message. */
 function inOrder(one: Refusal, other: Refusal): number {

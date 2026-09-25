@@ -1,8 +1,9 @@
 /**
  * The inventory half of the manifest (RFC 0026): one row per document, plugin, include, feature, trigger, port,
- * policy, connection and startup step, read off the registry as the documents wrote them. Every reference a row
- * holds is printed canonical, so it names a document by the path `documents` lists it under; every list is sorted
- * by code units, except the two whose order is meaning: a trigger's policies and the startup steps.
+ * policy, connection and startup step, read off the registry with the values the documents wrote. Every reference a
+ * row holds is printed canonical, so it names a document by the path `documents` lists it under; every list is
+ * sorted by code units, except the two whose order is meaning: a trigger's policies and the startup steps; and every
+ * object's keys are, settings' at every depth among them.
  */
 import {
   type Kind,
@@ -14,6 +15,7 @@ import {
   type Scope,
   type TriggerDoc,
 } from '@wilanis/core';
+import { byUnits } from './diagnostics.js';
 import { RUNTIME_VERSION } from './runtime-version.js';
 
 /** One document of the tree, its plugins' and its includes' among them. */
@@ -43,7 +45,7 @@ export interface FeatureRow {
   included: string | null;
   effects: string[];
 }
-/** One trigger: its kind and settings as written, the operation it fires, and what gates it. */
+/** One trigger: its kind and settings, the operation it fires, and what gates it. */
 export interface TriggerRow {
   path: string;
   kind: string;
@@ -86,7 +88,7 @@ export interface PolicyRow {
   gates: string[];
   included: string | null;
 }
-/** One connection: its kind and settings as written, and the secret keys its templates read. */
+/** One connection: its kind and settings, and the secret keys its templates read. */
 export interface ConnectionRow {
   path: string;
   kind: string;
@@ -101,13 +103,26 @@ export interface StartupRow {
   profiles: string[] | null;
 }
 
-/** Code units, never a locale: the same tree sorts the same on every machine. */
-const byUnits = (one: string, other: string) => (one < other ? -1 : Number(one > other));
 /** The strings, each once, in code-unit order. */
 export const sorted = (items: Iterable<string>): string[] => [...new Set(items)].sort(byUnits);
 /** The rows in code-unit order of the key each is read by. */
 export const sortedBy = <T>(rows: T[], key: (row: T) => string): T[] =>
   [...rows].sort((one, other) => byUnits(key(one), key(other)));
+
+/**
+ * A copy of a value with every object's keys in code-unit order, at every depth, and every array in its own order:
+ * settings print the same whatever order a document wrote them in, and a caller editing the manifest edits a copy,
+ * never the loaded tree.
+ */
+export function keySorted(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(keySorted);
+  if (!value || typeof value !== 'object') return value;
+  const object = value as Record<string, unknown>;
+  return Object.fromEntries(sorted(Object.keys(object)).map(key => [key, keySorted(object[key])]));
+}
+
+/** An object's settings as a sorted copy. */
+const settingsOf = (settings: Record<string, unknown>) => keySorted(settings) as Record<string, unknown>;
 
 /** Every document the tree loaded, by path. */
 export function documentRows(load: LoadResult): DocumentRow[] {
@@ -172,7 +187,7 @@ export function triggerRows(load: LoadResult): TriggerRow[] {
     return {
       path: trigger.path,
       kind: load.resolve(trigger.doc.kind),
-      settings: trigger.doc.settings,
+      settings: settingsOf(trigger.doc.settings),
       fires: load.resolve(trigger.doc.fire.run),
       policies,
       public: policies.length === 0,
@@ -238,7 +253,7 @@ export function connectionRows(scope: Scope): ConnectionRow[] {
   const rows = scope.registry.all('connection').map(connection => ({
     path: connection.path,
     kind: scope.canon(connection.doc.kind),
-    settings: connection.doc.settings,
+    settings: settingsOf(connection.doc.settings),
     secrets: sorted(
       scope.templateReads(connection.doc.settings).flatMap(([root, key]) => (root === 'secrets' && key ? [key] : [])),
     ),
