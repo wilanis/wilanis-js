@@ -17,6 +17,15 @@ import { CHANNEL } from './queue-table.js';
 /** The pause before a listening session that failed is opened again. */
 const REOPEN_MS = 1000;
 
+/**
+ * TCP keepalive on the listening session, probing after ten seconds idle. A session left half-open -- a peer
+ * gone without a FIN, a NAT that forgot it -- raises neither `error` nor `end` of its own, and a consumer over an
+ * empty queue arms no timer, so without the probe it would wait for a notification that can never come. With
+ * it the drop surfaces as `error`, and the session is reopened and every consumer woken. A delay of 0 would
+ * leave the operating system's default, two hours.
+ */
+export const KEEP_ALIVE = { keepAlive: true, keepAliveInitialDelayMillis: 10_000 };
+
 /** What wakes a consumer: called with nothing, whenever its queue may have something for it. */
 export type Wake = () => void;
 
@@ -65,7 +74,7 @@ class Listening {
 
   /** Connect and `LISTEN`; a failure later reopens the session and wakes everyone once it is back. */
   private async open(): Promise<void> {
-    const client = new pg.Client({ connectionString: this.url });
+    const client = new pg.Client({ connectionString: this.url, ...KEEP_ALIVE });
     client.on('notification', note => this.wakeFor(note.payload ?? ''));
     client.on('error', () => this.lost(client));
     client.on('end', () => this.lost(client));
