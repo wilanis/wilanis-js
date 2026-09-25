@@ -197,15 +197,15 @@ and attaches the same two policies, reading the token from the message's headers
 the caller the route judged. Its `outcomes` say what each refusal means to the message, as a route's status
 table says what it means to a caller: `missing` is acknowledged, since the customer is already gone; `upstream`
 is retried, a second later and then doubling, and dead after five deliveries; a token that does not verify is
-dead at once. A broker delivers at least once, so `remove` may run twice for one message. The checker refuses a
-queue trigger whose operation does not promise `idempotent` (`T009`), and holds that promise under every
-profile to the effects the binding reaches (`B011`): a DELETE through the API under `live`, a store's remove
-under the others. On the laptop the broker is `@queue-memory`'s, in the process. In production
+dead at once. Both brokers here deliver at least once, so `remove` may run twice for one message. The checker
+refuses a queue trigger whose operation does not promise `idempotent` (`T009`), and holds that promise under
+every profile to the effects the binding reaches (`B011`): a DELETE through the API under `live`, a store's
+remove under the others. On the laptop the broker is `@queue-memory`'s, in the process. In production
 `jobs.connection.json` stands for the customer database, so the queue is a table beside the customers; `C018`
 admits that one stand-in of another kind because the in-process kind is a broker and nothing else and the two
 deliver alike. A worker is nothing new: it is `wilanis start` on a tree whose startup names
-`@queue/worker.port.json#consume`. The instances under `production` only listen, and the process started under
-`production-worker` works the queue and opens no port.
+`@queue/worker.port.json#consume`. The instances under `production` only listen, and the processes started under
+`production-worker` work the queue and open no port.
 
 The clock is a way in as well. A trigger of kind `@schedule/schedule.trigger-kind.json` fires at every instant a
 five-field `cron` expression names in its `timezone`, or at every multiple of an `everyMs` interval, into a domain
@@ -254,9 +254,9 @@ A profile is one place the tree runs. `npx wilanis start example` with no `--pro
 wins. `--profile production` is the deployment: the customers in PostgreSQL, one operator account standing in
 for the laptop's employee directory, and no watcher, since the watch step names `live` and `local` and a step
 without `profiles` runs everywhere. Nor does it schedule or work the queue: `--profile production-scheduler` is the
-one process that schedules and `--profile production-worker` a process that works the queue, both with production's
-bindings and neither opening a port. Started without its variables, it prints `profile production` and then
-every variable that profile reads and nobody set, with the document that reads it, before anything opens.
+one process that schedules and `--profile production-worker` the processes that work the queue, both with
+production's bindings and neither opening a port. Started without its variables, it prints `profile production`
+and then every variable that profile reads and nobody set, with the document that reads it, before anything opens.
 
 [`example/README.md`](example/README.md) walks through what it serves and who may do what.
 
