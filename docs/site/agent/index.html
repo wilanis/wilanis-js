@@ -137,7 +137,7 @@ footer { max-width: 44rem; margin: 3rem auto 0; color: var(--mute); font-size: .
     <div class="tile"><b>44 s</b><span>Sonnet reading</span><em>15 files</em></div>
     <div class="tile"><b>90 s</b><span>Sonnet writing</span><em>4 checks, 2 files</em></div>
   </div>
-  <p class="note">Apple M3 Max, Node 24, <code>npx wilanis</code> cold each time. Every output below is pasted from that run.</p>
+  <p class="note">Apple M3 Max, Node 24, <code>npx wilanis</code> cold each time. Every output below is pasted from that run, taken at <a href="https://github.com/wilanis/wilanis-js/commit/f3b61a4"><code>f3b61a4</code></a>.</p>
 </section>
 
 <section id="check">
@@ -152,7 +152,7 @@ footer { max-width: 44rem; margin: 3rem auto 0; color: var(--mute); font-size: .
     <li><span class="code">T</span><span class="what">Triggers <span class="n">10</span></span><span class="eg">a refusal the route can reach but never maps to a status</span></li>
     <li><span class="code">B</span><span class="what">Bindings and profiles <span class="n">12</span></span><span class="eg">a port nobody implements under production</span></li>
     <li><span class="code">C</span><span class="what">Connections and stores <span class="n">19</span></span><span class="eg">a unique constraint on a field the shape lacks</span></li>
-    <li><span class="code">P</span><span class="what">Static fields and resolvers <span class="n">6</span></span><span class="eg">a request header read where the request never arrives</span></li>
+    <li><span class="code">P</span><span class="what">Static fields and resolvers <span class="n">6</span></span><span class="eg">a resolver reading a request field no trigger kind hands</span></li>
     <li><span class="code">D</span><span class="what">Documents <span class="n">12</span></span><span class="eg">a trigger filed in the data layer</span></li>
     <li><span class="code">X</span><span class="what">Plugin rules <span class="n">35</span></span><span class="eg">a session write outside the session shape, a cron that is not one</span></li>
     <li><span class="code">S</span><span class="what">Scenarios <span class="n">3</span></span><span class="eg">a recorded run pinning a refusal that never happened</span></li>
@@ -182,7 +182,7 @@ footer { max-width: 44rem; margin: 3rem auto 0; color: var(--mute); font-size: .
 
 3 refusal(s)</pre>
   <p>Three findings from one node. The lease is outside the transaction it sits in. The CSV import's batch graph, two documents up, reaches it too and makes the same promise. And nobody reads whether the lease was actually taken.</p>
-  <p class="note">wilanis ships no Redis plugin yet (RFC 0030 plans one). The run used a 20-line stub plugin declaring one port with no <code>transactional</code> marker, which is all the rule looks at. The shipped example trips the same rule with <code>@http/http.port.json#request</code> and <code>@blob/csv.port.json#parse</code>.</p>
+  <p class="note">wilanis ships no Redis plugin yet (RFC 0030 plans a Redis cache kind, not a lease). The run used a 20-line stub plugin declaring one port with no <code>transactional</code> marker, which is all the rule looks at. Marking the example's CSV import atomic trips the same rule with <code>@http/http.port.json#request</code> and <code>@blob/csv.port.json#parse</code>.</p>
 </section>
 
 <section id="agent">
@@ -190,7 +190,7 @@ footer { max-width: 44rem; margin: 3rem auto 0; color: var(--mute); font-size: .
   <h2>“Add GET /customers/gold: the gold customers of the caller's tenant.”</h2>
   <p>Picked because it is one route, yet it touches sign-in, tenant isolation, three storage backends and an invariant. <span class="clock">44 s</span> of reading before the first write. In order:</p>
   <ol class="steps">
-    <li><span><code>CLAUDE.md</code>, 150 lines that <code>wilanis init</code> writes: the loop, the layers, every refusal code</span></li>
+    <li><span><code>CLAUDE.md</code>, 150 lines that <code>wilanis init</code> writes: the loop, the layers, every refusal family</span></li>
     <li><span><code>list-customers.trigger.json</code>, the nearest existing GET route, to copy</span></li>
     <li><span><code>customer.port.json</code>, where it found <code>listByTier</code> already exists</span></li>
     <li><span><code>request.resolvers.json</code> and <code>customers.store.json</code>, where the tenant comes from</span></li>
@@ -283,6 +283,7 @@ every branch settled -- 56 branch(es), 25 decision(s), 19 graph(s).</pre>
 <section class="wide" id="stack" style="margin-top:3.2rem">
   <p class="eyebrow">One microservice</p>
   <h2 style="margin-bottom:.8rem">The customers service</h2>
+  <p class="note">wilanis runs on Node today; the other languages show what each plugin would wrap in a runtime written there. None exists yet.</p>
   <div class="langs" role="group" aria-label="Language">
     <button type="button" data-lang="ts" aria-pressed="true">TypeScript</button>
     <button type="button" data-lang="php" aria-pressed="false">PHP</button>
@@ -335,7 +336,8 @@ every branch settled -- 56 branch(es), 25 decision(s), 19 graph(s).</pre>
       <rect class="ext" x="20" y="84" width="140" height="52" rx="26"/>
       <text class="t1" x="90" y="115" text-anchor="middle">Caller</text>
       <rect class="ext" x="20" y="214" width="140" height="52" rx="26"/>
-      <text class="t1" x="90" y="245" text-anchor="middle">Clock</text>
+      <text class="t1" x="90" y="238" text-anchor="middle">Clock</text>
+      <text class="t2" x="90" y="254" text-anchor="middle">nothing scheduled</text>
       <rect class="ext" x="20" y="374" width="140" height="52" rx="26"/>
       <text class="t1" x="90" y="398" text-anchor="middle">Removals queue</text>
       <text class="t2" x="90" y="414" text-anchor="middle">a Postgres table</text>
@@ -346,7 +348,8 @@ every branch settled -- 56 branch(es), 25 decision(s), 19 graph(s).</pre>
       <rect class="ext" x="1000" y="144" width="140" height="52" rx="26"/>
       <text class="t1" x="1070" y="175" text-anchor="middle">PostgreSQL</text>
       <rect class="ext" x="1000" y="244" width="140" height="52" rx="26"/>
-      <text class="t1" x="1070" y="275" text-anchor="middle">S3 bucket</text>
+      <text class="t1" x="1070" y="268" text-anchor="middle">S3 bucket</text>
+      <text class="t2" x="1070" y="284" text-anchor="middle">when blobs names one</text>
       <rect class="ext" x="1000" y="344" width="140" height="52" rx="26"/>
       <text class="t1" x="1070" y="375" text-anchor="middle">CSV files</text>
       <rect class="ext" x="1000" y="434" width="140" height="52" rx="26"/>
@@ -368,7 +371,7 @@ every branch settled -- 56 branch(es), 25 decision(s), 19 graph(s).</pre>
       libs: ['node:http', 'amphp/http-server', 'Kestrel', 'Netty', 'uvicorn', 'hyper', 'net/http', 'Boost.Beast'] },
     { plug: '@schedule', d: 'M160 240 L380 130', at: [270, 186],
       libs: ['node:timers', 'dragonmantank/cron-expression', 'Cronos', 'cron-utils', 'croniter', 'cron', 'robfig/cron', 'croncpp'] },
-    { plug: '@queue', d: 'M160 400 L380 148', at: [270, 290],
+    { plug: '@storage-postgres', d: 'M160 400 L380 148', at: [270, 290],
       libs: ['pg LISTEN/NOTIFY', 'amphp/postgres', 'Npgsql', 'PgJDBC', 'asyncpg', 'tokio-postgres', 'jackc/pgx', 'libpqxx'] },
     { plug: '@auth', d: 'M440 158 L440 300', at: [440, 229],
       libs: ['jose', 'firebase/php-jwt', 'Microsoft.IdentityModel.JsonWebTokens', 'Nimbus JOSE+JWT', 'PyJWT', 'jsonwebtoken', 'golang-jwt/jwt', 'jwt-cpp'] },
