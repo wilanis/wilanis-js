@@ -134,6 +134,8 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [T006](T006.md) | T | live | a refusal reason the trigger maps that nothing it fires, gates on or identifies with refuses with |
 | [T007](T007.md) | T | live | a trigger kind whose correlation names no field of its own context |
 | [T008](T008.md) | T | live | a trigger with no policies whose edge shapes take a list with no maxItems |
+| [T009](T009.md) | T | live | a trigger on an at-least-once connection firing an operation that does not declare `idempotent: true` |
+| [T010](T010.md) | T | live | a trigger's connection setting that is a read, names no connection, or names one whose kind declares no `delivery` |
 | [A001](A001.md) | A | live | a policy's input that reads outside the request or does not fit its decision under the trigger's kind |
 | [A002](A002.md) | A | live | a reason the decision reaches that outcomes does not map, a challenge without a method, a deny with one |
 | [A003](A003.md) | A | live | a policy outcome that nothing its decision reaches refuses with |
