@@ -29,6 +29,8 @@ export interface ResolvedInclude {
   from: string;
   dir: string;
   features?: string[];
+  /** The package's version, from its package.json, which the runtime's manifest prints (RFC 0026); absent when unknown. */
+  version?: string;
 }
 
 /**

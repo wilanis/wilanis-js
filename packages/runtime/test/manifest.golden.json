@@ -1,0 +1,3128 @@
+{
+  "format": 1,
+  "runtime": "0.1.0",
+  "ir": "v1",
+  "name": "customers",
+  "root": "example",
+  "plugins": [
+    {
+      "use": "@auth",
+      "from": "@wilanis/plugin-auth",
+      "version": "0.1.0",
+      "guard": true
+    },
+    {
+      "use": "@blob",
+      "from": "@wilanis/plugin-blob",
+      "version": "0.1.0",
+      "guard": false
+    },
+    {
+      "use": "@cli",
+      "from": null,
+      "version": "0.1.0",
+      "guard": false
+    },
+    {
+      "use": "@http",
+      "from": "@wilanis/plugin-http",
+      "version": "0.1.0",
+      "guard": false
+    },
+    {
+      "use": "@otel",
+      "from": "@wilanis/plugin-otel",
+      "version": "0.1.0",
+      "guard": false
+    },
+    {
+      "use": "@queue",
+      "from": "@wilanis/plugin-queue",
+      "version": "0.1.0",
+      "guard": false
+    },
+    {
+      "use": "@queue-memory",
+      "from": "@wilanis/plugin-queue-memory",
+      "version": "0.1.0",
+      "guard": false
+    },
+    {
+      "use": "@reload",
+      "from": "@wilanis/plugin-reload",
+      "version": "0.1.0",
+      "guard": false
+    },
+    {
+      "use": "@s3",
+      "from": "@wilanis/plugin-s3",
+      "version": "0.1.0",
+      "guard": false
+    },
+    {
+      "use": "@schedule",
+      "from": "@wilanis/plugin-schedule",
+      "version": "0.1.0",
+      "guard": false
+    },
+    {
+      "use": "@std",
+      "from": null,
+      "version": "0.1.0",
+      "guard": false
+    },
+    {
+      "use": "@storage",
+      "from": "@wilanis/plugin-storage",
+      "version": "0.1.0",
+      "guard": false
+    },
+    {
+      "use": "@storage-memory",
+      "from": "@wilanis/plugin-storage-memory",
+      "version": "0.1.0",
+      "guard": false
+    },
+    {
+      "use": "@storage-postgres",
+      "from": "@wilanis/plugin-storage-postgres",
+      "version": "0.1.0",
+      "guard": false
+    }
+  ],
+  "includes": [
+    {
+      "from": "@wilanis/access",
+      "version": "0.1.0",
+      "features": [
+        "access"
+      ]
+    }
+  ],
+  "features": [
+    {
+      "name": "access",
+      "included": "@wilanis/access",
+      "effects": [
+        "@auth/challenge.port.json#issue",
+        "@auth/session.port.json#end",
+        "@auth/session.port.json#get",
+        "@auth/session.port.json#set"
+      ]
+    },
+    {
+      "name": "customers",
+      "included": null,
+      "effects": [
+        "@blob/csv.port.json#parse",
+        "@blob/csv.port.json#write",
+        "@http/http.port.json#request",
+        "@queue/queue.port.json#ensure",
+        "@queue/queue.port.json#publish",
+        "@storage/storage.port.json#ensure",
+        "@storage/store.port.json#find",
+        "@storage/store.port.json#get",
+        "@storage/store.port.json#newKey",
+        "@storage/store.port.json#patch",
+        "@storage/store.port.json#put",
+        "@storage/store.port.json#remove"
+      ]
+    },
+    {
+      "name": "directories",
+      "included": null,
+      "effects": [
+        "@auth/identity.port.json#verify",
+        "@auth/token.port.json#issue",
+        "@auth/token.port.json#refresh"
+      ]
+    },
+    {
+      "name": "hello",
+      "included": null,
+      "effects": []
+    },
+    {
+      "name": "state",
+      "included": null,
+      "effects": [
+        "@auth/files.port.json#get",
+        "@auth/files.port.json#put",
+        "@auth/files.port.json#remove",
+        "@storage/storage.port.json#ensure",
+        "@storage/store.port.json#get",
+        "@storage/store.port.json#put",
+        "@storage/store.port.json#remove"
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "path": "@auth/Account.shape.json",
+      "kind": "shape",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@auth/ChallengeMethod.shape.json",
+      "kind": "shape",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@auth/ChallengeRecord.shape.json",
+      "kind": "shape",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@auth/Identity.shape.json",
+      "kind": "shape",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@auth/SessionRecord.shape.json",
+      "kind": "shape",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@auth/Tokens.shape.json",
+      "kind": "shape",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@auth/challenge.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@auth/directory.connection-kind.json",
+      "kind": "connection-kind",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@auth/files.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@auth/identity.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@auth/oidc.connection-kind.json",
+      "kind": "connection-kind",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@auth/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@auth/session.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@auth/state.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@auth/token.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@blob/csv.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@blob/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@blob/text.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@cli/cli.trigger-kind.json",
+      "kind": "trigger-kind",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@cli/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@connections/customers-api.connection.json",
+      "kind": "connection",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@connections/customers-postgres.connection.json",
+      "kind": "connection",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@connections/customers.connection.json",
+      "kind": "connection",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@connections/employees-production.connection.json",
+      "kind": "connection",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@connections/employees.connection.json",
+      "kind": "connection",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@connections/jobs.connection.json",
+      "kind": "connection",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@connections/people.connection.json",
+      "kind": "connection",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@features/access/data/access.binding.json",
+      "kind": "binding",
+      "feature": "access",
+      "layer": "data",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/data/end-session.graph.json",
+      "kind": "graph",
+      "feature": "access",
+      "layer": "data",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/data/issue-code.graph.json",
+      "kind": "graph",
+      "feature": "access",
+      "layer": "data",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/data/read-session.graph.json",
+      "kind": "graph",
+      "feature": "access",
+      "layer": "data",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/data/write-theme.graph.json",
+      "kind": "graph",
+      "feature": "access",
+      "layer": "data",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/Attributes.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/Challenge.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/ChallengeGate.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/CodeIssue.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/Credential.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/CustomerIdentity.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/CustomerVerification.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/Grant.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/Identity.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/IssuedCode.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/Principal.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/PrincipalGate.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/RefreshToken.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/Refreshed.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/Session.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/Tokens.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/Verification.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/access.port.json",
+      "kind": "port",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/identity.port.json",
+      "kind": "port",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/refresh.graph.json",
+      "kind": "graph",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/require-employee.graph.json",
+      "kind": "graph",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/require-otp.graph.json",
+      "kind": "graph",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/require-registrar.graph.json",
+      "kind": "graph",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/require-signed-in.graph.json",
+      "kind": "graph",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/sign-in-customer.graph.json",
+      "kind": "graph",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/domain/sign-in-employee.graph.json",
+      "kind": "graph",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/ChallengeRef.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/Credentials.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/IssuedCodeView.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/PreferencesUpdate.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/PreferencesView.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/RefreshRequest.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/SignedOut.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/TokensView.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/auth-customers.trigger.json",
+      "kind": "trigger",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/auth-employees.trigger.json",
+      "kind": "trigger",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/can-register.policy.json",
+      "kind": "policy",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/employees-only.policy.json",
+      "kind": "policy",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/get-preferences.trigger.json",
+      "kind": "trigger",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/issue-otp.trigger.json",
+      "kind": "trigger",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/otp-verified.policy.json",
+      "kind": "policy",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/refresh.trigger.json",
+      "kind": "trigger",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/session.resolvers.json",
+      "kind": "resolvers",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/set-preferences.trigger.json",
+      "kind": "trigger",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/sign-out.trigger.json",
+      "kind": "trigger",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/signed-in.policy.json",
+      "kind": "policy",
+      "feature": "access",
+      "layer": "edge",
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/feature.json",
+      "kind": "feature",
+      "feature": "access",
+      "layer": null,
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/customers/data/create-row.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/customers-postgres.binding.json",
+      "kind": "binding",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/customers-postgres.store.json",
+      "kind": "store",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/customers-rest.binding.json",
+      "kind": "binding",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/customers-store.binding.json",
+      "kind": "binding",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/customers.store.json",
+      "kind": "store",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/delete-row.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/get-row.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/jobs.binding.json",
+      "kind": "binding",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/keep-customer-postgres.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/keep-customer.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/kept-get-postgres.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/kept-get.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/kept-list-by-tier-postgres.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/kept-list-by-tier.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/kept-list-every-postgres.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/kept-list-every.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/kept-list-postgres.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/kept-list.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/kept-remove-postgres.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/kept-remove.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/list-raw-none.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/list-raw-rows.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/list-rows-by-tier.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/list-rows.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/next-id-postgres.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/next-id.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/parse-drafts.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/publish-removal.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/repair-kept.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/repair-row.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/row-key.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/store-and-latest-postgres.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/store-and-latest.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/update-row.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/data/write-csv.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/Customer.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/CustomerDraft.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/CustomerRecord.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/CustomerRef.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/CustomerUpdate.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/Digest.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/RawCustomer.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/Repaired.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/Tier.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/TierFilter.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/TierLatest.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/a-customer-is-reachable.invariant.json",
+      "kind": "invariant",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/backfill-customers.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/customer.port.json",
+      "kind": "port",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/digest.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/export-customers.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/import-customers.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/jobs.port.json",
+      "kind": "port",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/list-customers.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/register-all.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/register-customer.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/register-each.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/remove-customers.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/update-customer.graph.json",
+      "kind": "graph",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/domain/writes-are-for-registrars.invariant.json",
+      "kind": "invariant",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/CsvUpload.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/CustomerRow.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/CustomerView.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/DeleteRequest.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/DigestView.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/IdRequest.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/ListRequest.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/RawRow.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/RegisterRequest.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/UpdateBody.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/UpdateRequest.shape.json",
+      "kind": "shape",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/delete-customer.trigger.json",
+      "kind": "trigger",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/delete-customers.trigger.json",
+      "kind": "trigger",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/digest.trigger.json",
+      "kind": "trigger",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/enqueue-removal.trigger.json",
+      "kind": "trigger",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/export-customers.trigger.json",
+      "kind": "trigger",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/get-customer.trigger.json",
+      "kind": "trigger",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/import-customers.trigger.json",
+      "kind": "trigger",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/list-customers.trigger.json",
+      "kind": "trigger",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/register-customer.trigger.json",
+      "kind": "trigger",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/remove-queued.trigger.json",
+      "kind": "trigger",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/request.resolvers.json",
+      "kind": "resolvers",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/update-customer.trigger.json",
+      "kind": "trigger",
+      "feature": "customers",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/customers/feature.json",
+      "kind": "feature",
+      "feature": "customers",
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@features/directories/data/identity.binding.json",
+      "kind": "binding",
+      "feature": "directories",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/directories/domain/the-session-is-the-callers.invariant.json",
+      "kind": "invariant",
+      "feature": "directories",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/directories/feature.json",
+      "kind": "feature",
+      "feature": "directories",
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@features/hello/data/greeting.binding.json",
+      "kind": "binding",
+      "feature": "hello",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/hello/domain/Greeting.shape.json",
+      "kind": "shape",
+      "feature": "hello",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/hello/domain/greet.graph.json",
+      "kind": "graph",
+      "feature": "hello",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/hello/domain/greeting.port.json",
+      "kind": "port",
+      "feature": "hello",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/hello/edge/GreetingView.shape.json",
+      "kind": "shape",
+      "feature": "hello",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/hello/edge/hello-gated.trigger.json",
+      "kind": "trigger",
+      "feature": "hello",
+      "layer": "edge",
+      "included": null
+    },
+    {
+      "path": "@features/hello/feature.json",
+      "kind": "feature",
+      "feature": "hello",
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@features/state/data/auth-files.binding.json",
+      "kind": "binding",
+      "feature": "state",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/state/data/auth-storage.binding.json",
+      "kind": "binding",
+      "feature": "state",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/state/data/auth.store.json",
+      "kind": "store",
+      "feature": "state",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/state/data/memory-store.binding.json",
+      "kind": "binding",
+      "feature": "state",
+      "layer": "data",
+      "included": null
+    },
+    {
+      "path": "@features/state/domain/memory.port.json",
+      "kind": "port",
+      "feature": "state",
+      "layer": "domain",
+      "included": null
+    },
+    {
+      "path": "@features/state/feature.json",
+      "kind": "feature",
+      "feature": "state",
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@http/Cookie.shape.json",
+      "kind": "shape",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@http/codecs/blob.codec.json",
+      "kind": "codec",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@http/codecs/form.codec.json",
+      "kind": "codec",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@http/codecs/json.codec.json",
+      "kind": "codec",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@http/codecs/multipart.codec.json",
+      "kind": "codec",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@http/codecs/text.codec.json",
+      "kind": "codec",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@http/http.connection-kind.json",
+      "kind": "connection-kind",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@http/http.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@http/http.trigger-kind.json",
+      "kind": "trigger-kind",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@http/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@http/server.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@otel/exporter.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@otel/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@project.json",
+      "kind": "project",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@queue-memory/memory.connection-kind.json",
+      "kind": "connection-kind",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@queue-memory/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@queue/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@queue/queue.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@queue/queue.trigger-kind.json",
+      "kind": "trigger-kind",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@queue/worker.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@reload/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@reload/watch.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@s3/bucket.connection-kind.json",
+      "kind": "connection-kind",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@s3/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@schedule/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@schedule/schedule.trigger-kind.json",
+      "kind": "trigger-kind",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@schedule/scheduler.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@std/list.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@std/object.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@std/outcome.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@std/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@std/text.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@storage-memory/memory.connection-kind.json",
+      "kind": "connection-kind",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@storage-memory/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@storage-postgres/Pool.shape.json",
+      "kind": "shape",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@storage-postgres/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@storage-postgres/postgres.connection-kind.json",
+      "kind": "connection-kind",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@storage/Order.shape.json",
+      "kind": "shape",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@storage/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@storage/storage.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@storage/store.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    }
+  ],
+  "triggers": [
+    {
+      "path": "@features/access/edge/auth-customers.trigger.json",
+      "kind": "@http/http.trigger-kind.json",
+      "settings": {
+        "route": "/api/v1/auth-customers",
+        "method": "POST",
+        "produces": "application/json",
+        "consumes": "application/json",
+        "body": "@access/edge/Credentials.shape.json",
+        "response": {
+          "refusals": {
+            "bad_credentials": 401,
+            "directory_unavailable": 503
+          },
+          "cookies": {
+            "session": {
+              "from": "accessToken",
+              "httpOnly": true,
+              "sameSite": "lax",
+              "maxAge": 900
+            }
+          }
+        }
+      },
+      "fires": "@features/access/domain/access.port.json#signInCustomer",
+      "policies": [],
+      "public": true,
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/auth-employees.trigger.json",
+      "kind": "@http/http.trigger-kind.json",
+      "settings": {
+        "route": "/api/v1/auth-employees",
+        "method": "POST",
+        "produces": "application/json",
+        "consumes": "application/json",
+        "body": "@access/edge/Credentials.shape.json",
+        "response": {
+          "refusals": {
+            "bad_credentials": 401,
+            "directory_unavailable": 503
+          },
+          "cookies": {
+            "session": {
+              "from": "accessToken",
+              "httpOnly": true,
+              "sameSite": "lax",
+              "maxAge": 900
+            }
+          }
+        }
+      },
+      "fires": "@features/access/domain/access.port.json#signInEmployee",
+      "policies": [],
+      "public": true,
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/get-preferences.trigger.json",
+      "kind": "@http/http.trigger-kind.json",
+      "settings": {
+        "route": "/api/v1/me/preferences",
+        "method": "GET",
+        "produces": "application/json",
+        "response": {
+          "refusals": {
+            "anonymous": 401,
+            "invalid_credential": 401
+          }
+        }
+      },
+      "fires": "@features/access/domain/access.port.json#preferences",
+      "policies": [
+        "@features/access/edge/signed-in.policy.json"
+      ],
+      "public": false,
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/issue-otp.trigger.json",
+      "kind": "@cli/cli.trigger-kind.json",
+      "settings": {
+        "command": "issue-otp"
+      },
+      "fires": "@features/access/domain/access.port.json#deliverCode",
+      "policies": [],
+      "public": true,
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/refresh.trigger.json",
+      "kind": "@http/http.trigger-kind.json",
+      "settings": {
+        "route": "/api/v1/token/refresh",
+        "method": "POST",
+        "produces": "application/json",
+        "consumes": "application/json",
+        "body": "@access/edge/RefreshRequest.shape.json",
+        "response": {
+          "refusals": {
+            "invalid_refresh": 401
+          },
+          "cookies": {
+            "session": {
+              "from": "accessToken",
+              "httpOnly": true,
+              "sameSite": "lax",
+              "maxAge": 900
+            }
+          }
+        }
+      },
+      "fires": "@features/access/domain/access.port.json#refresh",
+      "policies": [],
+      "public": true,
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/set-preferences.trigger.json",
+      "kind": "@http/http.trigger-kind.json",
+      "settings": {
+        "route": "/api/v1/me/preferences",
+        "method": "PUT",
+        "produces": "application/json",
+        "consumes": "application/json",
+        "body": "@access/edge/PreferencesUpdate.shape.json",
+        "response": {
+          "refusals": {
+            "anonymous": 401,
+            "invalid_credential": 401
+          }
+        }
+      },
+      "fires": "@features/access/domain/access.port.json#savePreferences",
+      "policies": [
+        "@features/access/edge/signed-in.policy.json"
+      ],
+      "public": false,
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/sign-out.trigger.json",
+      "kind": "@http/http.trigger-kind.json",
+      "settings": {
+        "route": "/api/v1/sign-out",
+        "method": "POST",
+        "produces": "application/json",
+        "response": {
+          "refusals": {
+            "anonymous": 401,
+            "invalid_credential": 401
+          },
+          "cookies": {
+            "session": {
+              "clear": true
+            }
+          }
+        }
+      },
+      "fires": "@features/access/domain/access.port.json#signOut",
+      "policies": [
+        "@features/access/edge/signed-in.policy.json"
+      ],
+      "public": false,
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/customers/edge/delete-customer.trigger.json",
+      "kind": "@http/http.trigger-kind.json",
+      "settings": {
+        "route": "/customers/{id}",
+        "method": "DELETE",
+        "produces": "application/json",
+        "response": {
+          "refusals": {
+            "missing": 404,
+            "upstream": 502,
+            "anonymous": 401,
+            "invalid_credential": 401,
+            "forbidden": 403,
+            "invariant": 500
+          }
+        }
+      },
+      "fires": "@features/customers/domain/customer.port.json#remove",
+      "policies": [
+        "@features/access/edge/employees-only.policy.json",
+        "@features/access/edge/can-register.policy.json"
+      ],
+      "public": false,
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/delete-customers.trigger.json",
+      "kind": "@http/http.trigger-kind.json",
+      "settings": {
+        "route": "/customers",
+        "method": "DELETE",
+        "consumes": "application/json",
+        "produces": "application/json",
+        "body": "@customers/edge/DeleteRequest.shape.json",
+        "response": {
+          "refusals": {
+            "missing": 404,
+            "upstream": 502,
+            "anonymous": 401,
+            "invalid_credential": 401,
+            "forbidden": 403,
+            "invariant": 500
+          }
+        }
+      },
+      "fires": "@features/customers/domain/customer.port.json#removeMany",
+      "policies": [
+        "@features/access/edge/employees-only.policy.json",
+        "@features/access/edge/can-register.policy.json"
+      ],
+      "public": false,
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/digest.trigger.json",
+      "kind": "@cli/cli.trigger-kind.json",
+      "settings": {
+        "command": "digest"
+      },
+      "fires": "@features/customers/domain/customer.port.json#digest",
+      "policies": [
+        "@features/access/edge/employees-only.policy.json"
+      ],
+      "public": false,
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/enqueue-removal.trigger.json",
+      "kind": "@http/http.trigger-kind.json",
+      "settings": {
+        "route": "/customers/{id}/removal",
+        "method": "POST",
+        "produces": "application/json",
+        "response": {
+          "status": {
+            "default": 202
+          },
+          "refusals": {
+            "anonymous": 401,
+            "invalid_credential": 401,
+            "forbidden": 403
+          }
+        }
+      },
+      "fires": "@features/customers/domain/customer.port.json#enqueueRemoval",
+      "policies": [
+        "@features/access/edge/employees-only.policy.json",
+        "@features/access/edge/can-register.policy.json"
+      ],
+      "public": false,
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/export-customers.trigger.json",
+      "kind": "@http/http.trigger-kind.json",
+      "settings": {
+        "route": "/customers.csv",
+        "method": "GET",
+        "produces": "text/csv",
+        "response": {
+          "refusals": {
+            "upstream": 502,
+            "invariant": 500,
+            "anonymous": 401,
+            "invalid_credential": 401
+          }
+        }
+      },
+      "fires": "@features/customers/domain/customer.port.json#export",
+      "policies": [
+        "@features/access/edge/signed-in.policy.json"
+      ],
+      "public": false,
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/get-customer.trigger.json",
+      "kind": "@http/http.trigger-kind.json",
+      "settings": {
+        "route": "/customers/{id}",
+        "method": "GET",
+        "produces": "application/json",
+        "deadlineMs": 2000,
+        "response": {
+          "refusals": {
+            "missing": 404,
+            "upstream": 502,
+            "invariant": 500,
+            "anonymous": 401,
+            "invalid_credential": 401
+          }
+        }
+      },
+      "fires": "@features/customers/domain/customer.port.json#get",
+      "policies": [
+        "@features/access/edge/signed-in.policy.json"
+      ],
+      "public": false,
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/import-customers.trigger.json",
+      "kind": "@http/http.trigger-kind.json",
+      "settings": {
+        "route": "/customers.csv",
+        "method": "POST",
+        "consumes": "text/csv",
+        "produces": "application/json",
+        "body": "blob",
+        "response": {
+          "status": {
+            "default": 201
+          },
+          "refusals": {
+            "upstream": 502,
+            "conflict": 409,
+            "anonymous": 401,
+            "invalid_credential": 401,
+            "forbidden": 403,
+            "invariant": 500
+          }
+        }
+      },
+      "fires": "@features/customers/domain/customer.port.json#import",
+      "policies": [
+        "@features/access/edge/employees-only.policy.json",
+        "@features/access/edge/can-register.policy.json"
+      ],
+      "public": false,
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/list-customers.trigger.json",
+      "kind": "@http/http.trigger-kind.json",
+      "settings": {
+        "route": "/customers",
+        "method": "GET",
+        "produces": "application/json",
+        "response": {
+          "refusals": {
+            "upstream": 502,
+            "invariant": 500,
+            "anonymous": 401,
+            "invalid_credential": 401
+          }
+        }
+      },
+      "fires": "@features/customers/domain/customer.port.json#list",
+      "policies": [
+        "@features/access/edge/signed-in.policy.json"
+      ],
+      "public": false,
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/register-customer.trigger.json",
+      "kind": "@http/http.trigger-kind.json",
+      "settings": {
+        "route": "/customers",
+        "method": "POST",
+        "consumes": "application/json",
+        "produces": "application/json",
+        "response": {
+          "status": {
+            "default": 201
+          },
+          "refusals": {
+            "upstream": 502,
+            "conflict": 409,
+            "anonymous": 401,
+            "invalid_credential": 401,
+            "forbidden": 403,
+            "invariant": 500
+          }
+        },
+        "body": "@customers/edge/RegisterRequest.shape.json"
+      },
+      "fires": "@features/customers/domain/customer.port.json#submit",
+      "policies": [
+        "@features/access/edge/employees-only.policy.json",
+        "@features/access/edge/can-register.policy.json"
+      ],
+      "public": false,
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/remove-queued.trigger.json",
+      "kind": "@queue/queue.trigger-kind.json",
+      "settings": {
+        "connection": "@connections/jobs.connection.json",
+        "queue": "removals",
+        "message": "@customers/edge/IdRequest.shape.json",
+        "maxAttempts": 5,
+        "backoffMs": 1000,
+        "outcomes": {
+          "missing": "ack",
+          "upstream": "retry",
+          "anonymous": "dead",
+          "invalid_credential": "dead",
+          "forbidden": "dead",
+          "invariant": "dead"
+        }
+      },
+      "fires": "@features/customers/domain/customer.port.json#remove",
+      "policies": [
+        "@features/access/edge/employees-only.policy.json",
+        "@features/access/edge/can-register.policy.json"
+      ],
+      "public": false,
+      "included": null
+    },
+    {
+      "path": "@features/customers/edge/update-customer.trigger.json",
+      "kind": "@http/http.trigger-kind.json",
+      "settings": {
+        "route": "/customers/{id}",
+        "method": "PUT",
+        "consumes": "application/json",
+        "produces": "application/json",
+        "body": "@customers/edge/UpdateBody.shape.json",
+        "response": {
+          "refusals": {
+            "missing": 404,
+            "upstream": 502,
+            "anonymous": 401,
+            "invalid_credential": 401,
+            "forbidden": 403,
+            "invariant": 500,
+            "conflict": 409
+          }
+        }
+      },
+      "fires": "@features/customers/domain/customer.port.json#update",
+      "policies": [
+        "@features/access/edge/employees-only.policy.json",
+        "@features/access/edge/can-register.policy.json"
+      ],
+      "public": false,
+      "included": null
+    },
+    {
+      "path": "@features/hello/edge/hello-gated.trigger.json",
+      "kind": "@cli/cli.trigger-kind.json",
+      "settings": {
+        "command": "hello-gated"
+      },
+      "fires": "@features/hello/domain/greeting.port.json#hello",
+      "policies": [
+        "@features/access/edge/otp-verified.policy.json"
+      ],
+      "public": false,
+      "included": null
+    }
+  ],
+  "ports": {
+    "domain": [
+      {
+        "path": "@auth/state.port.json",
+        "feature": null,
+        "operations": [
+          {
+            "name": "endSession",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "getChallenge",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "getSession",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "putChallenge",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "putSession",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "removeChallenge",
+            "firedBy": [],
+            "public": false
+          }
+        ],
+        "bindings": [
+          "@features/state/data/auth-files.binding.json",
+          "@features/state/data/auth-storage.binding.json"
+        ]
+      },
+      {
+        "path": "@features/access/domain/access.port.json",
+        "feature": "access",
+        "operations": [
+          {
+            "name": "deliverCode",
+            "firedBy": [
+              "@features/access/edge/issue-otp.trigger.json"
+            ],
+            "public": true
+          },
+          {
+            "name": "preferences",
+            "firedBy": [
+              "@features/access/edge/get-preferences.trigger.json"
+            ],
+            "public": false
+          },
+          {
+            "name": "refresh",
+            "firedBy": [
+              "@features/access/edge/refresh.trigger.json"
+            ],
+            "public": true
+          },
+          {
+            "name": "requireEmployee",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "requireOtp",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "requireRegistrar",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "requireSignedIn",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "savePreferences",
+            "firedBy": [
+              "@features/access/edge/set-preferences.trigger.json"
+            ],
+            "public": false
+          },
+          {
+            "name": "signInCustomer",
+            "firedBy": [
+              "@features/access/edge/auth-customers.trigger.json"
+            ],
+            "public": true
+          },
+          {
+            "name": "signInEmployee",
+            "firedBy": [
+              "@features/access/edge/auth-employees.trigger.json"
+            ],
+            "public": true
+          },
+          {
+            "name": "signOut",
+            "firedBy": [
+              "@features/access/edge/sign-out.trigger.json"
+            ],
+            "public": false
+          }
+        ],
+        "bindings": [
+          "@features/access/data/access.binding.json"
+        ]
+      },
+      {
+        "path": "@features/access/domain/identity.port.json",
+        "feature": "access",
+        "operations": [
+          {
+            "name": "issue",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "refresh",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "verifyCustomer",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "verifyEmployee",
+            "firedBy": [],
+            "public": false
+          }
+        ],
+        "bindings": [
+          "@features/directories/data/identity.binding.json"
+        ]
+      },
+      {
+        "path": "@features/customers/domain/customer.port.json",
+        "feature": "customers",
+        "operations": [
+          {
+            "name": "backfill",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "digest",
+            "firedBy": [
+              "@features/customers/edge/digest.trigger.json"
+            ],
+            "public": false
+          },
+          {
+            "name": "enqueueRemoval",
+            "firedBy": [
+              "@features/customers/edge/enqueue-removal.trigger.json"
+            ],
+            "public": false
+          },
+          {
+            "name": "export",
+            "firedBy": [
+              "@features/customers/edge/export-customers.trigger.json"
+            ],
+            "public": false
+          },
+          {
+            "name": "get",
+            "firedBy": [
+              "@features/customers/edge/get-customer.trigger.json"
+            ],
+            "public": false
+          },
+          {
+            "name": "import",
+            "firedBy": [
+              "@features/customers/edge/import-customers.trigger.json"
+            ],
+            "public": false
+          },
+          {
+            "name": "keep",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "list",
+            "firedBy": [
+              "@features/customers/edge/list-customers.trigger.json"
+            ],
+            "public": false
+          },
+          {
+            "name": "listAll",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "listByTier",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "listEvery",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "listRaw",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "nextId",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "parseDrafts",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "prepare",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "register",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "registerAll",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "remove",
+            "firedBy": [
+              "@features/customers/edge/delete-customer.trigger.json",
+              "@features/customers/edge/remove-queued.trigger.json"
+            ],
+            "public": false
+          },
+          {
+            "name": "removeMany",
+            "firedBy": [
+              "@features/customers/edge/delete-customers.trigger.json"
+            ],
+            "public": false
+          },
+          {
+            "name": "repair",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "submit",
+            "firedBy": [
+              "@features/customers/edge/register-customer.trigger.json"
+            ],
+            "public": false
+          },
+          {
+            "name": "toCsv",
+            "firedBy": [],
+            "public": false
+          },
+          {
+            "name": "update",
+            "firedBy": [
+              "@features/customers/edge/update-customer.trigger.json"
+            ],
+            "public": false
+          }
+        ],
+        "bindings": [
+          "@features/customers/data/customers-postgres.binding.json",
+          "@features/customers/data/customers-rest.binding.json",
+          "@features/customers/data/customers-store.binding.json"
+        ]
+      },
+      {
+        "path": "@features/customers/domain/jobs.port.json",
+        "feature": "customers",
+        "operations": [
+          {
+            "name": "prepare",
+            "firedBy": [],
+            "public": false
+          }
+        ],
+        "bindings": [
+          "@features/customers/data/jobs.binding.json"
+        ]
+      },
+      {
+        "path": "@features/hello/domain/greeting.port.json",
+        "feature": "hello",
+        "operations": [
+          {
+            "name": "hello",
+            "firedBy": [
+              "@features/hello/edge/hello-gated.trigger.json"
+            ],
+            "public": false
+          }
+        ],
+        "bindings": [
+          "@features/hello/data/greeting.binding.json"
+        ]
+      },
+      {
+        "path": "@features/state/domain/memory.port.json",
+        "feature": "state",
+        "operations": [
+          {
+            "name": "prepare",
+            "firedBy": [],
+            "public": false
+          }
+        ],
+        "bindings": [
+          "@features/state/data/memory-store.binding.json"
+        ]
+      }
+    ],
+    "native": [
+      {
+        "path": "@auth/challenge.port.json",
+        "grantedBy": "@auth",
+        "operations": [
+          {
+            "name": "issue",
+            "pure": false,
+            "holds": false
+          }
+        ]
+      },
+      {
+        "path": "@auth/files.port.json",
+        "grantedBy": "@auth",
+        "operations": [
+          {
+            "name": "find",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "get",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "put",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "remove",
+            "pure": false,
+            "holds": false
+          }
+        ]
+      },
+      {
+        "path": "@auth/identity.port.json",
+        "grantedBy": "@auth",
+        "operations": [
+          {
+            "name": "verify",
+            "pure": false,
+            "holds": false
+          }
+        ]
+      },
+      {
+        "path": "@auth/session.port.json",
+        "grantedBy": "@auth",
+        "operations": [
+          {
+            "name": "end",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "get",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "remove",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "set",
+            "pure": false,
+            "holds": false
+          }
+        ]
+      },
+      {
+        "path": "@auth/token.port.json",
+        "grantedBy": "@auth",
+        "operations": [
+          {
+            "name": "issue",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "refresh",
+            "pure": false,
+            "holds": false
+          }
+        ]
+      },
+      {
+        "path": "@blob/csv.port.json",
+        "grantedBy": "@blob",
+        "operations": [
+          {
+            "name": "parse",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "write",
+            "pure": false,
+            "holds": false
+          }
+        ]
+      },
+      {
+        "path": "@blob/text.port.json",
+        "grantedBy": "@blob",
+        "operations": [
+          {
+            "name": "read",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "write",
+            "pure": false,
+            "holds": false
+          }
+        ]
+      },
+      {
+        "path": "@http/http.port.json",
+        "grantedBy": "@http",
+        "operations": [
+          {
+            "name": "request",
+            "pure": false,
+            "holds": false
+          }
+        ]
+      },
+      {
+        "path": "@http/server.port.json",
+        "grantedBy": "@http",
+        "operations": [
+          {
+            "name": "listen",
+            "pure": false,
+            "holds": true
+          }
+        ]
+      },
+      {
+        "path": "@otel/exporter.port.json",
+        "grantedBy": "@otel",
+        "operations": [
+          {
+            "name": "export",
+            "pure": false,
+            "holds": true
+          }
+        ]
+      },
+      {
+        "path": "@queue/queue.port.json",
+        "grantedBy": "@queue",
+        "operations": [
+          {
+            "name": "ensure",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "publish",
+            "pure": false,
+            "holds": false
+          }
+        ]
+      },
+      {
+        "path": "@queue/worker.port.json",
+        "grantedBy": "@queue",
+        "operations": [
+          {
+            "name": "consume",
+            "pure": false,
+            "holds": true
+          }
+        ]
+      },
+      {
+        "path": "@reload/watch.port.json",
+        "grantedBy": "@reload",
+        "operations": [
+          {
+            "name": "watch",
+            "pure": false,
+            "holds": true
+          }
+        ]
+      },
+      {
+        "path": "@schedule/scheduler.port.json",
+        "grantedBy": "@schedule",
+        "operations": [
+          {
+            "name": "run",
+            "pure": false,
+            "holds": true
+          }
+        ]
+      },
+      {
+        "path": "@std/list.port.json",
+        "grantedBy": "@std",
+        "operations": [
+          {
+            "name": "concat",
+            "pure": true,
+            "holds": false
+          },
+          {
+            "name": "count",
+            "pure": true,
+            "holds": false
+          },
+          {
+            "name": "first",
+            "pure": true,
+            "holds": false
+          },
+          {
+            "name": "slice",
+            "pure": true,
+            "holds": false
+          }
+        ]
+      },
+      {
+        "path": "@std/object.port.json",
+        "grantedBy": "@std",
+        "operations": [
+          {
+            "name": "make",
+            "pure": true,
+            "holds": false
+          },
+          {
+            "name": "merge",
+            "pure": true,
+            "holds": false
+          }
+        ]
+      },
+      {
+        "path": "@std/outcome.port.json",
+        "grantedBy": "@std",
+        "operations": [
+          {
+            "name": "refuse",
+            "pure": true,
+            "holds": false
+          }
+        ]
+      },
+      {
+        "path": "@std/text.port.json",
+        "grantedBy": "@std",
+        "operations": [
+          {
+            "name": "fill",
+            "pure": true,
+            "holds": false
+          },
+          {
+            "name": "join",
+            "pure": true,
+            "holds": false
+          },
+          {
+            "name": "replace",
+            "pure": true,
+            "holds": false
+          },
+          {
+            "name": "split",
+            "pure": true,
+            "holds": false
+          }
+        ]
+      },
+      {
+        "path": "@storage/storage.port.json",
+        "grantedBy": "@storage",
+        "operations": [
+          {
+            "name": "ensure",
+            "pure": false,
+            "holds": false
+          }
+        ]
+      },
+      {
+        "path": "@storage/store.port.json",
+        "grantedBy": "@storage",
+        "operations": [
+          {
+            "name": "count",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "find",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "get",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "newKey",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "patch",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "put",
+            "pure": false,
+            "holds": false
+          },
+          {
+            "name": "remove",
+            "pure": false,
+            "holds": false
+          }
+        ]
+      }
+    ]
+  },
+  "policies": [
+    {
+      "path": "@features/access/edge/can-register.policy.json",
+      "decides": "@features/access/domain/access.port.json#requireRegistrar",
+      "proves": [
+        "request.principal",
+        "request.session"
+      ],
+      "gates": [
+        "@features/customers/edge/delete-customer.trigger.json",
+        "@features/customers/edge/delete-customers.trigger.json",
+        "@features/customers/edge/enqueue-removal.trigger.json",
+        "@features/customers/edge/import-customers.trigger.json",
+        "@features/customers/edge/register-customer.trigger.json",
+        "@features/customers/edge/remove-queued.trigger.json",
+        "@features/customers/edge/update-customer.trigger.json"
+      ],
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/employees-only.policy.json",
+      "decides": "@features/access/domain/access.port.json#requireEmployee",
+      "proves": [
+        "request.principal",
+        "request.session"
+      ],
+      "gates": [
+        "@features/customers/edge/delete-customer.trigger.json",
+        "@features/customers/edge/delete-customers.trigger.json",
+        "@features/customers/edge/digest.trigger.json",
+        "@features/customers/edge/enqueue-removal.trigger.json",
+        "@features/customers/edge/import-customers.trigger.json",
+        "@features/customers/edge/register-customer.trigger.json",
+        "@features/customers/edge/remove-queued.trigger.json",
+        "@features/customers/edge/update-customer.trigger.json"
+      ],
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/otp-verified.policy.json",
+      "decides": "@features/access/domain/access.port.json#requireOtp",
+      "proves": [],
+      "gates": [
+        "@features/hello/edge/hello-gated.trigger.json"
+      ],
+      "included": "@wilanis/access"
+    },
+    {
+      "path": "@features/access/edge/signed-in.policy.json",
+      "decides": "@features/access/domain/access.port.json#requireSignedIn",
+      "proves": [
+        "request.principal",
+        "request.session"
+      ],
+      "gates": [
+        "@features/access/edge/get-preferences.trigger.json",
+        "@features/access/edge/set-preferences.trigger.json",
+        "@features/access/edge/sign-out.trigger.json",
+        "@features/customers/edge/export-customers.trigger.json",
+        "@features/customers/edge/get-customer.trigger.json",
+        "@features/customers/edge/list-customers.trigger.json"
+      ],
+      "included": "@wilanis/access"
+    }
+  ],
+  "connections": [
+    {
+      "path": "@connections/customers-api.connection.json",
+      "kind": "@http/http.connection-kind.json",
+      "settings": {
+        "baseUrl": "https://6aa009e23e0d88d3d7e5525d.mockapi.io/api/v1",
+        "timeoutMs": 10000,
+        "throttle": {
+          "concurrency": 4,
+          "perSecond": 3
+        }
+      },
+      "secrets": []
+    },
+    {
+      "path": "@connections/customers-postgres.connection.json",
+      "kind": "@storage-postgres/postgres.connection-kind.json",
+      "settings": {
+        "url": "{{secrets.customersDatabase}}"
+      },
+      "secrets": [
+        "customersDatabase"
+      ]
+    },
+    {
+      "path": "@connections/customers.connection.json",
+      "kind": "@storage-memory/memory.connection-kind.json",
+      "settings": {},
+      "secrets": []
+    },
+    {
+      "path": "@connections/employees-production.connection.json",
+      "kind": "@auth/directory.connection-kind.json",
+      "settings": {
+        "users": [
+          {
+            "username": "operator",
+            "passwordHash": "{{secrets.operatorPasswordHash}}",
+            "name": "Operator",
+            "groups": [
+              "registrar"
+            ]
+          }
+        ]
+      },
+      "secrets": [
+        "operatorPasswordHash"
+      ]
+    },
+    {
+      "path": "@connections/employees.connection.json",
+      "kind": "@auth/directory.connection-kind.json",
+      "settings": {
+        "users": [
+          {
+            "username": "bo",
+            "passwordHash": "scrypt:c2FsdC1iby0wMDAwMDAwMQ:JtqRTYo_UPXAncXpIxTIsOiye-IOkOUeWKeLt81AZTA",
+            "name": "Bo",
+            "groups": [
+              "registrar"
+            ]
+          },
+          {
+            "username": "cy",
+            "passwordHash": "scrypt:c2FsdC1jeS0wMDAwMDAwMQ:K29QYBs5NHAlTXIcm2SagPjbJurjANyMfcoO0z2k8Aw",
+            "name": "Cy",
+            "groups": [
+              "viewer"
+            ]
+          }
+        ]
+      },
+      "secrets": []
+    },
+    {
+      "path": "@connections/jobs.connection.json",
+      "kind": "@queue-memory/memory.connection-kind.json",
+      "settings": {},
+      "secrets": []
+    },
+    {
+      "path": "@connections/people.connection.json",
+      "kind": "@auth/directory.connection-kind.json",
+      "settings": {
+        "users": [
+          {
+            "username": "ana",
+            "passwordHash": "scrypt:c2FsdC1hbmEtMDAwMDAwMQ:sFkuzjzEGVI3rUhiD0_oBkeRkhMeZH71meOkdSmBXSo",
+            "name": "Ana",
+            "groups": [
+              "customer"
+            ],
+            "attributes": {
+              "tenant": "acme"
+            }
+          },
+          {
+            "username": "dee",
+            "passwordHash": "scrypt:c2FsdC1kZWUtMDAwMDAwMQ:aguoYf1e0yklfWOJltQ6T6WZKUnyRv5aY-Se1ZNSbK8",
+            "name": "Dee",
+            "groups": [
+              "customer"
+            ],
+            "attributes": {
+              "tenant": "globex"
+            }
+          }
+        ]
+      },
+      "secrets": []
+    }
+  ],
+  "secrets": {
+    "customersDatabase": "CUSTOMERS_DATABASE_URL",
+    "jwt": "CUSTOMERS_JWT_SECRET",
+    "operatorPasswordHash": "CUSTOMERS_OPERATOR_PASSWORD_HASH"
+  },
+  "startup": [
+    {
+      "label": "Prepare the customer store",
+      "run": "@features/customers/domain/customer.port.json#prepare",
+      "required": true,
+      "profiles": null
+    },
+    {
+      "label": "Make the customers whole",
+      "run": "@features/customers/domain/customer.port.json#backfill",
+      "required": true,
+      "profiles": null
+    },
+    {
+      "label": "Reach the customer store",
+      "run": "@features/customers/domain/customer.port.json#listEvery",
+      "required": true,
+      "profiles": null
+    },
+    {
+      "label": "Prepare the guard's memory",
+      "run": "@features/state/domain/memory.port.json#prepare",
+      "required": true,
+      "profiles": [
+        "production",
+        "production-scheduler"
+      ]
+    },
+    {
+      "label": "Prepare the queues",
+      "run": "@features/customers/domain/jobs.port.json#prepare",
+      "required": true,
+      "profiles": [
+        "production",
+        "production-scheduler"
+      ]
+    },
+    {
+      "label": "Reach the guard's memory",
+      "run": "@auth/state.port.json#getSession",
+      "required": true,
+      "profiles": null
+    },
+    {
+      "label": "Watch for changes",
+      "run": "@reload/watch.port.json#watch",
+      "required": true,
+      "profiles": [
+        "live",
+        "local"
+      ]
+    },
+    {
+      "label": "Keep the schedule",
+      "run": "@schedule/scheduler.port.json#run",
+      "required": true,
+      "profiles": [
+        "live",
+        "local"
+      ]
+    },
+    {
+      "label": "Keep the schedule in one process",
+      "run": "@schedule/scheduler.port.json#run",
+      "required": true,
+      "profiles": [
+        "production-scheduler"
+      ]
+    },
+    {
+      "label": "Export traces",
+      "run": "@otel/exporter.port.json#export",
+      "required": false,
+      "profiles": null
+    },
+    {
+      "label": "Work the queues",
+      "run": "@queue/worker.port.json#consume",
+      "required": true,
+      "profiles": [
+        "live",
+        "local",
+        "production"
+      ]
+    },
+    {
+      "label": "Listen",
+      "run": "@http/server.port.json#listen",
+      "required": true,
+      "profiles": [
+        "live",
+        "local",
+        "production"
+      ]
+    }
+  ]
+}
