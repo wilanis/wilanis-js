@@ -1,8 +1,9 @@
 /**
  * The project's profiles: the places a tree runs (RFC 0013). At most one is the default (C017); each binds a
  * domain port to a binding that implements it (R001, B003, B004) and lets a connection stand in for another
- * of the same kind, or a broker for a broker of another kind delivering alike (R001, C018); every domain port is
- * met under every profile (B002) and keeps every promise its operations make of being repeated (B011).
+ * of the same kind, or -- where the connection replaced is a broker and nothing else -- for another of any kind
+ * delivering alike (R001, C018); every domain port is met under every profile (B002) and keeps every promise its
+ * operations make of being repeated (B011).
  */
 import type { ConnectionKindDoc, Loaded, PortDoc, ProfileDoc } from '@wilanis/core';
 import { effectsReachable } from '../refusals.js';
@@ -104,7 +105,7 @@ function checkProfileConnection(judge: Judge, name: string, [fromRef, toRef]: [s
   refuse('C018', `${message}${disagreement(judge, kind, other)}`, at, hint);
 }
 
-/** Whether a connection of one kind may stand in for one of another: the same kind, or a broker for a broker delivering alike. */
+/** Whether a connection of one kind may stand in for one of another: the same kind, or any kind delivering alike in place of a broker alone. */
 function standsIn(judge: Judge, kind: string, other: string): boolean {
   if (other === kind) return true;
   const delivery = brokerOnly(judge, kind);

@@ -2,9 +2,11 @@
  * A broker standing in for another under a profile (RFC 0009 step 10, C018). The example's queue is written
  * against `jobs.connection.json`, the in-process broker, and under production and production-scheduler that
  * connection stands for `customers-postgres.connection.json`, the table broker of the customer database: a
- * different kind, admitted because both kinds deliver at least once, so what was judged of the queue trigger and
- * the publishing graph still holds of the connection they reach. Each case changes one thing and says the rule
- * still refuses a stand-in that would not deliver as the connection it replaces does.
+ * different kind, admitted because the connection replaced is a broker and nothing else and the stand-in
+ * delivers as it does, at least once, so what was judged of the queue trigger and the publishing graph still
+ * holds of the connection they reach. Each case changes one thing and says the rule still refuses a stand-in
+ * that breaks either condition: one that does not deliver as the replaced broker does, and one replacing a
+ * connection that is more than a broker (the store's, marked storage and leases), whatever it delivers.
  */
 import { rmSync } from 'node:fs';
 import { buildEnv } from '@wilanis/compiler';

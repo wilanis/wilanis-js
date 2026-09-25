@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/connection.schema.json",
   "label": "Jobs",
-  "description": "The broker the customers' queued work goes through. As written, the in-process broker, whose queues live as long as the process that published to them, so a message is consumed by the process whose route put it there: that is the laptop's, under live and local. Under production and production-scheduler it stands for customers-postgres.connection.json, the table broker of the database the customers are kept in: the queue is a table beside them, and every instance shares it. Both kinds deliver at least once, which is what lets one stand in for the other (C018).",
+  "description": "The broker the customers' queued work goes through. As written, the in-process broker, whose queues live as long as the process that published to them, so a message is consumed by the process whose route put it there: that is the laptop's, under live and local. Under production and production-scheduler it stands for customers-postgres.connection.json, the table broker of the database the customers are kept in: the queue is a table beside them, and every instance shares it. The table broker may stand in for this one because the in-process kind is a broker and nothing else and the two deliver alike, at least once (C018); the customer database, being a store too, may not be stood in for by this one.",
   "kind": "@queue-memory/memory.connection-kind.json",
   "settings": {}
 }
