@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "A wilanis project: pure JSON documents, run by @wilanis/runtime with the @http, @blob, @reload, @auth, @schedule, @storage, @otel and @s3 plugin packages, against a public REST API or a store of its own.",
+  "description": "A wilanis project: pure JSON documents, run by @wilanis/runtime with the @http, @blob, @reload, @auth, @schedule, @queue, @queue-memory, @storage, @otel and @s3 plugin packages, against a public REST API or a store of its own.",
   "scripts": {
     "check": "wilanis check .",
     "rehearse": "wilanis rehearse .",
@@ -20,6 +20,8 @@
     "@wilanis/plugin-blob": "0.1.0",
     "@wilanis/plugin-http": "0.1.0",
     "@wilanis/plugin-otel": "0.1.0",
+    "@wilanis/plugin-queue": "0.1.0",
+    "@wilanis/plugin-queue-memory": "0.1.0",
     "@wilanis/plugin-reload": "^0.1.0",
     "@wilanis/plugin-s3": "0.1.0",
     "@wilanis/plugin-schedule": "0.1.0",

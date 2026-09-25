@@ -1,0 +1,42 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
+  "label": "Publish a removal",
+  "description": "Data graph behind customer.enqueueRemoval under every profile: one message on the removals queue, carrying the caller's token so the worker's gate judges the same caller, and answering the broker's id for it.",
+  "reads": {
+    "token": "@customers/edge/request.resolvers.json#token"
+  },
+  "in": "@customers/domain/CustomerRef.shape.json",
+  "out": {
+    "type": "string",
+    "from": "queued"
+  },
+  "nodes": [
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "published",
+      "label": "Publish the id",
+      "run": "@queue/queue.port.json#publish",
+      "in": {
+        "connection": "@connections/jobs.connection.json",
+        "queue": "removals",
+        "type": "@customers/edge/IdRequest.shape.json",
+        "message": {
+          "id": "{{in.id}}"
+        },
+        "headers": {
+          "authorization": "{{token}}"
+        }
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "queued",
+      "label": "The message's id",
+      "run": "@std/object.port.json#make",
+      "in": {
+        "value": "{{published.id}}",
+        "type": "string"
+      }
+    }
+  ]
+}

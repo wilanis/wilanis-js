@@ -18,6 +18,8 @@ import auth from '@wilanis/plugin-auth';
 import blob from '@wilanis/plugin-blob';
 import http from '@wilanis/plugin-http';
 import otel from '@wilanis/plugin-otel';
+import queue from '@wilanis/plugin-queue';
+import queueMemory from '@wilanis/plugin-queue-memory';
 import reload from '@wilanis/plugin-reload';
 import s3 from '@wilanis/plugin-s3';
 import schedule from '@wilanis/plugin-schedule';
@@ -51,6 +53,8 @@ const PLUGINS: Record<string, PluginModule> = {
   '@reload': reload,
   '@auth': auth,
   '@schedule': schedule,
+  '@queue': queue,
+  '@queue-memory': queueMemory,
   '@storage': storage,
   '@storage-memory': memory,
   '@storage-postgres': postgres,

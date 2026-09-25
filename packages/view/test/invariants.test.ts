@@ -15,6 +15,8 @@ import auth from '@wilanis/plugin-auth';
 import blob from '@wilanis/plugin-blob';
 import http from '@wilanis/plugin-http';
 import otel from '@wilanis/plugin-otel';
+import queue from '@wilanis/plugin-queue';
+import queueMemory from '@wilanis/plugin-queue-memory';
 import reload from '@wilanis/plugin-reload';
 import s3 from '@wilanis/plugin-s3';
 import schedule from '@wilanis/plugin-schedule';
@@ -47,6 +49,8 @@ const PLUGINS: Record<string, PluginModule> = {
   '@reload': reload,
   '@auth': auth,
   '@schedule': schedule,
+  '@queue': queue,
+  '@queue-memory': queueMemory,
   '@storage': storage,
   '@storage-memory': memory,
   '@storage-postgres': postgres,
@@ -138,6 +142,7 @@ describe('the view of an access invariant', () => {
       ['DELETE /customers', 'removeMany'],
       ['POST /customers.csv', 'import'],
       ['POST /customers', 'submit'],
+      ['removals queue', 'remove'],
       ['PUT /customers/{id}', 'update'],
     ]);
     for (const one of seen.reached) expect(one.satisfiedBy).toEqual([{ path: CAN_REGISTER, label: 'Can register' }]);
@@ -172,8 +177,8 @@ describe('the view of an access invariant', () => {
     // either. A page that said "satisfied by" where wilanis check refuses I001 would be worse than silent,
     // and the rule now lives in one place -- metBy in the compiler, judged as TriggerGate.unmet judges it
     const seen = await access(WRITES);
-    expect(seen.reached.length).toBe(10);
-    expect(new Set(seen.reached.map(one => one.trigger)).size).toBe(5);
+    expect(seen.reached.length).toBe(11);
+    expect(new Set(seen.reached.map(one => one.trigger)).size).toBe(6);
     // the example meets its own invariants, so every way in is met and none is left unjudged
     for (const one of seen.reached) {
       expect(one.satisfiedBy.length).toBeGreaterThan(0);

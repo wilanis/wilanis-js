@@ -9,19 +9,9 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { checkTree } from '@wilanis/compiler';
 import { type BlobStore, loadTree } from '@wilanis/core';
-import auth from '@wilanis/plugin-auth';
-import blobs from '@wilanis/plugin-blob';
-import otel from '@wilanis/plugin-otel';
-import reload from '@wilanis/plugin-reload';
-import s3 from '@wilanis/plugin-s3';
-import schedule from '@wilanis/plugin-schedule';
-import storage from '@wilanis/plugin-storage';
-import memory from '@wilanis/plugin-storage-memory';
-import postgres from '@wilanis/plugin-storage-postgres';
-import { BUILTIN_PLUGINS, FileBlobStore, start } from '@wilanis/runtime';
+import { FileBlobStore, start } from '@wilanis/runtime';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { multipart } from '../src/codecs.js';
-import http from '../src/index.js';
 import { bounded } from '../src/limit.js';
 import {
   caller,
@@ -37,23 +27,11 @@ import {
   UPSTREAM,
   type Upstream,
 } from './harness.js';
+import { EXAMPLE_PLUGINS as PLUGINS } from './plugins.js';
 
 const BACK = UPSTREAM + 2;
 const PORT = UPSTREAM + 3;
 const EDGE = 'features/customers/edge';
-const PLUGINS = {
-  ...BUILTIN_PLUGINS,
-  '@http': http,
-  '@blob': blobs,
-  '@reload': reload,
-  '@auth': auth,
-  '@schedule': schedule,
-  '@storage': storage,
-  '@storage-memory': memory,
-  '@storage-postgres': postgres,
-  '@otel': otel,
-  '@s3': s3,
-};
 
 const upstream: Upstream = { rows: [firstRow()], inFlight: { now: 0, peak: 0 } };
 const server = fakeUpstream(upstream);

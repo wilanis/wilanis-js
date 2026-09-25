@@ -43,20 +43,21 @@ const documents = () => load().registry.files.length;
 const paste = (name: string) => copyFileSync(join(DEMO, name), join(dir, ROUTE));
 
 describe('beat 1, the hook: the tree as it ships, and what the rule reaches', () => {
-  it('checks ok at 209 documents, and describe computes the five routes the rule reaches', () => {
+  it('checks ok at 219 documents, and describe computes the six triggers the rule reaches', () => {
     expect(refusalsAt(dir)).toEqual([]);
-    expect(documents()).toBe(209);
+    expect(documents()).toBe(219);
     const said = describeDoc(load(), '@customers/domain/writes-are-for-registrars.invariant.json').split('\n');
     expect(said).toContain('access: every trigger reaching these domain operations is gated');
     expect(said).toContain(`requires: attaches ${POLICY}`);
     expect(said).toContain('reached by (every one met by @features/access/edge/can-register.policy.json):');
-    // five routes reach a write today, and the rule names none of them
+    // five routes and a queue reach a write today, and the rule names none of them
     const reached = said.filter(line => /^ {4}@features\/customers\/edge\/.*\.trigger\.json {2}#/.test(line));
     expect(reached.map(line => line.trim().split(/ {2}/)[0])).toEqual([
       '@features/customers/edge/delete-customer.trigger.json',
       '@features/customers/edge/delete-customers.trigger.json',
       '@features/customers/edge/import-customers.trigger.json',
       '@features/customers/edge/register-customer.trigger.json',
+      '@features/customers/edge/remove-queued.trigger.json',
       '@features/customers/edge/update-customer.trigger.json',
     ]);
   });
@@ -134,15 +135,15 @@ describe('beat 3, following the hints', () => {
       `A005 write { "policy": "${POLICY}", "in": { "token": "{{request.headers.authorization}}" } } -- the read is where this kind hands the credential`,
     );
   });
-  it('the finished route yields ok, at 210 documents', () => {
+  it('the finished route yields ok, at 220 documents', () => {
     paste('archive-customer.step3.trigger.json');
     expect(refusalsAt(dir)).toEqual([]);
-    expect(documents()).toBe(210);
+    expect(documents()).toBe(220);
   });
 });
 
 describe('beat 4, no test was written: the rehearsal', () => {
-  it('settles the three branches of require-registrar, and the rule holds at six triggers', async () => {
+  it('settles the three branches of require-registrar, and the rule holds at seven triggers', async () => {
     paste('archive-customer.step3.trigger.json');
     const run = await rehearse(load(), { seed: 1, profile: 'local' });
     const text = run.lines.join('\n');
@@ -158,8 +159,8 @@ describe('beat 4, no test was written: the rehearsal', () => {
       '  ok  anything else  refused on purpose at \'anonymous\' as anonymous: "sign in first: no token was presented"',
     ]);
     expect(text).toMatch(/^every branch settled/m);
-    // it was five in beat 1: the route the agent wrote is counted without anyone adding it
-    expect(text).toContain('Writes are for registrars  holds at 6 trigger(s)');
+    // it was six in beat 1: the route the agent wrote is counted without anyone adding it
+    expect(text).toContain('Writes are for registrars  holds at 7 trigger(s)');
   });
 });
 

@@ -33,6 +33,7 @@ describe('the reach of a profile', () => {
     expect([...keys(live)].some(key => key.startsWith('@std/'))).toBe(false);
     expect(live.connections).toEqual([
       '@connections/customers-api.connection.json',
+      '@connections/jobs.connection.json',
       '@connections/people.connection.json',
       '@connections/employees.connection.json',
     ]);
@@ -82,7 +83,13 @@ describe('the reach of a profile', () => {
     }
     // the watcher is a laptop's step; what production holds open is what serves and reports, nothing that reloads
     // and nothing that schedules, which is production-scheduler's alone, and that one opens no port (RFC 0010)
-    expect(production.holds).toEqual(['@otel/exporter.port.json#export', '@http/server.port.json#listen']);
+    // production works the queues where it listens, since the in-process broker keeps a queue in the process
+    // whose route published to it (RFC 0009)
+    expect(production.holds).toEqual([
+      '@otel/exporter.port.json#export',
+      '@queue/worker.port.json#consume',
+      '@http/server.port.json#listen',
+    ]);
     expect(reach('production-scheduler').holds).toEqual([
       '@schedule/scheduler.port.json#run',
       '@otel/exporter.port.json#export',

@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/project.schema.json",
   "label": "Customers",
   "name": "customers",
-  "description": "A registry of customers: the routes talk to a REST API (mockapi.io); customers are imported from and exported to CSV files through the blob registry. Customers are kept per tenant, the tenant the sign-in wrote into the caller's session; reads are for a signed-in caller, and writes for signed-in employees holding the registrar role, identified by our own token, issued by the included access tree (@wilanis/access) at /api/v1/auth-employees against a directory this project binds (account holders sign in at /api/v1/auth-customers and hold a token too, and read their own tenant's customers, but no write). Preferences live in the session. A command-line greeting is gated by a one-time code. Plugins come from npm packages named by \"from\".",
+  "description": "A registry of customers: the routes talk to a REST API (mockapi.io); customers are imported from and exported to CSV files through the blob registry. Customers are kept per tenant, the tenant the sign-in wrote into the caller's session; reads are for a signed-in caller, and writes for signed-in employees holding the registrar role, identified by our own token, issued by the included access tree (@wilanis/access) at /api/v1/auth-employees against a directory this project binds (account holders sign in at /api/v1/auth-customers and hold a token too, and read their own tenant's customers, but no write). A removal may also be queued, and a worker in the same process does it off the request. Preferences live in the session. A command-line greeting is gated by a one-time code. Plugins come from npm packages named by \"from\".",
   "aliases": {
     "@customers": "@features/customers",
     "@hello": "@features/hello"
@@ -38,6 +38,14 @@
     {
       "use": "@schedule",
       "from": "@wilanis/plugin-schedule"
+    },
+    {
+      "use": "@queue",
+      "from": "@wilanis/plugin-queue"
+    },
+    {
+      "use": "@queue-memory",
+      "from": "@wilanis/plugin-queue-memory"
     },
     {
       "use": "@auth",
@@ -175,6 +183,16 @@
       "description": "Send every run this tree serves to an OpenTelemetry collector at localhost:4318, as spans. Delete this step and nothing is exported: traces leave the process because project.json says so, never because the runtime decided a tree should phone home. It is not required, because no collector is running when you clone this example: the step only subscribes, so it succeeds with nothing listening, and every batch it then cannot send is said once in the log and dropped rather than delaying or failing the run whose trace it was. Run `wilanis run <trigger> example --trace` to read the same spans on your terminal with no collector at all.",
       "run": "@otel/exporter.port.json#export",
       "required": false
+    },
+    {
+      "label": "Work the queues",
+      "description": "Consume the queue every queue trigger of this tree receives from: here the removals queue on jobs.connection.json, each message firing customer.port.json#remove through remove-queued.trigger.json, gated as DELETE /customers/{id} is. Delete this step and nothing is consumed: a queue is worked because project.json says so, never because a queue trigger exists. It runs wherever the listener runs and nowhere else, since the in-process broker keeps a queue in the process whose route published to it, and production-scheduler serves no route. It is listed before Listen, so on the way out the port closes first and the messages in flight are answered after.",
+      "run": "@queue/worker.port.json#consume",
+      "profiles": [
+        "live",
+        "local",
+        "production"
+      ]
     },
     {
       "label": "Listen",

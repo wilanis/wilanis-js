@@ -161,19 +161,19 @@ describe('wilanis fuzz and regress', () => {
     const { ok, written, lines } = await fuzz(loadTree(dir, PLUGINS, INCLUDES), { runs: 2, profile: 'live' });
     // the example never faults under stubs, so every run is written
     expect(ok, lines.join('\n')).toBe(true);
-    // seventeen triggers -- the example's and the included access tree's -- two seeds each
-    expect(written).toHaveLength(34);
+    // nineteen triggers -- the example's and the included access tree's -- two seeds each
+    expect(written).toHaveLength(38);
     expect(readdirSync(join(dir, 'scenarios')).sort()).toEqual(written.map(one => one.split('/').pop()!).sort());
     const sc = read(join(dir, 'scenarios', 'get-customer.1.scenario.json'));
     expect(sc.trigger).toBe('@features/customers/edge/get-customer.trigger.json');
     expect(['done', 'failed']).toContain(sc.expect.status);
     // the scenarios are documents of the tree: they load, and they pass check
     const again = loadTree(dir, PLUGINS, INCLUDES);
-    expect(again.registry.all('scenario')).toHaveLength(34);
+    expect(again.registry.all('scenario')).toHaveLength(38);
     expect(checkTree(again).items).toEqual([]);
     const replayed = await regress(again, { profile: 'live' });
     expect(replayed.ok, replayed.lines.join('\n')).toBe(true);
-    expect(replayed.lines).toHaveLength(34);
+    expect(replayed.lines).toHaveLength(38);
     expect(replayed.lines.every(line => line.endsWith(': same'))).toBe(true);
     // a graph that changes is caught: the answering node under a new name is a node the scenario never saw
     const file = join(dir, 'features/customers/data/get-row.graph.json');

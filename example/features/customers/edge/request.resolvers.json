@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/resolvers.schema.json",
   "label": "Request context",
-  "description": "What this feature reads from the HTTP request beyond its body and route: the caller's user agent, forwarded to the API on a registration, and the caller's tenant, which the customer stores scope their records by.",
+  "description": "What this feature reads from the HTTP request beyond its body and route: the caller's user agent, forwarded to the API on a registration, the caller's tenant, which the customer stores scope their records by, and the caller's token, forwarded with a queued removal.",
   "resolvers": {
     "agent": {
       "label": "The caller's user agent",
@@ -13,6 +13,11 @@
       "read": "request.session.attributes.tenant",
       "required": true,
       "description": "Written into the session at sign-in from what the directory said about the account; every customer kept in a store belongs to one"
+    },
+    "token": {
+      "label": "The caller's token",
+      "read": "request.headers.authorization",
+      "description": "The Authorization header as the caller sent it, forwarded in a queued message's headers so the worker's gate verifies the same caller the route did"
     }
   }
 }

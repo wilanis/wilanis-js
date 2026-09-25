@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
+  "label": "POST /customers/{id}/removal",
+  "description": "POST /customers/{id}/removal -> 202 with the queued message's id: the removal is put on the removals queue and remove-queued.trigger.json does it off the request, so the caller does not wait for the DELETE and is not told whether the customer existed. Employees holding the registrar role only, with the token in the Authorization header, since that header is what the message carries to the worker's gate: 401 as anonymous without it or as invalid_credential with a bad one, 403 as forbidden for a customer or an employee without the role.",
+  "settings": {
+    "route": "/customers/{id}/removal",
+    "method": "POST",
+    "produces": "application/json",
+    "response": {
+      "status": {
+        "default": 202
+      },
+      "refusals": {
+        "anonymous": 401,
+        "invalid_credential": 401,
+        "forbidden": 403
+      }
+    }
+  },
+  "in": "@customers/edge/IdRequest.shape.json",
+  "out": "string",
+  "policies": [
+    {
+      "policy": "@access/edge/employees-only.policy.json",
+      "in": {
+        "token": "{{request.headers.authorization}}"
+      }
+    },
+    "@access/edge/can-register.policy.json"
+  ],
+  "kind": "@http/http.trigger-kind.json",
+  "fire": {
+    "run": "@customers/domain/customer.port.json#enqueueRemoval",
+    "in": {
+      "id": "{{request.params.id}}"
+    }
+  }
+}

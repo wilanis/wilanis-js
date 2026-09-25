@@ -167,6 +167,7 @@ describe('withRehearsal and withRegression: what rehearse and regress computed, 
     expect(envelope.decisions).toHaveLength(Number(decisions));
     expect(all).toHaveLength(Number(branches));
     expect((envelope.plain ?? []).map(one => one.trigger).sort()).toEqual([
+      'enqueue-removal',
       'get-preferences',
       'hello-gated',
       'set-preferences',

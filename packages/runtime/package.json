@@ -51,6 +51,8 @@
     "@wilanis/plugin-blob": "0.1.0",
     "@wilanis/plugin-http": "0.1.0",
     "@wilanis/plugin-otel": "0.1.0",
+    "@wilanis/plugin-queue": "0.1.0",
+    "@wilanis/plugin-queue-memory": "0.1.0",
     "@wilanis/plugin-reload": "0.1.0",
     "@wilanis/plugin-s3": "0.1.0",
     "@wilanis/plugin-schedule": "0.1.0",

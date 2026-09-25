@@ -77,7 +77,7 @@ export CUSTOMERS_JWT_SECRET=$(openssl rand -base64 32)
 npm run check                       # wilanis check .  -- every profile at once
 npm run rehearse -- --profile local # every trigger, every policy, every branch of every switch, effects stubbed
 npm run digest -- --profile local --token=$TOKEN   # an employee's token: the count and one line per customer of every tenant
-npm run start -- --profile local    # GET /customers[?tier=], POST /customers, GET|PUT|DELETE /customers/{id}, DELETE /customers, GET|POST /customers.csv,
+npm run start -- --profile local    # GET /customers[?tier=], POST /customers, GET|PUT|DELETE /customers/{id}, POST /customers/{id}/removal, DELETE /customers, GET|POST /customers.csv,
                                     # POST /api/v1/auth-customers | auth-employees | token/refresh | sign-out, GET|PUT /api/v1/me/preferences on :8099
 npm run hello -- --profile local    # challenged until a one-time code is answered
 ```
@@ -356,16 +356,18 @@ only listen, one process under `production-scheduler` only schedules, and `wilan
 under each profile what it holds and starts.
 `@otel/exporter.port.json#export` sends every run as spans to a collector on :4318; it is the one step marked
 `"required": false`, since no collector is running when you clone this, and what it cannot send is said once
-in the log rather than delaying the run. `@http/server.port.json#listen` opens :8099 -- **delete that step
+in the log rather than delaying the run. `@queue/worker.port.json#consume` works the removals queue (below)
+under every profile that listens, and sits before the listener so that on the way out the port closes first
+and the messages in flight are answered after. `@http/server.port.json#listen` opens :8099 -- **delete that step
 and nothing listens**, since no runtime opens a port merely because http triggers exist. The first four are
-domain port operations, so whichever binding the profile chose is what gets checked; the last four are
+domain port operations, so whichever binding the profile chose is what gets checked; the last five are
 `holds` operations, which a plugin grants and the runtime stops when the process ends.
 `wilanis describe @http/server.port.json` says which plugin grants it.
 
 ## The port, and what meets it
 
 `customer.port.json` is what the domain needs: `listAll`, `listByTier`, `get`, `nextId`, `register`, `update`,
-`keep`, `remove`, `removeMany`, `submit`, `registerAll`, `list`, `digest`, `parseDrafts`, `toCsv`, `import`,
+`keep`, `remove`, `removeMany`, `enqueueRemoval`, `submit`, `registerAll`, `list`, `digest`, `parseDrafts`, `toCsv`, `import`,
 `export`, `prepare`. `customers-rest.binding.json` meets the data operations with a data graph each, which
 issues one declared request and decides with a `switch` on `status` what the answer means: the row, the
 declared refusal `no customer {id}` with reason `missing` when the API answers 404, or the refusal `upstream`
@@ -401,6 +403,30 @@ the order asked -- leaves only after the last one settled. One id that does not 
 as `missing`, a 404. The connection paces this further: `customers-api.connection.json` declares
 `"throttle": { "concurrency": 4, "perSecond": 3 }`, so under `live` at most four requests are in flight
 against the API at a time, whatever the map allows.
+
+`POST /customers/{id}/removal` does one removal off the request. It fires `enqueueRemoval`, which every
+binding meets with the one data graph `publish-removal`: a message `{ "id": ... }` on the `removals` queue of
+`jobs.connection.json`, carrying the caller's `Authorization` header, read through the `token` resolver since a
+data graph never reads the request itself. The route answers 202 with the message's id and nothing about the
+customer. `remove-queued.trigger.json` is a queue trigger on the same queue: it fires the same `remove` that
+`DELETE /customers/{id}` fires, reading the id from the message, and attaches the same two policies with the
+token read from the message's headers, so the worker's gate judges the caller the route judged. What each
+refusal means to the message is its `outcomes`: `missing` is acknowledged, since the customer is already gone;
+`upstream` is retried, a second later and then doubling, and dead after five deliveries; a token that does not
+verify, or a caller who may not remove, is dead at once, since delivering it again cannot help. The route
+takes the token from the header only, not the session cookie, because the header is what the message carries.
+The broker is `@queue-memory`'s, in the process: a queue lives as long as the process whose route published to
+it, so the `Work the queues` step runs wherever `Listen` does, and `production-scheduler`, which serves no
+route, consumes nothing. Like every broker a production would use, it delivers at least once, so `remove` may
+run twice for one message; under `live` its one effect is a DELETE, which HTTP declares idempotent, but under
+the store profiles it is `@storage/store.port.json#remove`, which declares no such promise yet, so `remove` does
+not claim `idempotent` today. `wilanis start` logs `queue: consuming removals on @connections/jobs.connection.json → @customers/domain/customer.port.json#remove`
+beside the listener, and one line per delivery:
+
+```
+POST /customers/ab1ac9db-…/removal → 202 (1ms, @customers/domain/customer.port.json#enqueueRemoval ok)
+queue removals dc05cb59-… attempt 1 → ack (1ms, @customers/domain/customer.port.json#remove done)
+```
 
 ## Trying again, and for how long
 

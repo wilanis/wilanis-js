@@ -1,18 +1,9 @@
 import { rmSync } from 'node:fs';
 import { checkTree } from '@wilanis/compiler';
 import { loadTree } from '@wilanis/core';
-import auth from '@wilanis/plugin-auth';
-import blobs from '@wilanis/plugin-blob';
-import otel from '@wilanis/plugin-otel';
-import reload from '@wilanis/plugin-reload';
-import s3 from '@wilanis/plugin-s3';
-import schedule from '@wilanis/plugin-schedule';
-import storage from '@wilanis/plugin-storage';
-import memory from '@wilanis/plugin-storage-memory';
-import postgres from '@wilanis/plugin-storage-postgres';
-import { BUILTIN_PLUGINS, start } from '@wilanis/runtime';
+import { start } from '@wilanis/runtime';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import http, { encode } from '../src/index.js';
+import { encode } from '../src/index.js';
 import { outcomeWords } from '../src/said.js';
 import {
   caller,
@@ -26,6 +17,7 @@ import {
   signInAsRegistrar,
   UPSTREAM,
 } from './harness.js';
+import { EXAMPLE_PLUGINS } from './plugins.js';
 
 let stopUpstream: () => Promise<void>;
 let stop: () => Promise<void>;
@@ -50,23 +42,7 @@ beforeAll(async () => {
   process.env.CUSTOMERS_DATABASE_URL = 'postgres://customers:customers@localhost:5432/customers';
   dir = localCopy();
   // a copy outside the workspace cannot resolve plugins[].from through node_modules, so the plugins are handed in
-  const load = loadTree(
-    dir,
-    {
-      ...BUILTIN_PLUGINS,
-      '@http': http,
-      '@blob': blobs,
-      '@reload': reload,
-      '@auth': auth,
-      '@schedule': schedule,
-      '@storage': storage,
-      '@storage-memory': memory,
-      '@storage-postgres': postgres,
-      '@otel': otel,
-      '@s3': s3,
-    },
-    INCLUDES,
-  );
+  const load = loadTree(dir, EXAMPLE_PLUGINS, INCLUDES);
   expect(checkTree(load).items).toEqual([]);
   ({ stop } = await start(load, {
     log: line => logs.push(line),

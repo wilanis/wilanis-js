@@ -85,7 +85,7 @@ describe('the example tree', () => {
       const text = run.lines.join('\n');
       // the batch delete reaches the delete-row decision through its map, and every branch of it settles
       expect(text).toMatch(
-        /delete-row {2}switch 'outcome' {2}3\/3 branches {2}\[via delete-customer, delete-customers\]/,
+        /delete-row {2}switch 'outcome' {2}3\/3 branches {2}\[via delete-customer, delete-customers, remove-queued\]/,
       );
     }
   });
@@ -98,6 +98,8 @@ describe('the example tree', () => {
       '@cli',
       '@http',
       '@otel',
+      '@queue',
+      '@queue-memory',
       '@reload',
       '@s3',
       '@schedule',
