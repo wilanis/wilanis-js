@@ -1,10 +1,10 @@
 /**
  * The project's profiles: the places a tree runs (RFC 0013). At most one is the default (C017); each binds a
  * domain port to a binding that implements it (R001, B003, B004) and lets a connection stand in for another
- * of the same kind, or of another kind delivering messages as it does (R001, C018); every domain port is met
- * under every profile (B002) and keeps every promise its operations make of being repeated (B011).
+ * of the same kind, or a broker for a broker of another kind delivering alike (R001, C018); every domain port is
+ * met under every profile (B002) and keeps every promise its operations make of being repeated (B011).
  */
-import type { Loaded, PortDoc, ProfileDoc } from '@wilanis/core';
+import type { ConnectionKindDoc, Loaded, PortDoc, ProfileDoc } from '@wilanis/core';
 import { effectsReachable } from '../refusals.js';
 import { type Judge, underProfile } from './judge.js';
 
@@ -76,10 +76,12 @@ function checkProfileBinding(judge: Judge, name: string, [portRef, bindingRef]: 
 /**
  * R001, C018: a stand-in maps one connection of the tree to another connection of the tree, of the same kind.
  * A connection's kind stays a fact about the connection: a different kind is a different binding. The one
- * exception is a broker: where both kinds declare `delivery` and declare it alike, what was judged of the
- * connection a trigger receives from -- T009, T010 and X402, which read that word, and X405, which reads the
- * `storage` marker a stand-in can only add -- still holds of the stand-in. Swapping brokers is then swapping
- * the connection's kind, as RFC 0009 says, and the rule reads a word of core's and names no plugin.
+ * exception is a connection that is a broker and nothing else: where the replaced kind declares `delivery` and
+ * neither `storage` nor `leases`, a stand-in of another kind declaring the same `delivery` is admitted. What
+ * was judged of such a connection is what T009, T010 and X402 read of that word, and what X405 reads of
+ * `storage`, which a stand-in marked `storage` only relaxes -- all still true of the stand-in. A connection a
+ * store or a lease names is judged as written (X203, X254), so its stand-in must be of its own kind. Swapping
+ * brokers is then swapping the connection's kind, as RFC 0009 says, and the rule reads core's words alone.
  */
 function checkProfileConnection(judge: Judge, name: string, [fromRef, toRef]: [string, string]): void {
   const refuse = judge.refuser(judge.project.path);
@@ -102,29 +104,42 @@ function checkProfileConnection(judge: Judge, name: string, [fromRef, toRef]: [s
   refuse('C018', `${message}${disagreement(judge, kind, other)}`, at, hint);
 }
 
-/** Whether a connection of one kind may stand in for one of another: the same kind, or brokers delivering alike. */
+/** Whether a connection of one kind may stand in for one of another: the same kind, or a broker for a broker delivering alike. */
 function standsIn(judge: Judge, kind: string, other: string): boolean {
   if (other === kind) return true;
-  const delivery = deliveryOf(judge, kind);
-  return delivery !== undefined && deliveryOf(judge, other) === delivery;
+  const delivery = brokerOnly(judge, kind);
+  return delivery !== undefined && kindOf(judge, other)?.delivery === delivery;
 }
 
-/** What the hint adds for a broker: any kind that delivers as it does may stand in too. */
+/** What the hint adds where the replaced connection is a broker and nothing else: any kind delivering alike. */
 function broadly(judge: Judge, kind: string): string {
-  const delivery = deliveryOf(judge, kind);
+  const delivery = brokerOnly(judge, kind);
   return delivery ? `, or of any kind that also delivers ${delivery}` : '';
 }
 
-/** What the message adds for a broker: what each side delivers, since that is why the kinds do not agree. */
+/** What the message adds where the replaced kind delivers: why a stand-in of this other kind cannot replace it. */
 function disagreement(judge: Judge, kind: string, other: string): string {
-  const delivery = deliveryOf(judge, kind);
-  if (!delivery) return '';
-  return ` (which delivers ${deliveryOf(judge, other) ?? 'nothing'}, where the other delivers ${delivery})`;
+  const replaced = kindOf(judge, kind);
+  if (!replaced?.delivery) return '';
+  if (brokerOnly(judge, kind) === undefined) {
+    const marks = [replaced.storage && 'storage', replaced.leases && 'leases'].filter(Boolean).join(' and ');
+    return ` (only a broker that is nothing else may be stood in for by another kind, and this kind is marked ${marks} too)`;
+  }
+  return ` (which delivers ${kindOf(judge, other)?.delivery ?? 'nothing'}, where the other delivers ${replaced.delivery})`;
 }
 
-/** How many times a connection kind hands one message to a trigger, where it is a broker; nothing where it is not. */
-function deliveryOf(judge: Judge, kind: string): string | undefined {
-  return judge.scope.get('connection-kind', kind)?.doc.delivery;
+/**
+ * What a kind delivers where it is a broker and nothing else: it declares `delivery`, and neither `storage` nor
+ * `leases`, the markers a store and a lease judge their connection by as written. Nothing for any other kind.
+ */
+function brokerOnly(judge: Judge, kind: string): string | undefined {
+  const doc = kindOf(judge, kind);
+  return doc?.delivery && !doc.storage && !doc.leases ? doc.delivery : undefined;
+}
+
+/** A connection kind's document, where the tree has one. */
+function kindOf(judge: Judge, kind: string): ConnectionKindDoc | undefined {
+  return judge.scope.get('connection-kind', kind)?.doc;
 }
 
 /** B002: a domain port has one binding under a profile; a port a plugin requires names the plugin, since the tree never wrote it. */

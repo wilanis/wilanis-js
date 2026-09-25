@@ -189,7 +189,7 @@
             "type": "boolean"
           },
           "connections": {
-            "description": "Which connection stands in for another under this profile: every reference to the left-hand connection reaches the right-hand one, a different connection document of the same kind, or, for a broker, of another kind declaring the same delivery (C018). The mapping is one step: a stand-in that is itself a key is not followed.",
+            "description": "Which connection stands in for another under this profile: every reference to the left-hand connection reaches the right-hand one, a different connection document of the same kind, or, where the left-hand connection's kind declares delivery and neither storage nor leases, of another kind declaring the same delivery (C018). The mapping is one step: a stand-in that is itself a key is not followed.",
             "type": "object",
             "propertyNames": {
               "description": "A connection path (@...) the documents name, replaced under this profile by the connection it maps to.",

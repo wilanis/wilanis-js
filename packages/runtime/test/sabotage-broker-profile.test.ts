@@ -52,4 +52,12 @@ describe('sabotage: a broker standing in for another (C018)', () => {
       }),
     ).toEqual(['C018']);
   });
+
+  it('C018 a broker standing in for the store: a connection marked storage is judged as written, so it keeps its kind', () => {
+    const said = sabotageSaying('project.json', doc => {
+      doc.profiles.production.connections['@connections/customers-postgres.connection.json'] = JOBS;
+    });
+    expect(said.map(one => one.split(' ')[0])).toEqual(['C018']);
+    expect(said[0]).toContain('marked storage and leases too');
+  });
 });
