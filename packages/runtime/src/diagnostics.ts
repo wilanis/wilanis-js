@@ -4,23 +4,16 @@
  * rendered it as lines, or what `migrate` planned and applied. Every command prints the same envelope on a refused
  * tree, so one parser serves them all.
  */
-import { createRequire } from 'node:module';
 import { type Fix, type LoadResult, pageUrl, type Refusal } from '@wilanis/core';
 import type { Regression, Replayed } from './fuzz.js';
 import type { MigratedTarget, MigrateResult } from './migrate.js';
 import type { Decision, PlainRun } from './rehearsal-report.js';
 import type { Rehearsal, Settled } from './rehearse.js';
+import { RUNTIME_VERSION } from './runtime-version.js';
 
 /** Where the envelope's JSON Schema is published, beside the runtime that prints it. */
 export const DIAGNOSTICS_SCHEMA =
   'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/runtime/schemas/diagnostics.schema.json';
-
-/**
- * The runtime package's version, read once from its package.json. `createRequire` rather than a JSON import:
- * package.json sits outside `rootDir`, and `../package.json` is the package root both from `src/` under a test
- * and from `dist/` in the published package, which always ships its package.json.
- */
-const RUNTIME: string = createRequire(import.meta.url)('../package.json').version;
 
 /** One checker refusal as the envelope carries it: the `Refusal`, its family, and the page about its code. */
 export interface Diagnostic {
@@ -118,7 +111,7 @@ export function diagnosticsOf(
   const pages = ownsXPages(load);
   return {
     format: 1,
-    runtime: RUNTIME,
+    runtime: RUNTIME_VERSION,
     command: how.command,
     root: how.root,
     ok: refusals.items.length === 0,

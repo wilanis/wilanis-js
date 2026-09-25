@@ -7,7 +7,7 @@ import { pipeline } from 'node:stream/promises';
 import { checkTree } from '@wilanis/compiler';
 import type { BlobHandle, Trace } from '@wilanis/core';
 import { KINDS, type Kind, type LoadResult, RefusalList } from '@wilanis/core';
-import { loadProject } from './project.js';
+import { loadProject, type ProjectLoad } from './project.js';
 import { runSaid } from './run-said.js';
 import { runTrigger, start } from './serve.js';
 import { type StopInput, stopHook } from './stopping.js';
@@ -17,6 +17,7 @@ import {
   fuzz,
   init,
   ls,
+  manifestOf,
   map,
   migrate,
   printed,
@@ -57,6 +58,7 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
   wilanis ls       [root] [kind]                   every document, or those of one kind
   wilanis describe <path> [root]                   a document, with its contract laid out
   wilanis map      [root] [--profile word]         trigger → graph → port → binding → graph
+  wilanis manifest [root]                          what the tree is, as JSON on stdout (packages/runtime/schemas/manifest.schema.json)
   wilanis new      <kind> <name|path> [root] [--layer edge|data] [--port word] [--run word#op] [--kind k]
                    [--of shape] [--over word#op] [--on shape]
                    graph, read-decide-write: --store <store> --collection <name> --read-then patch|put|remove
@@ -117,7 +119,7 @@ function tracing(flags: Record<string, string>): ((trace: Trace) => void) | unde
   return trace => console.error(write(atLevel(trace, level)));
 }
 
-async function load(root: string): Promise<LoadResult> {
+async function load(root: string): Promise<ProjectLoad> {
   const abs = resolve(root);
   if (!existsSync(join(abs, 'project.json'))) {
     console.error(`no project.json in ${abs}`);
@@ -130,7 +132,7 @@ async function load(root: string): Promise<LoadResult> {
  * Load and judge the tree, and stop at a refusal: in words on stderr, or, under `--json`, as the envelope on stdout
  * with `command` set to what was asked, so a refused tree reads the same whichever command met it.
  */
-async function check(root: string, json?: string): Promise<LoadResult> {
+async function check(root: string, json?: string): Promise<ProjectLoad> {
   const loaded = await load(root);
   const answer = checkTree(loaded);
   if (!answer.ok) {
@@ -267,6 +269,11 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
   },
   map: async ({ flags, rootArg }) => {
     console.log(map(await load(rootArg(0)), flags.profile).join('\n'));
+  },
+  // judged first, as start is: the manifest of a tree with an unresolved reference would describe nothing real
+  manifest: async ({ rootArg }) => {
+    const loaded = await check(rootArg(0));
+    console.log(JSON.stringify(manifestOf(loaded, { root: rootArg(0) }), null, 2));
   },
   new: async ({ flags, positional, rootArg }) => {
     const [kind, target] = positional;

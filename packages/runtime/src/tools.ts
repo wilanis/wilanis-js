@@ -15,6 +15,13 @@ export {
 } from './diagnostics.js';
 export { describe, ls } from './discovery.js';
 export { fuzz, type Regression, type Replayed, regress, SCENARIOS } from './fuzz.js';
+export {
+  irOf,
+  MANIFEST_SCHEMA,
+  type Manifest,
+  type ManifestOptions,
+  manifestOf,
+} from './manifest.js';
 export { map } from './map.js';
 export { type MigratedStep, type MigratedTarget, type MigrateOptions, type MigrateResult, migrate } from './migrate.js';
 export { type Rehearsal, rehearse } from './rehearse.js';
