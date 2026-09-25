@@ -196,7 +196,7 @@
     },
     {
       "label": "Work the queues",
-      "description": "Consume the queue every queue trigger of this tree receives from: here the removals queue on jobs.connection.json, each message firing customer.port.json#remove through remove-queued.trigger.json, gated as DELETE /customers/{id} is. Delete this step and nothing is consumed: a queue is worked because project.json says so, never because a queue trigger exists. It runs wherever the listener runs and nowhere else, since the in-process broker keeps a queue in the process whose route published to it, and production-scheduler serves no route. It is listed before Listen, so on the way out the port closes first and the messages in flight are answered after.",
+      "description": "Consume the queue every queue trigger of this tree receives from: here the removals queue on jobs.connection.json, each message firing customer.port.json#remove through remove-queued.trigger.json, gated as DELETE /customers/{id} is. Delete this step and nothing is consumed: a queue is worked because project.json says so, never because a queue trigger exists. It runs wherever the listener runs and nowhere else. On the laptop that is because the in-process broker keeps a queue in the process whose route published to it. Under production the queue is a table every instance shares, so the instances that listen work it between them; production-scheduler serves no route and consumes nothing, and a worker process of its own, apart from the listener, is what #163 adds. It is listed before Listen, so on the way out the port closes first and the messages in flight are answered after.",
       "run": "@queue/worker.port.json#consume",
       "profiles": [
         "live",
