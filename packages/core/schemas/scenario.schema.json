@@ -35,11 +35,11 @@
       "$ref": "common.schema.json#/$defs/path"
     },
     "policy": {
-      "description": "A policy this scenario replays instead of the trigger's fire: its `decide` is fired under the trigger's kind and settings, the way `wilanis rehearse` walks a policy's decision. The trigger must attach it.",
+      "description": "A policy this scenario replays instead of the trigger's fire: its `decide` is fired under the trigger's kind and settings, the way `wilanis rehearse` walks a policy's decision. The trigger must attach it (S005).",
       "$ref": "common.schema.json#/$defs/path"
     },
     "branch": {
-      "description": "The decision this scenario proves: the graph that declares the switch, the switch's node id, the rule's expression (`else` for the else), and the node the rule routes to. `wilanis regress` names it first when the run differs; `wilanis check` refuses one the tree no longer has.",
+      "description": "The decision this scenario proves: the graph that declares the switch, the switch's node id, the rule's expression (`else` for the else), and the node the rule routes to. `wilanis regress` names it first when the run differs; `wilanis check` refuses one the tree no longer has (S004).",
       "type": "object",
       "properties": {
         "graph": {
