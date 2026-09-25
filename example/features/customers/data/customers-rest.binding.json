@@ -40,6 +40,9 @@
       "description": "The business graph that fans one removal out per id and waits for all of them.",
       "graph": "@customers/domain/remove-customers.graph.json"
     },
+    "enqueueRemoval": {
+      "graph": "@customers/data/publish-removal.graph.json"
+    },
     "submit": {
       "description": "The business graph that attributes and records.",
       "graph": "@customers/domain/register-customer.graph.json"

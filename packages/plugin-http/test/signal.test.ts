@@ -9,19 +9,10 @@ import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import { type Compiled, checkTree, runGraph } from '@wilanis/compiler';
 import { loadTree } from '@wilanis/core';
-import auth from '@wilanis/plugin-auth';
-import blobs from '@wilanis/plugin-blob';
-import otel from '@wilanis/plugin-otel';
-import reload from '@wilanis/plugin-reload';
-import s3 from '@wilanis/plugin-s3';
-import schedule from '@wilanis/plugin-schedule';
-import storage from '@wilanis/plugin-storage';
-import memory from '@wilanis/plugin-storage-memory';
-import postgres from '@wilanis/plugin-storage-postgres';
-import { BUILTIN_PLUGINS, embedderFor } from '@wilanis/runtime';
+import { embedderFor } from '@wilanis/runtime';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import http from '../src/index.js';
 import { firstRow, INCLUDES, listening, localCopy, SECRET, UPSTREAM } from './harness.js';
+import { EXAMPLE_PLUGINS } from './plugins.js';
 
 const PORT = UPSTREAM + 1;
 const GRAPH = 'features/customers/data/get-row.graph.json';
@@ -88,23 +79,7 @@ function getRow(said: Record<string, unknown>): { compiled: Compiled; env: Recor
     said,
   );
   writeFileSync(join(dir, GRAPH), JSON.stringify(graph));
-  const load = loadTree(
-    dir,
-    {
-      ...BUILTIN_PLUGINS,
-      '@http': http,
-      '@blob': blobs,
-      '@reload': reload,
-      '@auth': auth,
-      '@schedule': schedule,
-      '@storage': storage,
-      '@storage-memory': memory,
-      '@storage-postgres': postgres,
-      '@otel': otel,
-      '@s3': s3,
-    },
-    INCLUDES,
-  );
+  const load = loadTree(dir, EXAMPLE_PLUGINS, INCLUDES);
   expect(checkTree(load).items).toEqual([]);
   const embedder = embedderFor(load, { profile: 'live' });
   return { compiled: embedder.graph(`@features/customers/data/get-row.graph.json`), env: embedder.env };

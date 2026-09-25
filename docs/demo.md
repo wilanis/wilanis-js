@@ -68,16 +68,17 @@ reached by (every one met by @features/access/edge/can-register.policy.json):
     @features/customers/edge/delete-customers.trigger.json  #remove (through #removeMany), #removeMany
     @features/customers/edge/import-customers.trigger.json  #register (through #submit), #submit (through #registerAll), #import
     @features/customers/edge/register-customer.trigger.json  #register (through #submit), #submit
+    @features/customers/edge/remove-queued.trigger.json  #remove
     @features/customers/edge/update-customer.trigger.json  #update
 ```
 
-**Point at.** `reached by (every one met by @features/access/edge/can-register.policy.json)`: five routes reach
-a write today, and the rule names none of them. It names six operations and one policy, and the checker
+**Point at.** `reached by (every one met by @features/access/edge/can-register.policy.json)`: five routes and a
+queue reach a write today, and the rule names none of them. It names six operations and one policy, and the checker
 works out who reaches what.
 
 **If asked.** *"We have this. It is a middleware on the router, and the agent's instructions say to use it."*
 A middleware is attached where someone remembers to, and an agent remembers what is in its context. This
-rule is in the tree, not the context, and `reached by` is computed, not maintained: the sixth route will
+rule is in the tree, not the context, and `reached by` is computed, not maintained: the next way in will
 appear there on its own, or be refused. The next beat is that route.
 
 ## 2. The new hire
@@ -247,11 +248,11 @@ features/access/domain/require-registrar  switch 'isRegistrar'  3/3 branches
 every branch settled -- 47 branch(es), 21 decision(s), 17 graph(s).
 3 invariant(s) declared:
   A customer is reachable  proved at 0 site(s), guarded at 16
-  Writes are for registrars  holds at 6 trigger(s)
+  Writes are for registrars  holds at 7 trigger(s)
   The session is the caller's  holds at 3 trigger(s)
 ```
 
-This is the test suite the agent did not write. `holds at 6 trigger(s)`: it was five in beat 1. Then the map,
+This is the test suite the agent did not write. `holds at 7 trigger(s)`: it was six in beat 1. Then the map,
 which says how a request flows and what gates it:
 
 ```

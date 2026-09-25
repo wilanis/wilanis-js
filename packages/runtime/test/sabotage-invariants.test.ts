@@ -15,11 +15,11 @@ const REACHABLE = 'features/customers/domain/a-customer-is-reachable.invariant.j
 /** The graph whose `row` node makes a customer: where a literal value is written to contradict the rule. */
 const STORED = 'features/customers/data/store-and-latest.graph.json';
 /**
- * What a tree answers once nothing of `Customer` is guarded any more: the eight triggers of the registry that map
+ * What a tree answers once nothing of `Customer` is guarded any more: the nine triggers of the registry that map
  * `invariant` reach no guard, and T006 refuses each for mapping a reason it cannot be answered with. A rule
  * that guards nothing takes its reason with it, which is the whole of what makes the word honest.
  */
-const UNGUARDED = Array.from({ length: 8 }, () => 'T006');
+const UNGUARDED = Array.from({ length: 9 }, () => 'T006');
 
 describe('sabotage: invariants, the access form', () => {
   it('I001 a trigger reaching a gated operation without the policy the invariant names', () => {

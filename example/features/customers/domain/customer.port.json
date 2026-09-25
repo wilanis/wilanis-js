@@ -68,6 +68,15 @@
       },
       "returns": "@customers/domain/Customer.shape.json[]"
     },
+    "enqueueRemoval": {
+      "description": "Ask for one customer to be removed later, off the request: a message on the removals queue, which remove-queued.trigger.json consumes by firing remove. Answers the broker's id for the message, and nothing about the customer, since nothing is removed yet; whether they existed is the worker's to find out.",
+      "accepts": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "returns": "string"
+    },
     "submit": {
       "description": "Register a customer, attributing it to this API rather than the client.",
       "accepts": {

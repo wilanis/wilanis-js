@@ -109,6 +109,7 @@ describe('sabotage: access, as the example attaches the included policies', () =
       '@connections/customers.connection.json',
       '@connections/employees-production.connection.json',
       '@connections/employees.connection.json',
+      '@connections/jobs.connection.json',
       '@connections/people.connection.json',
     ]);
   });

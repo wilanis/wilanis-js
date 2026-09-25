@@ -53,12 +53,12 @@ describe('describe: an access invariant that names the policy', () => {
   });
 
   it('names each trigger once, however many of the gated operations it reaches', () => {
-    // one trigger reaching three operations is one trigger. The five write triggers of the customers feature,
+    // one trigger reaching three operations is one trigger. The six write triggers of the customers feature,
     // one line each; the reads are not reached and say nothing at all
     const rows = said()
       .split('\n')
       .filter(line => line.includes('.trigger.json  #'));
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(6);
     expect(said()).not.toContain('@features/customers/edge/list-customers.trigger.json');
     expect(said()).not.toContain('@features/customers/edge/get-customer.trigger.json');
   });
@@ -73,12 +73,12 @@ describe('describe: an access invariant that names the policy', () => {
 
   it('gives every way in, not only the one a refusal would name first', () => {
     // the checker stops at the first covered operation a trigger reaches, since one is enough to refuse; a
-    // reader has opened the invariant and is owed all of them. Ten ways in, across five trigger lines.
+    // reader has opened the invariant and is owed all of them. Eleven ways in, across six trigger lines.
     const ways = said()
       .split('\n')
       .filter(line => line.includes('.trigger.json  #'))
       .flatMap(line => line.slice(line.indexOf('  #') + 2).split(', '));
-    expect(ways).toHaveLength(10);
+    expect(ways).toHaveLength(11);
   });
 
   it("names an operation reached through another, which is the RFC's own reason for the rule", () => {
@@ -152,7 +152,7 @@ describe('map: the invariants under each trigger', () => {
   });
 
   it('prints one for every write trigger, and none for a read', () => {
-    expect(lines.filter(line => line.includes(`holds  ${WRITES}`))).toHaveLength(5);
+    expect(lines.filter(line => line.includes(`holds  ${WRITES}`))).toHaveLength(6);
     const at = lines.indexOf(
       '@features/customers/edge/list-customers.trigger.json  (@http/http.trigger-kind.json)  route "/customers", method "GET", produces "application/json"',
     );

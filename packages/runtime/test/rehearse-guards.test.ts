@@ -133,7 +133,7 @@ describe('the rehearsal reports a guard', () => {
     const said = stated((await localRun()).lines);
     expect(said).toHaveLength(3);
     // the access form holds at the triggers that reach what it gates and meet what it requires
-    expect(said).toContain('  Writes are for registrars  holds at 5 trigger(s)');
+    expect(said).toContain('  Writes are for registrars  holds at 6 trigger(s)');
     expect(said).toContain("  The session is the caller's  holds at 3 trigger(s)");
     // and the field form counts its sites: every site of Customer in the example is one the checker could not prove
     expect(said).toContain('  A customer is reachable  proved at 0 site(s), guarded at 23');

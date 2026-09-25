@@ -137,14 +137,14 @@ function step5(ctx) {
   const reh = wilanis(ctx, "rehearse", ".", "--profile", "local").text;
   const block = reh.match(/^features\/access\/domain\/require-registrar {2}switch 'isRegistrar' {2}3\/3 branches\n(?: .*\n?){3}/m)?.[0]?.trimEnd();
   const summary = reh.slice(reh.indexOf("every branch settled")).trimEnd();
-  assert(title, Boolean(block) && summary.includes("Writes are for registrars  holds at 6 trigger(s)"), reh, "rehearse shows require-registrar 3/3 branches and Writes are for registrars holds at 6 trigger(s)");
+  assert(title, Boolean(block) && summary.includes("Writes are for registrars  holds at 7 trigger(s)"), reh, "rehearse shows require-registrar 3/3 branches and Writes are for registrars holds at 7 trigger(s)");
   const map = wilanis(ctx, "map", ".", "--profile", "local").text;
   const mapBlock = map.match(/^@features\/customers\/edge\/archive-customer\.trigger\.json.*\n(?:[ \t].*\n?)*/m)?.[0]?.trimEnd();
   assert(title, Boolean(mapBlock) && mapBlock.includes("holds  @features/customers/domain/writes-are-for-registrars.invariant.json"), map, "map's archive-customer block holds the invariant");
   return {
     number: 5,
     title,
-    summary: "require-registrar 3/3 branches; holds at 6 trigger(s); map holds the invariant",
+    summary: "require-registrar 3/3 branches; holds at 7 trigger(s); map holds the invariant",
     does: [
       { text: "No test was written for the route. The rehearsal runs every route, every policy and every branch of every switch with the effects stubbed.", pre: "npx wilanis rehearse . --profile local" },
       { text: "Then the map: how a request flows, and what gates it.", pre: "npx wilanis map . --profile local" },
@@ -153,7 +153,7 @@ function step5(ctx) {
       { pre: `${block}\n\n${summary}`, full: reh, label: "the whole rehearsal" },
       { pre: mapBlock, full: map, label: "the whole map" },
     ],
-    why: "This is the test suite the agent did not write. The three branches of the registrar decision each ran to a declared outcome, and the summary counts the new route among the six the invariant holds at, up from five before the agent began. The map says in one line what step 1 said as a refusal: the route holds the invariant, through the policy.",
+    why: "This is the test suite the agent did not write. The three branches of the registrar decision each ran to a declared outcome, and the summary counts the new route among the seven the invariant holds at, up from six before the agent began. The map says in one line what step 1 said as a refusal: the route holds the invariant, through the policy.",
     note: "<code>map</code> today prints the graphs of all three bindings under <code>#remove</code> and <code>??</code> lines under nested domain calls although a profile was given (#481), and ends with 17 <code>orphan</code> lines for graphs the tree does reach (#488). Both are shown as printed.",
   };
 }
