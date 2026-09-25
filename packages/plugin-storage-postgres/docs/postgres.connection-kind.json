@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/connection-kind.schema.json",
   "label": "Records in PostgreSQL",
-  "description": "A store kept in a PostgreSQL database. The URL is a secret, since it carries the credentials; the schema and the pool are facts about this one database, so they sit here rather than in the plugin's settings.",
+  "description": "A store kept in a PostgreSQL database, and a broker: a queue trigger may receive from a connection of this kind and publish may send to it, the messages kept in one table, wilanis_queue, beside the stores. It delivers at least once, since a worker acknowledges after its run has answered. The URL is a secret, since it carries the credentials; the schema and the pool are facts about this one database, so they sit here rather than in the plugin's settings.",
   "settings": {
     "fields": {
       "url": {
@@ -22,5 +22,6 @@
     }
   },
   "storage": true,
-  "leases": true
+  "leases": true,
+  "delivery": "at-least-once"
 }

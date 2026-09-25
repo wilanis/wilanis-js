@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/plugin.schema.json",
   "label": "Storage in PostgreSQL",
-  "description": "An @storage engine that keeps records in PostgreSQL tables, through Kysely. It grants one connection kind and no port: what may be asked of a store is @storage's business, and this plugin only answers it in SQL. A collection is a table in the connection's schema, a field is a column, and what the store declares -- the key, what is unique, what refers to what -- is what the database is asked to hold. Engine-wide knobs live in these settings; per-database facts live on the connection.",
+  "description": "An @storage engine that keeps records in PostgreSQL tables, through Kysely, and the broker that keeps @queue's queues in a table of the same database. It grants one connection kind and no port: what may be asked of a store is @storage's business and what may be asked of a queue is @queue's, and this plugin only answers both in SQL. A collection is a table in the connection's schema, a field is a column, and what the store declares -- the key, what is unique, what refers to what -- is what the database is asked to hold. Engine-wide knobs live in these settings; per-database facts live on the connection.",
   "grants": {
     "connectionKinds": [
       "@storage-postgres/postgres.connection-kind.json"
@@ -22,6 +22,11 @@
           "identity"
         ],
         "description": "what newKey answers: uuidv7 for a string key, identity (one past the highest) for a number key. Absent: uuidv7. A collection whose key type the choice cannot answer is refused by X222."
+      },
+      "queueVisibility": {
+        "type": "number",
+        "required": false,
+        "description": "how many seconds a queue delivery holds its message before another worker may take it: a worker that dies mid-run gives the message up this long after taking it, and a run longer than this may be handed to a second worker while it is still going. Absent: 30."
       }
     }
   }

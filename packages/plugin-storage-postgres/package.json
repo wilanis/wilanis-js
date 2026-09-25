@@ -1,7 +1,7 @@
 {
   "name": "@wilanis/plugin-storage-postgres",
   "version": "0.1.0",
-  "description": "The @storage-postgres engine for wilanis: an @storage store kept in PostgreSQL, through Kysely.",
+  "description": "The @storage-postgres engine for wilanis: an @storage store kept in PostgreSQL, through Kysely, and the table broker @queue keeps a queue in beside it.",
   "type": "module",
   "license": "Apache-2.0",
   "author": "Rafael Fontes <rfontes1987@gmail.com>",
@@ -40,6 +40,7 @@
   "dependencies": {
     "@wilanis/core": "0.1.0",
     "@wilanis/engine": "0.1.0",
+    "@wilanis/plugin-queue": "0.1.0",
     "@wilanis/plugin-storage": "0.1.0",
     "kysely": "^0.28.17",
     "pg": "^8.13.1"
