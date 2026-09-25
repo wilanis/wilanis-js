@@ -16,6 +16,7 @@ import { Ajv2020 } from 'ajv/dist/2020.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loadProject, type Manifest, manifestOf, type ProjectLoad } from '../src/index.js';
 import { irOf } from '../src/manifest.js';
+import { keySorted } from '../src/manifest-rows.js';
 import { copyOfExample, EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
 const RUNTIME = fileURLToPath(new URL('..', import.meta.url));
@@ -95,7 +96,7 @@ describe('manifestOf: the inventory of the example', () => {
     expect(trigger('delete-customers')).toEqual({
       path: '@features/customers/edge/delete-customers.trigger.json',
       kind: '@http/http.trigger-kind.json',
-      settings: doc.settings,
+      settings: keySorted(doc.settings),
       fires: '@features/customers/domain/customer.port.json#removeMany',
       policies: ['@features/access/edge/employees-only.policy.json', '@features/access/edge/can-register.policy.json'],
       public: false,
@@ -130,13 +131,20 @@ describe('manifestOf: the inventory of the example', () => {
     expect(connection('customers-api.connection.json')).toEqual({
       path: '@connections/customers-api.connection.json',
       kind: api.kind,
-      settings: api.settings,
+      settings: keySorted(api.settings),
       secrets: [],
     });
     expect(connection('customers-postgres.connection.json')).toMatchObject({
       settings: { url: '{{secrets.customersDatabase}}' },
       secrets: ['customersDatabase'],
     });
+    // keys in code-unit order at every depth, whatever order the document wrote them in; arrays keep theirs
+    expect(Object.keys(api.settings)).not.toEqual(Object.keys(api.settings).sort());
+    expect(Object.keys(connection('customers-api.connection.json')?.settings ?? {})).toEqual(
+      Object.keys(api.settings).sort(),
+    );
+    expect(keySorted({ b: [{ d: 1, c: 2 }, 'z', 'a'], a: null })).toEqual({ a: null, b: [{ c: 2, d: 1 }, 'z', 'a'] });
+    expect(JSON.stringify(keySorted({ b: { d: 1, c: 2 }, a: 1 }))).toBe('{"a":1,"b":{"c":2,"d":1}}');
     expect(manifest.secrets).toEqual(example.registry.project?.doc.secrets);
     expect(Object.keys(manifest.secrets)).toEqual(Object.keys(manifest.secrets).sort());
   });
@@ -202,6 +210,21 @@ describe('manifestOf: determinism', () => {
   });
 });
 
+describe('manifestOf: a copy, never the tree', () => {
+  it('hands back settings a caller may edit without editing the loaded documents', () => {
+    const own = manifestOf(example, { root: 'example' });
+    const trigger = own.triggers.find(one => one.path.endsWith('/delete-customers.trigger.json'));
+    const connection = own.connections.find(one => one.path === '@connections/customers-api.connection.json');
+    if (!trigger || !connection) throw new Error('the example lost its delete trigger or its API connection');
+    trigger.settings.route = '/edited';
+    (connection.settings.throttle as Record<string, unknown>).concurrency = 99;
+    const loaded = (path: string) => example.registry.any(path)?.doc as { settings: Record<string, any> };
+    expect(loaded(trigger.path).settings.route).toBe('/customers');
+    expect(loaded(connection.path).settings.throttle.concurrency).toBe(4);
+    expect(printed(manifestOf(example, { root: 'example' }))).toBe(printed(manifest));
+  });
+});
+
 describe('manifest.schema.json', () => {
   it('accepts what manifestOf answers', () => {
     expect(conforms(manifest)).toEqual([]);
@@ -227,7 +250,7 @@ describe('wilanis manifest', () => {
   it('prints the manifest of an accepted tree as JSON on stdout and exits 0', { timeout: 60_000 }, () => {
     const ran = wilanis(join(EXAMPLE, '..'), 'manifest', 'example');
     expect(ran.code).toBe(0);
-    expect(JSON.parse(ran.stdout)).toEqual(manifest);
+    expect(ran.stdout).toBe(printed(manifest));
   });
 
   it('prints the refusals of a tree that fails check, as check does, and no JSON, and exits 1', {
