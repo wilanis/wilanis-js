@@ -114,4 +114,13 @@ describe('a scenario records the refusal its run declared, and regress compares 
     expect(await lineOf(dir, 'scenarios/unpinned.scenario.json')).toBe('@scenarios/unpinned.scenario.json: same');
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it('a scenario a command wrote is held to the reason it recorded, none included', async () => {
+    const { dir } = await fuzzedCopy();
+    const recorded = read(join(dir, FUZZED));
+    const { reason: _, ...unrecorded } = recorded.expect;
+    writeFileSync(join(dir, FUZZED), JSON.stringify({ ...recorded, expect: unrecorded }));
+    expect(await lineOf(dir, FUZZED)).toBe(`@${FUZZED}: DIFF reason none → upstream`);
+    rmSync(dir, { recursive: true, force: true });
+  });
 });
