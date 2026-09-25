@@ -712,8 +712,9 @@ access library's to add, and whether a token belongs in a message body at all is
 queue, as `listen` answers every route on one socket. A `consume` per trigger would put a startup step per
 queue in `project.json`, which is the routes-in-the-startup-list the http design refused.
 
-**Polling.** Neither broker keeps a fixed beat. The memory broker looks at its array when a message is put, a
-delivery is answered, or the soonest message falls due; the table broker wakes on LISTEN/NOTIFY, inside
+**Polling.** The memory broker looks at its array when a message is put, a delivery is answered, or the soonest
+message falls due, and once a second over an idle queue besides (`IDLE_MS`), which is the timer that keeps a
+process whose only work is its queues alive. The table broker keeps no beat: it wakes on LISTEN/NOTIFY, inside
 `@wilanis/plugin-storage-postgres`, and changes no document.
 
 **Cost.** Two packages, two READMEs, two customers in `npm run release`; a third when the table broker lands.
