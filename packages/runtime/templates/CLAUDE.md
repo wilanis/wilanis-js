@@ -17,7 +17,9 @@ the file, the rule and the fix.
    node the graph declares. A switch's `catch` is a branch too, `when <node> broke`, walked by making that stubbed
    effect break. The three to fix: `NEVER RUN` is a rule no inputs can reach, `BROKE` is a branch that fails
    where the graph declares no failure, `BLOCKED` is a wiring hole.
-3. `wilanis fuzz` writes scenarios; `wilanis regress` replays them. Run regress after any change to a graph or binding.
+3. `wilanis fuzz` writes scenarios under `scenarios/fuzz/`; `wilanis regress` replays them. Run regress after any change
+   to a graph or binding. A `<trigger>.<seed>.scenario.json` directly under `scenarios/` is one an older `fuzz` wrote
+   and nothing owns now: delete it, or move it into `scenarios/fuzz/`.
 4. When a contract is unclear: `wilanis describe <path>`. When you need the lay of the land: `wilanis ls`, `wilanis map`.
 
 A Stop hook judges the tree before you may finish: `wilanis check`, then `wilanis rehearse`, then the gate
