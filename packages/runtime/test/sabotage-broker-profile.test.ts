@@ -1,10 +1,10 @@
 /**
  * A broker standing in for another under a profile (RFC 0009 step 10, C018). The example's queue is written
- * against `jobs.connection.json`, the in-process broker, and under production and production-scheduler that
- * connection stands for `customers-postgres.connection.json`, the table broker of the customer database: a
- * different kind, admitted because the connection replaced is a broker and nothing else and the stand-in
- * delivers as it does, at least once, so what was judged of the queue trigger and the publishing graph still
- * holds of the connection they reach. Each case changes one thing and says the rule still refuses a stand-in
+ * against `jobs.connection.json`, the in-process broker, and under production, production-scheduler and
+ * production-worker that connection stands for `customers-postgres.connection.json`, the table broker of the
+ * customer database: a different kind, admitted because the connection replaced is a broker and nothing else and
+ * the stand-in delivers as it does, at least once, so what was judged of the queue trigger and the publishing
+ * graph still holds of the connection they reach. Each case changes one thing and says the rule still refuses a stand-in
  * that breaks either condition: one that does not deliver as the replaced broker does, and one replacing a
  * connection that is more than a broker (the store's, marked storage and leases), whatever it delivers.
  */
@@ -28,6 +28,7 @@ describe('sabotage: a broker standing in for another (C018)', () => {
       (buildEnv(scope, { CUSTOMERS_DATABASE_URL: 'postgres://x' }, profile).env.connections as any)[JOBS].kind;
     expect(kindUnder('production')).toBe(POSTGRES_KIND);
     expect(kindUnder('production-scheduler')).toBe(POSTGRES_KIND);
+    expect(kindUnder('production-worker')).toBe(POSTGRES_KIND);
     expect(kindUnder('local')).toBe('@queue-memory/memory.connection-kind.json');
     rmSync(dir, { recursive: true, force: true });
   });
@@ -44,7 +45,7 @@ describe('sabotage: a broker standing in for another (C018)', () => {
     const { codes: found } = withBrokenPluginDoc(postgres, 'postgres.connection-kind.json', kind => {
       kind.delivery = 'at-most-once';
     });
-    expect(found.filter(code => code === 'C018')).toHaveLength(2);
+    expect(found.filter(code => code === 'C018')).toHaveLength(3);
   });
 
   it('C018 still refuses a connection that delivers nothing standing in for one of another kind', () => {

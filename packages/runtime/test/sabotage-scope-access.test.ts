@@ -122,11 +122,13 @@ describe('sabotage: what a view is behind', () => {
     );
   });
   it('A008 is judged per profile: every profile whose binding reaches a view, and no other', () => {
-    // local and the two production profiles bind listEvery to a find over each store's view; live binds it to a
-    // REST call that reaches no store, so the dropped policy is owed under three profiles and live is not held to it
+    // local and the three production profiles bind listEvery to a find over each store's view; live binds it to a
+    // REST call that reaches no store, so the dropped policy is owed under four profiles and live is not held to it
     const said = a008(UNGATED);
     expect(said.filter(one => one.endsWith("(profile 'local')"))).toHaveLength(1);
-    expect(said.filter(one => one.endsWith("(profiles 'production', 'production-scheduler')"))).toHaveLength(1);
+    expect(
+      said.filter(one => one.endsWith("(profiles 'production', 'production-scheduler', 'production-worker')")),
+    ).toHaveLength(1);
     expect(said.some(one => one.includes("'live'"))).toBe(false);
   });
   it('A008 points at the policies of every trigger that reaches it, not of the one that names it', () => {
@@ -140,7 +142,7 @@ describe('sabotage: what a view is behind', () => {
     // crossing is owed under the profiles whose graph makes it, rather than every profile being held to a gate one needs
     for (const [graph, profiles] of [
       ['kept-list', "profile 'local'"],
-      ['kept-list-postgres', "profiles 'production', 'production-scheduler'"],
+      ['kept-list-postgres', "profiles 'production', 'production-scheduler', 'production-worker'"],
     ]) {
       const said = a008(viewedUnder(graph));
       expect(said.length).toBeGreaterThan(0);

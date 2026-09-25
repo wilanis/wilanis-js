@@ -646,7 +646,8 @@ its trigger; `map` prints the queue line. View, in `packages/view/test`: the exa
 10. **The table broker** (`area:plugin-storage`): `delivery` on the postgres kind, `broker.ts`, `ensure`, the
     suite behind the environment variable, the example's `ensure` step under its storage profile. Blocked on
     RFC 0002's implementation (and 9 for the join).
-11. **A worker process** (`area:runtime`): blocked on RFC 0013. See *Drawbacks*, first item.
+11. **A worker process** (`area:runtime`): RFC 0013 is implemented, so a startup step names the profiles it runs
+    under and the step is no longer blocked. See *Drawbacks*, first item.
 12. **README**: a "Work off the request" paragraph beside "Every branch runs before you deploy", and the roadmap's
     M10 row updated with the example's route and worker.
 
@@ -660,6 +661,29 @@ the right default for a small deployment: one process answers routes and works q
 `listen` drains in the right order. A separate worker process needs a startup list per profile, which RFC 0013's
 sketch already proposes (`startup` may name a profile); this RFC does not add a second way to say it, and marks
 the step blocked.
+
+**Decided (step 11): a profile of its own.** RFC 0013 gave a startup step its `profiles`, and a worker is what
+its sketch said: a profile whose `consume` step names it and whose `listen` step does not. The example's is
+`production-worker`, binding and standing in exactly as `production` does, so a message reaches what the route
+that published it reaches and `jobs.connection.json` is the same table. `Work the queues` names `live`, `local`
+and `production-worker`, and `Listen` names `live`, `local` and `production`: the instances behind the load
+balancer answer routes and publish, and the workers consume and open no port. On the laptop one process still
+does both, since the in-process broker keeps a queue in the process whose route published to it, and `consume`
+before `listen` still drains in the right order there. The steps that prepare the queue and the guard's memory
+run under the worker too, since it may start first against an empty database. Two other shapes were not taken.
+`production-scheduler` consumes nothing and serves no route, so it could have taken the step, but the two roles
+scale apart: one process schedules, while workers are as many as the queue needs, each taking messages no other
+has (`SKIP LOCKED`), and scaling the scheduler to scale the workers would make "run one of it" false. And
+`production` could have kept `consume` beside a worker profile, since the table broker makes that safe, but then
+every instance would still work the queue, a slow removal would still hold a route's process, and "the others
+only listen" would again be false of the profile a deployment names first, as RFC 0010's step 7 found for the
+scheduler. The cost is a fifth profile the checker judges every trigger under, which RFC 0013 foresaw (*A profile
+per process role*): a refusal a production binding causes is said under the three production profiles, in one
+refusal where the rule names every profile (L009, L010, A008) and one per profile where it names one (A006), and
+the demo's scaffolded route now meets four A006 and ten refusals. Nothing in the runtime changes: `start` stays up
+while a step holds something, and over an empty queue the table broker's listening session keeps the worker
+waiting for the next message. `wilanis describe project.json` and the viewer's project page already print, per profile, what each holds
+and starts.
 
 **The connection kind declares delivery, not the trigger kind.** The trigger kind is one document for every
 broker and cannot know whether a table or SQS is behind a given trigger; the connection kind is the broker's

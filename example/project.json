@@ -132,21 +132,23 @@
     },
     {
       "label": "Prepare the guard's memory",
-      "description": "Create the collections auth.store.json declares, once, before anything reads them. It runs under production and production-scheduler, where the guard's sessions and challenges are records in the database every instance shares, and whichever process starts first creates them; the laptop's profiles keep one file per record and have nothing to create.",
+      "description": "Create the collections auth.store.json declares, once, before anything reads them. It runs under production, production-scheduler and production-worker, where the guard's sessions and challenges are records in the database every process shares, and whichever process starts first creates them; the laptop's profiles keep one file per record and have nothing to create.",
       "run": "@features/state/domain/memory.port.json#prepare",
       "profiles": [
         "production",
-        "production-scheduler"
+        "production-scheduler",
+        "production-worker"
       ],
       "required": true
     },
     {
       "label": "Prepare the queues",
-      "description": "Create the table the removals queue is kept in, once, before anything publishes to it or consumes it. Under production and production-scheduler jobs.connection.json stands for the customer database, so the queue is a table beside the customers, every instance publishes to and works the one queue, and whichever process starts first creates it; the laptop's profiles keep the queue in the process and have nothing to create.",
+      "description": "Create the table the removals queue is kept in, once, before anything publishes to it or consumes it. Under production, production-scheduler and production-worker jobs.connection.json stands for the customer database, so the queue is a table beside the customers: the instances that listen publish to it, the workers work it, and whichever process starts first creates it. The laptop's profiles keep the queue in the process and have nothing to create.",
       "run": "@customers/domain/jobs.port.json#prepare",
       "profiles": [
         "production",
-        "production-scheduler"
+        "production-scheduler",
+        "production-worker"
       ],
       "required": true
     },
@@ -196,17 +198,17 @@
     },
     {
       "label": "Work the queues",
-      "description": "Consume the queue every queue trigger of this tree receives from: here the removals queue on jobs.connection.json, each message firing customer.port.json#remove through remove-queued.trigger.json, gated as DELETE /customers/{id} is. Delete this step and nothing is consumed: a queue is worked because project.json says so, never because a queue trigger exists. It runs wherever the listener runs and nowhere else. On the laptop that is because the in-process broker keeps a queue in the process whose route published to it. Under production the queue is a table every instance shares, so the instances that listen work it between them; production-scheduler serves no route and consumes nothing, and a worker process of its own, apart from the listener, is what #163 adds. It is listed before Listen, so on the way out the port closes first and the messages in flight are answered after.",
+      "description": "Consume the queue every queue trigger of this tree receives from: here the removals queue on jobs.connection.json, each message firing customer.port.json#remove through remove-queued.trigger.json, gated as DELETE /customers/{id} is. Delete this step and nothing is consumed: a queue is worked because project.json says so, never because a queue trigger exists. On the laptop it runs beside the listener, since the in-process broker keeps a queue in the process whose route published to it. Behind the load balancer the queue is a table every process shares, so the work moves off the instances that answer routes: it runs under production-worker, which serves no route, and not under production, whose instances only publish. It is listed before Listen, so on the laptop the port closes first on the way out and the messages in flight are answered after.",
       "run": "@queue/worker.port.json#consume",
       "profiles": [
         "live",
         "local",
-        "production"
+        "production-worker"
       ]
     },
     {
       "label": "Listen",
-      "description": "Open the HTTP port and answer this tree's routes. Delete this step and nothing listens: a tree serves because it says so, never because a trigger exists. It runs under every profile but production-scheduler, the process that keeps the schedule and serves no route.",
+      "description": "Open the HTTP port and answer this tree's routes. Delete this step and nothing listens: a tree serves because it says so, never because a trigger exists. It runs under every profile but production-scheduler and production-worker, the processes that keep the schedule and work the queue and serve no route.",
       "run": "@http/server.port.json#listen",
       "profiles": [
         "live",
@@ -234,7 +236,7 @@
       }
     },
     "production": {
-      "description": "Behind the load balancer, started with `wilanis start example --profile production`: the customers in PostgreSQL, the one operator account in place of the laptop's employees, and nothing watched. The same routes, policies, shapes and business graphs as every other profile, and not one document under features/ changes: another binding meets customer.port.json, every reference to employees.connection.json reaches employees-production.connection.json instead, and every reference to jobs.connection.json reaches the customer database, so the removals queue is a table beside the customers. The startup steps prepare the database before the port opens, so a tree whose database is unreachable refuses to serve rather than answering every route with a fault. It listens and keeps no schedule: run as many of it as the load needs, and one process under production-scheduler beside them.",
+      "description": "Behind the load balancer, started with `wilanis start example --profile production`: the customers in PostgreSQL, the one operator account in place of the laptop's employees, and nothing watched. The same routes, policies, shapes and business graphs as every other profile, and not one document under features/ changes: another binding meets customer.port.json, every reference to employees.connection.json reaches employees-production.connection.json instead, and every reference to jobs.connection.json reaches the customer database, so the removals queue is a table beside the customers. The startup steps prepare the database before the port opens, so a tree whose database is unreachable refuses to serve rather than answering every route with a fault. It listens, keeps no schedule and works no queue: run as many of it as the load needs, one process under production-scheduler beside them, and as many under production-worker as the queue needs.",
       "bindings": {
         "@customers/domain/customer.port.json": "@customers/data/customers-postgres.binding.json",
         "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
@@ -246,7 +248,19 @@
       }
     },
     "production-scheduler": {
-      "description": "The one process that keeps the schedule beside production, started with `wilanis start example --profile production-scheduler`: production's bindings and connections, so a tick reaches what a route there reaches and a queue is the same table, and production's startup but for the listener, which it never opens. Run one of it and as many production instances as the load needs; those listen and schedule nothing.",
+      "description": "The one process that keeps the schedule beside production, started with `wilanis start example --profile production-scheduler`: production's bindings and connections, so a tick reaches what a route there reaches and a queue is the same table, and production's startup but for the listener, which it never opens. Run one of it beside the production instances, which listen and schedule nothing, and the production-worker processes, which work the queue.",
+      "bindings": {
+        "@customers/domain/customer.port.json": "@customers/data/customers-postgres.binding.json",
+        "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
+        "@auth/state.port.json": "@features/state/data/auth-storage.binding.json"
+      },
+      "connections": {
+        "@connections/employees.connection.json": "@connections/employees-production.connection.json",
+        "@connections/jobs.connection.json": "@connections/customers-postgres.connection.json"
+      }
+    },
+    "production-worker": {
+      "description": "A process that works the removals queue beside production, started with `wilanis start example --profile production-worker`: production's bindings and connections, so a message reaches what the route that published it reaches and the queue is the same table, and production's startup with the consumer in place of the listener. It opens no port, so a slow removal never holds a route's instance; run as many of it as the queue needs, since each takes messages no other has taken.",
       "bindings": {
         "@customers/domain/customer.port.json": "@customers/data/customers-postgres.binding.json",
         "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
