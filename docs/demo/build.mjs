@@ -9,6 +9,7 @@ import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CODES, DOCUMENTS, LOCAL_STARTUP_STEPS, REGISTRATION } from "./lib/expected.mjs";
 import { render } from "./lib/render.mjs";
 import { Server, call, resetCopy, signIn, wilanis } from "./lib/run.mjs";
 
@@ -38,19 +39,19 @@ const read = (ctx, rel) => readFileSync(join(ctx.scratch, rel), "utf8").replace(
 const paste = (ctx, name) => copyFileSync(join(here, name), join(ctx.scratch, ROUTE));
 const check = (ctx) => wilanis(ctx, "check", ".").text;
 const CHECK = { text: "Then the whole tree is judged.", pre: "npx wilanis check ." };
-const REGISTRATION = '{"name":"Ada Lovelace","email":"ada@example.com","tier":"bronze"}';
 
 function step0(ctx) {
   const title = "The tree and its two rules";
   const out = check(ctx);
-  assert(title, out === "ok: 205 documents", out, "check answers ok: 205 documents");
+  const want = `ok: ${DOCUMENTS.shipped} documents`;
+  assert(title, out === want, out, `check answers ${want}`);
   return {
     number: 0,
     title,
     summary: out,
     does: [{ text: "Nothing yet. The tree is the example as it ships, and it is judged before anyone touches it.", pre: "npx wilanis check ." }],
     answers: [{ pre: out }],
-    why: "Every one of the 205 is a JSON document and none is code, so there is nothing an agent can write that the checker does not read whole. The two sentences above are the rules a human wrote; step 1 is where the first is caught, step 7 the second. Neither is repeated anywhere else in the tree.",
+    why: `Every one of the ${DOCUMENTS.shipped} is a JSON document and none is code, so there is nothing an agent can write that the checker does not read whole. The two sentences above are the rules a human wrote; step 1 is where the first is caught, step 7 the second. Neither is repeated anywhere else in the tree.`,
   };
 }
 
@@ -58,12 +59,13 @@ function step1(ctx) {
   const title = "The agent scaffolds a route";
   const made = wilanis(ctx, "new", "trigger", "features/customers/edge/archive-customer", ".", "--run", "@customers/domain/customer.port.json#remove", "--kind", "@http/http.trigger-kind.json").text;
   const out = check(ctx);
-  const want = ["T002", "T002", "A006", "A006", "A006", "A006", "T005", "T005", "T005", "I001"];
-  assert(title, codesOf(out).join(" ") === want.join(" ") && out.endsWith("10 refusal(s)"), out, `check answers ${want.join(", ")} and 10 refusal(s)`);
+  const want = CODES.scaffolded;
+  const count = `${want.length} refusal(s)`;
+  assert(title, codesOf(out).join(" ") === want.join(" ") && out.endsWith(count), out, `check answers ${want.join(", ")} and ${count}`);
   return {
     number: 1,
     title,
-    summary: `${codesOf(out).join(" ")}, 10 refusal(s)`,
+    summary: `${codesOf(out).join(" ")}, ${count}`,
     does: [
       { text: "The task is one line: add a way to archive a customer. The agent finds the <code>remove</code> operation on the customer port and scaffolds a route that fires it.", pre: `npx wilanis new trigger features/customers/edge/archive-customer . \\\n  --run '@customers/domain/customer.port.json#remove' --kind '@http/http.trigger-kind.json'\n${made}` },
       { text: `What it wrote, <code>${ROUTE}</code>:`, pre: read(ctx, ROUTE) },
@@ -78,11 +80,13 @@ function step2(ctx) {
   const title = "The agent follows the hints";
   paste(ctx, "archive-customer.step2.trigger.json");
   const out = check(ctx);
-  assert(title, codesOf(out).join(" ") === "A006 A006 A006 A006 I001" && out.endsWith("5 refusal(s)"), out, "check answers A006, A006, A006, A006, I001 and 5 refusal(s)");
+  const want = CODES.hinted;
+  const count = `${want.length} refusal(s)`;
+  assert(title, codesOf(out).join(" ") === want.join(" ") && out.endsWith(count), out, `check answers ${want.join(", ")} and ${count}`);
   return {
     number: 2,
     title,
-    summary: "A006 A006 A006 A006 I001, 5 refusal(s)",
+    summary: `${want.join(" ")}, ${count}`,
     does: [
       { text: "Five of the ten hints are shape and status: the agent declares what the route takes and answers and maps the three reasons the operation can end with. It leaves the policy alone, since nothing yet told it why.", pre: read(ctx, ROUTE) },
       CHECK,
@@ -103,11 +107,13 @@ function step3(ctx) {
   }
   writeFileSync(file, `${JSON.stringify(edited, null, 2)}\n`);
   const out = check(ctx);
-  assert(title, codesOf(out).join(" ") === "A005 T005 T005" && out.endsWith("3 refusal(s)"), out, "check answers A005, T005, T005 and 3 refusal(s)");
+  const want = CODES.gated;
+  const count = `${want.length} refusal(s)`;
+  assert(title, codesOf(out).join(" ") === want.join(" ") && out.endsWith(count), out, `check answers ${want.join(", ")} and ${count}`);
   return {
     number: 3,
     title,
-    summary: "A005 T005 T005, 3 refusal(s)",
+    summary: `${want.join(" ")}, ${count}`,
     does: [
       { text: "The I001 hint said: attach <code>\"@access/edge/can-register.policy.json\"</code> under <code>policies</code>. The agent adds exactly that line.", pre: read(ctx, ROUTE) },
       CHECK,
@@ -121,7 +127,8 @@ function step4(ctx) {
   const title = "The finished route";
   paste(ctx, "archive-customer.step3.trigger.json");
   const out = check(ctx);
-  assert(title, out === "ok: 206 documents", out, "check answers ok: 206 documents");
+  const want = `ok: ${DOCUMENTS.finished} documents`;
+  assert(title, out === want, out, `check answers ${want}`);
   return {
     number: 4,
     title,
@@ -161,7 +168,7 @@ function step5(ctx) {
 async function step6(ctx) {
   const title = "Live";
   ctx.server = new Server(ctx, join(ctx.scratch, "node_modules", ".bin", "wilanis"), ["start", ".", "--profile", "local"]);
-  await ctx.server.waitFor(/startup 8\/8 Listen: ok/, 30_000);
+  await ctx.server.waitFor(new RegExp(`startup ${LOCAL_STARTUP_STEPS}/${LOCAL_STARTUP_STEPS} Listen: ok`), 30_000);
   const anon = await call("POST", "/customers/x/archive");
   assert(title, anon.status === 401 && anon.json?.reason === "anonymous", `${anon.status} ${anon.text}`, "no token answers 401 anonymous");
   const cy = await call("POST", "/customers/x/archive", { token: await signIn("cy", "cy-pass") });
@@ -225,7 +232,7 @@ async function step8(ctx) {
   const anon = await call("POST", "/customers/x/archive");
   assert(title, anon.status === 401, `${anon.status} ${anon.text}`, "the route still answers 401");
   paste(ctx, "archive-customer.step3.trigger.json");
-  const served = await ctx.server.waitFor(/reload: \d+ documents, serving the new tree/, 15_000);
+  const served = await ctx.server.waitFor(new RegExp(`reload: ${DOCUMENTS.finished} documents, serving the new tree`), 15_000);
   const how = await ctx.server.stop();
   assert(title, how.code !== null || how.signal === "SIGTERM", JSON.stringify(how), "the server exits on SIGTERM");
   return {
