@@ -15,6 +15,7 @@ import { checkTree } from '@wilanis/compiler';
 import { type LoadResult, loadTree, type TriggerDoc } from '@wilanis/core';
 import { encode } from '@wilanis/plugin-http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { DOCUMENTS } from '../../../docs/demo/lib/expected.mjs';
 import { describe as describeDoc, embedderFor, FileBlobStore, postLoad, rehearse, scaffold } from '../src/index.js';
 import { copyOfExample, INCLUDES, PLUGINS, refusalsAt, refusalsHinting, refusalsSaying } from './example-harness.js';
 
@@ -43,9 +44,9 @@ const documents = () => load().registry.files.length;
 const paste = (name: string) => copyFileSync(join(DEMO, name), join(dir, ROUTE));
 
 describe('beat 1, the hook: the tree as it ships, and what the rule reaches', () => {
-  it('checks ok at 221 documents, and describe computes the six triggers the rule reaches', () => {
+  it(`checks ok at ${DOCUMENTS.shipped} documents, and describe computes the six triggers the rule reaches`, () => {
     expect(refusalsAt(dir)).toEqual([]);
-    expect(documents()).toBe(221);
+    expect(documents()).toBe(DOCUMENTS.shipped);
     const said = describeDoc(load(), '@customers/domain/writes-are-for-registrars.invariant.json').split('\n');
     expect(said).toContain('access: every trigger reaching these domain operations is gated');
     expect(said).toContain(`requires: attaches ${POLICY}`);
@@ -138,10 +139,10 @@ describe('beat 3, following the hints', () => {
       `A005 write { "policy": "${POLICY}", "in": { "token": "{{request.headers.authorization}}" } } -- the read is where this kind hands the credential`,
     );
   });
-  it('the finished route yields ok, at 222 documents', () => {
+  it(`the finished route yields ok, at ${DOCUMENTS.finished} documents`, () => {
     paste('archive-customer.step3.trigger.json');
     expect(refusalsAt(dir)).toEqual([]);
-    expect(documents()).toBe(222);
+    expect(documents()).toBe(DOCUMENTS.finished);
   });
 });
 
