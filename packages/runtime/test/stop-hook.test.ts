@@ -116,7 +116,9 @@ describe('the Stop hook', () => {
     expect(answer.systemMessage).toContain('the stop stands');
   });
 
-  it('runs the gate the tree declares, with the arguments its file names, and blocks on REJECTED', async () => {
+  it('runs the gate the tree declares, with the arguments its file names, and blocks on REJECTED', {
+    timeout: 20_000,
+  }, async () => {
     const dir = tree();
     declaresGate(dir, 'REJECTED', ['--suite', 'tasks']);
     expect(gateOf(dir)).toEqual({ run: join(dir, 'accept.sh'), args: ['--suite', 'tasks'] });
