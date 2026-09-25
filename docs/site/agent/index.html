@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Two Minutes to a Route</title>
+<meta name="description" content="What an agent does with a wilanis tree, and how long each step takes, measured on one run.">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #ffffff; --fg: #17191c; --mute: #5a6069; --line: #dde1e6; --link: #0b57d0;
+  --term: #f4f6f8; --term-fg: #1f2328;
+  --no: #b3261e; --no-bg: #fbeceb; --ok: #1d7244; --ok-bg: #e8f4ed;
+  --plug: #0b57d0; --plug-bg: #eaf1fd; --hot: #9a5b00; --hot-bg: #fff1d6;
+  --box: #f7f8fa; --box-line: #c9ced6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #131416; --fg: #e7e9ec; --mute: #9aa1ab; --line: #30343a; --link: #8ab4f8;
+    --term: #1c1f23; --term-fg: #d8dce1;
+    --no: #f2b8b5; --no-bg: #3a1f1e; --ok: #8fd6ad; --ok-bg: #16301f;
+    --plug: #8ab4f8; --plug-bg: #1a2a44; --hot: #ffcf70; --hot-bg: #3d2d0c;
+    --box: #1b1d21; --box-line: #3c424a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #131416; --fg: #e7e9ec; --mute: #9aa1ab; --line: #30343a; --link: #8ab4f8;
+  --term: #1c1f23; --term-fg: #d8dce1;
+  --no: #f2b8b5; --no-bg: #3a1f1e; --ok: #8fd6ad; --ok-bg: #16301f;
+  --plug: #8ab4f8; --plug-bg: #1a2a44; --hot: #ffcf70; --hot-bg: #3d2d0c;
+  --box: #1b1d21; --box-line: #3c424a;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); color: var(--fg); }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  padding-inline: 16px; padding-block: 2rem 4rem;
+  font: 17px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+main { max-width: 44rem; margin: 0 auto; display: grid; gap: 3.2rem; }
+section { display: grid; gap: .8rem; }
+h1, h2 { text-wrap: balance; line-height: 1.2; margin: 0; }
+h1 { font-size: clamp(1.9rem, 5vw, 2.6rem); letter-spacing: -.01em; }
+h2 { font-size: 1.45rem; }
+p { margin: 0; }
+a { color: var(--link); }
+code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+code { font-size: .88em; }
+.eyebrow { font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); font-weight: 600; }
+.lede { font-size: 1.15rem; color: var(--mute); }
+.clock { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--fg); }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: .6rem; margin-top: .6rem; }
+.tile { border: 1px solid var(--line); border-radius: 6px; padding: .8rem .9rem; display: grid; gap: .1rem; }
+.tile b { font-size: 1.7rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.tile span { font-size: .85rem; color: var(--mute); }
+.tile em { font-style: normal; font-size: .8rem; color: var(--mute); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+pre.term {
+  margin: 0; background: var(--term); color: var(--term-fg); border-radius: 6px;
+  padding: .9rem 1rem; font-size: .8rem; line-height: 1.5; overflow-x: auto; white-space: pre;
+}
+.term .cmd { color: var(--mute); }
+.term .no { color: var(--no); font-weight: 700; }
+.term .ok { color: var(--ok); font-weight: 700; }
+.term .hint { color: var(--mute); }
+
+.families { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .5rem; margin: 0; padding: 0; list-style: none; }
+.families li { display: grid; grid-template-columns: 2.1rem 1fr; gap: .1rem .6rem; padding: .55rem 0; border-top: 1px solid var(--line); }
+.families .code { grid-row: span 2; font: 700 1.25rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--no); }
+.families .what { font-weight: 600; font-size: .95rem; }
+.families .eg { font-size: .85rem; color: var(--mute); }
+.families .n { color: var(--mute); font-weight: 400; font-variant-numeric: tabular-nums; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; counter-reset: s; }
+.steps li { display: grid; grid-template-columns: 1.6rem 1fr; gap: .5rem; font-size: .93rem; counter-increment: s; }
+.steps li::before { content: counter(s); color: var(--mute); font-variant-numeric: tabular-nums; text-align: right; }
+.steps code { font-size: .82rem; }
+
+.loop { display: grid; gap: .4rem; list-style: none; margin: 0; padding: 0; }
+.loop li { display: flex; flex-wrap: wrap; gap: .4rem .7rem; align-items: baseline; font-size: .93rem; }
+.pill { font: 700 .75rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; padding: .3rem .45rem; border-radius: 4px; }
+.pill.no { background: var(--no-bg); color: var(--no); }
+.pill.ok { background: var(--ok-bg); color: var(--ok); }
+
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem; }
+.split h3 { font-size: .95rem; margin: 0 0 .3rem; }
+.split ul { margin: 0; padding-left: 1.1rem; font-size: .93rem; display: grid; gap: .2rem; }
+.note { font-size: .88rem; color: var(--mute); }
+
+/* the diagram */
+.wide { max-width: 72rem; margin: 0 auto; width: 100%; }
+.langs { display: flex; flex-wrap: wrap; gap: .4rem; }
+.langs button {
+  font: 600 .88rem/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding: .55rem .85rem; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--fg); cursor: pointer;
+}
+.langs button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.langs button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.stage { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.stage svg { display: block; min-width: 900px; width: 100%; height: auto; }
+svg .frame { fill: none; stroke: var(--box-line); stroke-dasharray: 5 4; }
+svg .frame-t { fill: var(--mute); font: 600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: .06em; }
+svg .box { fill: var(--box); stroke: var(--box-line); }
+svg .ext { fill: var(--bg); stroke: var(--fg); stroke-width: 1.2; }
+svg .t1 { fill: var(--fg); font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+svg .t2 { fill: var(--mute); font: 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+svg .wire { stroke: var(--box-line); stroke-width: 1.4; fill: none; }
+svg .pwire { stroke: var(--plug); stroke-width: 1.6; fill: none; }
+svg .chip rect { fill: var(--plug-bg); stroke: var(--plug); stroke-width: 1; transition: fill .35s, stroke .35s; }
+svg .chip .pn { fill: var(--plug); font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+svg .chip .lib { fill: var(--fg); font: 11.5px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+svg .chip.hot rect { fill: var(--hot-bg); stroke: var(--hot); stroke-width: 1.8; }
+svg .chip.hot .pn { fill: var(--hot); }
+svg .pwire.hot { stroke: var(--hot); }
+@media (prefers-reduced-motion: no-preference) {
+  svg .chip.flash rect { animation: flash .6s ease-out; }
+  @keyframes flash { from { stroke-width: 5; } to { stroke-width: 1.8; } }
+}
+footer { max-width: 44rem; margin: 3rem auto 0; color: var(--mute); font-size: .88rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+</style>
+</head>
+<body>
+<main>
+
+<section>
+  <p class="eyebrow">wilanis · one measured run · 2026-09-25</p>
+  <h1>An agent added a tenant-scoped, signed-in route in 2 min 14 s</h1>
+  <p class="lede">Claude Sonnet, a fresh copy of the example tree, one sentence of task. It wrote two JSON files. The compiler refused three drafts and accepted the fourth, each verdict in under a second.</p>
+  <div class="tiles">
+    <div class="tile"><b>0.5 s</b><span>check, whole tree</span><em>221 documents</em></div>
+    <div class="tile"><b>0.8 s</b><span>rehearse</span><em>56 branches</em></div>
+    <div class="tile"><b>0.5 s</b><span>regress</span><em>100 scenarios</em></div>
+    <div class="tile"><b>44 s</b><span>Sonnet reading</span><em>15 files</em></div>
+    <div class="tile"><b>90 s</b><span>Sonnet writing</span><em>4 checks, 2 files</em></div>
+  </div>
+  <p class="note">Apple M3 Max, Node 24, <code>npx wilanis</code> cold each time. Every output below is pasted from that run.</p>
+</section>
+
+<section id="check">
+  <p class="eyebrow">wilanis check</p>
+  <h2>148 ways a tree can be wrong, all found before anything runs</h2>
+  <p>Every refusal names the file, the JSON path inside it, and the edit that fixes it. It judges every profile at once, so the production wiring is checked on a laptop with no database.</p>
+  <ul class="families">
+    <li><span class="code">L</span><span class="what">Layers and effects <span class="n">12</span></span><span class="eg">a business graph calling the database, a lock inside a transaction</span></li>
+    <li><span class="code">G</span><span class="what">Graphs <span class="n">24</span></span><span class="eg">an effect that runs on every branch, a retry on a POST</span></li>
+    <li><span class="code">A</span><span class="what">Access <span class="n">8</span></span><span class="eg">a route reading the tenant with nothing proving who is calling</span></li>
+    <li><span class="code">I</span><span class="what">Invariants <span class="n">6</span></span><span class="eg">a new write route that skips the rule every other route follows</span></li>
+    <li><span class="code">T</span><span class="what">Triggers <span class="n">10</span></span><span class="eg">a refusal the route can reach but never maps to a status</span></li>
+    <li><span class="code">B</span><span class="what">Bindings and profiles <span class="n">12</span></span><span class="eg">a port nobody implements under production</span></li>
+    <li><span class="code">C</span><span class="what">Connections and stores <span class="n">19</span></span><span class="eg">a unique constraint on a field the shape lacks</span></li>
+    <li><span class="code">P</span><span class="what">Static fields and resolvers <span class="n">6</span></span><span class="eg">a request header read where the request never arrives</span></li>
+    <li><span class="code">D</span><span class="what">Documents <span class="n">12</span></span><span class="eg">a trigger filed in the data layer</span></li>
+    <li><span class="code">X</span><span class="what">Plugin rules <span class="n">35</span></span><span class="eg">a session write outside the session shape, a cron that is not one</span></li>
+    <li><span class="code">S</span><span class="what">Scenarios <span class="n">3</span></span><span class="eg">a recorded run pinning a refusal that never happened</span></li>
+    <li><span class="code">R</span><span class="what">References <span class="n">1</span></span><span class="eg">a path to a document that does not exist</span></li>
+  </ul>
+</section>
+
+<section id="lock">
+  <p class="eyebrow">Example refusal · L009</p>
+  <h2>A Redis lease inside a database transaction</h2>
+  <p>Registering a customer writes two rows in one <code>"atomic": true</code> graph. Suppose someone adds a Redis lease so two registrations of the same tier never race:</p>
+<pre class="term">{
+  "id": "tierLease",
+  "run": "@redis/lease.port.json#acquire",
+  "in": { "key": "tier:{{in.tier}}", "ttlMs": 5000 }
+}</pre>
+  <p>The transaction can roll back. The lease cannot. If the second write fails, the rows vanish and Redis still says the tier is held for five seconds. Check, <span class="clock">0.64 s</span>:</p>
+<pre class="term"><span class="no">G008</span>  @features/customers/data/store-and-latest.graph.json#nodes/tierLease
+    node 'tierLease' is read by nothing
+    <span class="hint">→ nothing routes to 'tierLease', so it runs on every branch: make it the 'to' of a switch rule, or read its answer from every branch</span>
+<span class="no">L009</span>  @features/customers/data/store-and-latest.graph.json#nodes/tierLease
+    atomic graph '@features/customers/data/store-and-latest.graph.json' reaches '@redis/lease.port.json#acquire', which cannot take part in a transaction (profile 'local')
+    <span class="hint">→ read or send that outside the transaction: in the caller for a domain graph, in a graph of its own for a data graph</span>
+<span class="no">L009</span>  @features/customers/data/store-and-latest.graph.json#nodes/tierLease
+    atomic graph '@features/customers/domain/register-all.graph.json' reaches '@redis/lease.port.json#acquire', which cannot take part in a transaction (profile 'local')
+    <span class="hint">→ read or send that outside the transaction: in the caller for a domain graph, in a graph of its own for a data graph</span>
+
+3 refusal(s)</pre>
+  <p>Three findings from one node. The lease is outside the transaction it sits in. The CSV import's batch graph, two documents up, reaches it too and makes the same promise. And nobody reads whether the lease was actually taken.</p>
+  <p class="note">wilanis ships no Redis plugin yet (RFC 0030 plans one). The run used a 20-line stub plugin declaring one port with no <code>transactional</code> marker, which is all the rule looks at. The shipped example trips the same rule with <code>@http/http.port.json#request</code> and <code>@blob/csv.port.json#parse</code>.</p>
+</section>
+
+<section id="agent">
+  <p class="eyebrow">Claude Sonnet · the first write</p>
+  <h2>“Add GET /customers/gold: the gold customers of the caller's tenant.”</h2>
+  <p>Picked because it is one route, yet it touches sign-in, tenant isolation, three storage backends and an invariant. <span class="clock">44 s</span> of reading before the first write. In order:</p>
+  <ol class="steps">
+    <li><span><code>CLAUDE.md</code>, 150 lines that <code>wilanis init</code> writes: the loop, the layers, every refusal code</span></li>
+    <li><span><code>list-customers.trigger.json</code>, the nearest existing GET route, to copy</span></li>
+    <li><span><code>customer.port.json</code>, where it found <code>listByTier</code> already exists</span></li>
+    <li><span><code>request.resolvers.json</code> and <code>customers.store.json</code>, where the tenant comes from</span></li>
+    <li><span>three bindings, to confirm <code>listByTier</code> is met under every profile</span></li>
+    <li><span>shapes and the two invariants, to see what else the route owes</span></li>
+  </ol>
+  <p>Then <span class="clock">90 s</span> of write, check, fix:</p>
+  <ul class="loop">
+    <li><span class="pill no">T003 T002</span><span>gave the operation a tier but declared no input shape</span></li>
+    <li><span class="pill no">L001</span><span>reached for a core shape at the edge</span></li>
+    <li><span class="pill no">T002</span><span>used the list route's shape, where tier is optional</span></li>
+    <li><span class="pill ok">ok</span><span>a one-field edge shape; 223 documents check, 56 branches rehearse</span></li>
+  </ul>
+<pre class="term">"policies": [{ "policy": "@access/edge/signed-in.policy.json",
+               "in": { "token": ["{{request.headers.authorization}}", "{{request.cookies.session}}"] } }],
+"fire": { "run": "@customers/domain/customer.port.json#listByTier", "in": { "tier": "gold" } }</pre>
+  <div class="split">
+    <div>
+      <h3>What it wrote</h3>
+      <ul>
+        <li>one trigger, 38 lines of JSON</li>
+        <li>one edge shape, 12 lines</li>
+      </ul>
+    </div>
+    <div>
+      <h3>What it never had to write</h3>
+      <ul>
+        <li>a handler, a SQL query, a REST call</li>
+        <li>a <code>WHERE tenant = ?</code></li>
+        <li>token parsing</li>
+      </ul>
+    </div>
+  </div>
+  <p>Delete its <code>policies</code> and the tree refuses to build, <span class="clock">0.6 s</span>:</p>
+<pre class="term"><span class="no">A006</span>  @features/customers/edge/list-gold-customers.trigger.json#policies
+    @features/customers/data/customers-postgres.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')
+    <span class="hint">→ gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence</span>
+<span class="cmd">… the same for 'local' and 'production-scheduler', plus two T006 for the 401s nothing can now reach</span>
+
+5 refusal(s)</pre>
+</section>
+
+<section id="rehearse">
+  <p class="eyebrow">wilanis rehearse · fuzz · regress</p>
+  <h2>Every branch run, every run replayed, in under a second each</h2>
+  <p><code>rehearse</code> fires every trigger with stubbed effects and solves inputs for every branch of every switch, including the invariant guards the compiler inserted. Nothing leaves the process.</p>
+<pre class="term"><span class="cmd">$ npx wilanis rehearse . --profile local</span>                                   <span class="cmd">0.78 s</span>
+features/customers/data/kept-get  switch 'isKept'  2/2 branches
+  <span class="ok">ok</span>  when has(record)  answered from 'customer:made'
+  <span class="ok">ok</span>  anything else     refused on purpose at 'noCustomer' as missing
+features/access/domain/require-employee  switch 'isEmployee'  3/3 branches
+  <span class="ok">ok</span>  when has(principal) &amp;&amp; principal.realm == 'employee'  answered from 'granted'
+  <span class="ok">ok</span>  when has(principal)                                   refused on purpose at 'forbidden'
+  <span class="ok">ok</span>  anything else                                         refused on purpose at 'anonymous'
+<span class="cmd">…</span>
+every branch settled -- 56 branch(es), 25 decision(s), 19 graph(s).</pre>
+  <p><code>fuzz</code> records runs as scenarios; <code>regress</code> replays them and diffs node by node. One template changed in the digest graph, a change that still type-checks:</p>
+<pre class="term"><span class="cmd">$ npx wilanis regress . --profile local</span>                                    <span class="cmd">0.52 s</span>
+@scenarios/digest.2.scenario.json: <span class="no">DIFF</span> output changed; op.lines: out changed; op.joined: out changed; op.digest: out changed
+@scenarios/digest.3.scenario.json: <span class="no">DIFF</span> output changed; …
+@scenarios/digest.4.scenario.json: <span class="no">DIFF</span> output changed; …
+<span class="cmd">97 more:</span> same</pre>
+  <div class="split">
+    <div>
+      <h3>What unit tests usually hold</h3>
+      <ul>
+        <li>the handler calls the right repository</li>
+        <li>types line up across layers</li>
+        <li>each <code>if</code> branch is reached</li>
+        <li>the 401 fires without a token</li>
+        <li>the output did not change</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Who holds it in a wilanis tree</h3>
+      <ul>
+        <li>no handler exists; <code>check</code> proves the wiring</li>
+        <li><code>check</code>, under every profile</li>
+        <li><code>rehearse</code>, which solves for each rule</li>
+        <li><code>check</code> (A, T) and <code>rehearse</code></li>
+        <li><code>regress</code>, naming the node that moved</li>
+      </ul>
+    </div>
+  </div>
+  <p>A tree has no code of its own to unit-test. The code lives in plugins, tested once in their own packages. What rehearsal cannot tell you is how the real Postgres or upstream API answers, since it stubs them; that stays an integration test.</p>
+</section>
+
+</main>
+
+<section class="wide" id="stack" style="margin-top:3.2rem">
+  <p class="eyebrow">One microservice</p>
+  <h2 style="margin-bottom:.8rem">The customers service</h2>
+  <div class="langs" role="group" aria-label="Language">
+    <button type="button" data-lang="ts" aria-pressed="true">TypeScript</button>
+    <button type="button" data-lang="php" aria-pressed="false">PHP</button>
+    <button type="button" data-lang="net" aria-pressed="false">.NET</button>
+    <button type="button" data-lang="java" aria-pressed="false">Java</button>
+    <button type="button" data-lang="py" aria-pressed="false">Python</button>
+    <button type="button" data-lang="rust" aria-pressed="false">Rust</button>
+    <button type="button" data-lang="go" aria-pressed="false">Go</button>
+    <button type="button" data-lang="cpp" aria-pressed="false">C++</button>
+  </div>
+  <div class="stage" style="margin-top:.8rem">
+    <svg id="diagram" viewBox="0 0 1160 520" role="img" aria-label="The customers service: the JSON tree in the middle, plugins on every edge to the world">
+      <!-- the tree -->
+      <rect class="frame" x="360" y="24" width="440" height="470" rx="10"/>
+      <text class="frame-t" x="376" y="46">JSON TREE</text>
+
+      <rect class="box" x="380" y="66" width="130" height="92" rx="6"/>
+      <text class="t1" x="394" y="92">Triggers</text>
+      <text class="t2" x="394" y="112">15 routes</text>
+      <text class="t2" x="394" y="128">1 queue worker</text>
+      <text class="t2" x="394" y="144">3 commands</text>
+
+      <rect class="box" x="380" y="300" width="130" height="80" rx="6"/>
+      <text class="t1" x="394" y="326">Policies</text>
+      <text class="t2" x="394" y="346">signed-in, can-register</text>
+      <text class="t2" x="394" y="362">employees-only, otp</text>
+
+      <rect class="box" x="530" y="170" width="120" height="120" rx="6"/>
+      <text class="t1" x="544" y="196">Domain</text>
+      <text class="t2" x="544" y="216">ports</text>
+      <text class="t2" x="544" y="232">business graphs</text>
+      <text class="t2" x="544" y="248">shapes</text>
+      <text class="t2" x="544" y="264">invariants</text>
+
+      <rect class="box" x="670" y="170" width="120" height="120" rx="6"/>
+      <text class="t1" x="684" y="196">Data</text>
+      <text class="t2" x="684" y="216">bindings</text>
+      <text class="t2" x="684" y="232">data graphs</text>
+      <text class="t2" x="684" y="248">stores</text>
+
+      <rect class="box" x="380" y="420" width="410" height="54" rx="6"/>
+      <text class="t1" x="394" y="444">Engine</text>
+      <text class="t2" x="394" y="462">stateless, runs what check approved</text>
+
+      <path class="wire" d="M510 112 C520 112, 520 210, 530 210"/>
+      <path class="wire" d="M510 340 C520 340, 520 262, 530 262"/>
+      <path class="wire" d="M650 230 L670 230"/>
+
+      <!-- the world -->
+      <rect class="ext" x="20" y="84" width="140" height="52" rx="26"/>
+      <text class="t1" x="90" y="115" text-anchor="middle">Caller</text>
+      <rect class="ext" x="20" y="214" width="140" height="52" rx="26"/>
+      <text class="t1" x="90" y="245" text-anchor="middle">Clock</text>
+      <rect class="ext" x="20" y="374" width="140" height="52" rx="26"/>
+      <text class="t1" x="90" y="398" text-anchor="middle">Removals queue</text>
+      <text class="t2" x="90" y="414" text-anchor="middle">a Postgres table</text>
+
+      <rect class="ext" x="1000" y="44" width="140" height="52" rx="26"/>
+      <text class="t1" x="1070" y="68" text-anchor="middle">Customers API</text>
+      <text class="t2" x="1070" y="84" text-anchor="middle">REST, profile live</text>
+      <rect class="ext" x="1000" y="144" width="140" height="52" rx="26"/>
+      <text class="t1" x="1070" y="175" text-anchor="middle">PostgreSQL</text>
+      <rect class="ext" x="1000" y="244" width="140" height="52" rx="26"/>
+      <text class="t1" x="1070" y="275" text-anchor="middle">S3 bucket</text>
+      <rect class="ext" x="1000" y="344" width="140" height="52" rx="26"/>
+      <text class="t1" x="1070" y="375" text-anchor="middle">CSV files</text>
+      <rect class="ext" x="1000" y="434" width="140" height="52" rx="26"/>
+      <text class="t1" x="1070" y="465" text-anchor="middle">OTel collector</text>
+
+      <g id="edges"></g>
+    </svg>
+  </div>
+</section>
+
+<footer><p><a href="/">wilanis</a> · <a href="/demo/">the demo</a> · <a href="/example/">the example, drawn</a> · <a href="https://github.com/wilanis/wilanis-js">GitHub</a></p></footer>
+
+<script>
+(() => {
+  const LANGS = ['ts', 'php', 'net', 'java', 'py', 'rust', 'go', 'cpp'];
+  // plugin, wire from → to, where the chip sits, then the library per language in LANGS order
+  const EDGES = [
+    { plug: '@http', d: 'M160 110 L380 100', at: [270, 104],
+      libs: ['node:http', 'amphp/http-server', 'Kestrel', 'Netty', 'uvicorn', 'hyper', 'net/http', 'Boost.Beast'] },
+    { plug: '@schedule', d: 'M160 240 L380 130', at: [270, 186],
+      libs: ['node:timers', 'dragonmantank/cron-expression', 'Cronos', 'cron-utils', 'croniter', 'cron', 'robfig/cron', 'croncpp'] },
+    { plug: '@queue', d: 'M160 400 L380 148', at: [270, 290],
+      libs: ['pg LISTEN/NOTIFY', 'amphp/postgres', 'Npgsql', 'PgJDBC', 'asyncpg', 'tokio-postgres', 'jackc/pgx', 'libpqxx'] },
+    { plug: '@auth', d: 'M440 158 L440 300', at: [440, 229],
+      libs: ['jose', 'firebase/php-jwt', 'Microsoft.IdentityModel.JsonWebTokens', 'Nimbus JOSE+JWT', 'PyJWT', 'jsonwebtoken', 'golang-jwt/jwt', 'jwt-cpp'] },
+    { plug: '@http', d: 'M790 188 L1000 70', at: [895, 124],
+      libs: ['fetch', 'amphp/http-client', 'HttpClient', 'java.net.http', 'httpx', 'reqwest', 'net/http', 'libcurl'] },
+    { plug: '@storage-postgres', d: 'M790 214 L1000 170', at: [895, 192],
+      libs: ['pg + kysely', 'amphp/postgres', 'Npgsql', 'PgJDBC + HikariCP', 'asyncpg', 'sqlx', 'jackc/pgx', 'libpqxx'] },
+    { plug: '@s3', d: 'M790 240 L1000 270', at: [895, 258],
+      libs: ['fetch + SigV4', 'aws/aws-sdk-php', 'AWSSDK.S3', 'AWS SDK for Java 2.x', 'boto3', 'aws-sdk-s3', 'aws-sdk-go-v2', 'aws-sdk-cpp'] },
+    { plug: '@blob', d: 'M790 266 L1000 370', at: [895, 324],
+      libs: ['node:stream', 'league/csv', 'CsvHelper', 'Apache Commons CSV', 'csv', 'csv-async', 'encoding/csv', 'vincentlaucsb/csv-parser'] },
+    { plug: '@otel', d: 'M790 460 L1000 460', at: [895, 460],
+      libs: ['@opentelemetry/exporter-trace-otlp-http', 'open-telemetry/exporter-otlp', 'OpenTelemetry.Exporter.OpenTelemetryProtocol', 'opentelemetry-exporter-otlp', 'opentelemetry-exporter-otlp-proto-http', 'opentelemetry-otlp', 'otlptracehttp', 'opentelemetry-cpp'] },
+  ];
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (name, attrs) => { const n = document.createElementNS(NS, name); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
+  const layer = document.getElementById('edges');
+  const drawn = EDGES.map(edge => {
+    const wire = el('path', { class: 'pwire', d: edge.d });
+    const chip = el('g', { class: 'chip' });
+    const rect = el('rect', { rx: 5 });
+    const pn = el('text', { class: 'pn', 'text-anchor': 'middle' });
+    const lib = el('text', { class: 'lib', 'text-anchor': 'middle' });
+    pn.textContent = edge.plug;
+    chip.append(rect, pn, lib);
+    layer.append(wire, chip);
+    return { edge, wire, chip, rect, pn, lib };
+  });
+  // a long name breaks after the separator nearest its middle, so no chip grows past its gap
+  const lines = name => {
+    if (name.length <= 22) return [name];
+    let cut = -1;
+    for (let i = 1; i < name.length - 1; i++)
+      if ('./-'.includes(name[i]) && (cut < 0 || Math.abs(i - name.length / 2) < Math.abs(cut - name.length / 2))) cut = i;
+    return cut < 0 ? [name] : [name.slice(0, cut + 1), name.slice(cut + 1)];
+  };
+  const place = (d, name) => {
+    const [x, y] = d.edge.at;
+    const parts = lines(name);
+    d.lib.replaceChildren(...parts.map((part, i) => {
+      const t = el('tspan', { x, dy: i ? 14 : 0 });
+      t.textContent = part;
+      return t;
+    }));
+    const h = 22 + 14 * parts.length;
+    const top = y - h / 2;
+    const w = Math.max(d.pn.getComputedTextLength(), d.lib.getBBox().width) + 18;
+    d.rect.setAttribute('x', x - w / 2); d.rect.setAttribute('y', top); d.rect.setAttribute('width', w); d.rect.setAttribute('height', h);
+    d.pn.setAttribute('x', x); d.pn.setAttribute('y', top + 15);
+    d.lib.setAttribute('x', x); d.lib.setAttribute('y', top + 30);
+  };
+  let current = 'ts';
+  const show = lang => {
+    const from = LANGS.indexOf(current), to = LANGS.indexOf(lang);
+    for (const d of drawn) {
+      place(d, d.edge.libs[to]);
+      const changed = lang !== current && d.edge.libs[from] !== d.edge.libs[to];
+      d.chip.classList.toggle('hot', changed);
+      d.wire.classList.toggle('hot', changed);
+      d.chip.classList.remove('flash');
+      if (changed) { void d.chip.getBBox(); d.chip.classList.add('flash'); }
+    }
+    current = lang;
+    for (const b of document.querySelectorAll('.langs button')) b.setAttribute('aria-pressed', String(b.dataset.lang === lang));
+  };
+  for (const b of document.querySelectorAll('.langs button')) b.addEventListener('click', () => show(b.dataset.lang));
+  show('ts');
+})();
+</script>
+</body>
+</html>
