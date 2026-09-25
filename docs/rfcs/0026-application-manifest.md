@@ -273,7 +273,7 @@ None. The manifest is derived from a tree that passed; an inconsistency in it is
   array is sorted: rows by `path` (or `name`, `variable`, `operation`, `label` in order of appearance for
   `startup`, which keeps its declared order because the order is meaning), object maps by key, settings' at every
   depth, arrays inside settings in their own order. `format` is the
-  literal `1`. `ir` is RFC 0008's segment of `SCHEMA_BASE` (`packages/core/src/model.ts:48`): `v1` while the base
+  literal `1`. `ir` is RFC 0008's segment of `SCHEMA_BASE` (`packages/core/src/published.ts`): `v1` while the base
   ends in `main` or `schemas-v1`.
 - **The inventory**, from the registry: `documents` (`path`, `kind`, `feature`, `layer`, `included`, each `null`
   where it does not apply); `plugins` (`use`, `from`, `version`, `guard`); `includes` (`from`, `version`,
@@ -346,9 +346,9 @@ separately" RFC 0002 asks for (`0002:695`). `ir` follows RFC 0008: `v2` when the
 - **Determinism.** Two calls answer equal strings; a registry whose `all()` is reversed answers the same string;
   the string contains no timestamp and no value of any environment variable set for the test.
 - **Schema.** The output validates against `manifest.schema.json` with Ajv; a row with an extra key fails it.
-- **The command**, in `packages/runtime/test/tools.test.ts`: `manifest example` exits 0 and its stdout
-  parses; `--profile staging` exits 1 with RFC 0013's message; a sabotaged copy that fails `check` exits 1 and
-  prints no JSON.
+- **The command**, in `packages/runtime/test/manifest.test.ts` beside the rest (`tools.test.ts` is at the house
+  rules' length): `manifest example` exits 0 and prints the same bytes as `manifestOf`; `--profile staging` exits
+  1 with RFC 0013's message (step 2); a sabotaged copy that fails `check` exits 1 and prints no JSON.
 - **The viewer**, in `packages/view/test`: `/api/manifest` answers the same string as `manifestOf`.
 
 No end-to-end test against a fake: nothing runs.
@@ -419,10 +419,12 @@ Settled while reviewing this draft, so the reasoning survives:
   (`packages/compiler/src/check/judge.ts:156`) answers `[undefined]` for a tree that declares none, and JSON
   has no key for nothing. The *Guide* and the *Reference* now say the mapping rather than leaving a reader to
   find it in the compiler.
+- **Where `manifestOf` reads the runtime's version from.** `RUNTIME_VERSION` in
+  `packages/runtime/src/runtime-version.ts`, the one module `diagnosticsOf` reads it from too, so the two
+  envelopes cannot disagree about which runtime printed them; it is not an option the command supplies.
 
 During implementation:
 
 - The exact sort key of `reaches` (by `operation`, then `via`) and whether `via` lists connection paths or
   connection kinds beside them.
 - Whether `needs[].readBy` names a plugin as `@auth settings` or as the plugin's `use` alone.
-- Where `manifestOf` reads the runtime's version from, shared with RFC 0019's `diagnosticsOf`.
