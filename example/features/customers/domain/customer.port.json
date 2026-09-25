@@ -51,6 +51,7 @@
     },
     "remove": {
       "description": "Delete one customer and answer what was deleted. Fails when there is no such customer.",
+      "idempotent": true,
       "accepts": {
         "id": {
           "type": "string"

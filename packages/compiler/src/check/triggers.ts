@@ -3,7 +3,8 @@
  * its edge shapes meet (L006, T002), reads the request into its input (T003), reaches only request.* paths its
  * kind hands (T004) and guarantees the ones a resolver requires (A006), and maps every refusal reason it can
  * reach, and no other (T005, T006). A kind itself is judged once: what it says correlates a run must be a path
- * into its own context (T007). A public trigger bounds every list its edge shapes take (T008). What gates it is
+ * into its own context (T007). A public trigger bounds every list its edge shapes take (T008). One that receives
+ * from a connection is judged by what that connection delivers, in delivery.ts (T009, T010). What gates it is
  * judged in access.ts; what a scenario of it pins, in scenarios.ts.
  */
 import {
@@ -23,6 +24,7 @@ import { readPath } from '@wilanis/engine';
 import { refusalsOfTrigger } from '../refusals.js';
 import { checkAccess } from './access.js';
 import { shapeName, unboundedLists } from './bounds.js';
+import { checkDelivery } from './delivery.js';
 import { type Judge, type Refuser, underProfile } from './judge.js';
 import { opNeeds, type RequestNeed } from './resolvers.js';
 import { assignableWire, atOrBelow, mismatch, requestOnly } from './typing.js';
@@ -30,7 +32,8 @@ import { assignableWire, atOrBelow, mismatch, requestOnly } from './typing.js';
 /**
  * Every refusal a trigger can earn: the kind and settings it names (R001, T001), the domain port it fires and
  * whether its edge shapes meet that contract (L006, T002), the request it reads into its input (T003) and the
- * paths its kind hands (T004), the reasons it maps (T005, T006), and what gates it (A001, A004, A005, A006).
+ * paths its kind hands (T004), what the connection it receives from delivers (T009, T010), the reasons it maps
+ * (T005, T006), and what gates it (A001, A004, A005, A006).
  */
 export function checkTrigger(judge: Judge, trigger: Loaded<TriggerDoc>): void {
   new TriggerCheck(judge, trigger).run();
@@ -101,6 +104,8 @@ class TriggerCheck {
     const ctx = this.judge.scope.contextType(kind.doc, this.doc.settings);
     this.checkFireIn(inType, ctx);
     this.checkContract(hit.op, inType, outType);
+    if (kind.doc.connection)
+      checkDelivery(this.judge, { trigger: this.trigger, setting: kind.doc.connection, op: hit.op });
     this.checkRequestReach(ctx);
     checkAccess(this.judge, this.trigger, ctx);
     if (kind.doc.refusals) this.checkRefusalTable(kind.doc.refusals);
