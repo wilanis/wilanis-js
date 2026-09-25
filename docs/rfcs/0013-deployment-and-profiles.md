@@ -366,7 +366,9 @@ Step 1 is what RFC 0016 and RFC 0026 wait for; steps 2 to 5 may land in any orde
   would also make every rule that reads a connection's kind -- T001, RFC 0002's `storage` mark, RFC 0022's
   `capabilities`, RFC 0009's delivery guarantee, RFC 0004's atomicity -- a judgement per profile. The
   machinery exists (`Judge.profiles()`), so a later RFC may take it once the duplication has proved heavier
-  than the rules; this one keeps a connection's kind a fact about the connection.
+  than the rules; this one keeps a connection's kind a fact about the connection. RFC 0009's step 10 makes the
+  one exception, for a connection that is a broker and nothing else, whose stand-in may be of another kind that
+  delivers alike (the paragraph on how the example swaps brokers, under *The table broker*).
 - **`profiles` on a step rather than a startup list per profile.** One list in one order keeps `Listen` last
   everywhere and shows at the root what every place starts; per-profile lists would repeat the common steps
   and let their order drift apart.
