@@ -213,6 +213,50 @@ describe('X405: a publish in an atomic graph to a broker outside the store', () 
   });
 });
 
+describe('X406: two queue triggers receiving from one queue', () => {
+  /** The tree with copies of the removals trigger, each at a file of its own, edited as the case says. */
+  const alongside = (...copies: [string, (doc: any) => void][]) => {
+    const docs = tree();
+    for (const [file, change] of copies) {
+      const copy = structuredClone(docs[TRIGGER]) as any;
+      change(copy);
+      docs[file] = copy;
+    }
+    return docs;
+  };
+  const sweep = 'features/customers/edge/sweep.trigger.json';
+  const tidy = 'features/customers/edge/tidy.trigger.json';
+
+  it('a second trigger on the same connection and queue: refused on the second, naming the first', () => {
+    const found = refusals(alongside([sweep, () => {}]));
+    expect(found.map(one => one.code)).toEqual(['X406']);
+    expect(found[0].file).toBe('@features/customers/edge/sweep.trigger.json');
+    expect(found[0].at).toBe('settings/queue');
+    expect(found[0].message).toBe(
+      `receives from queue 'removals' of '${JOBS}', as @features/customers/edge/removals.trigger.json already does: a message on it fires @features/customers/edge/removals.trigger.json, so this trigger never runs`,
+    );
+    expect(found[0].hint).toBe(
+      'one trigger per queue: remove @features/customers/edge/sweep.trigger.json, or change its settings.queue to a queue no other trigger receives from',
+    );
+  });
+
+  it('three on one queue: each after the first, in the order the tree lists them', () => {
+    const found = at(refusals(alongside([tidy, () => {}], [sweep, () => {}])), 'X406');
+    expect(found.map(one => one.file)).toEqual([
+      '@features/customers/edge/sweep.trigger.json',
+      '@features/customers/edge/tidy.trigger.json',
+    ]);
+    for (const one of found) expect(one.message).toMatch(/as @features\/customers\/edge\/removals\.trigger\.json/);
+  });
+
+  it('the same queue name on another connection, or another queue on the same one, is another queue', () => {
+    const found = refusals(
+      alongside([sweep, doc => (doc.settings.connection = TABLE)], [tidy, doc => (doc.settings.queue = 'sweeps')]),
+    );
+    expect(at(found, 'X406')).toEqual([]);
+  });
+});
+
 describe('what is not a rule here', () => {
   it('a tree with queue triggers and no consume step: nothing is consumed, as no listener serves nothing', () => {
     expect(

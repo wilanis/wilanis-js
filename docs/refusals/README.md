@@ -204,6 +204,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [X403](X403.md) | X | live | a `publish` of a type the queue trigger consuming that connection and queue does not accept |
 | [X404](X404.md) | X | live | a queue trigger's message type, or a `publish`'s, carrying a blob at any depth |
 | [X405](X405.md) | X | live | a `publish` in an atomic graph to a connection whose kind is not marked `storage`, which cannot join its transaction |
+| [X406](X406.md) | X | live | a second queue trigger receiving from a connection and queue another trigger of the tree already receives from |
 
 ## The page template
 

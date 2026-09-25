@@ -1,5 +1,5 @@
 /**
- * What only @queue can judge: X401 to X405, its own band. Each rule reads a word the generic families cannot --
+ * What only @queue can judge: X401 to X406, its own band. Each rule reads a word the generic families cannot --
  * an outcome is a string to the type system and an instruction to a broker here, and the queue a `publish`
  * names is a string to G005 and the other end of a queue trigger here.
  *
@@ -16,8 +16,11 @@
  * X405 a publish in an atomic graph to a broker whose kind is not marked storage, which cannot join the
  *      transaction. It sees the graph that carries the node; an atomic graph that reaches such a publish
  *      through a domain call is refused at run time by the handler, before the broker keeps anything.
+ * X406 a second queue trigger receiving from the connection and queue another already receives from: a message
+ *      fires one trigger, so the second would never run.
  */
 import type { ConnectionKindDoc, PluginCheckContext } from '@wilanis/core';
+import { placeOf } from './deliver.js';
 import { OUTCOMES } from './outcome.js';
 import { checkPublished, checkTriggerMessage } from './publishes.js';
 import { consumeSteps, published, type Queued, queued } from './sites.js';
@@ -157,7 +160,33 @@ function checkAtomicPublish(scope: Scope, refuse: Refuse): void {
   }
 }
 
-/** What only @queue can judge: X401 a setting a worker cannot act on, X402 a retry nothing redelivers, X403 a publish its consumer does not accept, X404 a blob in a message, X405 a publish an atomic graph's transaction cannot take in. */
+/**
+ * X406: one queue trigger to a connection and queue. A delivery fires one trigger, the first the tree lists, so
+ * each later one receiving from the same place is refused on its own file, in the order the tree lists them.
+ * The place is `placeOf`'s, the worker's own: the connection canonical, so two spellings of one are one.
+ */
+function checkOneReceiver(scope: Scope, triggers: Queued[], refuse: Refuse): void {
+  const first = new Map<string, Queued>();
+  for (const one of triggers) {
+    const place = placeOf(one.doc, scope.canon);
+    if (!place) continue; // T001 holds connection and queue to strings
+    const key = `${place.connection}\n${place.queue}`;
+    const earlier = first.get(key);
+    if (!earlier) {
+      first.set(key, one);
+      continue;
+    }
+    refuse({
+      code: 'X406',
+      file: one.file,
+      message: `receives from queue '${place.queue}' of '${place.connection}', as ${earlier.file} already does: a message on it fires ${earlier.file}, so this trigger never runs`,
+      at: 'settings/queue',
+      hint: `one trigger per queue: remove ${one.file}, or change its settings.queue to a queue no other trigger receives from`,
+    });
+  }
+}
+
+/** What only @queue can judge: X401 a setting a worker cannot act on, X402 a retry nothing redelivers, X403 a publish its consumer does not accept, X404 a blob in a message, X405 a publish an atomic graph's transaction cannot take in, X406 two triggers on one queue. */
 export function check({ scope, refuse }: PluginCheckContext): void {
   checkConcurrency(scope, refuse);
   const triggers = queued(scope);
@@ -167,6 +196,7 @@ export function check({ scope, refuse }: PluginCheckContext): void {
     checkRetryDelivers(scope, one, refuse);
     checkTriggerMessage(scope, one, refuse);
   }
+  checkOneReceiver(scope, triggers, refuse);
   checkPublished(scope, triggers, refuse);
   checkAtomicPublish(scope, refuse);
 }

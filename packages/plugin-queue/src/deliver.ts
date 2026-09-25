@@ -22,18 +22,27 @@ export interface Worked {
   canon: (ref: string) => string;
 }
 
-/** A queue trigger's settings, as far as where it receives from is concerned. */
-const placeOf = (trigger: TriggerDoc) => (trigger.settings ?? {}) as { connection?: unknown; queue?: unknown };
+/**
+ * Where a queue trigger receives from, the connection canonical, where its settings name both a connection and a
+ * queue. The one answer to "which queue is this": the worker groups by it, a delivery finds its trigger by it,
+ * and X406 refuses two triggers that answer the same.
+ */
+export function placeOf(trigger: TriggerDoc, canon: (ref: string) => string): Consumed | undefined {
+  const { connection, queue } = (trigger.settings ?? {}) as { connection?: unknown; queue?: unknown };
+  return typeof connection === 'string' && typeof queue === 'string'
+    ? { connection: canon(connection), queue }
+    : undefined;
+}
 
 /** Whether a queue trigger receives from this connection and queue. */
 export function receives(trigger: TriggerDoc, at: Consumed, canon: (ref: string) => string): boolean {
-  const { connection, queue } = placeOf(trigger);
-  return typeof connection === 'string' && canon(connection) === at.connection && queue === at.queue;
+  const place = placeOf(trigger, canon);
+  return place !== undefined && place.connection === at.connection && place.queue === at.queue;
 }
 
 /**
- * The trigger a message on this queue fires, as the tree now stands: the first queue trigger that receives
- * from it, in the order the tree lists them.
+ * The trigger a message on this queue fires, as the tree now stands: the one queue trigger that receives from
+ * it. X406 refuses a tree where two do, so the first in the order the tree lists them is the only one.
  */
 export function triggerFor(worked: Worked, at: Consumed): TriggerDoc | undefined {
   return worked.serving.triggers(KIND).find(trigger => receives(trigger, at, worked.canon));
