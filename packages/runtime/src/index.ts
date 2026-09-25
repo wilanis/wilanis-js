@@ -17,6 +17,18 @@ export {
   satisfy,
   switchesOf,
 } from './branches.js';
+export {
+  addressSaid,
+  connectionSetting,
+  DELIVERY_MEANS,
+  type Delivery,
+  deliveryOf,
+  receiversOf,
+  receivesFrom,
+  type Send,
+  sendersOf,
+  sendsOf,
+} from './delivery.js';
 export { UNCAUGHT_FAULT } from './discovery.js';
 export { coerceWire, Embedder, type FireOptions, fillTemplates, type Observers, prune } from './embed.js';
 export {

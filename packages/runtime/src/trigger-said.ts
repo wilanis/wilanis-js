@@ -14,15 +14,15 @@ const SCALARS: readonly unknown[] = ['string', 'number', 'boolean'];
  * The settings of one trigger that say when or where it fires: every one its kind declares a string, a number or
  * a boolean, in the order the kind declares them, each as `name value` with the value as written -- `cron
  * "0 3 * * *", timezone "UTC"`, `route "/customers", method "GET"`. A setting naming a type or holding parts of
- * its own is left to `describe`, and a bound to the line that says where it came from; empty for a trigger that
- * writes none, or whose kind the tree does not have.
+ * its own is left to `describe`, a bound to the line that says where it came from, and a setting named in
+ * `except` to a reader already told it; empty for a trigger that writes none, or whose kind the tree does not have.
  */
-export function settingsSaid(trigger: Loaded<TriggerDoc>, scope: Scope): string {
+export function settingsSaid(trigger: Loaded<TriggerDoc>, scope: Scope, except: readonly string[] = []): string {
   const written = trigger.doc.settings ?? {};
   const declared = scope.get('trigger-kind', trigger.doc.kind)?.doc.settings?.fields ?? {};
-  const bounds: readonly string[] = LIMIT_SETTINGS;
+  const left: readonly string[] = [...LIMIT_SETTINGS, ...except];
   return Object.entries(declared)
-    .filter(([name, field]) => SCALARS.includes(field.type) && name in written && !bounds.includes(name))
+    .filter(([name, field]) => SCALARS.includes(field.type) && name in written && !left.includes(name))
     .map(([name]) => `${name} ${JSON.stringify(written[name])}`)
     .join(', ');
 }

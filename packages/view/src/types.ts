@@ -6,9 +6,11 @@ import type { Kind, Layer, Loaded, Outcome, Refusal } from '@wilanis/core';
 import type { ProfileReach, TriggerLimits } from '@wilanis/runtime';
 import type { VAttempts, VPromised } from './attempts.js';
 import type { VCatches, VCaught } from './catches.js';
+import type { VDelivery, VReceives } from './delivery.js';
 import type { VFanOut } from './limits.js';
 
 export type { VAttempts, VPromised } from './attempts.js';
+export type { VDelivery, VLinked, VReceives, VSend } from './delivery.js';
 export type { VFanOut } from './limits.js';
 
 export interface VPort {
@@ -283,6 +285,10 @@ export interface DocView {
    * the same words `wilanis map` prints beside the kind; absent where it writes none that fit in a line.
    */
   firedBy?: string;
+  /** On a trigger whose kind receives from a connection: which, what it delivers, and the calls whose messages it receives. */
+  receives?: VReceives;
+  /** On a connection whose kind declares `delivery`: what that means, the triggers receiving from it and the calls sending to it. */
+  delivery?: VDelivery;
   /** On a trigger: the port operation it fires, and where that leads. */
   fires?: VTarget;
   /** On a trigger whose kind maps refusals: every reason it can reach or maps, how it is answered, and the nodes that refuse with it. */

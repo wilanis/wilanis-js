@@ -566,6 +566,38 @@
     page.appendChild(t);
   }
 
+  /** One call that sends to a broker, as a link: the graph opened at its node, or the binding it delegates in. */
+  function sendLink(s) { return s.node ? nodeLink(s.file, s.where, s.label + SEP + s.where) : link(s.file, s.label + ' #' + s.where); }
+
+  /**
+   * A broker's side of its queues: what its kind's delivery means, the triggers receiving from it, and the calls
+   * sending to it with where on it and who receives each. The pairing is the runtime's, so this page and
+   * `wilanis describe` cannot pair a call with a different trigger.
+   */
+  function deliveryEl(page, dv) {
+    const p = el('p'); p.appendChild(frag('Delivers ')); p.appendChild(el('code', null, dv.delivery)); p.appendChild(frag(': ' + dv.means + '.')); page.appendChild(p);
+    page.appendChild(el('h2', null, 'Received by (' + dv.receivers.length + ')'));
+    if (!dv.receivers.length) page.appendChild(el('p', 'miss', 'No trigger of this tree receives from it.'));
+    for (const r of dv.receivers) { const row = el('div', 'ref'); row.appendChild(badge('trigger')); row.appendChild(frag(' ')); row.appendChild(link(r.path, r.label)); if (r.said) row.appendChild(el('small', 'mono', ' ' + r.said)); page.appendChild(row); }
+    page.appendChild(el('h2', null, 'Sent to by (' + dv.senders.length + ')'));
+    if (!dv.senders.length) { page.appendChild(el('p', null, 'Nothing in this tree sends to it.')); return; }
+    const t = el('table'); const hd = el('tr'); for (const h of ['sent by', 'where on it', 'received by']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
+    for (const s of dv.senders) {
+      const tr = el('tr'); tr.appendChild(el('td')).appendChild(sendLink(s)); tr.appendChild(el('td', 'mono', s.address));
+      const to = el('td'); if (!s.receivers.length) to.appendChild(el('span', 'miss', 'no trigger of this tree; another tree may'));
+      s.receivers.forEach((r, i) => { if (i) to.appendChild(frag(', ')); to.appendChild(link(r.path, r.label)); });
+      tr.appendChild(to); t.appendChild(tr);
+    }
+    page.appendChild(t);
+  }
+
+  /** A receiving trigger's other end: the calls of this tree whose messages it receives, and where on the connection each sends. */
+  function sentByEl(page, senders) {
+    page.appendChild(el('h2', null, 'Sent by (' + senders.length + ')'));
+    if (!senders.length) { page.appendChild(el('p', null, 'Nothing in this tree sends what it receives; another tree may.')); return; }
+    for (const s of senders) { const row = el('div', 'ref'); row.appendChild(sendLink(s)); row.appendChild(el('small', 'mono', ' ' + s.address)); page.appendChild(row); }
+  }
+
   function renderDocPage(page, v) {
     const h1 = el('h1', null, v.label); h1.appendChild(schemaBadge(v.kind, null, v.kind + '.schema.json')); if (v.kind === 'shape') h1.appendChild(badge(v.kind, v.doc.layer === 'edge' ? 'edge: the world’s shape' : 'core: ours')); page.appendChild(h1);
     page.appendChild(el('p', 'lead', v.description));
@@ -595,6 +627,7 @@
         const chain = el('div', 'chain');
         const by = el('span'); by.appendChild(link(d.kind)); if (v.firedBy) by.appendChild(document.createTextNode(', ' + v.firedBy));
         chain.appendChild(step('fired by', by));
+        if (v.receives) { const from = el('span'); from.appendChild(link(v.receives.connection, v.receives.label)); if (v.receives.delivery) from.appendChild(frag(', which delivers ' + v.receives.delivery)); chain.appendChild(step('receives from', from)); }
         if (d.in) chain.appendChild(step('takes', typeEl(d.in)));
         if (f) { const c = el('span'); c.appendChild(link(f.port, f.portLabel)); c.appendChild(document.createTextNode(SEP + f.opName)); chain.appendChild(step('fires the operation', c)); }
         for (const b of (f && f.bindings) || []) {
@@ -611,6 +644,7 @@
           page.appendChild(el('p', null, 'Each policy decides over what the kind and the guard hand; the first that does not allow answers, and the operation never fires.'));
           for (const [i, pol] of v.policies.entries()) { const c = el('div', 'card'); c.appendChild(el('div', 'k', String(i + 1))); const vv = el('div', 'v'); vv.appendChild(link(pol.path, pol.label)); if (pol.required) vv.appendChild(requiredEl(pol.required)); if (pol.gives) vv.appendChild(el('small', null, 'gives the guard: ' + Object.keys(pol.gives).join(', '))); if (pol.decide) { vv.appendChild(el('small', null, 'decides through ')); vv.appendChild(link(pol.decide.split('#')[0], showOp(pol.decide))); } c.appendChild(vv); page.appendChild(c); }
         }
+        if (v.receives) sentByEl(page, v.receives.senders);
         if (v.limits) limitsEl(page, v.limits);
         page.appendChild(el('h2', null, 'Settings the kind judges')); page.appendChild(valuesTable(d.settings));
         if (v.answers) {
@@ -761,6 +795,7 @@
       case 'connection': {
         const chain = el('div', 'chain'); chain.appendChild(step('a channel of kind', link(d.kind))); page.appendChild(chain);
         page.appendChild(el('h2', null, 'Settings')); page.appendChild(valuesTable(d.settings));
+        if (v.delivery) deliveryEl(page, v.delivery);
         break;
       }
       case 'scenario': {
