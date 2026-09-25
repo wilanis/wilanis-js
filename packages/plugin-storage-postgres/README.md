@@ -76,7 +76,8 @@ missing. It alters nothing that is there, and asking twice changes nothing.
   While every slot is busy it arms no timer at all; the delivery that ends next looks again. A look that fails
   is tried again after a pause that doubles to thirty seconds, and a listening session that drops is reopened
   after a second, after which every worker looks once, since a notification is a hint and never the only way a
-  message is found.
+  message is found. The session probes with TCP keepalive after ten seconds idle, so one left half-open by a
+  vanished peer or a forgetful NAT is noticed as a drop rather than waited on forever.
 
 The acknowledgement is the worker's, after the run has answered, and outside the graph's transaction: a process
 that dies between the two leaves the message to be delivered again. That is what `at-least-once` says, and why
