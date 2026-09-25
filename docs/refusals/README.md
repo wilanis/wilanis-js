@@ -167,7 +167,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [C015](C015.md) | C | live | an operation's `key`, `idempotent` and `pure` that do not make one sound fact about repeating it |
 | [C016](C016.md) | C | live | a `maxItems` on a field that is not a list |
 | [C017](C017.md) | C | live | more than one profile marked `default` |
-| [C018](C018.md) | C | live | a profile standing a connection in for itself, or for one of another kind that does not deliver as it does |
+| [C018](C018.md) | C | live | a profile standing a connection in for itself, or for one of another kind, unless the replaced one is a broker alone and the stand-in delivers as it does |
 | [C019](C019.md) | C | live | a declared secret that no plugin's or connection's settings and no startup step reads |
 | [S001](S001.md) | S | live | a scenario naming a trigger the tree does not have |
 | [S002](S002.md) | S | live | a scenario pinning a reason on a node whose status is not failed |
