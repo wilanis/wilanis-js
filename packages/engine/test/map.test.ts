@@ -30,8 +30,17 @@ describe('a map node', () => {
     const elapsed = Date.now() - began;
     expect(report.status).toBe('done');
     expect(report.output).toEqual(['a', 'b', 'c']);
-    expect(elapsed).toBeGreaterThanOrEqual(1000);
+    // The sum is 2300ms; concurrent, the node is bounded by its slowest element. No lower bound: `setTimeout`
+    // promises the timer's own clock, not `Date.now()`, so a 1000ms sleep can measure 999.
     expect(elapsed).toBeLessThan(1500);
+    // The elements' own reports are the evidence: all three were in flight at once, and the quickest was done
+    // while the slowest still ran.
+    const items = report.nodes.m.items!;
+    expect(items).toHaveLength(3);
+    const started = items.map(element => element.startedAt!);
+    const ended = items.map(element => element.endedAt!);
+    expect(Math.max(...started) - Math.min(...started)).toBeLessThan(100);
+    expect(ended[1]).toBeLessThan(ended[0]);
   });
   it('lets every map element settle before a failing map node reports', async () => {
     const spec: KernelSpec = {
@@ -53,13 +62,22 @@ describe('a map node', () => {
         },
       },
     };
-    const began = Date.now();
-    const report = await new Kernel(handlers).run(spec, {});
-    const elapsed = Date.now() - began;
+    const settled: string[] = [];
+    const recorded = {
+      sleepOrBoom: async (args: { in: Record<string, unknown> }) => {
+        try {
+          return await handlers.sleepOrBoom(args);
+        } finally {
+          settled.push(String(args.in.tag));
+        }
+      },
+    };
+    const report = await new Kernel(recorded).run(spec, {});
     expect(report.status).toBe('failed');
     expect(report.nodes.m.error).toContain("map 'm' element 0");
-    // the slow sibling was awaited rather than abandoned at the first rejection
-    expect(elapsed).toBeGreaterThanOrEqual(600);
+    // the slow sibling was awaited rather than abandoned at the first rejection: it had settled when the run answered
+    expect(settled).toEqual(['boom', 'late']);
+    expect(report.nodes.m.items![1]).toMatchObject({ status: 'done', out: 'late' });
   });
   it('fails the graph when a node throws and maps concurrently', async () => {
     const spec: KernelSpec = {
