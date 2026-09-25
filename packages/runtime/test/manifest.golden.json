@@ -3054,7 +3054,8 @@
       "required": true,
       "profiles": [
         "production",
-        "production-scheduler"
+        "production-scheduler",
+        "production-worker"
       ]
     },
     {
@@ -3063,7 +3064,8 @@
       "required": true,
       "profiles": [
         "production",
-        "production-scheduler"
+        "production-scheduler",
+        "production-worker"
       ]
     },
     {
@@ -3111,7 +3113,7 @@
       "profiles": [
         "live",
         "local",
-        "production"
+        "production-worker"
       ]
     },
     {
