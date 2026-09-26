@@ -9,6 +9,11 @@
         "required": false,
         "description": "listen port, default 8080"
       },
+      "host": {
+        "type": "string",
+        "required": false,
+        "description": "the interface to listen on, for every listen step that writes no host of its own: an address of this host (127.0.0.1 on a laptop). Absent: every interface, on both address families"
+      },
       "deadlineMs": {
         "type": "number",
         "required": false,

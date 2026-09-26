@@ -172,10 +172,14 @@ export interface Operation {
   pure?: boolean;
   refuses?: boolean;
   holds?: boolean;
+  /** `listens`: the operation opens a TCP socket, and where each part of the address it binds comes from. */
+  listens?: { port: Bound<number>; host?: Bound<string> };
   transactional?: boolean;
   idempotent?: boolean | string;
   key?: string;
 }
+/** One part of an address an operation binds: the step's `in.<input>`, else the granting plugin's `settings.<setting>`, else `default`. */
+export type Bound<T> = { input?: string; setting?: string; default?: T };
 export interface PortDoc extends Envelope {
   operations: Record<string, Operation>;
 }
@@ -279,6 +283,8 @@ export interface ConnectionKindDoc extends Envelope {
   leases?: boolean;
   /** `delivery`: how many times a connection of this kind may hand one message to a trigger that receives from it; absent, it delivers nothing. */
   delivery?: 'at-least-once' | 'at-most-once';
+  /** `endpoint`: the dotted path into `settings` of the setting that holds the address a connection of this kind reaches. */
+  endpoint?: string;
 }
 export interface ConnectionDoc extends Envelope {
   kind: string;

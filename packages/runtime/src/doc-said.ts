@@ -20,6 +20,7 @@ import type {
   ScenarioDoc,
   Scope,
 } from '@wilanis/core';
+import { endpointLines } from './address-said.js';
 import { attemptsSaid } from './attempts-said.js';
 import { deliveryLines, pairedLines } from './delivery-said.js';
 import { profilesLines, standInLines } from './profiles-said.js';
@@ -86,14 +87,15 @@ export function featureLines(doc: Loaded): string[] {
 }
 
 /**
- * A connection: the kind that gives it meaning and what that kind delivers, the settings it is configured with,
+ * A connection: the kind that gives it meaning and what that kind delivers, what it reaches where the kind names
+ * the setting that holds the address, the settings it is configured with,
  * where a profile names it under `connections`, what it stands in for or what replaces it there -- a reader of
  * the connection a data graph names learns it is not what every profile reaches -- and, for a broker, the
  * triggers receiving from it and the calls sending to it.
  */
 export function connectionLines(doc: Loaded, scope: Scope): string[] {
   const declared = doc.doc as ConnectionDoc;
-  const lines = [`kind  ${declared.kind}`, ...deliveryLines(doc, scope)];
+  const lines = [`kind  ${declared.kind}`, ...deliveryLines(doc, scope), ...endpointLines(doc, scope)];
   const settings = Object.entries(declared.settings ?? {});
   if (settings.length) lines.push('settings:');
   for (const [name, value] of settings) lines.push(`    ${name}: ${JSON.stringify(value)}`);

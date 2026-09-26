@@ -84,6 +84,8 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [L011](L011.md) | L | live | an atomic graph reaching nothing that could roll back |
 | [L012](L012.md) | L | live | a domain graph's node declaring `retry` or `timeoutMs` |
 | [L013](L013.md) | L | live | a domain graph's switch declaring `catch` |
+| [L014](L014.md) | L | live | an operation declaring `listens` without `holds` |
+| [L015](L015.md) | L | live | a `listens` input the operation does not accept, or not a number for the port or a string for the host |
 | [G001](G001.md) | G | live | a node id another node of the graph has, or one of the reserved roots in, const, request, secrets |
 | [G003](G003.md) | G | live | a read that cannot be typed: no such field, constant, earlier node, or name under reads |
 | [G004](G004.md) | G | live | a value that does not fit its input: optional where the contract requires it, or of the wrong type |
@@ -169,6 +171,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [C017](C017.md) | C | live | more than one profile marked `default` |
 | [C018](C018.md) | C | live | a profile standing a connection in for itself, or for one of another kind, unless the replaced one is a broker alone and the stand-in delivers as it does |
 | [C019](C019.md) | C | live | a declared secret that no plugin's or connection's settings and no startup step reads |
+| [C020](C020.md) | C | live | a connection kind's `endpoint` naming a setting it does not declare, or one that is not a string |
 | [S001](S001.md) | S | live | a scenario naming a trigger the tree does not have |
 | [S002](S002.md) | S | live | a scenario pinning a reason on a node whose status is not failed |
 | [S003](S003.md) | S | live | a `cancelAt` that is not a key of the scenario's `stubs` |

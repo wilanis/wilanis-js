@@ -43,7 +43,7 @@ describe('plugin packages and hooks', () => {
     expect(describeDoc(loaded, '@std/list.port.json')).toContain('granted by  @std  (built into the runtime)');
     expect(describeDoc(loaded, '@customers/domain/customer.port.json')).not.toContain('granted by');
     // and a holds operation says that it holds
-    expect(describeDoc(loaded, '@http/server.port.json')).toContain('#listen  (holds until stopped)');
+    expect(describeDoc(loaded, '@http/server.port.json')).toContain('#listen  (holds until stopped; ');
     // a kind that says what correlates a run with its caller says so where its other rules are said
     expect(describeDoc(loaded, '@http/http.trigger-kind.json')).toContain(
       "correlation: request.headers.traceparent correlates a run with the caller's trace, copied opaquely (T007)",

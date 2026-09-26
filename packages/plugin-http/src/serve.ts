@@ -8,6 +8,7 @@ import { pipeline } from 'node:stream/promises';
 import type { BlobStore, Codec, Hold, Serving, TriggerDoc } from '@wilanis/core';
 import type { Handler, Report } from '@wilanis/engine';
 import { compileRoute, encode, fault, type HttpSettings, parseCookies } from './answer.js';
+import { bind } from './bind.js';
 import { json, mediaType } from './codecs.js';
 import { type Bounded, bounded, type Limits, limitsOf, TooLarge, unbounded, withDeadline } from './limit.js';
 import { doc, ROOT } from './paths.js';
@@ -285,30 +286,23 @@ export const listen: Handler = async ({ in: input, ctx }) => {
     );
   const { log } = serving;
   const settings = env.plugins?.[ROOT] ?? {};
-  const port = Number(input.port ?? settings.port ?? 8080);
-
   // the limits every route that declares none of its own is held to; X004 has judged them whole numbers of 1 or more
   const defaults: Limits = {
     deadlineMs: settings.deadlineMs as number | undefined,
     maxBodyBytes: settings.maxBodyBytes as number | undefined,
   };
   const server = createServer((incoming, response) => answerRequest(incoming, response, { serving, defaults }));
-
-  await new Promise<void>((ok, fail) => {
-    server.once('error', fail);
-    server.listen(port, () => {
-      server.off('error', fail);
-      ok();
-    });
-  });
+  // the order server.port.json's `listens` declares: the step's in, then the plugin's settings, then the default
+  const host = (input.host ?? settings.host) as string | undefined;
+  const { port, address } = await bind(server, Number(input.port ?? settings.port ?? 8080), host);
   // every fire tells its observers which run it was; the request that fired it is told, so a fault can name it
   const unhear = hear(serving);
   const routes = routesOf(serving);
   log(
-    `http: listening on :${port} -- ${routes.map(one => `${one.settings.method} ${one.settings.route} → ${one.trigger.fire.run}`).join(', ')}`,
+    `http: listening on ${address} -- ${routes.map(one => `${one.settings.method} ${one.settings.route} → ${one.trigger.fire.run}`).join(', ')}`,
   );
   env.hold({
-    label: `http :${port}`,
+    label: `http ${address}`,
     stop: () =>
       new Promise<void>(ok =>
         server.close(() => {

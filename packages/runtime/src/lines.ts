@@ -18,6 +18,7 @@ import {
   type StoreDoc,
   show,
 } from '@wilanis/core';
+import { listensSaid } from './address-said.js';
 import { promisedSaid } from './attempts-said.js';
 import { boundSaid } from './limits-said.js';
 import { readsLines } from './reads-said.js';
@@ -74,13 +75,14 @@ function acceptsLines(op: Operation, showType: (spec: unknown) => string): strin
 
 /**
  * What an operation says about itself: whether it is pure, may refuse, may take part in a transaction, holds
- * something until stopped, or may be called again -- always, where its inputs say so, or given its key.
+ * something until stopped and where the address it listens on comes from, or may be called again -- always,
+ * where its inputs say so, or given its key.
  */
-function operationLine(name: string, op: Operation) {
+function operationLine(name: string, op: Operation, root: string | undefined) {
   const pure = op.pure ? '  (pure)' : '';
   const refuses = op.refuses ? '  (refuses on purpose)' : '';
   const transactional = op.transactional ? '  (transactional)' : '';
-  const holds = op.holds ? '  (holds until stopped)' : '';
+  const holds = op.holds ? `  (holds until stopped${listensSaid(op, root)})` : '';
   return `#${name}${pure}${refuses}${transactional}${holds}${promisedSaid(op)}: ${op.description}`;
 }
 
@@ -123,7 +125,7 @@ export function portLines(doc: Loaded, showType: (spec: unknown) => string): str
   const shape = shapeOfPort(port, showType);
   const lines = shape ? [`works in  ${shape}`, ''] : [];
   for (const [name, op] of Object.entries(port.operations)) {
-    lines.push(operationLine(name, op));
+    lines.push(operationLine(name, op, doc.native));
     lines.push(...acceptsLines(op, showType));
     if (op.returns) lines.push(returnsLine(showType(op.returns), shape));
   }

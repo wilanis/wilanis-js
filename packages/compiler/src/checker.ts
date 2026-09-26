@@ -14,7 +14,7 @@ import { type LoadResult, type PluginModule, RefusalList, Scope } from '@wilanis
 import { checkPolicy } from './check/access.js';
 import { checkAtomic } from './check/atomic.js';
 import { checkBinding } from './check/bindings.js';
-import { checkConnection, checkPort, checkShape } from './check/contracts.js';
+import { checkConnection, checkConnectionKind, checkPort, checkShape } from './check/contracts.js';
 import { checkGraph } from './check/graph.js';
 import { checkInvariant, checkInvariantSites } from './check/invariants.js';
 import { Judge } from './check/judge.js';
@@ -54,11 +54,12 @@ function judgeTree(judge: Judge): void {
   checkStartup(judge);
 }
 
-/** What a contract says for itself: the shapes, ports, connections, stores and plugin-shipped kinds. */
+/** What a contract says for itself: the shapes, ports, connection kinds, connections, stores and trigger kinds. */
 function judgeContracts(judge: Judge): void {
   const { registry } = judge.scope;
   for (const shape of registry.all('shape')) checkShape(judge, shape);
   for (const port of registry.all('port')) checkPort(judge, port);
+  for (const kind of registry.all('connection-kind')) checkConnectionKind(judge, kind);
   for (const connection of registry.all('connection')) checkConnection(judge, connection);
   for (const store of registry.all('store')) checkStore(judge, store);
   for (const kind of registry.all('trigger-kind')) checkTriggerKind(judge, kind);
