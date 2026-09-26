@@ -38,7 +38,7 @@ npx wilanis check .
 ```
 
 ```
-ok: 221 documents
+ok: 221 documents, IR v1, runtime reads v1
 ```
 
 Every one of the 221 is a JSON document; there is no JavaScript in the tree, and `check` judged every
@@ -222,7 +222,7 @@ npx wilanis check .
 ```
 
 ```
-ok: 222 documents
+ok: 222 documents, IR v1, runtime reads v1
 ```
 
 Three rounds of write, check, edit, and the agent read no manual.
