@@ -103,7 +103,7 @@ export function guardRoots(when: string): string[] {
 }
 
 /** Every field invariant over one shape, in registry order; what a site of that shape is held to. */
-function invariantsOn(scope: Scope, shape: string): Loaded<InvariantDoc>[] {
+export function invariantsOn(scope: Scope, shape: string): Loaded<InvariantDoc>[] {
   const want = scope.canon(shape);
   const out: Loaded<InvariantDoc>[] = [];
   for (const one of scope.registry.all('invariant'))
@@ -112,7 +112,7 @@ function invariantsOn(scope: Scope, shape: string): Loaded<InvariantDoc>[] {
 }
 
 /** The shapes a field invariant of this tree holds over, each canonical and named once. */
-function heldShapes(scope: Scope): string[] {
+export function heldShapes(scope: Scope): string[] {
   const out = new Set<string>();
   for (const one of scope.registry.all('invariant')) if (one.doc.holds) out.add(scope.canon(one.doc.holds.on));
   return [...out];
