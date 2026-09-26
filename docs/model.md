@@ -152,13 +152,14 @@ keep every write there. A `#patch` whose `changes` name a field such a rule read
 record, and a rule over several fields cannot be judged on a part, so a patch moving a customer to `gold` without a
 note would commit before any guard saw the customer it left. A `#put` of a shape a field invariant is on whose
 `record` is anything but one whole read of `in` or of a node is I008: a record written out at the write is made
-nowhere the compiler guards. And a data graph that makes a value of such a shape, which one of its effects reads,
-is L016: making the record is business, and a data graph translates. What remains is one form (RFC 0035). A domain
-graph loads the record, lays the change over it with `@std/object.port.json#merge` into the shape, which is the
-site the guard stands at, and hands the result to an operation whose data graph takes it whole as `in` and writes
-it with `"record": "{{in}}"`, a taken site, guarded again whoever calls it. `wilanis new graph --port` scaffolds
-the first half and `--store` the second. A field no rule reads may still be patched, and a read site stays guarded:
-a row the tree did not write is refused where it is read rather than trusted.
+nowhere the compiler guards. And a data graph that composes a value of such a shape, beyond re-typing what an
+effect answered, which one of its effects reads, is L016: making the record is business, and a data graph
+translates. What remains is one form (RFC 0035). A domain graph loads the record, lays the change over it with
+`@std/object.port.json#merge` into the shape, which is the site the guard stands at, and hands the result to an
+operation whose data graph takes it whole as `in` and writes it with `"record": "{{in}}"`, a taken site, guarded
+again whoever calls it. `wilanis new graph --port` scaffolds the first half and `--store` the second. A field no
+rule reads may still be patched, and a read site stays guarded: a row the tree did not write is refused where it is
+read rather than trusted.
 
 ## A tree includes trees
 
