@@ -2,7 +2,10 @@
 
 Every rule `wilanis check` enforces, stated once. The [README](../README.md) shows what a service looks
 like; this page is the reference. [`CLAUDE.md`](../CLAUDE.md) is for changing the toolchain itself, and the
-schemas under [`packages/core/schemas/`](../packages/core/schemas/) are what every rule here mirrors.
+schemas under [`packages/core/schemas/`](../packages/core/schemas/) are what every rule here mirrors. What these
+rules guarantee together, what the runtime enforces on every run whether or not the tree was checked, and what is
+left to the application are stated in full, each with the codes or the source that make it true, in
+[`security-model.md`](security-model.md).
 
 ## Documents
 

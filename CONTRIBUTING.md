@@ -77,6 +77,17 @@ next code, and the old one keeps its page as `retired`. From 1.0, when the `sche
 wording of a message or a hint is not. Before 1.0 nothing is promised, and a page records under *History* what
 changed. `docs/refusals/README.md` states the promise in full.
 
+`docs/security-model.md` says what every tree `wilanis check` accepts is guaranteed, what the runtime enforces on
+every run, and what is left to the application. A new check goes under the heading its claim belongs to: a rule
+of the checker when it holds of every tree that passes, code in the runtime when it must hold of every run. A line
+under *Guaranteed* or *Enforced* is added by the pull request that makes it true, and removed or weakened only by
+an RFC, or by withdrawing the RFC that added it; wording that changes no meaning is an ordinary pull request.
+
+This repository's own supply chain is outside that model, and is kept here. A dependency is added or upgraded the
+way code is changed, by a pull request to `main` merged with the checks green, and CI installs from the lockfile
+(`npm ci`). A plugin that carries an external dependency is a package of its own, so a project installs that
+dependency only when it names the plugin.
+
 ## Commits and pull requests
 
 A commit message says what changed and why, in the imperative, in plain words. No generated trailers,
