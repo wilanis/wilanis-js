@@ -9,6 +9,7 @@
     },
     "code": {
       "type": "string",
+      "secret": true,
       "required": false
     },
     "expiresAt": {
