@@ -19,6 +19,7 @@ import {
   init,
   ls,
   manifestOf,
+  manifestText,
   map,
   migrate,
   printed,
@@ -278,7 +279,7 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
   // judged first, as start is: the manifest of a tree with an unresolved reference would describe nothing real
   manifest: async ({ flags, rootArg }) => {
     const loaded = await check(rootArg(0));
-    console.log(JSON.stringify(manifestOf(loaded, { root: rootArg(0), profile: flags.profile }), null, 2));
+    process.stdout.write(manifestText(manifestOf(loaded, { root: rootArg(0), profile: flags.profile })));
   },
   new: async ({ flags, positional, rootArg }) => {
     const [kind, target] = positional;

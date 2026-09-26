@@ -226,6 +226,8 @@
   // ---- dom helpers ---------------------------------------------------------------------------------
   function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function link(path, text, cls) { const a = el('a', cls || null, text == null ? labelFor(path) : text); a.href = '#' + canon(path); a.title = canon(path); return a; }
+  /** A link that opens the manifest (RFC 0026) the server answers, the JSON `wilanis manifest` prints: every profile's block, or the one named. */
+  function manifestLink(profile) { const a = el('a', null, 'manifest'); a.href = '/api/manifest' + (profile === undefined ? '' : '?profile=' + encodeURIComponent(profile)); a.target = '_blank'; a.rel = 'noopener'; a.title = 'wilanis manifest' + (profile === undefined ? '' : ' --profile ' + profile); return a; }
   /** A link that opens a graph with one node selected. */
   function nodeLink(graph, node, text, cls) { const a = link(graph, text, cls); a.href += '?node=' + encodeURIComponent(node); a.title = canon(graph) + ' › ' + node; return a; }
   const badge = (kind, text) => el('span', 'badge kind-' + kind, text == null ? (KIND_ONE[kind] || kind) : text);
@@ -606,6 +608,8 @@
     const d = v.doc;
     switch (v.kind) {
       case 'project': {
+        // a tree written out as a site has no server to ask for the manifest
+        if (!STATIC) { const m = el('p'); m.appendChild(manifestLink()); m.appendChild(frag(': what the tree is, as the JSON ', el('code', null, 'wilanis manifest'), ' prints, for a machine to read and two runs to diff.')); page.appendChild(m); }
         page.appendChild(el('h2', null, 'Plugins'));
         const cards = el('div', 'cards');
         for (const p of d.plugins || []) { const c = el('div', 'card'); c.appendChild(el('div', 'k', p.from ? 'from ' + p.from : 'built in')); const vv = el('div', 'v'); vv.appendChild(link(p.use + '/plugin.json')); vv.appendChild(el('small', null, p.use)); c.appendChild(vv); if (p.settings && Object.keys(p.settings).length) c.appendChild(valuesTable(p.settings)); cards.appendChild(c); }
@@ -1039,7 +1043,7 @@
     page.appendChild(el('h2', null, 'Profiles'));
     page.appendChild(el('p', null, 'Each profile is one place the tree runs. What it reaches is derived from its choices, not written: every effectful operation the tree runs there, the connections those name, what it holds open, and the variables it needs set before it starts.'));
     for (const p of profiles) {
-      const h = el('h3', null, p.name === undefined ? 'none declared' : p.name); if (p.default) h.appendChild(el('span', 'badge ok', 'default')); page.appendChild(h);
+      const h = el('h3', null, p.name === undefined ? 'none declared' : p.name); if (p.default) h.appendChild(el('span', 'badge ok', 'default')); if (p.name !== undefined && !STATIC) h.appendChild(el('code')).appendChild(manifestLink(p.name)); page.appendChild(h);
       page.appendChild(el('p', null, p.name === undefined ? 'The project declares no profile: each port is met by its one binding.' : (p.description || '')));
       const t = el('table');
       const row = (label, items, none) => { const tr = el('tr'); tr.appendChild(el('td', 'name', label)); const td = el('td'); if (!items.length) td.appendChild(el('span', 'miss', none)); items.forEach((it, i) => { if (i) td.appendChild(el('br')); td.appendChild(it); }); tr.appendChild(td); t.appendChild(tr); };
