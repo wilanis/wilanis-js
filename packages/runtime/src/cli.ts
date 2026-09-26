@@ -7,6 +7,7 @@ import { pipeline } from 'node:stream/promises';
 import { checkTree } from '@wilanis/compiler';
 import type { BlobHandle, Trace } from '@wilanis/core';
 import { KINDS, type Kind, type LoadResult, RefusalList } from '@wilanis/core';
+import { irSaid } from './doc-said.js';
 import { loadProject, type ProjectLoad } from './project.js';
 import { runSaid } from './run-said.js';
 import { runTrigger, start } from './serve.js';
@@ -165,7 +166,7 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
   check: async ({ flags, rootArg }) => {
     const loaded = await check(rootArg(0), jsonOf(flags, 'check'));
     if (flags.json) console.log(printed(accepted(loaded, 'check', rootArg(0))));
-    else console.log(`ok: ${loaded.registry.files.length} documents`);
+    else console.log(`ok: ${loaded.registry.files.length} documents, ${irSaid()}`);
   },
   rehearse: async ({ flags, rootArg }) => {
     const loaded = await check(rootArg(0), jsonOf(flags, 'rehearse'));

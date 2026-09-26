@@ -9,7 +9,7 @@ import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CODES, DOCUMENTS, LOCAL_STARTUP_STEPS, REGISTRATION } from "./lib/expected.mjs";
+import { CODES, DOCUMENTS, IR, LOCAL_STARTUP_STEPS, REGISTRATION } from "./lib/expected.mjs";
 import { render } from "./lib/render.mjs";
 import { Server, call, resetCopy, signIn, wilanis } from "./lib/run.mjs";
 
@@ -43,7 +43,7 @@ const CHECK = { text: "Then the whole tree is judged.", pre: "npx wilanis check 
 function step0(ctx) {
   const title = "The tree and its two rules";
   const out = check(ctx);
-  const want = `ok: ${DOCUMENTS.shipped} documents`;
+  const want = `ok: ${DOCUMENTS.shipped} documents, ${IR}`;
   assert(title, out === want, out, `check answers ${want}`);
   return {
     number: 0,
@@ -127,7 +127,7 @@ function step4(ctx) {
   const title = "The finished route";
   paste(ctx, "archive-customer.step3.trigger.json");
   const out = check(ctx);
-  const want = `ok: ${DOCUMENTS.finished} documents`;
+  const want = `ok: ${DOCUMENTS.finished} documents, ${IR}`;
   assert(title, out === want, out, `check answers ${want}`);
   return {
     number: 4,
