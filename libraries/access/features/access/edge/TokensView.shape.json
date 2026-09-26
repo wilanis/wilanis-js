@@ -5,10 +5,12 @@
   "layer": "edge",
   "fields": {
     "accessToken": {
-      "type": "string"
+      "type": "string",
+      "secret": true
     },
     "refreshToken": {
-      "type": "string"
+      "type": "string",
+      "secret": true
     },
     "tokenType": {
       "type": "string"
