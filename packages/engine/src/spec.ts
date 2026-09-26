@@ -166,6 +166,8 @@ export interface RunContext {
    * shown as, so its reports read the caller's marks as well as their own.
    */
   shownIn?: Record<string, unknown>;
+  /** The trigger context as this run's reports show it, forwarded so a nested run's reports show it the same. */
+  shownRequest?: unknown;
   signal?: AbortSignal;
   /** The clock this run stamps its reports with, forwarded so a nested run stamps by the same one. */
   clock: () => number;
@@ -188,8 +190,8 @@ export interface RunOptions {
   initial?: Record<string, unknown>;
   /**
    * How a report shows a pre-supplied value where it is not the value itself: `in` with the secrets its caller
-   * marks as the marker. A report reads every value through what the report of its source shows; a value not
-   * named here is shown as it is.
+   * marks as the marker, `request` with those its trigger kind's context marks. A report reads every value through
+   * what the report of its source shows; a value not named here, or named as nothing, is shown as it is.
    */
   shown?: Record<string, unknown>;
   stubs?: Record<string, unknown>;

@@ -341,7 +341,7 @@ export class Compiler {
 
 /**
  * What a nested run starts from: the caller's `in` -- unwrapped where the graph takes it whole -- and request, and
- * that `in` as the caller's report shows it, which the nested reports read.
+ * both as the caller's reports show them, which the nested reports read.
  */
 function nestedRoots(
   input: Record<string, unknown>,
@@ -349,6 +349,6 @@ function nestedRoots(
   whole: boolean,
 ): Pick<RunOptions, 'initial' | 'shown'> {
   const initial = { in: whole ? input.in : input, ...(ctx.request !== undefined ? { request: ctx.request } : {}) };
-  if (!ctx.shownIn) return { initial };
-  return { initial, shown: { in: whole ? ctx.shownIn.in : ctx.shownIn } };
+  const shownIn = ctx.shownIn && (whole ? ctx.shownIn.in : ctx.shownIn);
+  return { initial, shown: { in: shownIn, request: ctx.shownRequest } };
 }

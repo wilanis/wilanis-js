@@ -11,6 +11,7 @@ import { type BlobChoice, blobStoreOf, FileBlobStore } from './blobs.js';
 import { correlationOf, type Fired, type Ran, runId, type Started } from './fired.js';
 import { gate } from './gate.js';
 import { portsOf } from './ports.js';
+import { shownRoots } from './shown.js';
 import { coerceWire, fillTemplates, prune } from './values.js';
 
 export { coerceWire, fillTemplates, prune } from './values.js';
@@ -313,6 +314,7 @@ export class Embedder {
     if (input !== undefined) initial.in = input;
     const report = await runGraph(this.operation(trigger.fire.run), {
       initial,
+      shown: shownRoots(this.scope, trigger, { request, input, inType: this.types(trigger).in }),
       stubs: opts.stubs,
       signal: opts.signal,
       clock: this.clock,
