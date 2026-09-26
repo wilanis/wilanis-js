@@ -57,7 +57,14 @@ export {
   type StandIn,
   standInsOf,
 } from './profiles-said.js';
-export { loadProject, type PluginResolution, resolveIncludes, resolvePlugins } from './project.js';
+export {
+  loadProject,
+  type PluginResolution,
+  type ProjectLoad,
+  type Resolved,
+  resolveIncludes,
+  resolvePlugins,
+} from './project.js';
 export { contentTypeOf, runStartup, runTrigger, start } from './serve.js';
 export { Served } from './served.js';
 export {
@@ -94,8 +101,11 @@ export {
   generatedFire,
   init,
   ls,
+  MANIFEST_SCHEMA,
+  type Manifest,
   type MigrateOptions,
   type MigrateResult,
+  manifestOf,
   map,
   migrate,
   policyRoots,

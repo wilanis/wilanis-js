@@ -6,29 +6,16 @@
  * profile starts is read off the one list in `project.json`, without a database behind either.
  */
 import { loadTree } from '@wilanis/core';
-import type { Report } from '@wilanis/engine';
 import { describe, expect, it } from 'vitest';
-import { describe as describeDoc, type Embedder, runStartup } from '../src/index.js';
 import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
+import { profileBlock, startedUnder } from './roles-harness.js';
 
 const LISTEN = '@http/server.port.json#listen';
 const SCHEDULE = '@schedule/scheduler.port.json#run';
 const LEASE = '@connections/customers-postgres.connection.json';
 const example = loadTree(EXAMPLE, PLUGINS, INCLUDES);
 
-/** What each startup step the profile runs names, and its `in`, in the order `runStartup` ran them. */
-async function started(profile: string) {
-  const ran: { run: string; in?: Record<string, unknown> }[] = [];
-  const answered: Report = { graph: 'g', status: 'done', nodes: {}, startedAt: 0, endedAt: 1 };
-  const emb = {
-    startup: async (step: { run: string; in?: Record<string, unknown> }) => {
-      ran.push({ run: step.run, ...(step.in ? { in: step.in } : {}) });
-      return answered;
-    },
-  };
-  await runStartup(example, emb as unknown as Embedder, () => {}, profile);
-  return ran;
-}
+const started = (profile: string) => startedUnder(example, profile);
 
 describe('a process that runs only the schedule', () => {
   it('under production-scheduler, keeps the schedule on its lease and opens no port', async () => {
@@ -52,13 +39,7 @@ describe('a process that runs only the schedule', () => {
   });
 
   it('is what describe project.json prints per profile: what each holds and starts', () => {
-    const said = describeDoc(example, 'project.json').split('\n');
-    // one profile's block, from its heading to the blank line before the next
-    const block = (profile: string) => {
-      const start = said.findIndex(line => line.startsWith(`profile ${profile}  `));
-      const end = said.indexOf('', start);
-      return said.slice(start, end < 0 ? undefined : end).join('\n');
-    };
+    const block = (profile: string) => profileBlock(example, profile);
     expect(block('production')).toContain(LISTEN);
     expect(block('production')).not.toContain(SCHEDULE);
     expect(block('production-scheduler')).toContain(SCHEDULE);

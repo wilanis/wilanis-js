@@ -68,7 +68,8 @@ policy (`A008`). `latest` is not scoped; its key is the tier, one row for every 
 back. Under `live` the customers are the REST API's, which knows no tenants, and nothing is scoped.
 
 The port has three bindings, so **a command that runs the tree runs it under a profile**: `--profile local`,
-`--profile live`, `--profile production` or `--profile production-scheduler`, else `WILANIS_PROFILE`, else `live`, the one `project.json` marks
+`--profile live`, `--profile production`, `--profile production-scheduler` or `--profile production-worker`, else
+`WILANIS_PROFILE`, else `live`, the one `project.json` marks
 `"default": true`. `wilanis check` needs none -- it judges every profile.
 
 ```
@@ -351,14 +352,17 @@ document changes, without closing the port; it names `"profiles": ["live", "loca
 and production runs every other step and not that one. `@schedule/scheduler.port.json#run` keeps the schedule, which is empty here:
 on the laptop in the one process there is, and behind the load balancer in one process alone. `production-scheduler`
 binds what `production` binds and starts what it starts but the listener, and the run step names it with a lease
-in the customer database, while `listen` names every profile but that one. So the instances run under `production`
+in the customer database, while `listen` names neither it nor `production-worker`. So the instances run under `production`
 only listen, one process under `production-scheduler` only schedules, and `wilanis describe project.json` prints
 under each profile what it holds and starts.
 `@otel/exporter.port.json#export` sends every run as spans to a collector on :4318; it is the one step marked
 `"required": false`, since no collector is running when you clone this, and what it cannot send is said once
-in the log rather than delaying the run. `@queue/worker.port.json#consume` works the removals queue (below)
-under every profile that listens, and sits before the listener so that on the way out the port closes first
-and the messages in flight are answered after. `@http/server.port.json#listen` opens :8099 -- **delete that step
+in the log rather than delaying the run. `@queue/worker.port.json#consume` works the removals queue (below):
+on the laptop beside the listener, before it so that on the way out the port closes first and the messages in
+flight are answered after, and behind the load balancer under `production-worker` alone. That profile, too,
+binds what `production` binds, and starts what it starts with the consumer in place of the listener, so the
+instances under `production` answer routes and publish, and as many processes under `production-worker` as the
+queue needs work it and open no port. `@http/server.port.json#listen` opens :8099 -- **delete that step
 and nothing listens**, since no runtime opens a port merely because http triggers exist. The first four are
 domain port operations, so whichever binding the profile chose is what gets checked; the last five are
 `holds` operations, which a plugin grants and the runtime stops when the process ends.
@@ -416,22 +420,27 @@ refusal means to the message is its `outcomes`: `missing` is acknowledged, since
 verify, or a caller who may not remove, is dead at once, since delivering it again cannot help. The route
 takes the token from the header only, not the session cookie, because the header is what the message carries.
 On the laptop the broker is `@queue-memory`'s, in the process: a queue lives as long as the process whose route
-published to it, so the `Work the queues` step runs wherever `Listen` does, and `production-scheduler`, which
-serves no route, consumes nothing. Under `production` and `production-scheduler`, `jobs.connection.json` stands
-for `customers-postgres.connection.json`, and the queue is a table, `wilanis_queue`, beside the customers: every
-instance behind the load balancer publishes to and works the one queue, and the `Prepare the queues` step creates
-the table before the port opens. The two brokers are different kinds; the table broker may stand in for the
+published to it, so under `live` and `local` the `Work the queues` step runs beside `Listen`. Under the three
+production profiles `jobs.connection.json` stands for `customers-postgres.connection.json`, and the queue is a
+table, `wilanis_queue`, beside the customers, so the process that consumes need not be the one that published:
+the instances under `production` publish to it and consume nothing, the processes under `production-worker`
+work it and serve no route, each taking messages no other has taken, and the `Prepare the queues` step creates
+the table under all three, since any of them may start first. The two brokers are different kinds; the table broker may stand in for the
 in-process one because the in-process kind is a broker and nothing else and the two deliver alike, at least once
 (C018). The other way round is refused: the customer database is also a store, so it keeps its kind. Since either may deliver a message twice, `remove` may run twice for one
 message, and `remove` promises `idempotent`: under `live` its one effect is a DELETE, which HTTP declares
 idempotent, and under the store profiles it is `@storage/store.port.json#remove`, which now promises the same.
 B011 holds the promise under every profile, and dropping the word is T009 on `remove-queued.trigger.json`.
 `wilanis start` logs `queue: consuming removals on @connections/jobs.connection.json → @customers/domain/customer.port.json#remove`
-beside the listener, and one line per delivery:
+wherever the step runs, and one line per delivery. On the laptop both lines are one process's; behind the load
+balancer the route's is the listener's and the delivery's the worker's:
 
 ```
-POST /customers/ab1ac9db-…/removal → 202 (1ms, @customers/domain/customer.port.json#enqueueRemoval ok)
-queue removals dc05cb59-… attempt 1 → ack (1ms, @customers/domain/customer.port.json#remove done)
+$ npx wilanis start example --profile production           # the listener
+POST /customers/6bc240eb-…/removal → 202 (6ms, @customers/domain/customer.port.json#enqueueRemoval ok)
+
+$ npx wilanis start example --profile production-worker    # the worker
+queue removals 9c57986b-… attempt 1 → ack (13ms, @customers/domain/customer.port.json#remove done)
 ```
 
 ## Trying again, and for how long

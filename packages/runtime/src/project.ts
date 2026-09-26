@@ -3,7 +3,7 @@
  * `from`, resolved from the project's own node_modules and imported. Only npm package names are accepted
  * there, so a JSON document can never point at an arbitrary file on disk.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -15,7 +15,18 @@ const PACKAGE_NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
 export interface PluginResolution {
   available: Record<string, PluginModule>;
   refusals: Refusal[];
+  /** The version of each plugin package imported, by its `use`: its package.json's, beside the `from` it was named by. */
+  versions: Record<string, string>;
 }
+
+/** What the runtime resolved a tree's packages to: each imported plugin's version by its `use`, and each include. */
+export interface Resolved {
+  plugins: Record<string, string>;
+  includes: ResolvedInclude[];
+}
+
+/** A tree as the runtime loads it: what the loader answers, and the packages it was loaded from (RFC 0026). */
+export type ProjectLoad = LoadResult & { resolved: Resolved };
 
 /** The array project.json holds under one key, or none when the file or the key is not there. loadTree reports D000 / D005. */
 function listedIn(root: string, key: 'plugins' | 'includes'): unknown[] {
@@ -34,17 +45,42 @@ export async function resolvePlugins(
 ): Promise<PluginResolution> {
   const available: Record<string, PluginModule> = { ...BUILTIN_PLUGINS, ...extra };
   const refusals: Refusal[] = [];
+  const versions: Record<string, string> = {};
   const require = createRequire(join(root, 'package.json'));
   for (const [at, entry] of listedIn(root, 'plugins').entries()) {
     const named = entry as { use?: unknown; from?: unknown };
     if (!named || typeof named !== 'object' || typeof named.from !== 'string' || typeof named.use !== 'string')
       continue;
     const found = await pluginFrom(require, named.from, named.use, `plugins/${at}/from`);
-    if ('refusal' in found) refusals.push(found.refusal);
-    else available[named.use] = found.plugin;
+    if ('refusal' in found) {
+      refusals.push(found.refusal);
+      continue;
+    }
+    available[named.use] = found.plugin;
+    if (found.version !== undefined) versions[named.use] = found.version;
   }
-  return { available, refusals };
+  return { available, refusals, versions };
 }
+
+/**
+ * The version in the package.json of the package `from` names, found by walking up from the file it resolved to:
+ * a plugin package's `exports` need not name its package.json, so it cannot be required by name.
+ */
+function versionAbove(entry: string, from: string): string | undefined {
+  for (let dir = dirname(entry); dir !== dirname(dir); dir = dirname(dir)) {
+    const file = join(dir, 'package.json');
+    if (!existsSync(file)) continue;
+    const found = JSON.parse(readFileSync(file, 'utf8'));
+    if (found.name === from) return typeof found.version === 'string' ? found.version : undefined;
+  }
+  return undefined;
+}
+
+/** The version a package.json says, or nothing when it says none. */
+const versionIn = (file: string): string | undefined => {
+  const found = JSON.parse(readFileSync(file, 'utf8')).version;
+  return typeof found === 'string' ? found : undefined;
+};
 
 /** One D006: what a plugin entry got wrong. */
 const badPlugin = (at: string, message: string, hint: string): Refusal => ({
@@ -61,7 +97,7 @@ async function pluginFrom(
   from: string,
   use: string,
   at: string,
-): Promise<{ plugin: PluginModule } | { refusal: Refusal }> {
+): Promise<{ plugin: PluginModule; version?: string } | { refusal: Refusal }> {
   if (!PACKAGE_NAME.test(from))
     return {
       refusal: badPlugin(
@@ -71,8 +107,10 @@ async function pluginFrom(
       ),
     };
   let mod: Record<string, unknown>;
+  let entry: string;
   try {
-    mod = (await import(pathToFileURL(require.resolve(from)).href)) as Record<string, unknown>;
+    entry = require.resolve(from);
+    mod = (await import(pathToFileURL(entry).href)) as Record<string, unknown>;
   } catch (error) {
     return {
       refusal: badPlugin(
@@ -95,7 +133,7 @@ async function pluginFrom(
     return {
       refusal: badPlugin(at, `'${from}' is the plugin '${plugin.root}', not '${use}'`, `"use": "${plugin.root}"`),
     };
-  return { plugin };
+  return { plugin, version: versionAbove(entry, from) };
 }
 
 /**
@@ -140,11 +178,14 @@ function includeFrom(
       ),
     };
   try {
+    const manifest = require.resolve(`${named.from}/package.json`);
+    const version = versionIn(manifest);
     return {
       include: {
         from: named.from,
-        dir: dirname(require.resolve(`${named.from}/package.json`)),
+        dir: dirname(manifest),
         ...(Array.isArray(named.features) ? { features: named.features.map(String) } : {}),
+        ...(version === undefined ? {} : { version }),
       },
     };
   } catch (error) {
@@ -158,18 +199,22 @@ function includeFrom(
   }
 }
 
-/** Load the tree at root with its plugins and includes resolved: builtins, `extra`, and the packages project.json names. */
+/**
+ * Load the tree at root with its plugins and includes resolved: builtins, `extra`, and the packages project.json
+ * names; the load carries the versions they were resolved at, which the manifest prints.
+ */
 export async function loadProject(
   root: string,
   opts: { plugins?: Record<string, PluginModule>; includes?: ResolvedInclude[] } = {},
-): Promise<LoadResult> {
-  const { available, refusals } = await resolvePlugins(root, opts.plugins);
+): Promise<ProjectLoad> {
+  const { available, refusals, versions } = await resolvePlugins(root, opts.plugins);
   const resolved = resolveIncludes(root);
-  const load = loadTree(root, available, [...(opts.includes ?? []), ...resolved.includes]);
+  const includes = [...(opts.includes ?? []), ...resolved.includes];
+  const load = loadTree(root, available, includes);
   refusals.push(...resolved.refusals);
   // a plugin whose package failed to load is reported once, with the install hint, not also as unknown
   const failed = new Set(refusals.map(refusal => refusal.at?.replace(/\/from$/, '')));
   const kept = load.refusals.items.filter(item => !(item.code === 'D006' && failed.has(item.at)));
   load.refusals.items.splice(0, load.refusals.items.length, ...kept, ...refusals);
-  return load;
+  return { ...load, resolved: { plugins: versions, includes } };
 }

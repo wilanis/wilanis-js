@@ -89,16 +89,27 @@ run is cancelled and still answers a report. Draws on RFC 0011, RFC 0012 and RFC
 
 ## M10 Work off the request
 
-Imports are processed by a worker fed from a queue, and a scheduled trigger fires on the clock, both beside
-the routes: `wilanis start` logs the next tick of each scheduled trigger and one line per tick it fires. Draws
-on RFC 0009 and RFC 0010. Which job the example schedules is not yet chosen. This row named the digest, and
-the digest reads the customers of every tenant: a tick has no caller for its tenant or its policy to be about,
-so the example's nightly run of it was taken out, and its `Keep the schedule` step schedules nothing.
+A removal is done off the request by a worker fed from a queue, and a scheduled trigger fires on the clock.
+`POST /customers/{id}/removal` answers 202 with the message's id, and `remove-queued.trigger.json` fires
+`customer.port.json#remove` for each message, under the same policies as `DELETE /customers/{id}`. On the
+laptop the process that listens works the queue, kept in the process; under production the queue is a table
+beside the customers, the instances under `production` only listen, and processes of their own started under
+`production-worker` consume it and open no port. `wilanis start` logs one line per delivery and what became
+of the message, and the next tick of each scheduled trigger and one line per tick it fires. Draws on RFC 0009
+and RFC 0010. Which job the example schedules is not yet chosen. This row named the digest, and the digest
+reads the customers of every tenant: a tick has no caller for its tenant or its policy to be about, so the
+example's nightly run of it was taken out, and its `Keep the schedule` step schedules nothing.
+
+```
+npx wilanis start example --profile local
+curl -X POST :8099/customers/{id}/removal -H "authorization: Bearer $TOKEN"   # 202, the message's id
+queue removals dc05cb59-… attempt 1 → ack (1ms, @customers/domain/customer.port.json#remove done)
+```
 
 After M09, not before it: RFC 0009 accepts after RFC 0011 and its step 1 lands before RFC 0009's step 2,
-and RFC 0010's `deadlineMs` setting waits on RFC 0012's `FireArgs.signal`. Both are M09's RFCs. A worker
-that runs in a process of its own waits on RFC 0013 under M11; this demo puts the worker beside the routes,
-so it does not.
+and RFC 0010's `deadlineMs` setting waits on RFC 0012's `FireArgs.signal`. Both are M09's RFCs. A worker in a
+process apart from the listener is a startup step naming its profiles, which is RFC 0013's; that RFC is M11's
+but is already implemented, so this milestone does not wait on M11.
 
 ## M11 Ship it
 

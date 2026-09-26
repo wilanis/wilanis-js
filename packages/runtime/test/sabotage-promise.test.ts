@@ -27,7 +27,9 @@ describe('sabotage: the promise a profile makes (RFC 0011)', () => {
     const said = sabotageSaying(port, promising('register'));
     expect(said.every(line => line.startsWith('B011'))).toBe(true);
     const profiles = said.map(line => /\(profile '([\w-]+)'\)/.exec(line)?.[1]);
-    expect(new Set(profiles)).toEqual(new Set(['live', 'local', 'production', 'production-scheduler']));
+    expect(new Set(profiles)).toEqual(
+      new Set(['live', 'local', 'production', 'production-scheduler', 'production-worker']),
+    );
   });
   it('B011 follows a domain graph through the bindings it calls', () => {
     const said = sabotageSaying(port, promising('submit')).filter(line => line.includes("profile 'live'"));

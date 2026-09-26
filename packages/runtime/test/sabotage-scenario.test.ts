@@ -15,7 +15,7 @@ import { copyOfExample, INCLUDES, PLUGINS, planted, plantedPointing } from './ex
 const TRIGGER = '@features/customers/edge/get-customer.trigger.json';
 const UPDATE = '@features/customers/edge/update-customer.trigger.json';
 const GRAPH = 'features/customers/data/get-row.graph.json';
-const SCENARIO = 'scenarios/get-customer.1.scenario.json';
+const SCENARIO = 'scenarios/fuzz/get-customer.1.scenario.json';
 const read = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
 
 /** Edit the refuse node the seed-1 run of get-customer ends at, in a copy of the example. */
@@ -77,6 +77,9 @@ describe('fuzz records the reason a node refused with, and regress diffs it', ()
     const file = join(dir, SCENARIO);
     const doc = read(file);
     for (const node of Object.values(doc.expect.nodes) as { reason?: string }[]) delete node.reason;
+    // nor the run's reason, nor the mark fuzz now writes (RFC 0018): a flat file an older fuzz left in scenarios/
+    delete doc.expect.reason;
+    delete doc.generated;
     writeFileSync(file, JSON.stringify(doc));
     editRefusal(dir, 'conflict');
     expect((await replayed(dir)).line).toBe(`@${SCENARIO}: same`);
