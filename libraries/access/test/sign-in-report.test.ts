@@ -6,7 +6,17 @@ import { loadTree, type PluginModule, type Trace } from '@wilanis/core';
 import type { NodeReport, Report } from '@wilanis/engine';
 import auth from '@wilanis/plugin-auth';
 import http, { encode } from '@wilanis/plugin-http';
-import { BUILTIN_PLUGINS, embedderFor, fuzz, type Ran, regress, Served, traceOf } from '@wilanis/runtime';
+import {
+  BUILTIN_PLUGINS,
+  embedderFor,
+  fuzz,
+  type Ran,
+  RECORDED,
+  regress,
+  rehearse,
+  Served,
+  traceOf,
+} from '@wilanis/runtime';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -197,6 +207,33 @@ describe('what fuzz records of a sign-in and of a code', () => {
         expect(output).toEqual({ id: expect.any(String), code: SECRET, expiresAt: expect.any(String) });
       const replayed = await regress(loadTree(dir, PLUGINS));
       expect(replayed.ok, replayed.lines.join('\n')).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('what rehearse --record records of a sign-in', () => {
+  it("records each realm's issued tokens as the trigger's out shape marks them, and replays the same", async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'wilanis-access-record-'));
+    cpSync(TREE, dir, { recursive: true, filter: path => !/node_modules|\.wilanis|\/test|\/scenarios/.test(path) });
+    try {
+      const { ok, lines, recorded } = await rehearse(loadTree(dir, PLUGINS), { record: RECORDED });
+      expect(ok, lines.join('\n')).toBe(true);
+      // the branch each realm's sign-in answers on: TokensView marks both tokens, so the stubbed ones never reach it
+      const issued = [
+        `${RECORDED}/auth-customers/access.sign-in-customer.verdict.issued.scenario.json`,
+        `${RECORDED}/auth-employees/access.sign-in-employee.verdict.issued.scenario.json`,
+      ];
+      expect(recorded?.written).toEqual(expect.arrayContaining(issued));
+      for (const file of issued)
+        expect(JSON.parse(readFileSync(join(dir, file), 'utf8')).expect).toMatchObject({
+          status: 'done',
+          output: { accessToken: SECRET, refreshToken: SECRET, tokenType: 'Bearer', expiresIn: expect.any(Number) },
+        });
+      const replayed = await regress(loadTree(dir, PLUGINS));
+      expect(replayed.ok, replayed.lines.join('\n')).toBe(true);
+      expect(replayed.results).toHaveLength(recorded?.files ?? -1);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

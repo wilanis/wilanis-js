@@ -13,6 +13,7 @@ import { runSaid } from './run-said.js';
 import { runTrigger, start } from './serve.js';
 import { type StopInput, stopHook } from './stopping.js';
 import {
+  current,
   describe,
   diagnosticsOf,
   fuzz,
@@ -23,6 +24,9 @@ import {
   map,
   migrate,
   printed,
+  RECORDED,
+  type Rehearsal,
+  recordedLines,
   regress,
   rehearse,
   SCENARIOS,
@@ -45,7 +49,10 @@ const REPEATABLE = ['branch'];
 const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a stateless engine
 
   wilanis check    [root] [--json]                 judge the whole tree, under every profile; exit 1 with every refusal
-  wilanis rehearse [root] [--seed n] [-v] [--json] run every trigger, and every branch of every switch
+  wilanis rehearse [root] [--seed n] [-v] [--json] [--record [dir]] [--check]
+                   run every trigger, and every branch of every switch; --record writes each branch's run as a
+                   scenario under scenarios/rehearsed/ (or dir), --check says whether that directory is what the
+                   tree writes today and exits 1 when it is not. Both solve under seed 1 and refuse --seed
   wilanis fuzz     [root] [--runs n]               write one scenario per trigger per seed to scenarios/fuzz/
   wilanis regress  [root] [--json]                 replay every scenario and diff node by node
   wilanis start    [root] [--profile word] [--trace[=text|json]] [--level summary|full]
@@ -158,6 +165,29 @@ const accepted = (loaded: LoadResult, command: string, root: string) =>
 /** The command's name when `--json` was given, which is what `check` needs to print the envelope; else nothing. */
 const jsonOf = (flags: Record<string, string>, command: string) => (flags.json ? command : undefined);
 
+/**
+ * What `rehearse` is asked to record: `--record [dir]` and `--check`, `--record --check` being `--check` on that
+ * directory. Either refuses `--seed`, since the recorded directory is a function of the tree and one fixed seed.
+ */
+function recordingOf(flags: Record<string, string>): { record?: string; check?: boolean } {
+  const check = flags.check !== undefined;
+  if ((flags.record !== undefined || check) && flags.seed !== undefined) {
+    console.error('the recorded directory is solved under seed 1: drop --seed');
+    process.exit(2);
+  }
+  const record = flags.record === 'true' ? RECORDED : flags.record;
+  return { ...(record !== undefined ? { record } : {}), ...(check ? { check } : {}) };
+}
+
+/**
+ * What a rehearsal prints: under `--check` what the profile skipped and how the recorded directory stands, else its
+ * lines and what it wrote.
+ */
+function rehearsalSaid(answer: Rehearsal, check?: boolean): string[] {
+  const recorded = answer.recorded ? recordedLines(answer.recorded) : [];
+  return check ? [...answer.skipped, ...recorded] : [...answer.lines, ...recorded];
+}
+
 /** What the command line gave: the flags, the words, and the root each command reads from. */
 interface Given {
   flags: Record<string, string>;
@@ -175,15 +205,17 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     else console.log(`ok: ${loaded.registry.files.length} documents, ${irSaid()}`);
   },
   rehearse: async ({ flags, rootArg }) => {
+    const recording = recordingOf(flags);
     const loaded = await check(rootArg(0), jsonOf(flags, 'rehearse'));
     const answer = await rehearse(loaded, {
       seed: flags.seed ? Number(flags.seed) : undefined,
       profile: flags.profile,
       verbose: Boolean(flags.verbose),
+      ...recording,
     });
     if (flags.json) console.log(printed(withRehearsal(accepted(loaded, 'rehearse', rootArg(0)), answer)));
-    else console.log(answer.lines.join('\n'));
-    if (!answer.ok) process.exit(1);
+    else console.log(rehearsalSaid(answer, recording.check).join('\n'));
+    if (recording.check ? !answer.recorded || !current(answer.recorded) : !answer.ok) process.exit(1);
   },
   fuzz: async ({ flags, rootArg }) => {
     const loaded = await check(rootArg(0));
@@ -200,7 +232,7 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     const loaded = await check(rootArg(0), jsonOf(flags, 'regress'));
     const answer = await regress(loaded, { profile: flags.profile });
     if (flags.json) console.log(printed(withRegression(accepted(loaded, 'regress', rootArg(0)), answer)));
-    else console.log(answer.lines.join('\n') || 'no scenarios -- run wilanis fuzz first');
+    else console.log(answer.lines.join('\n') || 'no scenarios -- run wilanis rehearse --record or wilanis fuzz');
     if (!answer.ok) process.exit(1);
   },
   start: async ({ flags, rootArg }) => {
