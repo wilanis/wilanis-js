@@ -63,10 +63,13 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
                    every profile's block, or the one --profile names; WILANIS_PROFILE is not read
   wilanis new      <kind> <name|path> [root] [--layer edge|data] [--port word] [--run word#op] [--kind k]
                    [--of shape] [--over word#op] [--on shape]
-                   graph, read-decide-write: --store <store> --collection <name> --read-then patch|put|remove
+                   graph, a change to a record, in two halves: --port <port> [--read get] [--write keep] the
+                   domain graph that loads it, lays the change over it with #merge and hands it whole to the write;
+                   --store <store> --collection <name> the data graph that takes it as in and #puts it whole
+                   graph, read-decide-write: --store <store> --collection <name> --read-then put|remove
                    [--branch <id>:<when> ...] [--type shape]   one write per branch, each routed to by its when;
-                   repeat the flag. Its ids name what each node holds: the shape (--type, else the store's), the
-                   write, the branch
+                   repeat the flag. Its ids name what each node holds: the shape (--type, else the store's or the
+                   write's), the write, the branch. No form patches; --read-then patch is refused
                    kinds: project feature shape port graph binding store trigger policy resolvers invariant
   wilanis init     [root]                          write CLAUDE.md and agent hooks into a tree
   wilanis stop-hook [root]                         the Stop hook: judge the tree, answer the harness on stdout

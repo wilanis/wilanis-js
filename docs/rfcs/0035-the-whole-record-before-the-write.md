@@ -407,3 +407,21 @@ in the scaffold for a collection no invariant reads or goes altogether; and the 
    `#put` as `record`, or to `#patch` as `changes`, is not judged: this RFC says what a record read from `in` or a
    node is, and not what an element of a list read from one is. That write path, and the others these rules do
    not see, are #682.
+4. **`--read-then patch` goes altogether, not only for a collection an invariant reads.** Kept for the rest, the
+   scaffold would have to say which collections those are, and it cannot say what I007 says: I007 refuses a patch
+   by the fields its `changes` names, and those fields are exactly what the scaffold leaves TODO. It would refuse a
+   patch of `active` that the checker takes, or take one the checker then refuses, and a tool that judges what a
+   rule judges is that rule written twice. A collection no invariant reads today is also one an invariant added in
+   `domain/` reads tomorrow, and then every graph the scaffold patched with is refused and rewritten as the pair;
+   the scaffold is what an author copies, which is how the example came to patch. What goes is small: a patch of a
+   field no invariant reads is one node, written against the store port's own description of `#patch`, which stays
+   on the port. `--read-then patch` is refused with the two flags that write the pair, and so is a `--read-then`
+   that names no write, where before it fell back to a patch. The read-decide-write form keeps `put` and `remove`,
+   and its `put` writes `"record": "{{in}}"`, the one record I008 takes that step 3's rule will not also refuse.
+   `--store` with `--collection` and no `--read-then` writes the data half, whose ids are `keep-customer`'s
+   (`stored`, `outcome`, `kept`, `repeated`, `nothingWritten`). `--port` writes the domain half, reading through
+   `--read` and handing to `--write`, `get` and `keep` unless they say, with the ids `update-customer` has
+   (`current`, the shape's noun, `kept`); it gives the write the shape's fields one by one, as a call to an
+   operation whose `accepts` names a shape gives them (entry 1), and not `{ "customer": "{{customer}}" }` as the
+   guide-level text shows. The scaffold's tests are `scaffold-graph.test.ts` and `scaffold-keep.test.ts`, beside
+   the module, where `demo.test.ts` was named above: that one runs `docs/demo.md`'s beats, and none scaffolds a graph.
