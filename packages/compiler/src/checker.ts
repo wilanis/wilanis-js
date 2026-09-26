@@ -9,6 +9,7 @@
  *   C connections and settings (project.ts, contracts.ts)
  *   C stores: what they keep and what they once called it (stores.ts), and who may see it (scopes.ts)
  *   atomic graphs, which are L and G rules over what one reaches (atomic.ts)
+ *   L016, a data graph making a guarded value an effect reads (graph-making.ts)
  *   S scenarios (scenarios.ts)   X plugin-specific (each plugin's own `check`)
  */
 import { type LoadResult, type PluginModule, RefusalList, Scope } from '@wilanis/core';
@@ -17,6 +18,7 @@ import { checkAtomic } from './check/atomic.js';
 import { checkBinding } from './check/bindings.js';
 import { checkConnection, checkPort, checkShape } from './check/contracts.js';
 import { checkGraph } from './check/graph.js';
+import { checkGuardedMaking } from './check/graph-making.js';
 import { checkInvariantWrites } from './check/invariant-writes.js';
 import { checkInvariant, checkInvariantSites } from './check/invariants.js';
 import { Judge } from './check/judge.js';
@@ -69,13 +71,15 @@ function judgeContracts(judge: Judge): void {
 /**
  * What names a contract: the resolvers, graphs, bindings, policies, triggers and scenarios. A store's scoping
  * is judged here rather than beside the rest of the store, because what a scope claims is about the resolver
- * it names, and a resolver is judged the line above.
+ * it names, and a resolver is judged the line above. Where a data graph makes a guarded value is judged once
+ * over the tree, after every graph, since it walks each guarded shape's sites rather than one document.
  */
 function judgeUses(judge: Judge): void {
   const { registry } = judge.scope;
   for (const resolvers of registry.all('resolvers')) checkResolversDoc(judge, resolvers);
   for (const store of registry.all('store')) checkStoreScoping(judge, store);
   for (const graph of registry.all('graph')) checkGraph(judge, graph, judge.scope.roleOf(graph.path));
+  checkGuardedMaking(judge);
   for (const binding of registry.all('binding')) checkBinding(judge, binding);
   for (const policy of registry.all('policy')) checkPolicy(judge, policy);
   for (const trigger of registry.all('trigger')) checkTrigger(judge, trigger);

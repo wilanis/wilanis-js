@@ -126,9 +126,9 @@ function wholeRead(write: Write, value: unknown): boolean {
 }
 
 /** How a message names a shape: its label, or its path where it has none. */
-const shapeName = (judge: Judge, shape: string): string => judge.scope.get('shape', shape)?.doc.label ?? shape;
+export const shapeName = (judge: Judge, shape: string): string => judge.scope.get('shape', shape)?.doc.label ?? shape;
 
 /** Items said as a reader would list them: `a`, `a and b`, `a, b and c`. */
-function listed(items: string[]): string {
+export function listed(items: string[]): string {
   return items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}` : (items[0] ?? '');
 }
