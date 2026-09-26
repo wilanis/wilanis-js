@@ -18,7 +18,7 @@ function listed(project: ProjectDoc | undefined): string {
 }
 
 /** A name given on the command line or in the environment, held to the profiles the project declares. */
-function declared(project: ProjectDoc | undefined, name: string): string {
+export function declaredProfile(project: ProjectDoc | undefined, name: string): string {
   if (project?.profiles?.[name]) return name;
   throw new Error(`no profile '${name}'; project.json declares: ${listed(project)}`);
 }
@@ -34,7 +34,7 @@ export function activeProfile(
   given: { flag?: string; env: NodeJS.ProcessEnv },
 ): string | undefined {
   const named = given.flag || given.env[PROFILE_VARIABLE];
-  if (named) return declared(project, named);
+  if (named) return declaredProfile(project, named);
   const profiles = Object.entries(project?.profiles ?? {});
   if (!profiles.length) return undefined;
   const defaults = profiles.filter(([, one]) => one.default === true).map(([name]) => name);
