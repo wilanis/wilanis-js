@@ -77,8 +77,8 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
 
 check, rehearse, regress and migrate take --json: one JSON object on stdout (RFC 0019's envelope, packages/runtime/
 schemas/diagnostics.schema.json), the refusals as data on a refused tree whichever was asked, and the same exit codes.
-rehearse, fuzz, regress, start and run take --profile word, and run under it; else under WILANIS_PROFILE, else
-under the profile project.json marks "default": true. A project that declares no profile runs its one unnamed one.
+rehearse, fuzz, regress, start, run and migrate take --profile word, and run under it; else under WILANIS_PROFILE,
+else under the profile project.json marks "default": true. A project that declares no profile runs its one unnamed one.
 Under a profile, rehearse, fuzz and regress skip a trigger whose kind no startup step of that profile serves (a
 route where nothing listens), and say how many; run refuses one, naming the profiles that serve it.
 Every path is @-rooted (@features/tasks/tasks.port.json) or through a project alias.
