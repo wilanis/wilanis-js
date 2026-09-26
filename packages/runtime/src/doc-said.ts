@@ -20,10 +20,9 @@ import type {
   ScenarioDoc,
   Scope,
 } from '@wilanis/core';
-import { SCHEMA_BASE } from '@wilanis/core';
+import { IR_READ } from '@wilanis/core';
 import { attemptsSaid } from './attempts-said.js';
 import { deliveryLines, pairedLines } from './delivery-said.js';
-import { irOf } from './manifest.js';
 import { profilesLines, standInLines } from './profiles-said.js';
 import { type Reader, readersOf, readsLines } from './reads-said.js';
 
@@ -160,13 +159,12 @@ function startupLines(declared: ProjectDoc): string[] {
 
 /**
  * The tree's IR version beside the one this runtime reads (RFC 0008), as `check` and `describe project` print it.
- * The same word on both sides, read once: the loader admits a document only under the schema base this runtime reads,
- * or the alias it reads as that base, so a tree that loaded is of that version, as the manifest's `ir` says, and a
- * document naming another is refused at load rather than counted as the tree's.
+ * The same word on both sides, read once: the loader refuses a document naming a version this runtime does not read
+ * (D013) and a tree naming two (D014) before it reads anything else, so a tree that loaded is of that version, as the
+ * manifest's `ir` says.
  */
 export function irSaid(): string {
-  const ir = irOf(SCHEMA_BASE);
-  return `IR ${ir}, runtime reads ${ir}`;
+  return `IR ${IR_READ}, runtime reads ${IR_READ}`;
 }
 
 /**

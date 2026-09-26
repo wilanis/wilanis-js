@@ -71,6 +71,8 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [D010](D010.md) | D | live | an include that is not found or not a tree, lacks a feature asked for, or uses a plugin the host lacks |
 | [D011](D011.md) | D | live | a plugin port's `resolves` on a non-static input, or keyed by an input that is missing or not static |
 | [D012](D012.md) | D | live | a plugin that both grants and requires a port, or requires one it does not ship |
+| [D013](D013.md) | D | live | a document, the tree's, an include's or a plugin's, whose `$schema` names an IR version this runtime does not read |
+| [D014](D014.md) | D | live | a tree whose documents, its includes' and its plugins' among them, name more than one IR version |
 | [R001](R001.md) | R | live | a reference to a port, operation, shape, policy or other document the tree does not have |
 | [L001](L001.md) | L | live | a type naming a type variable, or `unknown` in core, or a shape of the other layer |
 | [L002](L002.md) | L | live | a domain graph reaching an effect or the request, or a data graph running a domain operation |

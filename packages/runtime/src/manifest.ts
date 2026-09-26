@@ -7,7 +7,7 @@
  * string however it was walked. The inventory is what is the same under every profile; `profiles` holds one block
  * per profile, what RFC 0013's `reachOf` derives there.
  */
-import { type LoadResult, SCHEMA_BASE, Scope } from '@wilanis/core';
+import { IR_READ, type LoadResult, Scope } from '@wilanis/core';
 import { type ProfileBlock, profileBlocks } from './manifest-profiles.js';
 import {
   type ConnectionRow,
@@ -85,11 +85,8 @@ export interface ManifestOptions {
   profile?: string;
 }
 
-/**
- * The schema version a base URL serves, RFC 0008's segment of it: `v1` while the base is on `main` or on the tag
- * `schemas-v1`, and `vN` once it moves to `schemas-vN`.
- */
-export const irOf = (base: string): string => /\/schemas-(v[0-9]+)\//.exec(base)?.[1] ?? 'v1';
+/** The schema version a base URL serves: core's, where the loader reads a document's version with it (RFC 0008). */
+export { irOf } from '@wilanis/core';
 
 /**
  * The manifest of a tree the checker accepted. The versions of its plugins and includes are read off `resolved`,
@@ -106,7 +103,7 @@ export function manifestOf(load: LoadResult & { resolved?: Resolved }, options: 
   return {
     format: 1,
     runtime: RUNTIME_VERSION,
-    ir: irOf(SCHEMA_BASE),
+    ir: IR_READ,
     name: load.registry.project?.doc.name ?? '',
     root: options.root,
     plugins: pluginRows(load, load.resolved?.plugins ?? {}),
