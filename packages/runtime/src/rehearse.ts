@@ -4,12 +4,13 @@
  */
 import { type Guard, guardsOf, idsOf, TAKEN_IDS, walkedUnder } from '@wilanis/compiler';
 import type { Loaded, LoadResult, TriggerDoc, Type } from '@wilanis/core';
-import { Scope } from '@wilanis/core';
+import { isSwitch, Scope } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
 import { outcomeOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, nonEmpty, type Stubbing, setPath, switchesOf } from './branches.js';
 import type { Embedder } from './embed.js';
 import { activeProfile, skippedLines } from './profile.js';
+import { type Recorded, type RecordedRun, recordRuns } from './record.js';
 import { type Decision, format, gather, type PlainRun, statedOf, stateName } from './rehearsal-report.js';
 import { heldUpstream } from './rehearse-held.js';
 import { atomicAt, declaredAt, rootGraph, specBehind, type Where, whereOf } from './rehearse-where.js';
@@ -27,6 +28,8 @@ export interface Rehearsal {
   decisions: Decision[];
   /** Every trigger with no switch under it, run once. */
   plain: PlainRun[];
+  /** Under `record` or `check`: the recorded directory, and what was written to it or found different in it. */
+  recorded?: Recorded;
 }
 
 /** What one run of one branch settled to, judged at the graph that owns the decision. */
@@ -112,37 +115,57 @@ function whyFailed(local: Report): Partial<Settled> {
  * It runs under the profile `activeProfile` picks, as `start` would, so the bindings it stubs are the ones
  * that place runs; being stubbed, it needs no variable set. It runs only the triggers that profile serves
  * (`walkedUnder`), the ones the checker judged there, and says first how many it skipped and where they are served.
+ *
+ * With `record` (a directory under the root) or `check`, the runs a trigger's branches made are also recorded as
+ * scenarios (`record.ts`): written there, or under `check` compared with what is there. Either solves under seed 1
+ * whatever `seed` says, so the directory is a function of the tree alone.
  */
 export async function rehearse(
   load: LoadResult,
-  opts: { seed?: number; profile?: string; verbose?: boolean } = {},
+  opts: { seed?: number; profile?: string; verbose?: boolean; record?: string; check?: boolean } = {},
 ): Promise<Rehearsal> {
-  const seed = opts.seed ?? 1;
+  const recording = opts.record !== undefined || Boolean(opts.check);
+  const seed = recording ? 1 : (opts.seed ?? 1);
   const profile = activeProfile(load.registry.project?.doc, { flag: opts.profile, env: process.env });
   const scope = new Scope(load.registry, load.resolve);
-  const lines = skippedLines(scope, profile, load.registry.all('trigger'), 'trigger(s)');
+  const triggers = load.registry.all('trigger');
+  const lines = skippedLines(scope, profile, triggers, 'trigger(s)');
   const decisions: Decision[] = [];
   const plain: PlainRun[] = [];
-  // every trigger, and every policy as a trigger of each kind that attaches it: a decision is walked like any other graph
-  for (const trigger of [...load.registry.all('trigger'), ...policyRoots(load)]) {
+  const runs: RecordedRun[] = [];
+  // every trigger, and every policy as a trigger of each kind that attaches it: a decision is walked like any other
+  // graph. Only a trigger's runs are recorded: a scenario names a trigger, and a policy's decision is not yet one.
+  for (const trigger of [...triggers, ...policyRoots(load)]) {
     if (!walkedUnder(scope, trigger.doc, profile)) continue;
-    const found = await rehearseTrigger(load, trigger, { seed, profile }, decisions);
-    if (!found) plain.push(await wholeOf(load, trigger, seed, profile));
+    const how = { seed, profile, runs: recording && triggers.includes(trigger) ? runs : undefined };
+    const found = await rehearseTrigger(load, trigger, how, decisions);
+    if (!found) plain.push(await wholeOf(load, trigger, how));
   }
   // the invariants the tree states, counted over the whole tree rather than per trigger: a rule is stated once.
   // A scope of its own rather than an embedder's: what is asked of it reads documents and runs nothing.
   const said = { verbose: opts.verbose, stated: statedOf(new Scope(load.registry, load.resolve)) };
-  return { ok: format(decisions, plain, lines, said), lines, seed, decisions, plain };
+  const ok = format(decisions, plain, lines, said);
+  return { ok, lines, seed, decisions, plain, ...(recording ? { recorded: recordRuns(load.root, opts, runs) } : {}) };
+}
+
+/** How a trigger is walked: the seed, the profile, and -- when its runs are recorded -- where they go. */
+interface How {
+  seed: number;
+  profile?: string;
+  runs?: RecordedRun[];
 }
 
 /** What broke, when a run failed without declaring a refusal: the node, and what it threw. */
 const brokeAt = (fault: { at: string; error: string }) => (fault.at ? `${fault.at}: ${fault.error}` : 'failed');
 
-/** A trigger with no switch anywhere under it: one run is the whole of it. */
-async function wholeOf(load: LoadResult, trigger: Loaded<TriggerDoc>, seed: number, profile?: string) {
-  const emb = embedderFor(load, { seed, profile });
+/** A trigger with no switch anywhere under it: one run is the whole of it, and recorded whole where runs are. */
+async function wholeOf(load: LoadResult, trigger: Loaded<TriggerDoc>, how: How): Promise<PlainRun> {
+  const { seed, profile } = how;
+  const record: Record<string, unknown> = {};
+  const emb = embedderFor(load, { seed, profile, record });
   const { input, request } = generatedFire(emb, trigger, seed);
   const report = await emb.fire(trigger.doc, input, request);
+  how.runs?.push({ trigger, seed, input, request, stubs: record, report });
   const outcome = outcomeOf(report);
   return {
     trigger: trigger.name,
@@ -158,7 +181,7 @@ async function wholeOf(load: LoadResult, trigger: Loaded<TriggerDoc>, seed: numb
 async function rehearseTrigger(
   load: LoadResult,
   trigger: Loaded<TriggerDoc>,
-  how: { seed: number; profile?: string },
+  how: How,
   decisions: Decision[],
 ): Promise<boolean> {
   const { seed, profile } = how;
@@ -187,7 +210,7 @@ async function rehearseTrigger(
     inputSeed: input,
     inType,
   };
-  const walk: Walk = { load, trigger, seed, profile, found, stubbing, input, request, probe };
+  const walk: Walk = { load, trigger, seed, profile, found, stubbing, input, request, probe, runs: how.runs };
 
   // The probe took one path, so nodes behind every branch it did not take are absent from the recording
   // and their declared types are unknown -- a case built from nothing cannot generate a typed value. One
@@ -208,6 +231,8 @@ interface Walk {
   input: unknown;
   request: Record<string, unknown>;
   probe: Embedder;
+  /** Where each branch's run is recorded, when the rehearsal records. */
+  runs?: RecordedRun[];
 }
 
 /** What steers a run: the stubs it is given, the patches to the trigger's input, and the nodes made to break. */
@@ -332,11 +357,55 @@ async function decisionFor(walk: Walk, sw: FoundSwitch): Promise<Decision> {
   // a guard whose value an enclosing graph already judged on this path is held there: neither branch is steered,
   // since what reaches it is what the caller handed down, and the one that refuses cannot be reached on this path
   const held = guard && heldUpstream(walk.probe, walk.trigger, sw, guard);
-  for (const one of casesFor(sw, walk.stubbing))
-    decision.branches.push(
-      held ? { when: one.branch.when, to: one.branch.to, held } : await branchOf(walk, sw, one, { pre, downstream }),
-    );
+  const cases = casesFor(sw, walk.stubbing);
+  for (const one of cases) {
+    if (held) {
+      decision.branches.push({ when: one.branch.when, to: one.branch.to, held });
+      continue;
+    }
+    const { said, ran } = await branchOf(walk, sw, one, { pre, downstream });
+    decision.branches.push(said);
+    // a guard's switch is the compiler's, in no document a scenario can name, and a run that broke a node for real
+    // is one a scenario's stubs cannot say: neither is recorded
+    if (ran && !guard && !ran.broke) walk.runs?.push(recordedOf(walk, decision, { one, cases, ran }));
+  }
   return decision;
+}
+
+/** What a branch's run hands back to be recorded: what it was fired with, what answered, and whether a node broke. */
+interface Ran {
+  input: unknown;
+  stubs: Record<string, unknown>;
+  report: Report;
+  broke: boolean;
+}
+
+/** One branch's run as it is recorded, named by the branch it proves and, where a sibling shares its target, its place. */
+function recordedOf(walk: Walk, decision: Decision, of: { one: Case; cases: Case[]; ran: Ran }): RecordedRun {
+  const { one, cases, ran } = of;
+  const shared = cases.filter(other => other.branch.to === one.branch.to).length > 1;
+  const graph = walk.load.resolve(decision.graph);
+  const branch = {
+    graph,
+    node: decision.node,
+    when: one.branch.when,
+    to: authoredTo(walk.probe, { graph, node: decision.node }, one),
+    ...(shared ? { n: cases.indexOf(one) } : {}),
+  };
+  const { input, stubs, report } = ran;
+  return { trigger: walk.trigger, branch, seed: walk.seed, input, request: walk.request, stubs, report };
+}
+
+/**
+ * The node a case routes to as the graph document writes it. The lowered spec may route elsewhere -- a guarded
+ * site's made node is moved aside to `<id>:made` with whatever routed it (RFC 0007) -- and a scenario names what a
+ * reader of the document can find.
+ */
+function authoredTo(emb: Embedder, at: { graph: string; node: string }, one: Case): string {
+  const node = emb.scope.get('graph', at.graph)?.doc.nodes.find(each => each.id === at.node);
+  if (!node || !isSwitch(node)) return one.branch.to;
+  if (one.branch.rule >= 0) return node.rules[one.branch.rule]?.to ?? one.branch.to;
+  return one.branch.rule === -1 ? node.else : one.branch.to;
 }
 
 /** One case of a switch: the branch it reaches, or why nothing can reach it. */
@@ -345,22 +414,23 @@ async function branchOf(
   sw: FoundSwitch,
   one: Case,
   steer: { pre: Steering; downstream: Record<string, unknown> },
-): Promise<Decision['branches'][number]> {
+): Promise<{ said: Decision['branches'][number]; ran?: Ran }> {
   const at = { when: one.branch.when, to: one.branch.to };
-  if (one.branch.unsolved) return { ...at, uncovered: one.branch.unsolved };
-  if (one.unreachable?.length)
-    return {
-      ...at,
-      uncovered: `${one.unreachable.join(', ')} is the trigger's own input and the rehearsal cannot vary it`,
-    };
+  if (one.branch.unsolved) return { said: { ...at, uncovered: one.branch.unsolved } };
+  if (one.unreachable?.length) {
+    const why = `${one.unreachable.join(', ')} is the trigger's own input and the rehearsal cannot vary it`;
+    return { said: { ...at, uncovered: why } };
+  }
   // a caught node breaks for real: its stubbed effect throws, and nothing recorded answers in its place
   const broken = new Set([...steer.pre.broken, ...(one.broken ?? [])]);
-  const emb = embedderFor(walk.load, { seed: walk.seed, profile: walk.profile, broken });
+  const record: Record<string, unknown> = {};
+  const emb = embedderFor(walk.load, { seed: walk.seed, profile: walk.profile, broken, record });
   // a demand on the graph's own input is met by firing with a patched input, not by a stub
   let fired = walk.input;
   for (const patch of [...steer.pre.input, ...(one.input ?? [])]) fired = setPath(fired, patch.path, patch.value);
-  const report = await emb.fire(walk.trigger.doc, fired, walk.request, {
-    stubs: unbroken({ ...steer.downstream, ...steer.pre.stubs, ...one.stubs }, broken),
-  });
-  return { ...at, settled: settle(report, sw, one.branch.to) };
+  const given = unbroken({ ...steer.downstream, ...steer.pre.stubs, ...one.stubs }, broken);
+  const report = await emb.fire(walk.trigger.doc, fired, walk.request, { stubs: given });
+  // a stubbed node's handler never runs, so what the case gave is written over what the run generated
+  const ran = { input: fired, stubs: { ...record, ...given }, report, broke: broken.size > 0 };
+  return { said: { ...at, settled: settle(report, sw, one.branch.to) }, ran };
 }

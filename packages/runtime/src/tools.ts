@@ -24,6 +24,18 @@ export {
 } from './manifest.js';
 export { map } from './map.js';
 export { type MigratedStep, type MigratedTarget, type MigrateOptions, type MigrateResult, migrate } from './migrate.js';
+export {
+  checkRecorded,
+  current,
+  fileOf,
+  RECORDED,
+  type RecordCheck,
+  type Recorded,
+  type RecordedRun,
+  recordedLines,
+  scenarioOf,
+  writeRecorded,
+} from './record.js';
 export { type Rehearsal, rehearse } from './rehearse.js';
 export { init, scaffold } from './scaffolds.js';
 export {
