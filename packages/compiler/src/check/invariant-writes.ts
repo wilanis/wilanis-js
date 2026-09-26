@@ -8,7 +8,6 @@
  * write downstream of it. They run after `checkInvariantSites`, over the invariants as `checkHolds` judged them.
  */
 import {
-  expr,
   type GraphDoc,
   type InvariantDoc,
   isSwitch,
@@ -19,8 +18,9 @@ import {
   typeAt,
 } from '@wilanis/core';
 import { bindings } from '../documents.js';
+import { guardRoots } from '../guard.js';
 import { named } from './invariant-holds.js';
-import { type Judge, rootsOf } from './judge.js';
+import type { Judge } from './judge.js';
 import { readWhole } from './prove.js';
 
 /** The native port whose two writes these rules judge. */
@@ -55,26 +55,16 @@ export function checkInvariantWrites(judge: Judge): void {
   }
 }
 
-/** Every guarded shape by canonical path, with the invariants on it. A rule that does not parse guards nothing here: I004 refuses it. */
+/** Every guarded shape by canonical path, with the invariants on it. A rule that does not parse reads no field, so refuses nothing here: I004 refuses it. */
 function guardedShapes(judge: Judge): Map<string, Guard[]> {
   const out = new Map<string, Guard[]>();
   for (const invariant of judge.scope.registry.all('invariant')) {
     const holds = invariant.doc.holds;
-    const fields = holds ? fieldsRead(holds.when) : undefined;
-    if (!holds || !fields) continue;
+    if (!holds) continue;
     const shape = judge.scope.canon(holds.on);
-    out.set(shape, [...(out.get(shape) ?? []), { invariant, fields }]);
+    out.set(shape, [...(out.get(shape) ?? []), { invariant, fields: new Set(guardRoots(holds.when)) }]);
   }
   return out;
-}
-
-/** The fields a rule reads, or nothing where it does not parse. */
-function fieldsRead(when: string): Set<string> | undefined {
-  try {
-    return rootsOf(expr.parse(when));
-  } catch {
-    return undefined;
-  }
 }
 
 /**
@@ -106,7 +96,7 @@ function checkPatch(judge: Judge, write: Write): void {
 
 /**
  * The fields a patch's `changes` name: its keys where it is written out, or the fields of its type where it is
- * one read of `in`, typed off the graph's `in` as X211 types it. None where neither can be told.
+ * one read of `in`, typed off the graph's `in`. None where neither can be told.
  */
 function changedFields(judge: Judge, write: Write): string[] {
   const changes = write.node.in?.changes;
