@@ -4,7 +4,7 @@
  */
 import { type Guard, guardsOf, idsOf, TAKEN_IDS, walkedUnder } from '@wilanis/compiler';
 import type { Loaded, LoadResult, TriggerDoc, Type } from '@wilanis/core';
-import { isSwitch, Scope } from '@wilanis/core';
+import { Scope } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
 import { outcomeOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, nonEmpty, type Stubbing, setPath, switchesOf } from './branches.js';
@@ -13,6 +13,7 @@ import { activeProfile, skippedLines } from './profile.js';
 import { type Recorded, type RecordedRun, recordRuns } from './record.js';
 import { type Decision, format, gather, type PlainRun, statedOf, stateName } from './rehearsal-report.js';
 import { heldUpstream } from './rehearse-held.js';
+import { type Ran, recordedOf, secretOut } from './rehearse-recorded.js';
 import { atomicAt, declaredAt, rootGraph, specBehind, type Where, whereOf } from './rehearse-where.js';
 import { embedderFor, failedBelow, generatedFire, policyRoots, unbroken } from './stubbing.js';
 
@@ -28,6 +29,8 @@ export interface Rehearsal {
   decisions: Decision[];
   /** Every trigger with no switch under it, run once. */
   plain: PlainRun[];
+  /** The lines `lines` opens with: how many triggers the profile does not serve were skipped, and where they are served. */
+  skipped: string[];
   /** Under `record` or `check`: the recorded directory, and what was written to it or found different in it. */
   recorded?: Recorded;
 }
@@ -128,24 +131,40 @@ export async function rehearse(
   const seed = recording ? 1 : (opts.seed ?? 1);
   const profile = activeProfile(load.registry.project?.doc, { flag: opts.profile, env: process.env });
   const scope = new Scope(load.registry, load.resolve);
-  const triggers = load.registry.all('trigger');
-  const lines = skippedLines(scope, profile, triggers, 'trigger(s)');
-  const decisions: Decision[] = [];
-  const plain: PlainRun[] = [];
-  const runs: RecordedRun[] = [];
-  // every trigger, and every policy as a trigger of each kind that attaches it: a decision is walked like any other
-  // graph. Only a trigger's runs are recorded: a scenario names a trigger, and a policy's decision is not yet one.
-  for (const trigger of [...triggers, ...policyRoots(load)]) {
-    if (!walkedUnder(scope, trigger.doc, profile)) continue;
-    const how = { seed, profile, runs: recording && triggers.includes(trigger) ? runs : undefined };
-    const found = await rehearseTrigger(load, trigger, how, decisions);
-    if (!found) plain.push(await wholeOf(load, trigger, how));
-  }
+  const skipped = skippedLines(scope, profile, load.registry.all('trigger'), 'trigger(s)');
+  const lines = [...skipped];
+  const gathered: Gathered = { decisions: [], plain: [], runs: recording ? [] : undefined };
+  await walkServed(load, { seed, profile, scope }, gathered);
+  const { decisions, plain, runs } = gathered;
   // the invariants the tree states, counted over the whole tree rather than per trigger: a rule is stated once.
   // A scope of its own rather than an embedder's: what is asked of it reads documents and runs nothing.
   const said = { verbose: opts.verbose, stated: statedOf(new Scope(load.registry, load.resolve)) };
   const ok = format(decisions, plain, lines, said);
-  return { ok, lines, seed, decisions, plain, ...(recording ? { recorded: recordRuns(load.root, opts, runs) } : {}) };
+  const recorded = runs ? { recorded: recordRuns(load.root, opts, runs) } : {};
+  return { ok, lines, seed, decisions, plain, skipped, ...recorded };
+}
+
+/** What walking the triggers gathers: every decision, every plain run, and -- when the rehearsal records -- the runs. */
+interface Gathered {
+  decisions: Decision[];
+  plain: PlainRun[];
+  runs?: RecordedRun[];
+}
+
+/**
+ * Walk every trigger the profile serves, and every policy as a trigger of each kind that attaches it: a decision is
+ * walked like any other graph. Only a trigger's runs are recorded: a scenario names a trigger, and a policy's
+ * decision is not yet one.
+ */
+async function walkServed(load: LoadResult, how: { seed: number; profile?: string; scope: Scope }, into: Gathered) {
+  const { seed, profile, scope } = how;
+  const triggers = load.registry.all('trigger');
+  for (const trigger of [...triggers, ...policyRoots(load)]) {
+    if (!walkedUnder(scope, trigger.doc, profile)) continue;
+    const one = { seed, profile, runs: triggers.includes(trigger) ? into.runs : undefined };
+    const found = await rehearseTrigger(load, trigger, one, into.decisions);
+    if (!found) into.plain.push(await wholeOf(load, trigger, one));
+  }
 }
 
 /** How a trigger is walked: the seed, the profile, and -- when its runs are recorded -- where they go. */
@@ -165,7 +184,8 @@ async function wholeOf(load: LoadResult, trigger: Loaded<TriggerDoc>, how: How):
   const emb = embedderFor(load, { seed, profile, record });
   const { input, request } = generatedFire(emb, trigger, seed);
   const report = await emb.fire(trigger.doc, input, request);
-  how.runs?.push({ trigger, seed, input, request, stubs: record, report });
+  // the output is written as the trigger's out type marks it, so a recorded scenario holds no secret in clear
+  how.runs?.push({ trigger, seed, input, request, stubs: record, report, secret: secretOut(emb, trigger) });
   const outcome = outcomeOf(report);
   return {
     trigger: trigger.name,
@@ -370,42 +390,6 @@ async function decisionFor(walk: Walk, sw: FoundSwitch): Promise<Decision> {
     if (ran && !guard && !ran.broke) walk.runs?.push(recordedOf(walk, decision, { one, cases, ran }));
   }
   return decision;
-}
-
-/** What a branch's run hands back to be recorded: what it was fired with, what answered, and whether a node broke. */
-interface Ran {
-  input: unknown;
-  stubs: Record<string, unknown>;
-  report: Report;
-  broke: boolean;
-}
-
-/** One branch's run as it is recorded, named by the branch it proves and, where a sibling shares its target, its place. */
-function recordedOf(walk: Walk, decision: Decision, of: { one: Case; cases: Case[]; ran: Ran }): RecordedRun {
-  const { one, cases, ran } = of;
-  const shared = cases.filter(other => other.branch.to === one.branch.to).length > 1;
-  const graph = walk.load.resolve(decision.graph);
-  const branch = {
-    graph,
-    node: decision.node,
-    when: one.branch.when,
-    to: authoredTo(walk.probe, { graph, node: decision.node }, one),
-    ...(shared ? { n: cases.indexOf(one) } : {}),
-  };
-  const { input, stubs, report } = ran;
-  return { trigger: walk.trigger, branch, seed: walk.seed, input, request: walk.request, stubs, report };
-}
-
-/**
- * The node a case routes to as the graph document writes it. The lowered spec may route elsewhere -- a guarded
- * site's made node is moved aside to `<id>:made` with whatever routed it (RFC 0007) -- and a scenario names what a
- * reader of the document can find.
- */
-function authoredTo(emb: Embedder, at: { graph: string; node: string }, one: Case): string {
-  const node = emb.scope.get('graph', at.graph)?.doc.nodes.find(each => each.id === at.node);
-  if (!node || !isSwitch(node)) return one.branch.to;
-  if (one.branch.rule >= 0) return node.rules[one.branch.rule]?.to ?? one.branch.to;
-  return one.branch.rule === -1 ? node.else : one.branch.to;
 }
 
 /** One case of a switch: the branch it reaches, or why nothing can reach it. */

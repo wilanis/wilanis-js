@@ -179,10 +179,13 @@ function recordingOf(flags: Record<string, string>): { record?: string; check?: 
   return { ...(record !== undefined ? { record } : {}), ...(check ? { check } : {}) };
 }
 
-/** What a rehearsal prints: under `--check` only how the recorded directory stands, else its lines and what it wrote. */
+/**
+ * What a rehearsal prints: under `--check` what the profile skipped and how the recorded directory stands, else its
+ * lines and what it wrote.
+ */
 function rehearsalSaid(answer: Rehearsal, check?: boolean): string[] {
   const recorded = answer.recorded ? recordedLines(answer.recorded) : [];
-  return check ? recorded : [...answer.lines, ...recorded];
+  return check ? [...answer.skipped, ...recorded] : [...answer.lines, ...recorded];
 }
 
 /** What the command line gave: the flags, the words, and the root each command reads from. */

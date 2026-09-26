@@ -30,6 +30,8 @@ export interface RecordedRun {
   /** Every effect's answer by dotted node path: what the run generated, with what the case stubbed written over it. */
   stubs: Record<string, unknown>;
   report: Report;
+  /** Where the trigger's `out` marks a field secret: the output is written with those as the marker. */
+  secret: string[][];
 }
 
 const WRITTEN = 'Written by wilanis rehearse --record; regenerate it, do not edit it.';
@@ -83,7 +85,7 @@ export function scenarioOf(run: RecordedRun): ScenarioDoc {
     in: run.input,
     request: run.request,
     stubs: sorted(run.stubs),
-    expect: expectOf(run.report),
+    expect: expectOf(run.report, run.secret),
   };
 }
 
