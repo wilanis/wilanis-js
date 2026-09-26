@@ -4,7 +4,8 @@
  * retry over something that cannot fail transiently is noise (G017); over a call that may already have been
  * applied, a second charge (G018); and its `when` reads the answer, so it types as boolean over the answer's
  * fields (G019). Whether a call is idempotent where it is made is `Judge.idempotentAt`'s answer, never this
- * module's. A retry below an atomic graph is refused by G020 in `atomic.ts`, which reads the walk made there.
+ * module's. A binding's retry is judged under the profiles that run its operation there, so G018 names only
+ * those. A retry below an atomic graph is refused by G020 in `atomic.ts`, which reads the walk made there.
  */
 import {
   type BindingDoc,
@@ -50,14 +51,16 @@ export function answersOf(judge: Judge, hit: OpHit, subst: Record<string, Type>)
 
 /**
  * G017, G018, G019 for a retry over one call: a node of a data graph, or a binding's delegation. A call of a
- * domain operation is judged by the native sites it reaches, since what is repeated is what those do.
+ * domain operation is judged by the native sites it reaches, since what is repeated is what those do, under the
+ * profiles that run the delegating binding's operation.
  */
 export function checkCallRetry(judge: Judge, site: RetrySite, call: RetriedCall): void {
   const refuse = judge.refuser(site.file);
   const at = `${site.at}/retry`;
   const run = `${call.hit.path}#${call.hit.opName}`;
   if (!call.hit.port.native) {
-    judgeReached(judge, site, { what: run, reach: profile => effectsReachable(judge.scope, run, profile) });
+    const binding = judge.scope.registry.get('binding', site.file);
+    judgeReached(judge, site, { what: run, reach: profile => effectsReachable(judge.scope, run, profile), binding });
     return;
   }
   if (call.hit.op.pure) refuse('G017', `retry over '${run}', which is pure`, at, NO_EFFECT_HINT);
@@ -70,8 +73,8 @@ export function checkCallRetry(judge: Judge, site: RetrySite, call: RetriedCall)
 
 /**
  * G017, G018, G019 for a binding operation that retries the graph it runs: the graph is judged by every effect
- * it reaches, under each profile that binds this binding (every profile, where none names it), so a domain
- * graph is held to whatever each profile's bindings run for it. An atomic graph's transactional effects are
+ * it reaches, under each profile that runs the operation through this binding (`profilesRunning`), so a domain
+ * graph is held to whatever each such profile's bindings run for it. An atomic graph's transactional effects are
  * not held to G018: a try that fails rolls them back, so the next try starts from nothing it applied.
  */
 export function checkGraphRetry(judge: Judge, site: RetrySite, binding: Loaded<BindingDoc>, graphPath: string): void {
@@ -81,8 +84,18 @@ export function checkGraphRetry(judge: Judge, site: RetrySite, binding: Loaded<B
   judgeReached(judge, site, { what: graph, reach, binding, rolledBack });
 }
 
-/** The profiles a binding is judged under: those that bind it, or every one when none names it. */
-function profilesBinding(judge: Judge, binding: Loaded<BindingDoc> | undefined): (string | undefined)[] {
+/**
+ * The profiles a retry is judged under: every one for a site outside a binding; for a binding's operation, those
+ * that choose the binding and run the operation there (`Judge.judgedUnder`, off the walk from the triggers each
+ * serves), so a retry only routes reach is not judged under a profile that never listens. Where none of those
+ * runs it, the profiles that choose the binding; where none chooses it, every one: a retry nothing runs yet is
+ * still judged, as a trigger no profile serves is.
+ */
+function profilesRunning(
+  judge: Judge,
+  site: RetrySite,
+  binding: Loaded<BindingDoc> | undefined,
+): (string | undefined)[] {
   const all = judge.profiles();
   if (!binding) return all;
   const port = judge.scope.canon(binding.doc.port);
@@ -90,7 +103,10 @@ function profilesBinding(judge: Judge, binding: Loaded<BindingDoc> | undefined):
     const chosen = judge.scope.bindingFor(port, profile);
     return typeof chosen !== 'string' && chosen.path === binding.path;
   });
-  return binds.length ? binds : all;
+  if (!binds.length) return all;
+  const key = `${port}#${site.at.split('/')[1]}`;
+  const running = binds.filter(profile => judge.judgedUnder(key, profile));
+  return running.length ? running : binds;
 }
 
 /** One effect a retried graph reaches that is not idempotent there, and the profiles it was found under. */
@@ -104,6 +120,7 @@ interface Unsafe {
 interface Reached {
   what: string;
   reach: (profile: string | undefined) => ReachedEffect[];
+  /** The binding whose operation carries the retry; nothing for a data graph's node. */
   binding?: Loaded<BindingDoc>;
   /** The retried graph is atomic, so a transactional effect in it is rolled back by a try that fails. */
   rolledBack?: boolean;
@@ -113,7 +130,7 @@ interface Reached {
 function judgeReached(judge: Judge, site: RetrySite, reached: Reached): void {
   const refuse = judge.refuser(site.file);
   const at = `${site.at}/retry`;
-  const { effectful, unsafe } = walkEffects(judge, reached);
+  const { effectful, unsafe } = walkEffects(judge, site, reached);
   if (!effectful) refuse('G017', `retry over '${reached.what}', which reaches no effect`, at, NO_EFFECT_HINT);
   for (const { effect, reason, profiles } of unsafe) {
     const under = effect.through ? underProfiles(profiles) : '';
@@ -124,11 +141,11 @@ function judgeReached(judge: Judge, site: RetrySite, reached: Reached): void {
   checkWhen(refuse, site);
 }
 
-/** Whether anything effectful is reached under the binding's profiles, and each effect that is not idempotent. */
-function walkEffects(judge: Judge, reached: Reached): { effectful: boolean; unsafe: Unsafe[] } {
+/** Whether anything effectful is reached under the profiles that run the retry, and each effect that is not idempotent. */
+function walkEffects(judge: Judge, site: RetrySite, reached: Reached): { effectful: boolean; unsafe: Unsafe[] } {
   const unsafe = new Map<string, Unsafe>();
   let effectful = false;
-  for (const profile of profilesBinding(judge, reached.binding)) {
+  for (const profile of profilesRunning(judge, site, reached.binding)) {
     for (const effect of reached.reach(profile)) {
       const hit = effectfulHit(judge.scope, effect);
       if (!hit) continue;

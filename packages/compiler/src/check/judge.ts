@@ -247,7 +247,7 @@ export class Judge {
   }
 
   private served(): Serving {
-    this.serving ??= new Serving(this.scope, this.profiles());
+    this.serving ??= new Serving(this.scope);
     return this.serving;
   }
 

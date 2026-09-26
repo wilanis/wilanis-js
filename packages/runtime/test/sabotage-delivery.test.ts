@@ -44,7 +44,7 @@ describe('sabotage: what a queue trigger receives from (RFC 0009)', () => {
       `T009 '${JOBS}' delivers a message at least once, so '${REMOVE}' may run twice for one message, and the operation does not promise idempotent`,
     ]);
     expect(sabotageHinting(PORT, unpromised)).toEqual([
-      `T009 declare "idempotent": true on ${REMOVE} (the checker then holds every profile to it, B011), or receive from a connection whose kind delivers at most once`,
+      `T009 declare "idempotent": true on ${REMOVE} (the checker then holds each profile that runs it to the promise, B011), or receive from a connection whose kind delivers at most once`,
     ]);
   });
 

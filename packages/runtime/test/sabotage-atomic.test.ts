@@ -63,13 +63,15 @@ describe('a graph that says it is atomic', () => {
   });
 
   it('answers one refusal for one fault, naming every profile that reached it -- L009', () => {
-    // parse-drafts is a data graph, so every profile's walk reaches the same @blob node: one fault, one
-    // refusal, and the message says the five profiles rather than the refusal being repeated five times
+    // parse-drafts is a data graph, so every profile that runs the import reaches the same @blob node: one
+    // fault, one refusal, and the message says the three profiles rather than the refusal being repeated three
+    // times. Only the import route runs the graph, so production-scheduler and production-worker, which bind
+    // what production binds but open no route, run it nowhere and are not named
     const said = sabotageSaying(IMPORT, doc => {
       doc.atomic = true;
     }).filter(one => one.startsWith('L009') && one.includes('@blob/csv.port.json#parse'));
     expect(said).toEqual([
-      "L009 atomic graph '@features/customers/domain/import-customers.graph.json' reaches '@blob/csv.port.json#parse', which cannot take part in a transaction (profiles 'live', 'local', 'production', 'production-scheduler', 'production-worker')",
+      "L009 atomic graph '@features/customers/domain/import-customers.graph.json' reaches '@blob/csv.port.json#parse', which cannot take part in a transaction (profiles 'live', 'local', 'production')",
     ]);
   });
 
@@ -153,8 +155,9 @@ describe('an atomic graph over more than one connection', () => {
 
   it('names the profiles whose bindings put the effects on two connections -- L010', () => {
     // register-customer fires customer.register, which the local profile meets in memory and the production
-    // profiles in PostgreSQL: two connections, each different from the notes one, so every such profile refuses.
-    // The live profile meets it over HTTP, which is L009 and not a second connection at all.
+    // profiles in PostgreSQL: two connections, each different from the notes one, so each such profile that runs
+    // the registration refuses -- local and production, since only routes reach it and production-scheduler and
+    // production-worker open none. The live profile meets it over HTTP, which is L009 and not a second connection.
     const broken = plantedEditingSaying(ELSEWHERE, RECORD, doc => {
       doc.atomic = true;
       doc.nodes.push(NOTED);
@@ -162,7 +165,7 @@ describe('an atomic graph over more than one connection', () => {
     // each fault is said once, naming the profiles that reached it and the connections it put the effects on
     expect([...new Set(broken.filter(one => one.startsWith('L010')))]).toEqual([
       "L010 atomic graph reaches effects on 2 connections (@connections/customers.connection.json, @connections/notes.connection.json) (profile 'local')",
-      "L010 atomic graph reaches effects on 2 connections (@connections/customers-postgres.connection.json, @connections/notes.connection.json) (profiles 'production', 'production-scheduler', 'production-worker')",
+      "L010 atomic graph reaches effects on 2 connections (@connections/customers-postgres.connection.json, @connections/notes.connection.json) (profile 'production')",
     ]);
     // and it is said by each graph that promised a transaction over it: record-all reaches record-entry
     // through submit and is atomic itself, so two promises answer for the one fault, each naming itself
