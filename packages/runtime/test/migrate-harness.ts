@@ -74,18 +74,30 @@ function member(plan: Plan, calls: string[], seen: MigrateContext[], opts: Optio
         targets: one.steps.map(step => step.target),
       }));
     },
-    history: async () => {
+    history: async (ctx: MigrateContext) => {
       calls.push('history');
+      seen.push(ctx);
       return opts.history ?? [];
     },
   };
 }
 
-/** What a test may vary about the fake plugin: the record it keeps, and whether it migrates at all. */
+/** What a test may vary about the tree: the record its plugin keeps, whether it migrates at all, and its profiles. */
 interface Options {
   history?: Applied[];
   noMigrate?: boolean;
+  /** The profiles project.json declares, by name, `true` on the one marked default; none unless given. */
+  profiles?: Record<string, boolean>;
 }
+
+/** The profiles a test named, as project.json declares them: nothing to bind, since the tree has no domain port. */
+const profilesOf = (named: Record<string, boolean>) =>
+  Object.fromEntries(
+    Object.entries(named).map(([name, marked]) => [
+      name,
+      { description: `the ${name} place`, ...(marked ? { default: true } : {}), bindings: {} },
+    ]),
+  );
 
 /**
  * A tree whose one plugin grants a `holds` operation a startup step names, and whose `migrate` member
@@ -106,6 +118,7 @@ export function tree(plan: Plan, opts: Options = {}) {
     description: 'a tree with state in the world',
     plugins: [{ use: '@std' }, { use: '@fake' }],
     startup: [{ run: '@fake/server.port.json#listen' }],
+    ...(opts.profiles ? { profiles: profilesOf(opts.profiles) } : {}),
   });
   put('features/boot/feature.json', { $schema: schemaRef('feature'), description: 'the boot feature' });
   return { dir, calls, seen, plugins: { ...BUILTIN_PLUGINS, '@fake': fake } };

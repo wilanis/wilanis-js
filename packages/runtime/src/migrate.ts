@@ -1,10 +1,11 @@
 /**
  * `wilanis migrate`: the tree's declared state against what the world has recorded. It loads and judges the
- * tree, refuses the variables nobody set that the profile's reach reads, as `start` refuses them, or that the
- * connection of any store reads, since every store is planned whatever the profile runs (RFC 0017), and runs
- * every plugin's postLoad under the profile exactly as `start` does -- a plan needs whatever an engine registered
- * there -- asks every plugin with a `migrate` member for its plan, prints it, applies it when told, and tears the
- * plugins down. It runs no startup step and builds no `Served`: nothing listens.
+ * tree, picks its profile as `start` picks it (`activeProfile`) and says it first, refuses the variables nobody
+ * set that the profile's reach reads, as `start` refuses them, or that the connection of any store reads, since
+ * every store is planned whatever the profile runs (RFC 0017), and runs every plugin's postLoad under the profile
+ * exactly as `start` does -- a plan needs whatever an engine registered there -- asks every plugin with a
+ * `migrate` member for its plan, prints it, applies it when told, and tears the plugins down. It runs no startup
+ * step and builds no `Served`: nothing listens.
  */
 import { checkTree, type ReachedSecret } from '@wilanis/compiler';
 import type {
@@ -22,11 +23,12 @@ import { FileBlobStore } from './blobs.js';
 import type { Embedder } from './embed.js';
 import { historyLines, summaryLine, targetLines } from './migrate-lines.js';
 import { postLoad } from './post-load.js';
-import { secretsRefusal } from './profile.js';
+import { activeProfile, secretsRefusal } from './profile.js';
 import { embedderFor } from './stubbing.js';
 
 /** What the command was told to do, as the flags say it. */
 export interface MigrateOptions {
+  /** `--profile`; else `WILANIS_PROFILE`, else the profile marked default, as `start` picks it (`activeProfile`). */
   profile?: string;
   apply?: boolean;
   /** Each `<connection>/<target>`: the pair names the thing, since two connections of one tree may hold a target of one name. */
@@ -118,7 +120,7 @@ function judged(targets: PlanTarget[], opts: MigrateOptions): MigratedTarget[] {
   });
 }
 
-/** The profile a `migrate` member is handed: the flag's, else `default`. */
+/** The profile a `migrate` member is handed: the one chosen, else `default` where the project declares none. */
 const profileOf = (opts: MigrateOptions) => opts.profile ?? 'default';
 
 /** A run's answer: what it said and how it exits, over a run that planned nothing, applied nothing and was not refused. */
@@ -244,6 +246,17 @@ function storeSecrets(scope: Scope, profile: string | undefined): ReachedSecret[
 }
 
 /**
+ * The profile the command plans under, said first as `start` says it: `--profile`, else `WILANIS_PROFILE`, else the
+ * profile marked default, or nothing for the unnamed profile of a project that declares none. Throws, before any
+ * plugin has run, for a name the project does not declare and for a project that gives no way to choose one.
+ */
+function chosenProfile(load: LoadResult, flag: string | undefined, log: (line: string) => void): string | undefined {
+  const profile = activeProfile(load.registry.project?.doc, { flag, env: process.env });
+  log(`profile ${profile ?? 'none declared'}`);
+  return profile;
+}
+
+/**
  * Plan every plugin's declared state against the world, and apply it when told. The whole command, callable
  * without the command line: it never runs a startup step, never fires a trigger and never serves anything.
  */
@@ -257,18 +270,21 @@ export async function migrate(load: LoadResult, opts: MigrateOptions = {}): Prom
       code: 1,
       refusals: checked.items,
     });
-  const emb = embedderFor(load, { profile: opts.profile });
+  const profile = chosenProfile(load, opts.profile, log);
+  // the flag has been read: the plan, the apply and the history are each made under the profile it chose
+  const under = { ...opts, profile };
+  const emb = embedderFor(load, { profile });
   // what `start` asks for under the profile, and the connection of every store, since every store is planned
-  const unset = secretsRefusal(emb.scope, opts.profile, process.env, storeSecrets(emb.scope, opts.profile));
+  const unset = secretsRefusal(emb.scope, profile, process.env, storeSecrets(emb.scope, profile));
   if (unset) throw new Error(unset);
   const down = await postLoad(load, emb, log);
   try {
-    if (opts.history) return await printHistory(load, emb, opts);
-    const targets = await planned(load, emb, opts);
-    const applied = opts.apply ? await applying(load, emb, opts, targets) : [];
-    const { lines, code } = report(targets, opts, applied);
+    if (opts.history) return await printHistory(load, emb, under);
+    const targets = await planned(load, emb, under);
+    const applied = opts.apply ? await applying(load, emb, under, targets) : [];
+    const { lines, code } = report(targets, under, applied);
     const plan = { targets: targets.map(one => one.target) };
-    return answered(opts, { lines, code, plan, applied, targets: judged(plan.targets, opts) });
+    return answered(under, { lines, code, plan, applied, targets: judged(plan.targets, under) });
   } finally {
     await down();
     if (emb.blobs instanceof FileBlobStore) emb.blobs.destroy();
