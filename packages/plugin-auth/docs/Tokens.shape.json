@@ -6,10 +6,12 @@
   "fields": {
     "accessToken": {
       "type": "string",
+      "secret": true,
       "description": "a signed JWT; present it where a trigger's policy attachment reads it (Authorization: Bearer ..., a cookie, --token=)"
     },
     "refreshToken": {
       "type": "string",
+      "secret": true,
       "description": "opaque, single-use: token.port.json#refresh trades it for a new pair and voids it"
     },
     "tokenType": {

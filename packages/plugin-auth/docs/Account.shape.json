@@ -15,6 +15,7 @@
     },
     "passwordHash": {
       "type": "string",
+      "secret": true,
       "required": false,
       "description": "scrypt:<salt>:<hash>, both base64url; what a real directory holds"
     },
