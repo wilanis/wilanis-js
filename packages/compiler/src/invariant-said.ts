@@ -20,6 +20,7 @@ import type { AccessInvariant, InvariantDoc, Loaded, PolicyDoc, Scope, TriggerDo
 import { policyPath, splitRef } from '@wilanis/core';
 import { provesFaultIn } from './check/access.js';
 import { atOrBelow } from './check/typing.js';
+import { profilesWalking } from './reach.js';
 import { operationsReachable } from './refusals.js';
 
 /** One way `requires` is met at one trigger: the policy that meets it, and the path it proved where that is why. */
@@ -90,15 +91,14 @@ function attached(trigger: Loaded<TriggerDoc>, scope: Scope): Loaded<PolicyDoc>[
 }
 
 /**
- * Every covered operation this trigger reaches, under any profile, keyed by the operation. The checker stops
- * at the first, since one is enough to refuse; a reader has opened the invariant and is owed every way in.
- * The first way one operation is reached by wins, as `operationsReachable` answers a way and not every way.
+ * Every covered operation this trigger reaches, under any profile that serves it (`profilesWalking`, the list
+ * I001 and I003 are judged under), keyed by the operation. The checker stops at the first, since one is enough
+ * to refuse; a reader has opened the invariant and is owed every way in. The first way one operation is reached
+ * by wins, as `operationsReachable` answers a way and not every way.
  */
 function reachesAll(trigger: Loaded<TriggerDoc>, over: Set<string>, scope: Scope): Map<string, string | undefined> {
   const found = new Map<string, string | undefined>();
-  const declared = scope.profiles();
-  const profiles: (string | undefined)[] = declared.length ? declared : [undefined];
-  for (const profile of profiles)
+  for (const profile of profilesWalking(scope, trigger.doc))
     for (const reached of operationsReachable(scope, trigger.doc.fire.run, profile))
       if (over.has(reached.key) && !found.has(reached.key)) found.set(reached.key, reached.through);
   return found;

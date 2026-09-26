@@ -8,7 +8,7 @@
  * views a run reaches (`viewsReachedBy`) are the compiler's, where the rules that refuse on them live, so the
  * page cannot say a crossing A008 does not.
  */
-import { profilesOf, takesScope, type ViewReachedBy, viewsReachedBy } from '@wilanis/compiler';
+import { profilesWalking, takesScope, type ViewReachedBy, viewsReachedBy } from '@wilanis/compiler';
 import type { Loaded, Scope, StoreCollection, StoreDoc, TriggerDoc } from '@wilanis/core';
 import { readsOf } from './reads.js';
 import type { VRequiredBy, VScope, VScopedColumn, VStoreViewOf } from './types.js';
@@ -56,15 +56,15 @@ export function scopeOf(scope: Scope, over: Over): VScope | undefined {
 }
 
 /**
- * The views one trigger reaches, grouped by the policy each is behind: the walk A008 makes, under every profile,
- * so the *Gated by* list can say which of a trigger's policies it could not have dropped. The walk itself is
- * `viewsReachedBy`, which the rule reads too, so the page and the refusal cannot name different crossings; all
- * this adds is the grouping. The canonical policy path is the key, since that is what an attachment is
- * compared against.
+ * The views one trigger reaches, grouped by the policy each is behind: the walk A008 makes, under every profile
+ * that serves the trigger (`profilesWalking`), so the *Gated by* list can say which of a trigger's policies it
+ * could not have dropped. The walk itself is `viewsReachedBy`, which the rule reads too, so the page and the
+ * refusal cannot name different crossings; all this adds is the grouping. The canonical policy path is the key,
+ * since that is what an attachment is compared against.
  */
 export function viewsRequiredBy(scope: Scope, trigger: TriggerDoc): Map<string, VRequiredBy[]> {
   const out = new Map<string, VRequiredBy[]>();
-  for (const profile of profilesOf(scope))
+  for (const profile of profilesWalking(scope, trigger))
     for (const found of viewsReachedBy(scope, trigger.fire.run, profile))
       remember(out, scope.canon(found.behind), requiredOf(scope, found));
   return out;
