@@ -84,9 +84,13 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
 - A graph, a binding or a store names under `reads` each read it takes from the request, and no other.
   [[G003](refusals/G003.md), [P004](refusals/P004.md), [P005](refusals/P005.md), [P006](refusals/P006.md)]
   (RFC 0029)
-- At most one profile is the default, a stand-in is a connection of the same kind, every declared secret is read,
-  and a startup step names only declared profiles. [[C017](refusals/C017.md), [C018](refusals/C018.md),
-  [C019](refusals/C019.md), [B012](refusals/B012.md)] (RFC 0013)
+- At most one profile is the default, a stand-in is a connection of the same kind or, for a broker alone, one that
+  delivers as it does, every declared secret is read, and a startup step names only declared profiles.
+  [[C017](refusals/C017.md), [C018](refusals/C018.md), [C019](refusals/C019.md), [B012](refusals/B012.md)]
+  (RFC 0013)
+- A `retry` is written only over a call that reaches an effect and is idempotent where it is made, an atomic
+  graph's transactional effects excepted, since a failed try rolls them back. [[G017](refusals/G017.md),
+  [G018](refusals/G018.md)] (RFC 0011)
 
 ## Enforced by the runtime
 
