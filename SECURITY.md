@@ -34,6 +34,10 @@ Two things look like findings and are not:
 
 ## The security model
 
-What the toolchain guarantees, what it enforces and what is left to the application is being written as a
-page of its own, under [RFC 0020](docs/rfcs/0020-security-model.md) and issue
-[#310](https://github.com/wilanis/wilanis-js/issues/310).
+[`docs/security-model.md`](docs/security-model.md) says what every tree `wilanis check` accepts is guaranteed,
+what the runtime enforces on every run, what is left to the application, and what the model does not address.
+A line under *Guaranteed by the checker* or *Enforced by the runtime* that is false is a vulnerability: it is
+fixed in the code, and the advisory quotes the line. Once packages are published, the fix ships as a patch
+release of every affected package. The page is never edited to match the bug. A line under *The application's*
+found wanting is not a vulnerability; it is a request to move the line up, which is an RFC. What the page puts
+outside the model, the code of a plugin among it, is not a finding either.
