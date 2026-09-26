@@ -32,6 +32,7 @@
             "open": "string"
           },
           "required": false,
+          "secret": true,
           "description": "what rides beside the body, by name; the consuming trigger reads them as request.headers"
         },
         "delayMs": {
