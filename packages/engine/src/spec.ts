@@ -105,7 +105,7 @@ export interface NodeReport {
   selected?: string;
   /** call or map: the switch that routed this node's fault; the run went on, so this is not how it ended. */
   caught?: string;
-  /** call bound to a graph: the nested run. */
+  /** call bound to a graph: the nested run, its answer redacted as this node's `out` is. */
   sub?: Report;
   /**
    * call, or one element of a map: the tries before the one this report shows, oldest first. Absent: it ran
@@ -134,6 +134,10 @@ export interface Report {
   graph: string;
   /** How the run ended: `cancelled` when its signal fired before anything else ended it; a cancelled run has no output. */
   status: 'done' | 'failed' | 'blocked' | 'cancelled';
+  /**
+   * done: what the run answers its caller, the value itself. The node that answered it shows it redacted, and so
+   * does this field once the report hangs as a node's `sub` in another report.
+   */
   output?: unknown;
   /** blocked: the root paths that were read but never supplied. */
   needs?: string[];

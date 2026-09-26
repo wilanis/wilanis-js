@@ -156,18 +156,32 @@ export function secretPaths(
   return out;
 }
 
-/** The secret paths of an operation's inputs and result at a call, the result substituted through what the call gives its type fields. */
-export function redactOf(scope: Scope, op: Operation, given: Values | undefined): Redact | undefined {
-  let inType: Type | undefined;
-  let outType: Type | undefined;
+/**
+ * What an operation takes and answers at a call, each substituted through what the call gives its type
+ * fields: an input typed `$T` is as secret as the type the call binds it to, like a result typed `$T`.
+ */
+function typesAt(scope: Scope, op: Operation, given: Values | undefined): { in: Type; out?: Type } | undefined {
   try {
-    inType = scope.types.accepts(op.accepts);
-    outType = op.returns ? scope.types.spec(op.returns) : undefined;
-    if (outType && hasVars(outType)) outType = substitute(outType, bindings(scope, op, given));
+    const takes = scope.types.accepts(op.accepts);
+    const answers = op.returns ? scope.types.spec(op.returns) : undefined;
+    if (!hasVars(takes) && !(answers && hasVars(answers))) return { in: takes, out: answers };
+    const bound = bindings(scope, op, given);
+    return { in: substitute(takes, bound), out: answers && substitute(answers, bound) };
   } catch {
     return undefined;
   }
-  const inPaths = secretPaths(inType);
-  const outPaths = secretPaths(outType);
+}
+
+/** The secret paths of an operation's inputs and result at a call, both substituted through what the call gives its type fields. */
+export function redactOf(scope: Scope, op: Operation, given: Values | undefined): Redact | undefined {
+  const types = typesAt(scope, op, given);
+  const inPaths = secretPaths(types?.in);
+  const outPaths = secretPaths(types?.out);
   return inPaths.length || outPaths.length ? { in: inPaths, out: outPaths } : undefined;
+}
+
+/** A call's secret paths where it hands one input on under another name: a graph taking its input whole is handed it as `in`. */
+export function handedAs(redact: Redact | undefined, from: string, to: string): Redact | undefined {
+  if (!redact?.in) return redact;
+  return { ...redact, in: redact.in.map(path => (path[0] === from ? [to, ...path.slice(1)] : path)) };
 }
