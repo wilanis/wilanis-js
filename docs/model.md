@@ -146,17 +146,19 @@ and costs nothing. Where it is not, the compiler lowers a guard the author never
 routing to the value when it holds and to a refusal with the reserved reason `invariant` when it does not. The
 trigger maps that reason like any other (T005), and `wilanis rehearse` reports each site as proved or guarded.
 
-**A field invariant guards the value a graph answers, not the row a store keeps.** The guard stands at the site,
-and a site is where the value is made -- so a graph that writes before it answers has already written when the
-guard fires. Patch a record into a state the rule forbids and the patch commits, the guard refuses the answer,
-and the row stays as it was written: every later read of it is guarded too, and refuses. Until that changes
-(issue #489, RFC 0035, tracking #536), write the graph so the decision precedes the effect -- a `switch` that
-judges the record as the change will leave it, its `in` carrying the incoming fields beside the stored `record`
-(`in.tier != 'gold' || has(in.note) || has(record.note)`), with the write reached only from the branch that holds;
-a switch over the stored row alone judges the row before the change and lets the bad patch through. Better, load
-the record, lay the change over it with `@std/object.port.json#merge` in a domain graph, and `#put` the result
-whole: the merge is where the value is made, so the guard stands before the write. Or mark the graph `atomic`, so
-that the refusal ends the transaction and the write rolls back with it.
+**A field invariant is held before the write.** The guard stands at the site, and a site is where a value is made,
+so a rule over a record holds for the records a tree writes only where each is made before its write. Three rules
+keep every write there. A `#patch` whose `changes` name a field such a rule reads is I007: a patch sets part of a
+record, and a rule over several fields cannot be judged on a part, so a patch moving a customer to `gold` without a
+note would commit before any guard saw the customer it left. A `#put` of a shape a field invariant is on whose
+`record` is anything but one whole read of `in` or of a node is I008: a record written out at the write is made
+nowhere the compiler guards. And a data graph that makes a value of such a shape, which one of its effects reads,
+is L016: making the record is business, and a data graph translates. What remains is one form (RFC 0035). A domain
+graph loads the record, lays the change over it with `@std/object.port.json#merge` into the shape, which is the
+site the guard stands at, and hands the result to an operation whose data graph takes it whole as `in` and writes
+it with `"record": "{{in}}"`, a taken site, guarded again whoever calls it. `wilanis new graph --port` scaffolds
+the first half and `--store` the second. A field no rule reads may still be patched, and a read site stays guarded:
+a row the tree did not write is refused where it is read rather than trusted.
 
 ## A tree includes trees
 
