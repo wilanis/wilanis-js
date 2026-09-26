@@ -1,8 +1,9 @@
 /**
- * What a trigger's run shows of the roots it starts from. The request with every field the kind's context marks
- * secret as the marker -- an open map such as a queue message's headers is marked whole -- and the input built
- * from it with the same fields where `fire.in` reads them, and those the trigger's own `in` marks. The run is handed
- * the values; only its reports read these.
+ * What a run a trigger starts shows of the roots it starts from: its operation's run, and each policy's decision
+ * before it. The request with every field the kind's context marks secret as the marker -- an open map such as a
+ * queue message's headers is marked whole -- and the input built from it with the same fields where what fills it
+ * (`fire.in`, or a policy's `decide.in`) reads them, and those the input's own type marks. The run is handed the
+ * values; only its reports read these.
  */
 import {
   type Scope,
@@ -15,17 +16,23 @@ import {
 } from '@wilanis/core';
 import { redactValue } from '@wilanis/engine';
 
-/** The request and the input as a trigger's reports show them. */
-export function shownRoots(
-  scope: Scope,
-  trigger: TriggerDoc,
-  roots: { request: Record<string, unknown>; input: unknown; inType: Type | undefined },
-): { request: unknown; in?: unknown } {
+/** What a run a trigger starts is started from: the request, the input, the input's type, and what filled the input. */
+export interface RunRoots {
+  request: Record<string, unknown>;
+  input: unknown;
+  inType: Type | undefined;
+  /** What the input was filled from where it is not the trigger's own: a policy's `decide.in`. Absent: `fire.in`, or the body. */
+  filledBy?: Record<string, unknown>;
+}
+
+/** The request and the input as the reports of a run the trigger starts show them. */
+export function shownRoots(scope: Scope, trigger: TriggerDoc, roots: RunRoots): { request: unknown; in?: unknown } {
   const kind = scope.get('trigger-kind', trigger.kind);
   const marked = kind ? secretPaths(scope.contextType(kind.doc, trigger.settings)) : [];
   const request = redactValue(roots.request, marked);
   if (roots.input === undefined) return { request };
-  const read = trigger.fire.in === undefined ? below(marked, ['body'], []) : readInto(trigger.fire.in, marked);
+  const given = roots.filledBy ?? trigger.fire.in;
+  const read = given === undefined ? below(marked, ['body'], []) : readInto(given, marked);
   return { request, in: redactValue(roots.input, [...secretPaths(roots.inType), ...read]) };
 }
 
