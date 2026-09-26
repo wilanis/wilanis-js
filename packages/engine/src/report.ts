@@ -38,13 +38,17 @@ export function noteRefusal(report: NodeReport, error: unknown): void {
   if (error.detail) report.detail = error.detail;
 }
 
-/** The run's report: how it ended, with no output (a cancelled run did not finish, whatever had settled); else done with the first answered output candidate; else blocked on what was never supplied. */
+/**
+ * The run's report: how it ended, with no output (a cancelled run did not finish, whatever had settled); else
+ * done with the value of the first answered output candidate -- the value, not its report's redacted `out`, since
+ * the caller is handed it; else blocked on what was never supplied.
+ */
 export function reportOf(run: Settled): Report {
   const base = { graph: run.spec.name, nodes: run.nodes, startedAt: run.startedAt, endedAt: run.endedAt };
   if (run.ending) return { ...base, status: run.ending };
   if (!run.spec.output) return { ...base, status: 'done' };
   const answer = run.spec.output.find(id => answered(run.nodes[id]));
-  if (answer !== undefined) return { ...base, status: 'done', output: run.nodes[answer].out };
+  if (answer !== undefined) return { ...base, status: 'done', output: run.values.get(answer) };
   return { ...base, status: 'blocked', needs: needs(run) };
 }
 

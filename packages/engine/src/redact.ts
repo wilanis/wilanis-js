@@ -1,4 +1,10 @@
-/** Secrets never appear in a report: a redacted copy of a value replaces every marked path with a marker. */
+/**
+ * Secrets never appear in a report: a redacted copy of a value replaces every marked path with a marker. Only
+ * what is written into a report is redacted; the values the run hands from node to node, and the answer it
+ * hands its caller, are the values themselves.
+ */
+import type { Attempt, Report } from './spec.js';
+
 const SECRET = '«secret»';
 
 /** A copy of `value` with every listed path replaced; a path of no segments redacts the whole value. */
@@ -15,6 +21,20 @@ export function redactValue(value: unknown, paths: string[][] | undefined): unkn
 /** Each element of a list redacted on its own: what a map's report shows of its answer. */
 export function redactEach(items: unknown[], paths: string[][] | undefined): unknown[] {
   return paths?.length ? items.map(item => redactValue(item, paths)) : items;
+}
+
+/**
+ * A nested run as the report it hangs in shows it: its answer redacted by the paths of the node that ran it,
+ * which are the ones that node's own `out` is redacted by, so the two say the answer alike.
+ */
+export function redactReport(report: Report, paths: string[][] | undefined): Report {
+  if (report.output === undefined || !paths?.length) return report;
+  return { ...report, output: redactValue(report.output, paths) };
+}
+
+/** A try that did not stand as the node's report records it: the nested run it ran, if any, redacted as above. */
+export function redactAttempt(attempt: Attempt, paths: string[][] | undefined): Attempt {
+  return attempt.sub ? { ...attempt, sub: redactReport(attempt.sub, paths) } : attempt;
 }
 
 /**
