@@ -88,6 +88,46 @@ describe('a read of a node whose answer carries a secret', () => {
   });
 });
 
+describe('a switch reading a secret', () => {
+  it('routes on the value, while its report shows the marker', async () => {
+    const spec: KernelSpec = {
+      name: 't',
+      output: ['right', 'wrong'],
+      nodes: {
+        made,
+        checked: {
+          kind: 'switch',
+          in: { password: { ref: 'made', path: ['password'] } },
+          rules: [{ when: input => input.password === 'p-ada', to: 'right', label: 'the password' }],
+          else: 'wrong',
+        },
+        right: { kind: 'call', handler: 'echo', in: { name: { ref: 'made', path: ['name'] } } },
+        wrong: { kind: 'call', handler: 'echo', in: {} },
+      },
+    };
+    const report = await new Kernel(handlers).run(spec, {});
+    expect(report.nodes.checked.selected).toBe('right');
+    expect(report.nodes.checked.in).toEqual({ password: SECRET });
+  });
+});
+
+describe('a map over a list its source marks whole', () => {
+  it('shows each element as the marker, and hands each its value', async () => {
+    const spec: KernelSpec = {
+      name: 't',
+      output: ['each'],
+      nodes: {
+        coded: { kind: 'call', handler: 'codes', in: {}, redact: { out: [['codes']] } },
+        each: { kind: 'map', handler: 'echo', over: { ref: 'coded', path: ['codes'] }, in: {}, onItemFailure: 'fail' },
+      },
+    };
+    const codes = async () => ({ codes: ['c-1', 'c-2'] });
+    const report = await new Kernel({ ...handlers, codes }).run(spec, {});
+    expect(report.nodes.each.items?.map(item => item.in)).toEqual([{ item: SECRET }, { item: SECRET }]);
+    expect(report.output).toEqual([{ item: 'c-1' }, { item: 'c-2' }]);
+  });
+});
+
 describe("a nested run's input", () => {
   const inner: KernelSpec = {
     name: 'inner',

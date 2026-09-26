@@ -13,6 +13,7 @@ import queue from '@wilanis/plugin-queue';
 import queueMemory from '@wilanis/plugin-queue-memory';
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_PLUGINS, embedderFor, type Fired, type Ran, Served } from '../src/index.js';
+import { shownRoots } from '../src/shown.js';
 import { clearIn, fake, nodeNamed, putter, SECRET, vaultTree } from './redact-tree.js';
 
 const PARENT = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
@@ -132,5 +133,14 @@ describe("a header of the request, in the reports of a trigger's run", () => {
     expect(nodeNamed(report, 'agented')?.in).toEqual({ value: { agent: SECRET }, type: SEEN });
     expect(clearIn(report, ['a-1', 't-1', 's-1'])).toEqual([]);
     expect(heard.correlation).toBe(PARENT);
+  });
+
+  it("shows an http request's cookies as the marker whole, as it shows its headers", async () => {
+    const shown = await withTree(async load => {
+      const route = load.registry.get('trigger', load.resolve('@features/vault/edge/agent-route.trigger.json'));
+      const request = { headers: { authorization: 'Bearer t-1' }, cookies: { session: 's-1' }, query: {} };
+      return shownRoots(embedderFor(load).scope, route?.doc as never, { request, input: undefined, inType: undefined });
+    });
+    expect(shown.request).toEqual({ headers: SECRET, cookies: SECRET, query: {} });
   });
 });
