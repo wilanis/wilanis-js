@@ -436,18 +436,21 @@ in the scaffold for a collection no invariant reads or goes altogether; and the 
    made site an effect reads, but "What the rules do not refuse, on purpose" ends with "every read site", and this is
    the one rule that could refuse one. So a made site that only re-types what an effect answered is not refused,
    whatever reads it: the node is itself an effect (a `#find`), or its whole value is one read of an effect's answer
-   (a `#make` of `{{stored.record}}`, read through `siteRead` in `prove.ts`, which reads no `map`'s bind, so a `map`
-   of makes over an effect's answer is refused where one `#make` of it is not: #694). A read site composes nothing,
-   so the hint would have nothing to move, and the guard stands at the site before any reader either way. A `#merge`
-   over what was read, or a value written out in place, is composed. No graph in this repository is a read site an
-   effect reads, so the example checks clean with or without the exemption, which is one function (`readSite`) to
-   take out if "every read site" meant less. The message says "and the effect 'stored' reads it", not "writes it",
-   since the effect need not be a write, and names the invariant's file, as I007's and I008's do. The sabotage moves
-   the `#merge` into a planted `kept-update.graph.json` that the store binding meets `update` with, the graph the
-   Motivation describes, rather than into `keep-customer`, whose `in` a `CustomerUpdate` would put at odds with
-   `keep` (B005). Of #682's paths, L016 refuses a `map` writing elements it made as the guarded shape, and a
-   `changes` read from a node that made the guarded shape; it does not reach a `changes` made as `CustomerUpdate`, a
-   `map` over a list that is no site, a binding's delegation, or a wider `in`, which stay #682's.
+   (a `#make` of `{{stored.record}}`, read through `siteRead` in `prove.ts`). A `map` is read as the call it makes for
+   each element, every input it binds spelled as a read of the list it maps over, so a `map` of makes over an effect's
+   answer is the read site one `#make` of it is, and a `map` of merges over each element is composed (#694). That
+   reading is `readSite`'s alone and `siteRead` is unchanged, so the guard's `heldAt` still reads the map as written
+   and guards it where it did: a proof about each element of a list is a claim the proof rules do not make. A read
+   site composes nothing, so the hint would have nothing to move, and the guard stands at the site before any reader
+   either way. A `#merge` over what was read, or a value written out in place, is composed. No graph in this
+   repository is a read site an effect reads, so the example checks clean with or without the exemption, which is one
+   function (`readSite`) to take out if "every read site" meant less. The message says "and the effect 'stored' reads
+   it", not "writes it", since the effect need not be a write, and names the invariant's file, as I007's and I008's
+   do. The sabotage moves the `#merge` into a planted `kept-update.graph.json` that the store binding meets `update`
+   with, the graph the Motivation describes, rather than into `keep-customer`, whose `in` a `CustomerUpdate` would
+   put at odds with `keep` (B005). Of #682's paths, L016 refuses a `map` writing elements it made as the guarded
+   shape, and a `changes` read from a node that made the guarded shape; it does not reach a `changes` made as
+   `CustomerUpdate`, a `map` over a list that is no site, a binding's delegation, or a wider `in`, which stay #682's.
 6. **I007 and I008 hold on every write path (#682).** I007 types a `changes` that is one whole read of `in`, a
    constant or a node with the checker's own `GraphReads`, over the graph's input, constants and node answers, the
    table G004 types a node's inputs by; it is built quietly, so what does not resolve names no field and is refused

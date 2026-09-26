@@ -5,9 +5,12 @@
  * Moving the making down into a data graph, on the way to a write, is what L016 refuses, at the node that makes it;
  * a value made behind the write, and a read site whatever reads it, are not.
  */
+import { rmSync } from 'node:fs';
 import { schemaUrl } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
+import { describe as describeDoc } from '../src/index.js';
 import {
+  loadedWith,
   plantedAll,
   plantedEditing,
   plantedEditingAllAt,
@@ -22,6 +25,7 @@ const KEEP = 'features/customers/data/keep-customer.graph.json';
 const BINDING = 'features/customers/data/customers-store.binding.json';
 const KEPT_UPDATE = 'features/customers/data/kept-update.graph.json';
 const PLANTED = 'features/customers/data/rewrite-customer.graph.json';
+const EACH_FOUND = 'features/customers/data/rewrite-bronze.graph.json';
 const STORE = { store: '@customers/data/customers.store.json', collection: 'customers' };
 const CUSTOMER = '@customers/domain/Customer.shape.json';
 const REACHABLE = "'A customer is reachable' (@features/customers/domain/a-customer-is-reachable.invariant.json)";
@@ -80,6 +84,30 @@ const readThenWrite = (takes: string, made: Record<string, unknown>) => ({
     refuse('noCustomer', 'missing', 'no customer {{in.id}}'),
   ],
 });
+
+/** A data graph that finds the bronze customers, makes one of each by the map `each`, and writes each it made. */
+const eachFound = (each: Record<string, unknown>) => ({
+  $schema: schemaUrl('graph'),
+  label: 'Write back every bronze customer',
+  description: 'A data graph that finds the bronze customers, makes a customer of each, and writes each back.',
+  out: { type: 'number', from: 'written' },
+  nodes: [
+    run('found', '@storage/store.port.json#find', { ...STORE, where: { tier: 'bronze' } }),
+    { type: '@wilanis/node/map.schema.json', id: 'customers', over: '{{found}}', ...each },
+    {
+      type: '@wilanis/node/map.schema.json',
+      id: 'stored',
+      run: '@storage/store.port.json#put',
+      over: '{{customers}}',
+      bind: { record: '' },
+      in: STORE,
+    },
+    run('written', '@std/list.port.json#count', { list: '{{stored}}' }),
+  ],
+});
+
+/** A map that makes each customer the #find answered again, whole: a read site per element, as `kept` is one. */
+const REMADE = eachFound({ run: '@std/object.port.json#make', bind: { value: '' }, in: { type: CUSTOMER } });
 
 /** The graph RFC 0035 found, made again: update-customer's merge moved into the data graph behind customer.update. */
 const MERGED_BELOW = readThenWrite('@customers/domain/CustomerUpdate.shape.json', {
@@ -203,5 +231,31 @@ describe('sabotage: what a data graph may make', () => {
       in: { base: '{{current.record}}', over: { active: true }, type: CUSTOMER },
     });
     expect(plantedPointing({ [PLANTED]: activated })).toEqual([`L016 @${PLANTED}#nodes/customer`]);
+  });
+
+  it('none for a map of read sites an effect reads: each customer a #find answered, made again and written back', () => {
+    // the map binds each element whole to #make, so each value is one read of what `found` answered (#694)
+    expect(plantedAll({ [EACH_FOUND]: REMADE })).toEqual([]);
+  });
+
+  it('L016 for the same map once it lays a change over each customer it found', () => {
+    const activated = eachFound({
+      run: '@std/object.port.json#merge',
+      bind: { base: '' },
+      in: { over: { active: true }, type: CUSTOMER },
+    });
+    expect(plantedPointing({ [EACH_FOUND]: activated })).toEqual([`L016 @${EACH_FOUND}#nodes/customers`]);
+  });
+
+  it('the guard still stands at the map L016 leaves alone, element by element: the exemption proves nothing', () => {
+    // L016 reads the map as a read site; the guard's heldAt reads it as written, so the guard is lowered as before
+    const { load, dir } = loadedWith({ [EACH_FOUND]: REMADE });
+    try {
+      expect(describeDoc(load, `@${EACH_FOUND}`)).toContain(
+        `        customers  maps customers:made through guard:@${EACH_FOUND}#customers, element by element  (guard)`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
