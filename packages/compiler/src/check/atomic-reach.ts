@@ -148,25 +148,41 @@ class Walk {
 }
 
 /**
- * The profiles that reach one graph: those whose chosen binding lists it behind an operation. A profile
- * chooses a binding by naming it, and a port met by exactly one binding is chosen by every profile, so
- * `bindingFor` answers the choice either way.
+ * Whether a domain `path#operation` runs under a profile, as the profile's one walk answers it: unless only
+ * triggers the profile does not serve reach it (`Judge.judgedUnder`, `Serving.judgedUnder`).
+ */
+export interface Running {
+  judgedUnder(key: string, profile: string | undefined): boolean;
+}
+
+/**
+ * The profiles that run one graph: those whose chosen binding lists it behind an operation the profile runs. A
+ * profile chooses a binding by naming it, and a port met by exactly one binding is chosen by every profile, so
+ * `bindingFor` answers the choice either way; whether the profile runs the operation is `running`'s answer,
+ * read off the walk `reachOf` makes from the triggers the profile walks (`walkedUnder`), so a graph only routes
+ * reach is not run under a profile that never listens. An operation nothing reaches at all is run wherever its
+ * binding is chosen, so a graph waiting for its trigger is still judged.
  *
  * This is the set L009 and L010 are judged under. A profile that never runs a graph has nothing to be
  * refused for: the graph's effects are only reached through a binding, and a binding a profile does not
- * choose is a binding whose graph it never runs. The test is over the bindings rather than over `atomicReachOf`,
- * which walks the document's own nodes and so answers the same under every profile.
+ * choose, or chooses for an operation nothing it serves calls, is a binding whose graph it never runs. The test
+ * is over the bindings rather than over `atomicReachOf`, which walks the document's own nodes and so answers the
+ * same under every profile.
  */
 export function profilesReaching(
   scope: Scope,
   graph: Loaded<GraphDoc>,
   profiles: (string | undefined)[],
+  running: Running,
 ): (string | undefined)[] {
   return profiles.filter(profile =>
     scope.registry.all('binding').some(binding => {
       const port = scope.canon(binding.doc.port);
       if (scope.bindingFor(port, profile) !== binding) return false;
-      return Object.values(binding.doc.operations).some(op => op.graph && scope.canon(op.graph) === graph.path);
+      return Object.entries(binding.doc.operations).some(
+        ([name, op]) =>
+          op.graph && scope.canon(op.graph) === graph.path && running.judgedUnder(`${port}#${name}`, profile),
+      );
     }),
   );
 }

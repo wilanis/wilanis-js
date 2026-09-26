@@ -2,7 +2,8 @@
  * What a trigger receives from (RFC 0009). A kind that declares `connection` names the setting its triggers write
  * a connection in; that connection's kind says how many times it may hand one message (`delivery`), and where it
  * may hand one twice, the operation the trigger fires must promise it is safe to run twice (T009). T010 refuses
- * a setting that names no such connection. Whether the promise holds under each profile is B011's, not this.
+ * a setting that names no such connection. Whether the promise holds under each profile that runs the operation
+ * is B011's, not this.
  */
 import type { ConnectionKindDoc, Loaded, Operation, TriggerDoc } from '@wilanis/core';
 import { readPath } from '@wilanis/engine';
@@ -28,7 +29,7 @@ export function checkDelivery(judge: Judge, receiving: Receiving): void {
     'T009',
     `'${from.path}' delivers a message at least once, so '${run}' may run twice for one message, and the operation does not promise idempotent`,
     'fire/run',
-    `declare "idempotent": true on ${run} (the checker then holds every profile to it, B011), or receive from a connection whose kind delivers at most once`,
+    `declare "idempotent": true on ${run} (the checker then holds each profile that runs it to the promise, B011), or receive from a connection whose kind delivers at most once`,
   );
 }
 

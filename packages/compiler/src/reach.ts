@@ -190,6 +190,17 @@ export function walkedUnder(scope: Scope, trigger: TriggerDoc, profile: string |
   return !scope.profiles().some(one => servedUnder(scope, trigger, one));
 }
 
+/**
+ * The profiles that walk a trigger, in the project's order: each declared one `walkedUnder` answers yes for, or
+ * the one unnamed profile of a project that declares none. The checker judges a trigger under these
+ * (`Judge.profilesServing`), and whatever explains a rule made per trigger -- `describe`, `map`, the viewer --
+ * walks the same list, so a reader is never shown what a profile that does not serve the trigger would reach.
+ */
+export function profilesWalking(scope: Scope, trigger: TriggerDoc): (string | undefined)[] {
+  const declared = scope.profiles();
+  return declared.length ? declared.filter(profile => walkedUnder(scope, trigger, profile)) : [undefined];
+}
+
 /** The domain operations one profile's walk reaches, canonical `path#operation`s, split by what reached them. */
 export interface OperationsReached {
   /** Those `reachOf`'s roots reach: the triggers the profile walks, their policies, the required ports, the steps. */

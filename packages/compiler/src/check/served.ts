@@ -15,23 +15,20 @@
  * profile's bindings are its own edit.
  */
 import type { Loaded, Scope, TriggerDoc } from '@wilanis/core';
-import { type OperationsReached, operationsReachedBy, walkedUnder } from '../reach.js';
+import { type OperationsReached, operationsReachedBy, profilesWalking } from '../reach.js';
 
 /** The profiles each trigger is judged under, and what each profile's walk reaches on whose behalf, each found once. */
 export class Serving {
   private readonly triggers = new Map<string, (string | undefined)[]>();
   private readonly reached = new Map<string | undefined, OperationsReached>();
 
-  constructor(
-    private readonly scope: Scope,
-    private readonly all: (string | undefined)[],
-  ) {}
+  constructor(private readonly scope: Scope) {}
 
-  /** The profiles a trigger is judged under: those that serve it, or every one where none does. */
+  /** The profiles a trigger is judged under: those that serve it, or every one where none does (`profilesWalking`). */
   profilesOf(trigger: Loaded<TriggerDoc>): (string | undefined)[] {
     const known = this.triggers.get(trigger.path);
     if (known) return known;
-    const judged = this.all.filter(profile => walkedUnder(this.scope, trigger.doc, profile));
+    const judged = profilesWalking(this.scope, trigger.doc);
     this.triggers.set(trigger.path, judged);
     return judged;
   }

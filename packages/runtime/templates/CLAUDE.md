@@ -82,7 +82,7 @@ features/<name>/
   `retry` or `timeoutMs`: how long and how often a call is tried is the data layer's, on a data graph's node or
   a binding's operation (L012). A retry is refused over a pure call (G017) and over one that is not idempotent
   where it is made (G018): a POST that failed may have been applied. A domain operation that says
-  `idempotent: true` is held to it under every profile: whatever the profile's binding reaches for it must be
+  `idempotent: true` is held to it under each profile that runs it: whatever its binding there reaches must be
   idempotent where it is made (B011, naming the profile, the binding and the node).
 - **The data layer** translates. A data graph may name edge shapes and speaks native ports, and every
   effectful operation it reaches is listed in `feature.json → effects` (L003). It is the only layer that

@@ -62,11 +62,13 @@ class Faults {
  * and name the profiles that reached it, so a fault under one profile alone names that profile and a fault
  * every profile shares is said once.
  *
- * L009 and L010 are judged only under the profiles that reach the graph, since they ask what one run of it
- * would do and a profile that never runs it has no such run. L011 and G014 are judged over every profile:
- * they ask whether anything below the graph ever rolls back, and a graph no profile reaches would otherwise
- * get an empty union and a misleading L011 rather than the refusal its own contents earn. G020 is both: a
- * retry on the graph's own node is judged whoever runs it, one further down only under a profile that does.
+ * L009 and L010 are judged only under the profiles that run the graph (`profilesReaching`): whose binding lists
+ * it behind an operation something the profile serves reaches, so a graph only routes reach is not judged under
+ * a profile that never listens. They ask what one run of it would do, and a profile that never runs it has no
+ * such run. L011 and G014 are judged over every profile: they ask whether anything below the graph ever rolls
+ * back, and a graph no profile reaches would otherwise get an empty union and a misleading L011 rather than the
+ * refusal its own contents earn. G020 is both: a retry on the graph's own node is judged whoever runs it, one
+ * further down only under a profile that does.
  */
 export function checkAtomic(judge: Judge): void {
   const profiles = judge.profiles();
@@ -82,7 +84,7 @@ interface ProfileWalk {
 
 /** Every rule over one atomic graph, each profile walked once and every rule reading that walk. */
 function checkOneAtomic(judge: Judge, graph: Loaded<GraphDoc>, profiles: (string | undefined)[]): void {
-  const reaching = profilesReaching(judge.scope, graph, profiles);
+  const reaching = profilesReaching(judge.scope, graph, profiles, judge);
   const walks: ProfileWalk[] = profiles.map(profile => ({
     profile,
     reach: atomicReachOf(judge.scope, graph, profile),

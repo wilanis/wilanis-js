@@ -8,9 +8,10 @@
  * the profiles disagree about the connection -- a port bound to one store under `local` and another under
  * `production` -- every one they reach is named, since a reader chooses a profile before running.
  *
- * It reads the same profiles L009 and L010 are judged under -- those whose bindings name the graph -- so what
- * a reader is told is what the tree was held to. A profile that never runs the graph would otherwise add a
- * connection no run of it can fall on.
+ * It reads the same profiles L009 and L010 are judged under -- those whose bindings name the graph behind an
+ * operation the profile runs (`profilesReaching`) -- so what a reader is told is what the tree was held to. A
+ * profile that never runs the graph, a worker that opens no route among them, would otherwise add a connection no
+ * run of it can fall on.
  *
  * Where no profile reaches the graph it falls back to all of them, which is the one place it parts from the
  * checker and on purpose: the checker is deciding what to refuse and says nothing of an unreached graph,
@@ -19,6 +20,7 @@
  */
 import type { GraphDoc, Loaded, Scope } from '@wilanis/core';
 import { atomicReachOf, profilesReaching } from './check/atomic-reach.js';
+import { Serving } from './check/served.js';
 import { refusalsOfGraph } from './refusals.js';
 
 /** What one atomic graph commits, where, and what undoes it. */
@@ -67,7 +69,7 @@ export function atomicOf(scope: Scope, graph: Loaded<GraphDoc>): AtomicSaid | un
   const declared = scope.profiles();
   const all: (string | undefined)[] = declared.length ? declared : [undefined];
   // a graph no profile reaches is still described by its own contents, rather than by nothing at all
-  const reaching = profilesReaching(scope, graph, all);
+  const reaching = profilesReaching(scope, graph, all, new Serving(scope));
   const profiles = reaching.length ? reaching : all;
   const { connections, participants } = transactionOf(scope, graph, profiles);
   return {
