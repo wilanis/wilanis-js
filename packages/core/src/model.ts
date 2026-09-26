@@ -97,13 +97,19 @@ export function runsUnder(step: StartupStep, profile: string | undefined): boole
 
 /**
  * One place a tree runs (RFC 0013): which binding meets each domain port, which connection stands in for a
- * connection the documents name (one step, same kind), and whether a start that names no profile runs this one.
+ * connection the documents name (one step, same kind), whether a start that names no profile runs this one, and
+ * what the place permits the tree to reach (RFC 0016).
  */
 export interface ProfileDoc {
   description?: string;
   default?: boolean;
   bindings: Record<string, string>;
   connections?: Record<string, string>;
+  /**
+   * What the place allows the tree to reach (RFC 0016): effectful native operations, whole native ports and
+   * connections. Absent: everything; present: exactly what the profile reaches (C021, C022, C023).
+   */
+  permits?: string[];
 }
 
 export interface ProjectDoc extends Envelope {

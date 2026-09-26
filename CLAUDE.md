@@ -111,6 +111,7 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   the graphs), `triggers.ts` (T) with
   `bounds.ts` for the lists T008 finds unbounded and `delivery.ts` (T009, T010: what a trigger's connection
   delivers), `scenarios.ts` (S),
+  `permits.ts` (C021, C022, C023: what a profile's `permits` allows against what `reachOf` says it reaches),
   `access.ts` (A), `invariants.ts` (I: what an invariant states
   once and the whole tree is held to) with `invariant-holds.ts` beside it for the field form and `prove.ts`
   for whether a rule already holds where a value is made -- what the checker and the guard the compiler
