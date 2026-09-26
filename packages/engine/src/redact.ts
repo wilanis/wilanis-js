@@ -1,6 +1,4 @@
 /** Secrets never appear in a report: a redacted copy of a value replaces every marked path with a marker. */
-import { readPath } from './sources.js';
-
 const SECRET = '«secret»';
 
 /** A copy of `value` with every listed path replaced; a path of no segments redacts the whole value. */
@@ -19,9 +17,20 @@ export function redactEach(items: unknown[], paths: string[][] | undefined): unk
   return paths?.length ? items.map(item => redactValue(item, paths)) : items;
 }
 
-/** Replace the value at `path` inside `root` in place, when the path leads somewhere. */
-function redactAt(root: unknown, path: string[]): void {
-  const parent = readPath(root, path.slice(0, -1));
-  const last = path[path.length - 1];
-  if (parent && typeof parent === 'object' && last in parent) (parent as Record<string, unknown>)[last] = SECRET;
+/**
+ * Replace the value at `path` inside `value` in place, where the path leads somewhere. A path names fields
+ * only, a list adding no segment, so a list met on the way -- the value itself, for a list result -- has the
+ * rest of the path walked in each of its elements; the last field is replaced only where an object has it.
+ */
+function redactAt(value: unknown, path: string[]): void {
+  if (Array.isArray(value)) {
+    for (const element of value) redactAt(element, path);
+    return;
+  }
+  if (value === null || typeof value !== 'object') return;
+  const record = value as Record<string, unknown>;
+  const [field, ...rest] = path;
+  if (!(field in record)) return;
+  if (rest.length) redactAt(record[field], rest);
+  else record[field] = SECRET;
 }
