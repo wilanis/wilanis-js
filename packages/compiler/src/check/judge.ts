@@ -230,9 +230,9 @@ export class Judge {
   }
 
   /**
-   * The profiles a trigger is judged under: those whose startup serves it (`servedUnder`), or every one where
-   * none does. Every rule made per profile over a trigger walks this list, so none refuses a route under a
-   * profile that never opens it (`served.ts`).
+   * The profiles a trigger is judged under: those whose startup serves it, or every one where none does
+   * (`walkedUnder`, which `reachOf` starts from too). Every rule made per profile over a trigger walks this list,
+   * so none refuses a route under a profile that never opens it (`served.ts`).
    */
   profilesServing(trigger: Loaded<TriggerDoc>): (string | undefined)[] {
     return this.served().profilesOf(trigger);

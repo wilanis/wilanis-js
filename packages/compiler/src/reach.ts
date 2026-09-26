@@ -48,8 +48,12 @@ export interface NativeSite<R> extends Call<R> {
   op: Operation;
 }
 
-/** Whoever reads the walk: told each graph entered, each delegation a binding writes, and each native site. */
+/**
+ * Whoever reads the walk: told each domain operation followed (its canonical `path#operation`), each graph
+ * entered, each delegation a binding writes, and each native site.
+ */
 export interface Listener<R> {
+  operation?(key: string): void;
   graph?(graph: Loaded<GraphDoc>): void;
   delegation?(binding: Loaded<BindingDoc>, opName: string, bound: BindingOp): void;
   native?(site: NativeSite<R>): void;
@@ -87,6 +91,7 @@ export class Walk<R> {
       this.listener.native?.({ ...call, key: `${hit.path}#${hit.opName}`, op: hit.op });
       return;
     }
+    this.listener.operation?.(`${hit.path}#${hit.opName}`);
     const binding = this.scope.bindingFor(hit.path, this.profile);
     if (typeof binding === 'string') return;
     const bound = binding.doc.operations[hit.opName];
@@ -160,14 +165,51 @@ export interface Reach {
 }
 
 /**
- * The reach of one profile, pure over the loaded tree. Its roots are every trigger's `fire`, every policy a
- * trigger attaches, every operation of a port a plugin requires (RFC 0005), and every startup step that runs
- * under the profile (`startup[].profiles`); a policy no trigger attaches runs nowhere and is not walked. A
- * connection a site names is the one `connectionFor` reaches under the profile: a stand-in replaces what it
- * stands in for, and its settings are the ones whose secrets the reach reads.
+ * The reach of one profile, pure over the loaded tree. Its roots are the `fire` of every trigger the profile
+ * walks (`walkedUnder`: its startup serves the trigger, or no profile's does), every policy such a trigger
+ * attaches, every operation of a port a plugin requires (RFC 0005), and every startup step that runs under the
+ * profile (`startup[].profiles`); a route under a profile that never listens, and a policy only such routes
+ * attach, run nowhere there and are not walked. A connection a site names is the one `connectionFor` reaches
+ * under the profile: a stand-in replaces what it stands in for, and its settings are the ones whose secrets the
+ * reach reads.
  */
 export function reachOf(scope: Scope, profile: string | undefined): Reach {
   return rooted(new Reaching(scope, profile)).done();
+}
+
+/**
+ * Whether a profile walks a trigger: the profile serves it (`servedUnder`), or no profile the project declares
+ * does, so a tree that listens nowhere -- a library checked alone, a route whose step is not written yet -- is
+ * walked whole rather than not at all. `reachOf` starts at the triggers this answers yes for, the checker judges
+ * a trigger under the profiles it answers yes for (`Judge.profilesServing`), and `rehearse`, `fuzz`, `regress`
+ * and `run` fire a trigger under a profile only where it does. A project that declares no profile walks every
+ * trigger under its one unnamed profile.
+ */
+export function walkedUnder(scope: Scope, trigger: TriggerDoc, profile: string | undefined): boolean {
+  if (servedUnder(scope, trigger, profile)) return true;
+  return !scope.profiles().some(one => servedUnder(scope, trigger, one));
+}
+
+/** The domain operations one profile's walk reaches, canonical `path#operation`s, split by what reached them. */
+export interface OperationsReached {
+  /** Those `reachOf`'s roots reach: the triggers the profile walks, their policies, the required ports, the steps. */
+  walked: Set<string>;
+  /** Those only the triggers the profile does not walk reach, with the policies they attach. */
+  beyond: Set<string>;
+}
+
+/**
+ * Every domain operation a profile's walk reaches, split by whether one of `reachOf`'s roots reaches it or only
+ * a trigger the profile does not walk does. It is one walk: from `reachOf`'s roots, then on from the triggers
+ * left out, and a graph the roots entered is not entered again, so what the second leg finds is what only those
+ * triggers reach. B011 reads it (`check/served.ts`): an operation only `beyond` reaches is not held to its
+ * promise under the profile, since nothing the profile runs calls it.
+ */
+export function operationsReachedBy(scope: Scope, profile: string | undefined): OperationsReached {
+  const reaching = rooted(new Reaching(scope, profile));
+  const walked = new Set(reaching.domain);
+  reaching.triggers(false);
+  return { walked, beyond: new Set([...reaching.domain].filter(key => !walked.has(key))) };
 }
 
 /**
@@ -213,7 +255,7 @@ export function graphsReachedBy(scope: Scope, profile: string | undefined): stri
   return graphs;
 }
 
-/** One reader walked from every root: the triggers and their policies, the required ports, the startup steps. */
+/** One reader walked from every root: the triggers it walks, their policies, the required ports, the startup steps. */
 function rooted(reaching: Reaching): Reaching {
   reaching.triggers();
   reaching.required();
@@ -223,8 +265,12 @@ function rooted(reaching: Reaching): Reaching {
 
 /** The reader of the walk that gathers a profile's reach: the roots it starts at, and what it keeps of each site. */
 class Reaching implements Listener<Root> {
+  /** Every domain operation the walk followed, canonical, for a reader after the ports rather than the effects. */
+  readonly domain = new Set<string>();
   private readonly found: Reach = { operations: [], connections: [], holds: [], secrets: [] };
   private readonly secretIds = new Set<string>();
+  /** Each policy whose `decide` was walked, so none is walked twice whichever trigger attached it. */
+  private readonly attached = new Set<string>();
   private readonly walk: Walk<Root>;
   private readonly projectPath: string;
 
@@ -236,6 +282,11 @@ class Reaching implements Listener<Root> {
   ) {
     this.walk = new Walk(scope, profile, this);
     this.projectPath = scope.registry.project?.path ?? 'project.json';
+  }
+
+  /** A domain operation followed: kept by its canonical `path#operation`. */
+  operation(key: string): void {
+    this.domain.add(key);
   }
 
   /** A graph entered: its path kept where a reader asked for the graphs; the walk enters each once. */
@@ -261,17 +312,20 @@ class Reaching implements Listener<Root> {
     return typeof reached === 'string' ? named : reached.path;
   }
 
-  /** Every trigger's `fire`, and the `decide` of every policy some trigger attaches, each policy once. */
-  triggers(): void {
-    const attached = new Set<string>();
+  /**
+   * The `fire` of every trigger the profile walks (`walkedUnder`) -- or, told `walked` false, of every one it does
+   * not -- and the `decide` of every policy one of them attaches, each policy once.
+   */
+  triggers(walked = true): void {
     for (const trigger of this.scope.registry.all('trigger')) {
+      if (walkedUnder(this.scope, trigger.doc, this.profile) !== walked) continue;
       const { fire, policies } = trigger.doc;
       const root: Root = { kind: 'trigger', file: trigger.path, run: fire.run };
       this.walk.follow({ run: fire.run, given: fire.in, file: trigger.path, node: 'fire', binding: undefined, root });
       for (const ref of policies ?? []) {
         const policy = this.scope.get('policy', policyPath(ref));
-        if (!policy || attached.has(policy.path)) continue;
-        attached.add(policy.path);
+        if (!policy || this.attached.has(policy.path)) continue;
+        this.attached.add(policy.path);
         this.decide(policy.path, policy.doc.decide);
       }
     }

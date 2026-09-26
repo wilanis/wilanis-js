@@ -3567,52 +3567,11 @@
           "via": []
         },
         {
-          "operation": "@auth/identity.port.json#verify",
-          "via": [
-            "@connections/employees-production.connection.json",
-            "@connections/people.connection.json"
-          ]
-        },
-        {
-          "operation": "@auth/session.port.json#end",
-          "via": []
-        },
-        {
-          "operation": "@auth/session.port.json#get",
-          "via": []
-        },
-        {
-          "operation": "@auth/session.port.json#set",
-          "via": []
-        },
-        {
-          "operation": "@auth/token.port.json#issue",
-          "via": []
-        },
-        {
-          "operation": "@auth/token.port.json#refresh",
-          "via": []
-        },
-        {
-          "operation": "@blob/csv.port.json#parse",
-          "via": []
-        },
-        {
-          "operation": "@blob/csv.port.json#write",
-          "via": []
-        },
-        {
           "operation": "@otel/exporter.port.json#export",
           "via": []
         },
         {
           "operation": "@queue/queue.port.json#ensure",
-          "via": [
-            "@connections/customers-postgres.connection.json"
-          ]
-        },
-        {
-          "operation": "@queue/queue.port.json#publish",
           "via": [
             "@connections/customers-postgres.connection.json"
           ]
@@ -3635,12 +3594,6 @@
         },
         {
           "operation": "@storage/store.port.json#get",
-          "via": [
-            "@connections/customers-postgres.connection.json"
-          ]
-        },
-        {
-          "operation": "@storage/store.port.json#newKey",
           "via": [
             "@connections/customers-postgres.connection.json"
           ]
@@ -3686,13 +3639,6 @@
           "readBy": [
             "@auth settings"
           ]
-        },
-        {
-          "variable": "CUSTOMERS_OPERATOR_PASSWORD_HASH",
-          "key": "operatorPasswordHash",
-          "readBy": [
-            "@connections/employees-production.connection.json"
-          ]
         }
       ]
     },
@@ -3714,52 +3660,11 @@
           "via": []
         },
         {
-          "operation": "@auth/identity.port.json#verify",
-          "via": [
-            "@connections/employees-production.connection.json",
-            "@connections/people.connection.json"
-          ]
-        },
-        {
-          "operation": "@auth/session.port.json#end",
-          "via": []
-        },
-        {
-          "operation": "@auth/session.port.json#get",
-          "via": []
-        },
-        {
-          "operation": "@auth/session.port.json#set",
-          "via": []
-        },
-        {
-          "operation": "@auth/token.port.json#issue",
-          "via": []
-        },
-        {
-          "operation": "@auth/token.port.json#refresh",
-          "via": []
-        },
-        {
-          "operation": "@blob/csv.port.json#parse",
-          "via": []
-        },
-        {
-          "operation": "@blob/csv.port.json#write",
-          "via": []
-        },
-        {
           "operation": "@otel/exporter.port.json#export",
           "via": []
         },
         {
           "operation": "@queue/queue.port.json#ensure",
-          "via": [
-            "@connections/customers-postgres.connection.json"
-          ]
-        },
-        {
-          "operation": "@queue/queue.port.json#publish",
           "via": [
             "@connections/customers-postgres.connection.json"
           ]
@@ -3782,12 +3687,6 @@
         },
         {
           "operation": "@storage/store.port.json#get",
-          "via": [
-            "@connections/customers-postgres.connection.json"
-          ]
-        },
-        {
-          "operation": "@storage/store.port.json#newKey",
           "via": [
             "@connections/customers-postgres.connection.json"
           ]
@@ -3832,13 +3731,6 @@
           "key": "jwt",
           "readBy": [
             "@auth settings"
-          ]
-        },
-        {
-          "variable": "CUSTOMERS_OPERATOR_PASSWORD_HASH",
-          "key": "operatorPasswordHash",
-          "readBy": [
-            "@connections/employees-production.connection.json"
           ]
         }
       ]
