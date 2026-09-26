@@ -655,8 +655,8 @@ its trigger; `map` prints the queue line. View, in `packages/view/test`: the exa
 ## Drawbacks and alternatives
 
 **One process listens and consumes; two processes need RFC 0013.** The stub said a worker is "the same tree
-started with a profile whose startup lists `subscribe` and not `listen`". The code says a profile is a set of
-bindings and nothing else -- `project.schema.json → profiles` has `bindings`, `runStartup` reads the one
+started with a profile whose startup lists `subscribe` and not `listen`". The code said a profile is a set of
+bindings and nothing else -- `project.schema.json → profiles` had `bindings`, `runStartup` read the one
 `project.doc.startup` for every profile -- so when this RFC was accepted every process that ran the tree ran
 every step. That is the right default for a small deployment: one process answers routes and works queues,
 and `consume` before `listen` drains in the right order. A separate worker process needs a startup list per
