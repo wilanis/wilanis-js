@@ -18,6 +18,7 @@ export * from './published.js';
 export * from './registry.js';
 export * from './resolves.js';
 export * from './scope.js';
+export * from './secret.js';
 export * from './templates.js';
 export * from './types.js';
 export * from './validate.js';

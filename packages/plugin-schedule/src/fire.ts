@@ -3,9 +3,9 @@
  * itself with a blob scope of its own, and the line the run is logged as. Nothing here waits on time: the
  * scheduler decides *when* and this decides *what happens then*, so a test can fire a tick without a clock.
  */
-import type { Serving, TriggerDoc } from '@wilanis/core';
+import { type Serving, secretPaths, type TriggerDoc } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
-import { refusalOf } from '@wilanis/engine';
+import { redactValue, refusalOf } from '@wilanis/engine';
 
 /** The context a tick hands a graph, as the kind declares it. */
 export interface Tick {
@@ -20,6 +20,8 @@ export interface Tick {
 /** What one tick's run answered, for the line it is logged as and for whoever waits on it. */
 export interface Fired {
   report?: Report;
+  /** What the run answered, as a log may show it: the fields the trigger's `out` marks secret as the marker. */
+  answer?: unknown;
   /** why the tick did not answer: the input could not be built, or the run itself threw */
   error?: string;
   /** true where the input could not be built, so the tick never reached a graph at all */
@@ -42,9 +44,9 @@ function outcome(fired: Fired): string {
   return '→ done';
 }
 
-/** The line one tick is logged as: what fired, for when, how it ended and what it answered. */
+/** The line one tick is logged as: what fired, for when, how it ended and what it answered, as a log may show it. */
 export function lineOf(name: string, tick: Tick, fired: Fired): string {
-  const answer = fired.report?.status === 'done' ? ` ${JSON.stringify(fired.report.output)}` : '';
+  const answer = fired.report?.status === 'done' ? ` ${JSON.stringify(fired.answer)}` : '';
   return `schedule ${name} ${tick.scheduled} ${outcome(fired)} (${fired.ms}ms)${answer}`;
 }
 
@@ -73,7 +75,8 @@ export async function fireTick(
       blobs: scope,
       ...(signal ? { signal } : {}),
     });
-    return { report, ms: Date.now() - started };
+    const answer = redactValue(report.output, secretPaths(serving.types(trigger).out));
+    return { report, answer, ms: Date.now() - started };
   } finally {
     await scope.release();
   }

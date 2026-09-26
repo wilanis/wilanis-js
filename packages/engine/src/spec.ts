@@ -139,6 +139,8 @@ export interface Report {
    * does this field once the report hangs as a node's `sub` in another report.
    */
   output?: unknown;
+  /** done: the output candidate that answered, whose report shows the output as a report may. */
+  answeredBy?: string;
   /** blocked: the root paths that were read but never supplied. */
   needs?: string[];
   nodes: Record<string, NodeReport>;
@@ -159,6 +161,11 @@ export interface RunContext {
   stubs?: Record<string, unknown>;
   /** The trigger context (`request`) of this run, forwarded to nested graphs. */
   request?: unknown;
+  /**
+   * What this node's report shows it was given, secrets as the marker: what a nested run is told its `in` is
+   * shown as, so its reports read the caller's marks as well as their own.
+   */
+  shownIn?: Record<string, unknown>;
   signal?: AbortSignal;
   /** The clock this run stamps its reports with, forwarded so a nested run stamps by the same one. */
   clock: () => number;
@@ -179,6 +186,12 @@ export interface RunOptions {
    * executed), and `<mapId>.<index>` for one element of a map (that element is seeded, the others run).
    */
   initial?: Record<string, unknown>;
+  /**
+   * How a report shows a pre-supplied value where it is not the value itself: `in` with the secrets its caller
+   * marks as the marker. A report reads every value through what the report of its source shows; a value not
+   * named here is shown as it is.
+   */
+  shown?: Record<string, unknown>;
   stubs?: Record<string, unknown>;
   signal?: AbortSignal;
   /**

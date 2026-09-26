@@ -17,7 +17,7 @@
  * what the rehearsal, `describe` and the viewer read a guard by; a second rule adds only its own refusal,
  * `<id>:violated:2`, as one more branch of the same switch.
  */
-import { expr, type GraphDoc, type InvariantDoc, type Loaded, type Scope } from '@wilanis/core';
+import { expr, type GraphDoc, type InvariantDoc, type Loaded, type Scope, secretPaths } from '@wilanis/core';
 import type { KCall, KernelSpec, KNode, KSwitch } from '@wilanis/engine';
 import { rootsOf } from './check/judge.js';
 import { conjunctsOf } from './check/narrowing.js';
@@ -49,6 +49,8 @@ export interface Guard {
   unproved: Unproved[];
   /** the one rule the switch tests: each unproved rule bracketed, joined by `&&` */
   when: string;
+  /** where the shape marks a field secret: what the guard's answer is shown with, whatever made the value */
+  secret: string[][];
 }
 
 /** The four ids one guard occupies: where the judged value is read, and the three nodes that judge it. */
@@ -129,6 +131,15 @@ function unprovedAt(scope: Scope, sites: Site[], site: Site, over: Loaded<Invari
   return out;
 }
 
+/** The secret paths of a shape an invariant holds over; none where it cannot be typed, which the checker has refused. */
+function marked(scope: Scope, shape: string): string[][] {
+  try {
+    return secretPaths(scope.types.ref(shape));
+  } catch {
+    return [];
+  }
+}
+
 /** Every guard of a tree, by the graph that carries it: the walk over the shapes, made once per scope. */
 function allGuards(scope: Scope): Map<string, Guard[]> {
   const out = new Map<string, Guard[]>();
@@ -139,7 +150,15 @@ function allGuards(scope: Scope): Map<string, Guard[]> {
       const unproved = unprovedAt(scope, sites, site, over);
       if (!unproved.length) continue;
       const when = unproved.map(one => `(${one.when})`).join(' && ');
-      const guard: Guard = { site, id: siteId(site), arity: site.arity, shape, unproved, when };
+      const guard: Guard = {
+        site,
+        id: siteId(site),
+        arity: site.arity,
+        shape,
+        unproved,
+        when,
+        secret: marked(scope, shape),
+      };
       out.set(site.graph.path, [...(out.get(site.graph.path) ?? []), guard]);
     }
   }
@@ -229,12 +248,14 @@ function checkNode(guard: Guard, from: string, ids: GuardIds): KSwitch {
  * The call that answers the value once the rule held: the value exactly as it stands. It declares no type,
  * unlike every `make` an author writes, because it is not making a value -- the node it reads already made
  * one of the shape and was judged against it. Declaring the shape again would judge the same value twice and
- * make the guard the place a value fails for a reason that has nothing to do with the rule it tests.
+ * make the guard the place a value fails for a reason that has nothing to do with the rule it tests. Its answer
+ * is shown with the shape's secrets as the marker, since it answers a value of the shape whatever made it.
  */
-const okNode = (from: string, handlers: GuardHandlers): KCall => ({
+const okNode = (from: string, handlers: GuardHandlers, secret: string[][]): KCall => ({
   kind: 'call',
   handler: handlers.make,
   in: { value: { ref: from, path: [] } },
+  ...(secret.length ? { redact: { out: secret } } : {}),
 });
 
 /** The call that refuses where one rule did not hold: the one reserved reason, and what that invariant says. */
@@ -256,7 +277,7 @@ const violatedNode = (one: Unproved, shape: string, handlers: GuardHandlers): KC
 export function guardNodes(guard: Guard, ids: GuardIds, handlers: GuardHandlers): Record<string, KNode> {
   const nodes: Record<string, KNode> = {
     [ids.check]: checkNode(guard, ids.made, ids),
-    [ids.ok]: okNode(ids.made, handlers),
+    [ids.ok]: okNode(ids.made, handlers, guard.secret),
   };
   const violated = violatedIds(ids, guard.unproved.length);
   guard.unproved.forEach((one, at) => {

@@ -48,7 +48,7 @@ export function reportOf(run: Settled): Report {
   if (run.ending) return { ...base, status: run.ending };
   if (!run.spec.output) return { ...base, status: 'done' };
   const answer = run.spec.output.find(id => answered(run.nodes[id]));
-  if (answer !== undefined) return { ...base, status: 'done', output: run.values.get(answer) };
+  if (answer !== undefined) return { ...base, status: 'done', output: run.values.get(answer), answeredBy: answer };
   return { ...base, status: 'blocked', needs: needs(run) };
 }
 

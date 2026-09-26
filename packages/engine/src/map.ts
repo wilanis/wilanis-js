@@ -6,7 +6,7 @@
  * decides when the map starts and what its answer is taken for; this module runs the elements and says what came
  * of each.
  */
-import { redactEach, redactValue } from './redact.js';
+import { redactEach, redactValue, shownOut } from './redact.js';
 import { initialReport, noteRefusal } from './report.js';
 import { readAll, readPath, readSource } from './sources.js';
 import type { KMap, NodeReport } from './spec.js';
@@ -17,9 +17,10 @@ type ElementResult =
   | { ok: true; value: unknown }
   | { ok: false; error: string; reason?: string; detail?: Record<string, unknown>; cancelled?: true };
 
-/** What a map needs of the run it is in: the values it reads, its clock, whether it has ended, and how one element's handler is called. */
+/** What a map needs of the run it is in: the values it reads and what reports show of them, its clock, whether it has ended, and how one element's handler is called. */
 export interface MapHost {
   readonly values: Map<string, unknown>;
+  readonly shown: Map<string, unknown>;
   readonly clock: () => number;
   /** Whether the run has ended (broken or cancelled), so no further element may start. */
   ended(): boolean;
@@ -33,6 +34,8 @@ interface MapSite {
   node: KMap;
   broadcast: Record<string, unknown>;
   over: unknown[];
+  /** The shared inputs and the list as the reports of their sources show them, which an element's report reads. */
+  shown: { broadcast: Record<string, unknown>; over: unknown[] };
   items: NodeReport[];
   results: ElementResult[];
   cursor: number;
@@ -74,10 +77,24 @@ function elementPaths(node: KMap): string[][] {
   );
 }
 
-/** What a map's report shows of its answer: each element redacted, under its `value` where failures are collected. */
-export function shownAnswer(node: KMap, answer: unknown[]): unknown[] {
+/**
+ * What a map's report shows of its answer: each element as its own report shows it, under its `value` where
+ * failures are collected, and redacted by the map's paths again -- a seeded element's report shows it as given.
+ */
+export function shownAnswer(node: KMap, answer: unknown[], items: NodeReport[]): unknown[] {
   const paths = node.redact?.out;
-  return redactEach(answer, node.onItemFailure === 'collect' ? paths?.map(path => ['value', ...path]) : paths);
+  if (node.onItemFailure !== 'collect')
+    return redactEach(
+      items.map(item => item.out),
+      paths,
+    );
+  const shown = answer.map((result, index) =>
+    (result as ElementResult).ok ? { ...(result as object), value: items[index].out } : result,
+  );
+  return redactEach(
+    shown,
+    paths?.map(path => ['value', ...path]),
+  );
 }
 
 /**
@@ -99,13 +116,14 @@ export async function runMap(host: MapHost, id: string, node: KMap, report: Node
   const over = readSource(node.over, host.values);
   if (!Array.isArray(over)) throw new Error(`map '${id}': over is not a list`);
   const broadcast = readAll(node.in, host.values);
-  report.in = shownIn(node, broadcast, over);
+  const shown = { broadcast: readAll(node.in, host.shown), over: readSource(node.over, host.shown) as unknown[] };
+  report.in = shownIn(node, shown.broadcast, shown.over);
   if (node.limit !== undefined && over.length > node.limit)
     throw new Error(`map '${id}': ${over.length} elements, limit ${node.limit}`);
   // one report per element; an element supplied in initial as '<id>.<index>' is seeded and never runs
   const items = over.map((_, index) => initialReport(host.values, `${id}.${index}`));
   report.items = items;
-  const site: MapSite = { id, node, broadcast, over, items, results: [], cursor: 0, broken: false };
+  const site: MapSite = { id, node, broadcast, over, shown, items, results: [], cursor: 0, broken: false };
   // every element settles before the node does, whatever happened to the others
   const workers = Math.min(node.concurrency ?? over.length, over.length);
   await Promise.all(Array.from({ length: workers }, () => work(host, site)));
@@ -136,10 +154,11 @@ async function runElement(host: MapHost, site: MapSite, index: number): Promise<
   element.status = 'running';
   element.startedAt = host.clock();
   element.handler = site.node.handler;
-  element.in = redactValue(inputs, site.node.redact?.in) as Record<string, unknown>;
+  const shownInputs = elementInputs(site.node, site.shown.broadcast, site.shown.over[index]);
+  element.in = redactValue(shownInputs, site.node.redact?.in) as Record<string, unknown>;
   try {
     const value = await host.call(site.node, [site.id, String(index)], inputs, element);
-    element.out = redactValue(value, site.node.redact?.out);
+    element.out = shownOut(element, value, site.node.redact?.out);
     element.status = 'done';
     return { ok: true, value };
   } catch (error) {

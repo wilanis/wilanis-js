@@ -218,6 +218,7 @@ describe('a map without limit or concurrency', () => {
       graph: 't',
       status: 'done',
       output: [2, 4],
+      answeredBy: 'm',
       startedAt: 7,
       endedAt: 7,
       nodes: {
