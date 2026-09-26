@@ -105,8 +105,8 @@ $ npx wilanis manifest example
       "path": "@features/customers/edge/delete-customers.trigger.json",
       "kind": "@http/http.trigger-kind.json",
       "settings": { "method": "DELETE", "route": "/customers" },
-      "fires": "@customers/domain/customer.port.json#removeMany",
-      "policies": ["@access/edge/employees-only.policy.json", "@access/edge/can-register.policy.json"],
+      "fires": "@features/customers/domain/customer.port.json#removeMany",
+      "policies": ["@features/access/edge/employees-only.policy.json", "@features/access/edge/can-register.policy.json"],
       "public": false,
       "included": null
     },
@@ -115,14 +115,14 @@ $ npx wilanis manifest example
   "ports": {
     "domain": [
       {
-        "path": "@customers/domain/customer.port.json",
+        "path": "@features/customers/domain/customer.port.json",
         "feature": "customers",
         "operations": [
           { "name": "list", "firedBy": ["@features/customers/edge/list-customers.trigger.json"], "public": true },
           { "name": "removeMany", "firedBy": ["@features/customers/edge/delete-customers.trigger.json"], "public": false },
           ...
         ],
-        "bindings": ["@customers/data/customers-rest.binding.json"]
+        "bindings": ["@features/customers/data/customers-rest.binding.json"]
       }
     ],
     "native": [
@@ -139,7 +139,7 @@ $ npx wilanis manifest example
     ]
   },
   "policies": [
-    { "path": "@access/edge/employees-only.policy.json", "decides": "@access/domain/access.port.json#requireEmployee", "proves": ["request.principal", "request.session"], "gates": ["@features/customers/edge/delete-customers.trigger.json", ...], "included": "@wilanis/access" }
+    { "path": "@features/access/edge/employees-only.policy.json", "decides": "@features/access/domain/access.port.json#requireEmployee", "proves": ["request.principal", "request.session"], "gates": ["@features/customers/edge/delete-customers.trigger.json", ...], "included": "@wilanis/access" }
   ],
   "connections": [
     { "path": "@connections/customers-api.connection.json", "kind": "@http/http.connection-kind.json", "settings": { "baseUrl": "https://6aa009e23e0d88d3d7e5525d.mockapi.io/api/v1", "throttle": { "concurrency": 4 }, "timeoutMs": 10000 }, "secrets": [] },
@@ -147,7 +147,7 @@ $ npx wilanis manifest example
   ],
   "secrets": { "jwt": "CUSTOMERS_JWT_SECRET", "customerKey": "CUSTOMERS_API_KEY" },
   "startup": [
-    { "label": "Reach the customer store", "run": "@customers/domain/customer.port.json#listAll", "required": true, "profiles": null },
+    { "label": "Reach the customer store", "run": "@features/customers/domain/customer.port.json#listAll", "required": true, "profiles": null },
     { "label": "Watch for changes", "run": "@reload/watch.port.json#watch", "required": true, "profiles": ["live"] },
     { "label": "Listen", "run": "@http/server.port.json#listen", "required": true, "profiles": null }
   ],
@@ -155,7 +155,7 @@ $ npx wilanis manifest example
     "live": {
       "default": true,
       "description": "The laptop: ...",
-      "bindings": { "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json", "@customers/domain/customer.port.json": "@customers/data/customers-rest.binding.json" },
+      "bindings": { "@features/access/domain/identity.port.json": "@features/directories/data/identity.binding.json", "@features/customers/domain/customer.port.json": "@features/customers/data/customers-rest.binding.json" },
       "connections": {},
       "reaches": [
         { "operation": "@auth/identity.port.json#verify", "via": ["@connections/customers.connection.json", "@connections/employees.connection.json"] },
@@ -187,13 +187,17 @@ $ npx wilanis manifest example
 }
 ```
 
-The example is the one RFC 0013 and RFC 0016 leave behind. Three things to notice. A trigger's `settings` are
-printed as its document wrote them: the route and method of an http trigger, the queue and broker of RFC 0009's,
-the cron of RFC 0010's are each the kind's own settings, declared in the kind's schema, so the manifest does not
-restate their shape; a reader groups triggers by `kind`. A connection's `settings` are printed as written too:
-`{{secrets.customerKey}}` stays the template text, the value never appears, and `secrets` beside it lists the
-keys it reads. Under a profile, `reaches` is RFC 0013's reach, with a stand-in where the profile chose one, and
-`permits` is RFC 0016's list or `null` when the profile permits everything.
+The example is the one RFC 0013 and RFC 0016 leave behind. Four things to notice. Every reference a row holds is
+canonical -- `@features/customers/domain/customer.port.json`, never the `@customers` alias a document may write --
+so it names a document by the path `documents` lists it under. A trigger's `settings` are printed with the values
+its document wrote: the route and method of an http trigger, the queue and broker of RFC 0009's, the cron of RFC
+0010's are each the kind's own settings, declared in the kind's schema, so the manifest does not restate their
+shape and does not rewrite a reference inside them; a reader groups triggers by `kind`. A connection's `settings`
+are printed with their values as written too: `{{secrets.customerKey}}` stays the template text, the value never
+appears, and `secrets` beside it lists the keys it reads. In both, every object's keys are in code-unit order at
+every depth and arrays keep theirs, so a document that reorders its settings prints the same manifest. Under a
+profile, `reaches` is RFC 0013's reach, with a stand-in where the profile chose one, and `permits` is RFC 0016's
+list or `null` when the profile permits everything.
 
 **One profile.** `wilanis manifest example --profile production` prints the same document with `profiles`
 holding that one block, which is what RFC 0024's image reads for one deployment. An unknown name is refused
@@ -257,24 +261,29 @@ None. The manifest is derived from a tree that passed; an inconsistency in it is
 ### Runtime behaviour
 
 - **`manifestOf(load, options): Manifest`**, new, `packages/runtime/src/manifest.ts`, exported by `tools.ts`. Pure
-  over a `LoadResult` that passed `checkTree`; `options.profile` narrows the blocks; `options.runtime` and
-  `options.root` are the two strings the command supplies (the runtime package's version, as RFC 0019's
-  `diagnosticsOf` takes it; the root as given). It reads the registry, `Scope`, and `reachOf(scope, profile)` from
+  over a `LoadResult` that passed `checkTree`. In step 1 `options` is `root` alone, the root as the command was
+  given it; `options.profile`, which narrows the profile blocks, arrives with step 2 (#315). The runtime's version
+  is not an option: `manifestOf` reads `RUNTIME_VERSION` (`packages/runtime/src/runtime-version.ts`), the one
+  module `diagnosticsOf` reads it from too. The versions of plugins and includes are read off the `resolved` that
+  `loadProject` carries on the load. From step 2 it also reads `reachOf(scope, profile)` from
   the compiler (RFC 0013) for every profile of `Judge.profiles()`, whose `undefined` -- the unnamed profile --
-  is written under the key `""`; never `process.env`, never the clock. Every
+  is written under the key `""`. It reads the registry and `Scope`; never `process.env`, never the clock. Every
+  reference it prints is canonical, never an alias, and settings are the one place a value is printed as the
+  document wrote it. Every
   array is sorted: rows by `path` (or `name`, `variable`, `operation`, `label` in order of appearance for
-  `startup`, which keeps its declared order because the order is meaning), object maps by key. `format` is the
-  literal `1`. `ir` is RFC 0008's segment of `SCHEMA_BASE` (`packages/core/src/model.ts:48`): `v1` while the base
+  `startup`, which keeps its declared order because the order is meaning), object maps by key, settings' at every
+  depth, arrays inside settings in their own order. `format` is the
+  literal `1`. `ir` is RFC 0008's segment of `SCHEMA_BASE` (`packages/core/src/published.ts`): `v1` while the base
   ends in `main` or `schemas-v1`.
 - **The inventory**, from the registry: `documents` (`path`, `kind`, `feature`, `layer`, `included`, each `null`
   where it does not apply); `plugins` (`use`, `from`, `version`, `guard`); `includes` (`from`, `version`,
-  `features`); `features` (`name`, `included`, `effects`); `triggers` (`path`, `kind`, `settings` as written,
+  `features`); `features` (`name`, `included`, `effects`); `triggers` (`path`, `kind`, `settings` with the values written,
   `fires`, `policies` in attached order, `public` = no policy attached, `included`); `ports.domain` (`path`,
   `feature`, `operations[]` with `firedBy` = the triggers whose `fire.run` is the operation and `public` = any of
   them is public, `bindings` = every binding of the port, since the inventory is profile-independent);
   `ports.native` (`path`, `grantedBy`, `operations[]` with `pure` and `holds`); `policies` (`path`, `decides`,
-  `proves`, `gates` = the triggers that attach it, `included`); `connections` (`path`, `kind`, `settings` as
-  written, `secrets` = the keys its templates read, from `Scope.templateReads`); `secrets` as declared; `startup`
+  `proves`, `gates` = the triggers that attach it, `included`); `connections` (`path`, `kind`, `settings` with
+  the values written, `secrets` = the keys its templates read, from `Scope.templateReads`); `secrets` as declared; `startup`
   (`label`, `run`, `required` defaulted to `true`, `profiles` or `null`).
 - **A profile block**, from RFC 0013: `default`, `description`, `bindings` as chosen, `connections` as mapped,
   `reaches` (each effectful native operation with `via`, the connections it was reached with, resolved through
@@ -337,9 +346,9 @@ separately" RFC 0002 asks for (`0002:695`). `ir` follows RFC 0008: `v2` when the
 - **Determinism.** Two calls answer equal strings; a registry whose `all()` is reversed answers the same string;
   the string contains no timestamp and no value of any environment variable set for the test.
 - **Schema.** The output validates against `manifest.schema.json` with Ajv; a row with an extra key fails it.
-- **The command**, in `packages/runtime/test/tools.test.ts`: `manifest example` exits 0 and its stdout
-  parses; `--profile staging` exits 1 with RFC 0013's message; a sabotaged copy that fails `check` exits 1 and
-  prints no JSON.
+- **The command**, in `packages/runtime/test/manifest.test.ts` beside the rest (`tools.test.ts` is at the house
+  rules' length): `manifest example` exits 0 and prints the same bytes as `manifestOf`; `--profile staging` exits
+  1 with RFC 0013's message (step 2); a sabotaged copy that fails `check` exits 1 and prints no JSON.
 - **The viewer**, in `packages/view/test`: `/api/manifest` answers the same string as `manifestOf`.
 
 No end-to-end test against a fake: nothing runs.
@@ -410,10 +419,12 @@ Settled while reviewing this draft, so the reasoning survives:
   (`packages/compiler/src/check/judge.ts:156`) answers `[undefined]` for a tree that declares none, and JSON
   has no key for nothing. The *Guide* and the *Reference* now say the mapping rather than leaving a reader to
   find it in the compiler.
+- **Where `manifestOf` reads the runtime's version from.** `RUNTIME_VERSION` in
+  `packages/runtime/src/runtime-version.ts`, the one module `diagnosticsOf` reads it from too, so the two
+  envelopes cannot disagree about which runtime printed them; it is not an option the command supplies.
 
 During implementation:
 
 - The exact sort key of `reaches` (by `operation`, then `via`) and whether `via` lists connection paths or
   connection kinds beside them.
 - Whether `needs[].readBy` names a plugin as `@auth settings` or as the plugin's `use` alone.
-- Where `manifestOf` reads the runtime's version from, shared with RFC 0019's `diagnosticsOf`.

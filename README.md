@@ -95,10 +95,11 @@ digest: the count, and one line per customer of every tenant. It reads across te
 declares, and the view names the policy every trigger reaching it must attach.
 
 Neither names a graph, and neither knows how `get` or `digest` is met. A trigger's kind is granted by a plugin
-(`@http`, `@cli`, `@schedule`), the compiler judges the trigger's settings by what that kind declares, and the
-engine sees a fired operation and nothing else. A queue or a file drop would be another kind from another
-plugin, with no change to the port or to the language. `wilanis ls example trigger` lists every way into the
-example, and `wilanis map example` draws what each one reaches.
+(`@http`, `@cli`, `@schedule`, `@queue`), the compiler judges the trigger's settings by what that kind declares,
+and the engine sees a fired operation and nothing else. A message on a queue is one more kind (below), and a
+file drop would be another from another plugin, with no change to the port or to the language.
+`wilanis ls example trigger` lists every way into the example, and `wilanis map example` draws what each one
+reaches.
 
 ## The compiler reads it first
 
@@ -185,6 +186,27 @@ size is a 413 before it is parsed or stored. `DELETE /customers` takes at most a
 no most. Cancelling undoes nothing that already ran, and the run's record says how far it got; only a graph
 marked atomic rolls back.
 
+## Work off the request
+
+Some work should not hold the caller's socket. `POST /customers/{id}/removal` answers 202 with a message's id
+and nothing about the customer: it fires `enqueueRemoval`, whose one data graph, `publish-removal.graph.json`,
+puts `{ "id": ... }` on the `removals` queue with the caller's `Authorization` header beside it, and publishing
+is an effect the feature declares like any other. `remove-queued.trigger.json` is a trigger of kind
+`@queue/queue.trigger-kind.json` on that queue. It fires the same `#remove` that `DELETE /customers/{id}` fires
+and attaches the same two policies, reading the token from the message's headers, so the worker's gate judges
+the caller the route judged. Its `outcomes` say what each refusal means to the message, as a route's status
+table says what it means to a caller: `missing` is acknowledged, since the customer is already gone; `upstream`
+is retried, a second later and then doubling, and dead after five deliveries; a token that does not verify is
+dead at once. Both brokers here deliver at least once, so `remove` may run twice for one message. The checker
+refuses a queue trigger whose operation does not promise `idempotent` (`T009`), and holds that promise under
+every profile to the effects the binding reaches (`B011`): a DELETE through the API under `live`, a store's
+remove under the others. On the laptop the broker is `@queue-memory`'s, in the process. In production
+`jobs.connection.json` stands for the customer database, so the queue is a table beside the customers; `C018`
+admits that one stand-in of another kind because the in-process kind is a broker and nothing else and the two
+deliver alike. A worker is nothing new: it is `wilanis start` on a tree whose startup names
+`@queue/worker.port.json#consume`. The instances under `production` only listen, and the processes started under
+`production-worker` work the queue and open no port.
+
 The clock is a way in as well. A trigger of kind `@schedule/schedule.trigger-kind.json` fires at every instant a
 five-field `cron` expression names in its `timezone`, or at every multiple of an `everyMs` interval, into a domain
 port operation like any route. The tick's instant reaches the graph as `request.scheduled`, a string read through
@@ -231,9 +253,10 @@ A profile is one place the tree runs. `npx wilanis start example` with no `--pro
 `--profile local` keeps them in memory and reaches no network; `WILANIS_PROFILE` names one too, and the flag
 wins. `--profile production` is the deployment: the customers in PostgreSQL, one operator account standing in
 for the laptop's employee directory, and no watcher, since the watch step names `live` and `local` and a step
-without `profiles` runs everywhere. Nor does it schedule: `--profile production-scheduler` is the one process that
-does, with production's bindings and no listener. Started without its variables, it prints `profile production` and then
-every variable that profile reads and nobody set, with the document that reads it, before anything opens.
+without `profiles` runs everywhere. Nor does it schedule or work the queue: `--profile production-scheduler` is the
+one process that schedules and `--profile production-worker` the processes that work the queue, both with
+production's bindings and neither opening a port. Started without its variables, it prints `profile production`
+and then every variable that profile reads and nobody set, with the document that reads it, before anything opens.
 
 [`example/README.md`](example/README.md) walks through what it serves and who may do what.
 

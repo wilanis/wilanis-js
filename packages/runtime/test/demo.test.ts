@@ -15,6 +15,7 @@ import { checkTree } from '@wilanis/compiler';
 import { type LoadResult, loadTree, type TriggerDoc } from '@wilanis/core';
 import { encode } from '@wilanis/plugin-http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { DOCUMENTS } from '../../../docs/demo/lib/expected.mjs';
 import { describe as describeDoc, embedderFor, FileBlobStore, postLoad, rehearse, scaffold } from '../src/index.js';
 import { copyOfExample, INCLUDES, PLUGINS, refusalsAt, refusalsHinting, refusalsSaying } from './example-harness.js';
 
@@ -43,9 +44,9 @@ const documents = () => load().registry.files.length;
 const paste = (name: string) => copyFileSync(join(DEMO, name), join(dir, ROUTE));
 
 describe('beat 1, the hook: the tree as it ships, and what the rule reaches', () => {
-  it('checks ok at 221 documents, and describe computes the six triggers the rule reaches', () => {
+  it(`checks ok at ${DOCUMENTS.shipped} documents, and describe computes the six triggers the rule reaches`, () => {
     expect(refusalsAt(dir)).toEqual([]);
-    expect(documents()).toBe(221);
+    expect(documents()).toBe(DOCUMENTS.shipped);
     const said = describeDoc(load(), '@customers/domain/writes-are-for-registrars.invariant.json').split('\n');
     expect(said).toContain('access: every trigger reaching these domain operations is gated');
     expect(said).toContain(`requires: attaches ${POLICY}`);
@@ -64,7 +65,7 @@ describe('beat 1, the hook: the tree as it ships, and what the rule reaches', ()
 });
 
 describe('beat 2, the new hire: the scaffolded route', () => {
-  it('yields exactly the nine codes, at the paths the script quotes', () => {
+  it('yields exactly the ten codes, at the paths the script quotes', () => {
     expect(
       scaffold(dir, 'trigger', 'features/customers/edge/archive-customer', {
         run: REMOVE,
@@ -74,6 +75,7 @@ describe('beat 2, the new hire: the scaffolded route', () => {
     expect(refusalsAt(dir)).toEqual([
       `T002 ${AT}#in`,
       `T002 ${AT}#out`,
+      `A006 ${AT}#policies`,
       `A006 ${AT}#policies`,
       `A006 ${AT}#policies`,
       `A006 ${AT}#policies`,
@@ -90,6 +92,7 @@ describe('beat 2, the new hire: the scaffolded route', () => {
       `A006 ${STORE} reads ${TENANT} as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'local')`,
       `A006 ${PG_STORE} reads ${TENANT} as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')`,
       `A006 ${PG_STORE} reads ${TENANT} as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production-scheduler')`,
+      `A006 ${PG_STORE} reads ${TENANT} as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production-worker')`,
       "T005 @features/customers/data/delete-row.graph.json may refuse with reason 'missing', which settings.response.refusals does not map",
       "T005 @features/customers/data/delete-row.graph.json may refuse with reason 'upstream', which settings.response.refusals does not map",
       "T005 @features/customers/data/kept-remove.graph.json may refuse with reason 'invariant', which settings.response.refusals does not map",
@@ -104,9 +107,10 @@ describe('beat 2, the new hire: the scaffolded route', () => {
 });
 
 describe('beat 3, following the hints', () => {
-  it('the second step, shapes and refusals filled in, yields the four that want a policy: A006 thrice and I001', () => {
+  it('the second step, shapes and refusals filled in, yields the five that want a policy: A006 four times and I001', () => {
     paste('archive-customer.step2.trigger.json');
     expect(refusalsAt(dir)).toEqual([
+      `A006 ${AT}#policies`,
       `A006 ${AT}#policies`,
       `A006 ${AT}#policies`,
       `A006 ${AT}#policies`,
@@ -135,10 +139,10 @@ describe('beat 3, following the hints', () => {
       `A005 write { "policy": "${POLICY}", "in": { "token": "{{request.headers.authorization}}" } } -- the read is where this kind hands the credential`,
     );
   });
-  it('the finished route yields ok, at 222 documents', () => {
+  it(`the finished route yields ok, at ${DOCUMENTS.finished} documents`, () => {
     paste('archive-customer.step3.trigger.json');
     expect(refusalsAt(dir)).toEqual([]);
-    expect(documents()).toBe(222);
+    expect(documents()).toBe(DOCUMENTS.finished);
   });
 });
 

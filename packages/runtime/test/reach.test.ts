@@ -83,16 +83,15 @@ describe('the reach of a profile', () => {
     }
     // the watcher is a laptop's step; what production holds open is what serves and reports, nothing that reloads
     // and nothing that schedules, which is production-scheduler's alone, and that one opens no port (RFC 0010)
-    // production works the queues where it listens, since the in-process broker keeps a queue in the process
-    // whose route published to it (RFC 0009)
-    expect(production.holds).toEqual([
-      '@otel/exporter.port.json#export',
-      '@queue/worker.port.json#consume',
-      '@http/server.port.json#listen',
-    ]);
+    // and nothing that works the queue, which is production-worker's, and that one opens no port either (RFC 0009)
+    expect(production.holds).toEqual(['@otel/exporter.port.json#export', '@http/server.port.json#listen']);
     expect(reach('production-scheduler').holds).toEqual([
       '@schedule/scheduler.port.json#run',
       '@otel/exporter.port.json#export',
+    ]);
+    expect(reach('production-worker').holds).toEqual([
+      '@otel/exporter.port.json#export',
+      '@queue/worker.port.json#consume',
     ]);
     // a handler asks for the connection by the name the documents use, and is handed the stand-in's settings
     const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);

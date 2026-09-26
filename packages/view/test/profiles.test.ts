@@ -21,6 +21,7 @@ describe("the project page's profiles", () => {
       'local',
       'production',
       'production-scheduler',
+      'production-worker',
     ]);
     const production = project?.profiles?.find(profile => profile.name === 'production');
     const said = describeDoc(load, 'project.json');
@@ -67,6 +68,16 @@ describe("the project page's profiles", () => {
     expect(ports('production')).not.toContain('@schedule/scheduler.port.json');
     expect(ports('production-scheduler')).toContain('@schedule/scheduler.port.json');
     expect(ports('production-scheduler')).not.toContain('@http/server.port.json');
+  });
+
+  it('shows the processes that work the queue apart from the instances that listen (RFC 0009)', async () => {
+    const project = viewOf(await loadProject(EXAMPLE), '@project.json');
+    const ports = (name: string) =>
+      project?.profiles?.find(profile => profile.name === name)?.holds.map(group => group.port) ?? [];
+    expect(ports('production')).not.toContain('@queue/worker.port.json');
+    expect(ports('production-worker')).toContain('@queue/worker.port.json');
+    expect(ports('production-worker')).not.toContain('@http/server.port.json');
+    expect(ports('production-worker')).not.toContain('@schedule/scheduler.port.json');
   });
 
   it('draws the six rows describe prints, and the default as a badge', async () => {

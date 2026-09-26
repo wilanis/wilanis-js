@@ -204,10 +204,13 @@ secrets.
 
 ## Scenarios
 
-A `scenario` is a recorded run: `wilanis fuzz` writes one per trigger and seed, under stubs, and `wilanis
-regress` replays it node by node. `fuzz` records the reason a node refused with beside its status
-(`expect.nodes.<id>.reason`) and `regress` diffs it, so a refusal that became a fault reads `reason missing →
-none`. A reason pinned on a node whose status is not `failed` is S002. A scenario's `cancelAt` names the stubbed effect at which
+A `scenario` is a recorded run: `wilanis fuzz` writes one per trigger and seed, under stubs, to
+`scenarios/fuzz/<trigger>.<seed>.scenario.json`, marked `"generated": "fuzz"`, and `wilanis regress` replays every
+scenario under `scenarios/` node by node. `fuzz` records the reason a node refused with beside its status
+(`expect.nodes.<id>.reason`), and the reason the run's declared refusal gave as `expect.reason`, and `regress` diffs
+both, so a refusal that became a fault reads `reason missing → none`. The run's reason is compared where the scenario
+records one or a command wrote it, so a hand-written scenario that leaves it out, and a flat file an older `fuzz`
+wrote under `scenarios/`, replay as they did. A reason pinned on a node whose status is not `failed` is S002. A scenario's `cancelAt` names the stubbed effect at which
 `regress` cancels the replay, so it is a key of the scenario's own `stubs` (S003). `fuzz` writes no scenario of a run that
 faults under stubs: it prints `FAULT at '<node>'` and exits 1.
 

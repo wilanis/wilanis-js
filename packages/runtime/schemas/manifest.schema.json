@@ -1,0 +1,396 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/runtime/schemas/manifest.schema.json",
+  "title": "manifest",
+  "description": "What `wilanis manifest` prints (RFC 0026): what a tree is, as one JSON object on stdout, computed by the runtime's pure `manifestOf` from a tree the checker accepted. It never reads the environment, the clock or a secret's value. Every reference outside a row's settings is canonical (@features/<feature>/..., never an alias), and settings keep the values their document wrote, a reference among them as written; every array is sorted by its first key, in code units, except a trigger's policies and the startup steps, whose order is meaning, and the arrays inside settings, which keep their own; and every object's keys are in code-unit order; so the same tree prints the same bytes, and a diff of two manifests is a diff of what the tree does. From 1.0 a field is added, never removed or retyped, and the sort is part of the promise; before 1.0 nothing is promised.",
+  "type": "object",
+  "required": ["format", "runtime", "ir", "name", "root", "plugins", "includes", "features", "documents", "triggers", "ports", "policies", "connections", "secrets", "startup"],
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "description": "Which envelope this is. 1 until a change a reader could not ignore, which takes the next number.",
+      "const": 1
+    },
+    "runtime": {
+      "description": "The version of @wilanis/runtime that printed it; the workspace pins every sibling package to it.",
+      "type": "string"
+    },
+    "ir": {
+      "description": "The schema version the documents are written against, RFC 0008's segment of the published base: v1 while it is main or schemas-v1.",
+      "type": "string",
+      "pattern": "^v[0-9]+$"
+    },
+    "name": {
+      "description": "The tree's name, as project.json says it.",
+      "type": "string"
+    },
+    "root": {
+      "description": "The tree's root as given on the command line, `.` when none was given.",
+      "type": "string"
+    },
+    "plugins": {
+      "description": "Every plugin project.json names, by `use`.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/plugin" }
+    },
+    "includes": {
+      "description": "Every tree project.json includes, by package.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/include" }
+    },
+    "features": {
+      "description": "Every feature a document sits in, by name.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/feature" }
+    },
+    "documents": {
+      "description": "Every document the tree loaded, plugins' and included trees' among them, by path: what `wilanis ls` lists, as data.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/document" }
+    },
+    "triggers": {
+      "description": "Every trigger, by path.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/trigger" }
+    },
+    "ports": {
+      "description": "Every port, split by who meets it: the tree's bindings, or a plugin's handlers.",
+      "type": "object",
+      "required": ["domain", "native"],
+      "additionalProperties": false,
+      "properties": {
+        "domain": {
+          "description": "Every port a binding meets, by path.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/domainPort" }
+        },
+        "native": {
+          "description": "Every port a plugin grants, by path.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/nativePort" }
+        }
+      }
+    },
+    "policies": {
+      "description": "Every policy, by path.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/policy" }
+    },
+    "connections": {
+      "description": "Every connection, by path.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/connection" }
+    },
+    "secrets": {
+      "description": "The secrets project.json declares, key to the environment variable that holds it, by key: the variable's name, never its value.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "startup": {
+      "description": "The startup steps in the order project.json declares them, which is the order they run in.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/startupStep" }
+    }
+  },
+  "$defs": {
+    "document": {
+      "description": "One document the tree loaded: its own, an included tree's, or one a plugin ships.",
+      "type": "object",
+      "required": ["path", "kind", "feature", "layer", "included"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "The document's canonical path: @features/..., @connections/..., @project.json, or @<plugin>/... for a plugin's.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "The kind its $schema names: project, port, trigger, and so on.",
+          "type": "string"
+        },
+        "feature": {
+          "description": "The feature folder it sits in; null outside features/ and for a plugin's document.",
+          "type": ["string", "null"]
+        },
+        "layer": {
+          "description": "The layer directory it sits in, read off its path; null where it sits in none.",
+          "enum": ["edge", "domain", "data", null]
+        },
+        "included": {
+          "description": "The package it was included from; null when it is this tree's own or a plugin's.",
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "plugin": {
+      "description": "One plugin project.json names.",
+      "type": "object",
+      "required": ["use", "from", "version", "guard"],
+      "additionalProperties": false,
+      "properties": {
+        "use": {
+          "description": "The plugin's root, as project.json's `use` names it: @http.",
+          "type": "string"
+        },
+        "from": {
+          "description": "The npm package it was loaded from; null for a plugin the runtime ships (@std, @cli).",
+          "type": ["string", "null"]
+        },
+        "version": {
+          "description": "The version of that package as resolved from the tree's node_modules, the runtime's own for a plugin it ships; null where the plugin was handed in rather than resolved.",
+          "type": ["string", "null"]
+        },
+        "guard": {
+          "description": "Whether its plugin.json declares a guard: the one plugin that identifies callers.",
+          "type": "boolean"
+        }
+      }
+    },
+    "include": {
+      "description": "One tree project.json includes.",
+      "type": "object",
+      "required": ["from", "version", "features"],
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "description": "The npm package the tree is included from.",
+          "type": "string"
+        },
+        "version": {
+          "description": "The version of that package as resolved from the tree's node_modules; null where it was handed in without one.",
+          "type": ["string", "null"]
+        },
+        "features": {
+          "description": "The features of it that loaded here, by name, sorted.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "feature": {
+      "description": "One feature: a folder under features/, this tree's or an included one's.",
+      "type": "object",
+      "required": ["name", "included", "effects"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "The feature's folder name.",
+          "type": "string"
+        },
+        "included": {
+          "description": "The package it was included from; null when it is this tree's own.",
+          "type": ["string", "null"]
+        },
+        "effects": {
+          "description": "The native operations its feature.json allows, canonical and sorted; empty where it declares none.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "trigger": {
+      "description": "One trigger: what starts a run, and what gates it.",
+      "type": "object",
+      "required": ["path", "kind", "settings", "fires", "policies", "public", "included"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "The trigger's canonical path.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "The canonical path of the trigger kind it is, which declares the shape of its settings.",
+          "type": "string"
+        },
+        "settings": {
+          "description": "Its settings with the values the document wrote: templates unresolved, a reference as written (an alias stays an alias), arrays in their own order, and every object's keys in code-unit order: an http trigger's route and method, a queue's or a schedule's own. Their shape is the kind's schema's, not restated here.",
+          "type": "object"
+        },
+        "fires": {
+          "description": "The domain port operation it fires, canonical, as path#operation.",
+          "type": "string"
+        },
+        "policies": {
+          "description": "The canonical paths of the policies it attaches, in the order it attaches them, which is the order they run in.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "public": {
+          "description": "Whether it attaches no policy, so that anyone who reaches it runs it.",
+          "type": "boolean"
+        },
+        "included": {
+          "description": "The package it was included from; null when it is this tree's own.",
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "domainOperation": {
+      "description": "One operation of a domain port.",
+      "type": "object",
+      "required": ["name", "firedBy", "public"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "The operation's name in its port.",
+          "type": "string"
+        },
+        "firedBy": {
+          "description": "The triggers whose fire names it, by canonical path, sorted; empty when only a policy, a graph or a startup step reaches it.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "public": {
+          "description": "Whether any trigger that fires it is public.",
+          "type": "boolean"
+        }
+      }
+    },
+    "domainPort": {
+      "description": "One port the tree binds: a feature's domain port, or one a plugin requires and the host binds.",
+      "type": "object",
+      "required": ["path", "feature", "operations", "bindings"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "The port's canonical path.",
+          "type": "string"
+        },
+        "feature": {
+          "description": "The feature it sits in; null for a port a plugin requires.",
+          "type": ["string", "null"]
+        },
+        "operations": {
+          "description": "Its operations, by name.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/domainOperation" }
+        },
+        "bindings": {
+          "description": "Every binding of it, by canonical path, sorted: the inventory is the same under every profile, so this is every binding one might choose.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "nativeOperation": {
+      "description": "One operation of a native port, and what its port document promises of it.",
+      "type": "object",
+      "required": ["name", "pure", "holds"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "The operation's name in its port.",
+          "type": "string"
+        },
+        "pure": {
+          "description": "Whether it is marked pure: no effect, the same answer for the same inputs.",
+          "type": "boolean"
+        },
+        "holds": {
+          "description": "Whether it is marked holds: it starts something that outlives its run, which only a startup step may name.",
+          "type": "boolean"
+        }
+      }
+    },
+    "nativePort": {
+      "description": "One port a plugin grants.",
+      "type": "object",
+      "required": ["path", "grantedBy", "operations"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "The port's canonical path, under the plugin's root.",
+          "type": "string"
+        },
+        "grantedBy": {
+          "description": "The plugin that grants it, by its `use`.",
+          "type": "string"
+        },
+        "operations": {
+          "description": "Its operations, by name.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/nativeOperation" }
+        }
+      }
+    },
+    "policy": {
+      "description": "One policy: a gate a trigger attaches.",
+      "type": "object",
+      "required": ["path", "decides", "proves", "gates", "included"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "The policy's canonical path.",
+          "type": "string"
+        },
+        "decides": {
+          "description": "The domain port operation its decide fires, canonical, as path#operation.",
+          "type": "string"
+        },
+        "proves": {
+          "description": "The request.* paths present once it allows, sorted; empty where it proves none.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "gates": {
+          "description": "The triggers that attach it, by canonical path, sorted.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "included": {
+          "description": "The package it was included from; null when it is this tree's own.",
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "connection": {
+      "description": "One connection under connections/.",
+      "type": "object",
+      "required": ["path", "kind", "settings", "secrets"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "The connection's canonical path.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "The canonical path of the connection kind it is.",
+          "type": "string"
+        },
+        "settings": {
+          "description": "Its settings with the values the document wrote: templates unresolved, a reference as written (an alias stays an alias), arrays in their own order, and every object's keys in code-unit order. A template reading a secret stays {{secrets.<key>}} text, and a secret's value never appears.",
+          "type": "object"
+        },
+        "secrets": {
+          "description": "The secret keys its settings read, sorted; empty where they read none.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "startupStep": {
+      "description": "One step of project.json's startup.",
+      "type": "object",
+      "required": ["label", "run", "required", "profiles"],
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "description": "The step's label; null where it has none.",
+          "type": ["string", "null"]
+        },
+        "run": {
+          "description": "The operation it runs, canonical, as path#operation.",
+          "type": "string"
+        },
+        "required": {
+          "description": "Whether starting stops when the step refuses; true where the document leaves it out, as it runs.",
+          "type": "boolean"
+        },
+        "profiles": {
+          "description": "The profiles it runs under, sorted; null where it names none and so runs under every one.",
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}
