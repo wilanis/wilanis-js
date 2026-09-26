@@ -588,4 +588,10 @@ Decided during implementation:
 - The `--json` envelope (#618): the members *Discoverability* lists, plus a target's `notes`, a migration's
   `connection` and the `lines` RFC 0019's other commands carry; a destructive step nobody allowed carries `refused:
   "needs --allow-destructive <connection>/<target>"`, so `ok` reads off the steps; `profile` is the one every
-  `migrate` member is handed (`--profile`, else `default`).
+  `migrate` member is handed (`--profile`, else `default`, until #711 below).
+- The profile (#711): the one `activeProfile` chooses, as it chooses `start`'s (`--profile`, else `WILANIS_PROFILE`,
+  else the profile marked default), said first as `profile <name>` before any plugin runs; a name the project does
+  not declare, or a project that gives no way to choose, is refused with RFC 0013's messages. That name is the
+  envelope's `profile` and every `migrate` member's; `default` stands only for the unnamed profile of a project that
+  declares none. Before #711 a run with no `--profile` planned under the unnamed profile, whatever the tree's default
+  or `WILANIS_PROFILE` said.
