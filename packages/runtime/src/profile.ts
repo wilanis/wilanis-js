@@ -1,7 +1,8 @@
 /**
  * Which profile a process runs under, what that profile needs of the environment before anything starts
  * (RFC 0013), and which triggers it serves. Every command that runs or stubs a tree picks its profile here, by
- * one precedence; only `start` and a reload go on to ask for the variables the profile's reach reads. A command
+ * one precedence; only `start`, a reload and `migrate` go on to ask for the variables the profile's reach reads,
+ * and `migrate` for those every store's connection reads beside them, since it plans every store (#710). A command
  * that fires triggers under the profile fires only those it walks (`walkedUnder`), since those are the ones the
  * checker judged there: `run` refuses one it does not, and `rehearse`, `fuzz` and `regress` skip them and say so.
  */
