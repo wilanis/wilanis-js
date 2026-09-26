@@ -5,7 +5,7 @@
  * that breaks does not end the run: that switch routes its fault. When the run's signal fires, nothing more
  * starts: what had not started is cancelled, what was in flight settles as it settles.
  */
-import { type MapHost, runMap, shownAnswer } from './map.js';
+import { type MapHost, runMap, seededAnswer, shownAnswer } from './map.js';
 import { type Plan, planOf, targetsOf } from './plan.js';
 import { redactAttempt, redactReport, redactValue, shownOut, shownRead } from './redact.js';
 import { answered, type Ending, initialReport, noteRefusal, reportOf } from './report.js';
@@ -59,8 +59,9 @@ export class Run {
     this.clock = opts.clock ?? Date.now;
     this.startedAt = this.clock();
     for (const [key, value] of Object.entries(opts.initial ?? {})) this.values.set(key, value);
-    for (const [key, value] of Object.entries(opts.initial ?? {})) this.shown.set(key, opts.shown?.[key] ?? value);
-    for (const id of Object.keys(spec.nodes)) this.reports[id] = initialReport(this.values, id);
+    for (const [key, value] of Object.entries(opts.initial ?? {})) this.shown.set(key, this.shownSeed(key, value));
+    // a seeded node's report shows its value as every read of it does: as the node would have shown its answer
+    for (const id of Object.keys(spec.nodes)) this.reports[id] = initialReport(this.shown, id);
     this.mapHost = {
       values: this.values,
       showing: this.showing,
@@ -69,6 +70,18 @@ export class Run {
       call: (node, path, inputs, report) =>
         this.invoke(node.handler, inputs, this.contextFor(node, [...this.root, ...path], report)),
     };
+  }
+
+  /**
+   * A pre-supplied value as a report shows it: a root as the run was told to show it, else as it is; a seeded node's
+   * as its own report would have shown what it answered, redacted by its operation's paths.
+   */
+  private shownSeed(key: string, value: unknown): unknown {
+    const told = this.opts.shown?.[key];
+    if (told !== undefined) return told;
+    const node = Object.hasOwn(this.spec.nodes, key) ? this.spec.nodes[key] : undefined;
+    if (node?.kind === 'call') return redactValue(value, node.redact?.out);
+    return node?.kind === 'map' && Array.isArray(value) ? seededAnswer(node, value) : value;
   }
 
   /** Fire everything ready, wait for any settle, repeat until quiescence; then answer. An abort ends the run cancelled. */

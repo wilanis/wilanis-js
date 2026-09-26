@@ -78,24 +78,38 @@ function elementPaths(node: KMap): string[][] {
   );
 }
 
+/** The paths each element of a map's answer is redacted by: the operation's, under `value` where failures are collected. */
+function answerPaths(node: KMap): string[][] | undefined {
+  const paths = node.redact?.out;
+  return node.onItemFailure === 'collect' ? paths?.map(path => ['value', ...path]) : paths;
+}
+
 /**
  * What a map's report shows of its answer: each element as its own report shows it, under its `value` where
- * failures are collected, and redacted by the map's paths again -- a seeded element's report shows it as given.
+ * failures are collected, and redacted by the map's paths again.
  */
 export function shownAnswer(node: KMap, answer: unknown[], items: NodeReport[]): unknown[] {
-  const paths = node.redact?.out;
   if (node.onItemFailure !== 'collect')
     return redactEach(
       items.map(item => item.out),
-      paths,
+      answerPaths(node),
     );
   const shown = answer.map((result, index) =>
     (result as ElementResult).ok ? { ...(result as object), value: items[index].out } : result,
   );
-  return redactEach(
-    shown,
-    paths?.map(path => ['value', ...path]),
-  );
+  return redactEach(shown, answerPaths(node));
+}
+
+/** What a seeded map's report shows of the answer it was given: each element redacted as the map's own answer is. */
+export function seededAnswer(node: KMap, answer: unknown[]): unknown[] {
+  return redactEach(answer, answerPaths(node));
+}
+
+/** One element's report before any element runs: seeded where `<id>.<index>` was pre-supplied, shown as the operation marks what it answers. */
+function elementReport(host: MapHost, node: KMap, key: string): NodeReport {
+  const report = initialReport(host.values, key);
+  if (report.status === 'seeded') report.out = redactValue(report.out, node.redact?.out);
+  return report;
 }
 
 /**
@@ -127,7 +141,7 @@ export async function runMap(host: MapHost, id: string, node: KMap, report: Node
   if (node.limit !== undefined && over.length > node.limit)
     throw new Error(`map '${id}': ${over.length} elements, limit ${node.limit}`);
   // one report per element; an element supplied in initial as '<id>.<index>' is seeded and never runs
-  const items = over.map((_, index) => initialReport(host.values, `${id}.${index}`));
+  const items = over.map((_, index) => elementReport(host, node, `${id}.${index}`));
   report.items = items;
   const site: MapSite = { id, node, broadcast, over, shown, items, results: [], cursor: 0, broken: false };
   // every element settles before the node does, whatever happened to the others
@@ -151,10 +165,13 @@ async function work(host: MapHost, site: MapSite): Promise<void> {
   }
 }
 
-/** One element of a map: a seeded element answers at once, a cancelled one never runs; the rest run the handler with the element bound in. */
+/**
+ * One element of a map: a seeded element answers at once with the value it was given (its report shows it
+ * redacted), a cancelled one never runs; the rest run the handler with the element bound in.
+ */
 async function runElement(host: MapHost, site: MapSite, index: number): Promise<ElementResult> {
   const element = site.items[index];
-  if (element.status === 'seeded') return { ok: true, value: element.out };
+  if (element.status === 'seeded') return { ok: true, value: host.values.get(`${site.id}.${index}`) };
   if (element.status === 'cancelled') return { ok: false, error: 'cancelled', cancelled: true };
   const inputs = elementInputs(site.node, site.broadcast, site.over[index]);
   element.status = 'running';
