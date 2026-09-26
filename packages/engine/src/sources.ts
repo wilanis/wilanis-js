@@ -51,25 +51,37 @@ export function readPath(value: unknown, path: string[]): unknown {
   return current;
 }
 
-/** The value a source yields, given the values settled so far. */
-export function readSource(source: KSource, values: Map<string, unknown>): unknown {
+/** How one read of a root at a path is answered: the values settled so far, or a reader over what reports show. */
+export type Reader = (ref: string, path: string[]) => unknown;
+
+/** A reader over settled values: the value at the path inside the root's value. */
+const readerOf = (values: Map<string, unknown> | Reader): Reader =>
+  values instanceof Map ? (ref, path) => readPath(values.get(ref), path) : values;
+
+/** The value a source yields, given the values settled so far -- or what a reader answers for each read. */
+export function readSource(source: KSource, values: Map<string, unknown> | Reader): unknown {
+  const read = readerOf(values);
   if ('value' in source) return source.value;
-  if ('ref' in source) return readPath(values.get(source.ref), source.path);
-  if ('list' in source) return source.list.map(part => readSource(part, values)).filter(item => item !== undefined);
-  if ('concat' in source) return source.concat.map(part => interpolated(part, values)).join('');
-  return readAll(source.object, values);
+  if ('ref' in source) return read(source.ref, source.path);
+  if ('list' in source) return source.list.map(part => readSource(part, read)).filter(item => item !== undefined);
+  if ('concat' in source) return source.concat.map(part => interpolated(part, read)).join('');
+  return readAll(source.object, read);
 }
 
 /** One piece of interpolated text: literal text as it is, a source as text, a missing value as nothing. */
-function interpolated(part: string | KSource, values: Map<string, unknown>): string {
-  return typeof part === 'string' ? part : String(readSource(part, values) ?? '');
+function interpolated(part: string | KSource, read: Reader): string {
+  return typeof part === 'string' ? part : String(readSource(part, read) ?? '');
 }
 
 /** Every named source read; a key whose value is undefined is left out. */
-export function readAll(sources: Record<string, KSource>, values: Map<string, unknown>): Record<string, unknown> {
+export function readAll(
+  sources: Record<string, KSource>,
+  values: Map<string, unknown> | Reader,
+): Record<string, unknown> {
+  const read = readerOf(values);
   const out: Record<string, unknown> = {};
   for (const [key, source] of Object.entries(sources)) {
-    const value = readSource(source, values);
+    const value = readSource(source, read);
     if (value !== undefined) out[key] = value;
   }
   return out;

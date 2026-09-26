@@ -110,14 +110,16 @@
           "fields": {},
           "open": "string"
         },
-        "description": "lower-cased names"
+        "secret": true,
+        "description": "lower-cased names; secret, since a credential rides here (authorization, an api key, the cookie header): the run reads the values, and every report and trace shows the map as the marker"
       },
       "cookies": {
         "type": {
           "fields": {},
           "open": "string"
         },
-        "description": "the request's cookies by name, from the cookie header"
+        "secret": true,
+        "description": "the request's cookies by name, from the cookie header; secret, since a session cookie is a bearer token"
       },
       "query": {
         "type": {

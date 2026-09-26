@@ -186,17 +186,20 @@ function edge(put: (rel: string, doc: object) => void): void {
   });
 }
 
+/** What writes one document into a tree at `dir`, its `$schema` read off the name it is written at. */
+export const putter = (dir: string) => (rel: string, doc: object) => {
+  mkdirSync(join(dir, rel, '..'), { recursive: true });
+  const kind = rel
+    .replace(/\.json$/, '')
+    .split(/[./]/)
+    .at(-1) as Kind;
+  writeFileSync(join(dir, rel), JSON.stringify({ $schema: schemaUrl(kind), description: 'd', ...doc }));
+};
+
 /** The tree's directory, written fresh; the caller removes it. */
 export function vaultTree(): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-vault-'));
-  const put = (rel: string, doc: object) => {
-    mkdirSync(join(dir, rel, '..'), { recursive: true });
-    const kind = rel
-      .replace(/\.json$/, '')
-      .split(/[./]/)
-      .at(-1) as Kind;
-    writeFileSync(join(dir, rel), JSON.stringify({ $schema: schemaUrl(kind), description: 'd', ...doc }));
-  };
+  const put = putter(dir);
   put('project.json', {
     name: 'vault',
     plugins: [{ use: '@std' }, { use: '@cli' }, { use: '@fake' }],
