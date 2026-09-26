@@ -168,7 +168,9 @@ describe('wilanis new graph --read-then: read, decide, write', () => {
     expect(asked({ ...STORE, 'read-then': 'patch' })).toThrow(
       '--read-then patch is not scaffolded: a record is changed whole (RFC 0035). --port <port> writes the domain graph',
     );
-    expect(asked({ ...STORE, 'read-then': 'upsert' })).toThrow("--read-then 'upsert' is not put or remove");
+    expect(asked({ ...STORE, 'read-then': 'upsert' })).toThrow(/^--read-then takes put or remove, not 'upsert'$/);
+    // a bare --read-then reaches the scaffold as 'true', as the CLI hands any flag given no value: no word was written
+    expect(asked({ ...STORE, 'read-then': 'true' })).toThrow(/^--read-then takes put or remove$/);
     // a --branch routes the read-decide-write form, so without a write it asks for one
     expect(asked({ ...STORE, branch: 'taken:has(record)' })).toThrow('give --read-then put|remove');
     rmSync(dir, { recursive: true, force: true });

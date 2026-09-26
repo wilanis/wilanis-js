@@ -35,10 +35,13 @@ const WRITTEN: Record<Write, string> = { put: 'replaced', remove: 'removed' };
 const PATCH =
   '--read-then patch is not scaffolded: a record is changed whole (RFC 0035). --port <port> writes the domain graph that loads it and lays the change over it with #merge, and --store <store> --collection <name> the data graph that #puts it; a patch of a field no invariant reads is one #patch node, written by hand';
 
-/** The write --read-then names; a patch, or a word that is no write, is refused with what to write instead. */
+/** The write --read-then names; a patch, or anything else that is no write, is refused with what to write instead. */
 function writeOf(named: string | undefined): Write {
   if ((WRITES as readonly string[]).includes(named ?? '')) return named as Write;
-  throw new Error(named === 'patch' ? PATCH : `--read-then '${named}' is not put or remove`);
+  if (named === 'patch') throw new Error(PATCH);
+  // a flag given bare arrives as 'true' (flagValue in cli.ts), which is no word the author wrote
+  const word = named && named !== 'true' ? `, not '${named}'` : '';
+  throw new Error(`--read-then takes put or remove${word}`);
 }
 
 /**
