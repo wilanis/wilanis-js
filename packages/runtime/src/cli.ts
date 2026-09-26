@@ -79,6 +79,8 @@ check, rehearse, regress and migrate take --json: one JSON object on stdout (RFC
 schemas/diagnostics.schema.json), the refusals as data on a refused tree whichever was asked, and the same exit codes.
 rehearse, fuzz, regress, start and run take --profile word, and run under it; else under WILANIS_PROFILE, else
 under the profile project.json marks "default": true. A project that declares no profile runs its one unnamed one.
+Under a profile, rehearse, fuzz and regress skip a trigger whose kind no startup step of that profile serves (a
+route where nothing listens), and say how many; run refuses one, naming the profiles that serve it.
 Every path is @-rooted (@features/tasks/tasks.port.json) or through a project alias.
 Plugins beyond @std and @cli are npm packages named by "from" in project.json.`;
 
@@ -190,7 +192,7 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
       `writing scenarios to ${join(loaded.root, SCENARIOS)} -- generated, and ignored by git as .wilanis/ is`,
     );
     const answer = await fuzz(loaded, { runs: flags.runs ? Number(flags.runs) : undefined, profile: flags.profile });
-    console.log(answer.written.map(file => `wrote ${file}`).join('\n'));
+    console.log([...answer.skipped, ...answer.written.map(file => `wrote ${file}`)].join('\n'));
     if (answer.lines.length) console.error(answer.lines.join('\n'));
     if (!answer.ok) process.exit(1);
   },
