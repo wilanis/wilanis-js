@@ -3,9 +3,20 @@
  * what is written into a report is redacted; the values the run hands from node to node, and the answer it
  * hands its caller, are the values themselves.
  */
+import { readPath } from './sources.js';
 import type { Attempt, NodeReport, Report } from './spec.js';
 
 const SECRET = '«secret»';
+
+/**
+ * A read as a report shows it: nothing where the value holds nothing there, the marker where the path walks into
+ * a value its report shows as the marker -- a header of a map marked whole -- and else what the report shows.
+ */
+export function shownRead(value: unknown, shown: unknown, path: string[]): unknown {
+  if (readPath(value, path) === undefined) return undefined;
+  for (let depth = 0; depth < path.length; depth++) if (readPath(shown, path.slice(0, depth)) === SECRET) return SECRET;
+  return readPath(shown, path);
+}
 
 /** A copy of `value` with every listed path replaced; a path of no segments redacts the whole value. */
 export function redactValue(value: unknown, paths: string[][] | undefined): unknown {

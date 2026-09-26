@@ -7,9 +7,9 @@
  */
 import { type MapHost, runMap, shownAnswer } from './map.js';
 import { type Plan, planOf, targetsOf } from './plan.js';
-import { redactAttempt, redactReport, redactValue, shownOut } from './redact.js';
+import { redactAttempt, redactReport, redactValue, shownOut, shownRead } from './redact.js';
 import { answered, type Ending, initialReport, noteRefusal, reportOf } from './report.js';
-import { nodeRefs, PSEUDO, readAll } from './sources.js';
+import { nodeRefs, PSEUDO, type Reader, readAll } from './sources.js';
 import {
   type Handlers,
   isRefusal,
@@ -34,6 +34,8 @@ export class Run {
   private readonly values = new Map<string, unknown>();
   /** What a report shows of each value: a node's `out`, secrets as the marker; a root as the run was told to show it. */
   private readonly shown = new Map<string, unknown>();
+  /** How a report reads a source: over what the reports of its sources show, where the value holds something. */
+  private readonly showing: Reader = (ref, path) => shownRead(this.values.get(ref), this.shown.get(ref), path);
   private readonly reports: Record<string, NodeReport> = {};
   private readonly plan: Plan;
   private readonly root: string[];
@@ -61,7 +63,7 @@ export class Run {
     for (const id of Object.keys(spec.nodes)) this.reports[id] = initialReport(this.values, id);
     this.mapHost = {
       values: this.values,
-      shown: this.shown,
+      showing: this.showing,
       clock: this.clock,
       ended: () => this.ending !== undefined,
       call: (node, path, inputs, report) =>
@@ -237,7 +239,7 @@ export class Run {
   /** A switch routes where a caught fault goes, else to the first rule that holds, else to its fallback. */
   private async runSwitch(id: string, node: KSwitch, report: NodeReport): Promise<void> {
     const inputs = readAll(node.in, this.values);
-    report.in = readAll(node.in, this.shown);
+    report.in = readAll(node.in, this.showing);
     const selected = this.caughtRoute(id, node) ?? node.rules.find(rule => rule.when(inputs))?.to ?? node.else;
     report.selected = selected;
     this.finish(id, report, selected);
@@ -253,7 +255,7 @@ export class Run {
   /** A call's report shows its inputs as their sources' reports show them and marked by its own operation; its answer likewise. */
   private async runCall(id: string, node: KCall, report: NodeReport): Promise<void> {
     const inputs = readAll(node.in, this.values);
-    report.in = redactValue(readAll(node.in, this.shown), node.redact?.in) as Record<string, unknown>;
+    report.in = redactValue(readAll(node.in, this.showing), node.redact?.in) as Record<string, unknown>;
     const out = await this.invoke(node.handler, inputs, this.contextFor(node, [...this.root, id], report));
     this.finish(id, report, out, shownOut(report, out, node.redact?.out));
   }

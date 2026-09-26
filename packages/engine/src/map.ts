@@ -8,7 +8,7 @@
  */
 import { redactEach, redactValue, shownOut } from './redact.js';
 import { initialReport, noteRefusal } from './report.js';
-import { readAll, readPath, readSource } from './sources.js';
+import { type Reader, readAll, readPath, readSource } from './sources.js';
 import type { KMap, NodeReport } from './spec.js';
 import { Refusal } from './spec.js';
 
@@ -20,7 +20,8 @@ type ElementResult =
 /** What a map needs of the run it is in: the values it reads and what reports show of them, its clock, whether it has ended, and how one element's handler is called. */
 export interface MapHost {
   readonly values: Map<string, unknown>;
-  readonly shown: Map<string, unknown>;
+  /** How a report reads a source: over what earlier reports show. */
+  readonly showing: Reader;
   readonly clock: () => number;
   /** Whether the run has ended (broken or cancelled), so no further element may start. */
   ended(): boolean;
@@ -116,7 +117,7 @@ export async function runMap(host: MapHost, id: string, node: KMap, report: Node
   const over = readSource(node.over, host.values);
   if (!Array.isArray(over)) throw new Error(`map '${id}': over is not a list`);
   const broadcast = readAll(node.in, host.values);
-  const shown = { broadcast: readAll(node.in, host.shown), over: readSource(node.over, host.shown) as unknown[] };
+  const shown = { broadcast: readAll(node.in, host.showing), over: readSource(node.over, host.showing) as unknown[] };
   report.in = shownIn(node, shown.broadcast, shown.over);
   if (node.limit !== undefined && over.length > node.limit)
     throw new Error(`map '${id}': ${over.length} elements, limit ${node.limit}`);
