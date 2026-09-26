@@ -1,9 +1,12 @@
+import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadTree, type PluginModule, type Trace } from '@wilanis/core';
 import type { NodeReport, Report } from '@wilanis/engine';
 import auth from '@wilanis/plugin-auth';
 import http, { encode } from '@wilanis/plugin-http';
-import { BUILTIN_PLUGINS, embedderFor, type Ran, Served, traceOf } from '@wilanis/runtime';
+import { BUILTIN_PLUGINS, embedderFor, fuzz, type Ran, regress, Served, traceOf } from '@wilanis/runtime';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -153,14 +156,49 @@ describe('a refresh, as its report says it', () => {
     expect(graph.nodes.renewed.out).toEqual(said(renewed));
   });
 
-  it('shows no token in clear in any report or in the full trace, but for one switch', async () => {
+  it('shows no token in clear in any report or in the full trace', async () => {
     const signedIn = await fire('@access/edge/auth-customers.trigger.json', { username: 'ana', password: 'ana-pass' });
     const old = signedIn.report.output as Tokens;
     const { report, trace } = await fire('@access/edge/refresh.trigger.json', { refreshToken: old.refreshToken });
     const renewed = report.output as Tokens;
     const values = [old.refreshToken, renewed.accessToken, renewed.refreshToken];
-    // #692: a switch's in is not redacted yet; remove this exception when it lands
-    expect(clearIn(report, values)).toEqual(['op/wasGood.in']);
-    expect(clearInTrace(trace, values)).toEqual(['wasGood switch → renewed [wilanis.in]']);
+    expect(clearIn(report, values)).toEqual([]);
+    expect(clearInTrace(trace, values)).toEqual([]);
+  });
+});
+
+describe('what fuzz records of a sign-in and of a code', () => {
+  it("records the answer as the trigger's out shape marks it, and replays the same", async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'wilanis-access-fuzz-'));
+    cpSync(TREE, dir, { recursive: true, filter: path => !/node_modules|\.wilanis|\/test|\/scenarios/.test(path) });
+    try {
+      // sixty seeds: under stubbed effects a sign-in, a refresh and a code each answer in only a few of them
+      const { ok, written, lines } = await fuzz(loadTree(dir, PLUGINS), { runs: 60 });
+      expect(ok, lines.join('\n')).toBe(true);
+      const recorded = (name: string) =>
+        written
+          .filter(file => file.includes(`/${name}.`))
+          .map(file => JSON.parse(readFileSync(file, 'utf8')).expect)
+          .filter(expected => expected.status === 'done')
+          .map(expected => expected.output);
+      // TokensView marks both tokens and IssuedCodeView the code: the stubbed values never reach a scenario
+      const tokens = [...recorded('auth-customers'), ...recorded('refresh')];
+      expect(tokens.length).toBeGreaterThan(1);
+      for (const output of tokens)
+        expect(output).toEqual({
+          accessToken: SECRET,
+          refreshToken: SECRET,
+          tokenType: 'Bearer',
+          expiresIn: expect.any(Number),
+        });
+      const issued = recorded('issue-otp');
+      expect(issued.length).toBeGreaterThan(0);
+      for (const output of issued)
+        expect(output).toEqual({ id: expect.any(String), code: SECRET, expiresAt: expect.any(String) });
+      const replayed = await regress(loadTree(dir, PLUGINS));
+      expect(replayed.ok, replayed.lines.join('\n')).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

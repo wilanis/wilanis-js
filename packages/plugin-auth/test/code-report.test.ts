@@ -21,7 +21,7 @@ const run = async (ref: string, flags: Record<string, string> = {}) =>
   runTrigger(loadTree(dir, PLUGINS, INCLUDES), ref, { flags }, { log: () => {}, profile: 'live' });
 
 describe('the code a challenge is issued, in the report of the run that issues it', () => {
-  it('is the marker in every report but one switch, and in clear in the answer', async () => {
+  it('is the marker in every report, and in clear in the answer', async () => {
     const first = await run('@hello/edge/hello-gated.trigger.json');
     const id = (first.answer as { challenge: { id: string } }).challenge.id;
     const { report, answer } = await run('@access/edge/issue-otp.trigger.json', { 'challenge-id': id });
@@ -33,9 +33,8 @@ describe('the code a challenge is issued, in the report of the run that issues i
     const issuing = report.nodes.op.sub;
     expect(issuing?.nodes.issued.out).toMatchObject({ issued: true, id, code: '«secret»' });
     expect(issuing?.nodes.code.out).toEqual({ id, code: '«secret»', expiresAt: expect.any(String) });
-    // #692: a switch's in is not redacted yet; remove this exception when it lands
-    expect(issuing?.nodes.wasThere.in?.code).toBe(code);
-    if (issuing) issuing.nodes.wasThere = { status: 'done' };
+    // the switch that asks whether a code came back reads it, and shows it as the node that made it does
+    expect(issuing?.nodes.wasThere.in?.code).toBe('«secret»');
     // the code is a JSON string wherever a report holds it, so a timestamp's digits cannot match it by chance
     expect(JSON.stringify({ ...report, output: undefined })).not.toContain(`"${code}"`);
   });

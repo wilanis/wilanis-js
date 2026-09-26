@@ -31,6 +31,8 @@ import {
   type KernelSpec,
   type KNode,
   type KSource,
+  type RunContext,
+  type RunOptions,
 } from '@wilanis/engine';
 import { inScope } from './atomic.js';
 import { attempting, type Sites, tagSite } from './attempts.js';
@@ -39,6 +41,7 @@ import { type CallSite, outputCandidates, passedInputs } from './documents.js';
 import { type GuardHandlers, guardsOf, MAKE, REFUSE, TAKEN_IDS } from './guard.js';
 import { lowerGuards } from './guard-lowering.js';
 import {
+  alsoAnswering,
   bindPaths,
   handedAs,
   inputsByName,
@@ -99,6 +102,7 @@ export class Compiler {
       kind: 'call',
       handler: this.nativeHandler(hit),
       in: inputsByName(Object.keys(this.scope.types.accepted(hit.op.accepts))),
+      redact: redactOf(this.scope, hit.op, undefined),
     };
     return { name: `${hit.path}#${hit.opName}`, nodes: { op }, output: hit.op.returns ? ['op'] : undefined };
   }
@@ -154,14 +158,15 @@ export class Compiler {
 
   /**
    * A handler that runs a nested spec with the caller's `in` and forwards request, stubs, clock and env. A graph that
-   * takes its input whole (an `in` that is not a shape) is handed it under the one key `in`, and unwraps it.
+   * takes its input whole (an `in` that is not a shape) is handed it under the one key `in`, and unwraps it. Its
+   * reports show that `in` as the caller's report shows what it handed down, so a mark the caller's operation
+   * carries holds inside a graph whose own `in` cannot say it.
    */
   private nestedRunner(spec: KernelSpec, whole = false, atomic = false): Handler {
     return async ({ in: input, ctx }) => {
-      const initial = { in: whole ? input.in : input, ...(ctx.request !== undefined ? { request: ctx.request } : {}) };
       const once = (env: Record<string, unknown>) =>
         new Kernel(this.handlers).run(spec, {
-          initial,
+          ...nestedRoots(input, ctx, whole),
           stubs: ctx.stubs,
           signal: ctx.signal,
           clock: ctx.clock,
@@ -290,7 +295,12 @@ export class Compiler {
     const given = passedInputs(this.scope, target, op, bound.in);
     const roots: Roots = { resolvers: this.resolverRoots(binding.doc.reads) };
     const inputs = this.withScope(lowerValues(given, roots), { key: bound.run, given: bound.in });
-    return { kind: 'call', handler, in: inputs, redact: redactOf(this.scope, target, given) };
+    return {
+      kind: 'call',
+      handler,
+      in: inputs,
+      redact: alsoAnswering(redactOf(this.scope, target, given), op, this.scope),
+    };
   }
 
   /**
@@ -327,4 +337,18 @@ export class Compiler {
     if (!resolver) throw new Error(`unknown resolver '${ref}'`);
     return splitPath(resolver.read).slice(1);
   }
+}
+
+/**
+ * What a nested run starts from: the caller's `in` -- unwrapped where the graph takes it whole -- and request, and
+ * that `in` as the caller's report shows it, which the nested reports read.
+ */
+function nestedRoots(
+  input: Record<string, unknown>,
+  ctx: RunContext,
+  whole: boolean,
+): Pick<RunOptions, 'initial' | 'shown'> {
+  const initial = { in: whole ? input.in : input, ...(ctx.request !== undefined ? { request: ctx.request } : {}) };
+  if (!ctx.shownIn) return { initial };
+  return { initial, shown: { in: whole ? ctx.shownIn.in : ctx.shownIn } };
 }

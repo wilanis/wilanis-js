@@ -5,8 +5,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Loaded, LoadResult } from '@wilanis/core';
-import { HOME, type ScenarioDoc, schemaUrl, type TriggerDoc } from '@wilanis/core';
-import { outcomeOf, type Report, refusalOf } from '@wilanis/engine';
+import { HOME, type ScenarioDoc, schemaUrl, secretPaths, type TriggerDoc } from '@wilanis/core';
+import { outcomeOf, type Report, redactValue, refusalOf } from '@wilanis/engine';
 import { activeProfile } from './profile.js';
 import { embedderFor, generatedFire } from './stubbing.js';
 
@@ -54,11 +54,11 @@ function pick(report: Report, prefix = ''): ScenarioDoc['expect']['nodes'] {
  * What a run is recorded as expecting: how it ended, what it answered, the reason the refuse node it failed at
  * declared (`refusalOf`, which no node's `out` carries), and what every node did.
  */
-function expectOf(report: Report): ScenarioDoc['expect'] {
+function expectOf(report: Report, secret: string[][] = []): ScenarioDoc['expect'] {
   const reason = refusalOf(report)?.reason;
   return {
     status: report.status,
-    ...(report.status === 'done' ? { output: report.output } : {}),
+    ...(report.status === 'done' ? { output: redactValue(report.output, secret) } : {}),
     ...(reason !== undefined ? { reason } : {}),
     nodes: pick(report),
   };
@@ -72,6 +72,8 @@ interface Fuzzed {
   request: Record<string, unknown>;
   record: Record<string, unknown>;
   report: Report;
+  /** Where the trigger's `out` marks a field secret: the output is written with those as the marker. */
+  secret: string[][];
 }
 
 /** Fire one trigger under one seed with stubbed effects, recording every stub's answer. */
@@ -80,11 +82,11 @@ async function fuzzed(load: LoadResult, trigger: Loaded<TriggerDoc>, seed: numbe
   const emb = embedderFor(load, { seed, record, profile });
   const { input, request } = generatedFire(emb, trigger, seed);
   const report = await emb.fire(trigger.doc, input, request);
-  return { trigger, seed, input, request, record, report };
+  return { trigger, seed, input, request, record, report, secret: secretPaths(emb.types(trigger.doc).out) };
 }
 
 /** The scenario a fuzzed run is written as. */
-function scenarioOf({ trigger, seed, input, request, record, report }: Fuzzed): ScenarioDoc {
+function scenarioOf({ trigger, seed, input, request, record, report, secret }: Fuzzed): ScenarioDoc {
   return {
     $schema: schemaUrl('scenario'),
     description: `${trigger.path} under seed ${seed}: ${report.status}. Written by wilanis fuzz; regenerate it, do not edit it -- to pin a case, copy it up into ${HOME_DIR}/, give it a description of its own, and drop generated.`,
@@ -94,7 +96,7 @@ function scenarioOf({ trigger, seed, input, request, record, report }: Fuzzed): 
     in: input,
     request,
     stubs: record,
-    expect: expectOf(report),
+    expect: expectOf(report, secret),
   };
 }
 
@@ -170,11 +172,12 @@ function nodeDiffs(
 }
 
 /** How this run differs from what the scenario recorded: its status, its output, every node, and its declared refusal. */
-function diffOf(report: Report, sc: ScenarioDoc): string[] {
+function diffOf(report: Report, sc: ScenarioDoc, secret: string[][]): string[] {
   const { expect } = sc;
   const diffs: string[] = [];
   if (report.status !== expect.status) diffs.push(`status ${expect.status} → ${report.status}`);
-  if (expect.status === 'done' && !same(report.output, expect.output)) diffs.push('output changed');
+  if (expect.status === 'done' && !same(redactValue(report.output, secret), expect.output))
+    diffs.push('output changed');
   const got = pick(report);
   const pinsReasons = Object.values(expect.nodes).some(node => node.reason !== undefined);
   for (const [id, was] of Object.entries(expect.nodes)) diffs.push(...nodeDiffs(id, was, got[id], pinsReasons));
@@ -216,7 +219,7 @@ export async function regress(load: LoadResult, opts: { profile?: string } = {})
     const report = sc.doc.cancelAt
       ? await cancelledReplay(load, stubbed, trigger.doc, sc.doc)
       : await emb.fire(trigger.doc, sc.doc.in, sc.doc.request ?? {}, { stubs: sc.doc.stubs });
-    const diffs = diffOf(report, sc.doc);
+    const diffs = diffOf(report, sc.doc, secretPaths(emb.types(trigger.doc).out));
     results.push({ scenario: sc.path, same: diffs.length === 0, diffs });
     lines.push(`${sc.path}: ${diffs.length ? `DIFF ${diffs.join('; ')}` : 'same'}`);
   }

@@ -3,7 +3,7 @@
  * what is written into a report is redacted; the values the run hands from node to node, and the answer it
  * hands its caller, are the values themselves.
  */
-import type { Attempt, Report } from './spec.js';
+import type { Attempt, NodeReport, Report } from './spec.js';
 
 const SECRET = '«secret»';
 
@@ -24,12 +24,23 @@ export function redactEach(items: unknown[], paths: string[][] | undefined): unk
 }
 
 /**
- * A nested run as the report it hangs in shows it: its answer redacted by the paths of the node that ran it,
- * which are the ones that node's own `out` is redacted by, so the two say the answer alike.
+ * A nested run as the report it hangs in shows it: its answer as the node that answered it shows it, redacted
+ * again by the paths of the node that ran it, so a mark either one carries holds -- and the node that ran it
+ * shows its own answer the same way.
  */
 export function redactReport(report: Report, paths: string[][] | undefined): Report {
-  if (report.output === undefined || !paths?.length) return report;
-  return { ...report, output: redactValue(report.output, paths) };
+  const answered = report.answeredBy === undefined ? undefined : report.nodes[report.answeredBy];
+  const shown = answered ? answered.out : report.output;
+  if (shown === undefined) return report;
+  return { ...report, output: redactValue(shown, paths) };
+}
+
+/**
+ * What a node's report shows of its answer: the nested run hung on it, where one answered for it, already shows it
+ * with every mark below and the node's own; otherwise the answer redacted by the node's own paths.
+ */
+export function shownOut(report: NodeReport, out: unknown, paths: string[][] | undefined): unknown {
+  return report.sub?.status === 'done' ? report.sub.output : redactValue(out, paths);
 }
 
 /** A try that did not stand as the node's report records it: the nested run it ran, if any, redacted as above. */

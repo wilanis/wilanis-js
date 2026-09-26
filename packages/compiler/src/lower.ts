@@ -10,6 +10,7 @@ import {
   type Operation,
   type Scope,
   type StoreDoc,
+  secretPaths,
   splitPath,
   splitRef,
   substitute,
@@ -137,24 +138,8 @@ function storeRoots(scope: Scope, store: Loaded<StoreDoc>): Record<string, strin
   return out;
 }
 
-const SECRET_DEPTH = 6;
-
-/** Every path to a secret field inside a type, to a bounded depth. */
-export function secretPaths(
-  type: Type | undefined,
-  prefix: string[] = [],
-  out: string[][] = [],
-  depth = 0,
-): string[][] {
-  if (!type || depth > SECRET_DEPTH) return out;
-  if (type.kind === 'list') secretPaths(type.of, prefix, out, depth + 1);
-  if (type.kind !== 'object') return out;
-  for (const [name, field] of Object.entries(type.fields)) {
-    if (field.secret) out.push([...prefix, name]);
-    else secretPaths(field.type, [...prefix, name], out, depth + 1);
-  }
-  return out;
-}
+/** The secret paths of a type, kept in core so whatever logs a run's answer reads them as the compiler does. */
+export { secretPaths };
 
 /**
  * What an operation takes and answers at a call, each substituted through what the call gives its type
@@ -184,4 +169,14 @@ export function redactOf(scope: Scope, op: Operation, given: Values | undefined)
 export function handedAs(redact: Redact | undefined, from: string, to: string): Redact | undefined {
   if (!redact?.in) return redact;
   return { ...redact, in: redact.in.map(path => (path[0] === from ? [to, ...path.slice(1)] : path)) };
+}
+
+/**
+ * A delegation's secret paths, its answer marked as the port operation it meets marks it as well as by the target
+ * it delegates to: the call answers that operation, so a mark only the port carries holds on its report too.
+ */
+export function alsoAnswering(redact: Redact | undefined, op: Operation, scope: Scope): Redact | undefined {
+  const port = redactOf(scope, op, undefined)?.out ?? [];
+  if (!port.length) return redact;
+  return { in: redact?.in ?? [], out: [...(redact?.out ?? []), ...port] };
 }
