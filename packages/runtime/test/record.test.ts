@@ -6,8 +6,8 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkTree } from '@wilanis/compiler';
-import { type GraphDoc, isSwitch, type LoadResult, loadTree } from '@wilanis/core';
+import { checkTree, walkedUnder } from '@wilanis/compiler';
+import { type GraphDoc, isSwitch, type LoadResult, loadTree, Scope } from '@wilanis/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { RECORDED, type Rehearsal, regress, rehearse } from '../src/index.js';
 import { copyOfExample, INCLUDES, PLUGINS } from './example-harness.js';
@@ -178,6 +178,27 @@ describe('rehearse --check: a recorded directory the tree has moved away from', 
   });
 });
 
+describe('rehearse --record under a profile', () => {
+  it('records only the triggers the profile serves, the ones the rehearsal ran', { timeout: 60_000 }, async () => {
+    const dir = copyOfExample();
+    const loaded = load(dir);
+    const scope = new Scope(loaded.registry, loaded.resolve);
+    const served = loaded.registry
+      .all('trigger')
+      .filter(one => walkedUnder(scope, one.doc, 'production-worker'))
+      .map(one => one.name);
+    const answer = await rehearse(loaded, { record: RECORDED, profile: 'production-worker' });
+    expect(answer.skipped).toEqual([expect.stringMatching(/^skipped \d+ trigger\(s\) profile 'production-worker' /)]);
+    expect(answer.lines.slice(0, answer.skipped.length)).toEqual(answer.skipped);
+    const recorded = new Set(
+      (answer.recorded?.written ?? []).map(file => file.slice(RECORDED.length + 1).split('/')[0]),
+    );
+    expect(recorded.size).toBeGreaterThan(0);
+    for (const trigger of recorded) expect(served).toContain(trigger);
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
 /** The CLI on a copy, from the built runtime: the copy reaches the workspace's plugins through a linked node_modules. */
 function wilanis(dir: string, ...args: string[]) {
   const ran = spawnSync(process.execPath, [join(RUNTIME, 'bin/wilanis.js'), ...args], { cwd: dir, encoding: 'utf8' });
@@ -197,6 +218,11 @@ describe('rehearse --record and --check on the command line', () => {
     const current = wilanis(dir, 'rehearse', '.', '--check');
     expect(current.code).toBe(0);
     expect(current.stdout).toContain('scenarios/rehearsed/ is what the solver writes for this tree');
+    // under a profile, --check says first what the rehearsal skipped, as the plain walk does
+    const worker = wilanis(dir, 'rehearse', '.', '--check', '--profile', 'production-worker');
+    expect(worker.stdout.split('\n')[0]).toMatch(
+      /^skipped \d+ trigger\(s\) profile 'production-worker' does not serve/,
+    );
     const file = 'scenarios/rehearsed/get-customer/customers.get-row.outcome.noCustomer.scenario.json';
     edit(dir, file, doc => {
       doc.expect.reason = 'gone';
