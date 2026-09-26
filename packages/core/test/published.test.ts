@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { IR_READ, irOfSchema, pageUrl, SCHEMA_BASE, schemaRef, schemaUrl } from '../src/published.js';
+import { IR_READ, irOf, irOfSchema, pageUrl, SCHEMA_BASE, schemaRef, schemaUrl } from '../src/published.js';
 
 describe('the page of a refusal code', () => {
   it('a code of a checker family, or of a plugin this workspace ships, has one; anything else has none', () => {
@@ -13,6 +13,15 @@ describe('the page of a refusal code', () => {
   it('an invariant code has one, as every other checker family does', () => {
     expect(pageUrl('I001')).toBe('https://github.com/wilanis/wilanis-js/blob/main/docs/refusals/I001.md');
     expect(pageUrl('I006')).toBe('https://github.com/wilanis/wilanis-js/blob/main/docs/refusals/I006.md');
+  });
+});
+
+describe('the IR version a schema base serves (RFC 0008)', () => {
+  it('is v1 on main and on the tag schemas-v1, and vN on the tag schemas-vN', () => {
+    expect(irOf('https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas')).toBe('v1');
+    expect(irOf('https://raw.githubusercontent.com/wilanis/wilanis-js/schemas-v1/packages/core/schemas')).toBe('v1');
+    expect(irOf('https://raw.githubusercontent.com/wilanis/wilanis-js/schemas-v2/packages/core/schemas')).toBe('v2');
+    expect(IR_READ).toBe(irOf(SCHEMA_BASE));
   });
 });
 

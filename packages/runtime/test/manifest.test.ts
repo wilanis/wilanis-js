@@ -15,7 +15,6 @@ import { type LoadResult, loadTree, type Registry, type ResolvedInclude } from '
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loadProject, type Manifest, manifestOf, type ProjectLoad } from '../src/index.js';
-import { irOf } from '../src/manifest.js';
 import { keySorted } from '../src/manifest-rows.js';
 import { copyOfExample, EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
@@ -54,8 +53,6 @@ describe('manifestOf: the inventory of the example', () => {
 
   it('opens with the envelope: format 1, the runtime, the schema version, the name and the root as given', () => {
     expect(manifest).toMatchObject({ format: 1, runtime: VERSION, ir: 'v1', name: 'customers', root: 'example' });
-    expect(irOf('https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas')).toBe('v1');
-    expect(irOf('https://raw.githubusercontent.com/wilanis/wilanis-js/schemas-v2/packages/core/schemas')).toBe('v2');
   });
 
   it('names every plugin with the version it was resolved at, the builtins at the runtime’s own', () => {

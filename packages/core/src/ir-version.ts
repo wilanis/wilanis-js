@@ -12,7 +12,7 @@
  * version, where D013 alone says each document this runtime cannot read.
  */
 import { join, relative } from 'node:path';
-import { nativePath, PROJECT_FILE, parseJson, takes } from './documents.js';
+import { listedIn, nativePath, PROJECT_FILE, parseJson, takes } from './documents.js';
 import { subdirectories, treePath, walk } from './paths.js';
 import type { PluginModule } from './plugin.js';
 import { IR_READ, irOfSchema, SCHEMA_BASE } from './published.js';
@@ -69,16 +69,13 @@ function shipped(plugin: PluginModule): Read[] {
 }
 
 /**
- * The plugins project.json names, read off it before it is judged, as the runtime reads it to find their packages:
- * which plugin's documents the version rules read is the one thing they take from a document not yet judged.
+ * The plugins project.json names, read off it before it is judged by the one reader the runtime finds their packages
+ * with: which plugin's documents the version rules read is the one thing they take from a document not yet judged.
  */
 function pluginsNamed(root: string, available: Record<string, PluginModule>): PluginModule[] {
-  const parsed = parseJson(join(root, PROJECT_FILE), PROJECT_FILE);
-  const plugins = 'doc' in parsed ? member(parsed.doc, 'plugins') : undefined;
-  if (!Array.isArray(plugins)) return [];
-  return plugins.flatMap(use => {
+  return listedIn(root, 'plugins').flatMap(use => {
     const name = member(use, 'use');
-    const plugin = typeof name === 'string' ? available[name] : undefined;
+    const plugin = typeof name === 'string' && Object.hasOwn(available, name) ? available[name] : undefined;
     return plugin ? [plugin] : [];
   });
 }

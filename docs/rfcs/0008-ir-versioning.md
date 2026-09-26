@@ -151,8 +151,8 @@ span kinds, so a version is a property of the tree.
   too late to judge anything before the rest.
 - "Before any other rule" is read literally. The loader reads the `$schema` of every document the load will read
   before it judges one: the tree's, each include's `project.json` and the features taken from it, and the `docs/` of
-  each plugin `project.json` names, a list read off it before it is judged, as the runtime reads it to find the
-  packages. A tree either rule refuses is answered with those refusals alone and nothing registered, so no D001 and
+  each plugin `project.json` names, a list read off it before it is judged by core's `listedIn`, the one reader the
+  runtime also finds the packages with. A tree either rule refuses is answered with those refusals alone and nothing registered, so no D001 and
   no checker rule follows. Each document is parsed twice, once for its version and once to be judged.
 - The alias names no version of its own and is read as the one this runtime reads, as the Guide says, so the alias
   beside the v1 URL is one version and mixes nothing.

@@ -7,7 +7,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { type LoadResult, loadTree, type PluginModule, type Refusal, type ResolvedInclude } from '@wilanis/core';
+import {
+  type LoadResult,
+  listedIn,
+  loadTree,
+  type PluginModule,
+  type Refusal,
+  type ResolvedInclude,
+} from '@wilanis/core';
 import { BUILTIN_PLUGINS } from './plugins/index.js';
 
 const PACKAGE_NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
@@ -27,16 +34,6 @@ export interface Resolved {
 
 /** A tree as the runtime loads it: what the loader answers, and the packages it was loaded from (RFC 0026). */
 export type ProjectLoad = LoadResult & { resolved: Resolved };
-
-/** The array project.json holds under one key, or none when the file or the key is not there. loadTree reports D000 / D005. */
-function listedIn(root: string, key: 'plugins' | 'includes'): unknown[] {
-  try {
-    const found = JSON.parse(readFileSync(join(root, 'project.json'), 'utf8'))[key];
-    return Array.isArray(found) ? found : [];
-  } catch {
-    return [];
-  }
-}
 
 /** Import every plugin project.json names with `from`, on top of the builtins and `extra`. */
 export async function resolvePlugins(
