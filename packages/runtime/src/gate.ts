@@ -9,6 +9,7 @@ import { type Compiled, runGraph } from '@wilanis/compiler';
 import { type GuardArgs, type PluginModule, policyPath, type Scope, type TriggerDoc } from '@wilanis/core';
 import { outcomeOf, type Report } from '@wilanis/engine';
 import type { Decided, Identified } from './fired.js';
+import { shownRoots } from './shown.js';
 import { fillTemplates, refused } from './values.js';
 
 /** What the gate needs of the embedder to run a decision graph, without the embedder itself. */
@@ -83,7 +84,9 @@ async function identifies(
 /**
  * One policy's decision, kept whichever way it went: nothing when it allows and the run goes on, else the
  * report that ends it. A policy that allows is recorded all the same -- a reader of a gate that only kept the
- * refusal could not tell an unguarded run from one that passed two policies.
+ * refusal could not tell an unguarded run from one that passed two policies. The decision is handed the request
+ * and its input as they are, and its reports show both as a trigger's run shows them: what the kind's context
+ * marks is the marker, and so is an input `decide.in` fills from it.
  */
 async function decide(
   emb: Gating,
@@ -93,8 +96,13 @@ async function decide(
 ): Promise<Report | undefined> {
   const policy = emb.scope.get('policy', ref);
   if (!policy) throw new Error(`unknown policy '${ref}'`);
+  const filledBy = policy.doc.decide.in ?? {};
+  const input = fillTemplates(filledBy, { request: run.request });
+  // what the decision's operation accepts it marks itself, on the one call its run makes
+  const roots = { request: run.request, input, inType: undefined, filledBy };
   const report = await runGraph(emb.operation(policy.doc.decide.run), {
-    initial: { in: fillTemplates(policy.doc.decide.in ?? {}, { request: run.request }), request: run.request },
+    initial: { in: input, request: run.request },
+    shown: shownRoots(emb.scope, run.args.trigger, roots),
     signal: run.opts.signal,
     clock: emb.clock,
     env: emb.envFor(run.opts.blobs),
