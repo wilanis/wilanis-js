@@ -76,13 +76,14 @@ function refuseNotHanded(
 
 /**
  * A008: a trigger that reaches a view attaches the policy the view names. A view is the one way across a
- * scope, so what a store declared `behind` is a gate every trigger reaching it carries -- judged per profile,
- * since which binding meets the fired operation decides which graph, and so which collection, is reached.
+ * scope, so what a store declared `behind` is a gate every trigger reaching it carries -- judged per profile
+ * that serves the trigger, since which binding meets the fired operation decides which graph, and so which
+ * collection, is reached.
  */
 export function checkViewGates(judge: Judge, trigger: Loaded<TriggerDoc>): void {
   const attached = new Set((trigger.doc.policies ?? []).map(use => judge.scope.canon(policyPath(use))));
   const faults = new Map<string, ViewFault>();
-  for (const profile of judge.profiles()) {
+  for (const profile of judge.profilesServing(trigger)) {
     for (const found of viewsReached(judge, trigger.doc.fire.run, profile, attached)) {
       const seen = faults.get(found.message);
       if (seen) seen.profiles.push(profile);

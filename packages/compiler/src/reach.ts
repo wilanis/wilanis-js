@@ -20,6 +20,7 @@ import {
   runsUnder,
   type Scope,
   splitRef,
+  type TriggerDoc,
   type Values,
 } from '@wilanis/core';
 import { connectionOf } from './documents.js';
@@ -167,6 +168,42 @@ export interface Reach {
  */
 export function reachOf(scope: Scope, profile: string | undefined): Reach {
   return rooted(new Reaching(scope, profile)).done();
+}
+
+/**
+ * Whether a profile serves a trigger: some startup step that runs under the profile names a `holds` operation of
+ * the plugin that grants the trigger's kind. The link is the plugin's manifest, which grants both -- a route kind
+ * beside the server that listens, a queue kind beside the worker that consumes -- so no kind is named here, and a
+ * kind a new plugin grants beside its own `holds` operation follows the same rule. A kind whose plugin grants no
+ * `holds` operation is served by no startup step (`wilanis run` fires a command-line trigger), so it is served
+ * under every profile. What the step is given is not read: a step that consumes some queues serves, as far as
+ * this says, every queue trigger.
+ */
+export function servedUnder(scope: Scope, trigger: TriggerDoc, profile: string | undefined): boolean {
+  const servers = serversOf(scope, trigger.kind);
+  if (!servers.length) return true;
+  return (scope.project?.startup ?? []).some(
+    step => runsUnder(step, profile) && servers.includes(canonical(scope, step.run)),
+  );
+}
+
+/** A `path#operation` with the path made canonical, or the reference as written where it names nothing (B006). */
+function canonical(scope: Scope, opRef: string): string {
+  const hit = scope.op(opRef);
+  return typeof hit === 'string' ? opRef : `${hit.path}#${hit.opName}`;
+}
+
+/** The `holds` operations that serve a trigger kind, canonical: those of the ports the plugin granting the kind grants. */
+function serversOf(scope: Scope, kindRef: string): string[] {
+  const kind = scope.get('trigger-kind', kindRef);
+  const manifest = kind?.native ? scope.registry.get('plugin', `${kind.native}/plugin.json`) : undefined;
+  const servers: string[] = [];
+  for (const ref of manifest?.doc.grants.ports ?? []) {
+    const port = scope.get('port', ref);
+    if (!port) continue;
+    for (const [name, op] of Object.entries(port.doc.operations)) if (op.holds) servers.push(`${port.path}#${name}`);
+  }
+  return servers;
 }
 
 /** The canonical path of every graph a profile's walk enters, from the roots `reachOf` starts at, each once. */

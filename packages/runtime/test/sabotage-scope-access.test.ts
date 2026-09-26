@@ -123,7 +123,8 @@ describe('sabotage: what a view is behind', () => {
   });
   it('A008 is judged per profile: every profile whose binding reaches a view, and no other', () => {
     // local and the three production profiles bind listEvery to a find over each store's view; live binds it to a
-    // REST call that reaches no store, so the dropped policy is owed under four profiles and live is not held to it
+    // REST call that reaches no store, so the dropped policy is owed under four profiles and live is not held to it.
+    // The digest is a command, which `wilanis run` fires under any profile, so every one of the four serves it
     const said = a008(UNGATED);
     expect(said.filter(one => one.endsWith("(profile 'local')"))).toHaveLength(1);
     expect(
@@ -139,10 +140,12 @@ describe('sabotage: what a view is behind', () => {
   });
   it('A008 names the profile of the one binding that reaches the view, from either side', () => {
     // only local binds listAll to kept-list, and only the production profiles to kept-list-postgres: the same
-    // crossing is owed under the profiles whose graph makes it, rather than every profile being held to a gate one needs
+    // crossing is owed under the profiles whose graph makes it, rather than every profile being held to a gate one
+    // needs -- and of the production profiles only production, since the routes reaching listAll are served where
+    // the tree listens, and production-scheduler and production-worker never do
     for (const [graph, profiles] of [
       ['kept-list', "profile 'local'"],
-      ['kept-list-postgres', "profiles 'production', 'production-scheduler', 'production-worker'"],
+      ['kept-list-postgres', "profile 'production'"],
     ]) {
       const said = a008(viewedUnder(graph));
       expect(said.length).toBeGreaterThan(0);

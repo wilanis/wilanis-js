@@ -61,12 +61,12 @@ function accessInvariants(judge: Judge): [Loaded<InvariantDoc>, AccessInvariant]
 }
 
 /**
- * The first operation a trigger reaches, under any profile, that the caller is looking for; nothing when it
- * reaches none. One walk answers both questions the family asks -- whether an invariant constrains anything at
- * all (I003) and whether this trigger is one of the ways in it constrains (I001).
+ * The first operation a trigger reaches, under any profile that serves it, that the caller is looking for;
+ * nothing when it reaches none. One walk answers both questions the family asks -- whether an invariant
+ * constrains anything at all (I003) and whether this trigger is one of the ways in it constrains (I001).
  */
 function reaches(judge: Judge, trigger: Loaded<TriggerDoc>, wanted: (one: Covered) => boolean): Covered | undefined {
-  for (const profile of judge.profiles()) {
+  for (const profile of judge.profilesServing(trigger)) {
     for (const reached of operationsReachable(judge.scope, trigger.doc.fire.run, profile))
       if (wanted(reached)) return reached;
   }

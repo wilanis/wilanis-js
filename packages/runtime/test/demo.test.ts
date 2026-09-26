@@ -65,7 +65,7 @@ describe('beat 1, the hook: the tree as it ships, and what the rule reaches', ()
 });
 
 describe('beat 2, the new hire: the scaffolded route', () => {
-  it('yields exactly the ten codes, at the paths the script quotes', () => {
+  it('yields exactly the eight codes, at the paths the script quotes', () => {
     expect(
       scaffold(dir, 'trigger', 'features/customers/edge/archive-customer', {
         run: REMOVE,
@@ -77,8 +77,6 @@ describe('beat 2, the new hire: the scaffolded route', () => {
       `T002 ${AT}#out`,
       `A006 ${AT}#policies`,
       `A006 ${AT}#policies`,
-      `A006 ${AT}#policies`,
-      `A006 ${AT}#policies`,
       `T005 ${REFUSALS}`,
       `T005 ${REFUSALS}`,
       `T005 ${REFUSALS}`,
@@ -86,13 +84,13 @@ describe('beat 2, the new hire: the scaffolded route', () => {
     ]);
   });
   it('says what each refusal says: the shapes the operation takes and answers, the tenant, the three reasons, the rule', () => {
+    // the tenant is owed under local and production, the two profiles that listen and keep customers in a store;
+    // production-scheduler and production-worker bind the same store but never open a route, so neither is held to it
     expect(refusalsSaying(dir)).toEqual([
       `T002 '${REMOVE}' takes {id: string} but the trigger declares no in`,
       `T002 '${REMOVE}' answers @features/customers/domain/Customer.shape.json but the trigger declares no out`,
       `A006 ${STORE} reads ${TENANT} as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'local')`,
       `A006 ${PG_STORE} reads ${TENANT} as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')`,
-      `A006 ${PG_STORE} reads ${TENANT} as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production-scheduler')`,
-      `A006 ${PG_STORE} reads ${TENANT} as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production-worker')`,
       "T005 @features/customers/data/delete-row.graph.json may refuse with reason 'missing', which settings.response.refusals does not map",
       "T005 @features/customers/data/delete-row.graph.json may refuse with reason 'upstream', which settings.response.refusals does not map",
       "T005 @features/customers/data/kept-remove.graph.json may refuse with reason 'invariant', which settings.response.refusals does not map",
@@ -107,15 +105,9 @@ describe('beat 2, the new hire: the scaffolded route', () => {
 });
 
 describe('beat 3, following the hints', () => {
-  it('the second step, shapes and refusals filled in, yields the five that want a policy: A006 four times and I001', () => {
+  it('the second step, shapes and refusals filled in, yields the three that want a policy: A006 twice and I001', () => {
     paste('archive-customer.step2.trigger.json');
-    expect(refusalsAt(dir)).toEqual([
-      `A006 ${AT}#policies`,
-      `A006 ${AT}#policies`,
-      `A006 ${AT}#policies`,
-      `A006 ${AT}#policies`,
-      `I001 ${AT}#policies`,
-    ]);
+    expect(refusalsAt(dir)).toEqual([`A006 ${AT}#policies`, `A006 ${AT}#policies`, `I001 ${AT}#policies`]);
   });
   it('attaching the policy without the token yields A005 and the two T005 for forbidden and anonymous', () => {
     // exactly what the I001 hint said and no more: the one line, written after `out` as build.mjs writes it
