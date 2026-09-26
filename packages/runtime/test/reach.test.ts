@@ -106,8 +106,9 @@ describe('the reach of a profile', () => {
     ]);
   });
 
-  it('asks migrate for what it asks start: production-worker plans without the hash', async () => {
-    // migrate refuses before any plugin opens anything, as start does, and names the same variables start would
+  it('asks migrate for what start asks and what every store opens: production-worker plans without the hash', async () => {
+    // migrate refuses before any plugin opens anything, as start does, naming what the reach reads and what each
+    // store's connection reads, since every store is planned
     const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);
     const names = ['CUSTOMERS_DATABASE_URL', 'CUSTOMERS_JWT_SECRET', 'CUSTOMERS_OPERATOR_PASSWORD_HASH'];
     const kept = names.map(name => [name, process.env[name]] as const);
@@ -118,6 +119,10 @@ describe('the reach of a profile', () => {
       );
       await expect(migrate(load, { profile: 'production', log: () => {} })).rejects.toThrow(
         'CUSTOMERS_OPERATOR_PASSWORD_HASH (operatorPasswordHash, read by @connections/employees-production.connection.json)',
+      );
+      // but every store is planned whatever the profile runs (RFC 0017), so local is asked for the database too
+      await expect(migrate(load, { profile: 'local', log: () => {} })).rejects.toThrow(
+        'CUSTOMERS_DATABASE_URL (customersDatabase, read by @connections/customers-postgres.connection.json)',
       );
     } finally {
       for (const [name, value] of kept) if (value !== undefined) process.env[name] = value;
