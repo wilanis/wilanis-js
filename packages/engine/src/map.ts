@@ -6,7 +6,7 @@
  * decides when the map starts and what its answer is taken for; this module runs the elements and says what came
  * of each.
  */
-import { redactEach, redactValue, shownOut } from './redact.js';
+import { redactEach, redactValue, shownOut, shownRead } from './redact.js';
 import { initialReport, noteRefusal } from './report.js';
 import { type Reader, readAll, readPath, readSource } from './sources.js';
 import type { KMap, NodeReport } from './spec.js';
@@ -117,7 +117,12 @@ export async function runMap(host: MapHost, id: string, node: KMap, report: Node
   const over = readSource(node.over, host.values);
   if (!Array.isArray(over)) throw new Error(`map '${id}': over is not a list`);
   const broadcast = readAll(node.in, host.values);
-  const shown = { broadcast: readAll(node.in, host.showing), over: readSource(node.over, host.showing) as unknown[] };
+  // each element as the list's report shows it: the marker, where the list is shown as the marker whole
+  const shownOver = readSource(node.over, host.showing);
+  const shown = {
+    broadcast: readAll(node.in, host.showing),
+    over: over.map((_, at) => shownRead(over, shownOver, [String(at)])),
+  };
   report.in = shownIn(node, shown.broadcast, shown.over);
   if (node.limit !== undefined && over.length > node.limit)
     throw new Error(`map '${id}': ${over.length} elements, limit ${node.limit}`);

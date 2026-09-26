@@ -54,7 +54,7 @@ function pick(report: Report, prefix = ''): ScenarioDoc['expect']['nodes'] {
  * What a run is recorded as expecting: how it ended, what it answered, the reason the refuse node it failed at
  * declared (`refusalOf`, which no node's `out` carries), and what every node did.
  */
-function expectOf(report: Report, secret: string[][] = []): ScenarioDoc['expect'] {
+function expectOf(report: Report, secret: string[][]): ScenarioDoc['expect'] {
   const reason = refusalOf(report)?.reason;
   return {
     status: report.status,
