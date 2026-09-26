@@ -40,4 +40,5 @@ A line under *Guaranteed by the checker* or *Enforced by the runtime* that is fa
 fixed in the code, and the advisory quotes the line. Once packages are published, the fix ships as a patch
 release of every affected package. The page is never edited to match the bug. A line under *The application's*
 found wanting is not a vulnerability; it is a request to move the line up, which is an RFC. What the page puts
-outside the model, the code of a plugin among it, is not a finding either.
+outside the model is not a finding either; a plugin's code is outside it except where a line under *Enforced by
+the runtime* names it.
