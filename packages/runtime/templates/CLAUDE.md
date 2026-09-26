@@ -58,7 +58,7 @@ property is described.
 | `resolvers` | named reads of the request (`request.params.id`, `request.headers['user-agent']`, `request.session.id`), for data graphs and bindings to bind under `reads` and read as `{{name}}`; `required` when a policy guarantees the read | `edge/` |
 | `store` | what the feature keeps: a connection and collections of a core shape (or a plugin's shape), each by key, with `unique`, `refs`, `defaults`; `renamed` and `was` record what a field or the collection was called before, so a rename is read as one. A collection may be `scoped` by columns the store keeps, each filled from one read the store binds under `reads` (a `required` resolver over what the guard hands), and a `view` of a scoped collection sees every row `behind` a policy | `data/` |
 | `connection` | a channel to an external system, settings read `{{secrets.*}}`; a connection whose kind declares `leases` can keep the scheduler's hold, so one instance of several fires a tick; a connection whose kind declares `delivery` is a broker, handing each message `at-least-once` (what it fires may run twice) or `at-most-once` (it may not run at all) | `connections/` |
-| `scenario` | a recorded run: `wilanis fuzz` writes one per trigger per seed under `scenarios/`, and `wilanis regress` replays them all; a generated scenario is regenerated, never edited. `cancelAt` pins a cancellation | `scenarios/` |
+| `scenario` | a recorded run: `wilanis fuzz` writes one per trigger per seed under `scenarios/fuzz/`, and `wilanis regress` replays every scenario under `scenarios/`; a generated scenario is regenerated, never edited. `cancelAt` pins a cancellation | `scenarios/` |
 
 ## Layers
 
