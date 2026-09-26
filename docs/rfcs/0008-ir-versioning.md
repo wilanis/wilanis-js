@@ -106,8 +106,8 @@ serving because a newer runtime was published.
 
 ### Discoverability
 
-`docs/rfcs/README.md` lists which RFCs are v1 and, later, which are v2. The README's "Schemas" section
-already states the address rule; it gains the compatible/breaking definitions above.
+`docs/rfcs/README.md` lists which RFCs are v1 and, later, which are v2. `docs/model.md → Schemas and
+versioning` states the address rule and the compatible/breaking definitions above.
 
 ### Plugin contract
 
@@ -116,7 +116,7 @@ documents are of a version the runtime does not read is refused at load with the
 
 ## Compatibility
 
-This RFC is the compatibility rule. It changes no schema. It changes the README and adds two loader
+This RFC is the compatibility rule. It changes no schema. It changes `docs/model.md` and adds two loader
 rules that cannot fire on any v1 tree today.
 
 ## Tests
@@ -128,7 +128,8 @@ rules that cannot fire on any v1 tree today.
 
 ## Implementation plan
 
-1. Write the compatible/breaking definitions into `README.md → Schemas` (good first issue).
+1. Write the compatible/breaking definitions into `README.md → Schemas` (good first issue), now
+   `docs/model.md → Schemas and versioning` (#688).
 2. Print the IR version in `wilanis check` and `describe project`.
 3. The two loader rules and their sabotage tests.
 4. `wilanis upgrade`, when there is a second version to move to: it rewrites a tree's documents from one
@@ -136,7 +137,7 @@ rules that cannot fire on any v1 tree today.
    nothing for it to do.
 5. The deprecation warning on load, when a version is first deprecated: it names `wilanis upgrade` and the
    major that will drop the version.
-6. At 1.0: tag `schemas-v1` as frozen in the README and in this RFC's status.
+6. At 1.0: tag `schemas-v1` as frozen in `docs/model.md` and in this RFC's status.
 
 ## Drawbacks and alternatives
 

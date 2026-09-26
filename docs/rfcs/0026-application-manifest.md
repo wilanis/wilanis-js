@@ -274,7 +274,7 @@ None. The manifest is derived from a tree that passed; an inconsistency in it is
   `startup`, which keeps its declared order because the order is meaning), object maps by key, settings' at every
   depth, arrays inside settings in their own order. `format` is the
   literal `1`. `ir` is RFC 0008's segment of `SCHEMA_BASE` (`packages/core/src/published.ts`): `v1` while the base
-  ends in `main` or `schemas-v1`.
+  is on `main` or on the tag `schemas-v1`.
 - **The inventory**, from the registry: `documents` (`path`, `kind`, `feature`, `layer`, `included`, each `null`
   where it does not apply); `plugins` (`use`, `from`, `version`, `guard`); `includes` (`from`, `version`,
   `features`); `features` (`name`, `included`, `effects`); `triggers` (`path`, `kind`, `settings` with the values written,
