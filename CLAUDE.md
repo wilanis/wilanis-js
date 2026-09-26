@@ -113,6 +113,8 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   once and the whole tree is held to) with `invariant-holds.ts` beside it for the field form and `prove.ts`
   for whether a rule already holds where a value is made -- what the checker and the guard the compiler
   lowers both ask, through the one `heldAt`, so neither can prove a site the other would guard --,
+  `invariant-writes.ts` beside them (I007, I008: a write of a shape a field invariant is on takes the whole record,
+  read whole from a site upstream of the effect, and never patches a field the rule reads),
   `graph-nodes.ts` again for I006, which is a rule about the word a `refuse` node may name and so belongs
   with the node it judges rather than with the invariant it reserves the word for,
   `attempts.ts` (G017, G018, G019: what a `retry` on a data graph's node or a binding's operation is written

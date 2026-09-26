@@ -15,6 +15,7 @@ import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
 const STORE = { store: '@customers/data/customers.store.json', collection: 'customers' };
 const CUSTOMER = '@customers/domain/Customer.shape.json';
+const REF = '@customers/domain/CustomerRef.shape.json';
 
 /** A copy of the example with one scaffolded graph in it, and the graph itself, read back. */
 function scaffolded(name: string, opts: Record<string, string>) {
@@ -29,7 +30,7 @@ function scaffolded(name: string, opts: Record<string, string>) {
 function fill(dir: string, file: string, changes: Record<string, string>): string[] {
   const at = join(dir, file);
   const filled = readFileSync(at, 'utf8')
-    .replaceAll('"in": "TODO"', '"in": "@customers/domain/CustomerRef.shape.json"')
+    .replaceAll('"in": "TODO"', `"in": "${REF}"`)
     .replaceAll('"type": "TODO"', `"type": "${CUSTOMER}"`);
   writeFileSync(
     at,
@@ -94,14 +95,16 @@ describe('wilanis new graph --store: read, decide, write', () => {
       'read-then': 'patch',
       branch: 'noted:has(record) && !has(record.note)\nrenoted:has(record)',
     });
-    expect(fill(dir, file, { '"TODO": "TODO"': '"note": "seen"' })).toEqual([]);
+    // a patch changes a field no invariant reads: 'A customer is reachable' reads note, and patching it is I007
+    expect(fill(dir, file, { '"TODO": "TODO"': '"active": true' })).toEqual([]);
     rmSync(dir, { recursive: true, force: true });
   });
 
   it('checks clean for each write --read-then names, since each answers the record the same way', () => {
     for (const [write, changes] of [
       ['remove', {}],
-      ['put', { '"record": "TODO"': '"record": "{{storedCustomer.record}}"' }],
+      // a put of a Customer writes the record whole, taken as in, or it is composed at the write (I008)
+      ['put', { [`"in": "${REF}"`]: `"in": "${CUSTOMER}"`, '"record": "TODO"': '"record": "{{in}}"' }],
     ] as [string, Record<string, string>][]) {
       const { dir, file, doc } = scaffolded(`probe-${write}`, {
         'read-then': write,

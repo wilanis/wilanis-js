@@ -14,10 +14,11 @@ const STORE = '@storage/store.port.json';
 const STORE_DOC = '@customers/data/customers.store.json';
 const CUSTOMER = '@customers/domain/Customer.shape.json';
 /**
- * What the toggle reads of the customer: its key and who it is. keep-customer takes the whole record, and a toggle
- * that writes some fields of it leaves the rest unread, which is G008's and not the claim here.
+ * What the toggle reads of the customer: its key. keep-customer takes the whole record, and a toggle that writes
+ * one field of it leaves the rest unread, which is G008's and not the claim here; the field is one no invariant
+ * reads, since patching one an invariant reads is I007's.
  */
-const TAKES = '@customers/domain/RawCustomer.shape.json';
+const TAKES = '@customers/domain/CustomerRef.shape.json';
 
 const run = (id: string, op: string, input: Record<string, unknown>) => ({
   type: '@wilanis/node/run.schema.json',
@@ -33,13 +34,13 @@ const decide = (id: string, rules: { when: string; to: string }[], otherwise: st
   else: otherwise,
 });
 const get = run('get', `${STORE}#get`, { store: STORE_DOC, collection: 'customers', key: '{{in.id}}' });
-/** One write of the toggle: the caller's fields, and the note standing in for the flag the example has not. */
-const patch = (id: string, note: string) =>
+/** One write of the toggle: the flag this write sets, and nothing an invariant reads. */
+const patch = (id: string, active: boolean) =>
   run(id, `${STORE}#patch`, {
     store: STORE_DOC,
     collection: 'customers',
     key: '{{in.id}}',
-    changes: { name: '{{in.name}}', email: '{{in.email}}', tier: '{{in.tier}}', note },
+    changes: { active },
   });
 const make = (value: string) => run('customer', '@std/object.port.json#make', { value, type: CUSTOMER });
 const missing = run('noCustomer', '@std/outcome.port.json#refuse', {
@@ -55,8 +56,8 @@ const toggle = (graph: any) => {
   graph.nodes = [
     get,
     decide('check', [{ when: 'has(record)', to: 'customer' }], 'noCustomer'),
-    patch('pin', 'pinned'),
-    patch('unpin', 'unpinned'),
+    patch('pin', true),
+    patch('unpin', false),
     make('{{pin.record || unpin.record}}'),
     missing,
   ];
@@ -103,7 +104,7 @@ describe('sabotage: a graph written as control flow', () => {
       graph.nodes = [
         get,
         decide('check', [{ when: 'has(record)', to: 'pin' }], 'noCustomer'),
-        patch('pin', 'pinned'),
+        patch('pin', true),
         missing,
       ];
       graph.out.from = ['noCustomer'];

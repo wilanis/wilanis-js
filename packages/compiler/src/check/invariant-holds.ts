@@ -11,7 +11,7 @@ import type { Judge, Refuser } from './judge.js';
 import { heldAt, literalFields, siteRead } from './prove.js';
 
 /** How a reader is told which invariant judged them: its label where it has one, and the file either way. */
-const named = (invariant: Loaded<InvariantDoc>): string =>
+export const named = (invariant: Loaded<InvariantDoc>): string =>
   invariant.doc.label ? `'${invariant.doc.label}' (${invariant.path})` : invariant.path;
 
 /**

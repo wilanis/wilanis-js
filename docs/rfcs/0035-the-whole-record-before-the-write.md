@@ -172,11 +172,11 @@ compose.
 The refusals an author meets, each on the graph the example ships today:
 
 ```
-I0nn  features/customers/data/kept-update.graph.json  nodes/asked/in/changes
+I007  features/customers/data/kept-update.graph.json  nodes/asked/in/changes
       patch writes 'tier', which 'A customer is reachable' (features/customers/domain/a-customer-is-reachable.invariant.json) reads; a rule over the whole record cannot be held on a part of one
       hint: load the record, make the new one with @std/object.port.json#merge in a domain graph, and #put it whole through an operation that takes a Customer
 
-I0nn  features/customers/data/store-and-latest.graph.json  nodes/stored/in/record
+I008  features/customers/data/store-and-latest.graph.json  nodes/stored/in/record
       the Customer written here is composed at the write, so nothing judges it before the store keeps it
       hint: make it in a node -- @std/object.port.json#make with "type": "@customers/domain/Customer.shape.json" -- and give #put "record": "{{<node>}}"
 
@@ -216,8 +216,8 @@ it is a rule about what a layer may do.
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
-| I0nn | `check/invariant-writes.ts` | a `run` or `map` node runs `@storage/store.port.json#patch` over a collection whose `of` is a guarded shape, and a key of its `changes` is a field some `holds` invariant on that shape reads (`rootsOf` in `check/prove.ts` over the invariant's `when`). `at` is `nodes/<id>/in/changes`. | `load the record, make the new one with @std/object.port.json#merge in a domain graph, and #put it whole through an operation that takes a <Shape>` |
-| I0nn | `check/invariant-writes.ts` | a node runs `#put` over a collection whose `of` is a guarded shape and its `record` is written in place -- an object literal, or anything but one whole read of a node or of `in` (`readWhole` in `check/prove.ts`). `at` is `nodes/<id>/in/record`. | `make it in a node -- @std/object.port.json#make with "type": "<Shape>" -- and give #put "record": "{{<node>}}"` |
+| I007 | `check/invariant-writes.ts` | a `run` or `map` node runs `@storage/store.port.json#patch` over a collection whose `of` is a guarded shape, and a key of its `changes` is a field some `holds` invariant on that shape reads (`rootsOf` in `check/prove.ts` over the invariant's `when`). `at` is `nodes/<id>/in/changes`. | `load the record, make the new one with @std/object.port.json#merge in a domain graph, and #put it whole through an operation that takes a <Shape>` |
+| I008 | `check/invariant-writes.ts` | a node runs `#put` over a collection whose `of` is a guarded shape and its `record` is written in place -- an object literal, or anything but one whole read of a node or of `in` (`readWhole` in `check/prove.ts`). `at` is `nodes/<id>/in/record`. | `make it in a node -- @std/object.port.json#make with "type": "<Shape>" -- and give #put "record": "{{<node>}}"` |
 | L0nn | `check/graph.ts` | a data graph holds a made site of a guarded shape (`sitesOf` in `sites.ts`, `kind: 'made'`) and some effectful node of the graph reads that node, directly or through the routing (`readersOf` in `check/graph-routing.ts`). A made site no effect reads -- the `kept` node above, which translates what the store answered -- is not refused. `at` is `nodes/<id>` of the site. | `a data graph translates; make the record in a domain graph and hand it to this one whole, as its in` |
 
 L0nn is a refusal, not guidance. The two `I` rules alone put the guard before every write; L0nn additionally
@@ -290,11 +290,11 @@ the `decision` job.
 Every rule is exercised through the example in `packages/runtime/test/example.test.ts`, as the compiler's rules
 are:
 
-- **I0nn (patch).** The example on `main` today, with the shipped `kept-update.graph.json`, is refused with this
+- **I007 (patch).** The example on `main` today, with the shipped `kept-update.graph.json`, is refused with this
   code and `at: nodes/asked/in/changes` once the rule exists. After the example is rewritten (plan step 1), the
   sabotage is a copy of the example with a data graph patching `tier`; a second case patches `active` and expects
   no refusal, since no invariant reads it.
-- **I0nn (composed record).** `store-and-latest.graph.json` on `main` today, `record` an object literal. After the
+- **I008 (composed record).** `store-and-latest.graph.json` on `main` today, `record` an object literal. After the
   rewrite, a copy whose `keep-customer` writes `"record": { "id": "{{in.id}}", ... }`; a second case with
   `"record": "{{in}}"` expects none.
 - **L0nn.** A copy with the `#merge` moved from `update-customer` into `keep-customer`; a second case where the
@@ -316,7 +316,7 @@ The storage suite is untouched: `patch` is still what it was, and the engines ar
    `register-customer` (domain) from a `nextId` operation and `#make`, `store-and-latest` taking the `Customer` as
    its `in`; `CustomerUpdate` gains `note`, and `UpdateBody` with it. Checks clean under today's
    rules, and the end-to-end gold-without-a-note test is added and passes. Node ids named for what they hold.
-2. **I0nn twice**, in `check/invariant-writes.ts`, with their sabotage tests. The example is the fixture.
+2. **I007 and I008**, in `check/invariant-writes.ts`, with their sabotage tests. The example is the fixture.
 3. **L0nn** in `check/graph.ts`, with its sabotage test.
 4. **`accepts` names a shape**: schema, `model.ts`, `acceptsType`, B005, `describe`, the viewer; `update` in the
    example written that way. This is the schema change and waits in `decision`.
@@ -394,3 +394,14 @@ in the scaffold for a collection no invariant reads or goes altogether; and the 
    `string` or `Customer.shape.json[]`; only a shape has fields to give one by one, so `Judge.acceptsTypeAt`
    refuses any other type at `operations/<op>/accepts` under the code an unresolved type already takes. No code
    is added.
+3. **The two `I` rules are I007 and I008, and read only what the document shows.** They run from
+   `judgeInvariants` in `checker.ts`, right after `checkInvariantSites`, and `rootsOf` is taken from
+   `check/judge.ts`, where it lives. I007 finds the fields a `changes` names where it is written out, by its keys,
+   and where it is one read of `in`, by the fields of that read's type, as X211 types a `changes` read whole; a read
+   of anything else names no field the checker can see and is not refused. I008's message names the invariant, as
+   I007's does, since the rule is non-local. Its hint sends the making to a domain graph and the write to
+   `"record": "{{in}}"`, not to a node beside the write as the table has it: a data graph that makes the guarded
+   record on its way to an effect is what L0nn refuses, so a hint pointing there would trade one refusal for the
+   next. The rule itself accepts one whole read of any node, as the table says. A `map` that binds each element to
+   `#put` as `record`, or to `#patch` as `changes`, is not judged: this RFC says what a record read from `in` or a
+   node is, and not what an element of a list read from one is.

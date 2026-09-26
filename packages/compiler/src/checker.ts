@@ -4,7 +4,8 @@
  *   D documents (the loader)   R references   L layers/effects/visibility   G graphs (graph.ts, inputs.ts)
  *   P static fields/resolvers (resolvers.ts)   B bindings/profiles (bindings.ts, project.ts; required.ts,
  *     what a binding of a port a plugin requires may read and may reach)
- *   T triggers (triggers.ts)   A access (access.ts)   I invariants (invariants.ts)
+ *   T triggers (triggers.ts)   A access (access.ts)   I invariants (invariants.ts; invariant-writes.ts, a
+ *     write of a shape a field invariant guards)
  *   C connections and settings (project.ts, contracts.ts)
  *   C stores: what they keep and what they once called it (stores.ts), and who may see it (scopes.ts)
  *   atomic graphs, which are L and G rules over what one reaches (atomic.ts)
@@ -16,6 +17,7 @@ import { checkAtomic } from './check/atomic.js';
 import { checkBinding } from './check/bindings.js';
 import { checkConnection, checkPort, checkShape } from './check/contracts.js';
 import { checkGraph } from './check/graph.js';
+import { checkInvariantWrites } from './check/invariant-writes.js';
 import { checkInvariant, checkInvariantSites } from './check/invariants.js';
 import { Judge } from './check/judge.js';
 import { checkBlobStore, checkProject, checkStartup } from './check/project.js';
@@ -84,11 +86,13 @@ function judgeUses(judge: Judge): void {
 /**
  * What must hold everywhere, after the trigger loop and before the scenarios: an invariant is judged over
  * documents already found well-formed, so an I refusal never repeats an R001, a T or an A refusal, and a
- * trigger's attached policies are known by the time the tree is held to a rule that spans triggers.
+ * trigger's attached policies are known by the time the tree is held to a rule that spans triggers. The writes
+ * of a guarded shape come last, once every invariant has been judged for itself.
  */
 function judgeInvariants(judge: Judge): void {
   for (const invariant of judge.scope.registry.all('invariant')) checkInvariant(judge, invariant);
   checkInvariantSites(judge);
+  checkInvariantWrites(judge);
 }
 
 /** X rules: what only the plugin can judge, given its settings and a way to refuse. */
