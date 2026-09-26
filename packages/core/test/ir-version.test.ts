@@ -1,6 +1,7 @@
 /**
  * RFC 0008, step 3, on the smallest trees that show it: a plugin whose docs/ are of a version this runtime does not
- * read is refused by the same rule as a tree's own document (D013), at each document it ships; a tree wholly of one
+ * read is refused by the same rule as a tree's own document (D013), at each document it ships; an include is read as
+ * the loader reads it, its project.json and the features taken from it and nothing else; a tree wholly of one
  * such version is refused document by document and mixes nothing; the alias is the version this runtime reads; and a
  * tree either rule refuses is read no further, so nothing of it is registered.
  */
@@ -67,6 +68,24 @@ describe('the IR version rules, where a plugin ships the documents', () => {
     const load = loadTree(root, { '@p': pluginAt(schemaUrl('plugin')) });
     expect(refusalsOf(load)).toEqual([]);
     expect(load.registry.get('plugin', '@p/plugin.json')).toBeDefined();
+  });
+});
+
+describe('the IR version rules, where an include ships the documents', () => {
+  it('D013 at the project.json of an include and at each feature taken from it, and none at a feature not taken', () => {
+    const root = written({ 'project.json': project(schemaUrl('project')) });
+    const thing = { $schema: `${V2}/shape.schema.json`, description: 'd' };
+    const dir = written({
+      'project.json': project(`${V2}/project.schema.json`),
+      'features/g/domain/Thing.shape.json': thing,
+      'features/h/domain/Thing.shape.json': thing,
+    });
+    const load = loadTree(root, {}, [{ from: '@i', dir, features: ['g'] }]);
+    expect(refusalsOf(load)).toEqual([
+      'D013 @i/project.json#$schema',
+      'D013 features/g/domain/Thing.shape.json#$schema',
+      'D014 project.json',
+    ]);
   });
 });
 

@@ -34,6 +34,17 @@ export function parseJson(abs: string, file: string): { doc: unknown } | { refus
   }
 }
 
+/**
+ * The array project.json holds under one key, read before it is judged, or none when the file, its JSON or the key is
+ * not there: what the runtime reads to find the packages a tree names, and the version rules the plugins whose docs
+ * they read. loadTree reports D000 / D005.
+ */
+export function listedIn(root: string, key: 'plugins' | 'includes'): unknown[] {
+  const parsed = parseJson(join(root, PROJECT_FILE), PROJECT_FILE);
+  const found = 'doc' in parsed ? (parsed.doc as Record<string, unknown> | null)?.[key] : undefined;
+  return Array.isArray(found) ? found : [];
+}
+
 /** The path a plugin's document is registered and refused under: the plugin's root, then its place under docs/. */
 export const nativePath = (plugin: PluginModule, abs: string): string =>
   `${plugin.root}/${treePath(relative(plugin.docs, abs))}`;

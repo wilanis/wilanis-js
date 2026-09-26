@@ -85,9 +85,6 @@ export interface ManifestOptions {
   profile?: string;
 }
 
-/** The schema version a base URL serves: core's, where the loader reads a document's version with it (RFC 0008). */
-export { irOf } from '@wilanis/core';
-
 /**
  * The manifest of a tree the checker accepted. The versions of its plugins and includes are read off `resolved`,
  * which `loadProject` carries; a load without it prints `null` for every version it did not resolve. Throws RFC
