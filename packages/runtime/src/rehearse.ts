@@ -2,14 +2,14 @@
  * `wilanis rehearse`: every branch of every decision a trigger can reach, walked until each is answered, and what it
  * took to get there said in words. It runs against stubbed effects, so nothing leaves the process.
  */
-import { type Guard, guardsOf, idsOf, TAKEN_IDS } from '@wilanis/compiler';
+import { type Guard, guardsOf, idsOf, TAKEN_IDS, walkedUnder } from '@wilanis/compiler';
 import type { Loaded, LoadResult, TriggerDoc, Type } from '@wilanis/core';
 import { Scope } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
 import { outcomeOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, nonEmpty, type Stubbing, setPath, switchesOf } from './branches.js';
 import type { Embedder } from './embed.js';
-import { activeProfile } from './profile.js';
+import { activeProfile, skippedLines } from './profile.js';
 import { type Decision, format, gather, type PlainRun, statedOf, stateName } from './rehearsal-report.js';
 import { heldUpstream } from './rehearse-held.js';
 import { atomicAt, declaredAt, rootGraph, specBehind, type Where, whereOf } from './rehearse-where.js';
@@ -110,7 +110,8 @@ function whyFailed(local: Report): Partial<Settled> {
  * routes somewhere other than where its rule points, or when no inputs can reach the branch at all.
  *
  * It runs under the profile `activeProfile` picks, as `start` would, so the bindings it stubs are the ones
- * that place runs; being stubbed, it needs no variable set.
+ * that place runs; being stubbed, it needs no variable set. It runs only the triggers that profile serves
+ * (`walkedUnder`), the ones the checker judged there, and says first how many it skipped and where they are served.
  */
 export async function rehearse(
   load: LoadResult,
@@ -118,11 +119,13 @@ export async function rehearse(
 ): Promise<Rehearsal> {
   const seed = opts.seed ?? 1;
   const profile = activeProfile(load.registry.project?.doc, { flag: opts.profile, env: process.env });
-  const lines: string[] = [];
+  const scope = new Scope(load.registry, load.resolve);
+  const lines = skippedLines(scope, profile, load.registry.all('trigger'), 'trigger(s)');
   const decisions: Decision[] = [];
   const plain: PlainRun[] = [];
   // every trigger, and every policy as a trigger of each kind that attaches it: a decision is walked like any other graph
   for (const trigger of [...load.registry.all('trigger'), ...policyRoots(load)]) {
+    if (!walkedUnder(scope, trigger.doc, profile)) continue;
     const found = await rehearseTrigger(load, trigger, { seed, profile }, decisions);
     if (!found) plain.push(await wholeOf(load, trigger, seed, profile));
   }

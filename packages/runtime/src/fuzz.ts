@@ -4,10 +4,11 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { walkedUnder } from '@wilanis/compiler';
 import type { Loaded, LoadResult } from '@wilanis/core';
-import { HOME, type ScenarioDoc, schemaUrl, secretPaths, type TriggerDoc } from '@wilanis/core';
+import { HOME, type ScenarioDoc, Scope, schemaUrl, secretPaths, type TriggerDoc } from '@wilanis/core';
 import { outcomeOf, type Report, redactValue, refusalOf } from '@wilanis/engine';
-import { activeProfile } from './profile.js';
+import { activeProfile, skippedLines } from './profile.js';
 import { embedderFor, generatedFire } from './stubbing.js';
 
 // ---- fuzz / regress ----------------------------------------------------------------------------------
@@ -101,21 +102,24 @@ function scenarioOf({ trigger, seed, input, request, record, report, secret }: F
 }
 
 /**
- * Run each trigger under N seeds with stubbed effects and write one scenario per run -- but never one of a fault.
- * The stubbed world never throws, so a run that faults under stubs is the tree's own bug (a `make` whose value does
- * not fit, a `refuse` whose reason is not a word, a wiring hole), and a scenario pinning it would hold the tree to
- * breaking: the fault is said, nothing is written for it, and the answer is not ok.
+ * Run each trigger the profile serves under N seeds with stubbed effects and write one scenario per run -- but never
+ * one of a fault. The stubbed world never throws, so a run that faults under stubs is the tree's own bug (a `make`
+ * whose value does not fit, a `refuse` whose reason is not a word, a wiring hole), and a scenario pinning it would
+ * hold the tree to breaking: the fault is said, nothing is written for it, and the answer is not ok. A trigger the
+ * profile does not serve (`walkedUnder`) is not run, and `skipped` says how many and where they are served.
  */
 export async function fuzz(
   load: LoadResult,
   opts: { runs?: number; profile?: string; out?: string } = {},
-): Promise<{ ok: boolean; written: string[]; lines: string[] }> {
+): Promise<{ ok: boolean; written: string[]; lines: string[]; skipped: string[] }> {
   const written: string[] = [];
   const lines: string[] = [];
   const profile = activeProfile(load.registry.project?.doc, { flag: opts.profile, env: process.env });
+  const scope = new Scope(load.registry, load.resolve);
   const dir = join(load.root, opts.out ?? SCENARIOS);
   mkdirSync(dir, { recursive: true });
   for (const trigger of load.registry.all('trigger')) {
+    if (!walkedUnder(scope, trigger.doc, profile)) continue;
     for (let seed = 1; seed <= (opts.runs ?? 5); seed++) {
       const run = await fuzzed(load, trigger, seed, profile);
       const outcome = outcomeOf(run.report);
@@ -128,7 +132,8 @@ export async function fuzz(
       written.push(file);
     }
   }
-  return { ok: lines.length === 0, written, lines };
+  const skipped = skippedLines(scope, profile, load.registry.all('trigger'), 'trigger(s)');
+  return { ok: lines.length === 0, written, lines, skipped };
 }
 
 const same = (one: unknown, other: unknown) => JSON.stringify(one) === JSON.stringify(other);
@@ -200,13 +205,19 @@ export interface Regression {
   results: Replayed[];
 }
 
-/** Replay every scenario with its recorded stubs, under the profile `activeProfile` picks, and diff the report node by node. */
+/**
+ * Replay every scenario with its recorded stubs, under the profile `activeProfile` picks, and diff the report node by
+ * node. A scenario whose trigger the profile does not serve (`walkedUnder`) is not replayed, and the last lines say
+ * how many and where their triggers are served.
+ */
 export async function regress(load: LoadResult, opts: { profile?: string } = {}): Promise<Regression> {
   const profile = activeProfile(load.registry.project?.doc, { flag: opts.profile, env: process.env });
   const stubbed = { seed: 0, profile, env: fakeEnvFor(load) };
   const emb = embedderFor(load, stubbed);
+  const scope = new Scope(load.registry, load.resolve);
   const results: Replayed[] = [];
   const lines: string[] = [];
+  const unserved: Loaded<TriggerDoc>[] = [];
   for (const sc of load.registry.all('scenario')) {
     const trigger = load.registry.all('trigger').find(trigger => trigger.path === load.resolve(sc.doc.trigger));
     // S001 has already refused a scenario whose trigger is gone; skip rather than replay nothing.
@@ -216,6 +227,10 @@ export async function regress(load: LoadResult, opts: { profile?: string } = {})
       lines.push(`${sc.path}: ${gone}`);
       continue;
     }
+    if (!walkedUnder(scope, trigger.doc, profile)) {
+      unserved.push(trigger);
+      continue;
+    }
     const report = sc.doc.cancelAt
       ? await cancelledReplay(load, stubbed, trigger.doc, sc.doc)
       : await emb.fire(trigger.doc, sc.doc.in, sc.doc.request ?? {}, { stubs: sc.doc.stubs });
@@ -223,6 +238,7 @@ export async function regress(load: LoadResult, opts: { profile?: string } = {})
     results.push({ scenario: sc.path, same: diffs.length === 0, diffs });
     lines.push(`${sc.path}: ${diffs.length ? `DIFF ${diffs.join('; ')}` : 'same'}`);
   }
+  lines.push(...skippedLines(scope, profile, unserved, 'scenario(s) whose trigger'));
   return { ok: results.every(one => one.same), lines, results };
 }
 

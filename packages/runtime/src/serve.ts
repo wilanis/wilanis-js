@@ -17,7 +17,7 @@ import { type Outcome, outcomeOf, type Report } from '@wilanis/engine';
 import { FileBlobStore } from './blobs.js';
 import type { Embedder } from './embed.js';
 import { postLoad, stopEach } from './post-load.js';
-import { activeProfile, secretsRefusal } from './profile.js';
+import { activeProfile, secretsRefusal, unservedRefusal } from './profile.js';
 import { Served } from './served.js';
 import { embedderFor } from './tools.js';
 
@@ -206,7 +206,8 @@ interface OneRun {
  * Everything a one-shot run needs before it fires: the trigger the reference names, an embedder for the
  * profile (`activeProfile`, as `start` picks it) and seed, the observer registered through a `Served` of its own -- the server an observer registers
  * with here exactly as it is under `start`, so `--trace` reads what an exporter would be handed -- and the
- * plugins' postLoad, which a seeded run skips because nothing of it ever leaves the process.
+ * plugins' postLoad, which a seeded run skips because nothing of it ever leaves the process. A trigger the profile
+ * does not serve is refused before any of it, naming the profiles that do: the checker never judged it there.
  */
 async function readied(
   load: LoadResult,
@@ -216,6 +217,8 @@ async function readied(
   const found = load.registry.get('trigger', load.resolve(ref));
   if (!found) throw new Error(`no trigger at '${ref}'`);
   const profile = activeProfile(load.registry.project?.doc, { flag: opts.profile, env: process.env });
+  const unserved = unservedRefusal(new Scope(load.registry, load.resolve), found, profile);
+  if (unserved) throw new Error(unserved);
   const emb = embedderFor(load, { profile, seed: opts.seed });
   if (opts.observe) {
     const served = new Served({ load, emb }, opts.log, { profile, env: process.env });

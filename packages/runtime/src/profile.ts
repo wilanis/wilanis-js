@@ -1,10 +1,12 @@
 /**
- * Which profile a process runs under, and what that profile needs of the environment before anything starts
- * (RFC 0013). Every command that runs or stubs a tree picks its profile here, by one precedence; only `start`
- * and a reload go on to ask for the variables the profile's reach reads.
+ * Which profile a process runs under, what that profile needs of the environment before anything starts
+ * (RFC 0013), and which triggers it serves. Every command that runs or stubs a tree picks its profile here, by
+ * one precedence; only `start` and a reload go on to ask for the variables the profile's reach reads. A command
+ * that fires triggers under the profile fires only those it walks (`walkedUnder`), since those are the ones the
+ * checker judged there: `run` refuses one it does not, and `rehearse`, `fuzz` and `regress` skip them and say so.
  */
-import { reachOf } from '@wilanis/compiler';
-import type { ProjectDoc, Scope } from '@wilanis/core';
+import { reachOf, servedUnder, walkedUnder } from '@wilanis/compiler';
+import type { Loaded, ProjectDoc, Scope, TriggerDoc } from '@wilanis/core';
 
 /** The variable that names the profile when no `--profile` was given. */
 export const PROFILE_VARIABLE = 'WILANIS_PROFILE';
@@ -70,4 +72,49 @@ export function unsetSecrets(scope: Scope, profile: string | undefined, env: Nod
 export function secretsRefusal(scope: Scope, profile: string | undefined, env: NodeJS.ProcessEnv): string | undefined {
   const unset = unsetSecrets(scope, profile, env);
   return unset.length ? `missing secrets: ${unset.join(', ')}` : undefined;
+}
+
+/** The profiles whose startup serves a trigger, in the project's order. */
+function serving(scope: Scope, trigger: TriggerDoc): string[] {
+  return scope.profiles().filter(one => servedUnder(scope, trigger, one));
+}
+
+/**
+ * Why `wilanis run` will not fire a trigger under a profile that does not serve it -- the kind no step of its
+ * startup serves, and the profiles that serve it -- or nothing where the profile walks it (`walkedUnder`).
+ */
+export function unservedRefusal(
+  scope: Scope,
+  trigger: Loaded<TriggerDoc>,
+  profile: string | undefined,
+): string | undefined {
+  if (walkedUnder(scope, trigger.doc, profile)) return undefined;
+  const others = serving(scope, trigger.doc);
+  return (
+    `profile '${profile}' does not serve ${trigger.path}: no startup step it runs serves kind ` +
+    `'${trigger.doc.kind}' (served under ${others.join(', ')})\n` +
+    `→ --profile ${others[0]}, or run the step that serves the kind under '${profile}' too`
+  );
+}
+
+/**
+ * What a command firing every trigger under a profile says of the ones it left out: a line per set of profiles
+ * serving them, how many and where they are served; nothing where it left none out. `triggers` holds the trigger
+ * of each thing the command would have run, once per thing, so a count of scenarios counts scenarios.
+ */
+export function skippedLines(
+  scope: Scope,
+  profile: string | undefined,
+  triggers: Loaded<TriggerDoc>[],
+  what: string,
+): string[] {
+  const counts = new Map<string, number>();
+  for (const trigger of triggers) {
+    if (walkedUnder(scope, trigger.doc, profile)) continue;
+    const others = serving(scope, trigger.doc).join(', ');
+    counts.set(others, (counts.get(others) ?? 0) + 1);
+  }
+  return [...counts].map(
+    ([others, count]) => `skipped ${count} ${what} profile '${profile}' does not serve (served under ${others})`,
+  );
 }
