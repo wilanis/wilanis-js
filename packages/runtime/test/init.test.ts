@@ -33,13 +33,15 @@ describe('wilanis init', () => {
     expect(frontmatter).not.toBeNull();
     expect(frontmatter![1]).toMatch(/^name: wilanis-graphs$/m);
     expect(frontmatter![1]).toMatch(/^description: /m);
-    for (const trigger of ['writing a graph', 'a switch', 'G004', 'G008', 'patch a record'])
+    for (const trigger of ['writing a graph', 'a switch', 'changing', 'load, make, keep', 'G004', 'G008', 'I007'])
       expect(frontmatter![1]).toContain(trigger);
-    // the body: the dataflow rule, the read-decide-write shape over the store, and the three refusals it meets
+    // the body: the dataflow rule, the load-make-keep pair and the read-decide-write shape over the store, and the
+    // refusals they meet; graphs-skill.test.ts holds the graphs it writes out to check
     expect(text).toContain('A switch chooses who answers, not who runs');
+    expect(text).toContain('@std/object.port.json#merge');
+    expect(text).toContain('"record": "{{in}}"');
     expect(text).toContain('@storage/store.port.json#get');
-    expect(text).toContain('@storage/store.port.json#patch');
-    for (const code of ['G004', 'G008', 'G009']) expect(text).toContain(`**${code}**`);
+    for (const code of ['G004', 'G008', 'G009', 'I007', 'I008', 'L016']) expect(text).toContain(`**${code}**`);
     rmSync(dir, { recursive: true, force: true });
   });
 });
