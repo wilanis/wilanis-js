@@ -14,12 +14,14 @@ import {
   sabotageSaying,
 } from './example-harness.js';
 
-/** Exactly what `production` reaches: storage in PostgreSQL, the queue beside it, the directories, the listener. */
+/**
+ * Exactly what `production` reaches: storage in PostgreSQL, the queue it publishes to and never works (that is
+ * `production-worker`'s), the directories, the listener.
+ */
 const PRODUCTION = [
   '@storage/store.port.json',
   '@storage/storage.port.json#ensure',
   '@queue/queue.port.json',
-  '@queue/worker.port.json#consume',
   '@blob/csv.port.json',
   '@auth/identity.port.json#verify',
   '@auth/token.port.json',
