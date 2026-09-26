@@ -114,6 +114,11 @@ it; where a queue trigger of the same tree consumes that connection and queue, t
 trigger accepts (X403). `delayMs` holds a message back. `ensure` prepares what a broker needs on a
 connection -- a table -- and changes nothing that exists.
 
+`headers` is marked `secret`, since a credential rides there: the broker is handed the values and the
+consuming trigger's gate reads them, but every report and trace of the publishing run says the map as
+`«secret»`. It is redacted whole because an open map has no named field to mark, and the port cannot know
+which header a publisher puts a credential under.
+
 No message carries a blob (X404): a handle names bytes in one process's blob registry. Publish the handle's
 id and read the bytes where the message is consumed.
 

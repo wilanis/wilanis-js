@@ -68,6 +68,7 @@
           "fields": {},
           "open": "string"
         },
+        "secret": true,
         "description": "what the publisher put beside the body; where a credential rides"
       },
       "message": {
