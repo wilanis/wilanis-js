@@ -174,6 +174,29 @@ describe('sabotage: what a data graph may make', () => {
     expect(plantedAll({ [PLANTED]: reread })).toEqual([]);
   });
 
+  it('none for a read site that is itself an effect: the customers a #find answered, each removed', () => {
+    // `found` is a made site of Customer[] and an effect both; what it answered is what the store holds
+    const sweep = {
+      $schema: schemaUrl('graph'),
+      label: 'Remove every bronze customer',
+      description: 'A data graph that finds the bronze customers and removes each.',
+      out: { type: 'number', from: 'removed' },
+      nodes: [
+        run('found', '@storage/store.port.json#find', { ...STORE, where: { tier: 'bronze' } }),
+        {
+          type: '@wilanis/node/map.schema.json',
+          id: 'gone',
+          run: '@storage/store.port.json#remove',
+          over: '{{found}}',
+          bind: { key: 'id' },
+          in: STORE,
+        },
+        run('removed', '@std/list.port.json#count', { list: '{{gone}}' }),
+      ],
+    };
+    expect(plantedAll({ 'features/customers/data/remove-bronze.graph.json': sweep })).toEqual([]);
+  });
+
   it('L016 for the same graph once it lays a change over what it read', () => {
     const activated = readThenWrite('@customers/domain/CustomerRef.shape.json', {
       run: '@std/object.port.json#merge',
