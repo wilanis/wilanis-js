@@ -5,7 +5,7 @@
  * that fires triggers under the profile fires only those it walks (`walkedUnder`), since those are the ones the
  * checker judged there: `run` refuses one it does not, and `rehearse`, `fuzz` and `regress` skip them and say so.
  */
-import { reachOf, servedUnder, walkedUnder } from '@wilanis/compiler';
+import { type ReachedSecret, reachOf, servedUnder, walkedUnder } from '@wilanis/compiler';
 import type { Loaded, ProjectDoc, Scope, TriggerDoc } from '@wilanis/core';
 
 /** The variable that names the profile when no `--profile` was given. */
@@ -53,9 +53,14 @@ export function activeProfile(
  * backs and who reads it: `VAR (key, read by <document or '@plugin settings'>)`. Variables are named, values
  * never. A key the project does not map to a variable is the checker's (C001, B007), not the environment's.
  */
-export function unsetSecrets(scope: Scope, profile: string | undefined, env: NodeJS.ProcessEnv): string[] {
+export function unsetSecrets(
+  scope: Scope,
+  profile: string | undefined,
+  env: NodeJS.ProcessEnv,
+  also: ReachedSecret[] = [],
+): string[] {
   const unset = new Map<string, { key: string; readers: string[] }>();
-  for (const secret of reachOf(scope, profile).secrets) {
+  for (const secret of [...reachOf(scope, profile).secrets, ...also]) {
     if (secret.variable === undefined || env[secret.variable] !== undefined) continue;
     const seen = unset.get(secret.variable) ?? { key: secret.key, readers: [] };
     if (!seen.readers.includes(secret.readBy)) seen.readers.push(secret.readBy);
@@ -69,8 +74,13 @@ export function unsetSecrets(scope: Scope, profile: string | undefined, env: Nod
  * nothing. `start` says it before any postLoad and adds that nothing is serving; a reload says it and keeps
  * the last good tree.
  */
-export function secretsRefusal(scope: Scope, profile: string | undefined, env: NodeJS.ProcessEnv): string | undefined {
-  const unset = unsetSecrets(scope, profile, env);
+export function secretsRefusal(
+  scope: Scope,
+  profile: string | undefined,
+  env: NodeJS.ProcessEnv,
+  also: ReachedSecret[] = [],
+): string | undefined {
+  const unset = unsetSecrets(scope, profile, env, also);
   return unset.length ? `missing secrets: ${unset.join(', ')}` : undefined;
 }
 

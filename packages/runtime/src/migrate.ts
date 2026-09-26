@@ -1,11 +1,12 @@
 /**
  * `wilanis migrate`: the tree's declared state against what the world has recorded. It loads and judges the
- * tree, refuses the variables the profile's reach reads and nobody set, and runs every plugin's postLoad under
- * the profile, both exactly as `start` does -- a plan needs whatever an engine registered there -- asks every
- * plugin with a `migrate` member for its plan, prints it, applies it when told, and tears the plugins down. It
- * runs no startup step and builds no `Served`: nothing listens.
+ * tree, refuses the variables nobody set that the profile's reach reads, as `start` refuses them, or that the
+ * connection of any store reads, since every store is planned whatever the profile runs (RFC 0017), and runs
+ * every plugin's postLoad under the profile exactly as `start` does -- a plan needs whatever an engine registered
+ * there -- asks every plugin with a `migrate` member for its plan, prints it, applies it when told, and tears the
+ * plugins down. It runs no startup step and builds no `Served`: nothing listens.
  */
-import { checkTree } from '@wilanis/compiler';
+import { checkTree, type ReachedSecret } from '@wilanis/compiler';
 import type {
   Applied,
   LoadResult,
@@ -15,6 +16,7 @@ import type {
   PlanTarget,
   PluginModule,
   Refusal,
+  Scope,
 } from '@wilanis/core';
 import { FileBlobStore } from './blobs.js';
 import type { Embedder } from './embed.js';
@@ -226,6 +228,22 @@ function report(
 }
 
 /**
+ * The secrets the connection each store sits on reads under the profile. Every store of the tree is planned,
+ * whichever of them the profile's reach runs (RFC 0017, *--profile*), so each one's connection is opened.
+ */
+function storeSecrets(scope: Scope, profile: string | undefined): ReachedSecret[] {
+  return scope.registry.all('store').flatMap(store => {
+    const connection = scope.connectionFor(store.doc.connection, profile);
+    if (typeof connection === 'string') return [];
+    return scope
+      .templateReads(connection.doc.settings)
+      .flatMap(([root, key]) =>
+        root === 'secrets' && key ? [{ key, variable: scope.project?.secrets?.[key], readBy: connection.path }] : [],
+      );
+  });
+}
+
+/**
  * Plan every plugin's declared state against the world, and apply it when told. The whole command, callable
  * without the command line: it never runs a startup step, never fires a trigger and never serves anything.
  */
@@ -240,8 +258,8 @@ export async function migrate(load: LoadResult, opts: MigrateOptions = {}): Prom
       refusals: checked.items,
     });
   const emb = embedderFor(load, { profile: opts.profile });
-  // what `start` asks for under the profile, and no more: a connection only another profile reaches costs it nothing
-  const unset = secretsRefusal(emb.scope, opts.profile, process.env);
+  // what `start` asks for under the profile, and the connection of every store, since every store is planned
+  const unset = secretsRefusal(emb.scope, opts.profile, process.env, storeSecrets(emb.scope, opts.profile));
   if (unset) throw new Error(unset);
   const down = await postLoad(load, emb, log);
   try {
