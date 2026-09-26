@@ -147,7 +147,7 @@ const SCAFFOLDS: Record<string, Build> = {
     ];
   },
   graph: (target, opts, root) => {
-    // two forms, both in scaffold-graph.ts: one node to replace, or the read-decide-write shape --store asks for
+    // four forms, chosen in scaffold-graph.ts: one node to replace, the two halves of a change --port and --store ask for, or the read-decide-write shape --read-then asks for
     const { layer, doc } = graphScaffold(opts, schemaOf, root);
     return [[into(target, layer, 'graph'), doc]];
   },

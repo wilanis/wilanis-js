@@ -6,7 +6,7 @@
  * decides when the map starts and what its answer is taken for; this module runs the elements and says what came
  * of each.
  */
-import { redactValue } from './redact.js';
+import { redactEach, redactValue } from './redact.js';
 import { initialReport, noteRefusal } from './report.js';
 import { readAll, readPath, readSource } from './sources.js';
 import type { KMap, NodeReport } from './spec.js';
@@ -54,6 +54,33 @@ function elementInputs(node: KMap, broadcast: Record<string, unknown>, item: unk
 }
 
 /**
+ * What a map's own report shows it was given: the shared inputs, redacted as the operation marks them, and the
+ * list, each element redacted as the operation marks what it is handed of it.
+ */
+function shownIn(node: KMap, broadcast: Record<string, unknown>, over: unknown[]): Record<string, unknown> {
+  const shared = redactValue(broadcast, node.redact?.in) as Record<string, unknown>;
+  return { ...shared, over: redactValue(over, elementPaths(node)) };
+}
+
+/**
+ * The secret paths inside one element of `over`, read back through how the element reaches the operation:
+ * whole as `item`, or a field of it through `bind`. A field the operation is not handed, it marks nothing of.
+ */
+function elementPaths(node: KMap): string[][] {
+  const handed: [string, string[]][] = node.bind ? Object.entries(node.bind) : [['item', []]];
+  const paths = node.redact?.in ?? [];
+  return handed.flatMap(([input, at]) =>
+    paths.filter(path => path[0] === input).map(path => [...at, ...path.slice(1)]),
+  );
+}
+
+/** What a map's report shows of its answer: each element redacted, under its `value` where failures are collected. */
+export function shownAnswer(node: KMap, answer: unknown[]): unknown[] {
+  const paths = node.redact?.out;
+  return redactEach(answer, node.onItemFailure === 'collect' ? paths?.map(path => ['value', ...path]) : paths);
+}
+
+/**
  * A map's answer: every element's outcome when failures are collected; else the values, unless an element failed.
  * An element that never started leaves the answer undecided, whichever way failures are taken: the node fails.
  */
@@ -72,7 +99,7 @@ export async function runMap(host: MapHost, id: string, node: KMap, report: Node
   const over = readSource(node.over, host.values);
   if (!Array.isArray(over)) throw new Error(`map '${id}': over is not a list`);
   const broadcast = readAll(node.in, host.values);
-  report.in = { ...broadcast, over };
+  report.in = shownIn(node, broadcast, over);
   if (node.limit !== undefined && over.length > node.limit)
     throw new Error(`map '${id}': ${over.length} elements, limit ${node.limit}`);
   // one report per element; an element supplied in initial as '<id>.<index>' is seeded and never runs

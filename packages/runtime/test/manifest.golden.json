@@ -3126,5 +3126,722 @@
         "production"
       ]
     }
-  ]
+  ],
+  "profiles": {
+    "live": {
+      "default": true,
+      "description": "The laptop, and the default, so `npx wilanis start example` names no profile: the customers through their REST API, the directories written in the connections, and a reload on every saved document.",
+      "bindings": {
+        "@auth/state.port.json": "@features/state/data/auth-files.binding.json",
+        "@features/access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
+        "@features/customers/domain/customer.port.json": "@features/customers/data/customers-rest.binding.json"
+      },
+      "connections": {},
+      "reaches": [
+        {
+          "operation": "@auth/challenge.port.json#issue",
+          "via": []
+        },
+        {
+          "operation": "@auth/files.port.json#get",
+          "via": []
+        },
+        {
+          "operation": "@auth/files.port.json#put",
+          "via": []
+        },
+        {
+          "operation": "@auth/files.port.json#remove",
+          "via": []
+        },
+        {
+          "operation": "@auth/identity.port.json#verify",
+          "via": [
+            "@connections/employees.connection.json",
+            "@connections/people.connection.json"
+          ]
+        },
+        {
+          "operation": "@auth/session.port.json#end",
+          "via": []
+        },
+        {
+          "operation": "@auth/session.port.json#get",
+          "via": []
+        },
+        {
+          "operation": "@auth/session.port.json#set",
+          "via": []
+        },
+        {
+          "operation": "@auth/token.port.json#issue",
+          "via": []
+        },
+        {
+          "operation": "@auth/token.port.json#refresh",
+          "via": []
+        },
+        {
+          "operation": "@blob/csv.port.json#parse",
+          "via": []
+        },
+        {
+          "operation": "@blob/csv.port.json#write",
+          "via": []
+        },
+        {
+          "operation": "@http/http.port.json#request",
+          "via": [
+            "@connections/customers-api.connection.json"
+          ]
+        },
+        {
+          "operation": "@http/server.port.json#listen",
+          "via": []
+        },
+        {
+          "operation": "@otel/exporter.port.json#export",
+          "via": []
+        },
+        {
+          "operation": "@queue/queue.port.json#publish",
+          "via": [
+            "@connections/jobs.connection.json"
+          ]
+        },
+        {
+          "operation": "@queue/worker.port.json#consume",
+          "via": []
+        },
+        {
+          "operation": "@reload/watch.port.json#watch",
+          "via": []
+        },
+        {
+          "operation": "@schedule/scheduler.port.json#run",
+          "via": []
+        }
+      ],
+      "holds": [
+        "@http/server.port.json#listen",
+        "@otel/exporter.port.json#export",
+        "@queue/worker.port.json#consume",
+        "@reload/watch.port.json#watch",
+        "@schedule/scheduler.port.json#run"
+      ],
+      "starts": [
+        "Prepare the customer store",
+        "Make the customers whole",
+        "Reach the customer store",
+        "Reach the guard's memory",
+        "Watch for changes",
+        "Keep the schedule",
+        "Export traces",
+        "Work the queues",
+        "Listen"
+      ],
+      "needs": [
+        {
+          "variable": "CUSTOMERS_JWT_SECRET",
+          "key": "jwt",
+          "readBy": [
+            "@auth settings"
+          ]
+        }
+      ]
+    },
+    "local": {
+      "default": false,
+      "description": "Everything in this process: the customers kept in memory, the directories written in the connections, and a reload on every saved document. Nothing reaches the network, so `wilanis start example --profile local` serves the same routes with no upstream at all.",
+      "bindings": {
+        "@auth/state.port.json": "@features/state/data/auth-files.binding.json",
+        "@features/access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
+        "@features/customers/domain/customer.port.json": "@features/customers/data/customers-store.binding.json"
+      },
+      "connections": {},
+      "reaches": [
+        {
+          "operation": "@auth/challenge.port.json#issue",
+          "via": []
+        },
+        {
+          "operation": "@auth/files.port.json#get",
+          "via": []
+        },
+        {
+          "operation": "@auth/files.port.json#put",
+          "via": []
+        },
+        {
+          "operation": "@auth/files.port.json#remove",
+          "via": []
+        },
+        {
+          "operation": "@auth/identity.port.json#verify",
+          "via": [
+            "@connections/employees.connection.json",
+            "@connections/people.connection.json"
+          ]
+        },
+        {
+          "operation": "@auth/session.port.json#end",
+          "via": []
+        },
+        {
+          "operation": "@auth/session.port.json#get",
+          "via": []
+        },
+        {
+          "operation": "@auth/session.port.json#set",
+          "via": []
+        },
+        {
+          "operation": "@auth/token.port.json#issue",
+          "via": []
+        },
+        {
+          "operation": "@auth/token.port.json#refresh",
+          "via": []
+        },
+        {
+          "operation": "@blob/csv.port.json#parse",
+          "via": []
+        },
+        {
+          "operation": "@blob/csv.port.json#write",
+          "via": []
+        },
+        {
+          "operation": "@http/server.port.json#listen",
+          "via": []
+        },
+        {
+          "operation": "@otel/exporter.port.json#export",
+          "via": []
+        },
+        {
+          "operation": "@queue/queue.port.json#publish",
+          "via": [
+            "@connections/jobs.connection.json"
+          ]
+        },
+        {
+          "operation": "@queue/worker.port.json#consume",
+          "via": []
+        },
+        {
+          "operation": "@reload/watch.port.json#watch",
+          "via": []
+        },
+        {
+          "operation": "@schedule/scheduler.port.json#run",
+          "via": []
+        },
+        {
+          "operation": "@storage/storage.port.json#ensure",
+          "via": [
+            "@connections/customers.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#find",
+          "via": [
+            "@connections/customers.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#get",
+          "via": [
+            "@connections/customers.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#newKey",
+          "via": [
+            "@connections/customers.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#put",
+          "via": [
+            "@connections/customers.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#remove",
+          "via": [
+            "@connections/customers.connection.json"
+          ]
+        }
+      ],
+      "holds": [
+        "@http/server.port.json#listen",
+        "@otel/exporter.port.json#export",
+        "@queue/worker.port.json#consume",
+        "@reload/watch.port.json#watch",
+        "@schedule/scheduler.port.json#run"
+      ],
+      "starts": [
+        "Prepare the customer store",
+        "Make the customers whole",
+        "Reach the customer store",
+        "Reach the guard's memory",
+        "Watch for changes",
+        "Keep the schedule",
+        "Export traces",
+        "Work the queues",
+        "Listen"
+      ],
+      "needs": [
+        {
+          "variable": "CUSTOMERS_JWT_SECRET",
+          "key": "jwt",
+          "readBy": [
+            "@auth settings"
+          ]
+        }
+      ]
+    },
+    "production": {
+      "default": false,
+      "description": "Behind the load balancer, started with `wilanis start example --profile production`: the customers in PostgreSQL, the one operator account in place of the laptop's employees, and nothing watched. The same routes, policies, shapes and business graphs as every other profile, and not one document under features/ changes: another binding meets customer.port.json, every reference to employees.connection.json reaches employees-production.connection.json instead, and every reference to jobs.connection.json reaches the customer database, so the removals queue is a table beside the customers. The startup steps prepare the database before the port opens, so a tree whose database is unreachable refuses to serve rather than answering every route with a fault. It listens, keeps no schedule and works no queue: run as many of it as the load needs, one process under production-scheduler beside them, and as many under production-worker as the queue needs.",
+      "bindings": {
+        "@auth/state.port.json": "@features/state/data/auth-storage.binding.json",
+        "@features/access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
+        "@features/customers/domain/customer.port.json": "@features/customers/data/customers-postgres.binding.json"
+      },
+      "connections": {
+        "@connections/employees.connection.json": "@connections/employees-production.connection.json",
+        "@connections/jobs.connection.json": "@connections/customers-postgres.connection.json"
+      },
+      "reaches": [
+        {
+          "operation": "@auth/challenge.port.json#issue",
+          "via": []
+        },
+        {
+          "operation": "@auth/identity.port.json#verify",
+          "via": [
+            "@connections/employees-production.connection.json",
+            "@connections/people.connection.json"
+          ]
+        },
+        {
+          "operation": "@auth/session.port.json#end",
+          "via": []
+        },
+        {
+          "operation": "@auth/session.port.json#get",
+          "via": []
+        },
+        {
+          "operation": "@auth/session.port.json#set",
+          "via": []
+        },
+        {
+          "operation": "@auth/token.port.json#issue",
+          "via": []
+        },
+        {
+          "operation": "@auth/token.port.json#refresh",
+          "via": []
+        },
+        {
+          "operation": "@blob/csv.port.json#parse",
+          "via": []
+        },
+        {
+          "operation": "@blob/csv.port.json#write",
+          "via": []
+        },
+        {
+          "operation": "@http/server.port.json#listen",
+          "via": []
+        },
+        {
+          "operation": "@otel/exporter.port.json#export",
+          "via": []
+        },
+        {
+          "operation": "@queue/queue.port.json#ensure",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@queue/queue.port.json#publish",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/storage.port.json#ensure",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#find",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#get",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#newKey",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#put",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#remove",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        }
+      ],
+      "holds": [
+        "@http/server.port.json#listen",
+        "@otel/exporter.port.json#export"
+      ],
+      "starts": [
+        "Prepare the customer store",
+        "Make the customers whole",
+        "Reach the customer store",
+        "Prepare the guard's memory",
+        "Prepare the queues",
+        "Reach the guard's memory",
+        "Export traces",
+        "Listen"
+      ],
+      "needs": [
+        {
+          "variable": "CUSTOMERS_DATABASE_URL",
+          "key": "customersDatabase",
+          "readBy": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "variable": "CUSTOMERS_JWT_SECRET",
+          "key": "jwt",
+          "readBy": [
+            "@auth settings"
+          ]
+        },
+        {
+          "variable": "CUSTOMERS_OPERATOR_PASSWORD_HASH",
+          "key": "operatorPasswordHash",
+          "readBy": [
+            "@connections/employees-production.connection.json"
+          ]
+        }
+      ]
+    },
+    "production-scheduler": {
+      "default": false,
+      "description": "The one process that keeps the schedule beside production, started with `wilanis start example --profile production-scheduler`: production's bindings and connections, so a tick reaches what a route there reaches and a queue is the same table, and production's startup but for the listener, which it never opens. Run one of it beside the production instances, which listen and schedule nothing, and the production-worker processes, which work the queue.",
+      "bindings": {
+        "@auth/state.port.json": "@features/state/data/auth-storage.binding.json",
+        "@features/access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
+        "@features/customers/domain/customer.port.json": "@features/customers/data/customers-postgres.binding.json"
+      },
+      "connections": {
+        "@connections/employees.connection.json": "@connections/employees-production.connection.json",
+        "@connections/jobs.connection.json": "@connections/customers-postgres.connection.json"
+      },
+      "reaches": [
+        {
+          "operation": "@auth/challenge.port.json#issue",
+          "via": []
+        },
+        {
+          "operation": "@auth/identity.port.json#verify",
+          "via": [
+            "@connections/employees-production.connection.json",
+            "@connections/people.connection.json"
+          ]
+        },
+        {
+          "operation": "@auth/session.port.json#end",
+          "via": []
+        },
+        {
+          "operation": "@auth/session.port.json#get",
+          "via": []
+        },
+        {
+          "operation": "@auth/session.port.json#set",
+          "via": []
+        },
+        {
+          "operation": "@auth/token.port.json#issue",
+          "via": []
+        },
+        {
+          "operation": "@auth/token.port.json#refresh",
+          "via": []
+        },
+        {
+          "operation": "@blob/csv.port.json#parse",
+          "via": []
+        },
+        {
+          "operation": "@blob/csv.port.json#write",
+          "via": []
+        },
+        {
+          "operation": "@otel/exporter.port.json#export",
+          "via": []
+        },
+        {
+          "operation": "@queue/queue.port.json#ensure",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@queue/queue.port.json#publish",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@schedule/scheduler.port.json#run",
+          "via": []
+        },
+        {
+          "operation": "@storage/storage.port.json#ensure",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#find",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#get",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#newKey",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#put",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#remove",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        }
+      ],
+      "holds": [
+        "@otel/exporter.port.json#export",
+        "@schedule/scheduler.port.json#run"
+      ],
+      "starts": [
+        "Prepare the customer store",
+        "Make the customers whole",
+        "Reach the customer store",
+        "Prepare the guard's memory",
+        "Prepare the queues",
+        "Reach the guard's memory",
+        "Keep the schedule in one process",
+        "Export traces"
+      ],
+      "needs": [
+        {
+          "variable": "CUSTOMERS_DATABASE_URL",
+          "key": "customersDatabase",
+          "readBy": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "variable": "CUSTOMERS_JWT_SECRET",
+          "key": "jwt",
+          "readBy": [
+            "@auth settings"
+          ]
+        },
+        {
+          "variable": "CUSTOMERS_OPERATOR_PASSWORD_HASH",
+          "key": "operatorPasswordHash",
+          "readBy": [
+            "@connections/employees-production.connection.json"
+          ]
+        }
+      ]
+    },
+    "production-worker": {
+      "default": false,
+      "description": "A process that works the removals queue beside production, started with `wilanis start example --profile production-worker`: production's bindings and connections, so a message reaches what the route that published it reaches and the queue is the same table, and production's startup with the consumer in place of the listener. It opens no port, so a slow removal never holds a route's instance; run as many of it as the queue needs, since each takes messages no other has taken.",
+      "bindings": {
+        "@auth/state.port.json": "@features/state/data/auth-storage.binding.json",
+        "@features/access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
+        "@features/customers/domain/customer.port.json": "@features/customers/data/customers-postgres.binding.json"
+      },
+      "connections": {
+        "@connections/employees.connection.json": "@connections/employees-production.connection.json",
+        "@connections/jobs.connection.json": "@connections/customers-postgres.connection.json"
+      },
+      "reaches": [
+        {
+          "operation": "@auth/challenge.port.json#issue",
+          "via": []
+        },
+        {
+          "operation": "@auth/identity.port.json#verify",
+          "via": [
+            "@connections/employees-production.connection.json",
+            "@connections/people.connection.json"
+          ]
+        },
+        {
+          "operation": "@auth/session.port.json#end",
+          "via": []
+        },
+        {
+          "operation": "@auth/session.port.json#get",
+          "via": []
+        },
+        {
+          "operation": "@auth/session.port.json#set",
+          "via": []
+        },
+        {
+          "operation": "@auth/token.port.json#issue",
+          "via": []
+        },
+        {
+          "operation": "@auth/token.port.json#refresh",
+          "via": []
+        },
+        {
+          "operation": "@blob/csv.port.json#parse",
+          "via": []
+        },
+        {
+          "operation": "@blob/csv.port.json#write",
+          "via": []
+        },
+        {
+          "operation": "@otel/exporter.port.json#export",
+          "via": []
+        },
+        {
+          "operation": "@queue/queue.port.json#ensure",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@queue/queue.port.json#publish",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@queue/worker.port.json#consume",
+          "via": []
+        },
+        {
+          "operation": "@storage/storage.port.json#ensure",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#find",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#get",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#newKey",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#put",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "operation": "@storage/store.port.json#remove",
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        }
+      ],
+      "holds": [
+        "@otel/exporter.port.json#export",
+        "@queue/worker.port.json#consume"
+      ],
+      "starts": [
+        "Prepare the customer store",
+        "Make the customers whole",
+        "Reach the customer store",
+        "Prepare the guard's memory",
+        "Prepare the queues",
+        "Reach the guard's memory",
+        "Export traces",
+        "Work the queues"
+      ],
+      "needs": [
+        {
+          "variable": "CUSTOMERS_DATABASE_URL",
+          "key": "customersDatabase",
+          "readBy": [
+            "@connections/customers-postgres.connection.json"
+          ]
+        },
+        {
+          "variable": "CUSTOMERS_JWT_SECRET",
+          "key": "jwt",
+          "readBy": [
+            "@auth settings"
+          ]
+        },
+        {
+          "variable": "CUSTOMERS_OPERATOR_PASSWORD_HASH",
+          "key": "operatorPasswordHash",
+          "readBy": [
+            "@connections/employees-production.connection.json"
+          ]
+        }
+      ]
+    }
+  }
 }

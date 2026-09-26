@@ -20,6 +20,7 @@ import type {
   ScenarioDoc,
   Scope,
 } from '@wilanis/core';
+import { IR_READ } from '@wilanis/core';
 import { attemptsSaid } from './attempts-said.js';
 import { deliveryLines, pairedLines } from './delivery-said.js';
 import { profilesLines, standInLines } from './profiles-said.js';
@@ -157,16 +158,27 @@ function startupLines(declared: ProjectDoc): string[] {
 }
 
 /**
- * The project: what it is called, what it loads, what it includes, the aliases it gives every reference, what
- * it starts, and a block per profile saying what the tree binds, stands in, reaches, holds, starts and needs
- * there (RFC 0013). The last two are what the document is chiefly for -- nothing a tree starts is decided by
- * the runtime -- so neither may be left for a reader to open the file, or run the tree, to find.
+ * The tree's IR version beside the one this runtime reads (RFC 0008), as `check` and `describe project` print it.
+ * The same word on both sides, read once: the loader refuses a document naming a version this runtime does not read
+ * (D013) and a tree naming two (D014) before it reads anything else, so a tree that loaded is of that version, as the
+ * manifest's `ir` says.
+ */
+export function irSaid(): string {
+  return `IR ${IR_READ}, runtime reads ${IR_READ}`;
+}
+
+/**
+ * The project: what it is called, the IR it is written in, what it loads, what it includes, the aliases it gives
+ * every reference, what it starts, and a block per profile saying what the tree binds, stands in, reaches, holds,
+ * starts and needs there (RFC 0013). The last two are what the document is chiefly for -- nothing a tree starts is
+ * decided by the runtime -- so neither may be left for a reader to open the file, or run the tree, to find.
  */
 export function projectLines(doc: Loaded, scope: Scope): string[] {
   const declared = doc.doc as ProjectDoc;
   const aliases = Object.entries(declared.aliases ?? {}).map(([name, target]) => `${name} → ${target}`);
   return [
     `name  ${declared.name}`,
+    irSaid(),
     ...pluginLines(declared),
     ...includeLines(declared),
     ...listLine('aliases  ', aliases),

@@ -7,6 +7,7 @@ import { pipeline } from 'node:stream/promises';
 import { checkTree } from '@wilanis/compiler';
 import type { BlobHandle, Trace } from '@wilanis/core';
 import { KINDS, type Kind, type LoadResult, RefusalList } from '@wilanis/core';
+import { irSaid } from './doc-said.js';
 import { loadProject, type ProjectLoad } from './project.js';
 import { runSaid } from './run-said.js';
 import { runTrigger, start } from './serve.js';
@@ -58,13 +59,17 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
   wilanis ls       [root] [kind]                   every document, or those of one kind
   wilanis describe <path> [root]                   a document, with its contract laid out
   wilanis map      [root] [--profile word]         trigger → graph → port → binding → graph
-  wilanis manifest [root]                          what the tree is, as JSON on stdout (packages/runtime/schemas/manifest.schema.json)
+  wilanis manifest [root] [--profile word]         what the tree is, as JSON on stdout (packages/runtime/schemas/manifest.schema.json);
+                   every profile's block, or the one --profile names; WILANIS_PROFILE is not read
   wilanis new      <kind> <name|path> [root] [--layer edge|data] [--port word] [--run word#op] [--kind k]
                    [--of shape] [--over word#op] [--on shape]
-                   graph, read-decide-write: --store <store> --collection <name> --read-then patch|put|remove
+                   graph, a change to a record, in two halves: --port <port> [--read get] [--write keep] the
+                   domain graph that loads it, lays the change over it with #merge and hands it whole to the write;
+                   --store <store> --collection <name> the data graph that takes it as in and #puts it whole
+                   graph, read-decide-write: --store <store> --collection <name> --read-then put|remove
                    [--branch <id>:<when> ...] [--type shape]   one write per branch, each routed to by its when;
-                   repeat the flag. Its ids name what each node holds: the shape (--type, else the store's), the
-                   write, the branch
+                   repeat the flag. Its ids name what each node holds: the shape (--type, else the store's or the
+                   write's), the write, the branch. No form patches; --read-then patch is refused
                    kinds: project feature shape port graph binding store trigger policy resolvers invariant
   wilanis init     [root]                          write CLAUDE.md and agent hooks into a tree
   wilanis stop-hook [root]                         the Stop hook: judge the tree, answer the harness on stdout
@@ -164,7 +169,7 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
   check: async ({ flags, rootArg }) => {
     const loaded = await check(rootArg(0), jsonOf(flags, 'check'));
     if (flags.json) console.log(printed(accepted(loaded, 'check', rootArg(0))));
-    else console.log(`ok: ${loaded.registry.files.length} documents`);
+    else console.log(`ok: ${loaded.registry.files.length} documents, ${irSaid()}`);
   },
   rehearse: async ({ flags, rootArg }) => {
     const loaded = await check(rootArg(0), jsonOf(flags, 'rehearse'));
@@ -271,9 +276,9 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     console.log(map(await load(rootArg(0)), flags.profile).join('\n'));
   },
   // judged first, as start is: the manifest of a tree with an unresolved reference would describe nothing real
-  manifest: async ({ rootArg }) => {
+  manifest: async ({ flags, rootArg }) => {
     const loaded = await check(rootArg(0));
-    console.log(JSON.stringify(manifestOf(loaded, { root: rootArg(0) }), null, 2));
+    console.log(JSON.stringify(manifestOf(loaded, { root: rootArg(0), profile: flags.profile }), null, 2));
   },
   new: async ({ flags, positional, rootArg }) => {
     const [kind, target] = positional;

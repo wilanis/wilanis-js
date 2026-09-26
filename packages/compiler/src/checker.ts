@@ -4,10 +4,12 @@
  *   D documents (the loader)   R references   L layers/effects/visibility   G graphs (graph.ts, inputs.ts)
  *   P static fields/resolvers (resolvers.ts)   B bindings/profiles (bindings.ts, project.ts; required.ts,
  *     what a binding of a port a plugin requires may read and may reach)
- *   T triggers (triggers.ts)   A access (access.ts)   I invariants (invariants.ts)
+ *   T triggers (triggers.ts)   A access (access.ts)   I invariants (invariants.ts; invariant-writes.ts, a
+ *     write of a shape a field invariant guards)
  *   C connections and settings (project.ts, contracts.ts)
  *   C stores: what they keep and what they once called it (stores.ts), and who may see it (scopes.ts)
  *   atomic graphs, which are L and G rules over what one reaches (atomic.ts)
+ *   L016, a data graph making a guarded value an effect reads (graph-making.ts)
  *   S scenarios (scenarios.ts)   X plugin-specific (each plugin's own `check`)
  */
 import { type LoadResult, type PluginModule, RefusalList, Scope } from '@wilanis/core';
@@ -16,6 +18,8 @@ import { checkAtomic } from './check/atomic.js';
 import { checkBinding } from './check/bindings.js';
 import { checkConnection, checkPort, checkShape } from './check/contracts.js';
 import { checkGraph } from './check/graph.js';
+import { checkGuardedMaking } from './check/graph-making.js';
+import { checkInvariantWrites } from './check/invariant-writes.js';
 import { checkInvariant, checkInvariantSites } from './check/invariants.js';
 import { Judge } from './check/judge.js';
 import { checkBlobStore, checkProject, checkStartup } from './check/project.js';
@@ -67,13 +71,15 @@ function judgeContracts(judge: Judge): void {
 /**
  * What names a contract: the resolvers, graphs, bindings, policies, triggers and scenarios. A store's scoping
  * is judged here rather than beside the rest of the store, because what a scope claims is about the resolver
- * it names, and a resolver is judged the line above.
+ * it names, and a resolver is judged the line above. Where a data graph makes a guarded value is judged once
+ * over the tree, after every graph, since it walks each guarded shape's sites rather than one document.
  */
 function judgeUses(judge: Judge): void {
   const { registry } = judge.scope;
   for (const resolvers of registry.all('resolvers')) checkResolversDoc(judge, resolvers);
   for (const store of registry.all('store')) checkStoreScoping(judge, store);
   for (const graph of registry.all('graph')) checkGraph(judge, graph, judge.scope.roleOf(graph.path));
+  checkGuardedMaking(judge);
   for (const binding of registry.all('binding')) checkBinding(judge, binding);
   for (const policy of registry.all('policy')) checkPolicy(judge, policy);
   for (const trigger of registry.all('trigger')) checkTrigger(judge, trigger);
@@ -84,11 +90,13 @@ function judgeUses(judge: Judge): void {
 /**
  * What must hold everywhere, after the trigger loop and before the scenarios: an invariant is judged over
  * documents already found well-formed, so an I refusal never repeats an R001, a T or an A refusal, and a
- * trigger's attached policies are known by the time the tree is held to a rule that spans triggers.
+ * trigger's attached policies are known by the time the tree is held to a rule that spans triggers. The writes
+ * of a guarded shape come last, once every invariant has been judged for itself.
  */
 function judgeInvariants(judge: Judge): void {
   for (const invariant of judge.scope.registry.all('invariant')) checkInvariant(judge, invariant);
   checkInvariantSites(judge);
+  checkInvariantWrites(judge);
 }
 
 /** X rules: what only the plugin can judge, given its settings and a way to refuse. */

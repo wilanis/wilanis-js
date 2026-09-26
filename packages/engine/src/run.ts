@@ -5,9 +5,9 @@
  * that breaks does not end the run: that switch routes its fault. When the run's signal fires, nothing more
  * starts: what had not started is cancelled, what was in flight settles as it settles.
  */
-import { type MapHost, runMap } from './map.js';
+import { type MapHost, runMap, shownAnswer } from './map.js';
 import { type Plan, planOf, targetsOf } from './plan.js';
-import { redactEach, redactValue } from './redact.js';
+import { redactAttempt, redactReport, redactValue } from './redact.js';
 import { answered, type Ending, initialReport, noteRefusal, reportOf } from './report.js';
 import { nodeRefs, PSEUDO, readAll } from './sources.js';
 import {
@@ -254,7 +254,7 @@ export class Run {
 
   private async runMap(id: string, node: KMap, report: NodeReport): Promise<void> {
     const out = await runMap(this.mapHost, id, node, report);
-    this.finish(id, report, out, redactEach(out, node.redact?.out));
+    this.finish(id, report, out, shownAnswer(node, out));
   }
 
   /**
@@ -266,10 +266,10 @@ export class Run {
       nodePath,
       ...(node.site !== undefined ? { site: node.site } : {}),
       attach: sub => {
-        report.sub = sub;
+        report.sub = redactReport(sub, node.redact?.out);
       },
       attempted: attempt => {
-        report.attempts = [...(report.attempts ?? []), attempt];
+        report.attempts = [...(report.attempts ?? []), redactAttempt(attempt, node.redact?.out)];
       },
       stubs: this.opts.stubs,
       request: this.values.get('request'),

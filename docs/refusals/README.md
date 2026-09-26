@@ -71,6 +71,8 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [D010](D010.md) | D | live | an include that is not found or not a tree, lacks a feature asked for, or uses a plugin the host lacks |
 | [D011](D011.md) | D | live | a plugin port's `resolves` on a non-static input, or keyed by an input that is missing or not static |
 | [D012](D012.md) | D | live | a plugin that both grants and requires a port, or requires one it does not ship |
+| [D013](D013.md) | D | live | a document, the tree's, an include's or a plugin's, whose `$schema` names an IR version this runtime does not read |
+| [D014](D014.md) | D | live | a tree whose documents, its includes' and its plugins' among them, name more than one IR version |
 | [R001](R001.md) | R | live | a reference to a port, operation, shape, policy or other document the tree does not have |
 | [L001](L001.md) | L | live | a type naming a type variable, or `unknown` in core, or a shape of the other layer |
 | [L002](L002.md) | L | live | a domain graph reaching an effect or the request, or a data graph running a domain operation |
@@ -84,6 +86,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [L011](L011.md) | L | live | an atomic graph reaching nothing that could roll back |
 | [L012](L012.md) | L | live | a domain graph's node declaring `retry` or `timeoutMs` |
 | [L013](L013.md) | L | live | a domain graph's switch declaring `catch` |
+| [L016](L016.md) | L | live | a data graph composing a value a field invariant guards that an effect of the graph reads |
 | [G001](G001.md) | G | live | a node id another node of the graph has, or one of the reserved roots in, const, request, secrets |
 | [G003](G003.md) | G | live | a read that cannot be typed: no such field, constant, earlier node, or name under reads |
 | [G004](G004.md) | G | live | a value that does not fit its input: optional where the contract requires it, or of the wrong type |
@@ -150,6 +153,8 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [I004](I004.md) | I | live | a `holds.when` that does not parse, does not type against the shape's fields, or is not boolean |
 | [I005](I005.md) | I | live | a value written in literals that contradicts a field invariant where it is made |
 | [I006](I006.md) | I | live | a refusal whose reason is `invariant`, the word the compiler's guards refuse with |
+| [I007](I007.md) | I | live | a `#patch` of a collection a field invariant holds over whose `changes` name a field the rule reads |
+| [I008](I008.md) | I | live | a `#put` of a collection a field invariant holds over whose `record` is not one whole read of `in` or a node |
 | [C001](C001.md) | C | live | settings that read anything but one declared `{{secrets.<key>}}` |
 | [C002](C002.md) | C | live | a connection's or a plugin's settings that do not fit the type its kind or manifest declares |
 | [C003](C003.md) | C | live | a store constraint (`unique`, `refs`, `defaults`) naming a field the collection's shape does not have |

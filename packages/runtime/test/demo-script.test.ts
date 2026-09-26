@@ -2,17 +2,18 @@
  * docs/demo.md held to the tree it presents. `demo.test.ts` asserts what each beat points at and `build.mjs`
  * runs the script and asserts its payoffs, but neither read what docs/demo.md prints, and each kept numbers of
  * its own: when the example grew, the test's were bumped and the script's were not, so the script said 205
- * documents to a tree of 221 while every test passed. Here what the script prints -- the counts, the codes of
- * each check, the rule's reach, the rehearsal, the map, the file the closer imports, the startup line -- is read
- * out of docs/demo.md and compared with what the tree answers at that beat, and the counts also with
- * `docs/demo/lib/expected.mjs`, the one place `build.mjs` asserts its run against.
+ * documents to a tree of 221 while every test passed. Here what the script prints -- the counts and the IR line
+ * after them, the codes of each check, the rule's reach, the rehearsal, the map, the file the closer imports, the
+ * startup line -- is read out of docs/demo.md and compared with what the tree answers at that beat, and the counts
+ * and the IR line also with `docs/demo/lib/expected.mjs`, the one place `build.mjs` asserts its run against.
  */
 import { copyFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type LoadResult, loadTree } from '@wilanis/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CODES, DOCUMENTS, LOCAL_STARTUP_STEPS, REGISTRATION } from '../../../docs/demo/lib/expected.mjs';
+import { CODES, DOCUMENTS, IR, LOCAL_STARTUP_STEPS, REGISTRATION } from '../../../docs/demo/lib/expected.mjs';
+import { irSaid } from '../src/doc-said.js';
 import { describe as describeDoc, map, rehearse, scaffold } from '../src/index.js';
 import { copyOfExample, INCLUDES, PLUGINS, refusalsAt } from './example-harness.js';
 import { startedUnder } from './roles-harness.js';
@@ -50,11 +51,12 @@ const codesNow = () => refusalsAt(dir).map(one => one.split(' ')[0]);
 const paste = (name: string) => copyFileSync(join(DEMO, name), join(dir, ROUTE));
 
 describe('docs/demo.md says what the tree answers', () => {
-  it('prints the counts the tree has and build.mjs asserts', () => {
+  it('prints the counts the tree has and the IR line, as build.mjs asserts them', () => {
     expect(load().registry.files.length).toBe(DOCUMENTS.shipped);
-    expect([...SCRIPT.matchAll(/^ok: (\d+) documents$/gm)].map(found => Number(found[1]))).toEqual([
-      DOCUMENTS.shipped,
-      DOCUMENTS.finished,
+    expect(IR).toBe(irSaid());
+    expect([...SCRIPT.matchAll(/^ok: (\d+) documents, (.*)$/gm)].map(found => [Number(found[1]), found[2]])).toEqual([
+      [DOCUMENTS.shipped, IR],
+      [DOCUMENTS.finished, IR],
     ]);
     expect(SCRIPT).toContain(`Every one of the ${DOCUMENTS.shipped} is a JSON document`);
     expect(SCRIPT).toContain(`reload: ${DOCUMENTS.finished} documents, serving the new tree`);

@@ -106,13 +106,17 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   profile chooses and whether every domain port is met and keeps its promises under it), `contracts.ts` (shapes,
   ports, connections), `resolvers.ts` (P), `inputs.ts` (a call site's inputs), `bindings.ts` (B), `required.ts` (B009, B010: what a binding of a port a plugin requires may read and may
   reach), `graph.ts` with `graph-nodes.ts`, `graph-reads.ts`, `graph-whole.ts`, `graph-routing.ts` (where a
-  node sits in the routing, which G015 judges an effect by) and `narrowing.ts` (G), `triggers.ts` (T) with
+  node sits in the routing, which G015 judges an effect by) and `narrowing.ts` (G), `graph-making.ts` (L016: a data
+  graph composing a value a field invariant guards that one of its effects reads, walked once over the tree after
+  the graphs), `triggers.ts` (T) with
   `bounds.ts` for the lists T008 finds unbounded and `delivery.ts` (T009, T010: what a trigger's connection
   delivers), `scenarios.ts` (S),
   `access.ts` (A), `invariants.ts` (I: what an invariant states
   once and the whole tree is held to) with `invariant-holds.ts` beside it for the field form and `prove.ts`
   for whether a rule already holds where a value is made -- what the checker and the guard the compiler
   lowers both ask, through the one `heldAt`, so neither can prove a site the other would guard --,
+  `invariant-writes.ts` beside them (I007, I008: a write of a shape a field invariant is on takes the whole record,
+  read whole from a site upstream of the effect, and never patches a field the rule reads),
   `graph-nodes.ts` again for I006, which is a rule about the word a `refuse` node may name and so belongs
   with the node it judges rather than with the invariant it reserves the word for,
   `attempts.ts` (G017, G018, G019: what a `retry` on a data graph's node or a binding's operation is written

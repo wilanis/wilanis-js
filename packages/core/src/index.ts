@@ -6,6 +6,7 @@
 
 export * from './assign.js';
 export * from './contracts.js';
+export { listedIn } from './documents.js';
 export * as expr from './expr/index.js';
 export * from './generate.js';
 export * from './load.js';

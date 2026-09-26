@@ -321,7 +321,27 @@ document can name its schema by URL and an editor can fetch it:
 https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/<kind>.schema.json
 ```
 
-Until 1.0 is published they are a working draft and `main` is their address. At 1.0 the tag `schemas-v1` marks
-the first supported version and becomes the address; a breaking change after that is tagged `schemas-v2`, and
-documents written against v1 keep validating. [RFC 0008](rfcs/0008-ir-versioning.md) states the rules. Node
-types are documents of their own under `node/`, listed in `graph.schema.json`.
+Until 1.0 is published they are a working draft and `main` is their address. A schema changes in place, and
+the documents this repository holds (`example/`, `libraries/`, every plugin's `docs/`) change in the same
+commit, so `npm test` is the compatibility check. At 1.0 the tag `schemas-v1` marks the first supported version
+and becomes the address, and from then on every change to a schema is compatible or breaking.
+[RFC 0008](rfcs/0008-ir-versioning.md) states the rules. Node types are documents of their own under `node/`,
+listed in `graph.schema.json`.
+
+A change is *compatible* when every document that validated before still validates and means the same thing:
+a new optional field whose absence means what the document meant before, a new document kind, a new node type,
+a new port a plugin grants, a new refusal for something that was already wrong. A graph's `atomic` is such a
+field, since a graph that leaves it out is not atomic and each of its effects commits on its own, as it did
+before the field existed. A fourth node type beside `run`, `switch` and `map` in `graph.schema.json` is such a
+type, since no document names it yet. A compatible change is made in place, and the tag `schemas-v1` moves to
+the commit that makes it, because a change that keeps every document's meaning lets the address follow it.
+
+A change is *breaking* when a document that validated stops validating or changes meaning: a field added to a
+kind's `required`, a field removed or renamed, a default changed, a rule that now refuses a document it
+accepted. Requiring `label` on a graph refuses every graph that leaves it out, and renaming a trigger's `fire`
+refuses every trigger. A default can change a tree's meaning while it still validates: a field's `required`
+defaults to `true` in `common.schema.json`, and turning it to `false` would make optional every field written
+without it. A breaking change is never made in place. The base URL (`SCHEMA_BASE` in
+`packages/core/src/published.ts`), every schema's `$id` and every kind's `$schema` enum move to the next tag,
+`schemas-v2` for the first, and `schemas-v1` stays where it was, so a document written against v1 keeps
+validating against the schemas it names.

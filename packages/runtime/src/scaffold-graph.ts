@@ -1,17 +1,22 @@
 /**
- * The graph `wilanis new graph` writes. A graph is the one kind with two forms worth scaffolding, so it lives
- * beside the rest rather than among them: the bare one node a reader replaces, and, with --store, the
- * read-decide-write shape a data graph takes whenever it changes a record it first read. Nothing here is a rule
- * of the language; it is what the shape looks like written out, with TODO where a value goes.
+ * The graph `wilanis new graph` writes. A graph is the one kind with several forms worth scaffolding, so it lives
+ * beside the rest rather than among them: the bare one node a reader replaces; with --port and with --store, the
+ * load-make-keep pair a change to a record takes (scaffold-keep.ts); and with --read-then, the read-decide-write
+ * shape a data graph takes when it decides from a record it first read whether to replace or remove it. Nothing
+ * here is a rule of the language; it is what the shape looks like written out, with TODO where a value goes.
  *
  * Every id is named for what the node holds once it has answered, from what the author gave: the shape the
  * record is of (--type, else the collection's `of` in the store), the write --read-then names, the branch ids
  * --branch typed. `storedCustomer` is the read, `noCustomer` the refusal where there was none, and each branch's
  * write is its own id, answered as `<branch>Customer` or refused as `goneBefore<Branch>`.
+ *
+ * No form writes a `#patch`. A patch of a field an invariant reads is I007, and which fields a patch changes is
+ * what a scaffold leaves TODO, so a tool that wrote one could not tell a patch the checker will take from one it
+ * will refuse.
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { type Kind, makeResolver, stem } from '@wilanis/core';
+import type { Kind } from '@wilanis/core';
+import { keepWhole, loadMakeKeep } from './scaffold-keep.js';
+import { nounOf, type Opts, raised, route, run, storedShape, storeOf } from './scaffold-parts.js';
 
 /** One branch of the decision: the id its nodes are named after, and the expression that routes to it. */
 interface Branch {
@@ -20,73 +25,31 @@ interface Branch {
 }
 
 /** The store operation a branch writes with: what --read-then names. */
-const WRITES = ['patch', 'put', 'remove'] as const;
+const WRITES = ['put', 'remove'] as const;
 type Write = (typeof WRITES)[number];
 
 /** What each write is called once it has run, which is the id of the one branch a bare --branch scaffolds. */
-const WRITTEN: Record<Write, string> = { patch: 'patched', put: 'replaced', remove: 'removed' };
+const WRITTEN: Record<Write, string> = { put: 'replaced', remove: 'removed' };
 
-/** A run node, which is most of what a graph is made of. */
-function run(id: string, label: string, op: string, values: Record<string, unknown>): Record<string, unknown> {
-  return { type: '@wilanis/node/run.schema.json', id, label, run: op, in: values };
+/** Why `--read-then patch` is not scaffolded, and the two forms that change a record instead. */
+const PATCH =
+  '--read-then patch is not scaffolded: a record is changed whole (RFC 0035). --port <port> writes the domain graph that loads it and lays the change over it with #merge, and --store <store> --collection <name> the data graph that #puts it; a patch of a field no invariant reads is one #patch node, written by hand';
+
+/** The write --read-then names; a patch, or anything else that is no write, is refused with what to write instead. */
+function writeOf(named: string | undefined): Write {
+  if ((WRITES as readonly string[]).includes(named ?? '')) return named as Write;
+  if (named === 'patch') throw new Error(PATCH);
+  // a flag given bare arrives as 'true' (flagValue in cli.ts), which is no word the author wrote
+  const word = named && named !== 'true' ? `, not '${named}'` : '';
+  throw new Error(`--read-then takes put or remove${word}`);
 }
 
-/** What a switch node is made of: what it reads, the rules in order, and the node nothing else routed to. */
-interface Routing {
-  id: string;
-  label: string;
-  in: Record<string, unknown>;
-  rules: { when: string; to: string }[];
-  otherwise: string;
-}
-
-/** A switch node: the rules in order, and the node nothing else routed to. */
-function route(routing: Routing): Record<string, unknown> {
-  const { otherwise, ...rest } = routing;
-  return { type: '@wilanis/node/switch.schema.json', ...rest, else: otherwise };
-}
-
-/** A word with its first letter raised, to join it onto another: customer becomes Customer. */
-const raised = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
-
-/** A word with its first letter lowered, to start an id with it: Customer becomes customer. */
-const lowered = (word: string) => word.charAt(0).toLowerCase() + word.slice(1);
-
-/** What the store names as the shape of a collection, read off the store document when the tree has it. */
-function storedShape(root: string, store: string, collection: string): string | undefined {
-  const project = join(root, 'project.json');
-  const aliases = existsSync(project)
-    ? ((JSON.parse(readFileSync(project, 'utf8')) as { aliases?: Record<string, string> }).aliases ?? {})
-    : {};
-  const path = makeResolver(aliases, new Set())(store);
-  if (!path.startsWith('@features/')) return undefined;
-  const file = join(root, path.slice(1));
-  if (!existsSync(file)) return undefined;
-  const doc = JSON.parse(readFileSync(file, 'utf8')) as { collections?: Record<string, { of?: string }> };
-  return doc.collections?.[collection]?.of;
-}
-
-/** The noun every id is built on: the stem of the shape the record is of, or `record` where nothing says. */
-function nounOf(opts: Record<string, string | undefined>, root: string): string {
-  const shape = opts.type ?? (opts.store && opts.collection ? tryStoredShape(root, opts) : undefined);
-  const named = shape ? lowered(stem(shape)) : '';
-  return /^[a-z][A-Za-z0-9]*$/.test(named) ? named : 'record';
-}
-
-/** The store's word for the collection's shape, or nothing where the store is not there to read or not JSON. */
-function tryStoredShape(root: string, opts: Record<string, string | undefined>): string | undefined {
-  try {
-    return storedShape(root, opts.store ?? '', opts.collection ?? '');
-  } catch {
-    return undefined;
-  }
-}
-
-/** What a branch's write takes beyond the store and the collection: a patch changes fields, a put writes a record. */
+/**
+ * What a branch's write takes beyond the store and the collection: a put writes the whole record the graph takes,
+ * read whole from `in`, where it was judged (I008 refuses one composed at the write); a remove, the key.
+ */
 function writeInput(write: Write): Record<string, unknown> {
-  if (write === 'put') return { record: 'TODO' };
-  if (write === 'patch') return { key: '{{in.id}}', changes: { TODO: 'TODO' } };
-  return { key: '{{in.id}}' };
+  return write === 'put' ? { record: '{{in}}' } : { key: '{{in.id}}' };
 }
 
 /** What `--branch <id>:<when>` gave, as pairs. Repeating the flag adds one; a bare --branch scaffolds one to rename. */
@@ -123,7 +86,7 @@ const leavesOf = (branch: Branch, noun: string) => ({
 /** The four nodes one branch is: the write, the switch on what it answered, the record it answers, the refusal. */
 function branchNodes(branch: Branch, shaped: Shaped): Record<string, unknown>[] {
   const { answered, gone } = leavesOf(branch, shaped.noun);
-  // every one of patch, put and remove answers `record`, absent where there was none to write, so one switch does
+  // both put and remove answer `record`, absent where there was none to write, so one switch does
   return [
     run(branch.id, 'TODO: what this branch writes', `@storage/store.port.json#${shaped.write}`, {
       ...shaped.store,
@@ -153,12 +116,10 @@ function branchNodes(branch: Branch, shaped: Shaped): Record<string, unknown>[] 
  * it, and answer the record the write gave back or refuse where it had gone. Every node a reader must fill says
  * TODO, and no rule of the language is new -- this is the shape written out, not a feature.
  */
-function readDecideWrite(opts: Record<string, string | undefined>, root: string): Record<string, unknown> {
-  const write = (WRITES as readonly string[]).includes(opts['read-then'] ?? '')
-    ? (opts['read-then'] as Write)
-    : 'patch';
-  const store = { store: opts.store ?? '@features/TODO/data/TODO.store.json', collection: opts.collection ?? 'TODO' };
-  const shaped = { store, write, noun: nounOf(opts, root), type: opts.type ?? 'TODO' };
+function readDecideWrite(opts: Opts, root: string): Record<string, unknown> {
+  const write = writeOf(opts['read-then']);
+  const store = storeOf(opts);
+  const shaped = { store, write, noun: nounOf(opts.type ?? storedShape(root, opts)), type: opts.type ?? 'TODO' };
   const branches = branchesOf(opts.branch, write);
   const [read, none] = [`stored${raised(shaped.noun)}`, `no${raised(shaped.noun)}`];
   const leaves = branches.flatMap(one => Object.values(leavesOf(one, shaped.noun)));
@@ -195,17 +156,41 @@ function oneNode(): Record<string, unknown> {
   };
 }
 
+/** The forms `wilanis new graph` writes, by what their flags ask for. */
+type Form = 'domain' | 'keep' | 'readDecideWrite' | 'oneNode';
+
+/** Which form the flags ask for; flags that ask for two at once, or a --branch with no write, are refused. */
+function formOf(opts: Opts): Form {
+  if (opts.port !== undefined) {
+    if (opts.store === undefined && opts['read-then'] === undefined) return 'domain';
+    throw new Error(
+      '--port writes the domain graph that loads, makes and keeps a record, and --store the data graph behind its write; give one',
+    );
+  }
+  if (opts['read-then'] !== undefined) return 'readDecideWrite';
+  if (opts.branch !== undefined)
+    throw new Error('--branch routes the read-decide-write form; give --read-then put|remove');
+  return opts.store !== undefined || opts.collection !== undefined ? 'keep' : 'oneNode';
+}
+
 /**
- * What `wilanis new graph` writes, and the layer it belongs in. With --store it is the read-decide-write shape,
- * which reaches a store and so is a data graph whatever --layer says; without it, one node in the layer asked for.
- * The tree's root is where the store is read from, for the shape its ids are named after.
+ * What `wilanis new graph` writes, and the layer it belongs in. With --port it is the domain half of the
+ * load-make-keep pair; with --store, or --read-then, a form that reaches a store and so is a data graph whatever
+ * --layer says; with neither, one node in the layer asked for. The tree's root is where the store, the port and
+ * the shape are read from, for the noun the ids are named after and the fields a write takes.
  */
 export function graphScaffold(
-  opts: Record<string, string | undefined>,
+  opts: Opts,
   schemaOf: (kind: Kind) => string,
   root: string,
 ): { layer: 'domain' | 'data'; doc: Record<string, unknown> } {
-  if (opts.store === undefined && opts.collection === undefined && opts['read-then'] === undefined)
-    return { layer: opts.layer === 'data' ? 'data' : 'domain', doc: { $schema: schemaOf('graph'), ...oneNode() } };
-  return { layer: 'data', doc: { $schema: schemaOf('graph'), ...readDecideWrite(opts, root) } };
+  const graph = (layer: 'domain' | 'data', doc: Record<string, unknown>) => ({
+    layer,
+    doc: { $schema: schemaOf('graph'), ...doc },
+  });
+  const form = formOf(opts);
+  if (form === 'domain') return graph('domain', loadMakeKeep(opts, root));
+  if (form === 'keep') return graph('data', keepWhole(opts, root));
+  if (form === 'readDecideWrite') return graph('data', readDecideWrite(opts, root));
+  return graph(opts.layer === 'data' ? 'data' : 'domain', oneNode());
 }

@@ -34,6 +34,25 @@ export function parseJson(abs: string, file: string): { doc: unknown } | { refus
   }
 }
 
+/**
+ * The array project.json holds under one key, read before it is judged, or none when the file, its JSON or the key is
+ * not there: what the runtime reads to find the packages a tree names, and the version rules the plugins whose docs
+ * they read. loadTree reports D000 / D005.
+ */
+export function listedIn(root: string, key: 'plugins' | 'includes'): unknown[] {
+  const parsed = parseJson(join(root, PROJECT_FILE), PROJECT_FILE);
+  const found = 'doc' in parsed ? (parsed.doc as Record<string, unknown> | null)?.[key] : undefined;
+  return Array.isArray(found) ? found : [];
+}
+
+/** The path a plugin's document is registered and refused under: the plugin's root, then its place under docs/. */
+export const nativePath = (plugin: PluginModule, abs: string): string =>
+  `${plugin.root}/${treePath(relative(plugin.docs, abs))}`;
+
+/** Whether an include takes one of the features it ships: every one, unless it names the ones it takes. */
+export const takes = (include: { features?: string[] }, name: string): boolean =>
+  !include.features || include.features.includes(name);
+
 /** A project document read from a directory, or nothing when there is none that validates. */
 export function readProject(dir: string, file: string): ProjectDoc | undefined {
   const parsed = parseJson(join(dir, PROJECT_FILE), file);
@@ -143,7 +162,7 @@ export class Documents {
 
   /** One document a plugin ships: native, unless it is a port the plugin requires, which is the host's to bind. */
   private registerNative(plugin: PluginModule, abs: string, required: Set<string>): void {
-    const path = `${plugin.root}/${treePath(relative(plugin.docs, abs))}`;
+    const path = nativePath(plugin, abs);
     const parsed = parseJson(abs, path);
     if ('refusal' in parsed) {
       this.refuse(parsed.refusal);

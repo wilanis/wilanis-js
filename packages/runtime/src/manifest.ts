@@ -2,10 +2,13 @@
  * What `wilanis manifest` prints (RFC 0026): what a tree is, as one JSON document a machine reads and two runs diff
  * to nothing. `manifestOf` is pure over a tree that passed the checker: it reads the registry, the Scope and the
  * versions the runtime resolved the packages at, never the environment, the clock or a secret's value, and every
- * list it answers is sorted but a trigger's policies, the startup steps and the arrays inside settings, which keep
- * the order their documents give them, so the same tree is the same string however it was walked.
+ * list it answers is sorted but a trigger's policies, the startup steps (and the labels of those a profile starts)
+ * and the arrays inside settings, which keep the order their documents give them, so the same tree is the same
+ * string however it was walked. The inventory is what is the same under every profile; `profiles` holds one block
+ * per profile, what RFC 0013's `reachOf` derives there.
  */
-import { type LoadResult, SCHEMA_BASE, Scope } from '@wilanis/core';
+import { IR_READ, type LoadResult, Scope } from '@wilanis/core';
+import { type ProfileBlock, profileBlocks } from './manifest-profiles.js';
 import {
   type ConnectionRow,
   connectionRows,
@@ -32,6 +35,7 @@ import {
 import type { Resolved } from './project.js';
 import { RUNTIME_VERSION } from './runtime-version.js';
 
+export type { NeedRow, ProfileBlock, ReachRow } from './manifest-profiles.js';
 export type {
   ConnectionRow,
   DocumentRow,
@@ -51,7 +55,7 @@ export type {
 export const MANIFEST_SCHEMA =
   'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/runtime/schemas/manifest.schema.json';
 
-/** The envelope, then the tree's inventory: what is the same under every profile. */
+/** The envelope, the tree's inventory (what is the same under every profile), then one block per profile. */
 export interface Manifest {
   format: 1;
   runtime: string;
@@ -68,22 +72,23 @@ export interface Manifest {
   connections: ConnectionRow[];
   secrets: Record<string, string>;
   startup: StartupRow[];
-}
-
-/** What the caller supplies: the root as it was given, which the manifest prints and never resolves. */
-export interface ManifestOptions {
-  root: string;
+  /** By profile name; the unnamed profile of a tree that declares none under `""`. */
+  profiles: Record<string, ProfileBlock>;
 }
 
 /**
- * The schema version a base URL serves, RFC 0008's segment of it: `v1` while the base is on `main` or on the tag
- * `schemas-v1`, and `vN` once it moves to `schemas-vN`.
+ * What the caller supplies: the root as it was given, which the manifest prints and never resolves, and the one
+ * profile to print a block for, where every profile's is not wanted.
  */
-export const irOf = (base: string): string => /\/schemas-(v[0-9]+)\//.exec(base)?.[1] ?? 'v1';
+export interface ManifestOptions {
+  root: string;
+  profile?: string;
+}
 
 /**
  * The manifest of a tree the checker accepted. The versions of its plugins and includes are read off `resolved`,
- * which `loadProject` carries; a load without it prints `null` for every version it did not resolve.
+ * which `loadProject` carries; a load without it prints `null` for every version it did not resolve. Throws RFC
+ * 0013's message where `options.profile` names a profile the project does not declare.
  */
 export function manifestOf(load: LoadResult & { resolved?: Resolved }, options: ManifestOptions): Manifest {
   const scope = new Scope(load.registry, load.resolve);
@@ -91,10 +96,11 @@ export function manifestOf(load: LoadResult & { resolved?: Resolved }, options: 
     (load.resolved?.includes ?? []).flatMap(one => (one.version === undefined ? [] : [[one.from, one.version]])),
   );
   const triggers = triggerRows(load);
+  const profiles = profileBlocks(scope, options.profile);
   return {
     format: 1,
     runtime: RUNTIME_VERSION,
-    ir: irOf(SCHEMA_BASE),
+    ir: IR_READ,
     name: load.registry.project?.doc.name ?? '',
     root: options.root,
     plugins: pluginRows(load, load.resolved?.plugins ?? {}),
@@ -107,5 +113,6 @@ export function manifestOf(load: LoadResult & { resolved?: Resolved }, options: 
     connections: connectionRows(scope),
     secrets: secretRows(load),
     startup: startupRows(load),
+    profiles,
   };
 }

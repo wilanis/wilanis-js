@@ -38,7 +38,17 @@ import { type Compiled, type CompileOptions, nestedFailure } from './compiled.js
 import { type CallSite, outputCandidates, passedInputs } from './documents.js';
 import { type GuardHandlers, guardsOf, MAKE, REFUSE, TAKEN_IDS } from './guard.js';
 import { lowerGuards } from './guard-lowering.js';
-import { bindPaths, inputsByName, lowerScope, lowerValue, lowerValues, type Roots, redactOf, SCOPE } from './lower.js';
+import {
+  bindPaths,
+  handedAs,
+  inputsByName,
+  lowerScope,
+  lowerValue,
+  lowerValues,
+  type Roots,
+  redactOf,
+  SCOPE,
+} from './lower.js';
 
 /**
  * Lowers a checked tree to what the kernel runs: the spec of a graph, or of the binding that meets a domain
@@ -251,7 +261,8 @@ export class Compiler {
 
   /**
    * The bound graph as one call. A graph whose in is a shape gets the operation's fields by name; one that
-   * takes a value whole gets the one field the operation accepts.
+   * takes a value whole gets the one field the operation accepts, as `in`. Its report is redacted by the
+   * operation's secret fields, as a delegation's is: the call takes the port's inputs and answers its result.
    */
   private graphCall(graphRef: string, op: Operation): KCall {
     const graph = this.scope.get('graph', graphRef);
@@ -262,8 +273,14 @@ export class Compiler {
       this.nestedRunner(this.lowerGraph(graph), whole, graph.doc.atomic === true),
     );
     const names = Object.keys(this.scope.types.accepted(op.accepts));
-    const passIn = whole ? { in: { ref: 'in', path: [names[0]] } } : inputsByName(names);
-    return { kind: 'call', handler, in: passIn };
+    const redact = redactOf(this.scope, op, undefined);
+    if (!whole) return { kind: 'call', handler, in: inputsByName(names), redact };
+    return {
+      kind: 'call',
+      handler,
+      in: { in: { ref: 'in', path: [names[0]] } },
+      redact: handedAs(redact, names[0], 'in'),
+    };
   }
 
   /** A delegation as one call: the statement's own values, the caller's by name for the rest, reads taken below request. */

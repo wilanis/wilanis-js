@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/runtime/schemas/manifest.schema.json",
   "title": "manifest",
-  "description": "What `wilanis manifest` prints (RFC 0026): what a tree is, as one JSON object on stdout, computed by the runtime's pure `manifestOf` from a tree the checker accepted. It never reads the environment, the clock or a secret's value. Every reference outside a row's settings is canonical (@features/<feature>/..., never an alias), and settings keep the values their document wrote, a reference among them as written; every array is sorted by its first key, in code units, except a trigger's policies and the startup steps, whose order is meaning, and the arrays inside settings, which keep their own; and every object's keys are in code-unit order; so the same tree prints the same bytes, and a diff of two manifests is a diff of what the tree does. From 1.0 a field is added, never removed or retyped, and the sort is part of the promise; before 1.0 nothing is promised.",
+  "description": "What `wilanis manifest` prints (RFC 0026): what a tree is, as one JSON object on stdout, computed by the runtime's pure `manifestOf` from a tree the checker accepted. It never reads the environment, the clock or a secret's value. Every reference outside a row's settings is canonical (@features/<feature>/..., never an alias), and settings keep the values their document wrote, a reference among them as written; every array is sorted by its first key, in code units, except a trigger's policies, the startup steps and the labels of those a profile starts, whose order is meaning, and the arrays inside settings, which keep their own; and every object's keys are in code-unit order; so the same tree prints the same bytes, and a diff of two manifests is a diff of what the tree does. From 1.0 a field is added, never removed or retyped, and the sort is part of the promise; before 1.0 nothing is promised.",
   "type": "object",
-  "required": ["format", "runtime", "ir", "name", "root", "plugins", "includes", "features", "documents", "triggers", "ports", "policies", "connections", "secrets", "startup"],
+  "required": ["format", "runtime", "ir", "name", "root", "plugins", "includes", "features", "documents", "triggers", "ports", "policies", "connections", "secrets", "startup", "profiles"],
   "additionalProperties": false,
   "properties": {
     "format": {
@@ -90,6 +90,11 @@
       "description": "The startup steps in the order project.json declares them, which is the order they run in.",
       "type": "array",
       "items": { "$ref": "#/$defs/startupStep" }
+    },
+    "profiles": {
+      "description": "One block per profile the tree is judged under, by name: every profile project.json declares, or, where it declares none, the one unnamed profile under the key \"\" (JSON has no key for nothing, and a tree that declares profiles never has an empty one). `--profile <name>` narrows it to that one block. WILANIS_PROFILE is never read: the manifest describes the tree, not the process.",
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/profile" }
     }
   },
   "$defs": {
@@ -362,6 +367,90 @@
         },
         "secrets": {
           "description": "The secret keys its settings read, sorted; empty where they read none.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "profile": {
+      "description": "One place the tree runs (RFC 0013): what the profile writes, and what `reachOf` derives from it.",
+      "type": "object",
+      "required": ["default", "description", "bindings", "connections", "reaches", "holds", "starts", "needs"],
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "description": "Whether a start that names no profile runs this one: the profile marked default, or the unnamed profile of a tree that declares none.",
+          "type": "boolean"
+        },
+        "description": {
+          "description": "What the profile says of itself; null where it says nothing.",
+          "type": ["string", "null"]
+        },
+        "bindings": {
+          "description": "The bindings the profile chooses, as it writes them: a domain port's canonical path to the canonical path of the binding that meets it there, by port. A port it leaves out is met by its one binding (ports.domain[].bindings). Empty for the unnamed profile.",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "connections": {
+          "description": "The stand-ins the profile maps, as it writes them: a connection's canonical path to the canonical path of the connection reached in its place, by connection; empty where it maps none.",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "reaches": {
+          "description": "Every native operation that is not pure the profile runs, from every trigger, attached policy, required port and startup step that runs there, once each, by operation. The `holds` operations are among them.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/reach" }
+        },
+        "holds": {
+          "description": "The operations among `reaches` that start something outliving their run, canonical, as path#operation, sorted.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "starts": {
+          "description": "The labels of the startup steps that run under the profile, in the order declared, which is the order they run in; null for a step with no label.",
+          "type": "array",
+          "items": { "type": ["string", "null"] }
+        },
+        "needs": {
+          "description": "Every environment variable the profile reads through a secret, once per secret key, by variable and then key: the variable's name, never its value.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/need" }
+        }
+      }
+    },
+    "reach": {
+      "description": "One effectful native operation a profile reaches.",
+      "type": "object",
+      "required": ["operation", "via"],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "description": "The operation, canonical, as path#operation.",
+          "type": "string"
+        },
+        "via": {
+          "description": "The canonical paths of the connections its sites name, directly or through a store, with the profile's stand-ins in place (Scope.connectionFor), sorted; empty where they name none. A connection's kind is on its row under connections.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "need": {
+      "description": "One environment variable a profile reads.",
+      "type": "object",
+      "required": ["variable", "key", "readBy"],
+      "additionalProperties": false,
+      "properties": {
+        "variable": {
+          "description": "The variable project.json's secrets map the key to.",
+          "type": "string"
+        },
+        "key": {
+          "description": "The secret key, as {{secrets.<key>}} reads it.",
+          "type": "string"
+        },
+        "readBy": {
+          "description": "Who reads it under the profile, sorted: the canonical path of a connection the profile reaches, `<use> settings` for a plugin's settings in project.json (`@auth settings`), or `<project> → startup/<index>` for a startup step's `in`.",
           "type": "array",
           "items": { "type": "string" }
         }
