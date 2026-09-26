@@ -5,14 +5,14 @@
  * staging` case among it, since manifest.test.ts is at the house rules' length.
  */
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadTree } from '@wilanis/core';
+import { type LoadResult, loadTree, type Registry } from '@wilanis/core';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadProject, type Manifest, manifestOf, type ProjectLoad } from '../src/index.js';
-import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
+import { codes, copyOfExample, EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
 const RUNTIME = fileURLToPath(new URL('..', import.meta.url));
 const read = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
@@ -43,6 +43,22 @@ function block(name: string) {
 }
 const via = (name: string, operation: string) => block(name).reaches.find(one => one.operation === operation)?.via;
 const everyVia = (name: string) => block(name).reaches.flatMap(one => one.via);
+
+/** The same load with its registry's documents in the reverse order, as another walk of the disk might find them. */
+function reversed(load: LoadResult): LoadResult {
+  const registry = Object.assign(Object.create(Object.getPrototypeOf(load.registry)), load.registry, {
+    files: [...load.registry.files].reverse(),
+  }) as Registry;
+  return { ...load, registry };
+}
+
+/** Make a copy's operator password hash read the database's variable: two secret keys, one variable. */
+function shareOneVariable(dir: string): void {
+  const path = join(dir, 'project.json');
+  const project = read(path);
+  project.secrets.operatorPasswordHash = project.secrets.customersDatabase;
+  writeFileSync(path, JSON.stringify(project, null, 2));
+}
 
 describe('manifestOf: one block per profile', () => {
   it('holds every profile project.json declares, by name, and never an empty key', () => {
@@ -95,6 +111,22 @@ describe('manifestOf: one block per profile', () => {
     });
     expect(needs.find(one => one.key === 'customersDatabase')?.readBy).toEqual([POSTGRES]);
     expect(block('live').needs.map(one => one.variable)).not.toContain('CUSTOMERS_DATABASE_URL');
+  });
+
+  it('orders two keys that read one variable by key, whichever order the registry was walked in', () => {
+    const dir = copyOfExample();
+    try {
+      shareOneVariable(dir);
+      expect(codes(dir)).toEqual([]);
+      const loaded = loadTree(dir, PLUGINS, INCLUDES);
+      const needs = (load: LoadResult) =>
+        manifestOf(load, { root: 'example', profile: 'production' }).profiles.production.needs;
+      const shared = needs(loaded).filter(one => one.variable === 'CUSTOMERS_DATABASE_URL');
+      expect(shared.map(one => one.key)).toEqual(['customersDatabase', 'operatorPasswordHash']);
+      expect(needs(reversed(loaded))).toEqual(needs(loaded));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('starts the labels of the steps that run under each profile, in the order declared', () => {

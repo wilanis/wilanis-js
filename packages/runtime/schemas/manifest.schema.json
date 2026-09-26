@@ -412,7 +412,7 @@
           "items": { "type": ["string", "null"] }
         },
         "needs": {
-          "description": "Every environment variable the profile reads through a secret, once each, by variable: the variable's name, never its value.",
+          "description": "Every environment variable the profile reads through a secret, once per secret key, by variable and then key: the variable's name, never its value.",
           "type": "array",
           "items": { "$ref": "#/$defs/need" }
         }

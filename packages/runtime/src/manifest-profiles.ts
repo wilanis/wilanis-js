@@ -54,8 +54,9 @@ function reachRows(reach: Reach): ReachRow[] {
 }
 
 /**
- * Every variable the reach reads, once, by variable, with its readers sorted. A key no variable answers is left
- * out: the checker refuses it (C001, B007), and the manifest is only ever of a tree the checker accepted.
+ * Every variable the reach reads, once per secret key, by variable and then key, with its readers sorted. A key no
+ * variable answers is left out: the checker refuses it (C001, B007), and the manifest is only ever of a tree the
+ * checker accepted.
  */
 function needRows(reach: Reach): NeedRow[] {
   const byKey = new Map<string, NeedRow>();
@@ -66,7 +67,10 @@ function needRows(reach: Reach): NeedRow[] {
     byKey.set(key, need);
   }
   const rows = [...byKey.values()].map(need => ({ ...need, readBy: sorted(need.readBy) }));
-  return sortedBy(rows, need => need.variable);
+  return sortedBy(
+    sortedBy(rows, need => need.key),
+    need => need.variable,
+  );
 }
 
 /** One profile's block; the unnamed one is the default, since a start that names no profile runs it. */
