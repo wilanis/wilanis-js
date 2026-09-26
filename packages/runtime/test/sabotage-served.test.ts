@@ -226,6 +226,30 @@ describe('sabotage: what an atomic graph and a retry are judged under, where onl
     expect(profilesOf(g020(ONE))).toEqual(["'serving'"]);
   });
 
+  it('G018 under the profiles that choose the binding where none of them runs the operation, never a G017', () => {
+    // the full example with local out of the listener: local alone chooses the store binding, and only routes
+    // reach submit, so no profile choosing it runs submit. The retry is still judged, over what it repeats under
+    // local; judged under no profile it would walk nothing and say the retry reaches no effect, which is false
+    const localQuiet = (project: any) => {
+      const listen = project.startup.find((step: any) => step.run === LISTEN);
+      listen.profiles = listen.profiles.filter((one: string) => one !== 'local');
+    };
+    const onStore = (doc: any) => {
+      doc.operations.submit.retry = { times: 1 };
+    };
+    const said = plantedEditingAllSaying(
+      {},
+      { 'project.json': localQuiet, 'features/customers/data/customers-store.binding.json': onStore },
+    );
+    const g018 = said.filter(one => one.startsWith('G018 '));
+    expect(g018.length).toBeGreaterThan(0);
+    expect(new Set(profilesOf(g018))).toEqual(new Set(["'local'"]));
+    expect(said.filter(one => one.startsWith('G017 '))).toEqual([]);
+    // and G020 is silent: the retry is inside register-all's transaction only where register-all runs through
+    // the store binding, which is under local, and local no longer serves the import route that reaches it
+    expect(said.filter(one => one.startsWith('G020 '))).toEqual([]);
+  });
+
   it("T009's hint says B011 then holds each profile that runs the operation, not every profile", () => {
     // a profile that neither consumes nor opens a route runs remove nowhere, so its promise is not held there
     const unpromised = {
