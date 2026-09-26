@@ -4,6 +4,26 @@ import { describe, expect, it } from 'vitest';
 import { migrate, unsetSecrets } from '../src/index.js';
 import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
+/** Run `body` with the example's secrets and WILANIS_PROFILE unset, then put back whatever the process had. */
+async function withoutSecrets(body: () => Promise<void>) {
+  const names = [
+    'CUSTOMERS_DATABASE_URL',
+    'CUSTOMERS_JWT_SECRET',
+    'CUSTOMERS_OPERATOR_PASSWORD_HASH',
+    'WILANIS_PROFILE',
+  ];
+  const kept = names.map(name => [name, process.env[name]] as const);
+  for (const name of names) delete process.env[name];
+  try {
+    await body();
+  } finally {
+    for (const [name, value] of kept) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+}
+
 describe('the reach of a profile', () => {
   // RFC 0013: what the tree does where it runs, derived from the profile's bindings and nothing else
   const reach = (profile: string) => {
@@ -110,10 +130,7 @@ describe('the reach of a profile', () => {
     // migrate refuses before any plugin opens anything, as start does, naming what the reach reads and what each
     // store's connection reads, since every store is planned
     const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);
-    const names = ['CUSTOMERS_DATABASE_URL', 'CUSTOMERS_JWT_SECRET', 'CUSTOMERS_OPERATOR_PASSWORD_HASH'];
-    const kept = names.map(name => [name, process.env[name]] as const);
-    for (const name of names) delete process.env[name];
-    try {
+    await withoutSecrets(async () => {
       await expect(migrate(load, { profile: 'production-worker', log: () => {} })).rejects.toThrow(
         'missing secrets: CUSTOMERS_DATABASE_URL (customersDatabase, read by @connections/customers-postgres.connection.json), CUSTOMERS_JWT_SECRET (jwt, read by @auth settings)',
       );
@@ -124,9 +141,27 @@ describe('the reach of a profile', () => {
       await expect(migrate(load, { profile: 'local', log: () => {} })).rejects.toThrow(
         'CUSTOMERS_DATABASE_URL (customersDatabase, read by @connections/customers-postgres.connection.json)',
       );
-    } finally {
-      for (const [name, value] of kept) if (value !== undefined) process.env[name] = value;
-    }
+    });
+  });
+
+  it('asks migrate with no --profile for what the profile start would run reads: WILANIS_PROFILE, else the default', async () => {
+    // #711: with no flag migrate planned under the unnamed profile, whatever the variable or the default said
+    const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);
+    await withoutSecrets(async () => {
+      process.env.WILANIS_PROFILE = 'production';
+      await expect(migrate(load, { log: () => {} })).rejects.toThrow(
+        'CUSTOMERS_OPERATOR_PASSWORD_HASH (operatorPasswordHash, read by @connections/employees-production.connection.json)',
+      );
+      // live, the default, verifies the laptop's employees and reads no hash; every store still opens the database
+      delete process.env.WILANIS_PROFILE;
+      const said = await migrate(load, { log: () => {} }).then(
+        () => undefined,
+        (error: Error) => error.message,
+      );
+      expect(said).toBe(
+        'missing secrets: CUSTOMERS_JWT_SECRET (jwt, read by @auth settings), CUSTOMERS_DATABASE_URL (customersDatabase, read by @connections/customers-postgres.connection.json)',
+      );
+    });
   });
 
   it('walks a route under every profile where no profile listens, so a tree that serves nowhere is walked whole', () => {

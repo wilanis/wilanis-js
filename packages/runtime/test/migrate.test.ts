@@ -10,6 +10,8 @@ import { run, step, target, tree } from './migrate-harness.js';
 const SCHEMA = fileURLToPath(new URL('../schemas/diagnostics.schema.json', import.meta.url));
 const valid = new Ajv2020({ allErrors: true }).compile(JSON.parse(readFileSync(SCHEMA, 'utf8')));
 const conforms = (envelope: unknown) => (valid(envelope) ? [] : valid.errors);
+/** A tree that declares production, so a test can plan under it; live is the default where no profile is named. */
+const PROFILED = { profiles: { live: true, production: false } };
 
 /** What `wilanis migrate --json` prints over a tree the harness wrote, and the code the process exits with. */
 async function json(dir: string, plugins: Record<string, PluginModule>, opts = {}) {
@@ -147,7 +149,7 @@ describe('wilanis migrate: what it plans and prints', () => {
   });
 
   it('hands every migrate member the profile and the flags the command ran under', async () => {
-    const { dir, seen, plugins } = tree({ targets: [target([step()])] });
+    const { dir, seen, plugins } = tree({ targets: [target([step()])] }, PROFILED);
     await run(dir, plugins, { profile: 'production', adopt: true, allowDestructive: ['a/b'] });
     expect(seen[0].profile).toBe('production');
     expect(seen[0].adopt).toBe(true);
@@ -272,11 +274,8 @@ describe('wilanis migrate --json: the plan as RFC 0019 envelope', () => {
   });
 
   it('--apply: every step of an allowed connection applied, and applied is true', async () => {
-    const { dir, plugins } = tree({
-      targets: [
-        target([step(), step({ do: 'drop', target: 'notes', says: 'collection notes', class: 'destructive' })]),
-      ],
-    });
+    const drop = step({ do: 'drop', target: 'notes', says: 'collection notes', class: 'destructive' });
+    const { dir, plugins } = tree({ targets: [target([step(), drop])] }, PROFILED);
     const allowDestructive = ['@connections/customers.connection.json/notes'];
     const { envelope, code } = await json(dir, plugins, { apply: true, allowDestructive, profile: 'production' });
     expect(conforms(envelope)).toEqual([]);
