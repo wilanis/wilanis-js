@@ -72,10 +72,10 @@ None.
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
-| D0nn | `load.ts` / `check/project.ts` | a document names an IR version this runtime does not read | "this runtime reads v1; the document names v2: upgrade @wilanis/runtime, or rewrite the document against v1" |
-| D0nn | `check/project.ts` | two documents of one tree name different IR versions | "a tree is one version: upgrade the rest, see docs/rfcs/0008" |
+| D013 | `ir-version.ts` (core's loader) | a document names an IR version this runtime does not read | "this runtime reads v1; the document names v2: upgrade @wilanis/runtime, or rewrite the document against v1" |
+| D014 | `ir-version.ts` (core's loader) | two documents of one tree name different IR versions | "a tree is one version: upgrade the rest, see docs/rfcs/0008" |
 
-Numbers are assigned when the implementing pull request lands (current highest: D010).
+Numbers were assigned when step 3 landed; both rules live in the loader (see Decided during implementation).
 
 ### Runtime behaviour
 
@@ -121,7 +121,8 @@ rules that cannot fire on any v1 tree today.
 
 - A copy of the example with one document rewritten to a `schemas-v2` URL expects the version refusal.
 - A copy with two versions mixed expects the mixing refusal.
-- Both in `packages/runtime/test/example.test.ts` beside the other sabotages.
+- Both in `packages/runtime/test/sabotage-ir-version.test.ts`, beside the other sabotages; the plugin's case in
+  `packages/core/test/ir-version.test.ts`.
 
 ## Implementation plan
 
@@ -140,3 +141,31 @@ rules that cannot fire on any v1 tree today.
 Freezing means a bad early decision lives in v1 for as long as v1 is read. The alternative, versioning
 per kind, would let a graph be v2 while a shape is v1; it was rejected because the checker's rules
 span kinds, so a version is a property of the tree.
+
+## Decided during implementation
+
+- D013 is a document of a version this runtime does not read, D014 a tree that mixes versions.
+- Both rules are in core, `packages/core/src/ir-version.ts`, and `loadTree` runs them first. The table placed the
+  mixing rule in the compiler's `check/project.ts`, but a `D` code is made only in core and in the runtime's project
+  loader (`fitness/a-refusal-code-is-made-where-its-family-lives.fitness.ts`), and the checker runs after the loader,
+  too late to judge anything before the rest.
+- "Before any other rule" is read literally. The loader reads the `$schema` of every document the load will read
+  before it judges one: the tree's, each include's `project.json` and the features taken from it, and the `docs/` of
+  each plugin `project.json` names, a list read off it before it is judged, as the runtime reads it to find the
+  packages. A tree either rule refuses is answered with those refusals alone and nothing registered, so no D001 and
+  no checker rule follows. Each document is parsed twice, once for its version and once to be judged.
+- The alias names no version of its own and is read as the one this runtime reads, as the Guide says, so the alias
+  beside the v1 URL is one version and mixes nothing.
+- A runtime reads one version, so a tree that mixes two always holds documents it cannot read. D013 refuses each of
+  them at its `$schema`, and D014 is said once, at `project.json` with no `at`, naming each version, how many
+  documents name it and one of them. A tree wholly of another version is one version: D013 at every document, no
+  D014.
+- A `schemas-v1` address names v1, so a runtime still reading `main` does not refuse it as D013. It stays D001, an
+  address this runtime's schemas are not published under until 1.0 (step 6).
+- The hint is written for a document newer than the runtime, the one case a v1 runtime meets. A runtime reading v2
+  meets older documents, and step 4, `wilanis upgrade`, gives that case its own.
+- `irOf` moved from the runtime's manifest to `packages/core/src/published.ts`, beside `SCHEMA_BASE`, with `IR_READ`
+  (the version this runtime reads) and `irOfSchema` (the version a `$schema` names). The manifest's `ir` and the
+  `IR v1, runtime reads v1` line read `IR_READ`.
+- The sabotage tests are in a file of their own rather than `example.test.ts`, which is at the house rule's file
+  length.

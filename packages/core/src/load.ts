@@ -1,11 +1,13 @@
 /**
  * Loads a tree: every *.json under the root, the features of the trees the project includes, and the documents
  * of the plugins the project names, read from each plugin's docs directory.
- * Judges each file against its kind schema, canonicalises paths (@root, project aliases, plugin roots),
+ * Judges first the IR version every one of them names (D013, D014, `ir-version.ts`), and reads a tree they refuse
+ * no further; then each file against its kind schema, canonicalises paths (@root, project aliases, plugin roots),
  * and answers a Registry the checker and compiler share.
  */
 import { join, relative } from 'node:path';
-import { Documents, PROJECT_FILE, parseJson, readProject } from './documents.js';
+import { Documents, PROJECT_FILE, parseJson, readProject, takes } from './documents.js';
+import { versionsRefused } from './ir-version.js';
 import type { ProjectDoc } from './model.js';
 import { makeResolver, RESERVED_ROOTS, subdirectories, treePath, walk } from './paths.js';
 import type { PluginModule } from './plugin.js';
@@ -54,7 +56,7 @@ class Loader {
   private readonly pluginRoots = new Set<string>();
   private readonly aliases: Record<string, string> = {};
   private readonly files: string[];
-  private readonly project: ProjectDoc | undefined;
+  private project: ProjectDoc | undefined;
 
   constructor(
     private readonly root: string,
@@ -62,11 +64,15 @@ class Loader {
     private readonly includes: ResolvedInclude[],
   ) {
     this.files = walk(root);
-    // project first: aliases and plugins shape every other resolution
-    this.project = this.loadProject();
   }
 
   load(): LoadResult {
+    // the IR version before any other rule: a tree this runtime does not read, or of two versions, is read no further
+    const { root, files, includes, available } = this;
+    for (const refusal of versionsRefused({ root, files, includes, available })) this.refuse(refusal);
+    if (!this.refusals.ok) return this.result();
+    // then the project: aliases and plugins shape every other resolution
+    this.project = this.loadProject();
     this.resolvePlugins();
     Object.assign(this.aliases, this.project?.aliases ?? {});
     for (const alias of Object.keys(this.aliases)) this.checkAlias(alias, `aliases/${alias}`);
@@ -74,13 +80,17 @@ class Loader {
     this.registerTree();
     this.registerIncludes(included);
     for (const plugin of this.plugins) this.documents.registerPlugin(plugin);
-    const resolve = makeResolver(this.aliases, this.pluginRoots);
+    return this.result();
+  }
+
+  /** What the load answers: what it registered, what it refused, and how a reference is canonicalised. */
+  private result(): LoadResult {
     return {
       registry: this.registry,
       refusals: this.refusals,
       root: this.root,
       plugins: this.plugins,
-      resolve,
+      resolve: makeResolver(this.aliases, this.pluginRoots),
       aliases: this.aliases,
     };
   }
@@ -236,9 +246,7 @@ class Loader {
     for (const include of included) {
       const index = this.includes.indexOf(include);
       const dir = join(include.dir, 'features');
-      const wanted = (this.featuresShipped(include, dir, index) ?? []).filter(
-        name => !include.features || include.features.includes(name),
-      );
+      const wanted = (this.featuresShipped(include, dir, index) ?? []).filter(name => takes(include, name));
       for (const name of wanted) this.registerFeature(include, index, name, taken);
     }
   }
