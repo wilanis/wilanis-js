@@ -648,19 +648,20 @@ its trigger; `map` prints the queue line. View, in `packages/view/test`: the exa
     RFC 0002's implementation (and 9 for the join).
 11. **A worker process** (`area:runtime`): RFC 0013 is implemented, so a startup step names the profiles it runs
     under and the step is no longer blocked. See *Drawbacks*, first item.
-12. **README**: a "Work off the request" paragraph beside "Every branch runs before you deploy", and the roadmap's
-    M10 row updated with the example's route and worker.
+12. **README**: a "Work off the request" paragraph beside "Every branch, before you ship", which became a
+    "Work off the request" section of its own after it, and the roadmap's M10 row updated with the example's
+    route and worker.
 
 ## Drawbacks and alternatives
 
 **One process listens and consumes; two processes need RFC 0013.** The stub said a worker is "the same tree
-started with a profile whose startup lists `subscribe` and not `listen`". The code says a profile is a set of
-bindings and nothing else -- `project.schema.json → profiles` has `bindings`, `runStartup` reads the one
-`project.doc.startup` for every profile -- so today every process that runs the tree runs every step. That is
-the right default for a small deployment: one process answers routes and works queues, and `consume` before
-`listen` drains in the right order. A separate worker process needs a startup list per profile, which RFC 0013's
-sketch already proposes (`startup` may name a profile); this RFC does not add a second way to say it, and marks
-the step blocked.
+started with a profile whose startup lists `subscribe` and not `listen`". The code said a profile is a set of
+bindings and nothing else -- `project.schema.json → profiles` had `bindings`, `runStartup` read the one
+`project.doc.startup` for every profile -- so when this RFC was accepted every process that ran the tree ran
+every step. That is the right default for a small deployment: one process answers routes and works queues,
+and `consume` before `listen` drains in the right order. A separate worker process needs a startup list per
+profile, which RFC 0013's sketch already proposes (`startup` may name a profile); this RFC does not add a second
+way to say it, and marked the step blocked until RFC 0013 landed; the decision below is what step 11 did.
 
 **Decided (step 11): a profile of its own.** RFC 0013 gave a startup step its `profiles`, and a worker is what
 its sketch said: a profile whose `consume` step names it and whose `listen` step does not. The example's is
