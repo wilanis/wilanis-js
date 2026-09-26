@@ -13,10 +13,11 @@ const STORE = '@storage/store.port.json';
 const CUSTOMERS = '@customers/data/customers.store.json';
 const CUSTOMER = '@customers/domain/Customer.shape.json';
 /**
- * What the toggles read of the customer: its key and who it is. keep-customer takes the whole record, and a toggle
- * that writes some fields of it leaves the rest unread, which is G008's and not the claim here.
+ * What the toggles read of the customer: its key. keep-customer takes the whole record, and a toggle that writes
+ * one field of it leaves the rest unread, which is G008's and not the claim here; the field is one no invariant
+ * reads, since patching one an invariant reads is I007's.
  */
-const TAKES = '@customers/domain/RawCustomer.shape.json';
+const TAKES = '@customers/domain/CustomerRef.shape.json';
 
 const run = (id: string, op: string, input: Record<string, unknown>) => ({
   type: '@wilanis/node/run.schema.json',
@@ -37,13 +38,13 @@ const decide = (
   else: otherwise,
 });
 const get = run('get', `${STORE}#get`, { store: CUSTOMERS, collection: 'customers', key: '{{in.id}}' });
-/** One write of the toggle: the caller's fields, and the flag this write sets. */
+/** One write of the toggle: the flag this write sets, and nothing an invariant reads. */
 const patch = (id: string, active: boolean) =>
   run(id, `${STORE}#patch`, {
     store: CUSTOMERS,
     collection: 'customers',
     key: '{{in.id}}',
-    changes: { name: '{{in.name}}', email: '{{in.email}}', tier: '{{in.tier}}', active },
+    changes: { active },
   });
 const make = (id: string, value: string) => run(id, '@std/object.port.json#make', { value, type: CUSTOMER });
 const refuse = (id: string) =>
