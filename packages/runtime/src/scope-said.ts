@@ -14,7 +14,7 @@
  * A008 filters, and `takesScope` the one `lowerScope` reads -- so what a reader is shown and what the tree was
  * held to cannot drift apart.
  */
-import { collectionOf, effectsReachable, profilesOf, takesScope, viewsReachedBy } from '@wilanis/compiler';
+import { collectionOf, effectsReachable, profilesWalking, takesScope, viewsReachedBy } from '@wilanis/compiler';
 import {
   type GraphDoc,
   type Loaded,
@@ -51,14 +51,18 @@ interface Reaching {
   proving: string[];
 }
 
-/** Every trigger of the tree that reaches one collection of one store, under any profile it is bound under. */
+/** Every trigger of the tree that reaches one collection of one store, under any profile that serves it. */
 function reaching(store: string, collection: string, load: LoadResult, scope: Scope): Loaded<TriggerDoc>[] {
   return load.registry.all('trigger').filter(trigger => reaches(trigger, store, collection, scope));
 }
 
-/** Whether one trigger's fired operation ends at a site over this collection, under some profile. */
+/**
+ * Whether one trigger's fired operation ends at a site over this collection, under some profile that serves it
+ * (`profilesWalking`, the list A006 judges the trigger under): a route does not reach a store under a profile
+ * that never listens, whatever that profile binds.
+ */
 function reaches(trigger: Loaded<TriggerDoc>, store: string, collection: string, scope: Scope): boolean {
-  for (const profile of profilesOf(scope)) {
+  for (const profile of profilesWalking(scope, trigger.doc)) {
     for (const effect of effectsReachable(scope, trigger.doc.fire.run, profile)) {
       const site = collectionOf(scope, { key: effect.key, given: effect.given });
       if (site && site.store === store && site.collection === collection) return true;
@@ -141,12 +145,12 @@ export interface ViewReached {
 /**
  * Every view one trigger reaches, with whether it attaches the policy the view names. A view is the one way
  * across a scope, so a reader of the trigger sees which crossings it makes and that each is gated -- the
- * same pair A008 refuses on, said rather than refused.
+ * same pair A008 refuses on, said rather than refused, under the same profiles: those that serve the trigger.
  */
 export function viewsOfTrigger(trigger: Loaded<TriggerDoc>, scope: Scope): ViewReached[] {
   const attached = new Set((trigger.doc.policies ?? []).map(use => scope.canon(policyPath(use))));
   const out = new Map<string, ViewReached>();
-  for (const profile of profilesOf(scope))
+  for (const profile of profilesWalking(scope, trigger.doc))
     for (const found of viewsReachedBy(scope, trigger.doc.fire.run, profile))
       out.set(found.collection, {
         collection: found.collection,
