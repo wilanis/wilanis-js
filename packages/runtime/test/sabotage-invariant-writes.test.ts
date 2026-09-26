@@ -12,6 +12,7 @@ import {
   plantedAll,
   plantedEditingAllAt,
   plantedEditingAllSaying,
+  plantedEditingHinting,
   plantedPointing,
   sabotage,
   sabotageHinting,
@@ -273,6 +274,9 @@ describe('sabotage: a binding delegating a guarded write straight to the store',
   it('I008 says a binding is no site, and hints the data graph that would be one', () => {
     expect(plantedEditingAllSaying(docs, bound)[0]).toBe(
       `I008 the Customer written here is read from 'in', which is no site of it, ${UNJUDGED}`,
+    );
+    expect(plantedEditingHinting(docs, 'project.json', bound['project.json'])[0]).toBe(
+      'I008 meet this operation with a data graph whose in is the Customer, and give its #put "record": "{{in}}", where the compiler judges it',
     );
   });
 });

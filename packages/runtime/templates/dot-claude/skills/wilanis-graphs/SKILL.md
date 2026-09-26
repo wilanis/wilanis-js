@@ -26,11 +26,11 @@ almost every tree.
 A record whose shape a `holds` invariant is on is written whole, and made before the write;
 `wilanis describe <the shape>` says `held to` for each such rule. Three refusals hold a write to it. A `#patch`
 whose `changes` name a field the rule reads is I007, since a rule over the whole record cannot be held on a part of
-one. A `#put` whose `record` is written out at the write, instead of read whole from `in` or from a node, is I008,
-since nothing judges it before the store keeps it. A data graph that composes a value of the shape, beyond
-re-typing what an effect answered, and hands it to an effect is L016, since making the record is the domain's and a
-data graph translates. So a change is two graphs, and the compiler guards the record where the first one makes it,
-before the second writes anything.
+one. A `#put` whose `record` is not read whole from a site of the shape (an `in` that is the shape, or a node that
+makes one), or that a binding delegates straight to the store, is I008, since nothing judges it before the store
+keeps it. A data graph that composes a value of the shape, beyond re-typing what an effect answered, and hands it to
+an effect is L016, since making the record is the domain's and a data graph translates. So a change is two graphs,
+and the compiler guards the record where the first one makes it, before the second writes anything.
 
 1. A domain graph loads the record through the port's read (`current`). The example's `get` refuses `missing`
    where there is no such customer, and nothing below it runs.
