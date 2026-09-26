@@ -260,6 +260,31 @@ and then every variable that profile reads and nobody set, with the document tha
 
 [`example/README.md`](example/README.md) walks through what it serves and who may do what.
 
+## What a tree is: the manifest
+
+`npx wilanis manifest example` prints the tree as one JSON document, for a provisioner, a reviewer or an agent
+about to add to it: every document with its kind and layer, the plugins and includes at their versions, every
+trigger with its settings and whether a policy gates it, every port with what fires and binds it, the connections
+as written, and under each profile what it binds, reaches, holds open, starts and needs set. A secret's value never
+appears, only the key a template reads, and `--profile` narrows the profiles to one. Every list is sorted, so the
+same tree prints the same bytes and a diff of two manifests is a diff of what the tree does. Below, the routes no
+policy gates, then the variables production needs set before it starts. The viewer's project page opens the same
+document, and [`packages/runtime/schemas/manifest.schema.json`](packages/runtime/schemas/manifest.schema.json) is
+its shape.
+
+```
+$ npx wilanis manifest example --profile production | jq '.triggers[] | select(.public and .settings.route) | .settings.route'
+"/api/v1/auth-customers"
+"/api/v1/auth-employees"
+"/api/v1/token/refresh"
+$ npx wilanis manifest example --profile production | jq '.profiles.production.needs[].variable'
+"CUSTOMERS_DATABASE_URL"
+"CUSTOMERS_JWT_SECRET"
+"CUSTOMERS_OPERATOR_PASSWORD_HASH"
+$ npx wilanis manifest example > before.json
+$ npx wilanis manifest example | diff before.json -    # after an edit: what the tree does differently
+```
+
 ## The rest
 
 [`docs/model.md`](docs/model.md) is the reference: every document kind and what it means, every rule and its
