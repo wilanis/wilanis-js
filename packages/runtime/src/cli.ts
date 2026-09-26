@@ -58,7 +58,8 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
   wilanis ls       [root] [kind]                   every document, or those of one kind
   wilanis describe <path> [root]                   a document, with its contract laid out
   wilanis map      [root] [--profile word]         trigger → graph → port → binding → graph
-  wilanis manifest [root]                          what the tree is, as JSON on stdout (packages/runtime/schemas/manifest.schema.json)
+  wilanis manifest [root] [--profile word]         what the tree is, as JSON on stdout (packages/runtime/schemas/manifest.schema.json);
+                   every profile's block, or the one --profile names; WILANIS_PROFILE is not read
   wilanis new      <kind> <name|path> [root] [--layer edge|data] [--port word] [--run word#op] [--kind k]
                    [--of shape] [--over word#op] [--on shape]
                    graph, read-decide-write: --store <store> --collection <name> --read-then patch|put|remove
@@ -271,9 +272,9 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     console.log(map(await load(rootArg(0)), flags.profile).join('\n'));
   },
   // judged first, as start is: the manifest of a tree with an unresolved reference would describe nothing real
-  manifest: async ({ rootArg }) => {
+  manifest: async ({ flags, rootArg }) => {
     const loaded = await check(rootArg(0));
-    console.log(JSON.stringify(manifestOf(loaded, { root: rootArg(0) }), null, 2));
+    console.log(JSON.stringify(manifestOf(loaded, { root: rootArg(0), profile: flags.profile }), null, 2));
   },
   new: async ({ flags, positional, rootArg }) => {
     const [kind, target] = positional;
