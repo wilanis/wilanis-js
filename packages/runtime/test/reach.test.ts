@@ -1,6 +1,7 @@
 import { buildEnv, type Reach, reachOf } from '@wilanis/compiler';
 import { loadTree, Scope } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
+import { unsetSecrets } from '../src/index.js';
 import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
 describe('the reach of a profile', () => {
@@ -66,6 +67,55 @@ describe('the reach of a profile', () => {
     // and nothing a profile does not run is walked: live prepares with a request, the two stores with ensure
     expect(keys(reach('live'))).not.toContain('@storage/storage.port.json#ensure');
     expect(keys(reach('local'))).toContain('@storage/storage.port.json#ensure');
+  });
+
+  it("walks only the triggers a profile serves: the workers never read the operator's hash, which only routes read", () => {
+    // production-worker and production-scheduler bind what production binds, but open no port, so the sign-in
+    // routes that verify the operator against employees-production run nowhere there (#703)
+    const production = reach('production');
+    for (const name of ['production-worker', 'production-scheduler']) {
+      const quiet = reach(name);
+      expect(quiet.secrets.map(one => one.variable).sort()).toEqual(['CUSTOMERS_DATABASE_URL', 'CUSTOMERS_JWT_SECRET']);
+      for (const route of [
+        '@auth/identity.port.json#verify',
+        '@auth/token.port.json#issue',
+        '@blob/csv.port.json#parse',
+        '@queue/queue.port.json#publish',
+      ]) {
+        expect(keys(production)).toContain(route);
+        expect(keys(quiet)).not.toContain(route);
+      }
+      expect(quiet.connections).not.toContain('@connections/employees-production.connection.json');
+      // what still runs there: the steps, the guard's memory, and the commands `wilanis run` fires anywhere
+      expect(keys(quiet)).toContain('@storage/store.port.json#get');
+      expect(keys(quiet)).toContain('@auth/challenge.port.json#issue');
+    }
+    // and the worker still reaches what the queue trigger it consumes for reaches: the removal, in the store
+    const worker = reach('production-worker').operations.filter(one => one.root.kind === 'trigger');
+    expect(worker.map(one => one.root.file)).toContain('@features/customers/edge/remove-queued.trigger.json');
+    expect(worker.map(one => one.root.file)).not.toContain('@features/customers/edge/get-customer.trigger.json');
+  });
+
+  it('asks start for only the variables the profile reaches: production-worker starts without the hash', () => {
+    const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);
+    const scope = new Scope(load.registry, load.resolve);
+    const env = { CUSTOMERS_DATABASE_URL: 'postgres://customers@localhost/customers', CUSTOMERS_JWT_SECRET: 'jwt' };
+    expect(unsetSecrets(scope, 'production-worker', env)).toEqual([]);
+    expect(unsetSecrets(scope, 'production', env)).toEqual([
+      'CUSTOMERS_OPERATOR_PASSWORD_HASH (operatorPasswordHash, read by @connections/employees-production.connection.json)',
+    ]);
+  });
+
+  it('walks a route under every profile where no profile listens, so a tree that serves nowhere is walked whole', () => {
+    // #632's fallback, kept: with the Listen step gone no profile serves a route, and each is walked everywhere
+    const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);
+    const scope = new Scope(load.registry, load.resolve);
+    const project = scope.project;
+    if (project?.startup)
+      project.startup = project.startup.filter(step => step.run !== '@http/server.port.json#listen');
+    const worker = reachOf(scope, 'production-worker');
+    expect(keys(worker)).toContain('@auth/identity.port.json#verify');
+    expect(worker.secrets.map(one => one.variable)).toContain('CUSTOMERS_OPERATOR_PASSWORD_HASH');
   });
 
   it('production reaches the operator directory in place of the employees, and watches nothing', () => {

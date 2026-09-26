@@ -58,6 +58,21 @@ describe('wilanis describe project.json: a block per profile', () => {
     );
   });
 
+  it('says under production-worker what the triggers it serves reach: no sign-in, so no operator hash', () => {
+    // it binds what production binds, but opens no port: the routes that sign the operator in never run there
+    const worker = block(describeDoc(example, 'project.json'), 'production-worker');
+    expect(worker).toContain(`  stands in  ${EMPLOYEES}  → ${OPERATOR}`);
+    expect(worker.some(line => line.includes('@auth/identity.port.json#verify'))).toBe(false);
+    expect(worker.some(line => line.includes('@blob/csv.port.json'))).toBe(false);
+    expect(worker).toContain(
+      '             @storage/store.port.json#find, #get, #put, #remove  via @connections/customers-postgres.connection.json',
+    );
+    expect(worker.filter(line => line.includes('CUSTOMERS_'))).toEqual([
+      '  needs      CUSTOMERS_DATABASE_URL (customersDatabase, read by @connections/customers-postgres.connection.json)',
+      '             CUSTOMERS_JWT_SECRET (jwt, read by @auth settings)',
+    ]);
+  });
+
   it('marks the default on its first line, and no other profile', () => {
     const said = describeDoc(example, 'project.json');
     expect(block(said, 'live')[0]).toMatch(/^profile live {2}\(default\) {2}-- /);

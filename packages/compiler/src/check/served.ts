@@ -1,30 +1,26 @@
 /**
- * The profiles each judgement about a trigger is made under. A trigger is judged under the profiles that serve it
- * -- `servedUnder` in reach.ts, read off the startup steps and the plugin that grants the trigger's kind -- so a
- * route is judged where the tree listens and a queue trigger where it consumes, and a profile that never opens a
- * route is not refused for it. A trigger no profile serves is judged under every one: a tree that listens nowhere
- * (a library checked alone, a route whose step is not written yet) is judged whole rather than not at all.
+ * The profiles each judgement about a trigger is made under. A trigger is judged under the profiles that walk it
+ * -- `walkedUnder` in reach.ts: those whose startup serves it, read off the steps and the plugin that grants the
+ * trigger's kind, or every one where none does -- so a route is judged where the tree listens and a queue trigger
+ * where it consumes, and a profile that never opens a route is not refused for it. A trigger no profile serves is
+ * judged under every one: a tree that listens nowhere (a library checked alone, a route whose step is not written
+ * yet) is judged whole rather than not at all. `reachOf` starts from the same triggers, so what the checker judges
+ * under a profile and what the manifest, `describe` and `start` say it reaches are one answer.
  *
  * What a domain operation promises on a trigger's behalf follows the trigger. Under a profile, an operation that
- * only triggers judged elsewhere reach is not held to its promise (B011). One that a trigger judged there reaches
- * is, and so is one reached by a policy such a trigger attaches, a port a plugin requires or a startup step that
- * runs there; one nothing reaches is judged for itself. A port is met under every profile (B002) all the same: a
- * profile's bindings are its own edit, and every tool that runs a tree under a profile runs every trigger.
+ * only triggers judged elsewhere reach is not held to its promise (B011). One that `reachOf`'s roots reach is --
+ * a trigger judged there, a policy such a trigger attaches, a port a plugin requires, a startup step that runs
+ * there -- and one nothing reaches is judged for itself. Which is which is the profile's one walk
+ * (`operationsReachedBy`), not a second one kept here. A port is met under every profile (B002) all the same: a
+ * profile's bindings are its own edit.
  */
-import { type Loaded, policyPath, runsUnder, type Scope, type TriggerDoc } from '@wilanis/core';
-import { servedUnder } from '../reach.js';
-import { operationsReachable } from '../refusals.js';
+import type { Loaded, Scope, TriggerDoc } from '@wilanis/core';
+import { type OperationsReached, operationsReachedBy, walkedUnder } from '../reach.js';
 
-/** What a profile's walks reach, as canonical `path#operation`s: from what is judged there, and from triggers judged elsewhere. */
-interface Reached {
-  judged: Set<string>;
-  elsewhere: Set<string>;
-}
-
-/** The profiles each trigger is judged under, and what each profile reaches on whose behalf, each worked out once. */
+/** The profiles each trigger is judged under, and what each profile's walk reaches on whose behalf, each found once. */
 export class Serving {
   private readonly triggers = new Map<string, (string | undefined)[]>();
-  private readonly reached = new Map<string | undefined, Reached>();
+  private readonly reached = new Map<string | undefined, OperationsReached>();
 
   constructor(
     private readonly scope: Scope,
@@ -35,8 +31,7 @@ export class Serving {
   profilesOf(trigger: Loaded<TriggerDoc>): (string | undefined)[] {
     const known = this.triggers.get(trigger.path);
     if (known) return known;
-    const serving = this.all.filter(profile => servedUnder(this.scope, trigger.doc, profile));
-    const judged = serving.length ? serving : this.all;
+    const judged = this.all.filter(profile => walkedUnder(this.scope, trigger.doc, profile));
     this.triggers.set(trigger.path, judged);
     return judged;
   }
@@ -44,44 +39,15 @@ export class Serving {
   /** Whether a canonical `path#operation` is judged under a profile: unless only triggers judged elsewhere reach it there. */
   judgedUnder(key: string, profile: string | undefined): boolean {
     const reached = this.reachedUnder(profile);
-    return reached.judged.has(key) || !reached.elsewhere.has(key);
+    return reached.walked.has(key) || !reached.beyond.has(key);
   }
 
-  /** Every operation a profile reaches, split by whether what reached it is judged under the profile. */
-  private reachedUnder(profile: string | undefined): Reached {
+  /** What a profile's walk reaches, from its roots and from the triggers judged elsewhere. */
+  private reachedUnder(profile: string | undefined): OperationsReached {
     const known = this.reached.get(profile);
     if (known) return known;
-    const reached: Reached = { judged: new Set(), elsewhere: new Set() };
-    for (const trigger of this.scope.registry.all('trigger')) {
-      const into = this.profilesOf(trigger).includes(profile) ? reached.judged : reached.elsewhere;
-      for (const run of runsOf(this.scope, trigger.doc)) this.note(into, run, profile);
-    }
-    for (const run of this.runsRegardless(profile)) this.note(reached.judged, run, profile);
+    const reached = operationsReachedBy(this.scope, profile);
     this.reached.set(profile, reached);
     return reached;
   }
-
-  /** What runs under a profile whatever it serves: each operation of a port a plugin requires, each startup step that runs there. */
-  private runsRegardless(profile: string | undefined): string[] {
-    const required = this.scope.registry
-      .all('port')
-      .filter(port => port.requiredBy)
-      .flatMap(port => Object.keys(port.doc.operations).map(name => `${port.path}#${name}`));
-    const steps = (this.scope.project?.startup ?? []).filter(step => runsUnder(step, profile)).map(step => step.run);
-    return [...required, ...steps];
-  }
-
-  /** Every domain operation a run reaches under the profile, noted in one of the two sets. */
-  private note(into: Set<string>, run: string, profile: string | undefined): void {
-    for (const one of operationsReachable(this.scope, run, profile)) into.add(one.key);
-  }
-}
-
-/** What a trigger runs: the operation it fires, and the one each policy it attaches decides through. */
-function runsOf(scope: Scope, trigger: TriggerDoc): string[] {
-  const decides = (trigger.policies ?? []).flatMap(ref => {
-    const policy = scope.get('policy', policyPath(ref));
-    return policy ? [policy.doc.decide.run] : [];
-  });
-  return [trigger.fire.run, ...decides];
 }

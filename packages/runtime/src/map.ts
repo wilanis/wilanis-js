@@ -156,11 +156,11 @@ function walked(load: LoadResult, scope: Scope, profile?: string): { lines: stri
 // ---- map ---------------------------------------------------------------------------------------------
 
 /**
- * The graphs the tree enters under no profile at all: what `reachOf` walks -- every trigger's `fire`, every
- * policy a trigger attaches, every required port, every startup step -- taken over each declared profile, or the
- * unnamed one, and subtracted from the graphs the tree has. The drawing above follows a trigger into the graph
- * behind it and no further than its nodes; the checker's walk is what says whether a graph runs, so it is what
- * the word `orphan` reads.
+ * The graphs the tree enters under no profile at all: what `reachOf` walks -- the `fire` of every trigger the
+ * profile serves, every policy such a trigger attaches, every required port, every startup step -- taken over each
+ * declared profile, or the unnamed one, and subtracted from the graphs the tree has. The drawing above follows a
+ * trigger into the graph behind it and no further than its nodes; the checker's walk is what says whether a graph
+ * runs, so it is what the word `orphan` reads.
  */
 function orphans(load: LoadResult, scope: Scope): string[] {
   const entered = new Set<string>();
