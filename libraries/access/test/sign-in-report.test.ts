@@ -1,19 +1,19 @@
 import { fileURLToPath } from 'node:url';
-import { loadTree, type PluginModule } from '@wilanis/core';
-import type { Report } from '@wilanis/engine';
+import { loadTree, type PluginModule, type Trace } from '@wilanis/core';
+import type { NodeReport, Report } from '@wilanis/engine';
 import auth from '@wilanis/plugin-auth';
 import http, { encode } from '@wilanis/plugin-http';
 import { BUILTIN_PLUGINS, embedderFor, type Ran, Served, traceOf } from '@wilanis/runtime';
 import { describe, expect, it } from 'vitest';
 
 /**
- * What a sign-in and a refresh leave behind. The password never leaves the run in clear: not in the report of any
- * node the run reached, nor in the full trace an exporter is handed. The tokens this tree answers with are marked
- * secret where it declares them (Tokens, TokensView), so every report of this tree's own operations says them as
- * the marker, while the caller -- the http answer, its cookie -- is handed the tokens themselves. The path is this
- * tree's own -- the route, access.binding.json meeting access.port.json with the business graph, and that graph's
- * call of identity.port.json -- so it is held here, with the development binding meeting identity.port.json as a
- * host would.
+ * What a sign-in and a refresh leave behind. Neither the password nor a token leaves the run in clear: not in the
+ * report of any node the run reached, nor in the full trace an exporter is handed. The tokens are marked secret
+ * where this tree declares them (Tokens, TokensView) and where @auth does (its Tokens), so every report says them
+ * as the marker, while the caller -- the http answer, its cookie -- is handed the tokens themselves. The path is
+ * this tree's own -- the route, access.binding.json meeting access.port.json with the business graph, and that
+ * graph's call of identity.port.json -- so it is held here, with the development binding meeting
+ * identity.port.json through @auth's operations as a host would.
  */
 const TREE = fileURLToPath(new URL('..', import.meta.url));
 const PLUGINS: Record<string, PluginModule> = { ...BUILTIN_PLUGINS, '@http': http, '@auth': auth };
@@ -40,6 +40,35 @@ function subOf(report: Report, id: string): Report {
   const sub = report.nodes[id]?.sub;
   if (!sub) throw new Error(`no nested run under '${id}'`);
   return sub;
+}
+
+/**
+ * Every place a report shows one of `values` in clear: each node's in and out, the output of a nested run hung
+ * on it or on an attempt, and a map's elements, by the path of node ids that leads there. The run's own output is
+ * what the caller is handed, so it is not a place a report shows.
+ */
+function clearIn(report: Report, values: string[], at = ''): string[] {
+  const shows = (said: unknown) => values.some(value => JSON.stringify(said ?? null).includes(value));
+  return Object.entries(report.nodes).flatMap(([id, node]) => clearInNode(node, `${at}${id}`, values, shows));
+}
+
+/** The places one node's report shows a value in clear, and the nested runs below it. */
+function clearInNode(node: NodeReport, at: string, values: string[], shows: (said: unknown) => boolean): string[] {
+  const nested = [node.sub, ...(node.attempts ?? []).map(one => one.sub)].filter(sub => sub !== undefined);
+  return [
+    ...(shows(node.in) ? [`${at}.in`] : []),
+    ...(shows(node.out) ? [`${at}.out`] : []),
+    ...nested.flatMap(sub => [...(shows(sub.output) ? [`${at}.sub.output`] : []), ...clearIn(sub, values, `${at}/`)]),
+    ...(node.items ?? []).flatMap((item, index) => clearInNode(item, `${at}.${index}`, values, shows)),
+  ];
+}
+
+/** Every span of a full trace whose attributes show one of `values` in clear, by the span's name and the attribute. */
+function clearInTrace(trace: Trace, values: string[]): string[] {
+  const here = Object.entries(trace.attributes)
+    .filter(([, said]) => values.some(value => String(said).includes(value)))
+    .map(([name]) => `${trace.name} [${name}]`);
+  return [...here, ...trace.children.flatMap(child => clearInTrace(child, values))];
 }
 
 /**
@@ -94,6 +123,15 @@ describe('a sign-in, as its report and its trace say it', () => {
       expect(graph.nodes.issued.out).toEqual(said(tokens));
       expect(subOf(graph, 'issued').output).toEqual(said(tokens));
     });
+
+  for (const [route, credential] of realms)
+    it(`shows neither token in clear in any report or in the full trace: ${route}`, async () => {
+      const { report, trace } = await fire(route, credential);
+      const tokens = report.output as Tokens;
+      const values = [tokens.accessToken, tokens.refreshToken];
+      expect(clearIn(report, values)).toEqual([]);
+      expect(clearInTrace(trace, values)).toEqual([]);
+    });
 });
 
 describe('a refresh, as its report says it', () => {
@@ -113,5 +151,16 @@ describe('a refresh, as its report says it', () => {
     expect(graph.nodes.traded.out).toEqual({ refreshed: true, tokens: said(renewed) });
     expect(graph.nodes.renewed.in?.value).toEqual(said(renewed));
     expect(graph.nodes.renewed.out).toEqual(said(renewed));
+  });
+
+  it('shows no token in clear in any report or in the full trace, but for one switch', async () => {
+    const signedIn = await fire('@access/edge/auth-customers.trigger.json', { username: 'ana', password: 'ana-pass' });
+    const old = signedIn.report.output as Tokens;
+    const { report, trace } = await fire('@access/edge/refresh.trigger.json', { refreshToken: old.refreshToken });
+    const renewed = report.output as Tokens;
+    const values = [old.refreshToken, renewed.accessToken, renewed.refreshToken];
+    // #692: a switch's in is not redacted yet; remove this exception when it lands
+    expect(clearIn(report, values)).toEqual(['op/wasGood.in']);
+    expect(clearInTrace(trace, values)).toEqual(['wasGood switch → renewed [wilanis.in]']);
   });
 });

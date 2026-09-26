@@ -38,6 +38,7 @@
     },
     "codeHash": {
       "type": "string",
+      "secret": true,
       "required": false,
       "description": "the digest of the code issued, never the code itself"
     },
