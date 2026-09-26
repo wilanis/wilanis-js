@@ -7,7 +7,16 @@
  * which turns what the store answered back into the shape), and a read site, which only re-types what an effect
  * answered and composes nothing, whatever reads it after.
  */
-import { type GraphDoc, isSwitch, type Loaded, type Node } from '@wilanis/core';
+import {
+  type GraphDoc,
+  isMap,
+  isSwitch,
+  type Loaded,
+  NODE_RUN,
+  type Node,
+  type RunNode,
+  type Values,
+} from '@wilanis/core';
 import { heldShapes, invariantsOn } from '../guard.js';
 import { type Site, siteId, sitesOf } from '../sites.js';
 import { readersOf } from './graph-routing.js';
@@ -15,7 +24,7 @@ import { named } from './invariant-holds.js';
 import { listed, shapeName } from './invariant-writes.js';
 import type { Judge } from './judge.js';
 import { Narrowing } from './narrowing.js';
-import { siteRead } from './prove.js';
+import { readWhole, siteRead } from './prove.js';
 
 /** The effect a made value reaches, and the nodes it passes through on the way; nothing where it reaches none. */
 interface Fed {
@@ -48,13 +57,30 @@ function composedInData(judge: Judge, shape: string): Site[] {
 /**
  * Whether a made site only re-types what an effect answered, which RFC 0035 leaves alone ("every read site"): the
  * node is itself an effect, as a `#find` is, or it reads its whole value from an effect's answer, as `kept` makes a
- * Customer of `{{stored.record}}`. A value laid over another (`#merge`) or written out in place is composed.
+ * Customer of `{{stored.record}}` and a `map` of `#make`s makes each of what a `#find` answered. A value laid over
+ * another (`#merge`) or written out in place is composed.
  */
 function readSite(judge: Judge, sites: Site[], site: Site): boolean {
   if (acts(judge, site.node)) return true;
-  const from = siteRead(judge.scope, sites, site).from;
+  const from = siteRead(judge.scope, sites, perElement(site)).from;
   const source = from ? site.graph.doc.nodes.find(node => node.id === from[0]) : undefined;
   return acts(judge, source);
+}
+
+/**
+ * A map's site as the call it makes for each element, where each input it binds reads the element and so the list
+ * it maps over: a map binding the element to `#make` reads its value from what `over` reads, as one `#make` of that
+ * read does (#694). Any other site is itself, and so is a map that binds nothing or maps over anything but one read.
+ * Only L016 reads a map so: the guard's `heldAt` reads the map as written, since what a switch established about the
+ * list is not established about each element.
+ */
+function perElement(site: Site): Site {
+  const node = site.node;
+  if (!node || !isMap(node) || !node.bind || !readWhole(node.over)) return site;
+  const bound: Values = {};
+  for (const name of Object.keys(node.bind)) bound[name] = node.over;
+  const call: RunNode = { type: NODE_RUN, id: node.id, run: node.run, in: { ...node.in, ...bound } };
+  return { ...site, node: call };
 }
 
 /**
