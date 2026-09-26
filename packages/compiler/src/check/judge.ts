@@ -2,7 +2,7 @@
  * What every rule family shares: the scope, the refusal list, the project, the resolver table, and the small
  * judgements that recur -- typing a spec (R001), visibility (L005), the shapes a type may name (L001), an
  * operation reference (R001, L005), settings where only secrets may appear (C001), the profiles to judge
- * under, and the reasons an operation can refuse with.
+ * under -- a trigger under those that serve it --, and the reasons an operation can refuse with.
  */
 import {
   expr,
@@ -19,6 +19,7 @@ import {
   type Scope,
   STRING,
   splitRef,
+  type TriggerDoc,
   type Type,
   TypeError_,
   type TypeSpec,
@@ -26,6 +27,7 @@ import {
 } from '@wilanis/core';
 import type { ReachableRefusal } from '../refusals.js';
 import { nearest } from './nearest.js';
+import { Serving } from './served.js';
 
 /** The direction of the fix: the words every refusal carries, and the edits a rule can prove. */
 export type Hint = string | { text: string; fixes: Fix[] };
@@ -145,6 +147,8 @@ function* typeRefs(spec: TypeSpec, at: string): Generator<[string, string]> {
 export class Judge {
   /** Every resolvers document as judged, by path: what `resolversFor` hands to the graphs and bindings that name it. */
   readonly resolverReads = new Map<string, Record<string, JudgedResolver>>();
+  /** Which profiles serve each trigger, and what each profile reaches on whose behalf: worked out once, when first asked. */
+  private serving: Serving | undefined;
 
   constructor(
     readonly scope: Scope,
@@ -225,6 +229,28 @@ export class Judge {
     return profilesOf(this.scope);
   }
 
+  /**
+   * The profiles a trigger is judged under: those whose startup serves it (`servedUnder`), or every one where
+   * none does. Every rule made per profile over a trigger walks this list, so none refuses a route under a
+   * profile that never opens it (`served.ts`).
+   */
+  profilesServing(trigger: Loaded<TriggerDoc>): (string | undefined)[] {
+    return this.served().profilesOf(trigger);
+  }
+
+  /**
+   * Whether a domain `path#operation` is held to its promise under a profile (B011): unless, under it, only
+   * triggers judged elsewhere reach it. What an operation promises on a trigger's behalf is judged where the trigger is.
+   */
+  judgedUnder(key: string, profile: string | undefined): boolean {
+    return this.served().judgedUnder(key, profile);
+  }
+
+  private served(): Serving {
+    this.serving ??= new Serving(this.scope, this.profiles());
+    return this.serving;
+  }
+
   /** L005 when `from` may not name `target`. */
   visible(from: Loaded, target: Loaded, at: string): void {
     const reason = this.scope.visibility(from, target);
@@ -271,10 +297,13 @@ export class Judge {
     return { allowed, file, path: 'effects', at: `${file} → effects` };
   }
 
-  /** Every reason reachable under any profile, with the first file found refusing with it. */
-  reachableReasons(reach: (profile: string | undefined) => ReachableRefusal[]): Map<string, string> {
+  /** Every reason reachable under any of the profiles (each one, unless told), with the first file found refusing with it. */
+  reachableReasons(
+    reach: (profile: string | undefined) => ReachableRefusal[],
+    profiles = this.profiles(),
+  ): Map<string, string> {
     const reasons = new Map<string, string>();
-    for (const profile of this.profiles()) {
+    for (const profile of profiles) {
       for (const refusal of reach(profile)) if (!reasons.has(refusal.reason)) reasons.set(refusal.reason, refusal.file);
     }
     return reasons;

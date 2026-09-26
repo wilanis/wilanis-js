@@ -1,7 +1,7 @@
 /**
  * The promise a profile makes (RFC 0011). A domain operation may say `idempotent: true`, and what it reaches
- * depends on which binding meets it, so the promise is held under every profile (B011): the refusal is against
- * the port and names the profile, the binding and the node whose effect breaks it.
+ * depends on which binding meets it, so the promise is held under every profile that runs something reaching
+ * it (B011): the refusal is against the port and names the profile, the binding and the node whose effect breaks it.
  */
 import { describe, expect, it } from 'vitest';
 import { sabotage, sabotageHinting, sabotagePointing, sabotageSaying } from './example-harness.js';
@@ -23,13 +23,13 @@ describe('sabotage: the promise a profile makes (RFC 0011)', () => {
       'B011 drop idempotent, or bind the operation under that profile to a graph whose effects are idempotent or keyed',
     );
   });
-  it('B011 names each profile under which the promise breaks', () => {
+  it('B011 names each profile under which the promise breaks and something reaches the operation', () => {
+    // only routes reach register, so production-scheduler and production-worker, which bind it as production does
+    // but open no route, run nothing that calls it and are not held to its promise
     const said = sabotageSaying(port, promising('register'));
     expect(said.every(line => line.startsWith('B011'))).toBe(true);
     const profiles = said.map(line => /\(profile '([\w-]+)'\)/.exec(line)?.[1]);
-    expect(new Set(profiles)).toEqual(
-      new Set(['live', 'local', 'production', 'production-scheduler', 'production-worker']),
-    );
+    expect(new Set(profiles)).toEqual(new Set(['live', 'local', 'production']));
   });
   it('B011 follows a domain graph through the bindings it calls', () => {
     const said = sabotageSaying(port, promising('submit')).filter(line => line.includes("profile 'live'"));

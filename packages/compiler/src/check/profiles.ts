@@ -3,7 +3,8 @@
  * domain port to a binding that implements it (R001, B003, B004) and lets a connection stand in for another
  * of the same kind, or -- where the connection replaced is a broker and nothing else -- for another of any kind
  * delivering alike (R001, C018); every domain port is met under every profile (B002) and keeps every promise its
- * operations make of being repeated (B011).
+ * operations make of being repeated (B011) -- but for an operation that, under a profile, only triggers it does
+ * not serve reach, which is held to nothing on their behalf (`Judge.judgedUnder`).
  */
 import type { ConnectionKindDoc, Loaded, PortDoc, ProfileDoc } from '@wilanis/core';
 import { effectsReachable } from '../refusals.js';
@@ -157,13 +158,15 @@ function checkPortMet(judge: Judge, port: Loaded<PortDoc>, profile: string | und
 /**
  * B011: a domain operation that promises `idempotent` reaches, under the profile, only effects that are
  * idempotent where they are made. The promise is the port's and the effects are the binding's, so the refusal is
- * against the port and names the profile, the binding that meets it there, and the node that breaks it.
+ * against the port and names the profile, the binding that meets it there, and the node that breaks it. An
+ * operation only triggers the profile does not serve reach is not held to its promise there.
  */
 function checkPromisesKept(judge: Judge, port: Loaded<PortDoc>, profile: string | undefined): void {
   const binding = judge.scope.bindingFor(port.path, profile);
   if (typeof binding === 'string') return;
   for (const [name, op] of Object.entries(port.doc.operations)) {
-    if (op.idempotent === true) checkPromiseKept(judge, { port: port.path, name, binding: binding.path, profile });
+    if (op.idempotent !== true || !judge.judgedUnder(`${port.path}#${name}`, profile)) continue;
+    checkPromiseKept(judge, { port: port.path, name, binding: binding.path, profile });
   }
 }
 

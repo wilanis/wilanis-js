@@ -254,12 +254,16 @@ class TriggerCheck {
       .filter((policy): policy is Loaded<PolicyDoc> => Boolean(policy));
   }
 
-  /** T004, A006: every request.* a resolver reads under this trigger is in the kind's context; a required one is guaranteed. */
+  /**
+   * T004, A006: every request.* a resolver reads under this trigger is in the kind's context; a required one is
+   * guaranteed. Judged under each profile that serves the trigger, since which binding meets what it fires decides
+   * what is read, and a profile that never opens the trigger reads nothing on its behalf.
+   */
   private checkRequestReach(ctx: Type): void {
     const policies = this.policies();
     const decides = policies.map(policy => policy.doc.decide.run);
     const proven = policies.flatMap(policy => policy.doc.proves ?? []).map(path => splitPath(path).slice(1).join('.'));
-    for (const profile of this.judge.profiles()) {
+    for (const profile of this.judge.profilesServing(this.trigger)) {
       for (const run of [this.doc.fire.run, ...decides]) {
         for (const need of opNeeds(this.judge, run, profile)) this.checkNeed(need, ctx, proven, profile);
       }
@@ -291,13 +295,16 @@ class TriggerCheck {
 
   /**
    * T005, T006. The graph says why it refused, in one word; the kind says how that word is answered. Each reason
-   * this trigger can reach -- through what it fires, what gates it, and the guard that identifies its caller --
-   * must be mapped, and nothing may be mapped that it cannot reach.
+   * this trigger can reach under a profile that serves it -- through what it fires, what gates it, and the guard
+   * that identifies its caller -- must be mapped, and nothing may be mapped that it cannot reach there.
    */
   private checkRefusalTable(tablePath: string): void {
     const atPath = `settings/${tablePath.replace(/\./g, '/')}`;
     const mapped = tableAt(this.doc.settings, tablePath);
-    const reachable = this.judge.reachableReasons(profile => refusalsOfTrigger(this.judge.scope, this.doc, profile));
+    const reachable = this.judge.reachableReasons(
+      profile => refusalsOfTrigger(this.judge.scope, this.doc, profile),
+      this.judge.profilesServing(this.trigger),
+    );
     for (const [reason, from] of reachable) {
       if (mapped[reason] !== undefined) continue;
       const message = `${from} may refuse with reason '${reason}', which settings.${tablePath} does not map`;

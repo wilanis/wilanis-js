@@ -10,8 +10,8 @@ export const IR = "IR v1, runtime reads v1";
 
 /** The codes `wilanis check .` answers at each turn of beats 2 and 3, in the order it prints them. */
 export const CODES = {
-  scaffolded: ["T002", "T002", "A006", "A006", "A006", "A006", "T005", "T005", "T005", "I001"],
-  hinted: ["A006", "A006", "A006", "A006", "I001"],
+  scaffolded: ["T002", "T002", "A006", "A006", "T005", "T005", "T005", "I001"],
+  hinted: ["A006", "A006", "I001"],
   gated: ["A005", "T005", "T005"],
 };
 

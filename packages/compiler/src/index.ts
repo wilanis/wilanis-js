@@ -5,8 +5,9 @@
  * it calls and `effectsReachable` the native sites it ends at,
  * `sitesOf` where a value of a shape comes into being and `heldAt` whether a field invariant already
  * holds there, `reachOf` what a profile reaches -- the effectful operations, connections, secrets and holds
- * of one place a tree runs --, `atomicReachOf` what an atomic graph reaches, `atomicOf` what a reader is told
- * about one, `invariantSaidOf` which triggers an access invariant reaches and how each one meets it, and
+ * of one place a tree runs --, `servedUnder` whether a profile's startup serves a trigger, `atomicReachOf` what
+ * an atomic graph reaches, `atomicOf` what a reader is told about one, `invariantSaidOf` which triggers an access
+ * invariant reaches and how each one meets it, and
  * `viewsReachedBy` every view across a scope a run reaches; `attempting` tries a handler as its call's site says
  * (RFC 0011's retry and timeout).
  */

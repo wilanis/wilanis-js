@@ -110,12 +110,6 @@ A006  @features/customers/edge/archive-customer.trigger.json#policies
 A006  @features/customers/edge/archive-customer.trigger.json#policies
     @features/customers/data/customers-postgres.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')
     → gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence
-A006  @features/customers/edge/archive-customer.trigger.json#policies
-    @features/customers/data/customers-postgres.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production-scheduler')
-    → gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence
-A006  @features/customers/edge/archive-customer.trigger.json#policies
-    @features/customers/data/customers-postgres.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production-worker')
-    → gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence
 T005  @features/customers/edge/archive-customer.trigger.json#settings/response/refusals
     @features/customers/data/delete-row.graph.json may refuse with reason 'missing', which settings.response.refusals does not map
     → add "missing" under settings.response.refusals: how this trigger answers that outcome
@@ -129,7 +123,7 @@ I001  @features/customers/edge/archive-customer.trigger.json#policies
     trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for registrars' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy
     → attach "@access/edge/can-register.policy.json" under policies, or take @features/customers/domain/customer.port.json#remove out of the invariant's over
 
-10 refusal(s)
+8 refusal(s)
 ```
 
 **Point at.** The last refusal. Read it aloud, whole, and land on its hint:
@@ -139,16 +133,17 @@ I001  @features/customers/edge/archive-customer.trigger.json#policies
 ```
 
 The file the agent wrote a second ago, the rule it broke by its label, the file the rule lives in, and the
-two edits that would fix it. Nothing has run. Each of the ten has a stable code, the file, the path inside it
+two edits that would fix it. Nothing has run. Each of the eight has a stable code, the file, the path inside it
 (`#in`, `#policies`, `#settings/response/refusals`) and a hint that is an edit: an agent's whole loop, write, check, edit.
 
 **If asked.** *"The agent should have read the invariant first."* It would have, had it known there was one
 to read. Instead the checker read the route, the port it fires, the graphs bound to that port and the
 invariant, and told the agent about the rule in the one place it was going to look: the output of the
 command it runs after every edit. `kept-remove` is the graph two ports down that will run under this profile.
-The four A006 are the same kind of news, once per profile whose store the route reaches (production,
-production-scheduler and production-worker bind the same one): the customer stores keep each tenant's rows apart, reading the tenant
-from the caller's session, and nothing on this route proves there is a caller.
+The two A006 are the same kind of news, once per profile that listens and keeps the customers in a store
+(`local` in memory, `production` in PostgreSQL): the customer stores keep each tenant's rows apart, reading the tenant
+from the caller's session, and nothing on this route proves there is a caller. `production-scheduler` and
+`production-worker` bind the same store, but neither opens a route, so neither is refused for one.
 
 ## 3. Following the hints
 
@@ -169,20 +164,14 @@ A006  @features/customers/edge/archive-customer.trigger.json#policies
 A006  @features/customers/edge/archive-customer.trigger.json#policies
     @features/customers/data/customers-postgres.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')
     → gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence
-A006  @features/customers/edge/archive-customer.trigger.json#policies
-    @features/customers/data/customers-postgres.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production-scheduler')
-    → gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence
-A006  @features/customers/edge/archive-customer.trigger.json#policies
-    @features/customers/data/customers-postgres.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production-worker')
-    → gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence
 I001  @features/customers/edge/archive-customer.trigger.json#policies
     trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for registrars' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy
     → attach "@access/edge/can-register.policy.json" under policies, or take @features/customers/domain/customer.port.json#remove out of the invariant's over
 
-5 refusal(s)
+3 refusal(s)
 ```
 
-One round took five refusals to zero. The five left all point at `#policies`: who may call the route, and
+One round took five refusals to zero. The three left all point at `#policies`: who may call the route, and
 whether a caller's tenant is known. Now the agent does exactly what the last one says, and no more:
 
 ```json
@@ -207,7 +196,7 @@ T005  @features/customers/edge/archive-customer.trigger.json#settings/response/r
 3 refusal(s)
 ```
 
-**Point at.** `A005 ... no attachment on this trigger gives one`, and the JSON in its hint. The four A006 are
+**Point at.** `A005 ... no attachment on this trigger gives one`, and the JSON in its hint. The two A006 are
 gone: the registrar policy proves a signed-in session, and a session carries the tenant its sign-in wrote.
 Fixing one refusal surfaced three the agent could not have seen: the policy decides on who is calling, and nothing on this route
 hands the guard a token; and a gated route can now end `forbidden` or `anonymous`, which the route has to
@@ -396,7 +385,7 @@ route, policy, shape or business graph differs from `local`, and beat 1 judged i
 
 **The edit that never reaches the serving tree.** With `start` still running, paste the beat-3 file back
 over the route (`cp $DEMO/archive-customer.step2.trigger.json features/customers/edge/archive-customer.trigger.json`):
-the log prints `reload refused, still serving the last good tree:` with the four A006 and the I001, hints and all, while
+the log prints `reload refused, still serving the last good tree:` with the two A006 and the I001, hints and all, while
 `curl` keeps answering 401, so an agent editing a live tree cannot make the write public for one request.
 Paste the finished file back and it prints `reload: 222 documents, serving the new tree`. It needs nothing
 beyond what this script already runs; `build.mjs` runs it as its last step.
