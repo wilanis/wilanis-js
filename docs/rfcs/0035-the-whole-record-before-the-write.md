@@ -448,3 +448,18 @@ in the scaffold for a collection no invariant reads or goes altogether; and the 
    `keep` (B005). Of #682's paths, L016 refuses a `map` writing elements it made as the guarded shape, and a
    `changes` read from a node that made the guarded shape; it does not reach a `changes` made as `CustomerUpdate`, a
    `map` over a list that is no site, a binding's delegation, or a wider `in`, which stay #682's.
+6. **I007 and I008 hold on every write path (#682).** I007 types a `changes` that is one whole read of `in`, a
+   constant or a node with the checker's own `GraphReads`, over the graph's input, constants and node answers, the
+   table G004 types a node's inputs by; it is built quietly, so what does not resolve names no field and is refused
+   where the graph is judged, and a resolver's read, which answers no record, is not typed. A `map` binding `changes`
+   is typed off the element of the list its `over` reads, at the path it binds. I008 accepts a record given as one
+   whole read only where the read is a site of the shape in that graph (`sitesOf`, one value: `in` where it is the
+   shape, or a node that makes one), and a record a `map` binds only where it is each element whole of one whole read
+   of a site that holds a list of the shape. Its message says where the record came from: composed at the write, read
+   from a path that is no site of it, or each element of a list that is none. A binding's delegation straight to
+   `#put` or `#patch` is judged in `check/invariant-writes.ts`, not `check/bindings.ts`: it is this rule over another
+   kind of call, and `bindings.ts` is the B family's. Its inputs are what `passedInputs` hands the store, as the
+   compiler and B005 read them, typed off what the operation accepts, as `bindings.ts` types a delegation's reads of
+   `in`. A binding holds no site, so every delegation of a guarded `#put` is refused, and the hint names the data
+   graph that would be one. Its `at` is `operations/<op>/in/<input>`, or `operations/<op>/run` where the input passes
+   on by name.
