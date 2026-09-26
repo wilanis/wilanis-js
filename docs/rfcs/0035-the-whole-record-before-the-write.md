@@ -395,13 +395,15 @@ in the scaffold for a collection no invariant reads or goes altogether; and the 
    refuses any other type at `operations/<op>/accepts` under the code an unresolved type already takes. No code
    is added.
 3. **The two `I` rules are I007 and I008, and read only what the document shows.** They run from
-   `judgeInvariants` in `checker.ts`, right after `checkInvariantSites`, and `rootsOf` is taken from
-   `check/judge.ts`, where it lives. I007 finds the fields a `changes` names where it is written out, by its keys,
-   and where it is one read of `in`, by the fields of that read's type, as X211 types a `changes` read whole; a read
+   `judgeInvariants` in `checker.ts`, right after `checkInvariantSites`. The fields an invariant reads are
+   `guardRoots` in `guard.ts`, the lowering's own reading of the rule, over `rootsOf` in `check/judge.ts`, where it
+   lives rather than in `prove.ts`. I007 finds the fields a `changes` names where it is written out, by its keys,
+   and where it is one read of `in`, by the fields of that read's type, typed off the graph's `in`; a read
    of anything else names no field the checker can see and is not refused. I008's message names the invariant, as
    I007's does, since the rule is non-local. Its hint sends the making to a domain graph and the write to
    `"record": "{{in}}"`, not to a node beside the write as the table has it: a data graph that makes the guarded
    record on its way to an effect is what L0nn refuses, so a hint pointing there would trade one refusal for the
    next. The rule itself accepts one whole read of any node, as the table says. A `map` that binds each element to
    `#put` as `record`, or to `#patch` as `changes`, is not judged: this RFC says what a record read from `in` or a
-   node is, and not what an element of a list read from one is.
+   node is, and not what an element of a list read from one is. That write path, and the others these rules do
+   not see, are #682.
