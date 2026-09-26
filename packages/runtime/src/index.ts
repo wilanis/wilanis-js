@@ -46,7 +46,7 @@ export { cli as cliTriggers } from './plugins/cli-trigger.js';
 export { BUILTIN_PLUGINS } from './plugins/index.js';
 export { std } from './plugins/std.js';
 export { postLoad } from './post-load.js';
-export { activeProfile, PROFILE_VARIABLE, secretsRefusal, unsetSecrets } from './profile.js';
+export { activeProfile, declaredProfile, PROFILE_VARIABLE, secretsRefusal, unsetSecrets } from './profile.js';
 export {
   groupSaid,
   needSaid,
@@ -106,6 +106,7 @@ export {
   type MigrateOptions,
   type MigrateResult,
   manifestOf,
+  manifestText,
   map,
   migrate,
   policyRoots,

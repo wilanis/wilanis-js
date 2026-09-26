@@ -116,3 +116,6 @@ export function manifestOf(load: LoadResult & { resolved?: Resolved }, options: 
     profiles,
   };
 }
+
+/** The manifest as `wilanis manifest` prints it and `/api/manifest` answers it: two-space JSON and a newline. */
+export const manifestText = (manifest: Manifest): string => `${JSON.stringify(manifest, null, 2)}\n`;

@@ -20,6 +20,7 @@ export {
   type Manifest,
   type ManifestOptions,
   manifestOf,
+  manifestText,
 } from './manifest.js';
 export { map } from './map.js';
 export { type MigratedStep, type MigratedTarget, type MigrateOptions, type MigrateResult, migrate } from './migrate.js';

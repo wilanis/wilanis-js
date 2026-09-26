@@ -1,8 +1,8 @@
 /**
  * The viewer's HTTP server: the page at /, the document list at /api/index, one document's view at
  * /api/doc?path=..., one schema at /api/schema?path=... (read from the installed @wilanis/core, so a node's
- * type and a document's $schema open the schema that judges it), and /api/version so the page can notice
- * the tree changed and refetch. The tree is
+ * type and a document's $schema open the schema that judges it), the manifest at /api/manifest?profile=... (RFC
+ * 0026), and /api/version so the page can notice the tree changed and refetch. The tree is
  * loaded on every request: a save in the editor shows on the next paint, and the server holds no state
  * that could go stale.
  */
@@ -11,8 +11,9 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkTree } from '@wilanis/compiler';
 import type { LoadResult, PluginModule } from '@wilanis/core';
-import { loadProject } from '@wilanis/runtime';
+import { declaredProfile, loadProject, manifestOf, manifestText } from '@wilanis/runtime';
 import { indexOf, refusalView, schemaRelOf, schemaViewOf, viewOf } from './model.js';
 
 export interface ServeViewOptions {
@@ -72,18 +73,52 @@ const missing = (path: string, load: LoadResult) => ({
   refusals: load.refusals.items.map(refusalView),
 });
 
+/** What a route answers when it has the text to send already: the status, and that text. */
+interface Answer {
+  status: number;
+  body: string;
+}
+
+/** Send an answer as JSON the browser never caches. */
+function send(res: ServerResponse, { status, body }: Answer): void {
+  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+  res.end(body);
+}
+
+/** Send a value as JSON. */
+const json = (res: ServerResponse, status: number, body: unknown) => send(res, { status, body: JSON.stringify(body) });
+
+/** The page itself, which the browser asks for once. */
+function page(res: ServerResponse): void {
+  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+  res.end(readFileSync(PAGE));
+}
+
+/**
+ * The manifest (RFC 0026) of the tree at root, the bytes `wilanis manifest` prints: every profile's block, or the one
+ * `profile` names. Where the command exits 1 this answers why, as the other routes do: a tree the checker refuses
+ * (409, with every refusal), or a profile the project does not declare (400, RFC 0013's message).
+ */
+async function manifestAnswer(root: string, profile?: string, plugins?: Record<string, PluginModule>): Promise<Answer> {
+  const load = await loadProject(root, { plugins });
+  const judged = checkTree(load);
+  if (!judged.ok) {
+    const refusals = judged.items.map(refusalView);
+    const error = `no manifest of a tree the checker refuses: ${refusals.length} refusal(s)`;
+    return { status: 409, body: JSON.stringify({ error, refusals }) };
+  }
+  try {
+    if (profile !== undefined) declaredProfile(load.registry.project?.doc, profile);
+  } catch (error) {
+    return { status: 400, body: JSON.stringify({ error: (error as Error).message }) };
+  }
+  // the root as the viewer was given it
+  return { status: 200, body: manifestText(manifestOf(load, { root, profile })) };
+}
+
 /** Serve the viewer for the tree at root. Answers the URL and a way to stop. */
 export async function serveView(root: string, opts: ServeViewOptions = {}): Promise<ViewServer> {
   const log = opts.log ?? (() => {});
-  const json = (res: ServerResponse, status: number, body: unknown) => {
-    res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-    res.end(JSON.stringify(body));
-  };
-  /** The page itself, which the browser asks for once. */
-  const page = (res: ServerResponse) => {
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-    res.end(readFileSync(PAGE));
-  };
   /** One document's view, or why there is none. */
   const document = async (res: ServerResponse, url: URL) => {
     const path = url.searchParams.get('path');
@@ -110,6 +145,9 @@ export async function serveView(root: string, opts: ServeViewOptions = {}): Prom
     },
     '/api/doc': document,
     '/api/schema': schema,
+    // an empty ?profile= is no profile, as an empty WILANIS_PROFILE is unset
+    '/api/manifest': async (res, url) =>
+      send(res, await manifestAnswer(root, url.searchParams.get('profile') || undefined, opts.plugins)),
   };
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
