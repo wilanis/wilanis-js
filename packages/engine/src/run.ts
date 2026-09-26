@@ -57,7 +57,7 @@ export class Run {
     this.clock = opts.clock ?? Date.now;
     this.startedAt = this.clock();
     for (const [key, value] of Object.entries(opts.initial ?? {})) this.values.set(key, value);
-    for (const [key, value] of Object.entries({ ...opts.initial, ...opts.shown })) this.shown.set(key, value);
+    for (const [key, value] of Object.entries(opts.initial ?? {})) this.shown.set(key, opts.shown?.[key] ?? value);
     for (const id of Object.keys(spec.nodes)) this.reports[id] = initialReport(this.values, id);
     this.mapHost = {
       values: this.values,
@@ -280,6 +280,7 @@ export class Run {
       stubs: this.opts.stubs,
       request: this.values.get('request'),
       shownIn: report.in,
+      shownRequest: this.shown.get('request'),
       signal: this.opts.signal,
       clock: this.clock,
       env: this.opts.env ?? {},
