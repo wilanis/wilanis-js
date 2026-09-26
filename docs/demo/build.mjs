@@ -88,11 +88,11 @@ function step2(ctx) {
     title,
     summary: `${want.join(" ")}, ${count}`,
     does: [
-      { text: "Five of the ten hints are shape and status: the agent declares what the route takes and answers and maps the three reasons the operation can end with. It leaves the policy alone, since nothing yet told it why.", pre: read(ctx, ROUTE) },
+      { text: "Five of the eight hints are shape and status: the agent declares what the route takes and answers and maps the three reasons the operation can end with. It leaves the policy alone, since nothing yet told it why.", pre: read(ctx, ROUTE) },
       CHECK,
     ],
     answers: [{ pre: out, codes: true }],
-    why: "One round of edits took five refusals to zero and touched nothing else, because each hint said where and what. What remains is not about the route's shape but about who may call it: I001, a rule of the tree, says the same thing it said before, since the rule did not move; and the four A006, one per profile with a store, say the customer stores keep each tenant's rows apart, so the route needs a policy that proves the caller's session carries a tenant. All five point at <code>#policies</code>.",
+    why: "One round of edits took five refusals to zero and touched nothing else, because each hint said where and what. What remains is not about the route's shape but about who may call it: I001, a rule of the tree, says the same thing it said before, since the rule did not move; and the two A006, one per profile that listens and keeps a store, say the customer stores keep each tenant's rows apart, so the route needs a policy that proves the caller's session carries a tenant. All three point at <code>#policies</code>.",
   };
 }
 

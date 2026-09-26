@@ -397,7 +397,7 @@
           "additionalProperties": { "type": "string" }
         },
         "reaches": {
-          "description": "Every native operation that is not pure the profile runs, from every trigger, attached policy, required port and startup step that runs there, once each, by operation. The `holds` operations are among them.",
+          "description": "Every native operation that is not pure the profile runs, from each trigger it walks (one its startup serves, or one no profile's startup serves), each policy such a trigger attaches, each required port and each startup step that runs there, once each, by operation. The `holds` operations are among them.",
           "type": "array",
           "items": { "$ref": "#/$defs/reach" }
         },
