@@ -162,8 +162,8 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   it where nothing is guarded -- and a proved site adds nothing, which is the whole incentive to prove one.
 - **A schema change.** The pull request waits for the maintainer's approval in CI, as a change of decision
   does, because `main` serves the schemas to every tree. Until 1.0: edit in place. After 1.0: compatible,
-  edit in place; breaking, the base URL in `model.ts` and every `$id` move to the tag `schemas-v2`, and the
-  `schemas-v1` tag stays (RFC 0008).
+  edit in place; breaking, the base URL (`SCHEMA_BASE` in `published.ts`) and every `$id` move to the tag
+  `schemas-v2`, and the `schemas-v1` tag stays (RFC 0008).
 - **A new plugin.** A new package under `packages/`, depending on core and engine only -- and, where it implements one, the contract plugin it answers -- exporting its
   `PluginModule` as default: `root`, `docs` (the directory of the JSON documents it ships, with
   `plugin.json`; listed in the package's `files`, and always `docs/` beside its package.json, which `wilanis new`
