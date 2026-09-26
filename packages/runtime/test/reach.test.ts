@@ -1,7 +1,7 @@
 import { buildEnv, type Reach, reachOf } from '@wilanis/compiler';
 import { loadTree, Scope } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
-import { unsetSecrets } from '../src/index.js';
+import { migrate, unsetSecrets } from '../src/index.js';
 import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
 describe('the reach of a profile', () => {
@@ -104,6 +104,24 @@ describe('the reach of a profile', () => {
     expect(unsetSecrets(scope, 'production', env)).toEqual([
       'CUSTOMERS_OPERATOR_PASSWORD_HASH (operatorPasswordHash, read by @connections/employees-production.connection.json)',
     ]);
+  });
+
+  it('asks migrate for what it asks start: production-worker plans without the hash', async () => {
+    // migrate refuses before any plugin opens anything, as start does, and names the same variables start would
+    const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);
+    const names = ['CUSTOMERS_DATABASE_URL', 'CUSTOMERS_JWT_SECRET', 'CUSTOMERS_OPERATOR_PASSWORD_HASH'];
+    const kept = names.map(name => [name, process.env[name]] as const);
+    for (const name of names) delete process.env[name];
+    try {
+      await expect(migrate(load, { profile: 'production-worker', log: () => {} })).rejects.toThrow(
+        'missing secrets: CUSTOMERS_DATABASE_URL (customersDatabase, read by @connections/customers-postgres.connection.json), CUSTOMERS_JWT_SECRET (jwt, read by @auth settings)',
+      );
+      await expect(migrate(load, { profile: 'production', log: () => {} })).rejects.toThrow(
+        'CUSTOMERS_OPERATOR_PASSWORD_HASH (operatorPasswordHash, read by @connections/employees-production.connection.json)',
+      );
+    } finally {
+      for (const [name, value] of kept) if (value !== undefined) process.env[name] = value;
+    }
   });
 
   it('walks a route under every profile where no profile listens, so a tree that serves nowhere is walked whole', () => {

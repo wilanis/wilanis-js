@@ -1,8 +1,9 @@
 /**
  * `wilanis migrate`: the tree's declared state against what the world has recorded. It loads and judges the
- * tree, runs every plugin's postLoad under the profile exactly as `start` does -- a plan needs whatever an
- * engine registered there -- asks every plugin with a `migrate` member for its plan, prints it, applies it
- * when told, and tears the plugins down. It runs no startup step and builds no `Served`: nothing listens.
+ * tree, refuses the variables the profile's reach reads and nobody set, and runs every plugin's postLoad under
+ * the profile, both exactly as `start` does -- a plan needs whatever an engine registered there -- asks every
+ * plugin with a `migrate` member for its plan, prints it, applies it when told, and tears the plugins down. It
+ * runs no startup step and builds no `Served`: nothing listens.
  */
 import { checkTree } from '@wilanis/compiler';
 import type {
@@ -19,6 +20,7 @@ import { FileBlobStore } from './blobs.js';
 import type { Embedder } from './embed.js';
 import { historyLines, summaryLine, targetLines } from './migrate-lines.js';
 import { postLoad } from './post-load.js';
+import { secretsRefusal } from './profile.js';
 import { embedderFor } from './stubbing.js';
 
 /** What the command was told to do, as the flags say it. */
@@ -238,7 +240,9 @@ export async function migrate(load: LoadResult, opts: MigrateOptions = {}): Prom
       refusals: checked.items,
     });
   const emb = embedderFor(load, { profile: opts.profile });
-  if (emb.missingSecrets.length) throw new Error(`missing secrets: ${emb.missingSecrets.join(', ')}`);
+  // what `start` asks for under the profile, and no more: a connection only another profile reaches costs it nothing
+  const unset = secretsRefusal(emb.scope, opts.profile, process.env);
+  if (unset) throw new Error(unset);
   const down = await postLoad(load, emb, log);
   try {
     if (opts.history) return await printHistory(load, emb, opts);
