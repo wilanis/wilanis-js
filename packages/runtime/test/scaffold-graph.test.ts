@@ -1,8 +1,9 @@
 /**
- * `wilanis new graph --store`: the read-decide-write shape, scaffolded. The claim is not that the JSON looks a
+ * `wilanis new graph --read-then`: the read-decide-write shape, scaffolded. The claim is not that the JSON looks a
  * certain way but that it is the shape whole -- the ids and the routing in place -- and that filling in the
  * TODOs a tool cannot decide is the only work left: the scaffold, written into a copy of the example over its
- * customers store and given the shapes it answers, checks clean.
+ * customers store and given the shapes it answers, checks clean. It replaces or removes a record; it never
+ * patches one (RFC 0035), and `--read-then patch` is refused with the pair that changes a record whole.
  */
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -26,7 +27,7 @@ function scaffolded(name: string, opts: Record<string, string>) {
   return { dir, file, doc };
 }
 
-/** Fill the TODOs a scaffold cannot decide -- what the graph takes and answers, and what a patch changes. */
+/** Fill the TODOs a scaffold cannot decide -- what the graph takes and answers -- and check the tree. */
 function fill(dir: string, file: string, changes: Record<string, string>): string[] {
   const at = join(dir, file);
   const filled = readFileSync(at, 'utf8')
@@ -45,24 +46,24 @@ const shapeOf = (doc: Record<string, unknown>) =>
     node => `${node.id} ${node.type === '@wilanis/node/switch.schema.json' ? 'switch' : 'run'}`,
   );
 
-describe('wilanis new graph --store: read, decide, write', () => {
+/** Two branches over what the record holds: one for an account that has lapsed, one for any other. */
+const BRANCHES = 'lapsed:has(record) && !has(record.active)\nclosed:has(record)';
+
+describe('wilanis new graph --read-then: read, decide, write', () => {
   it('writes the shape whole: the read, the decision, and a write with its own routing per branch', () => {
-    const { dir, doc } = scaffolded('note-customer', {
-      'read-then': 'patch',
-      branch: 'noted:has(record) && !has(record.note)\nrenoted:has(record)',
-    });
+    const { dir, doc } = scaffolded('close-customer', { 'read-then': 'remove', branch: BRANCHES });
     // every id says what its node holds: the store's collection is of Customer, the branches are the author's
     expect(shapeOf(doc)).toEqual([
       'storedCustomer run',
       'whichWrite switch',
-      'noted run',
-      'stillThereAfterNoted switch',
-      'notedCustomer run',
-      'goneBeforeNoted run',
-      'renoted run',
-      'stillThereAfterRenoted switch',
-      'renotedCustomer run',
-      'goneBeforeRenoted run',
+      'lapsed run',
+      'stillThereAfterLapsed switch',
+      'lapsedCustomer run',
+      'goneBeforeLapsed run',
+      'closed run',
+      'stillThereAfterClosed switch',
+      'closedCustomer run',
+      'goneBeforeClosed run',
       'noCustomer run',
     ]);
     // the read is by the key the graph takes, and the decision routes on what it answered
@@ -71,79 +72,73 @@ describe('wilanis new graph --store: read, decide, write', () => {
     expect(nodes[1]).toMatchObject({
       in: { record: '{{storedCustomer.record}}' },
       rules: [
-        { when: 'has(record) && !has(record.note)', to: 'noted' },
-        { when: 'has(record)', to: 'renoted' },
+        { when: 'has(record) && !has(record.active)', to: 'lapsed' },
+        { when: 'has(record)', to: 'closed' },
       ],
       else: 'noCustomer',
     });
     // each write routes on what it answered, so a record gone between the read and the write is a case, not a fault
     expect(nodes[3]).toMatchObject({
-      in: { record: '{{noted.record}}' },
-      rules: [{ when: 'has(record)', to: 'notedCustomer' }],
-      else: 'goneBeforeNoted',
+      in: { record: '{{lapsed.record}}' },
+      rules: [{ when: 'has(record)', to: 'lapsedCustomer' }],
+      else: 'goneBeforeLapsed',
     });
     // every node that can answer is a candidate, in the order the branches were named
     expect(doc.out).toEqual({
       type: 'TODO',
-      from: ['notedCustomer', 'goneBeforeNoted', 'renotedCustomer', 'goneBeforeRenoted', 'noCustomer'],
+      from: ['lapsedCustomer', 'goneBeforeLapsed', 'closedCustomer', 'goneBeforeClosed', 'noCustomer'],
     });
     rmSync(dir, { recursive: true, force: true });
   });
 
   it('checks clean against the example once the TODOs are filled', () => {
-    const { dir, file } = scaffolded('note-customer', {
-      'read-then': 'patch',
-      branch: 'noted:has(record) && !has(record.note)\nrenoted:has(record)',
-    });
-    // a patch changes a field no invariant reads: 'A customer is reachable' reads note, and patching it is I007
-    expect(fill(dir, file, { '"TODO": "TODO"': '"active": true' })).toEqual([]);
+    const { dir, file } = scaffolded('close-customer', { 'read-then': 'remove', branch: BRANCHES });
+    expect(fill(dir, file, {})).toEqual([]);
     rmSync(dir, { recursive: true, force: true });
   });
 
   it('checks clean for each write --read-then names, since each answers the record the same way', () => {
+    // a put writes the record whole, read from in where it is judged (I008), so the graph takes a Customer
     for (const [write, changes] of [
       ['remove', {}],
-      // a put of a Customer writes the record whole, taken as in, or it is composed at the write (I008)
-      ['put', { [`"in": "${REF}"`]: `"in": "${CUSTOMER}"`, '"record": "TODO"': '"record": "{{in}}"' }],
+      ['put', { [`"in": "${REF}"`]: `"in": "${CUSTOMER}"` }],
     ] as [string, Record<string, string>][]) {
-      const { dir, file, doc } = scaffolded(`probe-${write}`, {
-        'read-then': write,
-        branch: 'taken:has(record)',
-      });
+      const { dir, file, doc } = scaffolded(`probe-${write}`, { 'read-then': write, branch: 'taken:has(record)' });
       expect((doc.nodes as { run?: string }[])[2].run).toBe(`@storage/store.port.json#${write}`);
       expect(fill(dir, file, changes), write).toEqual([]);
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
+  it('writes a put whose record is the graph’s whole in, never one composed at the write', () => {
+    const { dir, doc } = scaffolded('replace-customer', { 'read-then': 'put' });
+    expect((doc.nodes as { in: Record<string, unknown> }[])[2].in).toEqual({ ...STORE, record: '{{in}}' });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it('is a data graph whatever --layer says, since it reaches a store', () => {
-    const { dir, file } = scaffolded('elsewhere', { 'read-then': 'patch', layer: 'domain' });
+    const { dir, file } = scaffolded('elsewhere', { 'read-then': 'remove', layer: 'domain' });
     expect(file).toBe('features/customers/data/elsewhere.graph.json');
     rmSync(dir, { recursive: true, force: true });
   });
 
   it('scaffolds one branch named for its write where none was named, and refuses a --branch that is not <id>:<when>', () => {
-    const { dir, doc } = scaffolded('one-branch', { 'read-then': 'patch' });
+    const { dir, doc } = scaffolded('one-branch', { 'read-then': 'put' });
     expect(shapeOf(doc)).toEqual([
       'storedCustomer run',
       'whichWrite switch',
-      'patched run',
-      'stillThereAfterPatched switch',
-      'patchedCustomer run',
-      'goneBeforePatched run',
+      'replaced run',
+      'stillThereAfterReplaced switch',
+      'replacedCustomer run',
+      'goneBeforeReplaced run',
       'noCustomer run',
     ]);
-    for (const [write, written] of [
-      ['put', 'replaced'],
-      ['remove', 'removed'],
-    ]) {
-      const { dir: other, doc: named } = scaffolded(`one-${write}`, { 'read-then': write });
-      expect((named.nodes as { id: string }[])[2].id).toBe(written);
-      rmSync(other, { recursive: true, force: true });
-    }
-    expect(() => scaffold(dir, 'graph', 'features/customers/bad', { ...STORE, branch: 'noWhen' })).toThrow(
-      "--branch 'noWhen' is not <id>:<when>",
-    );
+    const { dir: other, doc: named } = scaffolded('one-remove', { 'read-then': 'remove' });
+    expect((named.nodes as { id: string }[])[2].id).toBe('removed');
+    rmSync(other, { recursive: true, force: true });
+    expect(() =>
+      scaffold(dir, 'graph', 'features/customers/bad', { ...STORE, 'read-then': 'remove', branch: 'noWhen' }),
+    ).toThrow("--branch 'noWhen' is not <id>:<when>");
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -160,10 +155,23 @@ describe('wilanis new graph --store: read, decide, write', () => {
     expect(typed.doc.out).toMatchObject({ type: '@customers/domain/TierLatest.shape.json' });
     rmSync(typed.dir, { recursive: true, force: true });
     // a store the tree does not have says nothing of its collection, so the ids fall back to the record
-    const bare = scaffolded('bare', { 'read-then': 'patch', store: '@features/nowhere/data/nothing.store.json' });
+    const bare = scaffolded('bare', { 'read-then': 'remove', store: '@features/nowhere/data/nothing.store.json' });
     expect(shapeOf(bare.doc)[0]).toBe('storedRecord run');
     expect(shapeOf(bare.doc).at(-1)).toBe('noRecord run');
     rmSync(bare.dir, { recursive: true, force: true });
+  });
+
+  it('refuses --read-then patch, naming the pair that changes a record whole, and a word that is no write', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'wilanis-rdw-'));
+    cpSync(EXAMPLE, dir, { recursive: true });
+    const asked = (opts: Record<string, string>) => () => scaffold(dir, 'graph', 'features/customers/x', opts);
+    expect(asked({ ...STORE, 'read-then': 'patch' })).toThrow(
+      '--read-then patch is not scaffolded: a record is changed whole (RFC 0035). --port <port> writes the domain graph',
+    );
+    expect(asked({ ...STORE, 'read-then': 'upsert' })).toThrow("--read-then 'upsert' is not put or remove");
+    // a --branch routes the read-decide-write form, so without a write it asks for one
+    expect(asked({ ...STORE, branch: 'taken:has(record)' })).toThrow('give --read-then put|remove');
+    rmSync(dir, { recursive: true, force: true });
   });
 
   it('leaves a graph named with no store what it was: one node to replace', () => {
