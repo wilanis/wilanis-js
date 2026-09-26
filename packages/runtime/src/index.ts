@@ -90,6 +90,7 @@ export {
 } from './stores.js';
 export {
   type CancelAt,
+  checkRecorded,
   DIAGNOSTICS_SCHEMA,
   type Diagnostic,
   type Diagnostics,
@@ -97,6 +98,7 @@ export {
   diagnosticsOf,
   embedderFor,
   failedLeaf,
+  fileOf,
   fuzz,
   generatedFire,
   init,
@@ -113,6 +115,10 @@ export {
   migrate,
   policyRoots,
   printed,
+  RECORDED,
+  type RecordCheck,
+  type Recorded,
+  type RecordedRun,
   type Regression,
   type Rehearsal,
   type Replayed,
@@ -120,9 +126,11 @@ export {
   rehearse,
   type StubOptions,
   scaffold,
+  scenarioOf,
   stubEffects,
   withRegression,
   withRehearsal,
+  writeRecorded,
 } from './tools.js';
 export { atLevel, type Level, traceJson, traceOf, traceText } from './trace.js';
 export { settingsSaid } from './trigger-said.js';

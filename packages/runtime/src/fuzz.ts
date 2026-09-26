@@ -14,7 +14,7 @@ import { embedderFor, generatedFire } from './stubbing.js';
 // ---- fuzz / regress ----------------------------------------------------------------------------------
 
 /** The one directory placement says a scenario lives in (HOME, D008). */
-const HOME_DIR = HOME.scenario?.dir ?? 'scenarios';
+export const HOME_DIR = HOME.scenario?.dir ?? 'scenarios';
 
 /**
  * Where plain fuzz writes, under the root: a directory of its own inside the scenarios' home, so what fuzz owns sits
@@ -55,7 +55,7 @@ function pick(report: Report, prefix = ''): ScenarioDoc['expect']['nodes'] {
  * What a run is recorded as expecting: how it ended, what it answered, the reason the refuse node it failed at
  * declared (`refusalOf`, which no node's `out` carries), and what every node did.
  */
-function expectOf(report: Report, secret: string[][]): ScenarioDoc['expect'] {
+export function expectOf(report: Report, secret: string[][]): ScenarioDoc['expect'] {
   const reason = refusalOf(report)?.reason;
   return {
     status: report.status,
@@ -188,7 +188,34 @@ function diffOf(report: Report, sc: ScenarioDoc, secret: string[][]): string[] {
   for (const [id, was] of Object.entries(expect.nodes)) diffs.push(...nodeDiffs(id, was, got[id], pinsReasons));
   for (const id of Object.keys(got)) if (!(id in expect.nodes)) diffs.push(`${id}: new`);
   diffs.push(...refusalDiffs(report, sc));
-  return diffs;
+  return branchFirst(sc, got, diffs);
+}
+
+/**
+ * The diffs with the decision named first, where the scenario proves a branch and its switch no longer routes where
+ * the recording did, so a decision is named before the nodes that moved with it.
+ */
+function branchFirst(sc: ScenarioDoc, got: ScenarioDoc['expect']['nodes'], diffs: string[]): string[] {
+  const branch = sc.branch;
+  const at = branch && switchPath(sc.expect.nodes, branch);
+  if (!branch || at === undefined || !diffs.length) return diffs;
+  if (got[at]?.selected === sc.expect.nodes[at].selected) return diffs;
+  const [first, ...rest] = diffs;
+  return [`branch '${branch.when}' → ${branch.to} no longer routes there: ${first}`, ...rest];
+}
+
+/**
+ * Where a scenario's recording has the switch its branch names: under the node that ran the branch's graph, the
+ * switch that routed. The graph is matched first, since two graphs of one run may each have a switch of that id.
+ */
+function switchPath(
+  nodes: ScenarioDoc['expect']['nodes'],
+  branch: { graph: string; node: string },
+): string | undefined {
+  const ran = `graph:${branch.graph}`;
+  for (const [id, node] of Object.entries(nodes))
+    if (node.handler === ran && nodes[`${id}.${branch.node}`]?.selected !== undefined) return `${id}.${branch.node}`;
+  return undefined;
 }
 
 /** One scenario replayed: whether the run matched what it recorded, and each difference said in words. */
