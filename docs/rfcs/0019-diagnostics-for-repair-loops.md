@@ -377,7 +377,7 @@ callable without the CLI:
   asked; `root` as given on the command line; `ok` whether `refusals` is empty; `documents` the registry's file
   count; `refusals` sorted by `file`, then `at` (absent first), then `code`, then `message`, each carrying
   `family` (the code's first letter) and `url`.
-- `pageUrl(code: string): string | undefined` lives in `packages/core/src/model.ts` beside `schemaUrl`, sharing its
+- `pageUrl(code: string): string | undefined` lives in `packages/core/src/published.ts` beside `schemaUrl`, sharing its
   repository base: `https://github.com/wilanis/wilanis-js/blob/main/docs/refusals/<CODE>.md`, for the ten checker
   families and for the X codes of the plugins this workspace ships. Any other code (a plugin from elsewhere) has no
   `url`; how such a plugin names its pages is an open question below.

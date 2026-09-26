@@ -31,8 +31,9 @@ Every document names its kind and its version in one line:
 
 or the alias `@wilanis/graph.schema.json`, which the loader reads as the version the runtime prefers.
 Until 1.0, `main` is the address and `packages/core/schemas/` there is what the URL serves. At 1.0 the
-tag `schemas-v1` is cut, every URL moves to it, and it never moves again: a tag cannot go stale the way
-a branch does.
+tag `schemas-v1` is cut and every URL moves to it. That address never changes again. The commit the tag
+names does, to each compatible change (below), so the tag carries only what keeps a v1 document's meaning,
+where a branch would carry every change.
 
 **Before 1.0.** v1 is the working draft, and 1.0 waits for it: it is published only when no accepted RFC
 still changes a schema, so what is frozen is final (`docs/roadmap.md` puts it last for that reason). A schema may change in place, a kind may be renamed, a rule
@@ -57,8 +58,9 @@ prints the IR version of the tree beside the runtime's.
 
 ### Documents and schemas
 
-- `packages/core/src/model.ts` holds the base URL; the version is its last path segment. A
-  `schemas-v2` adds a second base and keeps the first.
+- `SCHEMA_BASE` in `packages/core/src/published.ts` holds the base URL; the version is the ref in its path,
+  `main` or the tag `schemas-vN` (`irOf`). A breaking change moves it to the next tag, and the tag it leaves
+  stays where it was.
 - Every schema's `$id` and `$schema` enum carry the URL; `validate.ts` joins the kinds in `model.ts`
   with the schemas, so a version is one list in one place.
 - `project.json` gains nothing: the version is per document, as today. Mixing versions in one tree is
