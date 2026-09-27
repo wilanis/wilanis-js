@@ -6,6 +6,7 @@
  * is here too, so the viewer reads it from one place rather than walking the tree its own way.
  */
 
+export { type Endpoint, endpointSaid, listensParts } from './address-said.js';
 export { FileBlobStore } from './blobs.js';
 export {
   type Branch,

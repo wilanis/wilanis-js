@@ -36,16 +36,24 @@ function partSaid(part: string, bound: Bound<unknown>, root: string | undefined,
 }
 
 /**
- * Where an operation that listens takes its address from, said inside its `holds` mark: `; port: in.port, else
- * @http settings.port, else 8080; host: ...`. A host nothing fixes is every interface; nothing for one that does
- * not listen.
+ * Where each part of the address an operation that listens binds comes from, port first: `port: in.port, else
+ * @http settings.port, else 8080`. A host nothing fixes is every interface; none for one that does not listen.
  */
-export function listensSaid(op: Operation, root: string | undefined): string {
-  if (!op.listens) return '';
+export function listensParts(op: Operation, root: string | undefined): string[] {
+  if (!op.listens) return [];
   const { port, host } = op.listens;
   const parts = [partSaid('port', port, root, 'nothing fixes it')];
   if (host) parts.push(partSaid('host', host, root, 'every interface'));
-  return `; ${parts.join('; ')}`;
+  return parts;
+}
+
+/**
+ * Where an operation that listens takes its address from, said inside its `holds` mark: `; port: in.port, else
+ * @http settings.port, else 8080; host: ...`; nothing for one that does not listen.
+ */
+export function listensSaid(op: Operation, root: string | undefined): string {
+  const parts = listensParts(op, root);
+  return parts.length ? `; ${parts.join('; ')}` : '';
 }
 
 /** The value a dotted path picks out of a connection's settings, as written, or nothing where it is not written. */
@@ -68,16 +76,27 @@ export function endpointOf(connection: ConnectionDoc, scope: Scope): { endpoint:
   return endpoint ? { endpoint, value: valueAt(connection.settings ?? {}, endpoint) } : undefined;
 }
 
+/** What a connection reaches, as `describe` says it: the address as written, the setting holding it, and the kind naming it. */
+export interface Endpoint {
+  value: string;
+  setting: string;
+  kind: string;
+}
+
 /**
- * What a connection reaches, where its kind says which setting holds the address: `endpoint  <value>  (baseUrl,
- * by @http/http.connection-kind.json)`. A secret read stays its template text; nothing for a kind that declares
- * no endpoint, or a connection that does not write the setting.
+ * What a connection reaches, where its kind says which setting holds the address. A secret read stays its
+ * template text; nothing for a kind that declares no endpoint, or a connection that does not write the setting.
  */
-export function endpointLines(doc: Loaded, scope: Scope): string[] {
+export function endpointSaid(doc: Loaded, scope: Scope): Endpoint | undefined {
   const connection = doc.doc as ConnectionDoc;
   const found = endpointOf(connection, scope);
-  if (found?.value === undefined) return [];
+  if (found?.value === undefined) return undefined;
   const { endpoint, value } = found;
-  const said = typeof value === 'string' ? value : JSON.stringify(value);
-  return [`endpoint  ${said}  (${endpoint}, by ${connection.kind})`];
+  return { value: typeof value === 'string' ? value : JSON.stringify(value), setting: endpoint, kind: connection.kind };
+}
+
+/** What a connection reaches, as one line: `endpoint  <value>  (baseUrl, by @http/http.connection-kind.json)`. */
+export function endpointLines(doc: Loaded, scope: Scope): string[] {
+  const said = endpointSaid(doc, scope);
+  return said ? [`endpoint  ${said.value}  (${said.setting}, by ${said.kind})`] : [];
 }

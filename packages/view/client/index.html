@@ -600,6 +600,23 @@
     for (const s of senders) { const row = el('div', 'ref'); row.appendChild(sendLink(s)); row.appendChild(el('small', 'mono', ' ' + s.address)); page.appendChild(row); }
   }
 
+  /**
+   * Where an operation that listens takes the address it binds from, part by part, in the words `wilanis describe`
+   * prints inside its holds mark: the startup step's input, else the plugin's setting, else the default.
+   */
+  function listensEl(parts) {
+    const p = el('p'); p.appendChild(frag('Listens on '));
+    parts.forEach((part, i) => { if (i) p.appendChild(frag('; ')); p.appendChild(el('code', null, part)); });
+    p.appendChild(frag('.')); return p;
+  }
+
+  /** What a connection reaches, where its kind names the setting that holds the address: `wilanis describe`'s endpoint line. */
+  function endpointEl(e) {
+    const p = el('p'); p.appendChild(frag('Reaches ')); p.appendChild(el('code', null, e.value));
+    p.appendChild(frag(', read from ')); p.appendChild(el('code', null, e.setting)); p.appendChild(frag(', the setting '));
+    p.appendChild(link(e.kind)); p.appendChild(frag(' names as the endpoint.')); return p;
+  }
+
   function renderDocPage(page, v) {
     const h1 = el('h1', null, v.label); h1.appendChild(schemaBadge(v.kind, null, v.kind + '.schema.json')); if (v.kind === 'shape') h1.appendChild(badge(v.kind, v.doc.layer === 'edge' ? 'edge: the world’s shape' : 'core: ours')); page.appendChild(h1);
     page.appendChild(el('p', 'lead', v.description));
@@ -719,6 +736,7 @@
         for (const [name, op] of Object.entries(d.operations)) {
           const h = el('h3', null, readable(name)); h.appendChild(el('code', null, '#' + name)); if (op.pure) h.appendChild(el('span', 'badge ok', 'pure')); else if (v.native) h.appendChild(el('span', 'badge warn', 'effect')); if (op.refuses) h.appendChild(el('span', 'badge warn', 'refuses on purpose')); if (op.transactional) h.appendChild(el('span', 'badge ok', 'transactional')); if (op.holds) h.appendChild(el('span', 'badge warn', 'holds until stopped')); for (const b of promisedBadges(op)) h.appendChild(b); page.appendChild(h);
           page.appendChild(el('p', null, op.description));
+          if (v.listens && v.listens[name]) page.appendChild(listensEl(v.listens[name]));
           if (typeof op.accepts === 'string') { const t = el('p'); t.appendChild(frag('Takes ')); t.appendChild(typeEl(op.accepts)); t.appendChild(frag(', its fields given one by one.')); page.appendChild(t); }
           else if (op.accepts && Object.keys(op.accepts).length) page.appendChild(fieldsTable(op.accepts)); else page.appendChild(el('p', null, 'Takes nothing.'));
           const r = el('p'); r.appendChild(frag('Answers ')); r.appendChild(op.returns ? typeEl(op.returns) : frag('nothing')); page.appendChild(r);
@@ -798,6 +816,7 @@
       }
       case 'connection': {
         const chain = el('div', 'chain'); chain.appendChild(step('a channel of kind', link(d.kind))); page.appendChild(chain);
+        if (v.endpoint) page.appendChild(endpointEl(v.endpoint));
         page.appendChild(el('h2', null, 'Settings')); page.appendChild(valuesTable(d.settings));
         if (v.delivery) deliveryEl(page, v.delivery);
         break;

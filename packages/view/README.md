@@ -15,8 +15,9 @@ fetched from the network, so the page shows the schema version the tree is actua
 
 Everything is named by its `label` (a document's, a node's, a resolver's), or by its file name made
 readable when none is written. Every other kind of document has a page of its own: a trigger as the chain
-it fires, a port as its operations and the bindings that meet them, a binding as how each operation is
-met, a shape as its fields, the project as its plugins and profiles. The JSON is one click away behind
+it fires, a port as its operations and the bindings that meet them (with, under an operation that listens,
+where the address it binds comes from), a connection as its kind, the endpoint it reaches and its settings,
+a binding as how each operation is met, a shape as its fields, the project as its plugins and profiles. The JSON is one click away behind
 "source". The side panel names what a document uses and, in the other direction, everything that reaches
 it, including the graph nodes that reach a data graph through its port operation.
 
