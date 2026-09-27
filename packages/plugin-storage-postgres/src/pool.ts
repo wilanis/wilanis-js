@@ -26,6 +26,23 @@ interface Connection {
   pool?: { max?: unknown };
 }
 
+/**
+ * The connections an environment carries: each one's kind, its settings with secrets substituted, and the path
+ * of the connection it reaches under the profile -- a stand-in's own, where the profile puts one in. The path is
+ * absent only from an environment made by hand, which names every connection as itself.
+ */
+type Connections = Record<string, { kind: string; settings: Record<string, unknown>; path?: string }>;
+
+/**
+ * A connection a caller names, as a pool and a transaction are kept for it: under the path it reaches, so a
+ * stand-in and the connection it stands for share one pool, and a publish through one joins the transaction a
+ * store call through the other opened. Nothing where the environment has no such connection.
+ */
+export function reachedOn(env: object, connection: string): On | undefined {
+  const conn = (env as { connections?: Connections }).connections?.[connection];
+  return conn && { connection: conn.path ?? connection, kind: conn.kind, settings: conn.settings };
+}
+
 /** Every pool one load of a tree made, by the connection each was made for. */
 const pools = new Map<string, { db: Kysely<never>; schema: string }>();
 

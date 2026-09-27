@@ -1,7 +1,8 @@
 /**
  * What both judges read off a document: the variables a call site binds, the inputs a delegation passes
  * on, the nodes a graph answers with, which collection of which store a native call site is over, and which
- * connection it goes to. The checker and the compiler agree on these by sharing them.
+ * connection it goes to, as written and as a profile reaches it. The checker and the compiler agree on these
+ * by sharing them.
  */
 import {
   type Field,
@@ -149,4 +150,17 @@ export function connectionOf(scope: Scope, op: Operation, given: Values | undefi
   const store = named('store');
   const doc = store ? scope.get('store', store) : undefined;
   return doc ? scope.canon(doc.doc.connection) : undefined;
+}
+
+/**
+ * The connection a named one is under a profile: the stand-in the profile puts in its place (C018), else
+ * itself, and itself too where the stand-in names no connection, which R001 refuses. This is what "one
+ * connection" means wherever it is asked: which settings a profile's reach reads, which connection an atomic
+ * graph's effects fall on (L010), and the path the environment hands a handler for each connection, which a
+ * pool and a transaction are keyed by. Two names a profile resolves to one connection are one connection to
+ * all three, since all three ask this.
+ */
+export function connectionUnder(scope: Scope, named: string, profile: string | undefined): string {
+  const reached = scope.connectionFor(named, profile);
+  return typeof reached === 'string' ? scope.canon(named) : reached.path;
 }

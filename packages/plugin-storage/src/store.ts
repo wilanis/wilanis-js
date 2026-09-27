@@ -8,7 +8,12 @@ import type { At, Engine, Ref } from './engine.js';
 import { engines } from './engine.js';
 import type { Lowering } from './ensure.js';
 
-type Connection = { kind: string; settings: Record<string, unknown> };
+/**
+ * A connection as the environment carries it. `path` is the connection it reaches under the profile the tree
+ * runs under -- a stand-in's own, where the profile puts one in -- and is absent only from an environment made
+ * by hand, which names every connection as itself.
+ */
+type Connection = { kind: string; settings: Record<string, unknown>; path?: string };
 
 /** The environment a handler reads: what the runtime built for the tree it is running. */
 interface Env {
@@ -55,12 +60,17 @@ function documentOf(env: Record<string, unknown>, named: unknown): StoreDocument
   return store as StoreDocument;
 }
 
-/** The connection a store sits on, with its kind canonicalised and its secrets already substituted. */
+/**
+ * The connection a store sits on, with its kind canonicalised and its secrets already substituted, under the
+ * path the environment says it reaches. A collection lives in the connection it reaches, so where a profile
+ * stands another connection in for the one the store names, the collection, its pool and the transaction of an
+ * atomic graph writing it are the other connection's, shared with every name that reaches it.
+ */
 function connectionOf(env: Record<string, unknown>, store: StoreDocument): { path: string; conn: Connection } {
-  const path = canonOf(env)(store.connection);
-  const conn = (env as Env).connections?.[path];
+  const named = canonOf(env)(store.connection);
+  const conn = (env as Env).connections?.[named];
   if (!conn) throw new Error(`unknown connection '${store.connection}'`);
-  return { path, conn };
+  return { path: conn.path ?? named, conn };
 }
 
 /**

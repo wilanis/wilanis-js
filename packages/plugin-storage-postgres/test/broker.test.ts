@@ -6,14 +6,16 @@
  * transaction commits -- the one a store call on the same connection opened, or one it opened itself.
  *
  * It needs a database, so the database cases are skipped without `WILANIS_TEST_POSTGRES_URL`, as the engine's
- * suite is (`engine.test.ts` says how to run one). That the plugin registers its broker needs none.
+ * suite is (`engine.test.ts` says how to run one). That the plugin registers its broker needs none, and nor does
+ * which connection a publish joins a transaction under.
  */
 import { randomUUID } from 'node:crypto';
+import { AtomicScope } from '@wilanis/compiler';
 import type { Atomic, Participant } from '@wilanis/core';
 import { brokers, type Delivery } from '@wilanis/plugin-queue';
 import { cases } from '@wilanis/plugin-queue/suite';
 import { engines, type Transaction } from '@wilanis/plugin-storage';
-import { sql } from 'kysely';
+import { DummyDriver, Kysely, PostgresAdapter, PostgresIntrospector, PostgresQueryCompiler, sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TableBroker } from '../src/broker.js';
 import { PostgresEngine } from '../src/engine.js';
@@ -88,6 +90,32 @@ describe('the broker this engine registers', () => {
     expect(brokers(tree).for(KIND)).toBeInstanceOf(TableBroker);
     expect(engines(tree).for(KIND)).toBeInstanceOf(PostgresEngine);
     if (typeof down === 'function') await down();
+  });
+});
+
+describe('a publish through a connection a profile stands in for the store’s', () => {
+  it('joins the transaction under the connection it reaches, not the name it was given (#653)', async () => {
+    // no database: the transaction a store call opened is a session on a driver that runs nothing, so what is
+    // proved is where the publish joined. Joined under the name, the scope would refuse a second connection
+    const store = '@connections/customers.connection.json';
+    const jobs = '@connections/jobs.connection.json';
+    const settings = { url: 'postgres://nobody@127.0.0.1:1/none' };
+    const standing = {
+      connections: { [store]: { kind: KIND, settings, path: store }, [jobs]: { kind: KIND, settings, path: store } },
+    };
+    const trx = new Kysely<never>({
+      dialect: {
+        createAdapter: () => new PostgresAdapter(),
+        createDriver: () => new DummyDriver(),
+        createIntrospector: db => new PostgresIntrospector(db),
+        createQueryCompiler: () => new PostgresQueryCompiler(),
+      },
+    });
+    const scope = new AtomicScope();
+    const opened = { trx, engine: new PostgresEngine({}, trx), commit: async () => {}, rollback: async () => {} };
+    await scope.join(store, async () => opened);
+    const broker = new TableBroker(standing, {}, new PostgresEngine({}));
+    await expect(broker.publish(jobs, 'removals', { body: {}, headers: {} }, scope)).resolves.toHaveProperty('id');
   });
 });
 
