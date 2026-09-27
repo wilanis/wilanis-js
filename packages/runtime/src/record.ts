@@ -3,8 +3,18 @@
  * documents under a directory the command owns, and that directory compared with what the tree would write today
  * (RFC 0018). Rendering is pure, so the directory is a function of the tree and the one seed it is solved under.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmdirSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { type ScenarioBranch, type ScenarioDoc, schemaUrl } from '@wilanis/core';
 import { type Report, refusalOf } from '@wilanis/engine';
 import { expectOf, HOME_DIR } from './fuzz.js';
@@ -104,30 +114,77 @@ export function fileOf(run: RecordedRun): string {
 /** The bytes a scenario is written as. */
 const rendered = (doc: ScenarioDoc) => `${JSON.stringify(doc, null, 2)}\n`;
 
-/** The recorded directory on disk, refused when it is not strictly inside the root, since everything in it is owned. */
+/** Whether `abs` is strictly inside `root`. */
+function strictlyInside(root: string, abs: string): boolean {
+  const inside = relative(root, abs);
+  return Boolean(inside) && !inside.startsWith('..') && !isAbsolute(inside);
+}
+
+/** The real path of a path that may not exist yet: its nearest existing ancestor's, followed by the rest as written. */
+function realOf(abs: string): string {
+  const rest: string[] = [];
+  let at = abs;
+  for (; !existsSync(at) && dirname(at) !== at; at = dirname(at)) rest.unshift(basename(at));
+  return join(realpathSync(at), ...rest);
+}
+
+/**
+ * The recorded directory on disk, refused when it is not strictly inside the root, since everything in it is owned.
+ * It is judged on the real paths too, so a link on the way cannot carry the directory out of the tree.
+ */
 function ownedDir(root: string, dir: string): string {
   const abs = resolve(root, dir);
-  const inside = relative(resolve(root), abs);
-  if (!inside || inside.startsWith('..') || isAbsolute(inside))
-    throw new Error(`the recorded directory must be inside the tree: ${dir}`);
+  if (!strictlyInside(resolve(root), abs)) throw new Error(`the recorded directory must be inside the tree: ${dir}`);
+  const real = realOf(abs);
+  if (!strictlyInside(realOf(resolve(root)), real))
+    throw new Error(`the recorded directory ${dir} leads through a link to ${real}, which is outside the tree`);
   return abs;
 }
 
-/** Every scenario file under the directory, by its path inside it with `/` between segments. */
+/**
+ * Every scenario file under the directory, by its path inside it with `/` between segments: only regular files, and
+ * only below real directories, since a link inside it may lead anywhere and what it leads to is not owned.
+ */
 function onDisk(abs: string): string[] {
   if (!existsSync(abs)) return [];
-  return readdirSync(abs, { recursive: true, encoding: 'utf8' })
-    .filter(file => file.endsWith('.scenario.json'))
-    .map(file => file.split(sep).join('/'))
-    .sort();
+  const found: string[] = [];
+  scenarioFiles(abs, [], found);
+  return found.sort();
+}
+
+/** The scenario files under one directory, walked through its real subdirectories and never through a link. */
+function scenarioFiles(at: string, prefix: string[], into: string[]): void {
+  for (const entry of readdirSync(at, { withFileTypes: true })) {
+    const path = [...prefix, entry.name];
+    if (entry.isDirectory()) scenarioFiles(join(at, entry.name), path, into);
+    else if (entry.isFile() && entry.name.endsWith('.scenario.json')) into.push(path.join('/'));
+  }
+}
+
+/** The files a write would reach through a link inside the directory, and so possibly outside the tree. */
+function throughLinks(abs: string, files: string[]): string[] {
+  const home = realOf(abs);
+  return files.filter(file => {
+    const target = join(abs, file);
+    const parent = realOf(dirname(target));
+    const linked = lstatSync(target, { throwIfNoEntry: false })?.isSymbolicLink() ?? false;
+    return linked || (parent !== home && !strictlyInside(home, parent));
+  });
 }
 
 /**
  * Write every recorded scenario under `dir` and remove every `*.scenario.json` under it this run did not write, with
- * any directory that leaves empty; nothing outside `dir` is touched. Answers the files written, root-relative.
+ * any directory that leaves empty; nothing outside `dir` is touched, and nothing is reached through a link in it.
+ * Answers the files written, root-relative.
  */
 export function writeRecorded(root: string, dir: string, docs: Record<string, ScenarioDoc>): string[] {
   const abs = ownedDir(root, dir);
+  const linked = throughLinks(abs, Object.keys(docs));
+  if (linked.length)
+    throw new Error(
+      `${linked.map(file => `${dir}/${file}`).join(', ')} would be written through a link, which may lead out of ` +
+        'the tree; the recorded directory holds only what --record writes: remove the link',
+    );
   for (const file of onDisk(abs)) if (!(file in docs)) removeOwned(abs, file);
   const written: string[] = [];
   for (const [file, doc] of Object.entries(docs).sort(([one], [other]) => (one < other ? -1 : 1))) {
