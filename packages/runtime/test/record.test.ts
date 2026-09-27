@@ -242,12 +242,24 @@ function wilanis(dir: string, ...args: string[]) {
 }
 
 describe('rehearse --record and --check on the command line', () => {
-  it('writes, says a directory is current, exits 1 on a stale one, and refuses --seed', { timeout: 120_000 }, () => {
+  it('writes, says a directory is current, exits 1 on a stale one, and refuses --seed and --json', {
+    timeout: 120_000,
+  }, () => {
     const dir = copyOfExample();
     symlinkSync(join(WORKSPACE, 'node_modules'), join(dir, 'node_modules'));
     const seeded = wilanis(dir, 'rehearse', '.', '--record', '--seed', '2');
     expect(seeded.code).toBe(2);
     expect(seeded.stderr).toContain('the recorded directory is solved under seed 1: drop --seed');
+    // the envelope's ok is the rehearsal's, and the exit code would be the directory's
+    for (const args of [
+      ['--record', '--json'],
+      ['--check', '--json'],
+    ]) {
+      const json = wilanis(dir, 'rehearse', '.', ...args);
+      expect(json.code).toBe(2);
+      expect(json.stdout).toBe('');
+      expect(json.stderr).toContain("an envelope for staleness is RFC 0019's to add: drop --json");
+    }
     const recorded = wilanis(dir, 'rehearse', '.', '--record');
     expect(recorded.code, recorded.stderr).toBe(0);
     expect(recorded.stdout).toMatch(/wrote \d+ scenario\(s\) under scenarios\/rehearsed\//);
