@@ -27,6 +27,7 @@ import { graphLines } from './graph-said.js';
 import { holdsLines, invariantLines } from './invariant-lines.js';
 import { LIMIT_SETTINGS, limitLines } from './limits-said.js';
 import { fieldLine, portLines, shower, storeLines } from './lines.js';
+import { permittedLines } from './profiles-said.js';
 import { requiredByLines, requiresLines } from './required-said.js';
 import { viewsOfTrigger } from './scope-said.js';
 import { shapeLines } from './shape-said.js';
@@ -263,7 +264,10 @@ function grantLine(doc: { native?: string; included?: string }, from: string | u
   return doc.included ? [`included from  ${doc.included}`] : [];
 }
 
-/** One document said in full: where it lives, who granted it, what it describes, and what its kind adds. */
+/**
+ * One document said in full: where it lives, who granted it and, for a native port, which profiles permit it
+ * (RFC 0016), what it describes, and what its kind adds.
+ */
 export function describe(load: LoadResult, ref: string): string {
   const scope = new Scope(load.registry, load.resolve);
   const { path } = splitRef(ref.includes('#') ? ref : `${ref}#`);
@@ -278,6 +282,7 @@ export function describe(load: LoadResult, ref: string): string {
     `${doc.kind}  ${doc.path}`,
     ...(doc.file ? [`file  ${doc.file}`] : []),
     ...grantedBy,
+    ...(doc.kind === 'port' ? permittedLines(scope, doc) : []),
     doc.doc.description,
     '',
   ];

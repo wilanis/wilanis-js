@@ -24,7 +24,7 @@ import { IR_READ } from '@wilanis/core';
 import { endpointLines } from './address-said.js';
 import { attemptsSaid } from './attempts-said.js';
 import { deliveryLines, pairedLines } from './delivery-said.js';
-import { profilesLines, standInLines } from './profiles-said.js';
+import { permittedLines, profilesLines, standInLines } from './profiles-said.js';
 import { type Reader, readersOf, readsLines } from './reads-said.js';
 
 /** One list of paths on one line, as `gates:` says a policy's triggers; nothing where the list is empty. */
@@ -88,15 +88,20 @@ export function featureLines(doc: Loaded): string[] {
 }
 
 /**
- * A connection: the kind that gives it meaning and what that kind delivers, what it reaches where the kind names
- * the setting that holds the address, the settings it is configured with,
+ * A connection: the kind that gives it meaning and what that kind delivers, the profiles whose `permits` name it
+ * (RFC 0016), what it reaches where the kind names the setting that holds the address, the settings it is configured with,
  * where a profile names it under `connections`, what it stands in for or what replaces it there -- a reader of
  * the connection a data graph names learns it is not what every profile reaches -- and, for a broker, the
  * triggers receiving from it and the calls sending to it.
  */
 export function connectionLines(doc: Loaded, scope: Scope): string[] {
   const declared = doc.doc as ConnectionDoc;
-  const lines = [`kind  ${declared.kind}`, ...deliveryLines(doc, scope), ...endpointLines(doc, scope)];
+  const lines = [
+    `kind  ${declared.kind}`,
+    ...deliveryLines(doc, scope),
+    ...permittedLines(scope, doc),
+    ...endpointLines(doc, scope),
+  ];
   const settings = Object.entries(declared.settings ?? {});
   if (settings.length) lines.push('settings:');
   for (const [name, value] of settings) lines.push(`    ${name}: ${JSON.stringify(value)}`);
@@ -172,7 +177,7 @@ export function irSaid(): string {
 /**
  * The project: what it is called, the IR it is written in, what it loads, what it includes, the aliases it gives
  * every reference, what it starts, and a block per profile saying what the tree binds, stands in, reaches, holds,
- * starts and needs there (RFC 0013). The last two are what the document is chiefly for -- nothing a tree starts is
+ * permits, starts and needs there (RFC 0013, RFC 0016). The last two are what the document is chiefly for -- nothing a tree starts is
  * decided by the runtime -- so neither may be left for a reader to open the file, or run the tree, to find.
  */
 export function projectLines(doc: Loaded, scope: Scope): string[] {
