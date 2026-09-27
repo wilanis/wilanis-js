@@ -5,12 +5,28 @@
  */
 import { isLevel, type Level, ROOT } from './paths.js';
 
-/** How the exporter is configured: where it sends, what this tree is called, and how much a span carries. */
+/**
+ * How the exporter is configured: where it sends, what this tree is called, how much a span carries, and how
+ * long stopping waits for the last spans to reach the collector.
+ */
 export interface Configured {
   endpoint: string;
   service: string;
   headers: Record<string, string>;
   level: Level;
+  flushDeadlineMs: number;
+}
+
+/**
+ * How long stopping waits on the last flush where the settings do not say: long enough for a collector that
+ * answers at all to take the last batch, and short enough to leave most of the 10 s a container is given after
+ * SIGTERM to the listener and whatever else stops after it. The manifest's description says the same.
+ */
+export const FLUSH_DEADLINE_MS = 2000;
+
+/** The flush deadline the settings wrote, where it is a number of milliseconds a wait can have; the default otherwise. */
+function deadlineOf(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : FLUSH_DEADLINE_MS;
 }
 
 /** What a tree hands a held operation, and what this one reads of it. */
@@ -40,5 +56,6 @@ export function configure(env: OtelEnv, input: Record<string, unknown>): Configu
     service: String(settings.service ?? ''),
     headers: stringsOf(settings.headers),
     level: isLevel(asked) ? asked : 'summary',
+    flushDeadlineMs: deadlineOf(settings.flushDeadlineMs),
   };
 }

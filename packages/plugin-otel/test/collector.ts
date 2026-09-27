@@ -6,6 +6,13 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+/**
+ * Where no collector is: a `.invalid` name never resolves (RFC 6761), so nothing can be listening at it and no
+ * port is chosen at all. The OTLP exporter retries the failed lookup as it retries a collector that is briefly
+ * down, for about nine seconds -- which is what a stop must not wait on.
+ */
+export const NOWHERE = 'http://collector.invalid/v1/traces';
+
 /** One span as OTLP/JSON spells it, in the few fields a test reads back. */
 export interface Received {
   name: string;

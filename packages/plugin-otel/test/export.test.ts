@@ -11,7 +11,8 @@ import type { Serving, Trace } from '@wilanis/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import otel from '../src/index.js';
 import { EXPORT, ROOT } from '../src/paths.js';
-import { attributesOf, type Collector, collector, until } from './collector.js';
+import { FLUSH_DEADLINE_MS } from '../src/settings.js';
+import { attributesOf, type Collector, collector, NOWHERE, until } from './collector.js';
 
 let open: Collector | undefined;
 let stop: (() => Promise<void>) | undefined;
@@ -257,15 +258,19 @@ describe('what a level lets leave the process', () => {
 
 describe('observing a tree never changes what the tree does', () => {
   // the OTLP exporter retries a batch with a backoff before it gives up, which is what one wants of a
-  // collector that is briefly out of reach -- so this is the one case here that waits on that happening
+  // collector that is briefly out of reach -- and the stop waits on that for the default deadline, no longer
   it('a collector that is not there is said once, and the run that was traced is untouched', async () => {
     const server = serving();
-    // nothing is listening on this port: the export fails, and the handler must not
-    await exporting({ serving: server.serving, ...settings('http://127.0.0.1:1/v1/traces') });
+    // nothing is listening there: the export fails, and the handler must not
+    await exporting({ serving: server.serving, ...settings(NOWHERE) });
     expect(() => server.observed(trace())).not.toThrow();
+    const began = performance.now();
     await stop?.();
     stop = undefined;
-    expect(server.logs.some(line => line.includes('not exported'))).toBe(true);
+    expect(performance.now() - began).toBeLessThan(FLUSH_DEADLINE_MS + 1000);
+    expect(server.logs.filter(line => line.includes('not exported'))).toEqual([
+      `otel: 3 span(s) not exported (the collector did not take them within ${FLUSH_DEADLINE_MS}ms of the stop)`,
+    ]);
   }, 30_000);
 
   it('the hold says where it sends, and stopping unsubscribes', async () => {

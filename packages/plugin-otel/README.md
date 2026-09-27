@@ -60,6 +60,7 @@ is kept as it came, on `wilanis.correlation`, and the run starts a trace of its 
 | `service` | yes | what this tree is called on a span: the `service.name` every exported span carries. |
 | `headers` | no | headers sent with every batch, for a collector that authenticates. |
 | `level` | no | `summary` (the default) or `full`. |
+| `flushDeadlineMs` | no | the most stopping waits for the last spans to reach the collector, in milliseconds; 2000 by default. |
 
 ## Levels, and why `summary` is the default
 
@@ -90,6 +91,11 @@ It never changes what the tree does. Export is batched and asynchronous, so a sl
 answer; a collector that cannot be reached is said once in the log and the batch is dropped; and an observer
 that throws is stepped over by the runtime rather than failing the run whose trace it was handed. Observing a
 tree must never be able to break it.
+
+Nor does it hold up a stop. The OTLP exporter retries a collector it cannot reach for about nine seconds, and
+a container is killed ten seconds after SIGTERM, so the last flush waits `flushDeadlineMs` and no longer: what
+is still unsent then is said in one line, `otel: 3 span(s) not exported (the collector did not take them within
+2000ms of the stop)`, and the rest of the teardown goes on.
 
 An export survives a reload. The listeners live on the server, not on the tree, so `@reload` can replace the
 tree underneath a running export exactly as it does under an open socket.
