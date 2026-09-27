@@ -321,7 +321,8 @@ what is guaranteed of every tree `wilanis check` accepts, what the runtime enfor
 application's. [`docs/compared.md`](docs/compared.md) says what wilanis is not, against the frameworks, workflow
 engines and configuration languages it is taken for.
 [`docs/roadmap.md`](docs/roadmap.md) is the plan, one demo per milestone, and each draws on RFCs under
-[`docs/rfcs/`](docs/rfcs/README.md), written and accepted before anything is built.
+[`docs/rfcs/`](docs/rfcs/README.md), written and accepted before anything is built. Where each milestone's
+issues stand is the [project board](https://github.com/orgs/wilanis/projects/1), public and read-only.
 
 The code is under [`packages/`](packages), one package per directory and a README in each, and
 [`libraries/`](libraries) holds trees to include, pure JSON with tests of their own. Dependencies point one
