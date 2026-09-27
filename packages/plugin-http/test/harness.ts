@@ -88,18 +88,25 @@ function writeUploadForm(dir: string) {
   );
 }
 
+/**
+ * Where a copy given no upstream sends the customer API: a `.invalid` name never resolves (RFC 6761), so a test that
+ * reaches the API without a fake fails at once rather than calling the example's public mockapi.
+ */
+const NOWHERE = 'http://customers-api.invalid/api/v1';
+
 /** What a copy is pointed at: the port a fake upstream was given, and any further edits. */
 export interface CopyOptions {
-  /** Where the customer API is served; absent, the connection keeps the example's, for a copy that reaches none. */
+  /** The port the customer API is served on, on localhost; absent, the connection points at `NOWHERE`. */
   upstream?: number;
   more?: (edit: Edit) => void;
 }
 
 /**
  * The example, pointed at a fake mockapi on localhost, its server on whatever port the system gives (`listenedOn`
- * reads it back once it is started). Its write routes are gated by the access feature's policies, so the tests sign
- * in as bo -- an employee holding the registrar role -- through the example's own route and present our token;
- * nothing about access is edited.
+ * reads it back once it is started). A copy given no upstream points the customer API at
+ * `http://customers-api.invalid/api/v1`, which never resolves, so it can never reach the example's public one. Its
+ * write routes are gated by the access feature's policies, so the tests sign in as bo -- an employee holding the
+ * registrar role -- through the example's own route and present our token; nothing about access is edited.
  */
 export function localCopy({ upstream, more }: CopyOptions = {}): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-http-'));
@@ -111,7 +118,7 @@ export function localCopy({ upstream, more }: CopyOptions = {}): string {
     writeFileSync(path, JSON.stringify(doc));
   };
   edit('connections/customers-api.connection.json', connection => {
-    if (upstream !== undefined) connection.settings.baseUrl = `http://localhost:${upstream}/api/v1`;
+    connection.settings.baseUrl = upstream === undefined ? NOWHERE : `http://localhost:${upstream}/api/v1`;
     connection.settings.throttle = { concurrency: 2 };
   });
   edit('project.json', project => {
