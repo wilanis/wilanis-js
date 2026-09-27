@@ -1,7 +1,8 @@
 /**
  * Which profile a process runs under, what that profile needs of the environment before anything starts
  * (RFC 0013), and which triggers it serves. Every command that runs or stubs a tree picks its profile here, by
- * one precedence; only `start`, a reload and `migrate` go on to ask for the variables the profile's reach reads,
+ * one precedence, save `rehearse --record` and `--check`, which read project.json alone (`recordedProfile`);
+ * only `start`, a reload and `migrate` go on to ask for the variables the profile's reach reads,
  * and `migrate` for those every store's connection reads beside them, since it plans every store (#710). A command
  * that fires triggers under the profile fires only those it walks (`walkedUnder`), since those are the ones the
  * checker judged there: `run` refuses one it does not, and `rehearse`, `fuzz` and `regress` skip them and say so.
@@ -38,14 +39,34 @@ export function activeProfile(
 ): string | undefined {
   const named = given.flag || given.env[PROFILE_VARIABLE];
   if (named) return declaredProfile(project, named);
+  return defaultOf(project, `--profile <name>, or set ${PROFILE_VARIABLE}, or mark one profile "default": true`);
+}
+
+/**
+ * The profile `rehearse --record` and `--check` solve under: the one project.json marks `default`, or the unnamed
+ * profile of a project that declares none, as `activeProfile` answers with no flag and no environment. Neither is
+ * read, so the recorded directory is a function of the tree alone and no caller's environment changes what `--check`
+ * answers. Throws for a project that declares profiles and marks none default.
+ */
+export function recordedProfile(project: ProjectDoc | undefined): string | undefined {
+  return defaultOf(
+    project,
+    'mark one profile "default": true; rehearse --record and --check solve under it and read no other',
+  );
+}
+
+/**
+ * The profile marked `default`, or nothing where the project declares none. Throws where it declares profiles and
+ * marks not exactly one, saying what it marks and, in `choose`, how the caller may pick one.
+ */
+function defaultOf(project: ProjectDoc | undefined, choose: string): string | undefined {
   const profiles = Object.entries(project?.profiles ?? {});
   if (!profiles.length) return undefined;
   const defaults = profiles.filter(([, one]) => one.default === true).map(([name]) => name);
   if (defaults.length === 1) return defaults[0];
   const marks = defaults.length ? `marks ${defaults.join(' and ')} default` : 'marks none default';
   throw new Error(
-    `which profile? project.json declares ${profiles.map(([name]) => name).join(', ')} and ${marks}\n` +
-      `→ --profile <name>, or set ${PROFILE_VARIABLE}, or mark one profile "default": true`,
+    `which profile? project.json declares ${profiles.map(([name]) => name).join(', ')} and ${marks}\n→ ${choose}`,
   );
 }
 

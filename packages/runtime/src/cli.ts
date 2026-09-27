@@ -52,7 +52,8 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
   wilanis rehearse [root] [--seed n] [-v] [--json] [--record [dir]] [--check]
                    run every trigger, and every branch of every switch; --record writes each branch's run as a
                    scenario under scenarios/rehearsed/ (or dir), --check says whether that directory is what the
-                   tree writes today and exits 1 when it is not. Both solve under seed 1 and refuse --seed and --json
+                   tree writes today and exits 1 when it is not. Both solve under seed 1 and the profile project.json
+                   marks "default": true, read no WILANIS_PROFILE, and refuse --seed, --profile and --json
   wilanis fuzz     [root] [--runs n]               write one scenario per trigger per seed to scenarios/fuzz/
   wilanis regress  [root] [--json]                 replay every scenario and diff node by node
   wilanis start    [root] [--profile word] [--trace[=text|json]] [--level summary|full]
@@ -87,6 +88,7 @@ schemas/diagnostics.schema.json), the refusals as data on a refused tree whichev
 rehearse refuses it beside --record or --check, whose exit code the envelope's ok would not say.
 rehearse, fuzz, regress, start, run and migrate take --profile word, and run under it; else under WILANIS_PROFILE,
 else under the profile project.json marks "default": true. A project that declares no profile runs its one unnamed one.
+rehearse --record and --check read neither --profile nor WILANIS_PROFILE: they run under the default alone.
 Under a profile, rehearse, fuzz and regress skip a trigger whose kind no startup step of that profile serves (a
 route where nothing listens), and say how many; run refuses one, naming the profiles that serve it.
 Every path is @-rooted (@features/tasks/tasks.port.json) or through a project alias.
@@ -169,6 +171,9 @@ const jsonOf = (flags: Record<string, string>, command: string) => (flags.json ?
 /** What `--record` and `--check` refuse beside them, and why each is refused. */
 const BESIDE_RECORDING: Record<string, string> = {
   seed: 'the recorded directory is solved under seed 1: drop --seed',
+  profile:
+    'the recorded directory is solved under the profile project.json marks "default": true, whatever --profile or ' +
+    'WILANIS_PROFILE say, so that it is a function of the tree alone: drop --profile',
   json:
     "--json prints the rehearsal's envelope, whose ok does not say whether the recorded directory is current, and " +
     "an envelope for staleness is RFC 0019's to add: drop --json",
@@ -176,8 +181,9 @@ const BESIDE_RECORDING: Record<string, string> = {
 
 /**
  * What `rehearse` is asked to record: `--record [dir]` and `--check`, `--record --check` being `--check` on that
- * directory. Either refuses `--seed`, since the recorded directory is a function of the tree and one fixed seed, and
- * `--json`, since the envelope's `ok` is the rehearsal's and the exit code would be the directory's.
+ * directory. Either refuses `--seed` and `--profile`, since the recorded directory is a function of the tree alone,
+ * solved under one fixed seed and the default profile, and `--json`, since the envelope's `ok` is the rehearsal's
+ * and the exit code would be the directory's.
  */
 function recordingOf(flags: Record<string, string>): { record?: string; check?: boolean } {
   const check = flags.check !== undefined;
