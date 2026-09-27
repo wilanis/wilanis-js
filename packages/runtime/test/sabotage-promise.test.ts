@@ -24,12 +24,20 @@ describe('sabotage: the promise a profile makes (RFC 0011)', () => {
     );
   });
   it('B011 names each profile under which the promise breaks and something reaches the operation', () => {
-    // only routes reach register, so production-scheduler and production-worker, which bind it as production does
+    // only routes reach submit, so production-scheduler and production-worker, which bind it as production does
     // but open no route, run nothing that calls it and are not held to its promise
-    const said = sabotageSaying(port, promising('register'));
+    const said = sabotageSaying(port, promising('submit'));
     expect(said.every(line => line.startsWith('B011'))).toBe(true);
     const profiles = said.map(line => /\(profile '([\w-]+)'\)/.exec(line)?.[1]);
     expect(new Set(profiles)).toEqual(new Set(['live', 'local', 'production']));
+  });
+  it('B011 refuses a promise whose graph asks newKey for the key, though the puts beside it are idempotent', () => {
+    // under local submit reaches newKey through nextId and two puts through register; only newKey breaks it,
+    // since a key made fresh on every call is what a repeat would write a second record under
+    const said = sabotageSaying(port, promising('submit')).filter(line => line.includes("profile 'local'"));
+    expect(said).toEqual([
+      `B011 '@${port}#submit' promises idempotent, but @features/customers/data/customers-store.binding.json (profile 'local') reaches 'key' in @features/customers/data/next-id.graph.json through '@${port}#nextId', which runs '@storage/store.port.json#newKey', not idempotent here: '@storage/store.port.json#newKey' declares neither idempotent nor key`,
+    ]);
   });
   it('B011 follows a domain graph through the bindings it calls', () => {
     const said = sabotageSaying(port, promising('submit')).filter(line => line.includes("profile 'live'"));
@@ -39,5 +47,11 @@ describe('sabotage: the promise a profile makes (RFC 0011)', () => {
   });
   it('accepts idempotent on a read that every profile meets with idempotent effects', () => {
     expect(sabotage(port, promising('get'))).toEqual([]);
+  });
+  it('accepts idempotent on a write the store profiles meet with a put, and holds register only where it POSTs', () => {
+    // keep is a put of the whole record under local and production, and a PUT under live
+    expect(sabotage(port, promising('keep'))).toEqual([]);
+    const register = sabotageSaying(port, promising('register'));
+    expect(register.map(line => /\(profile '([\w-]+)'\)/.exec(line)?.[1])).toEqual(['live']);
   });
 });

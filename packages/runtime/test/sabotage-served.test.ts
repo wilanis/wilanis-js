@@ -132,9 +132,10 @@ describe('sabotage: what a port is held to under a profile that does not serve t
   });
 
   it('B011 once, under the profile that serves the routes reaching the operation', () => {
-    // only the registration routes reach register, so a profile that opens none is not held to its promise
+    // only the registration routes reach submit, so a profile that opens none is not held to its promise; under
+    // production what breaks it is the newKey its graph asks for the key
     const promising = {
-      'features/customers/domain/customer.port.json': (doc: any) => (doc.operations.register.idempotent = true),
+      'features/customers/domain/customer.port.json': (doc: any) => (doc.operations.submit.idempotent = true),
     };
     expect(new Set(profilesOf(answering('B011', TWO, promising)))).toEqual(new Set(["'serving'", "'quiet'"]));
     expect(new Set(profilesOf(answering('B011', ONE, promising)))).toEqual(new Set(["'serving'"]));

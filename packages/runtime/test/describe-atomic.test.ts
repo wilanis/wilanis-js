@@ -69,7 +69,7 @@ describe('describe: a domain graph whose effects move together', () => {
 describe('describe: an operation that can take part in one', () => {
   it('lists transactional beside pure, refuses and holds, so a caller sees it on the contract', () => {
     const said = describeDoc(example, '@storage/store.port.json');
-    expect(said).toContain('#put  (transactional):');
+    expect(said).toContain('#put  (transactional)  (idempotent):');
     expect(said).toContain('#newKey  (transactional):');
   });
 });
