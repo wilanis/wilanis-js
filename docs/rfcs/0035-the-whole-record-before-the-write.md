@@ -1,6 +1,6 @@
 # RFC 0035: The whole record before the write: a guarded shape is made upstream of the effect, never from it
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:core` (one alternative on `accepts` in `port.schema.json`; `Operation.accepts` in `model.ts`),
   `area:compiler` (two `I` rules, one `L` rule, `B005` and `acceptsType` reading a shape), `area:runtime`
   (`describe`, the graph scaffold, the template's guidance), `area:view` (the port page reads a shape). Nothing in
@@ -466,3 +466,7 @@ in the scaffold for a collection no invariant reads or goes altogether; and the 
    `in`. A binding holds no site, so every delegation of a guarded `#put` is refused, and the hint names the data
    graph that would be one. Its `at` is `operations/<op>/in/<input>`, or `operations/<op>/run` where the input passes
    on by name.
+7. **RFC 0033 is withdrawn in the index alone.** Step 6 had its file land withdrawn with one line pointing here. It
+   landed so (#546) and was then removed (#548): "Drawbacks and alternatives" above carries why each of its three
+   options was not taken, so the file said nothing this RFC does not. Its row in `docs/rfcs/README.md` stays, without
+   a link and reading withdrawn, so the number is not reused.
