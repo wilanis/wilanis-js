@@ -6,7 +6,7 @@
 import type { Server } from 'node:http';
 
 /** Where a server now listens: the socket's own port, and the address as the startup line says it. */
-export interface Bound {
+export interface Listening {
   port: number;
   address: string;
 }
@@ -15,7 +15,7 @@ export interface Bound {
  * The address a server listens on, once it does: on the host where one is fixed, on every interface where none
  * is. The port is the socket's own, so asking for 0 answers the one the system chose.
  */
-export async function bind(server: Server, port: number, host: string | undefined): Promise<Bound> {
+export async function bind(server: Server, port: number, host: string | undefined): Promise<Listening> {
   await new Promise<void>((ok, fail) => {
     server.once('error', fail);
     const ready = () => {
