@@ -14,7 +14,8 @@ export {
   withRehearsal,
 } from './diagnostics.js';
 export { describe, ls } from './discovery.js';
-export { fuzz, type Regression, type Replayed, regress, SCENARIOS } from './fuzz.js';
+export { fuzz, type Regression, type Replayed, regress } from './fuzz.js';
+export { edgesLines, type Fuzzing, fuzzEdges } from './fuzz-edges.js';
 export {
   type ListenRow,
   listensOf,
@@ -34,9 +35,28 @@ export {
   recordedLines,
   scenarioOf,
 } from './record.js';
-export { checkRecorded, RECORDED, type RecordCheck, refusedDir, writeRecorded } from './recorded-dir.js';
+export {
+  checkRecorded,
+  EDGED,
+  EDGES,
+  type Owner,
+  RECORDED,
+  REHEARSED,
+  type RecordCheck,
+  refusedDir,
+  SCENARIOS,
+  writeRecorded,
+} from './recorded-dir.js';
 export { type Rehearsal, rehearse } from './rehearse.js';
 export { init, scaffold } from './scaffolds.js';
+export {
+  checkScenarios,
+  edgesFailed,
+  edgesSaid,
+  rehearsalFailed,
+  rehearsalSaid,
+  type ScenariosCheck,
+} from './scenarios-check.js';
 export {
   type CancelAt,
   embedderFor,
