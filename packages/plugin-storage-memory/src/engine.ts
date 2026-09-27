@@ -176,12 +176,16 @@ export class MemoryEngine implements Engine {
   /**
    * The record after the change, or `record` absent where the collection holds none under that key within
    * the scope. The scope it was written under is kept as it was: a patch changes fields of the shape, and a
-   * scope column is not one of them.
+   * scope column is not one of them. The record after the change is judged as `put` judges a record, within
+   * the row's scope and under its own key, so a constraint it would break is answered as `violated` and the
+   * row is left as it was.
    */
   async patch(at: At, key: unknown, changes: Record_, written?: Written) {
     const before = this.row(at, key, written?.scope);
     if (!before) return {};
     const after = MemoryEngine.kept({ ...before.record, ...changes });
+    const violated = this.repeats(at, after, before.scope) ?? this.dangles(at, after);
+    if (violated) return { violated };
     this.records(at).set(String(key), { record: after, scope: before.scope });
     return { record: MemoryEngine.kept(after) };
   }

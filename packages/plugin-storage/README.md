@@ -28,8 +28,8 @@ store whose connection is of the kind it grants is kept by it.
 - `#newKey` a key no record has, so what identifies a record is written by a node a reader can see.
 
 An absent record is answered as `record` absent rather than as a failure, so a graph routes on `has(record)`.
-A constraint the store declares is answered the same way: `#put` answers `violated` where a `unique` is
-repeated or a `refs` points at nothing, `#remove` answers `removed` and `referencedBy` where another
+A constraint the store declares is answered the same way: `#put` and `#patch` answer `violated` where a
+`unique` is repeated or a `refs` points at nothing, `#remove` answers `removed` and `referencedBy` where another
 collection still holds the key, and the node stays `done` either way -- failure is for the unforeseen, and a
 constraint the store itself declares is the opposite of that. `@storage/storage.port.json#ensure` prepares
 what a store declares, from a startup step.
@@ -82,7 +82,7 @@ shape they have, the field that identifies one, and what the store declared abou
 | `find(at, query)` | the records the filter matches, in the order asked for, cut to the page |
 | `count(at, where)` | how many match, carrying none of them back |
 | `put(at, record, replace)` | `{ record?, conflict, violated? }` -- the whole record written, or what stopped it |
-| `patch(at, key, changes)` | `{ record? }` -- the record after the change, never touching the key |
+| `patch(at, key, changes)` | `{ record?, violated? }` -- the record after the change, never touching the key, or what stopped it |
 | `remove(at, key)` | `{ record?, removed, referencedBy? }` -- what was removed, or what still references it |
 | `newKey(at)` | a key no record of the collection has, of the key field's type |
 | `ensure(collections)` | every collection prepared; what that means is the engine's, and may be nothing |
