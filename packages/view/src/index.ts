@@ -35,6 +35,8 @@ export {
   type VReceives,
   type VRef,
   type VRefusal,
+  type VScenarioGroup,
+  type VScenarioRow,
   type VSend,
   type VSite,
   type VTarget,

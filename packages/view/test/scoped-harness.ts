@@ -9,9 +9,9 @@
  * checker's rules. It is its own file rather than an import because the two packages' tests do not share a
  * directory, and because what a page needs from the tree is a loaded one rather than its refusals.
  */
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadTree, type PluginModule, type ResolvedInclude } from '@wilanis/core';
 import auth from '@wilanis/plugin-auth';
@@ -28,6 +28,7 @@ import memory from '@wilanis/plugin-storage-memory';
 import postgres from '@wilanis/plugin-storage-postgres';
 import { BUILTIN_PLUGINS } from '@wilanis/runtime';
 import { type DocView, viewOf } from '../src/index.js';
+import { treeReadsOf } from '../src/model.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 /** The tree the example includes, as the runtime would resolve it from the example's node_modules. */
@@ -76,6 +77,30 @@ const viewed = (root: string, path: string): DocView => {
   if (!seen) throw new Error(`no view for ${path}`);
   return seen;
 };
+
+/**
+ * The views of some documents of a copy of the example with these documents written into it, by path in the tree: a
+ * scenario, which the example keeps none of, among them. The copy lives for the length of the call and no longer.
+ */
+export function plantedViews(docs: Record<string, unknown>, paths: string[]): DocView[] {
+  const dir = mkdtempSync(join(tmpdir(), 'wilanis-view-planted-'));
+  try {
+    cpSync(EXAMPLE, dir, { recursive: true, filter: from => !from.includes('node_modules') });
+    for (const [file, doc] of Object.entries(docs)) {
+      mkdirSync(dirname(join(dir, file)), { recursive: true });
+      writeFileSync(join(dir, file), JSON.stringify(doc));
+    }
+    const load = loadTree(dir, PLUGINS, INCLUDES);
+    const reads = treeReadsOf(load);
+    return paths.map(path => {
+      const seen = viewOf(load, path, reads);
+      if (!seen) throw new Error(`no view for ${path}`);
+      return seen;
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 /**
  * The view of one document of the example, or of a copy of it with the edits a case asks for. A copy lives for
