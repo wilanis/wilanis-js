@@ -12,8 +12,8 @@ import { checkRecorded, keptIn, RECORDED, REHEARSED, type RecordCheck, writeReco
 /** What `--check` says after the files it lists: the one command that brings the directory back. */
 export const RECORD_HINT = 'run wilanis rehearse --record and review the diff';
 
-/** One run the rehearsal made, as it is recorded: what was fired, what every effect answered, what it produced. */
-export interface RecordedRun {
+/** What names a recorded scenario, and so its file: the way in, the decision it proves, and the seed. */
+interface Named {
   /** The trigger the scenario replays through: for a policy's decision, an attaching one whose kind the run borrowed. */
   trigger: { path: string; name: string };
   /** The policy whose `decide` the run fired in the trigger's place, for a policy's decision. */
@@ -25,6 +25,10 @@ export interface RecordedRun {
    */
   branch?: ScenarioBranch & { n?: number };
   seed: number;
+}
+
+/** One run the rehearsal made, as it is recorded: what was fired, what every effect answered, what it produced. */
+export interface RecordedRun extends Named {
   input: unknown;
   context: Record<string, unknown>;
   /** Every effect's answer by dotted node path: what the run generated, with what the case stubbed written over it. */
@@ -33,6 +37,18 @@ export interface RecordedRun {
   /** Where the trigger's `out` marks a field secret: the output is written with those as the marker. */
   secret: string[][];
 }
+
+/**
+ * A branch the solver could not reach, as it is recorded: nothing ran, so there is no input, no stub and no report,
+ * only why -- the sentence the rehearsal prints after `NEVER RUN` -- so the fix that reaches it is a diff (RFC 0018).
+ */
+export interface UnreachedBranch extends Named {
+  branch: NonNullable<Named['branch']>;
+  unreachable: string;
+}
+
+/** What the rehearsal records of one branch or one whole trigger: the run it made, or why it could make none. */
+export type Recording = RecordedRun | UnreachedBranch;
 
 const WRITTEN = 'Written by wilanis rehearse --record; regenerate it, do not edit it.';
 
@@ -55,36 +71,50 @@ function partsOf(path: string): { feature: string; stem: string } {
   return { feature: featureOf(rel) ?? rel.split('/')[0], stem: stem(rel) };
 }
 
-/** What a recorded scenario says it proves, in its first line. */
-function descriptionOf(run: RecordedRun): string {
-  const ended = endedAs(run.report);
-  const way = run.policy ? `${run.policy.name} as attached by ${run.trigger.name}` : run.trigger.name;
-  if (!run.branch) return `${way}: no switch under it, so one run is the whole of it, and it ${ended}. ${WRITTEN}`;
-  const { graph, node, when, to } = run.branch;
+/** A branch as a recorded scenario's first line says it: the graph, the switch, the rule and where it routes. */
+function provenAs({ graph, node, when, to }: ScenarioBranch): string {
   const rule = when === 'else' ? 'otherwise' : `when ${when}`;
-  return `${way}: ${partsOf(graph).stem} '${node}' ${rule} routes to ${to}, which ${ended}. ${WRITTEN}`;
+  return `${partsOf(graph).stem} '${node}' ${rule} routes to ${to}`;
+}
+
+/** What a recorded scenario says it proves, in its first line: how its run ended, or why no input reaches it. */
+function descriptionOf(run: Recording): string {
+  const way = run.policy ? `${run.policy.name} as attached by ${run.trigger.name}` : run.trigger.name;
+  if ('unreachable' in run)
+    return `${way}: ${provenAs(run.branch)}, and no input reaches it: ${run.unreachable}. ${WRITTEN}`;
+  const ended = endedAs(run.report);
+  if (!run.branch) return `${way}: no switch under it, so one run is the whole of it, and it ${ended}. ${WRITTEN}`;
+  return `${way}: ${provenAs(run.branch)}, which ${ended}. ${WRITTEN}`;
 }
 
 /** The stubs in the order of their paths, so the file does not depend on the order the effects happened to answer in. */
 const sorted = (stubs: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(stubs).sort(([one], [other]) => (one < other ? -1 : Number(one > other))));
 
-/** The scenario one recorded run is written as. */
-export function scenarioOf(run: RecordedRun): ScenarioDoc {
+/**
+ * The scenario one recorded run is written as. A branch no input reaches is written with nothing to run -- no `in`, no
+ * `context`, no `stubs` -- and an expectation that says why, which `regress` answers by solving the branch again.
+ */
+export function scenarioOf(run: Recording): ScenarioDoc {
   const branch = run.branch && {
     graph: run.branch.graph,
     node: run.branch.node,
     when: run.branch.when,
     to: run.branch.to,
   };
-  return {
+  const named = {
     $schema: schemaUrl('scenario'),
     description: descriptionOf(run),
-    generated: 'rehearse',
+    generated: 'rehearse' as const,
     trigger: run.trigger.path,
     ...(run.policy ? { policy: run.policy.path } : {}),
     ...(branch ? { branch } : {}),
     seed: run.seed,
+  };
+  if ('unreachable' in run)
+    return { ...named, expect: { status: 'unreachable', nodes: {}, unreachable: run.unreachable } };
+  return {
+    ...named,
     in: run.input,
     context: run.context,
     stubs: sorted(run.stubs),
@@ -109,7 +139,7 @@ export function dirOf(doc: { path: string }): string {
  * The directory one run is recorded in, inside the recorded directory: its trigger's, or for a policy's decision the
  * policy's under `policies/`, since that run replays the decision and the trigger only lends it a kind.
  */
-const underOf = (run: RecordedRun) => (run.policy ? `${POLICIES}/${dirOf(run.policy)}` : dirOf(run.trigger));
+const underOf = (run: Named) => (run.policy ? `${POLICIES}/${dirOf(run.policy)}` : dirOf(run.trigger));
 
 /**
  * Where one recorded run is written, inside the recorded directory: `<feature>.<trigger stem>/<feature>.<graph
@@ -117,7 +147,7 @@ const underOf = (run: RecordedRun) => (run.policy ? `${POLICIES}/${dirOf(run.pol
  * switch, and a policy's decision the same under `policies/<feature>.<policy stem>/`. Named by what it proves, so a
  * reorder of rules moves nothing and a change of target renames one file.
  */
-export function fileOf(run: RecordedRun): string {
+export function fileOf(run: Named): string {
   const under = underOf(run);
   if (!run.branch) return `${under}/whole.scenario.json`;
   const { feature, stem: graph } = partsOf(run.branch.graph);
@@ -169,7 +199,7 @@ export interface Recorded {
  * branch. Two triggers of one feature and one name -- one under `edge/`, one under `edge/v2/` -- would share a
  * directory, and are refused, naming both, rather than one's runs being dropped for the other's; two policies alike.
  */
-function docsOf(runs: RecordedRun[]): Record<string, ScenarioDoc> {
+function docsOf(runs: Recording[]): Record<string, ScenarioDoc> {
   const held = new Map<string, string>();
   const docs: Record<string, ScenarioDoc> = {};
   for (const run of runs) {
@@ -208,7 +238,7 @@ function sameDir(under: string, paths: string[], what: keyof typeof MANY): strin
 }
 
 /** Write the runs to the recorded directory, or under `check` compare them with it and write nothing. */
-export function recordRuns(root: string, how: { record?: string; check?: boolean }, runs: RecordedRun[]): Recorded {
+export function recordRuns(root: string, how: { record?: string; check?: boolean }, runs: Recording[]): Recorded {
   const dir = how.record ?? RECORDED;
   const docs = docsOf(runs);
   const files = Object.keys(docs).length;

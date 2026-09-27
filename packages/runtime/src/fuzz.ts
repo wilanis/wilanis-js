@@ -8,10 +8,11 @@ import { walkedUnder } from '@wilanis/compiler';
 import type { Loaded, LoadResult } from '@wilanis/core';
 import { type ScenarioDoc, Scope, schemaUrl, secretPaths, type TriggerDoc } from '@wilanis/core';
 import { outcomeOf, type Report, redactValue, refusalOf } from '@wilanis/engine';
+import type { Embedder } from './embed.js';
 import { type Fuzzing, fuzzEdges } from './fuzz-edges.js';
 import { activeProfile, skippedLines } from './profile.js';
 import { HOME_DIR, SCENARIOS } from './recorded-dir.js';
-import { replayedDoc } from './rehearse-recorded.js';
+import { replayedDoc, solvedAgain } from './rehearse-recorded.js';
 import { embedderFor, generatedFire } from './stubbing.js';
 
 export { HOME_DIR, SCENARIOS } from './recorded-dir.js';
@@ -263,16 +264,30 @@ export async function regress(load: LoadResult, opts: { profile?: string } = {})
       unserved.push(trigger);
       continue;
     }
-    const fired = replayedDoc(load, sc.doc, trigger);
-    const report = sc.doc.cancelAt
-      ? await cancelledReplay(load, stubbed, fired, sc.doc)
-      : await emb.fire(fired, sc.doc.in, sc.doc.context ?? {}, { stubs: sc.doc.stubs });
-    const diffs = diffOf(report, sc.doc, secretPaths(emb.types(fired).out));
+    const diffs = await replayedDiffs(load, { emb, stubbed }, sc.doc, trigger);
     results.push({ scenario: sc.path, same: diffs.length === 0, diffs });
     lines.push(`${sc.path}: ${diffs.length ? `DIFF ${diffs.join('; ')}` : 'same'}`);
   }
   lines.push(...skippedLines(scope, profile, unserved, 'scenario(s) whose trigger'));
   return { ok: results.every(one => one.same), lines, results };
+}
+
+/**
+ * How one served scenario replays: fired again with its recorded stubs and diffed, or -- where it recorded its branch
+ * unreachable, and so has nothing to run -- solved again (`solvedAgain`, RFC 0018).
+ */
+async function replayedDiffs(
+  load: LoadResult,
+  how: { emb: Embedder; stubbed: { seed: number; profile?: string; env: NodeJS.ProcessEnv } },
+  sc: ScenarioDoc,
+  trigger: Loaded<TriggerDoc>,
+): Promise<string[]> {
+  if (sc.expect.status === 'unreachable') return solvedAgain(load, sc, trigger, how.stubbed.profile);
+  const fired = replayedDoc(load, sc, trigger);
+  const report = sc.cancelAt
+    ? await cancelledReplay(load, how.stubbed, fired, sc)
+    : await how.emb.fire(fired, sc.in, sc.context ?? {}, { stubs: sc.stubs });
+  return diffOf(report, sc, secretPaths(how.emb.types(fired).out));
 }
 
 /**
