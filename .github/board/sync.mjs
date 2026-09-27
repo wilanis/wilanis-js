@@ -15,7 +15,7 @@ export function remember(ctx, issues) {
   for (const issue of issues) ctx.cache.set(issue.number, issue);
 }
 
-/** The issue numbered `number`, read once per run; null for a pull request. */
+/** The issue numbered `number`, read once per run; null for a pull request or a number never used. */
 export async function cached(ctx, number) {
   if (!ctx.cache.has(number)) ctx.cache.set(number, await fetchIssue(number));
   return ctx.cache.get(number);
@@ -58,7 +58,12 @@ async function linkBlockers(ctx, issue) {
   for (const [number, blocker] of blockersIn(issue.number, issue.body)) {
     const target = number === issue.number ? issue : await cached(ctx, number);
     const source = await cached(ctx, blocker);
-    if (!target || !source || target.state !== 'OPEN' || source.state !== 'OPEN') continue;
+    // A body may name a pull request by mistake; one such line must not stop the sync of every other issue.
+    if (!target || !source) {
+      console.log(`skip #${target ? blocker : number} in #${issue.number}'s body: it is not an issue (a pull request, or no such number)`);
+      continue;
+    }
+    if (target.state !== 'OPEN' || source.state !== 'OPEN') continue;
     if (target.blockers.includes(blocker)) continue;
     await write(ctx, `link #${number} blocked by #${blocker}`, 'mutation($i:ID!,$b:ID!){ addBlockedBy(input:{issueId:$i,blockingIssueId:$b}){ clientMutationId } }', {
       i: target.id,
