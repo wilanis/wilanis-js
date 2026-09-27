@@ -53,7 +53,7 @@ describe('a tree that really ran', () => {
       const report = await tree.serving.fire({
         trigger: (trigger as NonNullable<typeof trigger>).doc,
         input: undefined,
-        request: { flags: {}, args: [], cwd: '.' },
+        context: { flags: {}, args: [], cwd: '.' },
       });
       expect(report.status).toBe('done');
     } finally {
