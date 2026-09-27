@@ -249,7 +249,7 @@ function checkNode(guard: Guard, from: string, ids: GuardIds): KSwitch {
  * unlike every `make` an author writes, because it is not making a value -- the node it reads already made
  * one of the shape and was judged against it. Declaring the shape again would judge the same value twice and
  * make the guard the place a value fails for a reason that has nothing to do with the rule it tests. Its answer
- * is shown with the shape's secrets as the marker, since it answers a value of the shape whatever made it.
+ * is shown with the shape's secrets as the marker whatever made it, and the lowering adds what a made node marks.
  */
 const okNode = (from: string, handlers: GuardHandlers, secret: string[][]): KCall => ({
   kind: 'call',
