@@ -286,6 +286,30 @@ $ npx wilanis manifest example > before.json
 $ npx wilanis manifest example | diff before.json -    # after an edit: what the tree does differently
 ```
 
+## Ship it
+
+`npx wilanis-deploy` reads the same manifest and writes, for one profile, what a container runtime or a cluster
+takes: a Dockerfile, a Compose file with an `.env.example` naming every variable the profile reads and no value,
+and the values of the Helm chart this repository ships, [`charts/wilanis-tree`](charts/wilanis-tree/README.md).
+Each file says it is generated and the command that writes it again, and `--check` fails when one has gone stale
+against the tree.
+
+```
+npx wilanis-deploy example --profile production --target image,compose,helm   # writes example/deploy/
+docker compose -f example/deploy/compose.yaml up --build   # a tree installed from npm, with deploy/.env filled in
+scripts/cluster.sh up      # the example on a local kind cluster, installed from the chart
+scripts/cluster.sh down
+```
+
+The Compose line builds from the tree's own `package-lock.json`, which a tree installed from npm has. The example
+has none, since it is installed through the workspace and its packages are not on npm yet, so `scripts/cluster.sh
+up` builds its image from the workspace's packages as `npm pack` writes them, the artifacts a release would
+publish: it locks a staging copy of the tree to those tarballs, builds the generated Dockerfile unchanged, installs
+the chart on a kind cluster with `charts/wilanis-tree/values-local.yaml` (PostgreSQL through CloudNativePG, and a
+Secret holding the demo's values), and last signs in and reads `GET /customers` on http://localhost:8080, failing
+unless it answers 200. It is the one thing here that needs docker, kind, kubectl and helm, and it names whichever
+is missing.
+
 ## The rest
 
 [`docs/model.md`](docs/model.md) is the reference: every document kind and what it means, every rule and its
