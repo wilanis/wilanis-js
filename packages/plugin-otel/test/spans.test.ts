@@ -157,4 +157,16 @@ describe('how the exporter is configured', () => {
   it('only the headers that really are strings are sent', () => {
     expect(configure(env({ headers: { 'x-api-key': 'shh', n: 7 } }), {}).headers).toEqual({ 'x-api-key': 'shh' });
   });
+
+  it('a stop waits 2000ms on the last flush where the settings do not say, and what they say where they do', () => {
+    expect(configure(env({}), {}).flushDeadlineMs).toBe(2000);
+    expect(configure(env({ flushDeadlineMs: 500 }), {}).flushDeadlineMs).toBe(500);
+    // no wait at all is a wait a stop can have
+    expect(configure(env({ flushDeadlineMs: 0 }), {}).flushDeadlineMs).toBe(0);
+  });
+
+  it('a deadline no wait could have falls back rather than stopping at once or never', () => {
+    for (const nonsense of [-1, Number.NaN, Number.POSITIVE_INFINITY, '500'])
+      expect(configure(env({ flushDeadlineMs: nonsense }), {}).flushDeadlineMs).toBe(2000);
+  });
 });

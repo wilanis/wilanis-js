@@ -49,6 +49,25 @@ export function reasonOf(error: unknown): string {
   return inner ?? 'connection refused';
 }
 
+/** Whether `work` settled within `ms`: false when the deadline came first. The timer never outlives the answer. */
+async function settledWithin(work: Promise<void>, ms: number): Promise<boolean> {
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<boolean>(done => {
+    timer = setTimeout(() => done(false), ms);
+  });
+  try {
+    return await Promise.race([work.then(() => true), late]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** What a stop that missed its deadline says: the spans it left unsent, or, with none, that the sender would not close. */
+const lateLine = (unsent: number, ms: number) =>
+  unsent
+    ? `otel: ${unsent} span(s) not exported (the collector did not take them within ${ms}ms of the stop)`
+    : `otel: the exporter did not close within ${ms}ms of the stop; going on without it`;
+
 /**
  * One tree's export: traces arrive from the runtime's observer, spans leave in batches. It is deliberately
  * the only thing here that keeps state, so that what a trace means (`spans.ts`) and what a level allows
@@ -56,8 +75,12 @@ export function reasonOf(error: unknown): string {
  */
 export class Exporter {
   private waiting: Span[] = [];
+  /** How many spans have been handed to the sender and not yet answered for. */
+  private sending = 0;
   private timer?: NodeJS.Timeout;
   private stopped = false;
+  /** Set once a stop has given up on the sender: what it answers afterwards has already been said. */
+  private leftBehind = false;
   private readonly scope: Scope;
 
   constructor(private readonly opts: ExporterOptions) {
@@ -99,23 +122,44 @@ export class Exporter {
     const going = this.waiting;
     if (!going.length) return;
     this.waiting = [];
+    this.sending += going.length;
     await new Promise<void>(done =>
       this.opts.sends.export(going, result => {
+        this.sending -= going.length;
         if (result.code !== 0)
-          this.opts.log(`otel: ${going.length} span(s) not exported (${reasonOf(result.error ?? 'refused')})`);
+          this.say(`otel: ${going.length} span(s) not exported (${reasonOf(result.error ?? 'refused')})`);
         done();
       }),
     );
   }
 
-  /** Send what is left and close the collector, so a process that stops takes its last traces with it. */
+  /**
+   * Send what is left and close the collector, so a process that stops takes its last traces with it -- waiting
+   * no longer than `flushDeadlineMs` for that. The sender retries a collector it cannot reach for seconds, and a
+   * container is killed when its grace after SIGTERM runs out, so a stop that waited on every retry could be cut
+   * off before the rest of the teardown ran. Past the deadline, what is still unsent is said in one line and
+   * left behind, and the stop answers so the teardown goes on.
+   */
   async stop(): Promise<void> {
     this.stopped = true;
+    const ms = this.opts.configured.flushDeadlineMs;
+    if (await settledWithin(this.close(), ms)) return;
+    this.say(lateLine(this.sending, ms));
+    this.leftBehind = true;
+  }
+
+  /** The flush and the shutdown a stop waits on, saying rather than throwing where the sender would not close. */
+  private async close(): Promise<void> {
     try {
       await this.flush();
       await this.opts.sends.shutdown();
     } catch (error) {
-      this.opts.log(`otel: the exporter did not stop cleanly (${reasonOf(error)})`);
+      this.say(`otel: the exporter did not stop cleanly (${reasonOf(error)})`);
     }
+  }
+
+  /** Log a line, unless a stop has already said what became of everything still in flight. */
+  private say(line: string): void {
+    if (!this.leftBehind) this.opts.log(line);
   }
 }

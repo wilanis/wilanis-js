@@ -10,9 +10,9 @@
 import { rmSync } from 'node:fs';
 import { checkTree } from '@wilanis/compiler';
 import { loadTree } from '@wilanis/core';
-import { embedderFor, postLoad, runStartup, Served } from '@wilanis/runtime';
+import { embedderFor, postLoad, runStartup, Served, start } from '@wilanis/runtime';
 import { afterEach, describe, expect, it } from 'vitest';
-import { attributesOf, type Collector, collector, until } from './collector.js';
+import { attributesOf, type Collector, collector, NOWHERE, until } from './collector.js';
 import { PLUGINS, withSettings, write } from './tree.js';
 
 let open: Collector | undefined;
@@ -90,5 +90,35 @@ describe('a tree that really ran', () => {
     const startup = open.spans().filter(one => one.name.startsWith('startup '));
     expect(startup.length).toBeGreaterThan(0);
     for (const span of startup) expect(attributesOf(span)['wilanis.trigger']).toBeUndefined();
+  }, 30_000);
+});
+
+/**
+ * The OTLP exporter retries a batch it cannot send for about nine seconds, nearly all of the ten a container is given
+ * after SIGTERM; a stop waits this long for it and no longer.
+ */
+const DEADLINE_MS = 300;
+/** What the rest of a stop may take besides the deadline: the plugins' teardowns and the blob store. */
+const SLACK_MS = 700;
+
+describe('stopping a tree whose collector cannot be reached', () => {
+  it('waits no longer than flushDeadlineMs, says in one line what it left unsent, and goes on', async () => {
+    const dir = write(withSettings({ endpoint: NOWHERE, service: 'traced', flushDeadlineMs: DEADLINE_MS }));
+    const logs: string[] = [];
+    try {
+      const load = loadTree(dir, PLUGINS);
+      expect(checkTree(load).items).toEqual([]);
+      // started as `wilanis start` starts a tree, and stopped the way its SIGTERM handler stops one
+      const { stop } = await start(load, { env: {}, log: line => logs.push(line) });
+      const began = performance.now();
+      await stop();
+      const took = performance.now() - began;
+
+      expect(took).toBeLessThan(DEADLINE_MS + SLACK_MS);
+      // the startup step's own trace was waiting, so there was something to leave behind, and it is said once
+      expect(logs.filter(line => line.includes('not exported'))).toHaveLength(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }, 30_000);
 });

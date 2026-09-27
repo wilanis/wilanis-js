@@ -34,9 +34,10 @@ describe('what the plugin grants', () => {
 
   it('the settings a project may pass are declared, so `wilanis describe` can say what they are', () => {
     const fields = shipped('plugin.json').settings.fields;
-    expect(Object.keys(fields).sort()).toEqual(['endpoint', 'headers', 'level', 'service']);
+    expect(Object.keys(fields).sort()).toEqual(['endpoint', 'flushDeadlineMs', 'headers', 'level', 'service']);
     // what must be said, and what may be left out
     expect(fields.endpoint.required).toBeUndefined();
     expect(fields.level.required).toBe(false);
+    expect(fields.flushDeadlineMs.required).toBe(false);
   });
 });

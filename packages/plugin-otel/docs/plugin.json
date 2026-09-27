@@ -24,6 +24,11 @@
         "type": "string",
         "required": false,
         "description": "how much a span carries: \"summary\" (the default) is status, timing and the wilanis.* attributes and never a value; \"full\" adds the report's redacted in/out and a node's message"
+      },
+      "flushDeadlineMs": {
+        "type": "number",
+        "required": false,
+        "description": "the most stopping waits for the last spans to reach the collector, in milliseconds; past it what is still unsent is said in one log line and dropped, and the process goes on stopping. Absent: 2000, which lets a collector that answers at all take the last batch and leaves most of the 10 s a container is given after SIGTERM to everything else that stops, where a collector that cannot be reached would otherwise hold the stop for the ~9 s its exporter spends retrying"
       }
     }
   },
