@@ -6,13 +6,17 @@ import { randomBytes } from "node:crypto";
 import { cpSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 
-/** Copy the example to `scratch`, link the repository's node_modules, and answer the env the tree needs. */
+/**
+ * Copy the example to `scratch`, without the scenarios it keeps, as reset.sh does; link the repository's
+ * node_modules, and answer the env the tree needs.
+ */
 export function resetCopy(repo, scratch) {
   rmSync(scratch, { recursive: true, force: true });
   mkdirSync(scratch, { recursive: true });
   cpSync(join(repo, "example"), scratch, { recursive: true });
   rmSync(join(scratch, "node_modules"), { recursive: true, force: true });
   rmSync(join(scratch, ".wilanis"), { recursive: true, force: true });
+  rmSync(join(scratch, "scenarios"), { recursive: true, force: true });
   symlinkSync(join(repo, "node_modules"), join(scratch, "node_modules"));
   return {
     ...process.env,

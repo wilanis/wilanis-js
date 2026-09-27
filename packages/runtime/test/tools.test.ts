@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkTree } from '@wilanis/compiler';
@@ -15,7 +15,7 @@ import {
 } from '../src/index.js';
 import { runSaid } from '../src/run-said.js';
 import { askingTree } from './asking-tree.js';
-import { EXAMPLE, INCLUDES, loadedEditing, PLUGINS } from './example-harness.js';
+import { copyOfExample, EXAMPLE, INCLUDES, loadedEditing, PLUGINS } from './example-harness.js';
 
 const tmp = () => mkdtempSync(join(tmpdir(), 'wilanis-tools-'));
 const read = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
@@ -156,8 +156,7 @@ describe('wilanis new', () => {
 
 describe('wilanis fuzz and regress', () => {
   it('fuzz writes one scenario per trigger per seed, and regress replays every one as the same', async () => {
-    const dir = tmp();
-    cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
+    const dir = copyOfExample();
     const { ok, written, lines } = await fuzz(loadTree(dir, PLUGINS, INCLUDES), { runs: 2, profile: 'live' });
     // the example never faults under stubs, so every run is written
     expect(ok, lines.join('\n')).toBe(true);
@@ -191,8 +190,7 @@ describe('wilanis fuzz and regress', () => {
   });
 
   it('records the handler each node ran, so a diff says a node was rebound and not only that it answered differently', async () => {
-    const dir = tmp();
-    cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
+    const dir = copyOfExample();
     await fuzz(loadTree(dir, PLUGINS, INCLUDES), { runs: 1, profile: 'live' });
     const sc = read(join(dir, 'scenarios/fuzz', 'get-customer.1.scenario.json'));
     // the fire runs whatever the profile's binding met the port with -- the graph is the thing a rebind changes

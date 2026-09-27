@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { type LoadResult, loadTree } from '@wilanis/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { describe as describeDoc, fuzz, ls, RECORDED, rehearse } from '../src/index.js';
-import { copyOfExample, EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
+import { copyOfExample, INCLUDES, PLUGINS } from './example-harness.js';
 
 const GET_CUSTOMER = '@features/customers/edge/get-customer.trigger.json';
 const MISSING = `${RECORDED}/customers.get-customer/customers.get-row.outcome.noCustomer.scenario.json`;
@@ -144,8 +144,14 @@ describe('wilanis describe: a trigger counts the scenarios that replay it', () =
   });
 
   it('says how to write them where none replays it', () => {
-    expect(body(loadTree(EXAMPLE, PLUGINS, INCLUDES), GET_CUSTOMER)).toContain(
-      'scenarios  none yet -- wilanis rehearse --record writes one per branch, wilanis fuzz --edges one per input edge',
-    );
+    // a copy leaves the example's own scenarios behind, so nothing replays its triggers
+    const bare = copyOfExample();
+    try {
+      expect(body(loadTree(bare, PLUGINS, INCLUDES), GET_CUSTOMER)).toContain(
+        'scenarios  none yet -- wilanis rehearse --record writes one per branch, wilanis fuzz --edges one per input edge',
+      );
+    } finally {
+      rmSync(bare, { recursive: true, force: true });
+    }
   });
 });

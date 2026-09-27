@@ -18,7 +18,8 @@ target="${target%/}"
 rm -rf "$target"
 mkdir -p "$target"
 cp -R "$here/example/." "$target/"
-rm -rf "$target/node_modules" "$target/.wilanis"
+# the scenarios the example keeps are its commands' record, not what the demo counts or edits
+rm -rf "$target/node_modules" "$target/.wilanis" "$target/scenarios"
 ln -s "$here/node_modules" "$target/node_modules"
 
 echo "# the example, copied to $target; its node_modules link to $here"

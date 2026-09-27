@@ -196,7 +196,8 @@ describe('manifestOf: determinism', () => {
       const loaded: LoadResult = loadTree(dir, PLUGINS, VERSIONED);
       const copied = manifestOf({ ...loaded, resolved: { plugins: {}, includes: VERSIONED } }, { root: 'example' });
       expect(copied.includes).toEqual(manifest.includes);
-      expect(copied.documents).toEqual(manifest.documents);
+      // the copy leaves behind the scenarios the example keeps, and lists every other document as the example does
+      expect(copied.documents).toEqual(manifest.documents.filter(one => one.kind !== 'scenario'));
       // a module handed in has no package to read a version from, and the manifest says so rather than guess
       expect(copied.plugins.find(plugin => plugin.use === '@http')?.version).toBeNull();
       expect(copied.plugins.find(plugin => plugin.use === '@cli')?.version).toBe(VERSION);
