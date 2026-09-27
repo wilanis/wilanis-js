@@ -236,7 +236,9 @@ No end-to-end test: nothing runs.
 ## Implementation plan
 
 1. `permits` on the schema and `ProjectDoc`; `checkPermits` with the three C rules over `reachOf`; the
-   sabotage tests. Blocked on RFC 0013's step 1 (`reach.ts`). (`area:core`, `area:compiler`)
+   sabotage tests; the line RFC 0020 gives this RFC, "a profile with `permits` reaches exactly what it permits, and
+   permits only effects and connections", added to `docs/security-model.md` under *Guaranteed by the checker* with
+   the three C codes. Blocked on RFC 0013's step 1 (`reach.ts`). (`area:core`, `area:compiler`)
 2. `permits` on the example's `production`; the `templates/CLAUDE.md` row and sentence; one sentence in the
    README's *Effects are explicit* bullet. (`area:runtime`; `good first issue`)
 3. `describe project.json`, `describe <port>` and `describe <connection>` lines; the viewer's profile table.
