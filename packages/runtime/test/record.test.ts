@@ -16,10 +16,11 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkTree, walkedUnder } from '@wilanis/compiler';
-import { type GraphDoc, isSwitch, type LoadResult, loadTree, Scope } from '@wilanis/core';
+import { checkTree } from '@wilanis/compiler';
+import { type GraphDoc, isSwitch, type LoadResult, loadTree, type ProjectDoc } from '@wilanis/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { RECORDED, type Rehearsal, regress, rehearse, writeRecorded } from '../src/index.js';
+import { PROFILE_VARIABLE, RECORDED, type Rehearsal, regress, rehearse, writeRecorded } from '../src/index.js';
+import { recordedProfile } from '../src/profile.js';
 import { copyOfExample, INCLUDES, PLUGINS } from './example-harness.js';
 
 const RUNTIME = fileURLToPath(new URL('..', import.meta.url));
@@ -214,35 +215,57 @@ describe('rehearse --check: a recorded directory the tree has moved away from', 
   });
 });
 
-describe('rehearse --record under a profile', () => {
-  it('records only the triggers the profile serves, the ones the rehearsal ran', { timeout: 60_000 }, async () => {
+describe('rehearse --record and --check under a profile', () => {
+  it('solve under the profile project.json marks default, whatever profile is asked for or set', {
+    timeout: 60_000,
+  }, async () => {
     const dir = copyOfExample();
-    const loaded = load(dir);
-    const scope = new Scope(loaded.registry, loaded.resolve);
-    const served = loaded.registry
-      .all('trigger')
-      .filter(one => walkedUnder(scope, one.doc, 'production-worker'))
-      .map(one => one.name);
-    const answer = await rehearse(loaded, { record: RECORDED, profile: 'production-worker' });
-    expect(answer.skipped).toEqual([expect.stringMatching(/^skipped \d+ trigger\(s\) profile 'production-worker' /)]);
-    expect(answer.lines.slice(0, answer.skipped.length)).toEqual(answer.skipped);
-    const recorded = new Set(
-      (answer.recorded?.written ?? []).map(file => file.slice(RECORDED.length + 1).split('/')[0]),
-    );
-    expect(recorded.size).toBeGreaterThan(0);
-    for (const trigger of recorded) expect(served).toContain(trigger);
+    const recorded = await rehearse(load(dir), { record: RECORDED });
+    // production-worker skips most triggers and binds remove-queued to Postgres: read, it would change the answer
+    const asked = await rehearse(load(dir), { check: true, profile: 'production-worker' });
+    expect(asked.skipped).toEqual(recorded.skipped);
+    expect(asked.recorded?.check).toEqual({ stale: [], missing: [], extra: [] });
+    const kept = process.env[PROFILE_VARIABLE];
+    process.env[PROFILE_VARIABLE] = 'production-worker';
+    try {
+      const set = await rehearse(load(dir), { check: true });
+      expect(set.recorded?.check).toEqual({ stale: [], missing: [], extra: [] });
+    } finally {
+      if (kept === undefined) delete process.env[PROFILE_VARIABLE];
+      else process.env[PROFILE_VARIABLE] = kept;
+    }
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('refuses a project that declares profiles and marks none default, naming the one way to choose', () => {
+    expect(recordedProfile(undefined)).toBeUndefined();
+    const marked = { profiles: { live: {}, production: { default: true } } } as unknown as ProjectDoc;
+    expect(recordedProfile(marked)).toBe('production');
+    const unmarked = { profiles: { live: {}, production: {} } } as unknown as ProjectDoc;
+    expect(() => recordedProfile(unmarked)).toThrow(
+      'which profile? project.json declares live, production and marks none default\n' +
+        '→ mark one profile "default": true; rehearse --record and --check solve under it and read no other',
+    );
   });
 });
 
-/** The CLI on a copy, from the built runtime: the copy reaches the workspace's plugins through a linked node_modules. */
-function wilanis(dir: string, ...args: string[]) {
-  const ran = spawnSync(process.execPath, [join(RUNTIME, 'bin/wilanis.js'), ...args], { cwd: dir, encoding: 'utf8' });
+/**
+ * The CLI on a copy, from the built runtime, with `env` over this process's environment: the copy reaches the
+ * workspace's plugins through a linked node_modules.
+ */
+function wilanisWith(env: Record<string, string>, dir: string, ...args: string[]) {
+  const bin = join(RUNTIME, 'bin/wilanis.js');
+  const ran = spawnSync(process.execPath, [bin, ...args], {
+    cwd: dir,
+    encoding: 'utf8',
+    env: { ...process.env, ...env },
+  });
   return { code: ran.status, stdout: ran.stdout, stderr: ran.stderr };
 }
+const wilanis = (dir: string, ...args: string[]) => wilanisWith({}, dir, ...args);
 
 describe('rehearse --record and --check on the command line', () => {
-  it('writes, says a directory is current, exits 1 on a stale one, and refuses --seed and --json', {
+  it('writes, says a directory is current, exits 1 on a stale one, and refuses --seed, --profile and --json', {
     timeout: 120_000,
   }, () => {
     const dir = copyOfExample();
@@ -266,11 +289,13 @@ describe('rehearse --record and --check on the command line', () => {
     const current = wilanis(dir, 'rehearse', '.', '--check');
     expect(current.code).toBe(0);
     expect(current.stdout).toContain('scenarios/rehearsed/ is what the solver writes for this tree');
-    // under a profile, --check says first what the rehearsal skipped, as the plain walk does
-    const worker = wilanis(dir, 'rehearse', '.', '--check', '--profile', 'production-worker');
-    expect(worker.stdout.split('\n')[0]).toMatch(
-      /^skipped \d+ trigger\(s\) profile 'production-worker' does not serve/,
-    );
+    // --profile is refused and WILANIS_PROFILE is not read, so no caller's environment changes the answer
+    const profiled = wilanis(dir, 'rehearse', '.', '--check', '--profile', 'production-worker');
+    expect(profiled.code).toBe(2);
+    expect(profiled.stderr).toContain('so that it is a function of the tree alone: drop --profile');
+    const set = wilanisWith({ [PROFILE_VARIABLE]: 'production-worker' }, dir, 'rehearse', '.', '--check');
+    expect(set.code, set.stdout).toBe(0);
+    expect(set.stdout).toBe(current.stdout);
     const file = 'scenarios/rehearsed/get-customer/customers.get-row.outcome.noCustomer.scenario.json';
     edit(dir, file, doc => {
       doc.expect.reason = 'gone';

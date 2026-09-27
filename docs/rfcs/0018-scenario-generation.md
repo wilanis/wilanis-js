@@ -572,3 +572,13 @@ Settled at acceptance, with the edits in the text above:
    hand edit survives, and the rule is simpler when a generated file is bytes.
 5. **One seed.** `--record` and `--check` solve under seed 1 and refuse `--seed`; the flag belongs to the plain walk.
    The directory is a function of the tree, as the Summary says, not of a number every machine must agree on.
+
+Decided during implementation:
+
+- **One profile (#218).** `--record` and `--check` solve under the profile `project.json` marks `default`, or the
+  unnamed profile of a tree that declares none: what `activeProfile` answers with no flag and no environment
+  (`recordedProfile` in `packages/runtime/src/profile.ts`). `--profile` beside either is refused as `--seed` is, and
+  `WILANIS_PROFILE` is not read, so the directory is a function of the tree alone and CI's environment cannot change
+  what `--check` answers; the files carry no profile segment, as *Naming* has them. A tree that declares profiles
+  and marks none default is refused until it marks one. Another profile's bindings are still rehearsed by the plain
+  walk under `--profile`.

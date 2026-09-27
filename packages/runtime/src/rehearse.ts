@@ -9,7 +9,7 @@ import type { Report } from '@wilanis/engine';
 import { outcomeOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, nonEmpty, type Stubbing, setPath, switchesOf } from './branches.js';
 import type { Embedder } from './embed.js';
-import { activeProfile, skippedLines } from './profile.js';
+import { activeProfile, recordedProfile, skippedLines } from './profile.js';
 import { type Recorded, type RecordedRun, recordRuns } from './record.js';
 import { type Decision, format, gather, type PlainRun, statedOf, stateName } from './rehearsal-report.js';
 import { heldUpstream } from './rehearse-held.js';
@@ -121,7 +121,8 @@ function whyFailed(local: Report): Partial<Settled> {
  *
  * With `record` (a directory under the root) or `check`, the runs a trigger's branches made are also recorded as
  * scenarios (`record.ts`): written there, or under `check` compared with what is there. Either solves under seed 1
- * whatever `seed` says, so the directory is a function of the tree alone.
+ * whatever `seed` says, and under the profile project.json marks default whatever `profile` or `WILANIS_PROFILE`
+ * say (`recordedProfile`), so the directory is a function of the tree alone.
  */
 export async function rehearse(
   load: LoadResult,
@@ -129,7 +130,10 @@ export async function rehearse(
 ): Promise<Rehearsal> {
   const recording = opts.record !== undefined || Boolean(opts.check);
   const seed = recording ? 1 : (opts.seed ?? 1);
-  const profile = activeProfile(load.registry.project?.doc, { flag: opts.profile, env: process.env });
+  const project = load.registry.project?.doc;
+  const profile = recording
+    ? recordedProfile(project)
+    : activeProfile(project, { flag: opts.profile, env: process.env });
   const scope = new Scope(load.registry, load.resolve);
   const skipped = skippedLines(scope, profile, load.registry.all('trigger'), 'trigger(s)');
   const lines = [...skipped];
