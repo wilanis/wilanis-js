@@ -1,6 +1,6 @@
 /**
- * What `wilanis rehearse --record` owns (RFC 0018): every scenario under the recorded directory and nothing else --
- * not a scenario a person or fuzz wrote, not what a link inside it leads to -- on copies of the example.
+ * What `wilanis rehearse --record` owns (RFC 0018): the scenarios it wrote under the recorded directory and nothing
+ * else -- not a scenario a person or fuzz wrote, not what a link inside it leads to -- on copies of the example.
  */
 import {
   existsSync,
@@ -18,26 +18,58 @@ import { checkTree } from '@wilanis/compiler';
 import { loadTree } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { checkRecorded, RECORDED, rehearse, writeRecorded } from '../src/index.js';
+import { recordedLines } from '../src/record.js';
 import { copyOfExample, INCLUDES, PLUGINS } from './example-harness.js';
 
 const load = (dir: string) => loadTree(dir, PLUGINS, INCLUDES);
 const read = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
 
 describe('rehearse --record: what the recorded directory owns', () => {
-  it('owns its directory: a stray file in it is removed, a scenario beside it is kept', {
-    timeout: 60_000,
+  it('owns what it wrote: an orphan of its own is removed, a scenario a person wrote is kept wherever it sits', {
+    timeout: 120_000,
   }, async () => {
     const dir = copyOfExample();
     await rehearse(load(dir), { record: RECORDED });
-    const { generated: _, ...kept } = read(join(dir, RECORDED, 'hello.hello-gated/whole.scenario.json'));
+    const whole = read(join(dir, RECORDED, 'hello.hello-gated/whole.scenario.json'));
+    const { generated: _, ...kept } = whole;
     const mine = JSON.stringify({ ...kept, description: 'the gated hello, kept by hand' }, null, 2);
-    writeFileSync(join(dir, 'scenarios/mine.scenario.json'), mine);
-    mkdirSync(join(dir, RECORDED, 'gone-trigger'));
-    writeFileSync(join(dir, RECORDED, 'gone-trigger/old.scenario.json'), mine);
+    // written by hand at the home, in a directory of the home's a person made, and in the recorded directory itself
+    const byHand = [
+      'scenarios/mine.scenario.json',
+      'scenarios/customers/mine.scenario.json',
+      `${RECORDED}/mine.scenario.json`,
+    ];
+    mkdirSync(join(dir, 'scenarios/customers'));
+    for (const at of byHand) writeFileSync(join(dir, at), mine);
+    // what an earlier --record wrote of a trigger the tree no longer has
+    mkdirSync(join(dir, RECORDED, 'customers.gone-trigger'));
+    writeFileSync(join(dir, RECORDED, 'customers.gone-trigger/old.scenario.json'), JSON.stringify(whole));
     const answer = await rehearse(load(dir), { record: RECORDED });
-    expect(existsSync(join(dir, RECORDED, 'gone-trigger'))).toBe(false);
-    expect(readFileSync(join(dir, 'scenarios/mine.scenario.json'), 'utf8')).toBe(mine);
-    expect(answer.recorded?.written).not.toContain(`${RECORDED}/gone-trigger/old.scenario.json`);
+    expect(existsSync(join(dir, RECORDED, 'customers.gone-trigger'))).toBe(false);
+    for (const at of byHand) expect(readFileSync(join(dir, at), 'utf8')).toBe(mine);
+    expect(answer.recorded?.kept).toEqual([`${RECORDED}/mine.scenario.json`]);
+    expect(recordedLines(answer.recorded!).at(-1)).toBe(
+      `kept     ${RECORDED}/mine.scenario.json -- not written by --record, so left as it is`,
+    );
+    // --check does not count it against the directory
+    const checked = await rehearse(load(dir), { check: true });
+    expect(checked.recorded?.check).toEqual({ stale: [], missing: [], extra: [] });
+    expect(checked.recorded?.kept).toEqual([`${RECORDED}/mine.scenario.json`]);
+    // recorded into the directory a person keeps scenarios in, it writes beside them and removes none
+    const beside = await rehearse(load(dir), { record: 'scenarios/customers' });
+    expect(readFileSync(join(dir, 'scenarios/customers/mine.scenario.json'), 'utf8')).toBe(mine);
+    expect(beside.recorded?.kept).toEqual(['scenarios/customers/mine.scenario.json']);
+    // one in the way of a file it writes refuses the write, and nothing is written or removed
+    const inTheWay = `${RECORDED}/hello.hello-gated/whole.scenario.json`;
+    writeFileSync(join(dir, inTheWay), mine);
+    const before = readdirSync(join(dir, RECORDED), { recursive: true });
+    await expect(rehearse(load(dir), { record: RECORDED })).rejects.toThrow(
+      `${inTheWay} would be written over, and --record did not write it (no "generated": "rehearse"): ` +
+        `move it out of ${RECORDED}/, where --record writes`,
+    );
+    expect(readdirSync(join(dir, RECORDED), { recursive: true })).toEqual(before);
+    expect(readFileSync(join(dir, inTheWay), 'utf8')).toBe(mine);
+    expect((await rehearse(load(dir), { check: true })).recorded?.check?.stale).toEqual([inTheWay]);
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -83,7 +115,7 @@ describe('rehearse --record: what the recorded directory owns', () => {
     const refusals = ['scenarios', 'scenarios/', 'scenarios/fuzz', 'scenarios/fuzz/rehearsed', '.', 'features'];
     // and in another case, which a case-insensitive filesystem reads as the same directory
     for (const refused of [...refusals, 'scenarios/FUZZ', 'Scenarios/fuzz', 'SCENARIOS', 'scenarios/Fuzz/new']) {
-      expect(() => writeRecorded(dir, refused, {})).toThrow(`--record owns ${refused} and removes every scenario`);
+      expect(() => writeRecorded(dir, refused, {})).toThrow(`--record may not own ${refused}, beside the scenarios`);
       expect(() => checkRecorded(dir, refused, {})).toThrow(where);
     }
     for (const outside of ['../elsewhere', 'scenarios/../features', join(tmpdir(), 'elsewhere')])

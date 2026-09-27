@@ -7,7 +7,7 @@
 import { featureOf, type ScenarioBranch, type ScenarioDoc, schemaUrl, stem } from '@wilanis/core';
 import { type Report, refusalOf } from '@wilanis/engine';
 import { expectOf } from './fuzz.js';
-import { checkRecorded, RECORDED, type RecordCheck, writeRecorded } from './recorded-dir.js';
+import { checkRecorded, keptIn, RECORDED, type RecordCheck, writeRecorded } from './recorded-dir.js';
 
 /** What `--check` says after the files it lists: the one command that brings the directory back. */
 export const RECORD_HINT = 'run wilanis rehearse --record and review the diff';
@@ -130,6 +130,8 @@ export interface Recorded {
   written?: string[];
   /** Under `--check`: how the directory differs from what the tree writes today. */
   check?: RecordCheck;
+  /** The scenarios under the directory that `--record` did not write, left as they are, root-relative. */
+  kept: string[];
 }
 
 /**
@@ -166,16 +168,19 @@ export function recordRuns(root: string, how: { record?: string; check?: boolean
   const dir = how.record ?? RECORDED;
   const docs = docsOf(runs);
   const files = Object.keys(docs).length;
-  if (how.check) return { dir, files, check: checkRecorded(root, dir, docs) };
-  return { dir, files, written: writeRecorded(root, dir, docs) };
+  if (how.check) return { dir, files, check: checkRecorded(root, dir, docs), kept: keptIn(root, dir, docs) };
+  const written = writeRecorded(root, dir, docs);
+  return { dir, files, written, kept: keptIn(root, dir, docs) };
 }
 
 /** Whether the recorded directory is what the tree writes: always under `--record`, which just wrote it. */
 export const current = (recorded: Recorded) =>
   !recorded.check || Object.values(recorded.check).every(list => list.length === 0);
 
-/** What `--record` or `--check` says after the rehearsal. */
+/** What `--record` or `--check` says after the rehearsal, and last the scenarios it left, where it left any. */
 export function recordedLines(recorded: Recorded): string[] {
-  if (recorded.check) return checkLines(recorded.dir, recorded.check, recorded.files);
-  return [`wrote ${recorded.files} scenario(s) under ${recorded.dir}/ -- regenerate them, do not edit them`];
+  const said = recorded.check
+    ? checkLines(recorded.dir, recorded.check, recorded.files)
+    : [`wrote ${recorded.files} scenario(s) under ${recorded.dir}/ -- regenerate them, do not edit them`];
+  return [...said, ...recorded.kept.map(file => `kept     ${file} -- not written by --record, so left as it is`)];
 }

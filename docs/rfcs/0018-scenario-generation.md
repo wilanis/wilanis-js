@@ -335,7 +335,7 @@ set, the walk runs under seed 1 and `opts.seed` is not read: the directory is a 
 The writing lives in a new module, `packages/runtime/src/record.ts`, so `rehearse.ts` keeps to the walk: `record.ts`
 exports `scenarioOf(run: RecordedRun): ScenarioDoc` (pure, from one run's inputs and report to the document),
 `fileOf(run): string` (pure, the path below), `writeRecorded(root, dir, docs)` (writes every file, removes every
-`*.scenario.json` under `dir` it did not write, answers the paths written) and `checkRecorded(root, dir, docs)`
+scenario under `dir` an earlier run wrote and this one did not, answers the paths written) and `checkRecorded(root, dir, docs)`
 (renders each document as `writeRecorded` would and compares bytes to what is on disk; answers `{ stale, missing,
 extra }` and never writes).
 
@@ -371,10 +371,11 @@ A decision reached from three triggers (`list-rows` via `digest`, `export-custom
 files, since a scenario replays a way in and the three runs differ in their inputs; the rehearsal's lines still
 report it once, as `gather` does today.
 
-**Ownership.** `writeRecorded` removes every `*.scenario.json` under the directory it did not write on this run and
-touches nothing outside it, so a renamed branch leaves no orphan and a hand-written scenario one level up is safe.
-`--check` lists `stale` (on disk, different bytes), `missing` (would be written, not on disk) and `extra` (on disk
-under the directory, not written), exits 1 on any, and prints the one hint. Determinism holds because every value in a
+**Ownership.** `writeRecorded` removes every scenario under the directory that says `"generated": "rehearse"` and
+was not written on this run, and touches nothing else, so a renamed branch leaves no orphan and a hand-written
+scenario is safe wherever it sits. `--check` lists `stale` (on disk, different bytes), `missing` (would be written,
+not on disk) and `extra` (on disk under the directory, written by `--record`, not written now), exits 1 on any, and
+prints the one hint. Determinism holds because every value in a
 scenario is a function of the tree and one fixed seed: `--record` and `--check` always solve under seed 1, so a
 recorded directory never depends on a number two machines must agree on; stubs come from
 `generate(type, rng(1 ^ hash(nodePath)))`, the input from `generate(types.in, rng(1))`, the case's patches from
@@ -589,12 +590,16 @@ Decided during implementation:
 - **`--check` fails on a failing rehearsal.** It exits 1 when the rehearsal is not ok as well as when the directory
   differs, and prints the rehearsal's lines before the directory's verdict, so a tree whose `--record` fails cannot
   pass the CI step because the directory it wrote is current. `scenarios --check` inherits it.
-- **Where `--record <dir>` may write.** Strictly below `scenarios/` and outside `scenarios/fuzz/`, judged on the
-  path as written and on its real path (`refusedDir` in `packages/runtime/src/recorded-dir.ts`), and refused before the walk
-  with where it may go. Every scenario in the directory that `--record` did not write is removed, so it may never be
-  the home the hand-written scenarios sit in, nor a directory another command owns; #221 adds `scenarios/edges/`
-  beside `scenarios/fuzz/`. The directory is walked through real directories only, so what a link inside it leads
-  to is never removed, and a write a link would carry elsewhere is refused.
+- **What `--record` owns, and where it may write.** It owns what it wrote: a scenario under the directory that
+  says `"generated": "rehearse"`. *Ownership* first said every `*.scenario.json` under it, but placement reads
+  only a scenario's first segment (`misplacedDir`), so a person may keep hand-written scenarios in a directory of
+  their own below `scenarios/` (`scenarios/customers/`), and `--record scenarios/customers` would have removed them.
+  Any other scenario is left and named on a `kept` line, `--check` does not count it as `extra`, and one in the way
+  of a file `--record` writes refuses the write until it is moved. The directory must also sit strictly below
+  `scenarios/` and outside `scenarios/fuzz/`, judged on the path as written and on its real path, without case
+  (`refusedDir` in `packages/runtime/src/recorded-dir.ts`), and is refused before the walk with where it may go; #221
+  adds `scenarios/edges/` beside `scenarios/fuzz/`. It is walked through real directories only, so what a link
+  inside it leads to is never removed, and a write a link would carry elsewhere is refused.
 - **Two triggers of one name.** The checker accepts them: a document's name is its file's stem (`register` in
   `packages/core/src/documents.ts`), no rule asks that two triggers' names differ, and the loader walks an included
   tree's features as the tree's own, so a host trigger named `refresh` beside `@wilanis/access`'s checks, as does a
