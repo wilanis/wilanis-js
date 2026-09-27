@@ -3,10 +3,10 @@
  * port's operations resolve; a domain operation speaks core shapes and fixes no value itself (L001, L006);
  * what an operation says about repeating it names its own fields and types as boolean (C015). A field of
  * either bounds its length with maxItems only where it is a list (C016).
- * An operation that says it `listens` holds (L014), and the inputs its address reads are ones it accepts, of
- * the type each part takes (L015). A connection names a kind and its settings fit it, reading secrets only
- * (R001, C001, C002); a connection kind's `endpoint` names a string setting of its own (C020). What a store
- * declares is judged beside it, in `stores.ts`.
+ * An operation that says it `listens` holds (L014), and the inputs and settings its address reads are ones it
+ * accepts and its granting plugin declares, of the type each part takes (L015; L017 in `listen-settings.ts`). A
+ * connection names a kind and its settings fit it, reading secrets only (R001, C001, C002); a connection kind's
+ * `endpoint` names a string setting of its own (C020). What a store declares is judged beside it, in `stores.ts`.
  */
 import {
   type ConnectionDoc,
@@ -14,6 +14,7 @@ import {
   expr,
   type Fields,
   type Loaded,
+  type ObjField,
   type Operation,
   type PortDoc,
   type ShapeDoc,
@@ -21,6 +22,7 @@ import {
   type Type,
 } from '@wilanis/core';
 import type { Judge } from './judge.js';
+import { checkListenSetting, fieldsOf, listed, misfit, PARTS, type Part } from './listen-settings.js';
 import { mismatch } from './typing.js';
 
 /**
@@ -203,34 +205,38 @@ export function checkConnection(judge: Judge, connection: Loaded<ConnectionDoc>)
 }
 
 /**
- * L014 and L015: what an operation says about the address it binds. Only something that keeps running can listen,
- * so `listens` rides on `holds`; and each part's `input` is a field the operation accepts, of the type that part
- * takes -- a number for the port, a string for the interface -- since the startup step writes it under `in`.
+ * L014, L015 and L017: what an operation says about the address it binds. Only something that keeps running can
+ * listen, so `listens` rides on `holds`; each part's `input` is a field the operation accepts, and its `setting` one
+ * the granting plugin's settings declare, of the type that part takes -- a number for the port, a string for the
+ * interface -- since the startup step writes the one under `in` and the project the other under the plugin's.
+ * The setting is judged in `listen-settings.ts`.
  */
 function checkListens(judge: Judge, port: Loaded<PortDoc>, name: string, op: Operation): void {
   const refuse = judge.refuser(port.path);
-  const at = `operations/${name}`;
   if (!op.holds) {
     const message = `operation '${name}' declares 'listens' but not 'holds' -- only something that keeps running can listen`;
-    refuse('L014', message, at, 'add "holds": true, or drop "listens"');
+    refuse('L014', message, `operations/${name}`, 'add "holds": true, or drop "listens"');
   }
-  const accepts = judge.acceptsType(op);
-  const fields = accepts?.kind === 'object' ? accepts.fields : {};
-  const parts: [string, string | undefined, 'number' | 'string'][] = [
-    ['port', op.listens?.port.input, 'number'],
-    ['host', op.listens?.host?.input, 'string'],
-  ];
-  for (const [part, input, kind] of parts) {
-    if (input === undefined || fields[input]?.type.kind === kind) continue;
-    const found = fields[input] ? `is ${show(fields[input].type)}, not ${kind}` : 'is not a field it accepts';
-    const list = Object.keys(fields).filter(field => fields[field].type.kind === kind);
-    refuse(
-      'L015',
-      `operation '${name}' reads its ${part} from in.${input}, which ${found}`,
-      `${at}/listens/${part}/input`,
-      `name a ${kind} field this operation accepts: ${list.length ? list.join(', ') : 'none -- accept one, or drop "input"'}`,
-    );
+  const accepted = fieldsOf(judge.acceptsType(op));
+  for (const [part, kind] of PARTS) {
+    const where: Part = { refuse, name, part, kind };
+    const { input, setting } = op.listens?.[part] ?? {};
+    if (input !== undefined) checkListenInput(where, accepted, input);
+    if (setting !== undefined) checkListenSetting(judge, port, where, setting);
   }
+}
+
+/** L015: the input a part is read from is a field the operation accepts, of the part's type. */
+function checkListenInput(where: Part, accepted: Record<string, ObjField>, input: string): void {
+  const { refuse, name, part, kind } = where;
+  const found = misfit(accepted, input, kind);
+  if (found === undefined) return;
+  refuse(
+    'L015',
+    `operation '${name}' reads its ${part} from in.${input}, which ${found || 'is not a field it accepts'}`,
+    `operations/${name}/listens/${part}/input`,
+    `name a ${kind} field this operation accepts: ${listed(accepted, kind, 'accept one, or drop "input"')}`,
+  );
 }
 
 /**

@@ -2,7 +2,8 @@
  * What a plugin says about the address it binds and the address it dials (RFC 0024), broken one way at a time
  * in the documents @http ships: `server.port.json#listen` declares `listens`, and `http.connection-kind.json`
  * declares its `endpoint`. Each case hands the example a copy of the plugin whose one document is edited, since a
- * plugin author meets these refusals and a tree author never does.
+ * plugin author meets these refusals and a tree author never does -- but one: a `setting` on a port of the
+ * example's own, which no plugin grants, is refused on the copy of the example it is written in.
  */
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -11,7 +12,15 @@ import { checkTree } from '@wilanis/compiler';
 import { loadTree, type Refusal } from '@wilanis/core';
 import http from '@wilanis/plugin-http';
 import { describe, expect, it } from 'vitest';
-import { codes, EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
+import {
+  codes,
+  EXAMPLE,
+  INCLUDES,
+  PLUGINS,
+  sabotageHinting,
+  sabotagePointing,
+  sabotageSaying,
+} from './example-harness.js';
 
 const PORT = '@http/server.port.json';
 const KIND = '@http/http.connection-kind.json';
@@ -90,6 +99,67 @@ describe('sabotage: the address a plugin binds and the one it dials (RFC 0024)',
     expect(broken.at).toEqual([`L015 ${PORT}#operations/listen/listens/host/input`]);
     expect(broken.said).toEqual([
       "L015 operation 'listen' reads its host from in.port, which is number, not string → name a string field this operation accepts: host",
+    ]);
+  });
+
+  it('none for the example as it ships: port and host each read a setting @http declares, of the type it takes', () => {
+    const fields = JSON.parse(readFileSync(join(http.docs, 'plugin.json'), 'utf8')).settings.fields;
+    expect([fields.port.type, fields.host.type]).toEqual(['number', 'string']);
+    expect(withListen(() => {}).at).toEqual([]);
+  });
+
+  it('L017 a port read from a setting @http does not declare, or one that is not a number', () => {
+    const prot = withListen(op => {
+      op.listens.port.setting = 'prot';
+    });
+    expect(prot.found).toEqual(['L017']);
+    expect(prot.at).toEqual([`L017 ${PORT}#operations/listen/listens/port/setting`]);
+    expect(prot.said).toEqual([
+      "L017 operation 'listen' reads its port from @http settings.prot, which @http does not declare → name a number setting @http declares: port, deadlineMs, maxBodyBytes",
+    ]);
+    const host = withListen(op => {
+      op.listens.port.setting = 'host';
+    });
+    expect(host.found).toEqual(['L017']);
+    expect(host.at).toEqual([`L017 ${PORT}#operations/listen/listens/port/setting`]);
+    expect(host.said[0]).toContain('reads its port from @http settings.host, which is string, not number');
+  });
+
+  it('L017 an interface read from a setting that is not a string', () => {
+    const broken = withListen(op => {
+      op.listens.host.setting = 'port';
+    });
+    expect(broken.found).toEqual(['L017']);
+    expect(broken.at).toEqual([`L017 ${PORT}#operations/listen/listens/host/setting`]);
+    expect(broken.said).toEqual([
+      "L017 operation 'listen' reads its host from @http settings.port, which is number, not string → name a string setting @http declares: host",
+    ]);
+  });
+
+  it('L017 says to declare a setting where @http declares none of the type', () => {
+    const broken = withHttpDoc('plugin.json', manifest => {
+      delete manifest.settings.fields.host;
+    });
+    expect(broken.at).toEqual([`L017 ${PORT}#operations/listen/listens/host/setting`]);
+    expect(broken.said).toEqual([
+      'L017 operation \'listen\' reads its host from @http settings.host, which @http does not declare → name a string setting @http declares: none -- declare one in plugin.json, or drop "setting"',
+    ]);
+  });
+
+  it('L017 a setting on a port no plugin grants, which has no plugin settings to read', () => {
+    const file = 'features/customers/domain/customer.port.json';
+    const edit = (port: any) => {
+      port.operations.prepare.holds = true;
+      port.operations.prepare.listens = { port: { setting: 'port', default: 9000 } };
+    };
+    expect(sabotagePointing(file, edit)).toEqual([
+      'L017 @features/customers/domain/customer.port.json#operations/prepare/listens/port/setting',
+    ]);
+    expect(sabotageSaying(file, edit)).toEqual([
+      "L017 operation 'prepare' reads its port from settings.port, but no plugin grants this port",
+    ]);
+    expect(sabotageHinting(file, edit)).toEqual([
+      `L017 drop "setting": only a port a plugin grants reads that plugin's settings`,
     ]);
   });
 
