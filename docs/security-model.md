@@ -121,11 +121,9 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
   marked position of a report; its bounds are that an operation that is not `pure` and turns a secret into another
   value (the response to an http call made with a secret header) answers something its node never read, so its
   answer is shown by the operation's own marks alone, that where a pure node's answer holds a value it read as
-  `«secret»` the rest of that answer is shown as it is, that the schedule log and `wilanis fuzz` redact a run's
-  answer by the marks of the trigger's `out` type alone, so an answer carrying a secret its `out` type does not
-  mark is recorded in clear, and that a node seeded through the engine API, as a replay seeds one, carries the
-  marks of what it reads only where that was seeded too, and as a call of a graph runs no nested run to carry a
-  mark only the graph's own nodes make. (`packages/engine/src/redact.ts`, applied in
+  `«secret»` the rest of that answer is shown as it is, and that a node seeded through the engine API, as a
+  replay seeds one, carries the marks of what it reads only where that was seeded too, and as a call of a graph
+  runs no nested run to carry a mark only the graph's own nodes make. (`packages/engine/src/redact.ts`, applied in
   `packages/engine/src/run.ts`, `packages/engine/src/map.ts` and `packages/engine/src/seeds.ts`; a node's `pure`
   lowered by `lowerNode` and `delegateCall` in `packages/compiler/src/compiler.ts`; `redactOf` in
   `packages/compiler/src/guard-lowering.ts`; `shownRoots` in `packages/runtime/src/shown.ts`;

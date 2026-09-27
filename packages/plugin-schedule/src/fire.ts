@@ -5,7 +5,7 @@
  */
 import { type Serving, secretPaths, type TriggerDoc } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
-import { redactValue, refusalOf } from '@wilanis/engine';
+import { refusalOf, shownOutput } from '@wilanis/engine';
 
 /** The context a tick hands a graph, as the kind declares it. */
 export interface Tick {
@@ -20,7 +20,10 @@ export interface Tick {
 /** What one tick's run answered, for the line it is logged as and for whoever waits on it. */
 export interface Fired {
   report?: Report;
-  /** What the run answered, as a log may show it: the fields the trigger's `out` marks secret as the marker. */
+  /**
+   * What the run answered, as a log may show it: as the run's report shows it, with the fields the trigger's `out`
+   * marks secret as the marker too.
+   */
   answer?: unknown;
   /** why the tick did not answer: the input could not be built, or the run itself threw */
   error?: string;
@@ -75,7 +78,7 @@ export async function fireTick(
       blobs: scope,
       ...(signal ? { signal } : {}),
     });
-    const answer = redactValue(report.output, secretPaths(serving.types(trigger).out));
+    const answer = shownOutput(report, secretPaths(serving.types(trigger).out));
     return { report, answer, ms: Date.now() - started };
   } finally {
     await scope.release();

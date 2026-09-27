@@ -109,10 +109,33 @@ export function redactEach(items: unknown[], paths: string[][] | undefined): unk
  * shows its own answer the same way.
  */
 export function redactReport(report: Report, paths: string[][] | undefined): Report {
+  const output = shownOutput(report, paths);
+  return output === undefined ? report : { ...report, output };
+}
+
+/**
+ * A run's answer as its report shows it: as the node that answered it shows it, over the parts the answer still
+ * holds -- a field a trigger's closed `out` shape pruned is not there -- and redacted again by `paths`, so a mark
+ * either one carries holds. A report that names no node as answering is redacted by `paths` alone. What a log or a
+ * scenario records of a run's answer.
+ */
+export function shownOutput(report: Report, paths: string[][] | undefined): unknown {
   const answered = report.answeredBy === undefined ? undefined : report.nodes[report.answeredBy];
-  const shown = answered ? answered.out : report.output;
-  if (shown === undefined) return report;
-  return { ...report, output: redactValue(shown, paths) };
+  return redactValue(answered ? heldOf(report.output, answered.out) : report.output, paths);
+}
+
+/**
+ * What `shown` shows of the parts `value` holds, field by field: a field the value no longer has is not there, and
+ * `shown` itself where the value lost nothing below it, so a nested run's answer, which nothing prunes, is shared.
+ * Never a part of `value` that `shown` does not show.
+ */
+function heldOf(value: unknown, shown: unknown): unknown {
+  if (value === shown || !walked(value) || !walked(shown)) return shown;
+  const parts = shown as Record<string, unknown>;
+  const held = Object.entries(value).map(([key, part]) => [key, heldOf(part, parts[key])] as const);
+  const unchanged = held.length === Object.keys(parts).length && held.every(([key, part]) => part === parts[key]);
+  if (unchanged) return shown;
+  return Array.isArray(shown) ? held.map(([, part]) => part) : Object.fromEntries(held);
 }
 
 /** What a node says of how its report shows its answer: the paths its operation marks, and whether it is pure. */

@@ -3,13 +3,13 @@
  * `@std`'s `make` typed `string`, and builds a credential header from it with text; the graph that takes the vault's
  * key whole hands it back as a plain `string`; a startup step builds a header from a `{{secrets.*}}` read for an
  * operation that marks nothing. Each report shows the secret as the marker from the node that read it on, while the
- * run hands on the values themselves.
+ * run hands on the values themselves, and `wilanis fuzz` records the run's answer as its report shows it.
  */
-import { rmSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { checkTree, runGraph } from '@wilanis/compiler';
 import { type LoadResult, loadTree } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_PLUGINS, embedderFor } from '../src/index.js';
+import { BUILTIN_PLUGINS, embedderFor, fuzz, regress } from '../src/index.js';
 import { ADA, clearIn, fake, fired, LOGIN, nodeNamed, putter, SECRET, vaultTree, withVault } from './redact-tree.js';
 
 const BADGE = '@features/vault/domain/badge.port.json';
@@ -108,5 +108,22 @@ describe("a startup step's input built from a secret", () => {
     expect(report.status).toBe('done');
     expect(report.nodes.op.in).toEqual({ header: SECRET });
     expect(clearIn(report, ['v-1'])).toEqual([]);
+  });
+});
+
+describe("what fuzz records of a run's answer", () => {
+  it("is the marker where the run's report marks it and the trigger's out is a string that marks nothing", async () => {
+    await withVault(async load => {
+      const fuzzed = await fuzz(load, { runs: 1 });
+      const file = fuzzed.written.find(one => one.endsWith('unlock.1.scenario.json'));
+      if (!file) throw new Error(`fuzz wrote no scenario of unlock: ${fuzzed.lines.join('; ')}`);
+      const scenario = JSON.parse(readFileSync(file, 'utf8'));
+      expect(scenario.expect.status).toBe('done');
+      expect(scenario.expect.nodes.op.out).toBe(SECRET);
+      expect(scenario.expect.output).toBe(SECRET);
+      // regress reads the replay's answer the same way, so the scenario replays as it was written
+      const replayed = await regress(loadTree(load.root, { ...BUILTIN_PLUGINS, '@fake': fake }));
+      expect(replayed.lines).toContain('@scenarios/fuzz/unlock.1.scenario.json: same');
+    });
   });
 });
