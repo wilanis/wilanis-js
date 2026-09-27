@@ -44,16 +44,15 @@ describe('the example tree', () => {
   it('reaches both the answer and the declared failure of every data graph', async () => {
     const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'live' });
     const text = run.lines.join('\n');
-    // five of the six data graphs each answer on one branch and refuse on purpose on the others. The sixth,
-    // update-row, sits behind the get update-customer runs first, and the rehearsal steers a switch's own inputs
-    // and not the calls on the way to it: get-row's generated answer ends the run before update-row is reached,
-    // so its branches are credited with get-row's refusal rather than their own
-    expect(text.match(/refused on purpose at 'upstreamFailed' as upstream/g)).toHaveLength(5);
-    // the graphs behind an id declare what a missing id means, and say so in one word the trigger maps
-    expect(text.match(/refused on purpose at 'noCustomer' as missing: "no customer /g)).toHaveLength(2);
-    // every branch that answers names the node it answered from, never a bare status word: the registry's eight,
-    // the access feature's, and the `in:ok` of the guard over the CSV export's list
-    expect(text.match(/answered from '/g)).toHaveLength(20);
+    // the six data graphs each answer on one branch and refuse on purpose on the others. update-row sits behind the
+    // get update-customer runs first, and is reached because every other decision on the run is steered to answer
+    expect(text.match(/refused on purpose at 'upstreamFailed' as upstream/g)).toHaveLength(6);
+    // the three graphs behind an id declare what a missing id means, and say so in one word the trigger maps
+    expect(text.match(/refused on purpose at 'noCustomer' as missing: "no customer /g)).toHaveLength(3);
+    // every branch that answers names the node it answered from, never a bare status word: the customers feature's
+    // thirteen -- the data graphs' seven, the listing's two routes, and the holds of the four guards the walk runs --
+    // and the access feature's eight
+    expect(text.match(/answered from '/g)).toHaveLength(21);
     // the rule is shown as a condition, not as a bare expression next to a node id
     expect(text).toMatch(/when status == 200 && has\(body\)/);
     expect(text).toMatch(/anything else/);
