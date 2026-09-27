@@ -10,6 +10,7 @@
  *   C stores: what they keep and what they once called it (stores.ts), and who may see it (scopes.ts)
  *   atomic graphs, which are L and G rules over what one reaches (atomic.ts)
  *   L016, a data graph making a guarded value an effect reads (graph-making.ts)
+ *   L017, a `listens` setting the granting plugin does not declare (listen-settings.ts, beside contracts.ts)
  *   S scenarios (scenarios.ts)   X plugin-specific (each plugin's own `check`)
  */
 import { type LoadResult, type PluginModule, RefusalList, Scope } from '@wilanis/core';

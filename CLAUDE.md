@@ -104,7 +104,9 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
 - **A new rule.** Add it to its family's module under `packages/compiler/src/check/` -- `project.ts` (C, B at
   the project, startup), `profiles.ts` (C017, C018 and, under each profile, B002, B003, B004, B011: what a
   profile chooses and whether every domain port is met and keeps its promises under it), `contracts.ts` (shapes,
-  ports and what an operation `listens` on, connection kinds and connections), `resolvers.ts` (P), `inputs.ts` (a call site's inputs), `bindings.ts` (B), `required.ts` (B009, B010: what a binding of a port a plugin requires may read and may
+  ports and what an operation `listens` on, connection kinds and connections) with `listen-settings.ts` beside it
+  (L017: the setting a `listens` part reads is one the granting plugin declares, of the part's type, and the part
+  helpers L015 shares), `resolvers.ts` (P), `inputs.ts` (a call site's inputs), `bindings.ts` (B), `required.ts` (B009, B010: what a binding of a port a plugin requires may read and may
   reach), `graph.ts` with `graph-nodes.ts`, `graph-reads.ts`, `graph-whole.ts`, `graph-routing.ts` (where a
   node sits in the routing, which G015 judges an effect by) and `narrowing.ts` (G), `graph-making.ts` (L016: a data
   graph composing a value a field invariant guards that one of its effects reads, walked once over the tree after
