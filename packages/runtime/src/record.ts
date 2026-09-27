@@ -14,10 +14,10 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { type ScenarioBranch, type ScenarioDoc, schemaUrl } from '@wilanis/core';
 import { type Report, refusalOf } from '@wilanis/engine';
-import { expectOf, HOME_DIR } from './fuzz.js';
+import { expectOf, SCENARIOS as FUZZED, HOME_DIR } from './fuzz.js';
 
 /** Where `--record` writes, under the root, when the flag names no directory. */
 export const RECORDED = `${HOME_DIR}/rehearsed`;
@@ -129,17 +129,41 @@ function realOf(abs: string): string {
 }
 
 /**
- * The recorded directory on disk, refused when it is not strictly inside the root, since everything in it is owned.
- * It is judged on the real paths too, so a link on the way cannot carry the directory out of the tree.
+ * Whether a path below the root may hold the recorded directory: strictly below the scenarios' home, where no
+ * hand-written scenario sits in it, and outside what fuzz owns.
  */
-function ownedDir(root: string, dir: string): string {
-  const abs = resolve(root, dir);
-  if (!strictlyInside(resolve(root), abs)) throw new Error(`the recorded directory must be inside the tree: ${dir}`);
-  const real = realOf(abs);
-  if (!strictlyInside(realOf(resolve(root)), real))
-    throw new Error(`the recorded directory ${dir} leads through a link to ${real}, which is outside the tree`);
-  return abs;
+function ownable(root: string, abs: string): boolean {
+  const inside = relative(root, abs).split(sep).join('/');
+  const fuzzed = inside === FUZZED || inside.startsWith(`${FUZZED}/`);
+  return inside.startsWith(`${HOME_DIR}/`) && !fuzzed;
 }
+
+/**
+ * Why `dir` may not be the recorded directory, or nothing. Everything in it is owned -- a scenario `--record` did not
+ * write there is removed -- so it may not hold the scenarios a person wrote or the ones fuzz wrote. It is judged on
+ * the real paths too, so a link on the way cannot carry the directory anywhere else.
+ */
+export function refusedDir(root: string, dir: string): string | undefined {
+  const abs = resolve(root, dir);
+  const where = `it may be any directory below ${HOME_DIR}/ outside ${FUZZED}/, as ${RECORDED}/ is`;
+  if (!ownable(resolve(root), abs))
+    return `--record owns ${dir} and removes every scenario in it that it did not write: ${where}`;
+  const real = realOf(abs);
+  if (!ownable(realOf(resolve(root)), real))
+    return `the recorded directory ${dir} leads through a link to ${real}: ${where}`;
+  return undefined;
+}
+
+/** The recorded directory `record` names, `scenarios/rehearsed` where it names none; throws where `refusedDir` refuses it. */
+export function recordedDir(root: string, record?: string): string {
+  const dir = record ?? RECORDED;
+  const refused = refusedDir(root, dir);
+  if (refused) throw new Error(refused);
+  return dir;
+}
+
+/** The recorded directory on disk, where `refusedDir` accepts it, since everything in it is owned. */
+const ownedDir = (root: string, dir: string) => resolve(root, recordedDir(root, dir));
 
 /**
  * Every scenario file under the directory, by its path inside it with `/` between segments: only regular files, and

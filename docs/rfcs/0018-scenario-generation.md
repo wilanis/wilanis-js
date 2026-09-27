@@ -582,3 +582,9 @@ Decided during implementation:
   what `--check` answers; the files carry no profile segment, as *Naming* has them. A tree that declares profiles
   and marks none default is refused until it marks one. Another profile's bindings are still rehearsed by the plain
   walk under `--profile`.
+- **Where `--record <dir>` may write.** Strictly below `scenarios/` and outside `scenarios/fuzz/`, judged on the
+  path as written and on its real path (`refusedDir` in `packages/runtime/src/record.ts`), and refused before the walk
+  with where it may go. Every scenario in the directory that `--record` did not write is removed, so it may never be
+  the home the hand-written scenarios sit in, nor a directory another command owns; #221 adds `scenarios/edges/`
+  beside `scenarios/fuzz/`. The directory is walked through real directories only, so what a link inside it leads
+  to is never removed, and a write a link would carry elsewhere is refused.
