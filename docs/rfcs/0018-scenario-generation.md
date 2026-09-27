@@ -588,3 +588,11 @@ Decided during implementation:
   the home the hand-written scenarios sit in, nor a directory another command owns; #221 adds `scenarios/edges/`
   beside `scenarios/fuzz/`. The directory is walked through real directories only, so what a link inside it leads
   to is never removed, and a write a link would carry elsewhere is refused.
+- **Two triggers of one name.** The checker accepts them: a document's name is its file's stem (`register` in
+  `packages/core/src/documents.ts`), no rule asks that two triggers' differ, and the loader walks an included
+  tree's features as the tree's own, so a host trigger named `refresh` beside `@wilanis/access`'s checks, as does a
+  second `get-customer` under `edge/v2/`. A trigger's files sit under its name, as *Naming* has them and as the
+  rehearsal's lines and each `description` name it, so `--record` and `--check` refuse two recorded triggers of one
+  name, naming both; before, the first kept every file the two shared and the second's runs were dropped without a
+  word. A directory per canonical path, the feature before the name, was the other answer; it would move every file
+  off the layout *Naming* and the guide show, for a tree whose rehearsal lines already name the two alike.

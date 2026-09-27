@@ -119,15 +119,29 @@ export interface Recorded {
   check?: RecordCheck;
 }
 
-/** The runs as documents by file, the first run named by a file keeping it. */
+/**
+ * The runs as documents by file. Where two runs of one trigger name one file the first keeps it, since they prove one
+ * branch. A trigger's files sit under its name, so two triggers of one name -- an included tree's among them, since
+ * its features load as the tree's own -- are refused, naming both, rather than one's runs being dropped for the other's.
+ */
 function docsOf(runs: RecordedRun[]): Record<string, ScenarioDoc> {
+  const named = new Map<string, string>();
   const docs: Record<string, ScenarioDoc> = {};
   for (const run of runs) {
+    const { name, path } = run.trigger;
+    const other = named.get(name) ?? path;
+    if (other !== path) throw new Error(sameName(name, [other, path]));
+    named.set(name, path);
     const file = fileOf(run);
     if (!(file in docs)) docs[file] = scenarioOf(run);
   }
   return docs;
 }
+
+/** Why two triggers of one name cannot both be recorded, and the edit that lets them. */
+const sameName = (name: string, paths: string[]) =>
+  `two triggers are named '${name}' (${paths.sort().join(' and ')}), and a recorded trigger's scenarios are ` +
+  `written under its name (${name}/): rename one of them`;
 
 /** Write the runs to the recorded directory, or under `check` compare them with it and write nothing. */
 export function recordRuns(root: string, how: { record?: string; check?: boolean }, runs: RecordedRun[]): Recorded {
