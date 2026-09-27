@@ -1,11 +1,12 @@
 /**
  * What a report shows of a secret and what a run hands on: a map node's own `in` and a `collect` answer are
  * redacted as its elements are, a run answers its caller the value itself, and a nested run hangs on the node
- * that ran it with its answer redacted as that node's own.
+ * that ran it with its answer redacted as that node's own. What a log or a scenario records of a run's answer is
+ * that answer as the node that answered it shows it (`shownOutput`).
  */
 import { describe, expect, it } from 'vitest';
 import type { HandlerArgs, KernelSpec, Report } from '../src/index.js';
-import { Kernel, Refusal } from '../src/index.js';
+import { Kernel, Refusal, shownOutput } from '../src/index.js';
 
 const SECRET = '«secret»';
 
@@ -141,5 +142,31 @@ describe('what a run answers', () => {
     expect((ran.sub as Report).output).toEqual(redacted);
     expect(ran.attempts?.[0].sub?.output).toEqual(redacted);
     expect(report.output).toBe(2);
+  });
+});
+
+describe("a run's answer as its report shows it", () => {
+  const fetched = async () => ({ name: 'ada', password: 'p-ada' });
+  const fetch = (redact?: { out: string[][] }): KernelSpec => ({
+    name: 'fetch',
+    output: ['fetched'],
+    nodes: { fetched: { kind: 'call', handler: 'fetched', in: {}, ...(redact ? { redact } : {}) } },
+  });
+
+  it('is what the node that answered shows, while the run hands on the value', async () => {
+    const report = await new Kernel({ fetched }).run(fetch({ out: [['password']] }), {});
+    expect(shownOutput(report, undefined)).toEqual({ name: 'ada', password: SECRET });
+    expect(report.output).toEqual({ name: 'ada', password: 'p-ada' });
+  });
+
+  it('holds only what the answer still holds, where a closed shape pruned a field from it', async () => {
+    const report = await new Kernel({ fetched }).run(fetch({ out: [['password']] }), {});
+    // what a trigger's closed out shape leaves of the answer, as the embedder judges it
+    expect(shownOutput({ ...report, output: { name: 'ada' } }, undefined)).toStrictEqual({ name: 'ada' });
+  });
+
+  it('is redacted again by the paths it is given, where the node that answered marks nothing', async () => {
+    const report = await new Kernel({ fetched }).run(fetch(), {});
+    expect(shownOutput(report, [['password']])).toEqual({ name: 'ada', password: SECRET });
   });
 });

@@ -4,6 +4,6 @@
  */
 
 export * from './kernel.js';
-export { redactValue } from './redact.js';
+export { redactValue, shownOutput } from './redact.js';
 export { nodeRefs, PSEUDO, readPath, refsOf } from './sources.js';
 export * from './spec.js';

@@ -143,7 +143,7 @@ export function tree(): Docs {
 }
 
 /** Write a tree into a directory of its own; the caller removes it. */
-function write(docs: Docs): string {
+export function write(docs: Docs): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-schedule-'));
   for (const [relative, doc] of Object.entries(docs)) {
     const path = join(dir, relative);

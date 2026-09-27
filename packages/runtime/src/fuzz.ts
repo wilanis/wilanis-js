@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { walkedUnder } from '@wilanis/compiler';
 import type { Loaded, LoadResult } from '@wilanis/core';
 import { type ScenarioDoc, Scope, schemaUrl, secretPaths, type TriggerDoc } from '@wilanis/core';
-import { outcomeOf, type Report, redactValue, refusalOf } from '@wilanis/engine';
+import { outcomeOf, type Report, refusalOf, shownOutput } from '@wilanis/engine';
 import type { Embedder } from './embed.js';
 import { type Fuzzing, fuzzEdges } from './fuzz-edges.js';
 import { activeProfile, skippedLines } from './profile.js';
@@ -49,14 +49,15 @@ function pick(report: Report, prefix = ''): ScenarioDoc['expect']['nodes'] {
 }
 
 /**
- * What a run is recorded as expecting: how it ended, what it answered, the reason the refuse node it failed at
- * declared (`refusalOf`, which no node's `out` carries), and what every node did.
+ * What a run is recorded as expecting: how it ended, what it answered as its report shows it (`shownOutput`, with the
+ * fields `secret` marks as the marker too), the reason the refuse node it failed at declared (`refusalOf`, which no
+ * node's `out` carries), and what every node did.
  */
 export function expectOf(report: Report, secret: string[][]): ScenarioDoc['expect'] {
   const reason = refusalOf(report)?.reason;
   return {
     status: report.status,
-    ...(report.status === 'done' ? { output: redactValue(report.output, secret) } : {}),
+    ...(report.status === 'done' ? { output: shownOutput(report, secret) } : {}),
     ...(reason !== undefined ? { reason } : {}),
     nodes: pick(report),
   };
@@ -70,7 +71,7 @@ interface Fuzzed {
   context: Record<string, unknown>;
   record: Record<string, unknown>;
   report: Report;
-  /** Where the trigger's `out` marks a field secret: the output is written with those as the marker. */
+  /** Where the trigger's `out` marks a field secret: the marker in the output, beside what its report marks. */
   secret: string[][];
 }
 
@@ -187,8 +188,7 @@ function diffOf(report: Report, sc: ScenarioDoc, secret: string[][]): string[] {
   const { expect } = sc;
   const diffs: string[] = [];
   if (report.status !== expect.status) diffs.push(`status ${expect.status} → ${report.status}`);
-  if (expect.status === 'done' && !same(redactValue(report.output, secret), expect.output))
-    diffs.push('output changed');
+  if (expect.status === 'done' && !same(shownOutput(report, secret), expect.output)) diffs.push('output changed');
   const got = pick(report);
   const pinsReasons = Object.values(expect.nodes).some(node => node.reason !== undefined);
   for (const [id, was] of Object.entries(expect.nodes)) diffs.push(...nodeDiffs(id, was, got[id], pinsReasons));
