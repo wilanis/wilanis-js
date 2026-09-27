@@ -1,6 +1,6 @@
 # RFC 0016: Capability-aware compilation: what a tree requires against what an environment permits
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:core` (one additive key on `project.schema.json`: `profiles.<name>.permits`; `ProjectDoc`),
   `area:compiler` (three rules in `check/project.ts`, all over RFC 0013's `reachOf`), `area:runtime` (two lines
   of `describe`; the example's `production` profile), `area:view` (the project page). Nothing in the engine,
@@ -317,3 +317,21 @@ None before `accepted`.
 names every root that reaches the operation or the first found, which this RFC says is the first found with a
 count (`and 3 more`) so a message stays one screen; and whether the `permitted by` lines of `describe` are
 worth their cost against a tree with many profiles.
+
+## Decided during implementation
+
+- The three messages landed as C021, C022 and C023 in `check/permits.ts` (#660), and C021 names the first root
+  found with a count, `(and 3 more)`, as this RFC says.
+- The `permits` row of `describe project.json` prints after `holds` rather than straight under `reaches`: the count
+  covers the held operations too (`@http/server.port.json#listen` is permitted like any other), and "above" is true
+  only once both are printed. It counts entries, as #309 writes it: `permits    the 19 operations and 3 connections
+  above, by 13 entries` under the example's `production`.
+- The `permitted by` lines are kept (#309). They read only what each profile writes, never a walk, since the checker
+  already holds each list to its profile's reach, and they print one line however many profiles there are, where
+  `stands in for` and `bound by` already print one per profile. A profile with no `permits` is never named: it
+  permits everything and its block in `describe project.json` says so once, so a tree none of whose profiles writes
+  one prints no line. Where some profile writes one and none names the document, the line says `no profile that
+  writes permits`, which is what an author about to reach a new API or connection needs to read. A profile that
+  names some operations of a port rather than the port whole is named with them: `permitted by  production
+  (#ensure)`. A native port with no effectful operation and a domain port print nothing, since no permit may name
+  them (C023).
