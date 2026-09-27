@@ -5,7 +5,8 @@
  * list it answers is sorted but a trigger's policies, the startup steps (and the labels of those a profile starts)
  * and the arrays inside settings, which keep the order their documents give them, so the same tree is the same
  * string however it was walked. The inventory is what is the same under every profile; `profiles` holds one block
- * per profile, what RFC 0013's `reachOf` derives there.
+ * per profile, what RFC 0013's `reachOf` derives there and the addresses `listensOf` reads off the steps that run
+ * there (RFC 0024).
  */
 import { IR_READ, type LoadResult, Scope } from '@wilanis/core';
 import { type ProfileBlock, profileBlocks } from './manifest-profiles.js';
@@ -35,6 +36,7 @@ import {
 import type { Resolved } from './project.js';
 import { RUNTIME_VERSION } from './runtime-version.js';
 
+export { type ListenRow, listensOf } from './manifest-listens.js';
 export type { NeedRow, ProfileBlock, ReachRow } from './manifest-profiles.js';
 export type {
   ConnectionRow,
@@ -62,6 +64,8 @@ export interface Manifest {
   ir: string;
   name: string;
   root: string;
+  /** The Node versions the tree's package.json says it runs on (`engines.node`), verbatim; null where it says none. */
+  node: string | null;
   plugins: PluginRow[];
   includes: IncludeRow[];
   features: FeatureRow[];
@@ -86,9 +90,10 @@ export interface ManifestOptions {
 }
 
 /**
- * The manifest of a tree the checker accepted. The versions of its plugins and includes are read off `resolved`,
- * which `loadProject` carries; a load without it prints `null` for every version it did not resolve. Throws RFC
- * 0013's message where `options.profile` names a profile the project does not declare.
+ * The manifest of a tree the checker accepted. The versions of its plugins and includes, and the Node its
+ * package.json asks for, are read off `resolved`, which `loadProject` carries; a load without it prints `null` for
+ * each of them it did not resolve. Throws RFC 0013's message where `options.profile` names a profile the project
+ * does not declare.
  */
 export function manifestOf(load: LoadResult & { resolved?: Resolved }, options: ManifestOptions): Manifest {
   const scope = new Scope(load.registry, load.resolve);
@@ -103,6 +108,7 @@ export function manifestOf(load: LoadResult & { resolved?: Resolved }, options: 
     ir: IR_READ,
     name: load.registry.project?.doc.name ?? '',
     root: options.root,
+    node: load.resolved?.node ?? null,
     plugins: pluginRows(load, load.resolved?.plugins ?? {}),
     includes: includeRows(load, included),
     features: featureRows(load),

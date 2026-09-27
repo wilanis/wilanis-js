@@ -4,7 +4,7 @@
   "title": "manifest",
   "description": "What `wilanis manifest` prints (RFC 0026): what a tree is, as one JSON object on stdout, computed by the runtime's pure `manifestOf` from a tree the checker accepted. It never reads the environment, the clock or a secret's value. Every reference outside a row's settings is canonical (@features/<feature>/..., never an alias), and settings keep the values their document wrote, a reference among them as written; every array is sorted by its first key, in code units, except a trigger's policies, the startup steps and the labels of those a profile starts, whose order is meaning, and the arrays inside settings, which keep their own; and every object's keys are in code-unit order; so the same tree prints the same bytes, and a diff of two manifests is a diff of what the tree does. From 1.0 a field is added, never removed or retyped, and the sort is part of the promise; before 1.0 nothing is promised.",
   "type": "object",
-  "required": ["format", "runtime", "ir", "name", "root", "plugins", "includes", "features", "documents", "triggers", "ports", "policies", "connections", "secrets", "startup", "profiles"],
+  "required": ["format", "runtime", "ir", "name", "root", "node", "plugins", "includes", "features", "documents", "triggers", "ports", "policies", "connections", "secrets", "startup", "profiles"],
   "additionalProperties": false,
   "properties": {
     "format": {
@@ -27,6 +27,10 @@
     "root": {
       "description": "The tree's root as given on the command line, `.` when none was given.",
       "type": "string"
+    },
+    "node": {
+      "description": "The Node versions the tree's package.json says it runs on, its engines.node verbatim (a range as npm reads it, >=22); null where it has no package.json or names no Node. What an image of the tree is built from (RFC 0024).",
+      "type": ["string", "null"]
     },
     "plugins": {
       "description": "Every plugin project.json names, by `use`.",
@@ -350,7 +354,7 @@
     "connection": {
       "description": "One connection under connections/.",
       "type": "object",
-      "required": ["path", "kind", "settings", "secrets"],
+      "required": ["path", "kind", "endpoint", "settings", "secrets"],
       "additionalProperties": false,
       "properties": {
         "path": {
@@ -360,6 +364,10 @@
         "kind": {
           "description": "The canonical path of the connection kind it is.",
           "type": "string"
+        },
+        "endpoint": {
+          "description": "What it reaches (RFC 0024): the value the kind's `endpoint` path picks out of its settings, as written, so a {{secrets.<key>}} read stays its template text. Null where the kind declares no endpoint, since a connection of it reaches nothing a deployment provisions, or where the connection does not write that setting.",
+          "type": ["string", "null"]
         },
         "settings": {
           "description": "Its settings with the values the document wrote: templates unresolved, a reference as written (an alias stays an alias), arrays in their own order, and every object's keys in code-unit order. A template reading a secret stays {{secrets.<key>}} text, and a secret's value never appears.",
@@ -375,7 +383,7 @@
     "profile": {
       "description": "One place the tree runs (RFC 0013): what the profile writes, and what `reachOf` derives from it.",
       "type": "object",
-      "required": ["default", "description", "bindings", "connections", "reaches", "holds", "starts", "needs"],
+      "required": ["default", "description", "bindings", "connections", "reaches", "holds", "listens", "starts", "needs"],
       "additionalProperties": false,
       "properties": {
         "default": {
@@ -406,6 +414,11 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "listens": {
+          "description": "Every address the profile listens on (RFC 0024): one row per startup step that runs under it whose operation's port document declares `listens`, by operation, two steps that run one in the order declared. An operation that holds and opens no socket, a watcher or a consumer, is among `holds` and not here.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/listen" }
+        },
         "starts": {
           "description": "The labels of the startup steps that run under the profile, in the order declared, which is the order they run in; null for a step with no label.",
           "type": "array",
@@ -432,6 +445,27 @@
           "description": "The canonical paths of the connections its sites name, directly or through a store, with the profile's stand-ins in place (Scope.connectionFor), sorted; empty where they name none. A connection's kind is on its row under connections.",
           "type": "array",
           "items": { "type": "string" }
+        }
+      }
+    },
+    "listen": {
+      "description": "One address a profile listens on, each part read the way the operation's `listens` says it is taken: the step's in, else the granting plugin's settings, else the declared default.",
+      "type": "object",
+      "required": ["operation", "host", "port"],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "description": "The operation that binds it, canonical, as path#operation: one whose port document declares `listens`.",
+          "type": "string"
+        },
+        "host": {
+          "description": "The interface it binds, as written: a literal (127.0.0.1, 0.0.0.0), or a {{secrets.<key>}} read kept as its template text, since an operator may fix the interface from the environment. Null where nothing writes one, which is every interface on both address families, not an unknown.",
+          "type": ["string", "null"]
+        },
+        "port": {
+          "description": "The port it binds, where the tree fixes one with a number. Null where a {{secrets.<key>}} read supplies it, or nothing writes one and the operation declares no default: a port the environment decides is not the tree's to print.",
+          "type": ["integer", "null"],
+          "minimum": 1
         }
       }
     },

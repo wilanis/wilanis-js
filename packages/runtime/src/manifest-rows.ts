@@ -7,6 +7,7 @@
  * every depth among them.
  */
 import {
+  type ConnectionDoc,
   type Kind,
   type Layer,
   type Loaded,
@@ -16,6 +17,7 @@ import {
   type Scope,
   type TriggerDoc,
 } from '@wilanis/core';
+import { endpointOf } from './address-said.js';
 import { byUnits } from './diagnostics.js';
 import { RUNTIME_VERSION } from './runtime-version.js';
 
@@ -89,10 +91,12 @@ export interface PolicyRow {
   gates: string[];
   included: string | null;
 }
-/** One connection: its kind and settings, and the secret keys its templates read. */
+/** One connection: its kind, what it reaches, its settings, and the secret keys its templates read. */
 export interface ConnectionRow {
   path: string;
   kind: string;
+  /** What the kind's `endpoint` path picks out of the settings, as written; null where the kind declares none. */
+  endpoint: string | null;
   settings: Record<string, unknown>;
   secrets: string[];
 }
@@ -249,11 +253,21 @@ export function policyRows(load: LoadResult, triggers: TriggerRow[]): PolicyRow[
   return sortedBy(rows, row => row.path);
 }
 
-/** Every connection, by path, with the secret keys its settings read and never a secret's value. */
+/** What a connection reaches, as its settings write it: a secret read stays its text; null where nothing says. */
+const endpointIn = (scope: Scope, connection: ConnectionDoc): string | null => {
+  const value = endpointOf(connection, scope)?.value;
+  return typeof value === 'string' ? value : null;
+};
+
+/**
+ * Every connection, by path, with what its kind says it reaches and the secret keys its settings read, and never a
+ * secret's value.
+ */
 export function connectionRows(scope: Scope): ConnectionRow[] {
   const rows = scope.registry.all('connection').map(connection => ({
     path: connection.path,
     kind: scope.canon(connection.doc.kind),
+    endpoint: endpointIn(scope, connection.doc),
     settings: settingsOf(connection.doc.settings),
     secrets: sorted(
       scope.templateReads(connection.doc.settings).flatMap(([root, key]) => (root === 'secrets' && key ? [key] : [])),

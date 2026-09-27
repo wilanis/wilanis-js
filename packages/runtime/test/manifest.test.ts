@@ -128,6 +128,7 @@ describe('manifestOf: the inventory of the example', () => {
     expect(connection('customers-api.connection.json')).toEqual({
       path: '@connections/customers-api.connection.json',
       kind: api.kind,
+      endpoint: api.settings.baseUrl,
       settings: keySorted(api.settings),
       secrets: [],
     });

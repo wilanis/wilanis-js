@@ -2,11 +2,13 @@
  * The per-profile half of the manifest (RFC 0026): one block per profile the tree is judged under, each what the
  * profile writes (its bindings and stand-ins, canonical on both sides) beside what `reachOf` derives from it (the
  * effects reached and the connections they were reached with, what is held open, the startup steps that run there
- * and the variables read). It reads the Scope and never the environment: which profile a process would pick is
- * `activeProfile`'s question, and the manifest describes the tree, not the process.
+ * and the variables read) and what `listensOf` reads off the steps that run there (the addresses listened on). It
+ * reads the Scope and never the environment: which profile a process would pick is `activeProfile`'s question, and
+ * the manifest describes the tree, not the process.
  */
 import { profilesOf, type Reach, reachOf } from '@wilanis/compiler';
 import { runsUnder, type Scope } from '@wilanis/core';
+import { type ListenRow, listensOf } from './manifest-listens.js';
 import { sorted, sortedBy } from './manifest-rows.js';
 import { declaredProfile } from './profile.js';
 
@@ -21,7 +23,7 @@ export interface NeedRow {
   key: string;
   readBy: string[];
 }
-/** One profile: what it chooses, and what the tree reaches, holds, starts and needs under it. */
+/** One profile: what it chooses, and what the tree reaches, holds, listens on, starts and needs under it. */
 export interface ProfileBlock {
   default: boolean;
   description: string | null;
@@ -29,6 +31,7 @@ export interface ProfileBlock {
   connections: Record<string, string>;
   reaches: ReachRow[];
   holds: string[];
+  listens: ListenRow[];
   starts: (string | null)[];
   needs: NeedRow[];
 }
@@ -84,6 +87,7 @@ function profileBlock(scope: Scope, name: string | undefined): ProfileBlock {
     connections: canonMap(scope, written?.connections),
     reaches: reachRows(reach),
     holds: sorted(reach.holds),
+    listens: listensOf(scope, name),
     starts: (scope.project?.startup ?? []).filter(step => runsUnder(step, name)).map(step => step.label ?? null),
     needs: needRows(reach),
   };

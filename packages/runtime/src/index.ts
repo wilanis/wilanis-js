@@ -100,6 +100,8 @@ export {
   fuzz,
   generatedFire,
   init,
+  type ListenRow,
+  listensOf,
   ls,
   MANIFEST_SCHEMA,
   type Manifest,
