@@ -1,7 +1,8 @@
 /**
  * The directory `wilanis rehearse --record` owns (RFC 0018): where it may be, and how the scenarios in it are written,
- * removed and compared with what the tree writes today. Everything under it is owned and nothing else is: not the
- * scenarios a person or fuzz wrote, and not what a link inside it leads to.
+ * removed and compared with what the tree writes today. What it owns is what it wrote, a scenario saying
+ * `"generated": "rehearse"`, and nothing else: not a scenario a person or fuzz wrote, even one in the directory, and
+ * not what a link inside it leads to.
  */
 import {
   existsSync,
@@ -55,15 +56,15 @@ function ownable(root: string, abs: string): boolean {
 }
 
 /**
- * Why `dir` may not be the recorded directory, or nothing. Everything in it is owned -- a scenario `--record` did not
- * write there is removed -- so it may not hold the scenarios a person wrote or the ones fuzz wrote. It is judged on
- * the real paths too, so a link on the way cannot carry the directory anywhere else.
+ * Why `dir` may not be the recorded directory, or nothing: it sits apart from the scenarios a person keeps at the
+ * home and from what fuzz owns. It is judged on the real paths too, so a link on the way cannot carry the directory
+ * anywhere else.
  */
 export function refusedDir(root: string, dir: string): string | undefined {
   const abs = resolve(root, dir);
   const where = `it may be any directory below ${HOME_DIR}/ outside ${FUZZED}/, as ${RECORDED}/ is`;
   if (!ownable(resolve(root), abs))
-    return `--record owns ${dir} and removes every scenario in it that it did not write: ${where}`;
+    return `--record may not own ${dir}, beside the scenarios a person or fuzz wrote: ${where}`;
   const real = realOf(abs);
   if (!ownable(realOf(resolve(root)), real))
     return `the recorded directory ${dir} leads through a link to ${real}: ${where}`;
@@ -101,6 +102,29 @@ function scenarioFiles(at: string, prefix: string[], into: string[]): void {
   }
 }
 
+/** Whether a scenario on disk is one `--record` wrote, which says `"generated": "rehearse"`; an unreadable one is not. */
+function wroteIt(abs: string, file: string): boolean {
+  try {
+    return (JSON.parse(readFileSync(join(abs, file), 'utf8')) as { generated?: unknown }).generated === 'rehearse';
+  } catch {
+    return false;
+  }
+}
+
+/** The scenarios under the directory, parted into those `--record` wrote and the rest, which it never touches. */
+function held(abs: string): { owned: string[]; others: string[] } {
+  const files = onDisk(abs);
+  const owned = files.filter(file => wroteIt(abs, file));
+  return { owned, others: files.filter(file => !owned.includes(file)) };
+}
+
+/** The scenarios under `dir` that `--record` did not write and would not write over, root-relative: left as they are. */
+export function keptIn(root: string, dir: string, docs: Record<string, ScenarioDoc>): string[] {
+  return held(ownedDir(root, dir))
+    .others.filter(file => !(file in docs))
+    .map(file => `${dir}/${file}`);
+}
+
 /** The files a write would reach through a link inside the directory, and so possibly outside the tree. */
 function throughLinks(abs: string, files: string[]): string[] {
   const home = realOf(abs);
@@ -113,9 +137,10 @@ function throughLinks(abs: string, files: string[]): string[] {
 }
 
 /**
- * Write every recorded scenario under `dir` and remove every `*.scenario.json` under it this run did not write, with
- * any directory that leaves empty; nothing outside `dir` is touched, and nothing is reached through a link in it.
- * Answers the files written, root-relative.
+ * Write every recorded scenario under `dir` and remove every scenario under it that an earlier `--record` wrote and
+ * this one does not, with any directory that leaves empty. A scenario it did not write is left, and one in the way
+ * of a file it writes refuses the write; nothing outside `dir` is touched, and nothing is reached through a link in
+ * it. Answers the files written, root-relative.
  */
 export function writeRecorded(root: string, dir: string, docs: Record<string, ScenarioDoc>): string[] {
   const abs = ownedDir(root, dir);
@@ -125,7 +150,14 @@ export function writeRecorded(root: string, dir: string, docs: Record<string, Sc
       `${linked.map(file => `${dir}/${file}`).join(', ')} would be written through a link, which may lead out of ` +
         'the tree; the recorded directory holds only what --record writes: remove the link',
     );
-  for (const file of onDisk(abs)) if (!(file in docs)) removeOwned(abs, file);
+  const { owned, others } = held(abs);
+  const inTheWay = others.filter(file => file in docs).map(file => `${dir}/${file}`);
+  if (inTheWay.length)
+    throw new Error(
+      `${inTheWay.join(', ')} would be written over, and --record did not write it (no "generated": "rehearse"): ` +
+        `move it out of ${dir}/, where --record writes`,
+    );
+  for (const file of owned) if (!(file in docs)) removeOwned(abs, file);
   const written: string[] = [];
   for (const [file, doc] of Object.entries(docs).sort(([one], [other]) => (one < other ? -1 : 1))) {
     mkdirSync(dirname(join(abs, file)), { recursive: true });
@@ -147,20 +179,21 @@ export interface RecordCheck {
   stale: string[];
   /** Would be written, and is not on disk. */
   missing: string[];
-  /** On disk under the directory, and would not be written. */
+  /** On disk under the directory, written by `--record`, and would not be written now. */
   extra: string[];
 }
 
 /** Render every recorded scenario as `writeRecorded` would and compare the bytes with what is on disk; never writes. */
 export function checkRecorded(root: string, dir: string, docs: Record<string, ScenarioDoc>): RecordCheck {
   const abs = ownedDir(root, dir);
-  const present = new Set(onDisk(abs));
+  const { owned, others } = held(abs);
+  const present = new Set([...owned, ...others]);
   const out: RecordCheck = { stale: [], missing: [], extra: [] };
   for (const [file, doc] of Object.entries(docs)) {
     if (!present.has(file)) out.missing.push(`${dir}/${file}`);
     else if (readFileSync(join(abs, file), 'utf8') !== rendered(doc)) out.stale.push(`${dir}/${file}`);
   }
-  for (const file of present) if (!(file in docs)) out.extra.push(`${dir}/${file}`);
+  for (const file of owned) if (!(file in docs)) out.extra.push(`${dir}/${file}`);
   for (const list of Object.values(out)) list.sort();
   return out;
 }

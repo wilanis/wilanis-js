@@ -244,7 +244,7 @@ describe('rehearse --record and --check on the command line', () => {
     for (const at of ['scenarios', 'scenarios/fuzz']) {
       const owned = wilanis(dir, 'rehearse', '.', '--record', at);
       expect(owned.code).toBe(2);
-      expect(owned.stderr).toContain(`--record owns ${at} and removes every scenario in it that it did not write: `);
+      expect(owned.stderr).toContain(`--record may not own ${at}, beside the scenarios a person or fuzz wrote: `);
     }
     const recorded = wilanis(dir, 'rehearse', '.', '--record');
     expect(recorded.code, recorded.stderr).toBe(0);
