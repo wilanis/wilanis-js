@@ -13,7 +13,7 @@ sources:
 keywords:
   - wilanis
 # Each pinned, each behind its switch in values.yaml and off by default, each chosen for images that pull without a
-# vendor account. `helm dependency build` fetches them as Chart.lock pins them.
+# vendor account. `helm dependency update` fetches them as Chart.lock records them (README.md).
 dependencies:
   # The CloudNativePG operator; the one Cluster it runs is templates/postgresql.yaml, behind the same switch.
   - name: cloudnative-pg

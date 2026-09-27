@@ -1,2 +1,2 @@
-# The dependencies' archives: `helm dependency build` fetches them as Chart.lock pins them.
+# The dependencies' archives, which `helm dependency update` fetches as Chart.lock records them.
 /charts/

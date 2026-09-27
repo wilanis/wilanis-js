@@ -6,7 +6,7 @@ directory is generated.
 
 ```
 npx wilanis-deploy example --profile production --target helm
-helm dependency build charts/wilanis-tree
+helm dependency update charts/wilanis-tree
 helm install customers charts/wilanis-tree -f example/deploy/values.yaml
 ```
 
@@ -87,8 +87,11 @@ with itself, so on a first install there is no such type yet and the chart rende
 and the same command run again as `helm upgrade` once the operator is ready creates it. Until then the tree's pods
 wait for the Secret the cluster would write.
 
-`helm dependency build charts/wilanis-tree` fetches the three archives into `charts/wilanis-tree/charts/`, as
-`Chart.lock` pins them; they are not committed. A new pin is a pull request that runs `helm dependency update`.
+`Chart.yaml` names each version exactly, so `helm dependency update charts/wilanis-tree` fetches the three
+archives `Chart.lock` records into `charts/wilanis-tree/charts/`, where they are not committed. CI runs `helm
+dependency build` instead, which reads `Chart.lock` and fails where it has fallen out of step with `Chart.yaml`;
+it needs each repository added first. A new pin is a pull request that changes the version and runs `helm
+dependency update`.
 
 ## The example's cluster
 
