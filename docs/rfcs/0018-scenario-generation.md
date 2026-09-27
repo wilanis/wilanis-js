@@ -586,6 +586,9 @@ Decided during implementation:
   what `--check` answers; the files carry no profile segment, as *Naming* has them. A tree that declares profiles
   and marks none default is refused until it marks one. Another profile's bindings are still rehearsed by the plain
   walk under `--profile`.
+- **`--check` fails on a failing rehearsal.** It exits 1 when the rehearsal is not ok as well as when the directory
+  differs, and prints the rehearsal's lines before the directory's verdict, so a tree whose `--record` fails cannot
+  pass the CI step because the directory it wrote is current. `scenarios --check` inherits it.
 - **Where `--record <dir>` may write.** Strictly below `scenarios/` and outside `scenarios/fuzz/`, judged on the
   path as written and on its real path (`refusedDir` in `packages/runtime/src/recorded-dir.ts`), and refused before the walk
   with where it may go. Every scenario in the directory that `--record` did not write is removed, so it may never be

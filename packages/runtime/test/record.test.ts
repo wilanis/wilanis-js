@@ -272,4 +272,23 @@ describe('rehearse --record and --check on the command line', () => {
     }
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it('exits 1 under --check when the rehearsal fails, however current the directory is', { timeout: 120_000 }, () => {
+    const dir = copyOfExample();
+    symlinkSync(join(WORKSPACE, 'node_modules'), join(dir, 'node_modules'));
+    // a rule no input satisfies: the rehearsal cannot reach it, and fails
+    edit(dir, GET_ROW, doc => {
+      doc.nodes
+        .find((node: any) => node.id === 'outcome')
+        .rules.push({ when: 'status == 404 && status == 200', to: 'upstreamFailed' });
+    });
+    const recorded = wilanis(dir, 'rehearse', '.', '--record');
+    expect(recorded.code).toBe(1);
+    // the directory is what the tree writes, and the check still fails, saying why
+    const checked = wilanis(dir, 'rehearse', '.', '--check');
+    expect(checked.code, checked.stderr).toBe(1);
+    expect(checked.stdout).toContain('scenarios/rehearsed/ is what the solver writes for this tree');
+    expect(checked.stdout).toContain('NEVER RUN');
+    rmSync(dir, { recursive: true, force: true });
+  });
 });
