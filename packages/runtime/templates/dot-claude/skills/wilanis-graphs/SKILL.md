@@ -115,8 +115,9 @@ own, both check clean.
 
 `#patch` stays for a field no rule reads. `active` on `Customer` is one, since *A customer is reachable* does not
 read it, so a data graph may set it with one `#patch` node, written by hand against the store port
-(`wilanis describe @storage/store.port.json`). No scaffold writes a patch, and a rule added later that reads the
-field turns that node into an I007.
+(`wilanis describe @storage/store.port.json`), whose `changes` is written out or of a closed type: one of an open
+type or `unknown` may carry a field the rule reads, and is an I007. No scaffold writes a patch, and a rule added
+later that reads the field turns that node into an I007.
 
 ## Read, decide, write
 

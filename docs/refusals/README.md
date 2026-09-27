@@ -156,7 +156,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [I004](I004.md) | I | live | a `holds.when` that does not parse, does not type against the shape's fields, or is not boolean |
 | [I005](I005.md) | I | live | a value written in literals that contradicts a field invariant where it is made |
 | [I006](I006.md) | I | live | a refusal whose reason is `invariant`, the word the compiler's guards refuse with |
-| [I007](I007.md) | I | live | a `#patch` of a collection a field invariant holds over whose `changes` name a field the rule reads |
+| [I007](I007.md) | I | live | a `#patch` of a collection a field invariant holds over whose `changes` name a field the rule reads, or are of a type open to one |
 | [I008](I008.md) | I | live | a `#put` of a collection a field invariant holds over whose `record` is not one whole read of a site of the shape, or that a binding delegates straight to the store |
 | [C001](C001.md) | C | live | settings that read anything but one declared `{{secrets.<key>}}` |
 | [C002](C002.md) | C | live | a connection's or a plugin's settings that do not fit the type its kind or manifest declares |
