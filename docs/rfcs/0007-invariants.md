@@ -471,3 +471,14 @@ with `invariant`.
    the comparison: what a switch established is renamed from its input names to the paths its `in` reads, and
    what the invariant wants is renamed from the shape's fields to where the site reads them. Two spellings
    would compare as unequal terms and silently guard everything, so there is one.
+8. **A guarded shape is written whole, and made upstream of the write**, so a site is never downstream of the
+   effect that stores its value (RFC 0035). A guard stands at the first node whose answer is the shape, and a data
+   graph that patched a row and then made what the store answered held no value of the shape until it had stored
+   one: the guard judged the row after it was kept, and the refusal left it kept (#489). The guard does not move,
+   and its four ids stay the contract. A `#patch` whose `changes` name a field a field invariant reads is I007, and
+   a `#put` whose `record` is not one whole read of a site of the shape is I008, both in
+   `check/invariant-writes.ts`; a data graph making a value of a guarded shape that one of its effects reads is
+   L016, in `check/graph-making.ts`. The record is therefore made in a domain graph and reaches the write as the
+   data graph's `in`, a taken site guarded before the effect by decision 4, while a made site that only re-types
+   what the store answered is a read site and guarded as before. RFC 0033's ways of moving the guard onto the
+   write's input or rolling the write back were withdrawn for this.
