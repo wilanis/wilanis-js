@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/deploy/schemas/plan.schema.json",
+  "title": "plan",
+  "description": "What `wilanis-deploy --target plan` prints (RFC 0024): what one deployment of one tree is, as one JSON object on stdout, computed by the pure `planOf` from the tree's manifest (RFC 0026) and the profiles asked for. It never reads the environment, the clock or a secret's value: a variable is named, never valued. Every other target renders this plan and reads nothing else, so a target someone else writes needs nothing from this package but it. Every array is sorted, in code units, by its first key; every reference is canonical, as the manifest prints it. From 1.0 a field is added, never removed or retyped, and `format` is bumped for a breaking change; before 1.0 nothing is promised.",
+  "type": "object",
+  "required": ["format", "name", "node", "image", "workloads", "requires"],
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "description": "Which envelope this is. 1 until a change a reader could not ignore, which takes the next number.",
+      "const": 1
+    },
+    "name": {
+      "description": "The tree's name, as project.json says it and the manifest prints it.",
+      "type": "string"
+    },
+    "node": {
+      "description": "The Node versions the tree's package.json says it runs on, its engines.node verbatim, as the manifest prints it; null where it names none. What an image's base is chosen by.",
+      "type": ["string", "null"]
+    },
+    "image": {
+      "description": "The one image every workload runs: a tree's profiles share their documents and node_modules, and only the command differs.",
+      "type": "object",
+      "required": ["context", "dockerfile", "reference"],
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "description": "The directory the image is built from, relative to the tree's root.",
+          "type": "string"
+        },
+        "dockerfile": {
+          "description": "The file that builds it, relative to the tree's root.",
+          "type": "string"
+        },
+        "reference": {
+          "description": "The reference the image is tagged with, as the command was given it: the tree's name and its package.json version (customers:0.1.0), or latest where it gives none.",
+          "type": "string"
+        }
+      }
+    },
+    "workloads": {
+      "description": "One process per profile asked for, by profile.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/workload" }
+    },
+    "requires": {
+      "description": "What the environment must provide: every connection an asked profile reaches whose kind declares an endpoint, by connection. A floor, not a census: a connection of a kind that declares none is not listed.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/requirement" }
+    }
+  },
+  "$defs": {
+    "workload": {
+      "description": "One profile's process: how it starts, what it listens on and holds open, the variables it needs, and how it is known to be up.",
+      "type": "object",
+      "required": ["profile", "description", "command", "listens", "holds", "needs", "replicas", "probe"],
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "description": "The profile this process runs under, as project.json names it; \"\" for the unnamed profile of a tree that declares none.",
+          "type": "string"
+        },
+        "description": {
+          "description": "The profile's description, as project.json writes it; null where it writes none.",
+          "type": ["string", "null"]
+        },
+        "command": {
+          "description": "The command the process starts with, run in the tree's root: wilanis start . --profile <name>, and without --profile for the unnamed profile.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One word of the command, passed as it is, with no shell between.", "type": "string" }
+        },
+        "listens": {
+          "description": "Every address the profile's startup binds, by operation and then port: what a container publishes and a Service routes to.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/listen" }
+        },
+        "holds": {
+          "description": "Every operation the profile's startup holds open, by operation, as the manifest prints them; never empty, since a profile that holds nothing is refused.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "An operation, <port>#<operation>.", "type": "string" }
+        },
+        "needs": {
+          "description": "Every variable the profile reads, by variable and then key: named, never valued.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/need" }
+        },
+        "replicas": {
+          "description": "How many of the process to run: 1, since until RFC 0005 a tree may keep sessions and blobs on its instance's disk and a second replica would not see them.",
+          "const": 1
+        },
+        "probe": {
+          "description": "How the process is known to be up: its first listened port accepting a connection, since the startup opens the port only after every step before it succeeded; null where it listens on nothing.",
+          "oneOf": [{ "$ref": "#/$defs/probe" }, { "type": "null" }]
+        }
+      }
+    },
+    "listen": {
+      "description": "One address a profile's startup binds.",
+      "type": "object",
+      "required": ["operation", "host", "port"],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "description": "The operation that binds it, <port>#<operation>, whose port document declares listens.",
+          "type": "string"
+        },
+        "host": {
+          "description": "The interface, as the tree writes it: a literal, or a {{secrets.*}} read kept as its text; null where nothing is written, which is every interface.",
+          "type": ["string", "null"]
+        },
+        "port": {
+          "description": "The port the tree fixes. Always a number: an address whose port a secret supplies, or nothing fixes, is refused.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "need": {
+      "description": "One variable a profile reads.",
+      "type": "object",
+      "required": ["variable", "key", "readBy"],
+      "additionalProperties": false,
+      "properties": {
+        "variable": {
+          "description": "The environment variable, as project.json's secrets map the key to it.",
+          "type": "string"
+        },
+        "key": {
+          "description": "The secret key the variable answers, as a {{secrets.<key>}} read names it.",
+          "type": "string"
+        },
+        "readBy": {
+          "description": "Everyone who reads it, sorted: a connection's path, or @<plugin> settings.",
+          "type": "array",
+          "items": { "description": "A connection's path, or @<plugin> settings.", "type": "string" }
+        }
+      }
+    },
+    "probe": {
+      "description": "A readiness check on a TCP port.",
+      "type": "object",
+      "required": ["tcp"],
+      "additionalProperties": false,
+      "properties": {
+        "tcp": {
+          "description": "The port a connection is attempted on: the first one the workload listens on.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "requirement": {
+      "description": "One connection the environment must let the tree reach.",
+      "type": "object",
+      "required": ["connection", "kind", "endpoint", "reachedBy"],
+      "additionalProperties": false,
+      "properties": {
+        "connection": {
+          "description": "The connection document, by path; the stand-in a profile chose where it chose one.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "The connection kind, by path, whose endpoint says which setting is the address.",
+          "type": "string"
+        },
+        "endpoint": {
+          "description": "What that setting holds, as the connection writes it: a {{secrets.*}} read stays its text, and the value never appears.",
+          "type": "string"
+        },
+        "reachedBy": {
+          "description": "The asked profiles that reach it, sorted.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "A profile, as project.json names it.", "type": "string" }
+        }
+      }
+    }
+  }
+}
