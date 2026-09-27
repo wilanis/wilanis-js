@@ -30,7 +30,7 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
   (before the RFCs)
 - An alias names one thing: not a plugin root, not a reserved root, not a folder, and not two things across an
   include. [[D007](refusals/D007.md)] (before the RFCs)
-- A domain graph reaches no effect and reads no request, and a data graph runs no domain operation.
+- A domain graph reaches no effect and reads no context, and a data graph runs no domain operation.
   [[L002](refusals/L002.md)] (before the RFCs)
 - A data graph or a binding reaches only the effects its feature allows. [[L003](refusals/L003.md)] (before the
   RFCs)
@@ -39,7 +39,7 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
 - A trigger and a policy fire a domain operation and never a native one, and a graph never runs a `holds`
   operation. [[L006](refusals/L006.md), [L008](refusals/L008.md)] (before the RFCs)
 - A startup step names a domain operation or a native `holds` operation, with inputs it has and no read of the
-  request. [[B006](refusals/B006.md), [B007](refusals/B007.md), [B008](refusals/B008.md)] (before the RFCs)
+  context. [[B006](refusals/B006.md), [B007](refusals/B007.md), [B008](refusals/B008.md)] (before the RFCs)
 - Every value fits the type declared for it, every input is given, once, from something that exists, and a field
   the checker must see is written as a literal. [[G003](refusals/G003.md), [G004](refusals/G004.md),
   [G005](refusals/G005.md), [G006](refusals/G006.md), [G013](refusals/G013.md), [B005](refusals/B005.md),
@@ -49,8 +49,8 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
   node, constant and input is read. [[G001](refusals/G001.md), [G007](refusals/G007.md), [G008](refusals/G008.md),
   [G009](refusals/G009.md), [G010](refusals/G010.md), [G012](refusals/G012.md)] (before the RFCs)
 - A switch rule is a boolean expression over the node's inputs. [[G011](refusals/G011.md)] (before the RFCs)
-- The request is read in a trigger's `fire.in`, a policy's `decide.in` and a resolvers document only, and a
-  resolver reads only a path the trigger's kind or the guard hands. [[G003](refusals/G003.md),
+- The context a trigger kind hands is read as `context.*` in a trigger's `fire.in`, a policy's `decide.in` and a
+  resolvers document only, and a resolver reads only a path the trigger's kind or the guard hands. [[G003](refusals/G003.md),
   [L002](refusals/L002.md), [P002](refusals/P002.md), [P003](refusals/P003.md), [T004](refusals/T004.md),
   [A001](refusals/A001.md)] (before the RFCs)
 - Every refusal a trigger can reach, its policies' and the guard's included, is mapped to an answer, every mapped
@@ -82,7 +82,7 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
   sees every row is reached only behind its policy. [[A007](refusals/A007.md), [A008](refusals/A008.md),
   [C012](refusals/C012.md), [C013](refusals/C013.md), [X105](refusals/X105.md), [X214](refusals/X214.md)]
   (RFC 0015)
-- A graph, a binding or a store names under `reads` each read it takes from the request, and no other.
+- A graph, a binding or a store names under `reads` each read it takes from the context, and no other.
   [[G003](refusals/G003.md), [P004](refusals/P004.md), [P005](refusals/P005.md), [P006](refusals/P006.md)]
   (RFC 0029)
 - At most one profile is the default, a stand-in is a connection of the same kind or, for a broker alone, one that
@@ -102,13 +102,13 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
 - The stubbed gates never call the guard: `rehearse`, `fuzz`, `regress` and `run --seed` prove nothing about
   identity. (`gate` in `packages/runtime/src/gate.ts`; `Embedder.stubbed` in `packages/runtime/src/embed.ts`, set
   by `embedderFor` in `packages/runtime/src/stubbing.ts` for every run given a seed; before the RFCs)
-- What the guard learned reaches a graph as `request.principal`, `request.session` and `request.challenge` and by
+- What the guard learned reaches a graph as `context.principal`, `context.session` and `context.challenge` and by
   no other path, and it is what the credential established, never the token or the code itself. (`identifies` in
   `packages/runtime/src/gate.ts`; `guard` in `packages/plugin-auth/src/guard.ts`; before the RFCs)
 - A field marked `secret` is `«secret»` in every report's `in` and `out`, to a depth of six levels inside a type,
   a list counting as one, whichever node reads it (a call, a switch, a map and each of its elements, an
   invariant's guard, a graph that takes its input whole, a nested run, a node seeded in a replay), in a trigger's
-  request where its kind's context marks it (an http request's headers and cookies, a queue message's headers)
+  context where its kind marks it (an http request's headers and cookies, a queue message's headers)
   and in every input filled from such a field, in a policy's decision, and in what the schedule log and
   `wilanis fuzz` record of a run's answer; its bounds are that a secret read into a type that does not mark it
   (a `@std/object.port.json#make` typed `string` of `{{in.password}}`) is shown in clear from that node on, and
