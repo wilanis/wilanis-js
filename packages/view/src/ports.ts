@@ -222,18 +222,18 @@ function readsIn(value: unknown, into: Set<string> = new Set()): Set<string> {
   return into;
 }
 
-/** Where one read leaves: the node it names, or the request node at the path its resolver names. */
+/** Where one read leaves: the node it names, or the context node at the path its resolver names. */
 function leaves(read: string, resolvers: Map<string, { path: string[] }>) {
   const [root, ...path] = splitPath(read);
   if (root === 'secrets') return undefined;
   const resolver = resolvers.get(root);
   if (!resolver) return { from: root, fromPort: path.join('.') };
-  return { from: 'request', fromPort: [...resolver.path, ...path].join('.') };
+  return { from: 'context', fromPort: [...resolver.path, ...path].join('.') };
 }
 
 /**
  * Data edges: every {{root.path}} read in a node's inputs becomes an edge from the root's port to the input.
- * A read through a resolver leaves the request node at the path the resolver names.
+ * A read through a resolver leaves the context node at the path the resolver names.
  */
 export function wire(
   edges: VEdge[],

@@ -1,6 +1,6 @@
 /**
- * What a graph or a binding reads from the request, and the one node that stands for it. A document names each read
- * under `reads` -- a local name bound to a resolver of a resolvers document (RFC 0029) -- so the request node draws
+ * What a graph or a binding reads from the context, and the one node that stands for it. A document names each read
+ * under `reads` -- a local name bound to a resolver of a resolvers document (RFC 0029) -- so the context node draws
  * one port per name, labelled as the document reads it and opening the document that declares it. Two features'
  * resolvers are two `opens` on one node, which is why the document sits on the port and not on the node.
  */
@@ -9,9 +9,9 @@ import { splitPath, splitRef } from '@wilanis/core';
 import type { VEdge, VNode } from './types.js';
 import { labelOf } from './types.js';
 
-/** One name under a document's `reads`: where it lands in the request, and the resolvers document that declares it. */
+/** One name under a document's `reads`: where it lands in the context, and the resolvers document that declares it. */
 export interface Read {
-  /** The segments below `request` the resolver reads, which name the port the edge leaves. */
+  /** The segments below `context` the resolver reads, which name the port the edge leaves. */
   path: string[];
   /** The local name the document reads it by, which the port shows. */
   label: string;
@@ -29,7 +29,7 @@ function saying(resolver: { label?: string; description?: string }): string | un
   return [resolver.label, resolver.description].filter(Boolean).join('. ') || undefined;
 }
 
-/** Every name under a `reads` map, resolved: where it lands in the request, and which document declares it. */
+/** Every name under a `reads` map, resolved: where it lands in the context, and which document declares it. */
 export function readsOf(scope: Scope, reads: GraphDoc['reads']): Map<string, Read> {
   const out = new Map<string, Read>();
   for (const [name, ref] of Object.entries(reads ?? {})) {
@@ -55,15 +55,15 @@ function through(scope: Scope, reads: Map<string, Read>): string {
 }
 
 /**
- * The request node, when a read goes through a resolver and something reads it. Its ports are opened later, by the
- * deep reads that leave it; `markRequestPorts` then says what each one is.
+ * The context node, when a read goes through a resolver and something reads it. Its ports are opened later, by the
+ * deep reads that leave it; `markContextPorts` then says what each one is.
  */
-export function requestNode(scope: Scope, reads: Map<string, Read>, edges: VEdge[]): VNode | undefined {
-  if (!reads.size || !edges.some(edge => edge.from === 'request')) return undefined;
+export function contextNode(scope: Scope, reads: Map<string, Read>, edges: VEdge[]): VNode | undefined {
+  if (!reads.size || !edges.some(edge => edge.from === 'context')) return undefined;
   return {
-    id: 'request',
-    kind: 'request',
-    label: 'Request',
+    id: 'context',
+    kind: 'context',
+    label: 'Context',
     description: `what the trigger kind hands, read through ${through(scope, reads)}`,
     inputs: [],
     outputs: [],
@@ -71,13 +71,13 @@ export function requestNode(scope: Scope, reads: Map<string, Read>, edges: VEdge
 }
 
 /**
- * The request node's ports carry the name the document reads them by, and open the document that declares it:
+ * The context node's ports carry the name the document reads them by, and open the document that declares it:
  * `{{agent}}` is labelled `agent` and opens the resolvers document its `reads` entry pointed at.
  */
-export function markRequestPorts(request: VNode | undefined, reads: Map<string, Read>) {
-  if (!request) return;
+export function markContextPorts(context: VNode | undefined, reads: Map<string, Read>) {
+  if (!context) return;
   for (const read of reads.values()) {
-    const port = request.outputs.find(one => one.name === read.path.join('.'));
+    const port = context.outputs.find(one => one.name === read.path.join('.'));
     if (!port) continue;
     port.label = read.label;
     port.opens = read.opens;

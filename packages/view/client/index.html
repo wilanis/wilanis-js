@@ -150,12 +150,12 @@
   const heldSaid = (h) => h.by === 'narrowed' ? "narrowed by '" + h.switch + "'" : h.by === 'through' ? "from '" + h.node + "'" : 'literal';
   /** How a whole rule was established: the ways its conjuncts were, each said once, in the order it writes them. */
   const heldWays = (held) => [...new Set(held.map(heldSaid))].join(', ');
-  const KIND_NAMES = { project: 'Project', feature: 'Features', trigger: 'Triggers', policy: 'Policies', resolvers: 'Request reads', graph: 'Graphs', port: 'Ports', binding: 'Bindings', shape: 'Shapes', store: 'Stores', connection: 'Connections', scenario: 'Scenarios', plugin: 'Plugins', 'trigger-kind': 'Trigger kinds', 'connection-kind': 'Connection kinds', codec: 'Codecs' };
-  const KIND_ONE = { project: 'project', feature: 'feature', trigger: 'trigger', policy: 'policy', resolvers: 'request reads', graph: 'graph', port: 'port', binding: 'binding', shape: 'shape', store: 'store', connection: 'connection', scenario: 'scenario', plugin: 'plugin', 'trigger-kind': 'trigger kind', 'connection-kind': 'connection kind', codec: 'codec' };
-  /** A read path shown: request.headers['user-agent'] → request › headers › user-agent. */
+  const KIND_NAMES = { project: 'Project', feature: 'Features', trigger: 'Triggers', policy: 'Policies', resolvers: 'Context reads', graph: 'Graphs', port: 'Ports', binding: 'Bindings', shape: 'Shapes', store: 'Stores', connection: 'Connections', scenario: 'Scenarios', plugin: 'Plugins', 'trigger-kind': 'Trigger kinds', 'connection-kind': 'Connection kinds', codec: 'Codecs' };
+  const KIND_ONE = { project: 'project', feature: 'feature', trigger: 'trigger', policy: 'policy', resolvers: 'context reads', graph: 'graph', port: 'port', binding: 'binding', shape: 'shape', store: 'store', connection: 'connection', scenario: 'scenario', plugin: 'plugin', 'trigger-kind': 'trigger kind', 'connection-kind': 'connection kind', codec: 'codec' };
+  /** A read path shown: context.headers['user-agent'] → context › headers › user-agent. */
   const showRead = (read) => String(read).split(/\.|\[['"]|['"]\]/).filter(Boolean).join(SEP);
-  /** One scoped column said as a reader meets it: the column, and the read of the request that fills it. */
-  const scopeSaid = c => c.column + ' ← {{' + c.read + '}}' + (c.from ? ' (request' + SEP + showRead(c.from).replace(/^request /, '') + ')' : '');
+  /** One scoped column said as a reader meets it: the column, and the read of the context that fills it. */
+  const scopeSaid = c => c.column + ' ← {{' + c.read + '}}' + (c.from ? ' (context' + SEP + showRead(c.from).replace(/^context /, '') + ')' : '');
   const PALETTE = ['#6cb6ff', '#f0b350', '#7bd88f', '#c792ea', '#ff8a65', '#4ecdc4', '#f78c6c', '#82aaff', '#e57fb3', '#b5d66a', '#ffd166', '#64d3ff'];
 
   // ---- data --------------------------------------------------------------------------------------
@@ -530,18 +530,18 @@
   }
 
   /**
-   * What a store reads from the request to fill its scopes, drawn as a graph's request node is: one port per name
+   * What a store reads from the context to fill its scopes, drawn as a graph's context node is: one port per name
    * it binds, each labelled as the store reads it and opening the resolvers document that declares it. A store
    * binds a read the way a data graph does, so a reader meets the same node here.
    */
-  function storeReadsEl(page, request) {
-    page.appendChild(el('h2', null, 'Read from the request'));
+  function storeReadsEl(page, context) {
+    page.appendChild(el('h2', null, 'Read from the context'));
     page.appendChild(el('p', null, 'What this store reads to scope its collections. Nothing runs: each is a path into what the trigger kind and the guard hand, declared by a resolvers document, and the compiler carries it to every operation over the scoped collection.'));
     const t = el('table'); const head = el('tr'); for (const h of ['read as', 'read from', 'declared by', 'says']) head.appendChild(el('th', null, h)); t.appendChild(head);
-    for (const p of request.outputs) {
+    for (const p of context.outputs) {
       const tr = el('tr');
       tr.appendChild(el('td', 'name', p.label || p.name));
-      tr.appendChild(el('td', 'val', showRead('request.' + p.name)));
+      tr.appendChild(el('td', 'val', showRead('context.' + p.name)));
       const td = el('td'); if (p.opens) td.appendChild(link(p.opens)); tr.appendChild(td);
       tr.appendChild(el('td', 'desc', p.description || ''));
       t.appendChild(tr);
@@ -669,7 +669,7 @@
           page.appendChild(el('p', null, "Anything that breaks and no switch catches is a fault: answered the kind's one way, never mapped."));
         }
         page.appendChild(el('h2', null, 'What the operation is given'));
-        if (d.fire && d.fire.in) { page.appendChild(el('p', null, 'Each input, read from what the kind hands as request.*:')); page.appendChild(valuesTable(d.fire.in, ['input', 'read from'])); }
+        if (d.fire && d.fire.in) { page.appendChild(el('p', null, 'Each input, read from what the kind hands as context.*:')); page.appendChild(valuesTable(d.fire.in, ['input', 'read from'])); }
         else page.appendChild(el('p', null, d.in ? 'The decoded body, judged as the input type, field for field.' : 'Nothing: the operation takes no input.'));
         break;
       }
@@ -686,7 +686,7 @@
         const withArrows = el('div', 'chain'); [...chain.children].forEach((c, i) => { if (i) withArrows.appendChild(arrow()); withArrows.appendChild(c); });
         page.appendChild(withArrows);
         page.appendChild(el('h2', null, 'What the decision is given'));
-        if (d.decide && d.decide.in) { page.appendChild(el('p', null, 'Each input, read from what the kind and the guard hand as request.*:')); page.appendChild(valuesTable(d.decide.in, ['input', 'read from'])); }
+        if (d.decide && d.decide.in) { page.appendChild(el('p', null, 'Each input, read from what the kind and the guard hand as context.*:')); page.appendChild(valuesTable(d.decide.in, ['input', 'read from'])); }
         else page.appendChild(el('p', null, 'Nothing: the decision takes no input.'));
         page.appendChild(el('h2', null, 'Outcomes'));
         page.appendChild(el('p', null, 'Allow is the decision answering. Each reason the graph can refuse with means one of these: deny ends the run; challenge opens a challenge through the guard, and the caller is told how to answer it.'));
@@ -700,7 +700,7 @@
         break;
       }
       case 'resolvers': {
-        page.appendChild(el('p', null, 'Values a data graph or a binding reads straight from the request, by name. Nothing runs: each is a path into what the trigger kind hands.'));
+        page.appendChild(el('p', null, 'Values a data graph or a binding reads straight from the context, by name. Nothing runs: each is a path into what the trigger kind hands.'));
         page.appendChild(el('h2', null, 'Reads'));
         const t = el('table'); const hd = el('tr'); for (const h of ['name', 'reads', 'meaning']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
         for (const [name, r] of Object.entries(d.resolvers)) {
@@ -728,7 +728,7 @@
       }
       case 'binding': {
         const chain = el('div', 'chain'); chain.appendChild(step('meets the port', link(d.port))); page.appendChild(chain);
-        if (d.reads) { const p = el('p'); p.appendChild(frag('Delegations read the request by name: ')); Object.entries(d.reads).forEach(([n, r], i) => { if (i) p.appendChild(frag(', ')); p.appendChild(el('code', null, '{{' + n + '}}')); p.appendChild(frag(' from ')); p.appendChild(link(r.split('#')[0], showOp(r))); }); p.appendChild(frag('.')); page.appendChild(p); }
+        if (d.reads) { const p = el('p'); p.appendChild(frag('Delegations read the context by name: ')); Object.entries(d.reads).forEach(([n, r], i) => { if (i) p.appendChild(frag(', ')); p.appendChild(el('code', null, '{{' + n + '}}')); p.appendChild(frag(' from ')); p.appendChild(link(r.split('#')[0], showOp(r))); }); p.appendChild(frag('.')); page.appendChild(p); }
         page.appendChild(el('h2', null, 'Operations'));
         const t = el('table'); const hd = el('tr'); for (const h of ['operation', 'how it is met', 'inputs given']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
         for (const [name, op] of Object.entries(d.operations)) {
@@ -750,7 +750,7 @@
         if (s.kind) { chain.appendChild(arrow()); chain.appendChild(step('by the engine', link(s.kind, s.kindLabel))); }
         page.appendChild(chain);
         if (s.plugin) { const p = el('p'); p.appendChild(frag('Granted by ')); p.appendChild(link(s.plugin + '/plugin.json', s.plugin)); p.appendChild(frag(s.from ? ' (' + s.from + '), which carries the code that keeps these records. Swapping engines is swapping the connection\u2019s kind; no graph below changes.' : ', which carries the code that keeps these records.')); page.appendChild(p); }
-        if (s.request) storeReadsEl(page, s.request);
+        if (s.context) storeReadsEl(page, s.context);
         page.appendChild(el('h2', null, 'Collections'));
         page.appendChild(el('p', null, 'What this feature keeps, by name. The collection is where the record type is written down, so a graph names the store and the collection and never repeats the shape.'));
         const uniqueOf = c => (c.unique || []).map(fields => '[' + fields.join(', ') + ']').join(', ');
@@ -820,7 +820,7 @@
       }
       case 'trigger-kind': {
         page.appendChild(el('h2', null, 'Settings a trigger of this kind writes')); page.appendChild(fieldsTable(d.settings.fields, { open: d.settings.open }));
-        page.appendChild(el('h2', null, 'Context it hands: what request.* holds')); page.appendChild(fieldsTable(d.context.fields, { open: d.context.open }));
+        page.appendChild(el('h2', null, 'Context it hands: what context.* holds')); page.appendChild(fieldsTable(d.context.fields, { open: d.context.open }));
         if (d.refusals) { page.appendChild(el('h2', null, 'Refusals')); const p = el('p'); p.appendChild(frag('A trigger of this kind maps every refusal reason it can reach under ')); p.appendChild(el('code', null, 'settings.' + d.refusals)); p.appendChild(frag(' to how it answers; the checker requires each reason mapped (T005) and each mapping reachable (T006).')); page.appendChild(p); }
         break;
       }
@@ -1083,9 +1083,9 @@
 
   function renderNodeDetails(box, n, v) {
     const color = nodeColors(v.graph).get(n.id);
-    const h = el('h3'); const sw = el('span', 'swatch'); sw.style.background = color; h.appendChild(sw); h.appendChild(document.createTextNode(n.label + ' ')); const kindText = { run: 'operation', map: 'for each', rule: 'rule', in: 'input', out: 'output', const: 'constants', request: 'request' }[n.kind]; h.appendChild(NODE_SCHEMA[n.kind] ? schemaBadge(n.kind, kindText, NODE_SCHEMA[n.kind]) : badge(n.kind, kindText)); box.appendChild(h);
+    const h = el('h3'); const sw = el('span', 'swatch'); sw.style.background = color; h.appendChild(sw); h.appendChild(document.createTextNode(n.label + ' ')); const kindText = { run: 'operation', map: 'for each', rule: 'rule', in: 'input', out: 'output', const: 'constants', context: 'context' }[n.kind]; h.appendChild(NODE_SCHEMA[n.kind] ? schemaBadge(n.kind, kindText, NODE_SCHEMA[n.kind]) : badge(n.kind, kindText)); box.appendChild(h);
     box.appendChild(el('div', 'id', n.decision ? n.id + '   ' + n.decision.when : n.id));
-    // a request node reads through one document per name under `reads`; each is named once, however many reads came from it
+    // a context node reads through one document per name under `reads`; each is named once, however many reads came from it
     for (const path of [...new Set((n.outputs || []).map(p => p.opens).filter(Boolean))]) { const p = el('p'); p.appendChild(frag('Read through ')); p.appendChild(link(path)); box.appendChild(p); }
     if (n.type) { const p = el('p'); p.appendChild(frag(n.kind === 'in' ? 'The graph takes ' : 'The graph answers ')); p.appendChild(typeLink(n.type)); box.appendChild(p); }
     if (n.description) box.appendChild(el('p', null, n.description));
@@ -1161,7 +1161,7 @@
         if (p.depth) nm.style.paddingLeft = (p.depth * 12) + 'px';
         if (p.label) nm.title = p.name;
         r.appendChild(nm); r.appendChild(p.type ? typeLink(p.type) : el('span', 'type', p.description || '')); box.appendChild(r);
-        if (p.label) box.appendChild(el('div', 'desc', showRead('request.' + p.name) + (p.description ? ' - ' + p.description : '')));
+        if (p.label) box.appendChild(el('div', 'desc', showRead('context.' + p.name) + (p.description ? ' - ' + p.description : '')));
       }
     }
     if (n.fields && n.fields.length) { box.appendChild(el('h4', null, 'fields of the answer')); for (const p of n.fields) { const r = el('div', 'row'); r.appendChild(el('span', 'name ' + (p.required === false ? 'opt' : 'req'), p.name)); r.appendChild(typeLink(p.type)); box.appendChild(r); } }
@@ -1191,7 +1191,7 @@
   const ladderOf = (n) => n.kind === 'rule' ? n.decision.id : null;
   /** An edge inside one ladder: a rule's otherwise stepping to the next rule. */
   const isStep = (byId, e) => { const a = byId.get(e.from), b = byId.get(e.to); return Boolean(a && b && ladderOf(a) && ladderOf(a) === ladderOf(b)); };
-  /** Layered left to right: a node sits one column after the last node it reads; in/const/request first, out last. */
+  /** Layered left to right: a node sits one column after the last node it reads; in/const/context first, out last. */
   function layout(g) {
     const nodes = g.nodes, byId = new Map(nodes.map(n => [n.id, n]));
     const preds = new Map(nodes.map(n => [n.id, []]));
@@ -1202,7 +1202,7 @@
       if (visiting.has(id)) return 0;
       visiting.add(id);
       let r = 0;
-      if (!['in', 'const', 'request'].includes(byId.get(id).kind)) for (const p of preds.get(id)) r = Math.max(r, rankOf(p) + 1);
+      if (!['in', 'const', 'context'].includes(byId.get(id).kind)) for (const p of preds.get(id)) r = Math.max(r, rankOf(p) + 1);
       visiting.delete(id); rank.set(id, r); return r;
     };
     for (const n of nodes) rankOf(n.id);
@@ -1281,7 +1281,7 @@
     if (n.kind === 'rule') return '';
     if (n.kind === 'in' || n.kind === 'out') return showType(n.type);
     if (n.kind === 'const') return 'typed literals';
-    if (n.kind === 'request') return 'what the trigger kind hands';
+    if (n.kind === 'context') return 'what the trigger kind hands';
     const op = n.target ? n.target.portLabel + SEP + n.target.opName : showOp(n.op);
     return (n.kind === 'map' ? 'for each: ' : '') + op;
   };
@@ -1402,7 +1402,7 @@
       let right = b.w - 32;
       for (const m of marks) { gn.appendChild(withTitle(txt(right, 32, m.text, m.cls, { 'text-anchor': 'end' }), m.title)); right -= m.px; }
       if (n.guarded || n.proved) gn.appendChild(badgeEl(n, b));
-      // a double-click on the request node opens the document behind its first read; a port opens its own
+      // a double-click on the context node opens the document behind its first read; a port opens its own
       const goto = n.target ? n.target.implementation : (n.outputs || []).map(p => p.opens).find(Boolean);
       if (goto) {
         const go_ = withTitle(txt(b.w - 20, 19, ARROW, 'go'), 'open ' + labelFor(goto));
@@ -1446,7 +1446,7 @@
         }
         const leaf = p.name.split('.').pop();
         const label = p.name === '' ? (p.type ? showType(p.type) : 'the value') : (p.label || leaf);
-        const hint = (p.label ? p.label + ': ' : '') + (n.kind === 'request' ? showRead('request.' + p.name) : (p.name || 'the whole value')) + (req ? '' : ' (optional)') + (p.type ? ': ' + showType(p.type) : '') + (p.description ? '\n' + p.description : '');
+        const hint = (p.label ? p.label + ': ' : '') + (n.kind === 'context' ? showRead('context.' + p.name) : (p.name || 'the whole value')) + (req ? '' : ' (optional)') + (p.type ? ': ' + showType(p.type) : '') + (p.description ? '\n' + p.description : '');
         const room = (n.inputs.length ? 14 : 30) - depth * 2;
         const t = txt(b.w - 12 - depth * 12, y + 4, trunc(label, room), 'port' + (p.name === '' ? ' type' : parentOnly ? ' type' : req ? '' : ' opt'), { 'text-anchor': 'end' });
         gn.appendChild(opens(withTitle(t, hint), p.opens || (p.name === '' ? shapeOf(p.type) : null)));

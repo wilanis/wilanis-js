@@ -224,20 +224,20 @@ describe('the view model of a graph', () => {
     });
   });
 
-  // what each port of the request node then says -- the name the graph reads it by, the document that
+  // what each port of the context node then says -- the name the graph reads it by, the document that
   // declares it -- is `reads.test.ts`, which is what RFC 0029 made a concern of its own
-  it('draws the request as a node whose ports are the paths the resolvers read, edged to what reads them', async () => {
+  it('draws the context as a node whose ports are the paths the resolvers read, edged to what reads them', async () => {
     const seen = await view('@features/customers/data/create-row.graph.json');
     const ids = seen.graph!.nodes.map(node => node.id);
-    expect(ids.slice(0, 2)).toEqual(['request', 'in']);
-    const request = seen.graph!.nodes.find(node => node.id === 'request')!;
-    expect(request.outputs.map(port => port.name)).toEqual(['headers', 'headers.user-agent']);
+    expect(ids.slice(0, 2)).toEqual(['context', 'in']);
+    const context = seen.graph!.nodes.find(node => node.id === 'context')!;
+    expect(context.outputs.map(port => port.name)).toEqual(['headers', 'headers.user-agent']);
     expect(
-      edge(seen, { from: 'request', fromPort: 'headers.user-agent', to: 'posted', toPort: 'headers' }),
+      edge(seen, { from: 'context', fromPort: 'headers.user-agent', to: 'posted', toPort: 'headers' }),
     ).toMatchObject({
       kind: 'data',
     });
-    // no node stands between the request and the node that reads it
+    // no node stands between the context and the node that reads it
     expect(ids).not.toContain('agent');
   });
 

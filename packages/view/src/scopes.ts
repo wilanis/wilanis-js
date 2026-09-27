@@ -1,7 +1,7 @@
 /**
  * How a store scopes its rows, and what a view of a scoped collection crosses (RFC 0015). A collection names the
  * columns it keeps beside the record and the read that fills each; the store binds those reads as a data graph
- * binds one, so `reads.ts` answers where each lands in the request. Nothing here is written at a call site: the
+ * binds one, so `reads.ts` answers where each lands in the context. Nothing here is written at a call site: the
  * compiler puts the scope on every operation over the collection and no document may write one, so a node badge
  * and the store page are the only places a reader meets it -- and both ask this module, so neither can name a
  * column the other does not. Nothing here walks: whether an operation carries a scope (`takesScope`) and which

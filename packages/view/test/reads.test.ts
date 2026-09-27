@@ -1,7 +1,7 @@
 /**
- * What the request node says about `reads` (RFC 0029, step 5). A graph names each read it takes and where that read
+ * What the context node says about `reads` (RFC 0029, step 5). A graph names each read it takes and where that read
  * is declared, so one document no longer stands behind the whole node: the name the graph reads a value by, and the
- * document that declares it, belong to the port the edge leaves and not to the node. That is what lets one request
+ * document that declares it, belong to the port the edge leaves and not to the node. That is what lets one context
  * node open two features' resolvers, and what a reader meeting `{{agent}}` on the canvas follows to find it.
  */
 import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -58,16 +58,16 @@ const INCLUDES: ResolvedInclude[] = [
   },
 ];
 
-/** The request node of a graph of the example, as the view drew it. */
-async function requestIn(graph: string): Promise<VNode> {
+/** The context node of a graph of the example, as the view drew it. */
+async function contextIn(graph: string): Promise<VNode> {
   const seen = viewOf(await loadProject(EXAMPLE), graph);
-  const request = seen?.graph?.nodes.find(node => node.id === 'request');
-  if (!request) throw new Error(`no request node in ${graph}`);
-  return request;
+  const context = seen?.graph?.nodes.find(node => node.id === 'context');
+  if (!context) throw new Error(`no context node in ${graph}`);
+  return context;
 }
 
-/** The request node of a graph planted into a copy of the example, as the view drew it. */
-function requestOf(docs: Record<string, unknown>, graph: string): VNode {
+/** The context node of a graph planted into a copy of the example, as the view drew it. */
+function contextOf(docs: Record<string, unknown>, graph: string): VNode {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-reads-'));
   try {
     cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
@@ -76,9 +76,9 @@ function requestOf(docs: Record<string, unknown>, graph: string): VNode {
       writeFileSync(join(dir, file), JSON.stringify(doc, null, 2));
     }
     const seen = viewOf(loadTree(dir, PLUGINS, INCLUDES), graph);
-    const request = seen?.graph?.nodes.find(node => node.id === 'request');
-    if (!request) throw new Error(`no request node in ${graph}`);
-    return request;
+    const context = seen?.graph?.nodes.find(node => node.id === 'context');
+    if (!context) throw new Error(`no context node in ${graph}`);
+    return context;
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -96,7 +96,7 @@ const MORE = {
 const forwards = (reads: Record<string, string>, headers: Record<string, string>) => ({
   $schema: `${SCHEMAS}/graph.schema.json`,
   label: 'Two reads',
-  description: 'Planted to see the request node draw a port per name, each opening the document it came from.',
+  description: 'Planted to see the context node draw a port per name, each opening the document it came from.',
   reads,
   in: '@customers/domain/CustomerRecord.shape.json',
   out: { type: '@customers/edge/CustomerRow.shape.json', from: 'asked' },
@@ -120,12 +120,12 @@ const forwards = (reads: Record<string, string>, headers: Record<string, string>
   ],
 });
 
-describe('the request node, one port per name a graph reads', () => {
+describe('the context node, one port per name a graph reads', () => {
   it('names a port as the graph reads it, and opens the document that declares it', async () => {
-    const request = await requestIn(CREATE_ROW);
+    const context = await contextIn(CREATE_ROW);
     // the document sits on the port that came from it, never on the node: the node carries no document at all
-    expect(Object.keys(request)).not.toContain('opens');
-    expect(request.outputs).toEqual([
+    expect(Object.keys(context)).not.toContain('opens');
+    expect(context.outputs).toEqual([
       { name: 'headers', type: '{, ...}' },
       {
         name: 'headers.user-agent',
@@ -140,8 +140,8 @@ describe('the request node, one port per name a graph reads', () => {
     ]);
   });
 
-  it("opens two documents from the one request node when a graph reads two of its feature's resolvers", () => {
-    const request = requestOf(
+  it("opens two documents from the one context node when a graph reads two of its feature's resolvers", () => {
+    const context = contextOf(
       {
         'features/customers/edge/more.resolvers.json': MORE,
         'features/customers/data/two-reads.graph.json': forwards(
@@ -151,10 +151,10 @@ describe('the request node, one port per name a graph reads', () => {
       },
       TWO_READS,
     );
-    // one node stands for the request, however many documents declare what it reads
-    expect(Object.keys(request)).not.toContain('opens');
+    // one node stands for the context, however many documents declare what it reads
+    expect(Object.keys(context)).not.toContain('opens');
     // and each port carries the name the graph reads it by and the document that declares that name
-    expect(request.outputs.filter(port => port.opens)).toEqual([
+    expect(context.outputs.filter(port => port.opens)).toEqual([
       {
         name: 'headers.user-agent',
         depth: 1,
@@ -175,11 +175,11 @@ describe('the request node, one port per name a graph reads', () => {
       },
     ]);
     // two `opens`, not one: which is the whole of what this step changed
-    expect(new Set(request.outputs.flatMap(port => (port.opens ? [port.opens] : []))).size).toBe(2);
+    expect(new Set(context.outputs.flatMap(port => (port.opens ? [port.opens] : []))).size).toBe(2);
   });
 
   it('gives a read the name the graph chose, not the one the resolver declares', () => {
-    const request = requestOf(
+    const context = contextOf(
       {
         'features/customers/data/two-reads.graph.json': forwards(
           { whoCalled: '@customers/edge/request.resolvers.json#agent' },
@@ -189,11 +189,11 @@ describe('the request node, one port per name a graph reads', () => {
       TWO_READS,
     );
     // the resolver is named `agent`; the graph reads it as {{whoCalled}}, and the port says so
-    expect(request.outputs.find(port => port.opens)).toMatchObject({ label: 'whoCalled', opens: REQUEST_DOC });
+    expect(context.outputs.find(port => port.opens)).toMatchObject({ label: 'whoCalled', opens: REQUEST_DOC });
   });
 
   it('says nothing under a port whose resolver declares neither a label nor a description', () => {
-    const request = requestOf(
+    const context = contextOf(
       {
         'features/customers/edge/more.resolvers.json': {
           $schema: `${SCHEMAS}/resolvers.schema.json`,
@@ -208,7 +208,7 @@ describe('the request node, one port per name a graph reads', () => {
       },
       TWO_READS,
     );
-    const port = request.outputs.find(one => one.opens);
+    const port = context.outputs.find(one => one.opens);
     // absent, not the empty string: an empty description would draw a blank line under the port
     expect(port).toMatchObject({ label: 'host', opens: MORE_DOC });
     expect(Object.keys(port ?? {})).not.toContain('description');
