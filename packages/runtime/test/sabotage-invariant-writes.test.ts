@@ -32,8 +32,8 @@ const UPDATE = '@customers/domain/CustomerUpdate.shape.json';
 const PLANTED = 'features/customers/data/probe.graph.json';
 
 /**
- * keep-customer's write turned into a patch of the customer it takes, changing `changes`, and routed on what a
- * patch answers: a record or none, never a violated constraint.
+ * keep-customer's write turned into a patch of the customer it takes, changing `changes`, and routed on whether
+ * the patch answered a record, which is all these rules read of what it answers.
  */
 const patching = (changes: unknown) => (graph: any) => {
   const [stored, outcome] = graph.nodes;

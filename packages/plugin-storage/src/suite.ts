@@ -208,6 +208,41 @@ const recordCases: Case[] = [
     },
   },
   {
+    name: 'a patch repeating a declared unique answers violated and writes nothing',
+    async run(subject) {
+      const where_ = await seeded(subject, 'unique_patch', SEEDS, { unique: [['url', 'method']] });
+      const answer = await subject.engine.patch(where_, 'c', { url: 'https://one.example/a' });
+      assert.equal(answer.violated, 'unique [url, method]');
+      assert.equal(answer.record, undefined);
+      assert.deepEqual((await subject.engine.get(where_, 'c')).record, SEEDS[2]);
+    },
+  },
+  {
+    name: 'a patch of a record repeats nothing of its own, and answers no violation',
+    async run(subject) {
+      const where_ = await seeded(subject, 'unique_patch_self', SEEDS, { unique: [['url']] });
+      const answer = await subject.engine.patch(where_, 'a', { hits: 9 });
+      assert.equal(answer.violated, undefined);
+      assert.deepEqual(answer.record, { ...SEEDS[0], hits: 9 });
+    },
+  },
+  {
+    name: 'a patch pointing a reference at no record answers violated and writes nothing',
+    async run(subject) {
+      await seeded(subject, 'refs_patch_to');
+      const from = at(subject, 'refs_patch_from', {
+        refs: [{ from: 'refs_patch_from', field: 'ua', to: 'refs_patch_to' }],
+      });
+      await subject.engine.ensure([from]);
+      const note = entry('n', 'https://note', 'GET', { ua: 'a' });
+      await subject.engine.put(from, note, { replace: true });
+      const answer = await subject.engine.patch(from, 'n', { ua: 'nobody' });
+      assert.equal(answer.violated, 'refs refs_patch_from.ua -> refs_patch_to');
+      assert.equal(answer.record, undefined);
+      assert.deepEqual((await subject.engine.get(from, 'n')).record, note);
+    },
+  },
+  {
     name: 'a remove of a record another still references keeps it, and answers referencedBy',
     async run(subject) {
       const ref = { from: 'held_from', field: 'ua', to: 'held_to' };
