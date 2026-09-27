@@ -135,7 +135,7 @@ No new code. The rules that read the root keep their codes and change what they 
 | A006 | `check/triggers.ts` | the path a required resolver reads, and a policy's `proves`, are `context.*` paths |
 | A001 (`proves`, `decide.in`) | `check/access.ts` (`provesFaultIn`, `checkPolicy`) | "'…', which is not a context.* path", hint "write context.principal, context.session…" |
 | G003 | `check/graph-reads.ts` (`rootReadRaw`) | "graphs do not read context.* -- a resolvers document does; bind it under reads and read {{name}}" |
-| P006 | `check/judge.ts` (`RESERVED`) | `context` joins the reserved names and `request` leaves them: a node, constant or resolver named `context` is refused as a reserved root; one named `request` no longer is |
+| G001, P003, P006 | `check/judge.ts` (`RESERVED`), read by `check/graph.ts` and `check/resolvers.ts` | `context` joins the reserved names and `request` leaves them: a node named `context` is refused as G001, a resolver as P003, a name under `reads` as P006; one named `request` no longer is. No rule judges a constant's name |
 | B007, B008 | `check/project.ts` | a startup step or its bound graph reading `context.*` is refused, as `request.*` is today |
 | X105 | `plugin-auth/src/scoped.ts` | a scope resolver reads `context.session.attributes.<name>` |
 
@@ -148,9 +148,9 @@ The engine's pseudo-nodes (`PSEUDO` in `packages/engine/src/sources.ts`, the doc
 `spec.ts`) are `in`, `const`, `context`. `lowerRef` in `packages/compiler/src/lower.ts` writes a resolver read and a
 direct read as `{ ref: 'context', path }`; `Roots.request` is `Roots.context`; `compiler.ts` seeds the initial
 values under `context`. `Embedder.fire` and `gate.ts` fill templates from `{ context }`. `fuzz.ts` and
-`rehearse.ts` read a scenario's `context`. The trace prints the pseudo-node by its name, so a span that read the
-request says `context.params.id`, in the tree's word. Nothing else the embedder, the handlers, `rehearse`, `fuzz`,
-`regress` or `start` do changes.
+`rehearse.ts` read a scenario's `context`. A run blocked on a root it was never given names the read in the tree's
+word, `needs: ['context.params.id']`; a trace carries values and not read paths, so it prints none. Nothing else the
+embedder, the handlers, `rehearse`, `fuzz`, `regress` or `start` do changes.
 
 `RunContext.request` in `packages/engine/src/spec.ts`, the field a handler receives, is renamed `context` in the
 same step, so that no TypeScript name in the engine spells the retired word (settled on acceptance, below).
@@ -205,14 +205,14 @@ current documents and move.
 | Test | Where | What it does |
 |---|---|---|
 | the schema | `packages/core/test/validate.test.ts` | the baseline trigger, policy, resolvers and scenario documents spell `context`; a scenario with a `request` key is refused |
-| T003 | `packages/runtime/test/example.test.ts`, sabotage | `{{request.params.id}}` in `get-customer.trigger.json`: T003, message names `context` |
-| P006 | sabotage | a node with `"id": "context"` in `get-row.graph.json`; a resolver named `context` in `request.resolvers.json`; a node named `request` is accepted |
-| A001 | sabotage | `"proves": ["request.principal"]` in `signed-in.policy.json`: the message says "not a context.* path" |
+| T003 | `packages/runtime/test/sabotage-context.test.ts`, sabotage | `{{request.params.id}}` in `get-customer.trigger.json`: T003, message names `context` |
+| G001, P003, P006 | `packages/runtime/test/sabotage-context.test.ts`, sabotage | a node with `"id": "context"` in `get-row.graph.json` is G001; a resolver named `context` in `request.resolvers.json` is P003; a read bound as `context` under `create-row.graph.json`'s `reads` is P006; a node named `request` is accepted |
+| D001, A001 | `libraries/access/test/access.test.ts`, sabotage | `"proves": ["request.principal"]` in `signed-in.policy.json` is D001 at `proves/0`: the schema's `^context` pattern refuses it before A001 runs. A `decide.in` reading `{{request.principal}}` is A001, "decide.in reads 'request', but a policy's input reads context.* only", and under each attaching trigger's kind is told to write `{{context.principal}}` |
 | G003 | sabotage | `{{context.headers.host}}` in a data graph body: "graphs do not read context.*" |
 | the walk holds | existing A005, A006, T004, B007, B008, X105 cases, expectation unchanged | the migrated documents check clean and each sabotage answers its code |
 | the example | `packages/runtime/test/example.test.ts`, `libraries/access/test` | `codes(EXAMPLE)` is empty after the migration |
 | the engine | `packages/engine/test` | a spec reading `{ ref: 'context' }` runs; `PSEUDO` no longer holds `request` |
-| the trace | `packages/runtime/test/trace.test.ts` | a span that read the context prints `context.params.id` |
+| the trace | `packages/engine/test/kernel.test.ts` | a trace carries values, not read paths, so no span prints `context.params.id`; the root is proved where a run names what it read: a spec reading `context` it was never given is blocked with `needs: ['context.params.id']` |
 | `describe` | `packages/runtime/test/tools.test.ts` | the trigger prints the `context is what … hands` line, and not for a trigger whose `fire.in` reads nothing; the kind prints `context:` |
 | the viewer | `packages/view/test/view.test.ts` | `create-row`'s context node is labelled "Context" and its port opens `@customers/edge/request.resolvers.json` |
 | the README | `fitness/a-readme-snippet-is-a-document-in-the-tree.fitness.ts` | every JSON block matches the migrated example |
