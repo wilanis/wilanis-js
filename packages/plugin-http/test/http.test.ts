@@ -219,6 +219,7 @@ describe('files through the blob registry', () => {
     expect(lines).toHaveLength(rows.length + 1);
     expect(lines.some(line => line.includes('"Bo, CSV"'))).toBe(true);
   });
+  // 2,000 rows, each POSTed upstream two at a time, take 3-5 s in CI's full suite: too close to the 5 s default (#756)
   it('a multipart form: the file part streams into the registry as a blob, the text part arrives as a string', async () => {
     const big = `name,email,tier\n${Array.from(
       { length: 2000 },
@@ -236,7 +237,7 @@ describe('files through the blob registry', () => {
     expect(answer.status).toBe(201);
     expect(await answer.json()).toHaveLength(2000);
     expect(rows.length).toBe(before + 2000);
-  });
+  }, 20_000);
   it('a CSV row that is not a customer is a fault of the import, and nothing is recorded', async () => {
     const before = rows.length;
     const answer = await fetch('http://localhost:8099/customers.csv', {
