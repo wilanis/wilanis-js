@@ -4,7 +4,7 @@
  * (RFC 0018). Rendering is pure, so the directory is a function of the tree and the one seed it is solved under;
  * what the directory may be and what in it is owned is `recorded-dir.ts`'s.
  */
-import { type ScenarioBranch, type ScenarioDoc, schemaUrl } from '@wilanis/core';
+import { featureOf, type ScenarioBranch, type ScenarioDoc, schemaUrl, stem } from '@wilanis/core';
 import { type Report, refusalOf } from '@wilanis/engine';
 import { expectOf } from './fuzz.js';
 import { checkRecorded, RECORDED, type RecordCheck, writeRecorded } from './recorded-dir.js';
@@ -42,12 +42,14 @@ function endedAs(report: Report): string {
   return report.status === 'blocked' ? 'blocks' : 'is cancelled';
 }
 
-/** The graph's feature and file stem, read off its canonical path: `@features/customers/data/get-row.graph.json`. */
-function graphParts(graph: string): { feature: string; stem: string } {
-  const segments = graph.replace(/^@/, '').split('/');
-  const feature = segments[0] === 'features' && segments.length > 2 ? segments[1] : segments[0];
-  const stem = (segments.at(-1) ?? graph).replace(/\.graph\.json$/, '');
-  return { feature, stem };
+/**
+ * A document's feature and file stem, read off its canonical path as core reads them (`featureOf`, `stem`):
+ * `@features/customers/data/get-row.graph.json` is `customers` and `get-row`. A path in no feature answers its first
+ * segment in the feature's place.
+ */
+function partsOf(path: string): { feature: string; stem: string } {
+  const rel = path.replace(/^@/, '');
+  return { feature: featureOf(rel) ?? rel.split('/')[0], stem: stem(rel) };
 }
 
 /** What a recorded scenario says it proves, in its first line. */
@@ -57,7 +59,7 @@ function descriptionOf(run: RecordedRun): string {
     return `${run.trigger.name}: no switch under it, so one run is the whole of it, and it ${ended}. ${WRITTEN}`;
   const { graph, node, when, to } = run.branch;
   const rule = when === 'else' ? 'otherwise' : `when ${when}`;
-  return `${run.trigger.name}: ${graphParts(graph).stem} '${node}' ${rule} routes to ${to}, which ${ended}. ${WRITTEN}`;
+  return `${run.trigger.name}: ${partsOf(graph).stem} '${node}' ${rule} routes to ${to}, which ${ended}. ${WRITTEN}`;
 }
 
 /** The stubs in the order of their paths, so the file does not depend on the order the effects happened to answer in. */
@@ -93,9 +95,9 @@ export function scenarioOf(run: RecordedRun): ScenarioDoc {
  */
 export function fileOf(run: RecordedRun): string {
   if (!run.branch) return `${run.trigger.name}/whole.scenario.json`;
-  const { feature, stem } = graphParts(run.branch.graph);
+  const { feature, stem: graph } = partsOf(run.branch.graph);
   const nth = run.branch.n === undefined ? '' : `.${run.branch.n}`;
-  return `${run.trigger.name}/${feature}.${stem}.${run.branch.node}.${run.branch.to}${nth}.scenario.json`;
+  return `${run.trigger.name}/${feature}.${graph}.${run.branch.node}.${run.branch.to}${nth}.scenario.json`;
 }
 
 /** What `--check` prints: one line per file that differs, then how many and the one command, or that it is current. */
