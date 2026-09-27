@@ -1,6 +1,6 @@
 # RFC 0026: The application manifest
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:runtime` (`manifest.ts`, the `manifest` command, `packages/runtime/schemas/manifest.schema.json`,
   the version a plugin and an include are resolved with), `area:core` (one optional field on `ResolvedInclude`),
   `area:view` (one endpoint and one link on the project page). Nothing in the engine, the compiler or a plugin.
@@ -428,3 +428,46 @@ During implementation:
 - The exact sort key of `reaches` (by `operation`, then `via`) and whether `via` lists connection paths or
   connection kinds beside them.
 - Whether `needs[].readBy` names a plugin as `@auth settings` or as the plugin's `use` alone.
+
+## Decided during implementation
+
+- `reaches` has one row per operation, sorted by `operation`, so a second key on `via` would have nothing to order.
+  `via` lists connection paths alone, canonical, with stand-ins applied through `connectionFor`, sorted, and empty
+  where the operation's sites name none; a connection's kind is on its own `connections` row and is not said twice.
+  An operation that `holds` is effectful, so it is under `reaches` as well as under `holds` (#675).
+- `needs[].readBy` names a plugin as `@auth settings`, the string `reachOf` answers and `start`'s missing-secret
+  message and `describe` already print, so a reader has one name for it everywhere. A startup step's `in` is a
+  third reader, written `project.json → startup/<index>`. `readBy` is sorted, and the rows by `variable` and then
+  `key`, so two keys that read one variable keep their order under a reversed registry (#675).
+- A profile's `bindings` and `connections` are what the profile writes, canonical on both sides, as the `binds` row
+  of `describe project.json` prints them. A port the profile does not name is met by its one binding, which
+  `ports.domain[].bindings` lists. The unnamed profile has `bindings: {}` and `default: true`, since a start that
+  names no profile runs it. `starts` writes `null` for a step with no label, as `startup[].label` does (#675).
+- `permits` is a required key of every block: RFC 0016's list with each entry canonical and in code-unit order,
+  whatever order `project.json` writes it in (the *Guide*'s example keeps the written order), or `null` where the
+  profile writes none and so permits everything, the unnamed profile among them (#739).
+- `documents` holds every loaded document, the plugins' among them, as `wilanis ls` lists them and
+  `diagnostics.documents` counts them. A port a plugin requires and the host binds (`@auth/state.port.json`) is a
+  `ports.domain` row with `feature: null`. A `version` is `null` only where a load was handed modules or includes
+  instead of resolving packages, as a test's `loadTree` is (#656).
+- RFC 0024 added three fields by the procedure under *Compatibility*, before this RFC's third step landed and
+  without a line among its known additions: `node` on the envelope, the tree's `package.json → engines.node`
+  verbatim, which `loadProject` reads and carries on `resolved` so `manifestOf` stays pure; `endpoint` on a
+  `connections` row, what the kind's `endpoint` path picks out of the settings, as written; and `listens` on a
+  profile block, beside `holds`, by operation, two steps that run one operation in the order declared. `node` and
+  `endpoint` are required keys, `null` where the tree writes nothing (#729).
+- The viewer has no profile selector, since RFC 0013 shipped a block per profile instead of one. The project page's
+  *manifest* link opens every profile, and a link beside each named profile's heading opens `?profile=<name>`.
+  `/api/manifest` answers the bytes the command prints, newline included, through the one `manifestText` both
+  write. An empty `?profile=` is no profile; where the command exits 1 the route answers 409 with every refusal,
+  or 400 with RFC 0013's message for a profile the project does not declare. The manifest's `root` there is the
+  absolute path `wilanis-view` resolves. A site written by `wilanis-view --static` has no server behind it, so it
+  draws neither link and carries no manifest (#693).
+- The README's paragraph, *What a tree is: the manifest*, sits after *Try it*, since *What a tree starts* moved to
+  `docs/model.md` (ae19c74). Its `jq` lines print what the example prints today, and the diff is two commands,
+  because the *Guide*'s third line puts `diff` after a `#`, where the shell never runs it (#693).
+- The *Guide*'s example and the counts under *Tests* are the example as it stood at acceptance; the tests hold the
+  same claims against the example as it stands, whose `production` starts eight steps. The golden,
+  `manifest.golden.json`, is generated from the code (`npx vitest run packages/runtime/test/manifest.test.ts -u`)
+  and is byte-equal to the command's stdout. The per-profile tests are in `manifest-profiles.test.ts` and RFC
+  0024's fields in `manifest-listens.test.ts`, since `manifest.test.ts` is at the house rules' length (#675, #729).
