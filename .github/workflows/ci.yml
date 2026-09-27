@@ -4,8 +4,21 @@ on:
   push:
     branches: [main]
   pull_request:
+  # main's merge queue: a pull request merges once the queue's merge of it onto main passes the required checks,
+  # so no branch is rebased and run again by hand each time another merges.
+  merge_group:
+
+# A push to a pull request cancels the run it supersedes. A push to main and a merge group are never cancelled,
+# so neither shares a group with another run: GitHub keeps one pending run per group and cancels the older one
+# even without cancel-in-progress, and a group keyed on main's ref alone would drop a run of main whenever
+# merges land faster than one run takes. A merge group's ref already names one group; the sha keeps main's apart.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('{0}@{1}', github.ref, github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Skips on a merge group, as `changes` and `decision` do: the pull request in it was held to them already, and
+  # GitHub counts a skipped required check as satisfied.
   branch-name:
     name: branch name
     if: github.event_name == 'pull_request'
@@ -44,13 +57,81 @@ jobs:
     # anywhere their variable is unset, and are run locally (the Postgres engine's and the S3 plugin's READMEs)
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Whether a test reads anything the change touches. A pull request or a merge group whose every file is on
+      # UNREAD skips the rest of this job, which still reports success: a required check that never reports
+      # blocks the merge. UNREAD is read off the suite, not guessed: every test/ directory, fitness/, each
+      # package's src/, vitest.config.ts, biome.jsonc, the tsconfigs, the package.json scripts and docs/demo/lib
+      # (which the demo's tests import) were searched for the paths they open or walk, and what is left is prose
+      # and static files none of them names. README.md, docs/demo.md, docs/demo/ outside its arena, docs/refusals/
+      # and packages/runtime/templates/ are read, so they are not on it. A path goes on it only once no test and no
+      # fitness function reads it, and comes off the day one does. A push to main, and a change whose files
+      # cannot be listed, run in full; `fitness` always runs in full.
+      - id: reads
+        name: whether a test reads what the change touches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PULL: ${{ github.event.pull_request.number }}
+          CHANGED: ${{ github.event.pull_request.changed_files }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          # one extended regular expression per line, matched against the whole repository-relative path; a
+          # rename is listed under both its names, so moving a file a test reads onto this list still runs in full
+          UNREAD: |
+            docs/rfcs/.+
+            docs/(roadmap|model|compared|security-model)\.md
+            docs/atomic-sequence\.png
+            docs/site/.+
+            docs/demo/arena/.+
+            (packages|libraries)/[^/]+/(README\.md|LICENSE)
+            reserved/.+
+            fitness/README\.md
+            \.claude/skills/.+
+            \.github/ISSUE_TEMPLATE/.+
+            \.github/PULL_REQUEST_TEMPLATE\.md
+            \.github/board/README\.md
+            (CLAUDE|CONTRIBUTING|CODE_OF_CONDUCT|SECURITY)\.md
+            LICENSE
+        run: |
+          full() { echo "runs in full: $1"; echo "skip=false" >> "$GITHUB_OUTPUT"; exit 0; }
+          case "$EVENT" in
+            pull_request)
+              files=$(gh api --paginate "repos/${{ github.repository }}/pulls/$PULL/files" \
+                --jq '.[] | .filename, (.previous_filename // empty)') \
+                || full "the pull request's files could not be listed"
+              [ "$(printf '%s\n' "$files" | grep -c .)" -ge "$CHANGED" ] \
+                || full "the pull request changes $CHANGED files and only some were listed" ;;
+            merge_group)
+              git fetch --no-tags --depth=1 origin "$BASE_SHA" || full "the merge group's base could not be fetched"
+              files=$(git diff --no-renames --name-only "$BASE_SHA" "$HEAD_SHA") \
+                || full "the merge group's files could not be listed" ;;
+            *) full "a $EVENT is always tested whole" ;;
+          esac
+          [ -n "$files" ] || full "no changed file was listed"
+          printf '%s\n' "$UNREAD" | sed '/^[[:space:]]*$/d' > "$RUNNER_TEMP/unread"
+          listed=$(printf '%s\n' "$files" | grep -Evxf "$RUNNER_TEMP/unread" || true)
+          if [ -n "$listed" ]; then
+            echo "runs in full: a test may read these, which are not on UNREAD"
+            printf '%s\n' "$listed" | head -5 | sed 's/^/  /'
+            more=$(( $(printf '%s\n' "$listed" | grep -c .) - 5 ))
+            [ "$more" -le 0 ] || echo "  and $more more"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skips the build and the tests: no test reads a file this change touches"
+          printf '%s\n' "$files" | sed 's/^/  /'
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+      - if: steps.reads.outputs.skip != 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      - run: npm ci
-      - run: npm test
+      - if: steps.reads.outputs.skip != 'true'
+        run: npm ci
+      - if: steps.reads.outputs.skip != 'true'
+        run: npm test
       - name: the example checks and rehearses, under each of its profiles
+        if: steps.reads.outputs.skip != 'true'
         run: |
           npx wilanis check example
           npx wilanis check libraries/access
