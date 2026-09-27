@@ -42,6 +42,9 @@ const HELPERS = {
   link: (path: string, text?: string) => drawn({ tag: 'a', path, text: text ?? path }),
   nodeLink: (graph: string, node: string, text: string) => drawn({ tag: 'a', path: graph, node, text }),
   badge: (kind: string) => drawn({ tag: 'span', text: kind }),
+  step: (heading: string, content: Drawn) =>
+    drawn({ tag: 'div', cls: 'step', children: [drawn({ tag: 'div', cls: 'k', text: heading }), content] }),
+  arrow: () => drawn({ tag: 'span', cls: 'arrow', text: '→' }),
   SEP: ' › ',
 };
 

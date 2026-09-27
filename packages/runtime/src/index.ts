@@ -67,6 +67,17 @@ export {
   resolveIncludes,
   resolvePlugins,
 } from './project.js';
+export {
+  AUTHORS,
+  expectsSaid,
+  generatedSaid,
+  provesSaid,
+  type ScenarioAuthor,
+  type ScenarioWriter,
+  scenariosOf,
+  type TriggerScenarios,
+  WRITTEN_BY,
+} from './scenario-said.js';
 export { contentTypeOf, runStartup, runTrigger, start } from './serve.js';
 export { Served } from './served.js';
 export {

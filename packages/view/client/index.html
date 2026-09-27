@@ -617,6 +617,65 @@
     p.appendChild(link(e.kind)); p.appendChild(frag(' names as the endpoint.')); return p;
   }
 
+  /**
+   * What a scenario replays and how it expects the run to end: the trigger, or for a policy's decision the trigger
+   * lending its kind and the policy whose decide fires in the trigger's place; then the status, and the reason a
+   * declared refusal gives.
+   */
+  function scenarioChainEl(d) {
+    const chain = el('div', 'chain');
+    chain.appendChild(step(d.policy ? 'through the trigger' : 'replays', link(d.trigger)));
+    if (d.policy) { chain.appendChild(arrow()); chain.appendChild(step('the decision of', link(d.policy))); }
+    const ends = el('span', null, d.expect.status);
+    if (d.expect.reason !== undefined) { ends.appendChild(frag(', refusing as ')); ends.appendChild(el('code', null, d.expect.reason)); }
+    chain.appendChild(arrow()); chain.appendChild(step('expects', ends));
+    return chain;
+  }
+
+  /** The decision a scenario proves, as a chain: the graph, its switch, the rule, and the node it routes to, each opening the graph. */
+  function branchEl(b) {
+    const chain = el('div', 'chain');
+    chain.appendChild(step('in the graph', link(b.graph)));
+    chain.appendChild(arrow()); chain.appendChild(step('the switch', nodeLink(b.graph, b.node, b.node)));
+    chain.appendChild(arrow()); chain.appendChild(b.when === 'else' ? step('otherwise', frag('no rule holds')) : step('when', el('code', null, b.when)));
+    chain.appendChild(arrow()); chain.appendChild(step('routes to', nodeLink(b.graph, b.to, b.to)));
+    return chain;
+  }
+
+  /**
+   * A scenario's page: who wrote it, what it replays and expects, the branch it proves, why no input reaches that
+   * branch where none does, the seed and input it runs with, and what each node is expected to do.
+   */
+  function scenarioEl(page, v) {
+    const d = v.doc;
+    if (v.generated) { const p = el('p'); p.appendChild(el('span', 'badge warn', d.generated)); p.appendChild(frag(' ' + v.generated[0].toUpperCase() + v.generated.slice(1) + '.')); page.appendChild(p); }
+    page.appendChild(scenarioChainEl(d));
+    if (d.branch) { page.appendChild(el('h2', null, 'Proves')); page.appendChild(branchEl(d.branch)); }
+    if (d.expect.unreachable !== undefined) page.appendChild(el('p', 'miss', 'No input reaches this branch: ' + d.expect.unreachable));
+    page.appendChild(el('h2', null, 'Seed ' + d.seed));
+    if (d.in !== undefined) { page.appendChild(el('h2', null, 'Input')); page.appendChild(el('pre', 'mono', JSON.stringify(d.in, null, 2))); }
+    const nodes = Object.entries(d.expect.nodes || {});
+    if (!nodes.length) return;
+    page.appendChild(el('h2', null, 'Expected per node'));
+    const t = el('table'); const hd = el('tr'); for (const h of ['node', 'status', 'routes to', 'answers']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
+    for (const [id, n] of nodes) { const tr = el('tr'); tr.appendChild(el('td', 'name', id)); tr.appendChild(el('td', null, n.status)); tr.appendChild(el('td', 'name', n.selected || '')); tr.appendChild(el('td', 'val', n.out === undefined ? '' : JSON.stringify(n.out))); t.appendChild(tr); }
+    page.appendChild(t);
+  }
+
+  /**
+   * The scenarios that replay a trigger, grouped by who wrote them as `wilanis ls` marks them, each opening its page
+   * and saying the branch it proves and how it expects the run to end.
+   */
+  function triggerScenariosEl(page, groups) {
+    const count = groups.reduce((n, g) => n + g.scenarios.length, 0);
+    page.appendChild(el('h2', null, 'Scenarios (' + count + ')'));
+    if (!count) page.appendChild(el('p', 'miss', 'No scenario replays this trigger yet: wilanis rehearse --record writes one per branch, wilanis fuzz --edges one per input edge.'));
+    for (const g of groups) {
+      page.appendChild(el('h3', null, g.writtenBy ? 'Written by ' + g.writtenBy + ' (' + g.by + ')' : 'Written by hand'));
+      for (const s of g.scenarios) { const row = el('div', 'ref'); row.appendChild(link(s.path, s.said)); row.appendChild(el('small', 'mono', '  expects ' + s.expects)); page.appendChild(row); }
+    }
+  }
+
   function renderDocPage(page, v) {
     const h1 = el('h1', null, v.label); h1.appendChild(schemaBadge(v.kind, null, v.kind + '.schema.json')); if (v.kind === 'shape') h1.appendChild(badge(v.kind, v.doc.layer === 'edge' ? 'edge: the world’s shape' : 'core: ours')); page.appendChild(h1);
     page.appendChild(el('p', 'lead', v.description));
@@ -688,6 +747,7 @@
         page.appendChild(el('h2', null, 'What the operation is given'));
         if (d.fire && d.fire.in) { page.appendChild(el('p', null, 'Each input, read from what the kind hands as context.*:')); page.appendChild(valuesTable(d.fire.in, ['input', 'read from'])); }
         else page.appendChild(el('p', null, d.in ? 'The decoded body, judged as the input type, field for field.' : 'Nothing: the operation takes no input.'));
+        if (v.scenarios) triggerScenariosEl(page, v.scenarios);
         break;
       }
       case 'policy': {
@@ -822,13 +882,7 @@
         break;
       }
       case 'scenario': {
-        const chain = el('div', 'chain'); chain.appendChild(step('replays', link(d.graph))); chain.appendChild(arrow()); chain.appendChild(step('expects', frag(d.expect.status))); page.appendChild(chain);
-        page.appendChild(el('h2', null, 'Seed ' + d.seed));
-        if (d.in !== undefined) { page.appendChild(el('h2', null, 'Input')); const pre = el('pre', 'mono', JSON.stringify(d.in, null, 2)); page.appendChild(pre); }
-        page.appendChild(el('h2', null, 'Expected per node'));
-        const t = el('table'); const hd = el('tr'); for (const h of ['node', 'status', 'routes to', 'answers']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
-        for (const [id, n] of Object.entries(d.expect.nodes || {})) { const tr = el('tr'); tr.appendChild(el('td', 'name', id)); tr.appendChild(el('td', null, n.status)); tr.appendChild(el('td', 'name', n.selected || '')); tr.appendChild(el('td', 'val', n.out === undefined ? '' : JSON.stringify(n.out))); t.appendChild(tr); }
-        page.appendChild(t);
+        scenarioEl(page, v);
         break;
       }
       case 'plugin': {

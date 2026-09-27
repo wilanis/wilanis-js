@@ -3,7 +3,7 @@
  * the view fills in, and the labels a reader sees. The tree index is `tree-index.ts`.
  */
 import type { Kind, Layer, Loaded, Outcome, Refusal } from '@wilanis/core';
-import type { Endpoint, ProfileReach, TriggerLimits } from '@wilanis/runtime';
+import type { Endpoint, ProfileReach, ScenarioAuthor, TriggerLimits } from '@wilanis/runtime';
 import type { VAttempts, VPromised } from './attempts.js';
 import type { VCatches, VCaught } from './catches.js';
 import type { VDelivery, VReceives } from './delivery.js';
@@ -305,6 +305,13 @@ export interface DocView {
   limits?: TriggerLimits;
   /** On a trigger: the policies that gate it, in order, the operation each decides through, and the credentials the attachment gives the guard. */
   policies?: VAttachedPolicy[];
+  /**
+   * On a trigger: the scenarios that replay its fire, grouped by who wrote them as `wilanis ls` marks them, only the
+   * groups that hold one; empty where no scenario replays it.
+   */
+  scenarios?: VScenarioGroup[];
+  /** On a scenario a command wrote: the sentence `wilanis describe` marks it with, naming the command that rewrites it. */
+  generated?: string;
   /** On a policy: the port operation it decides through, and where that leads. */
   decides?: VTarget;
   /** On a policy: what each reason its decision can refuse with means. */
@@ -442,6 +449,25 @@ export interface VStoreCall {
   where: string;
   op: string;
   collection?: string;
+}
+
+/** The scenarios one command wrote, or a person, among those that replay a trigger. */
+export interface VScenarioGroup {
+  /** Who wrote them: the `generated` mark `wilanis ls` prints after each, or `hand` for none. */
+  by: ScenarioAuthor;
+  /** The command that writes them, where one does: `wilanis rehearse --record`. */
+  writtenBy?: string;
+  scenarios: VScenarioRow[];
+}
+
+/**
+ * One scenario as a trigger's page lists it: what it proves, as `wilanis describe` says it, or its file's name where
+ * it proves no one branch; and how it expects the run to end.
+ */
+export interface VScenarioRow {
+  path: string;
+  said: string;
+  expects: string;
 }
 
 /**

@@ -23,6 +23,7 @@ import { invariantView } from './invariants.js';
 import { stemOf, targetOf } from './ports.js';
 import { callersOf, type IndexedRef, referenceIndex } from './references.js';
 import { answersOf } from './refusals.js';
+import { generatedOf, scenarioGroupsOf } from './scenarios.js';
 import { viewsRequiredBy } from './scopes.js';
 import { storeView } from './stores.js';
 import type { DocView, VAttachedPolicy } from './types.js';
@@ -140,7 +141,10 @@ function policiesOf(scope: Scope, trigger: TriggerDoc): VAttachedPolicy[] {
   });
 }
 
-/** What a trigger adds to its view: what fires it, the connection it receives from, where it fires, what it answers, how its run is bounded, and the policies that gate it. */
+/**
+ * What a trigger adds to its view: what fires it, the connection it receives from, where it fires, what it answers,
+ * how its run is bounded, the policies that gate it, and the scenarios that replay it.
+ */
 function triggerView(scope: Scope, doc: Loaded, view: DocView) {
   const trigger = doc.doc as TriggerDoc;
   const said = settingsSaid(doc as Loaded<TriggerDoc>, scope);
@@ -152,6 +156,13 @@ function triggerView(scope: Scope, doc: Loaded, view: DocView) {
   const limits = limitsOf(doc as Loaded<TriggerDoc>, scope);
   if (Object.keys(limits).length) view.limits = limits;
   if (trigger.policies?.length) view.policies = policiesOf(scope, trigger);
+  view.scenarios = scenarioGroupsOf(scope, doc);
+}
+
+/** What a scenario adds to its view: the sentence it is marked with, where a command wrote it. */
+function scenarioView(doc: Loaded, view: DocView) {
+  const generated = generatedOf(doc);
+  if (generated) view.generated = generated;
 }
 
 /**
@@ -248,5 +259,6 @@ export function viewOf(load: LoadResult, ref: string, reads: TreeReads = treeRea
   if (doc.kind === 'invariant') view.invariant = invariantView(scope, doc);
   if (doc.kind === 'project') view.profiles = profilesOf(scope);
   if (doc.kind === 'connection') connectionView(scope, doc, view);
+  if (doc.kind === 'scenario') scenarioView(doc, view);
   return view;
 }
