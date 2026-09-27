@@ -4,8 +4,9 @@
  * from the step's `in.port`, from the plugin's settings, from neither; the interface from the step's `in.host`, from
  * the plugin's settings, from neither -- and the socket's own `address()` is held to what `listensOf` answered for
  * the same tree. It starts under `local`, which reaches no network, on port 0 wherever a case writes one: the system
- * gives the socket a port, and `listensOf` answers null for it, since 0 fixes none. The default port is the one it
- * cannot leave to the system, so that case binds 8080 itself.
+ * gives the socket a port, and `listensOf` answers null for it, since 0 fixes none. Where the step's 0 is written
+ * over the settings', the settings name a port the test holds, so a start that took theirs would fail with
+ * EADDRINUSE. The default port is the one it cannot leave to the system, so that case binds 8080 itself.
  */
 import { rmSync } from 'node:fs';
 import { type AddressInfo, connect, createServer, Server } from 'node:net';
@@ -19,8 +20,6 @@ import { EXAMPLE_PLUGINS } from './plugins.js';
 
 const PROFILE = 'local';
 const LISTEN = '@http/server.port.json#listen';
-/** A port no socket can bind: the settings write it under a step's 0, so a start that took the settings' would fail. */
-const UNBINDABLE = 70_000;
 /** What `listen` binds where nothing writes a port: server.port.json's default, and serve.ts's. */
 const DEFAULT_PORT = 8080;
 /** The one variable the example reads under local, and nothing else of the environment. */
@@ -63,6 +62,24 @@ const free = (port: number) =>
     probe.once('error', () => done(false));
     probe.listen(port, () => probe.close(() => done(true)));
   });
+
+/**
+ * A port the test holds for the length of the case: a blocker listening on one the system gives, closed in
+ * `afterEach`. The settings write it under a step's 0, so a start that took the settings' port over the step's
+ * would fail with EADDRINUSE.
+ */
+async function held(): Promise<number> {
+  const blocker = createServer();
+  await new Promise<void>((ok, fail) => {
+    blocker.once('error', fail);
+    blocker.listen(0, () => {
+      blocker.off('error', fail);
+      ok();
+    });
+  });
+  stops.push(() => new Promise<void>(done => blocker.close(() => done())));
+  return (blocker.address() as AddressInfo).port;
+}
 
 const EXPORT = '@otel/exporter.port.json#export';
 
@@ -118,7 +135,10 @@ async function agree(row: ListenRow, socket: AddressInfo) {
 /** One way to start the example: what it writes, and the address `listensOf` must answer for it. */
 interface Way {
   name: string;
-  edit: (project: any) => void;
+  /** What the case writes; `blocked` is the port a case that `holds` one is holding, and 0 for any other. */
+  edit: (project: any, blocked: number) => void;
+  /** Whether the case holds a port (`held`) for its edit to write, so a start that bound it would fail. */
+  holds?: boolean;
   host: string | null;
   port: number | null;
 }
@@ -126,10 +146,11 @@ interface Way {
 const WAYS: Way[] = [
   {
     name: "the port from the step's in.port, over the settings'",
-    edit: project => {
-      httpSettings(project).port = UNBINDABLE;
+    edit: (project, blocked) => {
+      httpSettings(project).port = blocked;
       listenStep(project).in = { port: 0 };
     },
+    holds: true,
     host: null,
     port: null,
   },
@@ -173,7 +194,8 @@ describe('the address listen binds is the one listensOf answers', () => {
     it(way.name, { timeout: 60_000 }, async ({ skip }) => {
       // the default is the one port this test cannot choose; a machine already serving on it says nothing of drift
       if (way.port === DEFAULT_PORT) skip(!(await free(DEFAULT_PORT)), `port ${DEFAULT_PORT} is taken on this machine`);
-      const { said, sockets } = await startedWith(way.edit);
+      const blocked = way.holds ? await held() : 0;
+      const { said, sockets } = await startedWith(project => way.edit(project, blocked));
       expect(said).toEqual([{ operation: LISTEN, host: way.host, port: way.port }]);
       expect(sockets).toHaveLength(1);
       await agree(said[0], sockets[0]);

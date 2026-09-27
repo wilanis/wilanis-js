@@ -56,9 +56,16 @@ export const SECRET = 'a-secret-of-thirty-two-bytes-or-more!';
 export type Edit = (doc: any) => void;
 
 /**
+ * Where a copy given no upstream sends the customer API: a `.invalid` name never resolves (RFC 6761), so a test that
+ * reaches the API without a fake fails at once rather than calling the example's public mockapi.
+ */
+const NOWHERE = 'http://customers-api.invalid/api/v1';
+
+/**
  * The example, its server on whatever port the system gives (`listenedOn` reads it back once it is started), its
- * API pointed at the fake upstream where one is given, with any further edits. A copy given no upstream keeps the
- * example's, for a test that checks the tree or runs what reaches none.
+ * API pointed at the fake upstream on localhost where one is given, with any further edits. A copy given no upstream
+ * points the API at `http://customers-api.invalid/api/v1`, which never resolves, for a test that checks the tree or
+ * runs what reaches none.
  */
 export function localCopy(edits: Record<string, Edit> = {}, upstream?: number): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-auth-'));
@@ -72,10 +79,9 @@ export function localCopy(edits: Record<string, Edit> = {}, upstream?: number): 
     change(doc);
     writeFileSync(path, JSON.stringify(doc));
   };
-  if (upstream !== undefined)
-    edit('connections/customers-api.connection.json', connection => {
-      connection.settings.baseUrl = `http://localhost:${upstream}/api/v1`;
-    });
+  edit('connections/customers-api.connection.json', connection => {
+    connection.settings.baseUrl = upstream === undefined ? NOWHERE : `http://localhost:${upstream}/api/v1`;
+  });
   edit('project.json', project => {
     project.plugins.find((plugin: any) => plugin.use === '@http').settings.port = 0;
   });
