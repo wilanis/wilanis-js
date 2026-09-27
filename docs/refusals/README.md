@@ -75,7 +75,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [D014](D014.md) | D | live | a tree whose documents, its includes' and its plugins' among them, name more than one IR version |
 | [R001](R001.md) | R | live | a reference to a port, operation, shape, policy or other document the tree does not have |
 | [L001](L001.md) | L | live | a type naming a type variable, or `unknown` in core, or a shape of the other layer |
-| [L002](L002.md) | L | live | a domain graph reaching an effect or the request, or a data graph running a domain operation |
+| [L002](L002.md) | L | live | a domain graph reaching an effect or the context, or a data graph running a domain operation |
 | [L003](L003.md) | L | live | a data graph or binding reaching an effect its feature's `effects` does not list |
 | [L005](L005.md) | L | live | a document naming another feature's document without `dependsOn`, or one that feature does not export |
 | [L006](L006.md) | L | live | a trigger or policy firing a native operation, or a domain operation marking a field `static` |
@@ -87,7 +87,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [L012](L012.md) | L | live | a domain graph's node declaring `retry` or `timeoutMs` |
 | [L013](L013.md) | L | live | a domain graph's switch declaring `catch` |
 | [L016](L016.md) | L | live | a data graph composing a value a field invariant guards that an effect of the graph reads |
-| [G001](G001.md) | G | live | a node id another node of the graph has, or one of the reserved roots in, const, request, secrets |
+| [G001](G001.md) | G | live | a node id another node of the graph has, or one of the reserved roots in, const, context, secrets |
 | [G003](G003.md) | G | live | a read that cannot be typed: no such field, constant, earlier node, or name under reads |
 | [G004](G004.md) | G | live | a value that does not fit its input: optional where the contract requires it, or of the wrong type |
 | [G005](G005.md) | G | live | a required input of the operation left out of a node's or a delegation's in |
@@ -112,8 +112,8 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [G024](G024.md) | G | live | a catch of a switch, a pure operation or one that refuses on purpose, which break only by a bug |
 | [G025](G025.md) | G | live | a catch of a node where an invariant is guarded, which the guard moves aside |
 | [P001](P001.md) | P | live | a static field, or a type reference, given a read where the checker must see a literal |
-| [P002](P002.md) | P | live | a resolver reading a request.* path no trigger kind hands and the guard does not add |
-| [P003](P003.md) | P | live | a resolver named in, const, request or secrets |
+| [P002](P002.md) | P | live | a resolver reading a context.* path no trigger kind hands and the guard does not add |
+| [P003](P003.md) | P | live | a resolver named in, const, context or secrets |
 | [P004](P004.md) | P | live | a `reads` entry naming no resolver of the document it names, or not a resolver reference at all |
 | [P005](P005.md) | P | live | a `reads` entry no value of the document reads, and on a store one no `scoped` column reads |
 | [P006](P006.md) | P | live | a `reads` name that is a root, or the id of a node of the graph |
@@ -124,22 +124,22 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [B005](B005.md) | B | live | what a bound operation accepts or returns does not fit the graph or delegation meeting it |
 | [B006](B006.md) | B | live | a startup step names no operation, or a native one that does not hold |
 | [B007](B007.md) | B | live | a startup step's input reads more than literals and declared secrets, or misfits the operation |
-| [B008](B008.md) | B | live | a startup step reaches, under a profile, a document that reads the request |
-| [B009](B009.md) | B | live | a binding of a port a plugin requires declares reads or reaches a read of the request |
+| [B008](B008.md) | B | live | a startup step reaches, under a profile, a document that reads the context |
+| [B009](B009.md) | B | live | a binding of a port a plugin requires declares reads or reaches a read of the context |
 | [B010](B010.md) | B | live | a binding of a port a plugin requires reaches a refuse or something that holds past the run |
 | [B011](B011.md) | B | live | a domain operation promising idempotent reaches, under a profile, an effect that is not |
 | [B012](B012.md) | B | live | a startup step naming a profile the project does not declare |
 | [T001](T001.md) | T | live | a trigger's settings that do not fit its kind's, or a type setting not written as a shape path |
 | [T002](T002.md) | T | live | a trigger's in or out that does not meet the contract of the domain operation it fires |
 | [T003](T003.md) | T | live | a trigger's fire.in that reads outside what its kind hands, or does not fit the trigger's in |
-| [T004](T004.md) | T | live | a resolver read, under a trigger, of a request.* path the trigger's kind does not hand |
+| [T004](T004.md) | T | live | a resolver read, under a trigger, of a context.* path the trigger's kind does not hand |
 | [T005](T005.md) | T | live | a refusal reason the trigger can reach, its policies' and the guard's included, that it does not map |
 | [T006](T006.md) | T | live | a refusal reason the trigger maps that nothing it fires, gates on or identifies with refuses with |
 | [T007](T007.md) | T | live | a trigger kind whose correlation names no field of its own context |
 | [T008](T008.md) | T | live | a trigger with no policies whose edge shapes take a list with no maxItems |
 | [T009](T009.md) | T | live | a trigger on an at-least-once connection firing an operation that does not declare `idempotent: true` |
 | [T010](T010.md) | T | live | a trigger's connection setting that is a read, names no connection, or names one whose kind declares no `delivery` |
-| [A001](A001.md) | A | live | a policy's input that reads outside the request or does not fit its decision under the trigger's kind |
+| [A001](A001.md) | A | live | a policy's input that reads outside the context or does not fit its decision under the trigger's kind |
 | [A002](A002.md) | A | live | a reason the decision reaches that outcomes does not map, a challenge without a method, a deny with one |
 | [A003](A003.md) | A | live | a policy outcome that nothing its decision reaches refuses with |
 | [A004](A004.md) | A | live | a credential the guard does not verify, read where the kind hands nothing, or yielding what no policy reads |
