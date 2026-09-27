@@ -117,8 +117,9 @@
       "returns": "number"
     },
     "put": {
-      "description": "Write one whole record under its own key. The one verb that writes: with replace (the default) it is the upsert the name suggests, and with \"replace\": false it writes nothing where a record of that key exists and answers conflict, so a graph routes on that rather than on a failure. A constraint the store declares is answered the same way: a unique another record already holds, or a refs pointing at a record that is not there, answers violated and writes nothing. Nothing is filled in silently -- a new record's key comes from newKey.",
+      "description": "Write one whole record under its own key. The one verb that writes: with replace (the default) it is the upsert the name suggests, and with \"replace\": false it writes nothing where a record of that key exists and answers conflict, so a graph routes on that rather than on a failure. A constraint the store declares is answered the same way: a unique another record already holds, or a refs pointing at a record that is not there, answers violated and writes nothing. Nothing is filled in silently -- a new record's key comes from newKey -- so it is idempotent: it writes only what it is given, and the same record put again is written over itself unchanged, or, with replace false, answered conflict with nothing written.",
       "transactional": true,
+      "idempotent": true,
       "accepts": {
         "store": {
           "type": "string",
@@ -168,8 +169,9 @@
       }
     },
     "patch": {
-      "description": "Change some fields of one record, leaving the rest as they are. It never removes a field -- absence is written by put -- and it never touches the key. Answers record absent where the collection holds none under that key.",
+      "description": "Change some fields of one record, leaving the rest as they are. It never removes a field -- absence is written by put -- and it never touches the key. Answers record absent where the collection holds none under that key. It is idempotent because each field it names is set to the value given, never to one reckoned from what is kept, so the same changes made again find those values already there.",
       "transactional": true,
+      "idempotent": true,
       "accepts": {
         "store": {
           "type": "string",
