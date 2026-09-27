@@ -1,17 +1,37 @@
 /**
- * What `wilanis describe` says about an address (RFC 0024): where the address an operation that `listens` binds
- * comes from, and what a connection of a kind that declares an `endpoint` reaches. Both are read off the documents
- * that declare them; nothing here resolves a secret or opens a socket.
+ * The address a tree's documents declare (RFC 0024): where the address an operation that `listens` binds comes
+ * from, and what a connection of a kind that declares an `endpoint` reaches. `describe` says both and the manifest
+ * reads both, through the one order of places and the one path into a connection's settings kept here. Both are
+ * read off the documents that declare them; nothing here resolves a secret or opens a socket.
  */
 import type { Bound, ConnectionDoc, Loaded, Operation, Scope } from '@wilanis/core';
 
-/** One part of an address, in the order it is taken: the step's input, the plugin's setting, the default. */
-function partSaid(part: string, bound: Bound<unknown>, root: string | undefined, otherwise: string): string {
-  const from = [
-    ...(bound.input ? [`in.${bound.input}`] : []),
-    ...(bound.setting ? [`${root ?? 'the plugin'} settings.${bound.setting}`] : []),
-    bound.default === undefined ? otherwise : String(bound.default),
+/** One place a part of an address is taken from: the step's input, the granting plugin's setting, or the default. */
+export type Place = { input: string } | { setting: string } | { default: unknown };
+
+/**
+ * The places one part of an address is taken from, in the order they are taken: the step's input, the plugin's
+ * setting, the default -- those its `listens` names, and no other. The handler that binds reads them in this order.
+ */
+export function placesOf(bound: Bound<unknown>): Place[] {
+  return [
+    ...(bound.input ? [{ input: bound.input }] : []),
+    ...(bound.setting ? [{ setting: bound.setting }] : []),
+    ...(bound.default === undefined ? [] : [{ default: bound.default }]),
   ];
+}
+
+/** One place, as `describe` says it. */
+function placeSaid(place: Place, root: string | undefined): string {
+  if ('input' in place) return `in.${place.input}`;
+  if ('setting' in place) return `${root ?? 'the plugin'} settings.${place.setting}`;
+  return String(place.default);
+}
+
+/** One part of an address, in the order it is taken, and what it is where no place fixes it. */
+function partSaid(part: string, bound: Bound<unknown>, root: string | undefined, otherwise: string): string {
+  const from = placesOf(bound).map(place => placeSaid(place, root));
+  if (bound.default === undefined) from.push(otherwise);
   return `${part}: ${from.join(', else ')}`;
 }
 
@@ -39,15 +59,25 @@ function valueAt(settings: Record<string, unknown>, path: string): unknown {
 }
 
 /**
+ * The setting a connection's kind names as its `endpoint`, and the value that path picks out of the connection's
+ * settings as written (a secret read stays its template text, and nothing where the setting is not written);
+ * nothing at all where the kind declares no endpoint.
+ */
+export function endpointOf(connection: ConnectionDoc, scope: Scope): { endpoint: string; value: unknown } | undefined {
+  const endpoint = scope.get('connection-kind', connection.kind)?.doc.endpoint;
+  return endpoint ? { endpoint, value: valueAt(connection.settings ?? {}, endpoint) } : undefined;
+}
+
+/**
  * What a connection reaches, where its kind says which setting holds the address: `endpoint  <value>  (baseUrl,
  * by @http/http.connection-kind.json)`. A secret read stays its template text; nothing for a kind that declares
  * no endpoint, or a connection that does not write the setting.
  */
 export function endpointLines(doc: Loaded, scope: Scope): string[] {
-  const { kind, settings } = doc.doc as ConnectionDoc;
-  const endpoint = scope.get('connection-kind', kind)?.doc.endpoint;
-  if (!endpoint) return [];
-  const value = valueAt(settings ?? {}, endpoint);
-  if (value === undefined) return [];
-  return [`endpoint  ${typeof value === 'string' ? value : JSON.stringify(value)}  (${endpoint}, by ${kind})`];
+  const connection = doc.doc as ConnectionDoc;
+  const found = endpointOf(connection, scope);
+  if (found?.value === undefined) return [];
+  const { endpoint, value } = found;
+  const said = typeof value === 'string' ? value : JSON.stringify(value);
+  return [`endpoint  ${said}  (${endpoint}, by ${connection.kind})`];
 }

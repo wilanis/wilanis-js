@@ -26,10 +26,14 @@ export interface PluginResolution {
   versions: Record<string, string>;
 }
 
-/** What the runtime resolved a tree's packages to: each imported plugin's version by its `use`, and each include. */
+/**
+ * What the runtime resolved a tree's packages to: each imported plugin's version by its `use`, each include, and the
+ * Node versions the tree's own package.json asks for (`engines.node`, as written), where it asks.
+ */
 export interface Resolved {
   plugins: Record<string, string>;
   includes: ResolvedInclude[];
+  node?: string;
 }
 
 /** A tree as the runtime loads it: what the loader answers, and the packages it was loaded from (RFC 0026). */
@@ -78,6 +82,19 @@ const versionIn = (file: string): string | undefined => {
   const found = JSON.parse(readFileSync(file, 'utf8')).version;
   return typeof found === 'string' ? found : undefined;
 };
+
+/**
+ * The Node versions a tree's package.json asks for (`engines.node`), verbatim, or nothing where it has no
+ * package.json, asks for none, or cannot be read: npm is the one that judges a package.json, not the loader.
+ */
+function nodeOf(root: string): string | undefined {
+  try {
+    const found = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).engines?.node;
+    return typeof found === 'string' ? found : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** One D006: what a plugin entry got wrong. */
 const badPlugin = (at: string, message: string, hint: string): Refusal => ({
@@ -198,7 +215,8 @@ function includeFrom(
 
 /**
  * Load the tree at root with its plugins and includes resolved: builtins, `extra`, and the packages project.json
- * names; the load carries the versions they were resolved at, which the manifest prints.
+ * names; the load carries the versions they were resolved at and the Node the tree asks for, which the manifest
+ * prints.
  */
 export async function loadProject(
   root: string,
@@ -213,5 +231,6 @@ export async function loadProject(
   const failed = new Set(refusals.map(refusal => refusal.at?.replace(/\/from$/, '')));
   const kept = load.refusals.items.filter(item => !(item.code === 'D006' && failed.has(item.at)));
   load.refusals.items.splice(0, load.refusals.items.length, ...kept, ...refusals);
-  return { ...load, resolved: { plugins: versions, includes } };
+  const node = nodeOf(root);
+  return { ...load, resolved: { plugins: versions, includes, ...(node === undefined ? {} : { node }) } };
 }

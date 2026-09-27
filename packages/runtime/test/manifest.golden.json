@@ -4,6 +4,7 @@
   "ir": "v1",
   "name": "customers",
   "root": "example",
+  "node": null,
   "plugins": [
     {
       "use": "@auth",
@@ -2916,6 +2917,7 @@
     {
       "path": "@connections/customers-api.connection.json",
       "kind": "@http/http.connection-kind.json",
+      "endpoint": "https://6aa009e23e0d88d3d7e5525d.mockapi.io/api/v1",
       "settings": {
         "baseUrl": "https://6aa009e23e0d88d3d7e5525d.mockapi.io/api/v1",
         "throttle": {
@@ -2929,6 +2931,7 @@
     {
       "path": "@connections/customers-postgres.connection.json",
       "kind": "@storage-postgres/postgres.connection-kind.json",
+      "endpoint": null,
       "settings": {
         "url": "{{secrets.customersDatabase}}"
       },
@@ -2939,12 +2942,14 @@
     {
       "path": "@connections/customers.connection.json",
       "kind": "@storage-memory/memory.connection-kind.json",
+      "endpoint": null,
       "settings": {},
       "secrets": []
     },
     {
       "path": "@connections/employees-production.connection.json",
       "kind": "@auth/directory.connection-kind.json",
+      "endpoint": null,
       "settings": {
         "users": [
           {
@@ -2964,6 +2969,7 @@
     {
       "path": "@connections/employees.connection.json",
       "kind": "@auth/directory.connection-kind.json",
+      "endpoint": null,
       "settings": {
         "users": [
           {
@@ -2989,12 +2995,14 @@
     {
       "path": "@connections/jobs.connection.json",
       "kind": "@queue-memory/memory.connection-kind.json",
+      "endpoint": null,
       "settings": {},
       "secrets": []
     },
     {
       "path": "@connections/people.connection.json",
       "kind": "@auth/directory.connection-kind.json",
+      "endpoint": null,
       "settings": {
         "users": [
           {
@@ -3229,6 +3237,13 @@
         "@reload/watch.port.json#watch",
         "@schedule/scheduler.port.json#run"
       ],
+      "listens": [
+        {
+          "operation": "@http/server.port.json#listen",
+          "host": null,
+          "port": 8099
+        }
+      ],
       "starts": [
         "Prepare the customer store",
         "Make the customers whole",
@@ -3381,6 +3396,13 @@
         "@reload/watch.port.json#watch",
         "@schedule/scheduler.port.json#run"
       ],
+      "listens": [
+        {
+          "operation": "@http/server.port.json#listen",
+          "host": null,
+          "port": 8099
+        }
+      ],
       "starts": [
         "Prepare the customer store",
         "Make the customers whole",
@@ -3515,6 +3537,13 @@
         "@http/server.port.json#listen",
         "@otel/exporter.port.json#export"
       ],
+      "listens": [
+        {
+          "operation": "@http/server.port.json#listen",
+          "host": null,
+          "port": 8099
+        }
+      ],
       "starts": [
         "Prepare the customer store",
         "Make the customers whole",
@@ -3615,6 +3644,7 @@
         "@otel/exporter.port.json#export",
         "@schedule/scheduler.port.json#run"
       ],
+      "listens": [],
       "starts": [
         "Prepare the customer store",
         "Make the customers whole",
@@ -3708,6 +3738,7 @@
         "@otel/exporter.port.json#export",
         "@queue/worker.port.json#consume"
       ],
+      "listens": [],
       "starts": [
         "Prepare the customer store",
         "Make the customers whole",

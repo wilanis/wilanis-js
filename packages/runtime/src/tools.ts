@@ -16,6 +16,8 @@ export {
 export { describe, ls } from './discovery.js';
 export { fuzz, type Regression, type Replayed, regress, SCENARIOS } from './fuzz.js';
 export {
+  type ListenRow,
+  listensOf,
   MANIFEST_SCHEMA,
   type Manifest,
   type ManifestOptions,
