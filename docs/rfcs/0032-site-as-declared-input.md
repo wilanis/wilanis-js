@@ -275,7 +275,10 @@ Each step one pull request and one sub-issue of the tracking issue. Steps 1 and 
    `ObjField.provided`, `TypeResolver.field`; `packages/runtime/docs/std/Site.shape.json` and `grants.shapes` in the
    `@std` manifest; the validate and types tests. `good first issue`.
 2. **Compiler** (`area:compiler`, `area:runtime`): `siteOf`, the literal at lowering in the three places, L0n1 and
-   G0n1, G005's exemption; the fixture plugin and every case of `example.test.ts` and `tools.test.ts` above.
+   G0n1, G005's exemption; the fixture plugin and every case of `example.test.ts` and `tools.test.ts` above. Adds the
+   line RFC 0020 gives this RFC to `docs/security-model.md` under *Guaranteed by the checker*, "a field the compiler
+   provides is never written by an author", with the codes L0n1 and G0n1 take, and its half of the trace line under
+   *Enforced by the runtime*, "a run's trace carries the site of every node", which then names RFC 0006 and this RFC.
 3. **Discoverability** (`area:runtime`, `area:view`): `(provided)` in `describe`, the template sentence, the viewer's
    node panel. `good first issue`.
 4. **The first consumer**: a line in RFC 0002's plan for `raw`, written by that RFC's owners when the storage plugin
