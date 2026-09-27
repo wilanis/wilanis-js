@@ -53,9 +53,9 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
   wilanis rehearse [root] [--seed n] [-v] [--json] [--record [dir]] [--check]
                    run every trigger, and every branch of every switch; --record writes each branch's run as a
                    scenario under scenarios/rehearsed/ (or dir, below scenarios/ and outside scenarios/fuzz/), --check
-                   says whether that directory is what the tree writes today and exits 1 when it is not. Both solve
-                   under seed 1 and the profile project.json marks "default": true, read no WILANIS_PROFILE, and
-                   refuse --seed, --profile and --json
+                   says whether that directory is what the tree writes today and exits 1 when it is not, or when
+                   the rehearsal fails, as every rehearse does. Both solve under seed 1 and the profile project.json
+                   marks "default": true, read no WILANIS_PROFILE, and refuse --seed, --profile and --json
   wilanis fuzz     [root] [--runs n]               write one scenario per trigger per seed to scenarios/fuzz/
   wilanis regress  [root] [--json]                 replay every scenario and diff node by node
   wilanis start    [root] [--profile word] [--trace[=text|json]] [--level summary|full]
@@ -201,13 +201,17 @@ function recordingOf(flags: Record<string, string>, root: string): { record?: st
 }
 
 /**
- * What a rehearsal prints: under `--check` what the profile skipped and how the recorded directory stands, else its
- * lines and what it wrote.
+ * What a rehearsal prints: under `--check` what the profile skipped and how the recorded directory stands, and the
+ * rehearsal's lines too where it failed, since that fails the check; else its lines and what it wrote.
  */
 function rehearsalSaid(answer: Rehearsal, check?: boolean): string[] {
   const recorded = answer.recorded ? recordedLines(answer.recorded) : [];
-  return check ? [...answer.skipped, ...recorded] : [...answer.lines, ...recorded];
+  return check && answer.ok ? [...answer.skipped, ...recorded] : [...answer.lines, ...recorded];
 }
+
+/** Whether `rehearse` exits 1: the rehearsal failed, or under `--check` the recorded directory is not current. */
+const failed = (answer: Rehearsal, check?: boolean) =>
+  !answer.ok || (check === true && !(answer.recorded && current(answer.recorded)));
 
 /** What the command line gave: the flags, the words, and the root each command reads from. */
 interface Given {
@@ -236,7 +240,7 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     });
     if (flags.json) console.log(printed(withRehearsal(accepted(loaded, 'rehearse', rootArg(0)), answer)));
     else console.log(rehearsalSaid(answer, recording.check).join('\n'));
-    if (recording.check ? !answer.recorded || !current(answer.recorded) : !answer.ok) process.exit(1);
+    if (failed(answer, recording.check)) process.exit(1);
   },
   fuzz: async ({ flags, rootArg }) => {
     const loaded = await check(rootArg(0));
