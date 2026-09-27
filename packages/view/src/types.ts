@@ -3,7 +3,7 @@
  * the view fills in, and the labels a reader sees. The tree index is `tree-index.ts`.
  */
 import type { Kind, Layer, Loaded, Outcome, Refusal } from '@wilanis/core';
-import type { ProfileReach, TriggerLimits } from '@wilanis/runtime';
+import type { Endpoint, ProfileReach, TriggerLimits } from '@wilanis/runtime';
 import type { VAttempts, VPromised } from './attempts.js';
 import type { VCatches, VCaught } from './catches.js';
 import type { VDelivery, VReceives } from './delivery.js';
@@ -281,6 +281,12 @@ export interface DocView {
     operations: Record<string, { graph?: string; graphLabel?: string; run?: string } & VAttempts>;
   }[];
   /**
+   * On a port with an operation that holds and listens: per such operation, where each part of the address it
+   * binds comes from, port first, in the words `wilanis describe` prints inside its `holds` mark (`port: in.port,
+   * else @http settings.port, else 8080`); absent where no operation listens.
+   */
+  listens?: Record<string, string[]>;
+  /**
    * On a trigger: what fires it, in the words of its kind's settings as written (`cron "0 3 * * *", timezone "UTC"`),
    * the same words `wilanis map` prints beside the kind; absent where it writes none that fit in a line.
    */
@@ -289,6 +295,8 @@ export interface DocView {
   receives?: VReceives;
   /** On a connection whose kind declares `delivery`: what that means, the triggers receiving from it and the calls sending to it. */
   delivery?: VDelivery;
+  /** On a connection whose kind names its `endpoint`: the address it reaches as written, the setting holding it, and the kind that names it. */
+  endpoint?: Endpoint;
   /** On a trigger: the port operation it fires, and where that leads. */
   fires?: VTarget;
   /** On a trigger whose kind maps refusals: every reason it can reach or maps, how it is answered, and the nodes that refuse with it. */

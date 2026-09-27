@@ -13,9 +13,9 @@
  */
 
 import { checkTree } from '@wilanis/compiler';
-import type { GraphDoc, Kind, Loaded, LoadResult, PolicyDoc, Refusal, TriggerDoc } from '@wilanis/core';
+import type { GraphDoc, Kind, Loaded, LoadResult, PolicyDoc, PortDoc, Refusal, TriggerDoc } from '@wilanis/core';
 import { pageUrl, policyPath, SCHEMA_BASE, Scope, WILANIS } from '@wilanis/core';
-import { limitsOf, profilesOf, settingsSaid } from '@wilanis/runtime';
+import { endpointSaid, limitsOf, listensParts, profilesOf, settingsSaid } from '@wilanis/runtime';
 import { attemptsOf } from './attempts.js';
 import { deliveryView, receivesView } from './delivery.js';
 import { graphView } from './graphs.js';
@@ -100,6 +100,25 @@ function implementationsOf(scope: Scope, path: string) {
 }
 
 /**
+ * Where each operation of a port that holds and listens takes the address it binds from, in `describe`'s words;
+ * nothing for a port none of whose operations listens.
+ */
+function listensView(doc: Loaded<PortDoc>): Record<string, string[]> | undefined {
+  const listens = Object.entries(doc.doc.operations)
+    .filter(([, operation]) => operation.holds)
+    .map(([name, operation]) => [name, listensParts(operation, doc.native)] as const)
+    .filter(([, parts]) => parts.length);
+  return listens.length ? Object.fromEntries(listens) : undefined;
+}
+
+/** What a port adds to its view: what its bindings meet it with, and where each operation that listens binds. */
+function portView(scope: Scope, doc: Loaded, view: DocView) {
+  view.implementations = implementationsOf(scope, doc.path);
+  const listens = listensView(doc as Loaded<PortDoc>);
+  if (listens) view.listens = listens;
+}
+
+/**
  * The policies a trigger attaches, in order, what each is given, and which of them a view it reaches requires:
  * a view is the one way across a scope, so the attachment that is its `behind` is the one the author could not
  * have dropped, and the page says so rather than leaving a reader to find A008 by removing it.
@@ -135,10 +154,15 @@ function triggerView(scope: Scope, doc: Loaded, view: DocView) {
   if (trigger.policies?.length) view.policies = policiesOf(scope, trigger);
 }
 
-/** What a connection adds to its view, where its kind declares `delivery`: who receives from it and who sends to it. */
+/**
+ * What a connection adds to its view: where its kind declares `delivery`, who receives from it and who sends to
+ * it; where its kind names an `endpoint`, the address it reaches.
+ */
 function connectionView(scope: Scope, doc: Loaded, view: DocView) {
   const delivery = deliveryView(scope, doc);
   if (delivery) view.delivery = delivery;
+  const endpoint = endpointSaid(doc, scope);
+  if (endpoint) view.endpoint = endpoint;
 }
 
 /** What a policy adds to its view: what decides it, what it can answer, and the triggers it gates. */
@@ -217,7 +241,7 @@ export function viewOf(load: LoadResult, ref: string, reads: TreeReads = treeRea
   if (!doc) return undefined;
   const view = baseView(reads, doc);
   if (doc.kind === 'graph') view.graph = graphView(scope, doc as Loaded<GraphDoc>);
-  if (doc.kind === 'port') view.implementations = implementationsOf(scope, doc.path);
+  if (doc.kind === 'port') portView(scope, doc, view);
   if (doc.kind === 'trigger') triggerView(scope, doc, view);
   if (doc.kind === 'policy') policyView(scope, doc, view);
   if (doc.kind === 'store') view.store = storeView(scope, load, doc);
