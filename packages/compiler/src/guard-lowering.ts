@@ -40,13 +40,18 @@ function guardMap(from: string, handler: string, redact: Redact | undefined): KM
 }
 
 /**
- * What the report shows of a guarded value: the secret paths the node that made it declared of its answer,
- * since the guard answers the same value. Its `in` paths are left behind with it -- they name that node's own
- * inputs, and the guard's one input is the whole value rather than any of them.
+ * What the report shows of a guarded value: every path the shape marks secret and every path the node that made
+ * it declared of its answer, each once. The guard answers the same value, so it keeps every mark either one
+ * carries and never shows less than the value would have shown without it: a taken site has no made node and
+ * is shown by the shape alone, and a made node that marks less than the shape does not unmark the rest. The
+ * made node's `in` paths are left behind with it -- they name that node's own inputs, and the guard's one input
+ * is the whole value rather than any of them.
  */
-function redactOf(node: KNode | undefined): Redact | undefined {
-  const out = node && node.kind !== 'switch' ? node.redact?.out : undefined;
-  return out?.length ? { out } : undefined;
+function redactOf(guard: Guard, made: KNode | undefined): Redact | undefined {
+  const declared = made && made.kind !== 'switch' ? (made.redact?.out ?? []) : [];
+  const out = new Map<string, string[]>();
+  for (const path of [...guard.secret, ...declared]) out.set(JSON.stringify(path), path);
+  return out.size ? { out: [...out.values()] } : undefined;
 }
 
 /**
@@ -82,12 +87,12 @@ function lowerOne(spec: KernelSpec, guard: Guard, handlers: GuardHandlers): Guar
   if (guard.arity === 'list') {
     const nested = guardSpec(guard, guardSpecName(spec.name, guard.id), handlers);
     handlers.nested(nested);
-    spec.nodes[ids.ok] = guardMap(ids.made, nested.name, redactOf(made));
+    spec.nodes[ids.ok] = guardMap(ids.made, nested.name, redactOf(guard, made));
     return ids;
   }
   for (const [id, node] of Object.entries(guardNodes(guard, ids, handlers))) spec.nodes[id] = node;
   const answered = spec.nodes[ids.ok];
-  if (answered.kind === 'call') answered.redact = redactOf(made);
+  if (answered.kind === 'call') answered.redact = redactOf(guard, made);
   return ids;
 }
 
