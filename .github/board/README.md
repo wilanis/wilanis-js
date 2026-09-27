@@ -26,7 +26,8 @@ body already states and never removes one:
 - `Needs #A and #B` anywhere else in an issue: it is blocked by them;
 - a task's `### RFC and step` naming `#T, step n`: it is a sub-issue of T.
 
-A relationship is added only between two open issues: a blocker that has already closed blocks nothing.
+A relationship is added only between two open issues: a blocker that has already closed blocks nothing. A number
+that is not an issue (a pull request, or one never used) is skipped with a line saying so, and the sync goes on.
 
 ## Hygiene
 

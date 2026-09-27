@@ -5,7 +5,7 @@ export const OWNER = 'wilanis';
 export const REPO = 'wilanis-js';
 export const PROJECT = 1;
 
-/** The answer to one GraphQL request, or a thrown error naming what GitHub refused. */
+/** The answer to one GraphQL request, or a thrown error naming what GitHub refused, with its `errors` kept. */
 export async function graphql(query, variables = {}) {
   const token = process.env.GH_TOKEN;
   if (!token) throw new Error('GH_TOKEN is not set: the board sync needs a token with project and issues write');
@@ -19,10 +19,13 @@ export async function graphql(query, variables = {}) {
   if (answer.errors?.length) {
     // The path names the field refused, so a token missing one permission says which.
     const said = answer.errors.map((e) => (e.path ? `${e.path.join('.')}: ${e.message}` : e.message));
-    throw new Error(said.join('; '));
+    throw Object.assign(new Error(said.join('; ')), { errors: answer.errors });
   }
   return answer.data;
 }
+
+/** Whether GitHub refused only because nothing is at `path`, as `issue(number:)` does for a pull request. */
+const absent = (error, path) => error.errors?.every((e) => e.type === 'NOT_FOUND' && e.path?.join('.') === path) ?? false;
 
 /** The answer to one REST request against the repository, e.g. `rest('POST', 'issues', {...})`. */
 export async function rest(method, path, body) {
@@ -86,12 +89,15 @@ function shape(node) {
 
 /** The issue numbered `number`, or null when the number is a pull request or nothing. */
 export async function issue(number) {
-  const data = await graphql(`query($o:String!,$r:String!,$n:Int!){ repository(owner:$o,name:$r){ issue(number:$n){ ${ISSUE} } } }`, {
-    o: OWNER,
-    r: REPO,
-    n: number,
-  });
-  return data.repository.issue ? shape(data.repository.issue) : null;
+  const query = `query($o:String!,$r:String!,$n:Int!){ repository(owner:$o,name:$r){ issue(number:$n){ ${ISSUE} } } }`;
+  try {
+    const data = await graphql(query, { o: OWNER, r: REPO, n: number });
+    return data.repository.issue ? shape(data.repository.issue) : null;
+  } catch (error) {
+    // GitHub answers a pull request's number, and one never used, with NOT_FOUND rather than a null issue.
+    if (absent(error, 'repository.issue')) return null;
+    throw error;
+  }
 }
 
 /** Every issue matching a search, e.g. `is:open` or `is:closed closed:>2026-09-01`. */
