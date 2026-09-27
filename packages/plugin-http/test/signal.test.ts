@@ -11,10 +11,9 @@ import { type Compiled, checkTree, runGraph } from '@wilanis/compiler';
 import { loadTree } from '@wilanis/core';
 import { embedderFor } from '@wilanis/runtime';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { firstRow, INCLUDES, listening, localCopy, SECRET, UPSTREAM } from './harness.js';
+import { firstRow, INCLUDES, listening, localCopy, SECRET } from './harness.js';
 import { EXAMPLE_PLUGINS } from './plugins.js';
 
-const PORT = UPSTREAM + 1;
 const GRAPH = 'features/customers/data/get-row.graph.json';
 
 /** What the upstream does with the next request: answer each status in turn, or hold the socket and never answer. */
@@ -40,12 +39,14 @@ function scripted(): Server {
 }
 
 let server: Server;
-let stopUpstream: () => Promise<void>;
+/** The port the scripted upstream was given, which every copy's connection points at. */
+let port = 0;
+let stopUpstream: (() => Promise<void>) | undefined;
 const dirs: string[] = [];
 
 beforeAll(async () => {
   server = scripted();
-  stopUpstream = await listening(server, PORT);
+  ({ port, stop: stopUpstream } = await listening(server));
   process.env.CUSTOMERS_JWT_SECRET = SECRET;
   process.env.CUSTOMERS_DATABASE_URL = 'postgres://customers:customers@localhost:5432/customers';
 });
@@ -58,7 +59,7 @@ afterEach(() => {
 });
 
 afterAll(async () => {
-  await stopUpstream();
+  await stopUpstream?.();
   for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -67,12 +68,8 @@ afterAll(async () => {
  * checked, and the graph compiled under `live`; with the environment its handlers see.
  */
 function getRow(said: Record<string, unknown>): { compiled: Compiled; env: Record<string, unknown> } {
-  const dir = localCopy();
+  const dir = localCopy({ upstream: port });
   dirs.push(dir);
-  const connection = join(dir, 'connections/customers-api.connection.json');
-  const conn = JSON.parse(readFileSync(connection, 'utf8'));
-  conn.settings.baseUrl = `http://localhost:${PORT}/api/v1`;
-  writeFileSync(connection, JSON.stringify(conn));
   const graph = JSON.parse(readFileSync(join(dir, GRAPH), 'utf8'));
   Object.assign(
     graph.nodes.find((node: { id: string }) => node.id === 'fetched'),

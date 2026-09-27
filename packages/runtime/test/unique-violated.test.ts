@@ -5,9 +5,9 @@
  * routes map to 409. Before the branch existed the same import read as `502 upstream`, saying the store had
  * broken when it had done exactly what the document asked (issue #484).
  *
- * The tree is the example served under `local`, over its own port, and the calls go over HTTP: the status is
- * the route's and the message is the graph's, so both are read where the caller reads them. The store is the
- * memory engine's, so nothing here outlives the process.
+ * The tree is the example served under `local`, over a port the system gives, and the calls go over HTTP: the
+ * status is the route's and the message is the graph's, so both are read where the caller reads them. The store
+ * is the memory engine's, so nothing here outlives the process.
  */
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,16 +16,15 @@ import { checkTree } from '@wilanis/compiler';
 import { loadTree } from '@wilanis/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { start } from '../src/index.js';
-import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
+import { EXAMPLE, INCLUDES, listenedOn, PLUGINS } from './example-harness.js';
 
-// spaced apart per vitest worker, since test files run in parallel and a fixed port is one two of them can
-// ask for at once: the second gets EADDRINUSE and the whole file fails on the hook that was starting a server
-const PORT = 8300 + Number(process.env.VITEST_POOL_ID ?? 0) * 16;
-let dir: string;
-let stop: () => Promise<void>;
+let dir: string | undefined;
+let stop: (() => Promise<void>) | undefined;
 let token: string;
+/** The port the served copy was given, read back once it listens. */
+let port = 0;
 
-/** The example, its server on a port of its own, without what a copy must not carry. */
+/** The example, its server on whatever port the system gives, without what a copy must not carry. */
 function localCopy(): string {
   const copy = mkdtempSync(join(tmpdir(), 'wilanis-unique-'));
   cpSync(EXAMPLE, copy, {
@@ -34,7 +33,7 @@ function localCopy(): string {
   });
   const at = join(copy, 'project.json');
   const project = JSON.parse(readFileSync(at, 'utf8'));
-  project.plugins.find((plugin: { use: string }) => plugin.use === '@http').settings.port = PORT;
+  project.plugins.find((plugin: { use: string }) => plugin.use === '@http').settings.port = 0;
   writeFileSync(at, JSON.stringify(project));
   return copy;
 }
@@ -44,7 +43,7 @@ const answered = async (response: Response) => ({ status: response.status, body:
 
 /** One request to the served tree, as the registrar. */
 const call = (path: string, init: RequestInit & { type?: string } = {}) =>
-  fetch(`http://localhost:${PORT}${path}`, {
+  fetch(`http://localhost:${port}${path}`, {
     ...init,
     headers: { 'content-type': init.type ?? 'application/json', authorization: `Bearer ${token}` },
   }).then(answered);
@@ -64,7 +63,9 @@ beforeAll(async () => {
   dir = localCopy();
   const load = loadTree(dir, PLUGINS, INCLUDES);
   expect(checkTree(load).items).toEqual([]);
-  ({ stop } = await start(load, { log: () => {}, profile: 'local' }));
+  const lines: string[] = [];
+  ({ stop } = await start(load, { log: line => lines.push(line), profile: 'local' }));
+  port = listenedOn(lines);
   const signedIn = await call('/api/v1/auth-employees', {
     method: 'POST',
     body: JSON.stringify({ username: 'bo', password: 'bo-pass' }),
@@ -73,8 +74,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await stop();
-  rmSync(dir, { recursive: true, force: true });
+  await stop?.();
+  if (dir) rmSync(dir, { recursive: true, force: true });
 });
 
 describe('registering a customer the store already keeps', () => {

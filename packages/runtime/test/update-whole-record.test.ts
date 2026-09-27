@@ -6,9 +6,9 @@
  * before the rewrite the patch committed first and the guard refused after, leaving a row every later read
  * refused.
  *
- * The tree is the example served over its own port and the calls go over HTTP, on both engines: the memory
- * store under `local`, and PostgreSQL under `production` where `WILANIS_TEST_POSTGRES_URL` names a database,
- * skipped otherwise as the postgres engine's own cases are.
+ * The tree is the example served over a port the system gives and the calls go over HTTP, on both engines: the
+ * memory store under `local`, and PostgreSQL under `production` where `WILANIS_TEST_POSTGRES_URL` names a
+ * database, skipped otherwise as the postgres engine's own cases are.
  */
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,19 +18,18 @@ import { loadTree } from '@wilanis/core';
 import { hashPassword } from '@wilanis/plugin-auth';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { start } from '../src/index.js';
-import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
+import { EXAMPLE, INCLUDES, listenedOn, PLUGINS } from './example-harness.js';
 
 const url = process.env.WILANIS_TEST_POSTGRES_URL;
 
 /** One engine the example keeps its customers in: the profile that chooses it and who signs in there. */
 interface Engine {
   profile: string;
-  port: number;
   who: { username: string; password: string };
 }
 
-/** The example, its server on a port of its own, without what a copy must not carry. */
-function copyServing(port: number): string {
+/** The example, its server on whatever port the system gives, without what a copy must not carry. */
+function copyServing(): string {
   const copy = mkdtempSync(join(tmpdir(), 'wilanis-whole-'));
   cpSync(EXAMPLE, copy, {
     recursive: true,
@@ -38,21 +37,23 @@ function copyServing(port: number): string {
   });
   const at = join(copy, 'project.json');
   const project = JSON.parse(readFileSync(at, 'utf8'));
-  project.plugins.find((plugin: { use: string }) => plugin.use === '@http').settings.port = port;
+  project.plugins.find((plugin: { use: string }) => plugin.use === '@http').settings.port = 0;
   writeFileSync(at, JSON.stringify(project));
   return copy;
 }
 
 /** The cases, run against one engine. */
 function updating(engine: Engine) {
-  let dir: string;
-  let stop: () => Promise<void>;
+  let dir: string | undefined;
+  let stop: (() => Promise<void>) | undefined;
   let token: string;
+  /** The port the served copy was given, read back once it listens. */
+  let port = 0;
   const mark = `whole-${Date.now()}`;
 
   /** One request to the served tree, as the registrar: the status and the JSON body. */
   const call = async (path: string, init: RequestInit = {}) => {
-    const response = await fetch(`http://localhost:${engine.port}${path}`, {
+    const response = await fetch(`http://localhost:${port}${path}`, {
       ...init,
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
     });
@@ -62,10 +63,12 @@ function updating(engine: Engine) {
     call(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(body) });
 
   beforeAll(async () => {
-    dir = copyServing(engine.port);
+    dir = copyServing();
     const load = loadTree(dir, PLUGINS, INCLUDES);
     expect(checkTree(load).items).toEqual([]);
-    ({ stop } = await start(load, { log: () => {}, profile: engine.profile }));
+    const lines: string[] = [];
+    ({ stop } = await start(load, { log: line => lines.push(line), profile: engine.profile }));
+    port = listenedOn(lines);
     const signedIn = await call('/api/v1/auth-employees', { method: 'POST', body: JSON.stringify(engine.who) });
     token = signedIn.body.accessToken;
   });
@@ -73,7 +76,7 @@ function updating(engine: Engine) {
   // stopping runs the plugins' teardowns, the postgres engine's closing of its pools among them
   afterAll(async () => {
     await stop?.();
-    rmSync(dir, { recursive: true, force: true });
+    if (dir) rmSync(dir, { recursive: true, force: true });
   });
 
   it('refuses a move to gold without a note as invariant, and the customer read back is unchanged', async () => {
@@ -115,13 +118,10 @@ beforeAll(() => {
   process.env.CUSTOMERS_OPERATOR_PASSWORD_HASH = hashPassword('operator-pass');
 });
 
-// spaced apart per vitest worker, as the other served-example cases are, so two files never ask for one port
-const PORT = 8310 + Number(process.env.VITEST_POOL_ID ?? 0) * 16;
-
 describe('updating a customer kept in memory', () => {
-  updating({ profile: 'local', port: PORT, who: { username: 'bo', password: 'bo-pass' } });
+  updating({ profile: 'local', who: { username: 'bo', password: 'bo-pass' } });
 });
 
 describe.skipIf(!url)('updating a customer kept in PostgreSQL', () => {
-  updating({ profile: 'production', port: PORT + 1, who: { username: 'operator', password: 'operator-pass' } });
+  updating({ profile: 'production', who: { username: 'operator', password: 'operator-pass' } });
 });

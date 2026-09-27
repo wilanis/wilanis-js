@@ -4,6 +4,7 @@
  */
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -50,28 +51,16 @@ export const INCLUDES: ResolvedInclude[] = [
   },
 ];
 
-/**
- * The ports these tests listen on, spaced apart per vitest worker. Vitest runs test files in parallel workers,
- * so two files that bind the same fixed port race: whichever listens second answers EADDRINUSE, the `beforeAll`
- * that was starting a fake issuer never finishes, and the run fails with a hook timeout and a `stop` that was
- * never assigned. Which file loses is a matter of scheduling, so it fails on CI and not on a developer's
- * machine. `VITEST_POOL_ID` is the worker's own number, so a band per worker is a band nothing else binds --
- * the ports stay readable and fixed within a run, and no two workers ever ask for the same one. The harnesses'
- * bands overlap as ranges; what keeps them apart is that each base sits on its own residue mod 16 (8093 here is
- * 13 against 8300's 12 in `unique-violated`; 54325 and 54326 are 5 and 6 against the http upstream's 54900 at 4),
- * so a new base goes on a residue nothing else uses.
- */
-const BAND = Number(process.env.VITEST_POOL_ID ?? 0) * 16;
-
-export const PORT = 8093 + BAND;
-export const UPSTREAM = 54325 + BAND;
-export const ISSUER = 54326 + BAND;
 export const SECRET = 'a-secret-of-thirty-two-bytes-or-more!';
 
 export type Edit = (doc: any) => void;
 
-/** The example, its API pointed at a fake upstream, its server on a port of its own, with any further edits. */
-export function localCopy(edits: Record<string, Edit> = {}): string {
+/**
+ * The example, its server on whatever port the system gives (`listenedOn` reads it back once it is started), its
+ * API pointed at the fake upstream where one is given, with any further edits. A copy given no upstream keeps the
+ * example's, for a test that checks the tree or runs what reaches none.
+ */
+export function localCopy(edits: Record<string, Edit> = {}, upstream?: number): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-auth-'));
   cpSync(EXAMPLE, dir, {
     recursive: true,
@@ -83,11 +72,12 @@ export function localCopy(edits: Record<string, Edit> = {}): string {
     change(doc);
     writeFileSync(path, JSON.stringify(doc));
   };
-  edit('connections/customers-api.connection.json', connection => {
-    connection.settings.baseUrl = `http://localhost:${UPSTREAM}/api/v1`;
-  });
+  if (upstream !== undefined)
+    edit('connections/customers-api.connection.json', connection => {
+      connection.settings.baseUrl = `http://localhost:${upstream}/api/v1`;
+    });
   edit('project.json', project => {
-    project.plugins.find((plugin: any) => plugin.use === '@http').settings.port = PORT;
+    project.plugins.find((plugin: any) => plugin.use === '@http').settings.port = 0;
   });
   for (const [relative, change] of Object.entries(edits)) edit(relative, change);
   return dir;
@@ -140,20 +130,34 @@ export const json = async (answer: Response) => ({
   headers: answer.headers,
 });
 
-/** A call to the tree's own server, with a token or a cookie when the test presents one. */
-export const call = (path: string, init: RequestInit & { token?: string; cookie?: string } = {}) => {
-  const headers: Record<string, string> = {
-    'content-type': 'application/json',
-    ...((init.headers as Record<string, string>) ?? {}),
-  };
-  if (init.token) headers.authorization = `Bearer ${init.token}`;
-  if (init.cookie) headers.cookie = init.cookie;
-  return fetch(`http://localhost:${PORT}${path}`, { ...init, headers }).then(json);
-};
+/**
+ * The port a started tree's server was given, read off the line `listen` logs as it opens it
+ * (`http: listening on <host>:<port> -- <routes>`): a copy asks for 0, so the system chooses.
+ */
+export function listenedOn(lines: string[]): number {
+  const said = lines.map(line => /^http: listening on .*:(\d+) -- /.exec(line)).find(found => found !== null);
+  if (!said) throw new Error(`the tree logged no 'http: listening on' line:\n${lines.join('\n')}`);
+  return Number(said[1]);
+}
 
-/** Sign in over one of the tree's sign-in routes. */
-export const signIn = (route: string, username: string, password: string) =>
-  call(`/api/v1/${route}`, { method: 'POST', body: JSON.stringify({ username, password }) });
+/** What a call to the tree's own server may carry beside a fetch's own: a token or a cookie the test presents. */
+export type CallInit = RequestInit & { token?: string; cookie?: string };
+
+/** The calls a test makes to the tree served at `port`: any route, and one of its sign-in routes. */
+export function over(port: number) {
+  const call = (path: string, init: CallInit = {}) => {
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+      ...((init.headers as Record<string, string>) ?? {}),
+    };
+    if (init.token) headers.authorization = `Bearer ${init.token}`;
+    if (init.cookie) headers.cookie = init.cookie;
+    return fetch(`http://localhost:${port}${path}`, { ...init, headers }).then(json);
+  };
+  const signIn = (route: string, username: string, password: string) =>
+    call(`/api/v1/${route}`, { method: 'POST', body: JSON.stringify({ username, password }) });
+  return { call, signIn };
+}
 
 /** Reads a request's whole body, which both fakes do before answering. */
 async function bodyOf(request: { [Symbol.asyncIterator](): AsyncIterableIterator<unknown> }) {
@@ -223,9 +227,15 @@ async function grantAnswer(base: string, privateKey: KeyLike, body: string) {
   };
 }
 
-/** An OIDC issuer: discovery, a password grant that knows one user, and the keys its identity tokens are signed with. */
-export function fakeIssuer(base: string, key: { privateKey: KeyLike; jwk: Record<string, unknown> }): Server {
-  const routes: Record<string, (body: string) => Promise<{ status: number; value: unknown }>> = {
+/** Where a server listening on `port` of this machine is reached: an issuer's own name for itself among them. */
+export const baseOf = (port: number) => `http://localhost:${port}`;
+
+/** What an issuer at `base` answers on each of its routes, given a request's body. */
+function issuerRoutes(
+  base: string,
+  key: { privateKey: KeyLike; jwk: Record<string, unknown> },
+): Record<string, (body: string) => Promise<{ status: number; value: unknown }>> {
+  return {
     '/.well-known/openid-configuration': async () => ({
       status: 200,
       value: { issuer: base, token_endpoint: `${base}/token`, jwks_uri: `${base}/keys` },
@@ -233,17 +243,37 @@ export function fakeIssuer(base: string, key: { privateKey: KeyLike; jwk: Record
     '/keys': async () => ({ status: 200, value: { keys: [key.jwk] } }),
     '/token': body => grantAnswer(base, key.privateKey, body),
   };
-  return createServer(async (request, response) => {
+}
+
+/**
+ * An OIDC issuer: discovery, a password grant that knows one user, and the keys its identity tokens are signed with.
+ * It names itself by the port it was given, read once it listens, so it is built before that port is known.
+ */
+export function fakeIssuer(key: { privateKey: KeyLike; jwk: Record<string, unknown> }): Server {
+  const server = createServer(async (request, response) => {
     const body = await bodyOf(request);
-    const route = routes[request.url ?? ''];
+    const base = baseOf((server.address() as AddressInfo).port);
+    const route = issuerRoutes(base, key)[request.url ?? ''];
     const { status, value } = route ? await route(body) : { status: 404, value: {} };
     response.writeHead(status, { 'content-type': 'application/json' });
     response.end(JSON.stringify(value));
   });
+  return server;
 }
 
-/** Listen, and answer how to stop. */
-export const listening = async (server: Server, port: number) => {
-  await new Promise<void>(done => server.listen(port, done));
-  return () => new Promise<void>(done => server.close(() => done()));
-};
+/**
+ * Listen on a port the system gives, and answer it with how to stop. A fixed port is one another test file, or
+ * any socket on the machine, may hold first; this rejects where the server cannot listen, so a failure says why
+ * rather than running out the timeout of the hook that was starting it.
+ */
+export async function listening(server: Server): Promise<{ port: number; stop: () => Promise<void> }> {
+  await new Promise<void>((ok, fail) => {
+    server.once('error', fail);
+    server.listen(0, () => {
+      server.off('error', fail);
+      ok();
+    });
+  });
+  const { port } = server.address() as AddressInfo;
+  return { port, stop: () => new Promise<void>(done => server.close(() => done())) };
+}

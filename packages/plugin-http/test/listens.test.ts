@@ -3,8 +3,9 @@
  * reads off a tree for the manifest, and the socket `serve.ts` opens. The example is started six ways -- the port
  * from the step's `in.port`, from the plugin's settings, from neither; the interface from the step's `in.host`, from
  * the plugin's settings, from neither -- and the socket's own `address()` is held to what `listensOf` answered for
- * the same tree. It starts under `local`, which reaches no network, on ports of this worker's band; the default
- * port is the one it cannot choose, so that case binds 8080 itself.
+ * the same tree. It starts under `local`, which reaches no network, on port 0 wherever a case writes one: the system
+ * gives the socket a port, and `listensOf` answers null for it, since 0 fixes none. The default port is the one it
+ * cannot leave to the system, so that case binds 8080 itself.
  */
 import { rmSync } from 'node:fs';
 import { type AddressInfo, connect, createServer, Server } from 'node:net';
@@ -13,14 +14,13 @@ import { checkTree } from '@wilanis/compiler';
 import { loadTree, Scope } from '@wilanis/core';
 import { type ListenRow, listensOf, start } from '@wilanis/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { httpSettings, INCLUDES, localCopy, SECRET, UPSTREAM } from './harness.js';
+import { httpSettings, INCLUDES, localCopy, SECRET } from './harness.js';
 import { EXAMPLE_PLUGINS } from './plugins.js';
 
 const PROFILE = 'local';
 const LISTEN = '@http/server.port.json#listen';
-/** The port the step writes, and the one the plugin's settings write: this worker's, clear of the other files'. */
-const STEP_PORT = UPSTREAM + 4;
-const SETTINGS_PORT = UPSTREAM + 5;
+/** A port no socket can bind: the settings write it under a step's 0, so a start that took the settings' would fail. */
+const UNBINDABLE = 70_000;
 /** What `listen` binds where nothing writes a port: server.port.json's default, and serve.ts's. */
 const DEFAULT_PORT = 8080;
 /** The one variable the example reads under local, and nothing else of the environment. */
@@ -81,12 +81,13 @@ function withoutExporter(project: any) {
  * answered for it before the start, and the address of every socket the start left listening.
  */
 async function startedWith(edit: (project: any) => void): Promise<{ said: ListenRow[]; sockets: AddressInfo[] }> {
-  const dir = localCopy(change =>
-    change('project.json', project => {
-      withoutExporter(project);
-      edit(project);
-    }),
-  );
+  const dir = localCopy({
+    more: change =>
+      change('project.json', project => {
+        withoutExporter(project);
+        edit(project);
+      }),
+  });
   dirs.push(dir);
   const load = loadTree(dir, EXAMPLE_PLUGINS, INCLUDES);
   expect(checkTree(load).items).toEqual([]);
@@ -98,9 +99,13 @@ async function startedWith(edit: (project: any) => void): Promise<{ said: Listen
   return { said, sockets: servers.map(server => server.address() as AddressInfo) };
 }
 
-/** The socket agrees with the row: the same port, and the host it names, or every interface where it names none. */
+/**
+ * The socket agrees with the row: on the port it fixes, or, where it fixes none because 0 asked for any, on one the
+ * system gave rather than the default; and on the host it names, or every interface where it names none.
+ */
 async function agree(row: ListenRow, socket: AddressInfo) {
-  expect(socket.port).toBe(row.port);
+  if (row.port === null) expect(socket.port).not.toBe(DEFAULT_PORT);
+  else expect(socket.port).toBe(row.port);
   if (row.host !== null) {
     expect(socket.address).toBe(row.host);
     return;
@@ -115,24 +120,24 @@ interface Way {
   name: string;
   edit: (project: any) => void;
   host: string | null;
-  port: number;
+  port: number | null;
 }
 
 const WAYS: Way[] = [
   {
     name: "the port from the step's in.port, over the settings'",
     edit: project => {
-      httpSettings(project).port = SETTINGS_PORT;
-      listenStep(project).in = { port: STEP_PORT };
+      httpSettings(project).port = UNBINDABLE;
+      listenStep(project).in = { port: 0 };
     },
     host: null,
-    port: STEP_PORT,
+    port: null,
   },
   {
     name: "the port from the plugin's settings",
-    edit: project => Object.assign(httpSettings(project), { port: SETTINGS_PORT }),
+    edit: project => Object.assign(httpSettings(project), { port: 0 }),
     host: null,
-    port: SETTINGS_PORT,
+    port: null,
   },
   {
     name: 'the port from neither: the declared default',
@@ -143,23 +148,23 @@ const WAYS: Way[] = [
   {
     name: "the interface from the step's in.host, over the settings'",
     edit: project => {
-      Object.assign(httpSettings(project), { port: SETTINGS_PORT, host: '0.0.0.0' });
+      Object.assign(httpSettings(project), { port: 0, host: '0.0.0.0' });
       listenStep(project).in = { host: '127.0.0.1' };
     },
     host: '127.0.0.1',
-    port: SETTINGS_PORT,
+    port: null,
   },
   {
     name: "the interface from the plugin's settings",
-    edit: project => Object.assign(httpSettings(project), { port: SETTINGS_PORT, host: '0.0.0.0' }),
+    edit: project => Object.assign(httpSettings(project), { port: 0, host: '0.0.0.0' }),
     host: '0.0.0.0',
-    port: SETTINGS_PORT,
+    port: null,
   },
   {
     name: 'the interface from neither: every interface, on both families',
-    edit: project => Object.assign(httpSettings(project), { port: SETTINGS_PORT }),
+    edit: project => Object.assign(httpSettings(project), { port: 0 }),
     host: null,
-    port: SETTINGS_PORT,
+    port: null,
   },
 ];
 

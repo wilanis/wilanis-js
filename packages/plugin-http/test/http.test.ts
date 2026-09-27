@@ -11,18 +11,21 @@ import {
   firstRow,
   INCLUDES,
   type InFlight,
+  listenedOn,
   listening,
   localCopy,
   SECRET,
   signInAsRegistrar,
-  UPSTREAM,
 } from './harness.js';
 import { EXAMPLE_PLUGINS } from './plugins.js';
 
-let stopUpstream: () => Promise<void>;
-let stop: () => Promise<void>;
+let stopUpstream: (() => Promise<void>) | undefined;
+let stop: (() => Promise<void>) | undefined;
 let token = '';
-let dir: string;
+let dir: string | undefined;
+/** The port the tree's server was given, and where a case reaches one of its routes. */
+let port = 0;
+const at = (path: string) => `http://localhost:${port}${path}`;
 const rows: Record<string, unknown>[] = [firstRow()];
 const logs: string[] = [];
 /** The ids of every fire the server told its observers of, as the trace carries them. */
@@ -32,15 +35,19 @@ const lineFor = (asked: string, status: number) =>
   logs.filter(line => line.startsWith(`${asked} → ${status} (`)).at(-1) ?? '';
 /** How many DELETEs the upstream is serving right now, and the most it ever served at once. */
 const inFlight: InFlight = { now: 0, peak: 0 };
-const call = caller(() => token);
+const call = caller(
+  () => token,
+  () => port,
+);
 
 beforeAll(async () => {
-  stopUpstream = await listening(fakeUpstream({ rows, inFlight }), UPSTREAM);
+  const upstream = await listening(fakeUpstream({ rows, inFlight }));
+  stopUpstream = upstream.stop;
   process.env.CUSTOMERS_JWT_SECRET = SECRET;
   // every connection's secrets are substituted whatever the profile, and the example now has one over a
   // database; nothing here dials it, so any well-formed URL will do
   process.env.CUSTOMERS_DATABASE_URL = 'postgres://customers:customers@localhost:5432/customers';
-  dir = localCopy();
+  dir = localCopy({ upstream: upstream.port });
   // a copy outside the workspace cannot resolve plugins[].from through node_modules, so the plugins are handed in
   const load = loadTree(dir, EXAMPLE_PLUGINS, INCLUDES);
   expect(checkTree(load).items).toEqual([]);
@@ -49,13 +56,15 @@ beforeAll(async () => {
     profile: 'live',
     observe: trace => runs.push(String(trace.attributes['wilanis.run.id'])),
   }));
-  token = await signInAsRegistrar();
+  port = listenedOn(logs);
+  token = await signInAsRegistrar(port);
 });
 
+// a beforeAll that failed part way assigned only what it reached, and the error it failed with is the one to read
 afterAll(async () => {
-  await stop();
-  await stopUpstream();
-  rmSync(dir, { recursive: true, force: true });
+  await stop?.();
+  await stopUpstream?.();
+  if (dir) rmSync(dir, { recursive: true, force: true });
 });
 
 describe('http trigger kind against a mockapi-shaped upstream', () => {
@@ -193,7 +202,7 @@ describe('http trigger kind against a mockapi-shaped upstream', () => {
 describe('files through the blob registry', () => {
   it('uploads a CSV as a blob: the body streams into the registry, the graph gets a handle, every row is registered', async () => {
     const csv = 'name,email,tier\nAda CSV,csv-1@x.example,bronze\n"Bo, CSV",csv-2@x.example,silver\n';
-    const answer = await fetch('http://localhost:8099/customers.csv', {
+    const answer = await fetch(at('/customers.csv'), {
       method: 'POST',
       headers: { 'content-type': 'text/csv', authorization: `Bearer ${token}` },
       body: csv,
@@ -206,7 +215,7 @@ describe('files through the blob registry', () => {
     expect(rows.filter(row => String(row.email).startsWith('csv-'))).toHaveLength(2);
   });
   it('downloads every customer as a CSV: streamed from the registry with its content type, length and filename', async () => {
-    const answer = await fetch('http://localhost:8099/customers.csv', {
+    const answer = await fetch(at('/customers.csv'), {
       headers: { authorization: `Bearer ${token}` },
     });
     expect(answer.status).toBe(200);
@@ -229,7 +238,7 @@ describe('files through the blob registry', () => {
     form.append('note', 'from a form');
     form.append('file', new Blob([big], { type: 'text/csv' }), 'bulk.csv');
     const before = rows.length;
-    const answer = await fetch('http://localhost:8099/customers/upload', {
+    const answer = await fetch(at('/customers/upload'), {
       method: 'POST',
       headers: { authorization: `Bearer ${token}` },
       body: form,
@@ -240,7 +249,7 @@ describe('files through the blob registry', () => {
   }, 20_000);
   it('a CSV row that is not a customer is a fault of the import, and nothing is recorded', async () => {
     const before = rows.length;
-    const answer = await fetch('http://localhost:8099/customers.csv', {
+    const answer = await fetch(at('/customers.csv'), {
       method: 'POST',
       headers: { 'content-type': 'text/csv', authorization: `Bearer ${token}` },
       body: 'name,email,tier\nNo Tier,notier@x.example,platinum\n',
@@ -257,7 +266,7 @@ describe('files through the blob registry', () => {
     expect(rows.length).toBe(before);
   });
   it('a body of another content type than the route consumes is a 415, and an upload with no body is a 400', async () => {
-    const answer = await fetch('http://localhost:8099/customers.csv', {
+    const answer = await fetch(at('/customers.csv'), {
       method: 'POST',
       headers: { 'content-type': 'application/pdf' },
       body: '%PDF',
@@ -265,36 +274,32 @@ describe('files through the blob registry', () => {
     expect(answer.status).toBe(415);
     expect((await answer.json()).error).toBe('this route consumes text/csv, not application/pdf');
     expect(
-      (await fetch('http://localhost:8099/customers.csv', { method: 'POST', headers: { 'content-type': 'text/csv' } }))
-        .status,
+      (await fetch(at('/customers.csv'), { method: 'POST', headers: { 'content-type': 'text/csv' } })).status,
     ).toBe(400);
   });
 });
 
+// the last case of the file: it stops the upstream for good, since one started again would be on another port
 describe('an upstream that answers nothing', () => {
   it('is the upstream a switch catches it as, and a fault that says nothing of what broke where none does', async () => {
-    await stopUpstream();
-    try {
-      const headers = { authorization: `Bearer ${token}` };
-      // get-row catches the GET that got no answer and routes it to its refusal of upstream, which the route maps
-      const caught = await fetch('http://localhost:8099/customers/1', { headers });
-      expect(caught.status).toBe(502);
-      expect(await caught.json()).toEqual({ reason: 'upstream', message: 'the customer API could not be reached' });
-      expect(lineFor('GET /customers/1', 502)).toContain('customer.port.json#get refused: upstream');
-      // list-rows catches nothing, so the same outage is the kind's one answer: the run named, nothing of the node
-      const answer = await fetch('http://localhost:8099/customers', { headers });
-      expect(answer.status).toBe(500);
-      const text = await answer.text();
-      const body = JSON.parse(text);
-      expect(body).toEqual({ error: 'fault', run: expect.any(String) });
-      expect(runs).toContain(body.run);
-      expect(text).not.toContain('fetch');
-      // the log line is where the operator finds what broke, under the id the caller was handed
-      const line = lineFor('GET /customers', 500);
-      expect(line).toMatch(/customer\.port\.json#list failed at '[^']+': /);
-      expect(line.endsWith(`  run=${body.run}`)).toBe(true);
-    } finally {
-      stopUpstream = await listening(fakeUpstream({ rows, inFlight }), UPSTREAM);
-    }
+    await stopUpstream?.();
+    const headers = { authorization: `Bearer ${token}` };
+    // get-row catches the GET that got no answer and routes it to its refusal of upstream, which the route maps
+    const caught = await fetch(at('/customers/1'), { headers });
+    expect(caught.status).toBe(502);
+    expect(await caught.json()).toEqual({ reason: 'upstream', message: 'the customer API could not be reached' });
+    expect(lineFor('GET /customers/1', 502)).toContain('customer.port.json#get refused: upstream');
+    // list-rows catches nothing, so the same outage is the kind's one answer: the run named, nothing of the node
+    const answer = await fetch(at('/customers'), { headers });
+    expect(answer.status).toBe(500);
+    const text = await answer.text();
+    const body = JSON.parse(text);
+    expect(body).toEqual({ error: 'fault', run: expect.any(String) });
+    expect(runs).toContain(body.run);
+    expect(text).not.toContain('fetch');
+    // the log line is where the operator finds what broke, under the id the caller was handed
+    const line = lineFor('GET /customers', 500);
+    expect(line).toMatch(/customer\.port\.json#list failed at '[^']+': /);
+    expect(line.endsWith(`  run=${body.run}`)).toBe(true);
   });
 });

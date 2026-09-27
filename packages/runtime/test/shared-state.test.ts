@@ -2,9 +2,9 @@
  * Sign in on one instance, stay signed in on another (RFC 0005, step 7). Under `production` the example binds
  * `@auth/state.port.json` to `auth-storage.binding.json`, so the guard's sessions are records of
  * `auth.store.json` rather than files of one process. Two instances of the tree are started here, each its own
- * embedder behind its own port, and a caller moves between them: signed in on one, writing their session on
- * the other, refreshing and signing out wherever the next request lands. Only a store both instances read makes
- * that work; with the laptop's file binding each process would see sessions only it had written.
+ * embedder behind a port the system gives it, and a caller moves between them: signed in on one, writing their
+ * session on the other, refreshing and signing out wherever the next request lands. Only a store both instances
+ * read makes that work; with the laptop's file binding each process would see sessions only it had written.
  *
  * It runs everywhere over memory: the copies point production's database connection at the memory engine,
  * and both instances register one `MemoryEngine`, which is what one database behind a load balancer is to
@@ -21,21 +21,19 @@ import { engines } from '@wilanis/plugin-storage';
 import memory, { MemoryEngine } from '@wilanis/plugin-storage-memory';
 import { afterEach, describe, expect, it } from 'vitest';
 import { start } from '../src/index.js';
-import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
+import { EXAMPLE, INCLUDES, listenedOn, PLUGINS } from './example-harness.js';
 
-// two ports per vitest worker, on residues mod 16 no other harness uses (0 and 1), so parallel files never race
-const BAND = Number(process.env.VITEST_POOL_ID ?? 0) * 16;
-const PORTS = [8400 + BAND, 8401 + BAND];
 const PASSWORD = 'operator-pass';
 const url = process.env.WILANIS_TEST_POSTGRES_URL;
 
 type Edit = (doc: any) => void;
 
 /**
- * A copy of the example serving on its own port, with any further edits; the caller removes it. It exports no
- * traces: no collector runs here, and an exporter retrying one that refuses holds each stop for seconds.
+ * A copy of the example serving on whatever port the system gives, with any further edits; the caller removes it.
+ * It exports no traces: no collector runs here, and an exporter retrying one that refuses holds each stop for
+ * seconds.
  */
-function copyServing(port: number, edits: Record<string, Edit>): string {
+function copyServing(edits: Record<string, Edit>): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-shared-'));
   cpSync(EXAMPLE, dir, {
     recursive: true,
@@ -48,7 +46,7 @@ function copyServing(port: number, edits: Record<string, Edit>): string {
     writeFileSync(path, JSON.stringify(doc));
   };
   edit('project.json', project => {
-    project.plugins.find((plugin: { use: string }) => plugin.use === '@http').settings.port = port;
+    project.plugins.find((plugin: { use: string }) => plugin.use === '@http').settings.port = 0;
     project.startup = project.startup.filter((step: { run: string }) => step.run !== '@otel/exporter.port.json#export');
     // production permits what it reaches, and without the step it exports nothing
     project.profiles.production.permits = project.profiles.production.permits.filter(
@@ -97,21 +95,26 @@ afterEach(async () => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-/** Two instances of the example under production, each on its own port, over whatever the case shares. */
+/** One instance of the example under production, started with its plugins and environment: the port it was given. */
+async function instance(edits: Record<string, Edit>, plugins: Record<string, PluginModule>, env: NodeJS.ProcessEnv) {
+  const dir = copyServing(edits);
+  dirs.push(dir);
+  const load = loadTree(dir, plugins, INCLUDES);
+  expect(checkTree(load).items).toEqual([]);
+  const lines: string[] = [];
+  const { stop } = await start(load, { log: line => lines.push(line), profile: 'production', env });
+  stops.push(stop);
+  return listenedOn(lines);
+}
+
+/** Two instances of the example under production, over whatever the case shares: the ports each was given. */
 async function twoInstances(edits: Record<string, Edit>, plugins: Record<string, PluginModule>, database: string) {
   const env = {
     CUSTOMERS_JWT_SECRET: 'a-secret-of-thirty-two-bytes-or-more!',
     CUSTOMERS_DATABASE_URL: database,
     CUSTOMERS_OPERATOR_PASSWORD_HASH: hashPassword(PASSWORD),
   };
-  for (const port of PORTS) {
-    const dir = copyServing(port, edits);
-    dirs.push(dir);
-    const load = loadTree(dir, plugins, INCLUDES);
-    expect(checkTree(load).items).toEqual([]);
-    const { stop } = await start(load, { log: () => {}, profile: 'production', env });
-    stops.push(stop);
-  }
+  return [await instance(edits, plugins, env), await instance(edits, plugins, env)];
 }
 
 /**
@@ -162,12 +165,10 @@ async function movesBetween([one, other]: number[]) {
 describe("production's guard memory, shared by two instances", () => {
   it('over one memory store: signed in on one instance, recognised by the other, and signed out of both', async () => {
     const engine = new MemoryEngine();
-    await twoInstances(OVER_MEMORY, { ...PLUGINS, '@storage-memory': sharing(engine) }, 'unused');
-    await movesBetween(PORTS);
+    await movesBetween(await twoInstances(OVER_MEMORY, { ...PLUGINS, '@storage-memory': sharing(engine) }, 'unused'));
   });
 
   it.skipIf(!url)('over PostgreSQL: the same journey, each instance with its own engine', async () => {
-    await twoInstances({}, PLUGINS, String(url));
-    await movesBetween(PORTS);
+    await movesBetween(await twoInstances({}, PLUGINS, String(url)));
   });
 });
