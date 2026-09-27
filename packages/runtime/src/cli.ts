@@ -10,12 +10,15 @@ import { KINDS, type Kind, type LoadResult, RefusalList } from '@wilanis/core';
 import { irSaid } from './doc-said.js';
 import { loadProject, type ProjectLoad } from './project.js';
 import { runSaid } from './run-said.js';
+import { type Asked, edgingOf, recordingOf, scenariosOf } from './scenario-flags.js';
 import { runTrigger, start } from './serve.js';
 import { type StopInput, stopHook } from './stopping.js';
 import {
-  current,
+  checkScenarios,
   describe,
   diagnosticsOf,
+  edgesFailed,
+  edgesSaid,
   fuzz,
   init,
   ls,
@@ -24,11 +27,9 @@ import {
   map,
   migrate,
   printed,
-  RECORDED,
-  type Rehearsal,
-  recordedLines,
-  refusedDir,
   regress,
+  rehearsalFailed,
+  rehearsalSaid,
   rehearse,
   SCENARIOS,
   scaffold,
@@ -52,11 +53,21 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
   wilanis check    [root] [--json]                 judge the whole tree, under every profile; exit 1 with every refusal
   wilanis rehearse [root] [--seed n] [-v] [--json] [--record [dir]] [--check]
                    run every trigger, and every branch of every switch; --record writes each branch's run as a
-                   scenario under scenarios/rehearsed/ (or dir, below scenarios/ and outside scenarios/fuzz/), --check
-                   says whether that directory is what the tree writes today and exits 1 when it is not, or when
-                   the rehearsal fails, as every rehearse does. Both solve under seed 1 and the profile project.json
-                   marks "default": true, read no WILANIS_PROFILE, and refuse --seed, --profile and --json
-  wilanis fuzz     [root] [--runs n]               write one scenario per trigger per seed to scenarios/fuzz/
+                   scenario under scenarios/rehearsed/ (or dir, below scenarios/ and outside scenarios/fuzz/ and
+                   scenarios/edges/), --check says whether that directory is what the tree writes today and exits 1
+                   when it is not, or when the rehearsal fails, as every rehearse does. Both solve under seed 1 and
+                   the profile project.json marks "default": true, read no WILANIS_PROFILE, and refuse --seed,
+                   --profile and --json
+  wilanis fuzz     [root] [--runs n] [--edges] [--check]
+                   write one scenario per trigger per seed to scenarios/fuzz/; --edges instead writes one per trigger
+                   and fixed edge of its input (an empty, one-character and 256-character string, each member of an
+                   enum, 0, -1, 0.5 and the largest safe integer, true and false, an empty and a one-element list, an
+                   optional field left out) under scenarios/edges/, and --edges --check says whether that directory
+                   is what the tree writes today and exits 1 when it is not, or when a run faults. --edges fires
+                   under seed 1 and the default profile, as --record solves, and refuses --runs, --seed, --profile
+                   and --json
+  wilanis scenarios [root] --check                 rehearse --check and fuzz --edges --check in one step, for CI:
+                   exit 1 when either fails
   wilanis regress  [root] [--json]                 replay every scenario and diff node by node
   wilanis start    [root] [--profile word] [--trace[=text|json]] [--level summary|full]
                    refuse a variable the profile reads that is unset, then run postLoad and the profile's
@@ -87,10 +98,12 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
 
 check, rehearse, regress and migrate take --json: one JSON object on stdout (RFC 0019's envelope, packages/runtime/
 schemas/diagnostics.schema.json), the refusals as data on a refused tree whichever was asked, and the same exit codes;
-rehearse refuses it beside --record or --check, whose exit code the envelope's ok would not say.
+rehearse refuses it beside --record or --check, whose exit code the envelope's ok would not say, and fuzz --edges
+and scenarios --check refuse it until RFC 0019 adds an envelope for staleness.
 rehearse, fuzz, regress, start, run and migrate take --profile word, and run under it; else under WILANIS_PROFILE,
 else under the profile project.json marks "default": true. A project that declares no profile runs its one unnamed one.
-rehearse --record and --check read neither --profile nor WILANIS_PROFILE: they run under the default alone.
+rehearse --record and --check, fuzz --edges and scenarios --check read neither --profile nor WILANIS_PROFILE: they
+run under the default alone.
 Under a profile, rehearse, fuzz and regress skip a trigger whose kind no startup step of that profile serves (a
 route where nothing listens), and say how many; run refuses one, naming the profiles that serve it.
 Every path is @-rooted (@features/tasks/tasks.port.json) or through a project alias.
@@ -170,48 +183,14 @@ const accepted = (loaded: LoadResult, command: string, root: string) =>
 /** The command's name when `--json` was given, which is what `check` needs to print the envelope; else nothing. */
 const jsonOf = (flags: Record<string, string>, command: string) => (flags.json ? command : undefined);
 
-/** What `--record` and `--check` refuse beside them, and why each is refused. */
-const BESIDE_RECORDING: Record<string, string> = {
-  seed: 'the recorded directory is solved under seed 1: drop --seed',
-  profile:
-    'the recorded directory is solved under the profile project.json marks "default": true, whatever --profile or ' +
-    'WILANIS_PROFILE say, so that it is a function of the tree alone: drop --profile',
-  json:
-    "--json prints the rehearsal's envelope, whose ok does not say whether the recorded directory is current, and " +
-    "an envelope for staleness is RFC 0019's to add: drop --json",
-};
-
-/**
- * What `rehearse` is asked to record: `--record [dir]` and `--check`, `--record --check` being `--check` on that
- * directory. Either refuses `--seed` and `--profile`, since the recorded directory is a function of the tree alone,
- * solved under one fixed seed and the default profile, and `--json`, since the envelope's `ok` is the rehearsal's
- * and the exit code would be the directory's; and a directory it may not own (`refusedDir`), before any run.
- */
-function recordingOf(flags: Record<string, string>, root: string): { record?: string; check?: boolean } {
-  const check = flags.check !== undefined;
-  if (flags.record === undefined && !check) return {};
-  const record = flags.record === undefined || flags.record === 'true' ? RECORDED : flags.record;
-  const beside = Object.keys(BESIDE_RECORDING).find(flag => flags[flag] !== undefined);
-  const refused = beside ? BESIDE_RECORDING[beside] : refusedDir(resolve(root), record);
-  if (refused) {
-    console.error(refused);
+/** What the command line asked, or exit 2 with why it may not be asked, before any run. */
+function orRefused<T>(answer: Asked<T>): T {
+  if ('refused' in answer) {
+    console.error(answer.refused);
     process.exit(2);
   }
-  return { record, ...(check ? { check } : {}) };
+  return answer.asked;
 }
-
-/**
- * What a rehearsal prints: under `--check` what the profile skipped and how the recorded directory stands, and the
- * rehearsal's lines too where it failed, since that fails the check; else its lines and what it wrote.
- */
-function rehearsalSaid(answer: Rehearsal, check?: boolean): string[] {
-  const recorded = answer.recorded ? recordedLines(answer.recorded) : [];
-  return check && answer.ok ? [...answer.skipped, ...recorded] : [...answer.lines, ...recorded];
-}
-
-/** Whether `rehearse` exits 1: the rehearsal failed, or under `--check` the recorded directory is not current. */
-const failed = (answer: Rehearsal, check?: boolean) =>
-  !answer.ok || (check === true && !(answer.recorded && current(answer.recorded)));
 
 /** What the command line gave: the flags, the words, and the root each command reads from. */
 interface Given {
@@ -230,7 +209,7 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     else console.log(`ok: ${loaded.registry.files.length} documents, ${irSaid()}`);
   },
   rehearse: async ({ flags, rootArg }) => {
-    const recording = recordingOf(flags, rootArg(0));
+    const recording = orRefused(recordingOf(flags, rootArg(0)));
     const loaded = await check(rootArg(0), jsonOf(flags, 'rehearse'));
     const answer = await rehearse(loaded, {
       seed: flags.seed ? Number(flags.seed) : undefined,
@@ -240,10 +219,17 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     });
     if (flags.json) console.log(printed(withRehearsal(accepted(loaded, 'rehearse', rootArg(0)), answer)));
     else console.log(rehearsalSaid(answer, recording.check).join('\n'));
-    if (failed(answer, recording.check)) process.exit(1);
+    if (rehearsalFailed(answer, recording.check)) process.exit(1);
   },
   fuzz: async ({ flags, rootArg }) => {
+    const edging = orRefused(edgingOf(flags));
     const loaded = await check(rootArg(0));
+    if (edging.edges) {
+      const answer = await fuzz(loaded, edging);
+      console.log(edgesSaid(answer).join('\n'));
+      if (edgesFailed(answer, edging.check)) process.exit(1);
+      return;
+    }
     // said first, so whoever sees the directory appear knows it is generated and kept out of git, as .wilanis/ is
     console.log(
       `writing scenarios to ${join(loaded.root, SCENARIOS)} -- generated, and ignored by git as .wilanis/ is`,
@@ -258,6 +244,12 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     const answer = await regress(loaded, { profile: flags.profile });
     if (flags.json) console.log(printed(withRegression(accepted(loaded, 'regress', rootArg(0)), answer)));
     else console.log(answer.lines.join('\n') || 'no scenarios -- run wilanis rehearse --record or wilanis fuzz');
+    if (!answer.ok) process.exit(1);
+  },
+  scenarios: async ({ flags, rootArg }) => {
+    orRefused(scenariosOf(flags));
+    const answer = await checkScenarios(await check(rootArg(0)));
+    console.log(answer.lines.join('\n'));
     if (!answer.ok) process.exit(1);
   },
   start: async ({ flags, rootArg }) => {
