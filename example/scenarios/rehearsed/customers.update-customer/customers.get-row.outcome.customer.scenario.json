@@ -1,0 +1,317 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
+  "description": "update-customer: get-row 'outcome' when status == 200 && has(body) routes to customer, which answers. Written by wilanis rehearse --record; regenerate it, do not edit it.",
+  "generated": "rehearse",
+  "trigger": "@features/customers/edge/update-customer.trigger.json",
+  "branch": {
+    "graph": "@features/customers/data/get-row.graph.json",
+    "node": "outcome",
+    "when": "status == 200 && has(body)",
+    "to": "customer"
+  },
+  "seed": 1,
+  "in": {
+    "id": "hotel403",
+    "name": "delta489",
+    "email": "bravo",
+    "tier": "gold",
+    "note": "charlie427"
+  },
+  "context": {
+    "method": "juliet527",
+    "path": "Zulu-9",
+    "headers": {
+      "extra6": "kilo"
+    },
+    "cookies": {},
+    "query": {},
+    "params": {
+      "id": "hotel403"
+    },
+    "body": {
+      "name": "delta489",
+      "email": "bravo",
+      "tier": "gold",
+      "note": "charlie427"
+    },
+    "challenge": {
+      "id": "delta",
+      "method": "india",
+      "verified": true
+    }
+  },
+  "stubs": {
+    "op.current.op.fetched": {
+      "status": 200,
+      "headers": {
+        "extra9": "lima"
+      },
+      "body": {
+        "id": "bravo",
+        "name": "Zulu-9",
+        "email": "x320",
+        "tier": "india646",
+        "active": false,
+        "note": "echo",
+        "createdAt": "india",
+        "extra6": {
+          "k": "golf"
+        }
+      }
+    },
+    "op.customer:made": {
+      "id": "juliet527",
+      "name": "Zulu-9",
+      "email": "echo",
+      "tier": "kilo",
+      "active": true,
+      "note": "golf154"
+    },
+    "op.kept.op.updated": {
+      "status": 200,
+      "headers": {},
+      "body": {
+        "id": "juliet527",
+        "name": "Zulu-9",
+        "email": "echo",
+        "tier": "kilo",
+        "registrar": "hotel403",
+        "note": "charlie",
+        "createdAt": "foxtrot",
+        "extra2": "golf"
+      }
+    }
+  },
+  "expect": {
+    "status": "done",
+    "output": {
+      "id": "juliet527",
+      "name": "Zulu-9",
+      "email": "echo",
+      "tier": "kilo"
+    },
+    "nodes": {
+      "op": {
+        "status": "done",
+        "handler": "graph:@features/customers/domain/update-customer.graph.json",
+        "out": {
+          "id": "juliet527",
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo",
+          "registrar": "hotel403",
+          "note": "charlie",
+          "createdAt": "foxtrot",
+          "extra2": "golf"
+        }
+      },
+      "op.current": {
+        "status": "done",
+        "handler": "@features/customers/data/customers-rest.binding.json#get",
+        "out": {
+          "id": "bravo",
+          "name": "Zulu-9",
+          "email": "x320",
+          "tier": "india646",
+          "active": false,
+          "note": "echo",
+          "createdAt": "india",
+          "extra6": {
+            "k": "golf"
+          }
+        }
+      },
+      "op.current.op": {
+        "status": "done",
+        "handler": "graph:@features/customers/data/get-row.graph.json",
+        "out": {
+          "id": "bravo",
+          "name": "Zulu-9",
+          "email": "x320",
+          "tier": "india646",
+          "active": false,
+          "note": "echo",
+          "createdAt": "india",
+          "extra6": {
+            "k": "golf"
+          }
+        }
+      },
+      "op.current.op.fetched": {
+        "status": "done",
+        "handler": "@http/http.port.json#request",
+        "out": {
+          "status": 200,
+          "headers": {
+            "extra9": "lima"
+          },
+          "body": {
+            "id": "bravo",
+            "name": "Zulu-9",
+            "email": "x320",
+            "tier": "india646",
+            "active": false,
+            "note": "echo",
+            "createdAt": "india",
+            "extra6": {
+              "k": "golf"
+            }
+          }
+        }
+      },
+      "op.current.op.outcome": {
+        "status": "done",
+        "selected": "customer",
+        "out": "customer"
+      },
+      "op.current.op.customer": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "id": "bravo",
+          "name": "Zulu-9",
+          "email": "x320",
+          "tier": "india646",
+          "active": false,
+          "note": "echo",
+          "createdAt": "india",
+          "extra6": {
+            "k": "golf"
+          }
+        }
+      },
+      "op.current.op.noCustomer": {
+        "status": "cancelled"
+      },
+      "op.current.op.upstreamFailed": {
+        "status": "cancelled"
+      },
+      "op.current.op.unreachable": {
+        "status": "cancelled"
+      },
+      "op.kept": {
+        "status": "done",
+        "handler": "@features/customers/data/customers-rest.binding.json#keep",
+        "out": {
+          "id": "juliet527",
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo",
+          "registrar": "hotel403",
+          "note": "charlie",
+          "createdAt": "foxtrot",
+          "extra2": "golf"
+        }
+      },
+      "op.kept.op": {
+        "status": "done",
+        "handler": "graph:@features/customers/data/update-row.graph.json",
+        "out": {
+          "id": "juliet527",
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo",
+          "registrar": "hotel403",
+          "note": "charlie",
+          "createdAt": "foxtrot",
+          "extra2": "golf"
+        }
+      },
+      "op.kept.op.updated": {
+        "status": "done",
+        "handler": "@http/http.port.json#request",
+        "out": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "id": "juliet527",
+            "name": "Zulu-9",
+            "email": "echo",
+            "tier": "kilo",
+            "registrar": "hotel403",
+            "note": "charlie",
+            "createdAt": "foxtrot",
+            "extra2": "golf"
+          }
+        }
+      },
+      "op.kept.op.outcome": {
+        "status": "done",
+        "selected": "customer",
+        "out": "customer"
+      },
+      "op.kept.op.customer": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "id": "juliet527",
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo",
+          "registrar": "hotel403",
+          "note": "charlie",
+          "createdAt": "foxtrot",
+          "extra2": "golf"
+        }
+      },
+      "op.kept.op.noCustomer": {
+        "status": "cancelled"
+      },
+      "op.kept.op.upstreamFailed": {
+        "status": "cancelled"
+      },
+      "op.kept.op.in:check": {
+        "status": "done",
+        "selected": "in:ok",
+        "out": "in:ok"
+      },
+      "op.kept.op.in:ok": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "id": "juliet527",
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo",
+          "active": true,
+          "note": "golf154"
+        }
+      },
+      "op.kept.op.in:violated": {
+        "status": "cancelled"
+      },
+      "op.customer:made": {
+        "status": "done",
+        "handler": "@std/object.port.json#merge",
+        "out": {
+          "id": "juliet527",
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo",
+          "active": true,
+          "note": "golf154"
+        }
+      },
+      "op.customer:check": {
+        "status": "done",
+        "selected": "customer",
+        "out": "customer"
+      },
+      "op.customer": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "id": "juliet527",
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo",
+          "active": true,
+          "note": "golf154"
+        }
+      },
+      "op.customer:violated": {
+        "status": "cancelled"
+      }
+    }
+  }
+}

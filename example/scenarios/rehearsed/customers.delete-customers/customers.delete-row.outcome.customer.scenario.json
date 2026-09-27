@@ -1,0 +1,98 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
+  "description": "delete-customers: delete-row 'outcome' when status == 200 && has(body) routes to customer, which answers. Written by wilanis rehearse --record; regenerate it, do not edit it.",
+  "generated": "rehearse",
+  "trigger": "@features/customers/edge/delete-customers.trigger.json",
+  "branch": {
+    "graph": "@features/customers/data/delete-row.graph.json",
+    "node": "outcome",
+    "when": "status == 200 && has(body)",
+    "to": "customer"
+  },
+  "seed": 1,
+  "in": {
+    "ids": [
+      "charlie"
+    ]
+  },
+  "context": {
+    "method": "juliet527",
+    "path": "Zulu-9",
+    "headers": {
+      "extra6": "kilo"
+    },
+    "cookies": {},
+    "query": {},
+    "params": {},
+    "body": {
+      "ids": [
+        "charlie"
+      ]
+    },
+    "principal": {
+      "subject": "charlie",
+      "realm": "bravo",
+      "roles": [
+        "echo42",
+        "golf",
+        "lima205"
+      ],
+      "claims": {}
+    }
+  },
+  "stubs": {
+    "op.removed.0.op.deleted": {
+      "status": 200,
+      "headers": {},
+      "body": {
+        "id": "juliet",
+        "name": "",
+        "email": "charlie234",
+        "tier": "bravo",
+        "note": "x",
+        "createdAt": "juliet"
+      }
+    }
+  },
+  "expect": {
+    "status": "done",
+    "output": [
+      {
+        "id": "juliet",
+        "name": "",
+        "email": "charlie234",
+        "tier": "bravo"
+      }
+    ],
+    "nodes": {
+      "op": {
+        "status": "done",
+        "handler": "graph:@features/customers/domain/remove-customers.graph.json",
+        "out": [
+          {
+            "id": "juliet",
+            "name": "",
+            "email": "charlie234",
+            "tier": "bravo",
+            "note": "x",
+            "createdAt": "juliet"
+          }
+        ]
+      },
+      "op.removed": {
+        "status": "done",
+        "handler": "@features/customers/data/customers-rest.binding.json#remove",
+        "out": [
+          {
+            "id": "juliet",
+            "name": "",
+            "email": "charlie234",
+            "tier": "bravo",
+            "note": "x",
+            "createdAt": "juliet"
+          }
+        ]
+      }
+    }
+  }
+}

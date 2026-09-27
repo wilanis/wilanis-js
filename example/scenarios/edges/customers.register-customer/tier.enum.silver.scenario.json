@@ -1,0 +1,192 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
+  "description": "register-customer under seed 1 with tier enum.silver: done. Written by wilanis fuzz --edges; regenerate it, do not edit it.",
+  "generated": "edges",
+  "trigger": "@features/customers/edge/register-customer.trigger.json",
+  "seed": 1,
+  "in": {
+    "name": "hotel403",
+    "email": "delta489",
+    "tier": "silver"
+  },
+  "context": {
+    "method": "juliet527",
+    "path": "Zulu-9",
+    "headers": {
+      "extra6": "kilo"
+    },
+    "cookies": {},
+    "query": {},
+    "params": {},
+    "body": {
+      "name": "hotel403",
+      "email": "delta489",
+      "tier": "bronze"
+    },
+    "principal": {
+      "subject": "lima190",
+      "realm": "alpha",
+      "roles": [
+        "lima205",
+        "juliet"
+      ],
+      "claims": {}
+    },
+    "session": {
+      "id": "kilo",
+      "attributes": {
+        "displayName": "lima",
+        "realm": "delta",
+        "tenant": "charlie",
+        "theme": "light"
+      }
+    },
+    "challenge": {
+      "id": "kilo",
+      "method": "bravo48",
+      "verified": false
+    }
+  },
+  "stubs": {
+    "op.registered.op.posted": {
+      "status": 201,
+      "headers": {},
+      "body": {
+        "id": "charlie",
+        "name": "alpha136",
+        "email": "echo",
+        "tier": "echo",
+        "registrar": "echo",
+        "note": "india"
+      }
+    }
+  },
+  "expect": {
+    "status": "done",
+    "output": {
+      "id": "charlie",
+      "name": "alpha136",
+      "email": "echo",
+      "tier": "echo"
+    },
+    "nodes": {
+      "op": {
+        "status": "done",
+        "handler": "graph:@features/customers/domain/register-customer.graph.json",
+        "out": {
+          "id": "charlie",
+          "name": "alpha136",
+          "email": "echo",
+          "tier": "echo",
+          "registrar": "echo",
+          "note": "india"
+        }
+      },
+      "op.id": {
+        "status": "done",
+        "handler": "@features/customers/data/customers-rest.binding.json#nextId",
+        "out": ""
+      },
+      "op.id.op": {
+        "status": "done",
+        "handler": "graph:@features/customers/data/row-key.graph.json",
+        "out": ""
+      },
+      "op.id.op.key": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": ""
+      },
+      "op.registered": {
+        "status": "done",
+        "handler": "@features/customers/data/customers-rest.binding.json#register",
+        "out": {
+          "id": "charlie",
+          "name": "alpha136",
+          "email": "echo",
+          "tier": "echo",
+          "registrar": "echo",
+          "note": "india"
+        }
+      },
+      "op.registered.op": {
+        "status": "done",
+        "handler": "graph:@features/customers/data/create-row.graph.json",
+        "out": {
+          "id": "charlie",
+          "name": "alpha136",
+          "email": "echo",
+          "tier": "echo",
+          "registrar": "echo",
+          "note": "india"
+        }
+      },
+      "op.registered.op.posted": {
+        "status": "done",
+        "handler": "@http/http.port.json#request",
+        "out": {
+          "status": 201,
+          "headers": {},
+          "body": {
+            "id": "charlie",
+            "name": "alpha136",
+            "email": "echo",
+            "tier": "echo",
+            "registrar": "echo",
+            "note": "india"
+          }
+        }
+      },
+      "op.registered.op.outcome": {
+        "status": "done",
+        "selected": "customer",
+        "out": "customer"
+      },
+      "op.registered.op.customer": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "id": "charlie",
+          "name": "alpha136",
+          "email": "echo",
+          "tier": "echo",
+          "registrar": "echo",
+          "note": "india"
+        }
+      },
+      "op.registered.op.upstreamFailed": {
+        "status": "cancelled"
+      },
+      "op.customer:made": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "id": "",
+          "name": "hotel403",
+          "email": "delta489",
+          "tier": "silver",
+          "registrar": "wilanis-example/0.1.0"
+        }
+      },
+      "op.customer:check": {
+        "status": "done",
+        "selected": "customer",
+        "out": "customer"
+      },
+      "op.customer": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "id": "",
+          "name": "hotel403",
+          "email": "delta489",
+          "tier": "silver",
+          "registrar": "wilanis-example/0.1.0"
+        }
+      },
+      "op.customer:violated": {
+        "status": "cancelled"
+      }
+    }
+  }
+}

@@ -6,7 +6,7 @@ import { checkTree } from '@wilanis/compiler';
 import { loadTree, type PluginModule } from '@wilanis/core';
 import auth from '@wilanis/plugin-auth';
 import http from '@wilanis/plugin-http';
-import { BUILTIN_PLUGINS, rehearse } from '@wilanis/runtime';
+import { BUILTIN_PLUGINS, RECORDED, regress, rehearse } from '@wilanis/runtime';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -24,13 +24,13 @@ const codes = (root: string) => checkTree(loadTree(root, PLUGINS)).items.map(ref
  */
 type Doc = Record<string, any>;
 
-/** A throwaway copy of the tree, without what a check must not read. */
+/**
+ * A throwaway copy of the tree, without what a check must not read and without the scenarios it keeps, so a case
+ * that breaks a document judges that document and not the recorded runs naming it.
+ */
 function copyOfTree(): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-access-'));
-  cpSync(TREE, dir, {
-    recursive: true,
-    filter: path => !path.includes('node_modules') && !path.includes('.wilanis') && !path.includes('/test'),
-  });
+  cpSync(TREE, dir, { recursive: true, filter: path => !/node_modules|\.wilanis|\/test|\/scenarios/.test(path) });
   return dir;
 }
 
@@ -91,6 +91,18 @@ describe('the access tree on its own', () => {
       );
     }
   });
+  it('keeps under scenarios/rehearsed/ what rehearse --record writes for it, and replays every one the same', async () => {
+    // the committed directory itself, not a copy: a change that moves a branch fails here until --record rewrites it
+    const checked = await rehearse(loadTree(TREE, PLUGINS), { check: true });
+    expect(checked.ok, checked.lines.join('\n')).toBe(true);
+    expect(checked.recorded).toMatchObject({ dir: RECORDED, check: { stale: [], missing: [], extra: [] }, kept: [] });
+    expect(checked.recorded?.files).toBeGreaterThan(0);
+    const load = loadTree(TREE, PLUGINS);
+    const replayed = await regress(load);
+    expect(replayed.ok, replayed.lines.join('\n')).toBe(true);
+    expect(replayed.results).toHaveLength(load.registry.all('scenario').length);
+    expect(replayed.results.filter(one => !one.same)).toEqual([]);
+  }, 60_000);
   it('exports what a host binds and gates with, and nothing else', () => {
     const feature = JSON.parse(readFileSync(join(TREE, 'features/access/feature.json'), 'utf8'));
     expect(feature.exports).toEqual([

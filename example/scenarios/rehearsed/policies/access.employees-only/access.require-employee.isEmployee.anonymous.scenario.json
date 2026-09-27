@@ -1,0 +1,66 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
+  "description": "employees-only as attached by delete-customer: require-employee 'isEmployee' otherwise routes to anonymous, which refuses as anonymous. Written by wilanis rehearse --record; regenerate it, do not edit it.",
+  "generated": "rehearse",
+  "trigger": "@features/customers/edge/delete-customer.trigger.json",
+  "policy": "@features/access/edge/employees-only.policy.json",
+  "branch": {
+    "graph": "@features/access/domain/require-employee.graph.json",
+    "node": "isEmployee",
+    "when": "else",
+    "to": "anonymous"
+  },
+  "seed": 1,
+  "in": {},
+  "context": {
+    "method": "juliet527",
+    "path": "Zulu-9",
+    "headers": {
+      "extra6": "kilo"
+    },
+    "cookies": {},
+    "query": {},
+    "params": {
+      "id": "hotel403"
+    },
+    "body": 200,
+    "principal": {
+      "subject": "foxtrot",
+      "realm": "echo42",
+      "roles": [
+        "india"
+      ],
+      "claims": {
+        "extra2": "x"
+      }
+    }
+  },
+  "stubs": {},
+  "expect": {
+    "status": "failed",
+    "reason": "anonymous",
+    "nodes": {
+      "op": {
+        "status": "failed",
+        "reason": "anonymous",
+        "handler": "graph:@features/access/domain/require-employee.graph.json"
+      },
+      "op.isEmployee": {
+        "status": "done",
+        "selected": "anonymous",
+        "out": "anonymous"
+      },
+      "op.granted": {
+        "status": "cancelled"
+      },
+      "op.forbidden": {
+        "status": "cancelled"
+      },
+      "op.anonymous": {
+        "status": "failed",
+        "reason": "anonymous",
+        "handler": "@std/outcome.port.json#refuse"
+      }
+    }
+  }
+}

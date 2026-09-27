@@ -1,0 +1,78 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
+  "description": "delete-customer under seed 1 with id one: failed. Written by wilanis fuzz --edges; regenerate it, do not edit it.",
+  "generated": "edges",
+  "trigger": "@features/customers/edge/delete-customer.trigger.json",
+  "seed": 1,
+  "in": {
+    "id": "x"
+  },
+  "context": {
+    "method": "juliet527",
+    "path": "Zulu-9",
+    "headers": {
+      "extra6": "kilo"
+    },
+    "cookies": {},
+    "query": {},
+    "params": {
+      "id": "hotel403"
+    },
+    "body": 200,
+    "principal": {
+      "subject": "foxtrot",
+      "realm": "echo42",
+      "roles": [
+        "india"
+      ],
+      "claims": {
+        "extra2": "x"
+      }
+    }
+  },
+  "stubs": {
+    "op.deleted": {
+      "status": 3.5,
+      "headers": {
+        "extra7": "lima"
+      }
+    }
+  },
+  "expect": {
+    "status": "failed",
+    "reason": "upstream",
+    "nodes": {
+      "op": {
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "graph:@features/customers/data/delete-row.graph.json"
+      },
+      "op.deleted": {
+        "status": "done",
+        "handler": "@http/http.port.json#request",
+        "out": {
+          "status": 3.5,
+          "headers": {
+            "extra7": "lima"
+          }
+        }
+      },
+      "op.outcome": {
+        "status": "done",
+        "selected": "upstreamFailed",
+        "out": "upstreamFailed"
+      },
+      "op.customer": {
+        "status": "cancelled"
+      },
+      "op.noCustomer": {
+        "status": "cancelled"
+      },
+      "op.upstreamFailed": {
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "@std/outcome.port.json#refuse"
+      }
+    }
+  }
+}
