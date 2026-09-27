@@ -62,23 +62,30 @@ judges.
 
 ```json
 "production": {
-  "description": "Behind the load balancer: the same bindings, the real customers API in place of the test one, nothing watched.",
+  "description": "Behind the load balancer, started with `wilanis start example --profile production`: the customers in PostgreSQL, the one operator account in place of the laptop's employees, and nothing watched. ...",
   "bindings": {
-    "@customers/domain/customer.port.json": "@customers/data/customers-rest.binding.json",
-    "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json"
+    "@customers/domain/customer.port.json": "@customers/data/customers-postgres.binding.json",
+    "@access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
+    "@auth/state.port.json": "@features/state/data/auth-storage.binding.json"
   },
   "connections": {
-    "@connections/customers-api.connection.json": "@connections/customers-api-production.connection.json"
+    "@connections/employees.connection.json": "@connections/employees-production.connection.json",
+    "@connections/jobs.connection.json": "@connections/customers-postgres.connection.json"
   },
   "permits": [
-    "@http/http.port.json#request",
-    "@http/server.port.json#listen",
+    "@storage/store.port.json",
+    "@storage/storage.port.json#ensure",
+    "@queue/queue.port.json",
     "@blob/csv.port.json",
     "@auth/identity.port.json#verify",
     "@auth/token.port.json",
-    "@connections/customers-api-production.connection.json",
-    "@connections/employees.connection.json",
-    "@connections/customers.connection.json"
+    "@auth/session.port.json",
+    "@auth/challenge.port.json#issue",
+    "@otel/exporter.port.json#export",
+    "@http/server.port.json#listen",
+    "@connections/customers-postgres.connection.json",
+    "@connections/people.connection.json",
+    "@connections/employees-production.connection.json"
   ]
 }
 ```
@@ -86,20 +93,30 @@ judges.
 A customer is an operation, `path#operation`; a whole native port, `path`, which permits every operation of it;
 or a connection, which permits reaching the system it describes. The list is what production does and nothing
 more. It does not name `@reload/watch.port.json#watch`, because the `Watch for changes` step runs under `live`
-alone (RFC 0013). It names `listen`, because opening a port is something a place permits or does not -- a
-worker profile of RFC 0009 would not. It names the stand-in, `customers-api-production`, and not the test API
-it stands in for, because the stand-in is what production reaches. `live` has no `permits` and permits
-everything, as every profile does today.
+and `local` alone (RFC 0013), nor `@schedule/scheduler.port.json#run` or `@queue/worker.port.json#consume`,
+since production keeps no schedule and works no queue: those steps run on the laptop and under
+`production-scheduler` and `production-worker`, and production only publishes to the removals queue. It names
+`listen`, because opening a port is something a place permits or does not, and `production-worker`, which serves
+no route, would not. It names no `@http/http.port.json#request`: under production the customers are in
+PostgreSQL, so nothing it reaches asks an API. It names the stand-ins, `employees-production` and
+`customers-postgres`, and not the connections they stand in for (`employees`, `jobs`), because the stand-ins are
+what production reaches. `live` has no `permits` and permits everything, as the example's other profiles do.
 
 **When a feature reaches out.** An agent gives the hello feature a quote of the day: a connection
 `@connections/quotes.connection.json` to a public API, a data graph `@hello/data/fetch-quote.graph.json` that
 runs `@http/http.port.json#request` against it, and a line in `greeting.binding.json` that binds `greet` to
-the new graph. `wilanis check` refuses it twice, at two altitudes:
+the new graph. `wilanis check` refuses it at two altitudes:
 
 ```
 L003  @hello/data/fetch-quote.graph.json#nodes/quote
     node 'quote' runs effectful '@http/http.port.json#request' which the feature does not allow
     → add "@http/http.port.json#request" to @features/hello/feature.json → effects
+
+C0nn  project.json#profiles/production/permits
+    profile 'production' does not permit '@http/http.port.json#request', reached from
+    @hello/edge/hello-gated.trigger.json through @hello/data/greeting.binding.json (feature hello)
+    → remove the node that reaches it, or bind the port to a binding that does not; else, if production may,
+      add "@http/http.port.json#request" to profiles/production/permits
 
 C0nn  project.json#profiles/production/permits
     profile 'production' does not permit '@connections/quotes.connection.json', reached from
@@ -108,11 +125,12 @@ C0nn  project.json#profiles/production/permits
       add "@connections/quotes.connection.json" to profiles/production/permits
 ```
 
-The agent may fix L003 alone, since the feature is its to edit. Production already permits `http.request` --
-the customers makes them -- so the operation passes; the *connection* does not, and that is the refusal that
-stays until either the graph no longer reaches it or a person decides production may. The hint says remove
-first; widening the list is the last clause, written so that the diff a reviewer reads is one line in
-`project.json` under the word `production`.
+The agent may fix L003 alone, since the feature is its to edit. Production permits no `http.request`, because
+nothing it reached asked an API before the quote, so the operation is refused as well as the connection, and
+both refusals stay until either the graph no longer reaches them or a person decides production may. A place
+that already made requests would pass the operation and still refuse the *connection*: permitting
+`http.request` is not permitting every system. The hint says remove first; widening the list is the last
+clause, written so that the diff a reviewer reads is the lines in `project.json` under the word `production`.
 
 **When the list is stale.** The customers stops exporting CSV: the node that ran `@blob/csv.port.json#write`
 goes, and so does the one that ran `#parse`. `wilanis check` then refuses the profile that still says it may:
@@ -127,12 +145,13 @@ So `permits` never drifts wider than the tree: the list a reviewer reads is exac
 written by a person and held by the checker.
 
 **Includes.** The example includes `@wilanis/access`, whose sign-in routes reach `@auth/identity.port.json#verify`
-against the two directories through the identity binding the host chose. The host's profile permits them, or
-does not; nothing in between:
+against the two directories through the identity binding the host chose: under production, `people`, the
+account holders', and `employees-production`, the one operator account standing in for the laptop's employees.
+The host's profile permits them, or does not; nothing in between:
 
 ```
 C0nn  project.json#profiles/production/permits
-    profile 'production' does not permit '@connections/customers.connection.json', reached from
+    profile 'production' does not permit '@connections/people.connection.json', reached from
     @access/edge/auth-customers.trigger.json through @features/directories/data/identity.binding.json
     (feature access, included from @wilanis/access)
     → remove the feature from includes[].features, or bind identity.port.json to a binding that does not; else, ...
@@ -240,7 +259,8 @@ No end-to-end test: nothing runs.
    permits only effects and connections", added to `docs/security-model.md` under *Guaranteed by the checker* with
    the three C codes. Blocked on RFC 0013's step 1 (`reach.ts`). (`area:core`, `area:compiler`)
 2. `permits` on the example's `production`; the `templates/CLAUDE.md` row and sentence; one sentence in the
-   README's *Effects are explicit* bullet. (`area:runtime`; `good first issue`)
+   README's *Effects are explicit* bullet, which is the *Effects are explicit* section of `docs/model.md` since
+   the README's rewrite. (`area:runtime`; `good first issue`)
 3. `describe project.json`, `describe <port>` and `describe <connection>` lines; the viewer's profile table.
    (`area:runtime`, `area:view`; `good first issue`)
 
@@ -264,7 +284,9 @@ No end-to-end test: nothing runs.
 - **A whole-port customer permits operations the port does not have yet.** A plugin update that adds an
   operation to `@blob/csv.port.json` is permitted by the customer `"@blob/csv.port.json"` without a diff. That
   is the trade a port customer makes for brevity; a profile that wants the diff writes operations. The
-  example writes the port for `@blob/csv` and `@auth/token`, the operation for `@http`.
+  example writes the port for `@storage/store`, `@queue/queue`, `@blob/csv`, `@auth/token` and `@auth/session`,
+  and the operation for each port that has one; `@storage/store` whole also permits `count` and `patch`, which
+  production does not reach today.
 - **Deriving `permits` from the bindings** was rejected in the stub and stays rejected: then nothing would be
   written by a person, and the checker would compare a list with itself. Printing the derived list is what
   `describe` and the manifest do.

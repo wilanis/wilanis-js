@@ -81,7 +81,8 @@ describe('sabotage: profiles, their stand-ins, and the steps they run', () => {
       sabotage('project.json', doc => {
         doc.startup.at(-1).profiles = profiles;
       });
-    expect(naming(['staging'])).toEqual(['B012']);
+    // and production, which no longer listens, permits the listener for nothing (C022)
+    expect(naming(['staging'])).toEqual(['C022', 'B012']);
     expect(naming(['live', 'production'])).toEqual([]);
   });
   it('B008 judged only under the profiles a step runs under', () => {

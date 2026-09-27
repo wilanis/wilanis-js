@@ -245,7 +245,22 @@
       "connections": {
         "@connections/employees.connection.json": "@connections/employees-production.connection.json",
         "@connections/jobs.connection.json": "@connections/customers-postgres.connection.json"
-      }
+      },
+      "permits": [
+        "@storage/store.port.json",
+        "@storage/storage.port.json#ensure",
+        "@queue/queue.port.json",
+        "@blob/csv.port.json",
+        "@auth/identity.port.json#verify",
+        "@auth/token.port.json",
+        "@auth/session.port.json",
+        "@auth/challenge.port.json#issue",
+        "@otel/exporter.port.json#export",
+        "@http/server.port.json#listen",
+        "@connections/customers-postgres.connection.json",
+        "@connections/people.connection.json",
+        "@connections/employees-production.connection.json"
+      ]
     },
     "production-scheduler": {
       "description": "The one process that keeps the schedule beside production, started with `wilanis start example --profile production-scheduler`: production's bindings and connections, so a tick reaches what a route there reaches and a queue is the same table, and production's startup but for the listener, which it never opens. Run one of it beside the production instances, which listen and schedule nothing, and the production-worker processes, which work the queue.",

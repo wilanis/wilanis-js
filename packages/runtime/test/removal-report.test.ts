@@ -48,6 +48,10 @@ function inProcess(): string {
   const path = join(dir, 'project.json');
   const project = JSON.parse(readFileSync(path, 'utf8'));
   project.startup = project.startup.filter((step: { run: string }) => !OUTSIDE.includes(step.run));
+  // production permits what it reaches, and without those steps it reaches none of them
+  project.profiles.production.permits = project.profiles.production.permits.filter(
+    (entry: string) => !OUTSIDE.includes(entry),
+  );
   writeFileSync(path, JSON.stringify(project));
   return dir;
 }
