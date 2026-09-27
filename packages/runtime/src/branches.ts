@@ -8,7 +8,7 @@
  */
 import { type Type, typeAt } from '@wilanis/core';
 import type { Branch, Domain } from './domains.js';
-import { listHolder, sourceOf } from './frames.js';
+import { listHolder, ownInputAt, sourceOf } from './frames.js';
 import { branchesOf } from './solve.js';
 import { getPath, satisfy, setPath } from './stubs.js';
 
@@ -179,24 +179,26 @@ function atNode(
 
 /**
  * What it takes for a mapped operation to run at all: its list holds at least one element. A demand on the
- * trigger's input when the list is read from it, a stub of the node that holds it otherwise -- a sibling of
- * the map, or, where the map runs over what its frame was handed, the node one hop out that fed the call.
- * Nothing when the list is composed or literal, since a literal list is already what it is.
+ * trigger's input when the list is read from it -- field for field, or, for the `outermost` list of a switch,
+ * handed down under another name by the frames on the way (`ownInputAt`) -- a stub of the node that holds it
+ * otherwise -- a sibling of the map, or, where the map runs over what its frame was handed, the node one hop out
+ * that fed the call. Nothing when the list is composed or literal, since a literal list is already what it is.
  */
 export function nonEmpty(
   list: FoundList,
   from: Stubbing,
+  outermost = false,
 ): { stubs: Record<string, unknown>; input: { path: string[]; value: unknown }[] } {
   const { generated, typeOf = () => undefined, seed = 1, inputSeed, inType } = from;
   const src = sourceOf(list.over);
   const want: Domain = { minLen: 1, present: true };
   if (!src) return { stubs: {}, input: [] };
-  if (src.ref === 'in' && list.fromTriggerIn)
+  const own = src.ref === 'in' && list.fromTriggerIn ? src.path : undefined;
+  const handed = own ?? (outermost ? ownInputAt(list) : undefined);
+  if (handed)
     return {
       stubs: {},
-      input: [
-        { path: src.path, value: satisfy(want, getPath(inputSeed, src.path), typeAtPath(inType, src.path), seed) },
-      ],
+      input: [{ path: handed, value: satisfy(want, getPath(inputSeed, handed), typeAtPath(inType, handed), seed) }],
     };
   const held = listHolder(list);
   if (!held) return { stubs: {}, input: [] };

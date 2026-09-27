@@ -24,6 +24,24 @@ export function sourceOf(spec_: unknown): { ref: string; path: string[] } | unde
  * input the rehearsal steers is met before this is asked.
  */
 export function listHolder(list: FoundList): { target: string; path: string[] } | undefined {
+  const held = heldOutwards(list);
+  if (!held || ['in', 'context', 'const'].includes(held.src.ref)) return undefined;
+  return { target: [...held.at.split('.').slice(0, -1), held.src.ref].join('.'), path: held.src.path };
+}
+
+/**
+ * Where in its outermost frame's `in` a list a map runs over was handed down from, when every frame on the way names
+ * where it got it: the path within the trigger's own input for a map no other map encloses, whose frames run from the
+ * trigger's graph. A binding over a graph that takes its input whole hands it `in.ids` as its `in`, so the list is the
+ * trigger's own under another name. Nothing where the list comes from a node, or is composed on the way.
+ */
+export function ownInputAt(list: FoundList): string[] | undefined {
+  const held = heldOutwards(list);
+  return held?.src.ref === 'in' ? held.src.path : undefined;
+}
+
+/** A list's source followed out through the frames that handed it down, and the call it was last handed through. */
+function heldOutwards(list: FoundList): { at: string; src: { ref: string; path: string[] } } | undefined {
   let src = sourceOf(list.over);
   let at = list.at;
   // `in` is whatever the frame was handed, so a frame that declares where it got it is a hop outwards; one that
@@ -36,8 +54,7 @@ export function listHolder(list: FoundList): { target: string; path: string[] } 
     if (given === 'opaque') return undefined;
     if (given) src = given;
   }
-  if (!src || src.ref === 'in' || src.ref === 'context' || src.ref === 'const') return undefined;
-  return { target: [...at.split('.').slice(0, -1), src.ref].join('.'), path: src.path };
+  return src ? { at, src } : undefined;
 }
 
 /**

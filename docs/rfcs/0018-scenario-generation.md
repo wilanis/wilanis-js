@@ -656,3 +656,15 @@ Decided during implementation:
   nothing. Routed apart, the covered branch keeps the name its file has in the tree as it was, so restoring the order
   is `stale` under `--check`, as *A branch nothing reaches* has it; the solver's sentence for it is `no inputs satisfy
   'status == 200 && has(body)'`, since the rule before it leaves `status < 200`, and not every input, uncovered.
+- **A branch whose switch never ran (#637).** A branch's run is judged where its switch was tried, and a run whose
+  switch never ran -- its graph was never called, or something before it ended the graph and the switch was
+  cancelled -- proves nothing of the branch. It was once credited with whatever ended the run, read off the whole
+  report, and recorded as though it had run. It is now reported as `NEVER RUN -- the rehearsal did not reach it`,
+  with the graph, the node and the refusal the run ended at, and it is a problem like any `NEVER RUN`. It is not
+  recorded, and not as unreachable either: the solver reaches its case, so `regress` would answer a freshly
+  recorded file `is reachable now`. The rehearsal fails, so `--check` fails with it, and the branch's file appears
+  as `missing` once a fix reaches it. What the rehearsal steers so that such a branch is rare is in
+  `packages/runtime/src/rehearse-reached.ts`: every other decision on the run routed to its first case that a run
+  can take and whose target is not a refusal (`answering`), a switch routing to a guard's `<id>:made` counted as
+  governing the guarded call, and a switch's outermost list made to hold an element where the frames on the way
+  hand it the trigger's own input under another name.

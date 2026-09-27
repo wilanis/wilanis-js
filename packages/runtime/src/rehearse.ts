@@ -5,16 +5,16 @@
 import { type Guard, guardsOf, idsOf, TAKEN_IDS, walkedUnder } from '@wilanis/compiler';
 import type { Loaded, LoadResult, TriggerDoc } from '@wilanis/core';
 import { Scope } from '@wilanis/core';
-import type { Report } from '@wilanis/engine';
+import type { Outcome, Report } from '@wilanis/engine';
 import { outcomeOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, setPath } from './branches.js';
 import type { Embedder } from './embed.js';
 import { activeProfile, recordedProfile, skippedLines } from './profile.js';
 import { type Recorded, type Recording, recordRuns } from './record.js';
 import { recordedDir } from './recorded-dir.js';
-import { type Decision, format, gather, type PlainRun, statedOf, stateName } from './rehearsal-report.js';
+import { type Decision, format, gather, type PlainRun, short, statedOf, stateName } from './rehearsal-report.js';
 import { heldUpstream } from './rehearse-held.js';
-import { type Reached, reach, type Steering, switchesReached, uncoveredBy } from './rehearse-reached.js';
+import { answering, type Reached, reach, type Steering, switchesReached, uncoveredBy } from './rehearse-reached.js';
 import { namedBy, type Ran, recordedOf, recordsInto, secretOut } from './rehearse-recorded.js';
 import { atomicAt, rootGraph, type Where, whereOf } from './rehearse-where.js';
 import { embedderFor, failedBelow, generatedFire, policyRoots, unbroken } from './stubbing.js';
@@ -73,12 +73,21 @@ function reportAt(report: Report, prefix: string[]): Report | undefined {
 }
 
 /**
+ * The report of the graph a switch stands in, where the switch was tried on this run: nothing where the run never got
+ * to it -- the graph was never called, or something before the switch ended the graph first and it was cancelled.
+ */
+function ranAt(report: Report, sw: FoundSwitch): Report | undefined {
+  const local = reportAt(report, sw.prefix);
+  const node = local?.nodes[sw.at.split('.').pop() ?? ''];
+  return node && node.status !== 'cancelled' ? local : undefined;
+}
+
+/**
  * Judge one run at the graph that owns the switch. A branch that routes correctly into a nested graph
  * which then declares a failure is a success of the routing, so the outcome is read where the decision
  * was made rather than at the trigger, where every nested failure looks alike.
  */
-function settle(report: Report, sw: FoundSwitch, aim: string): Settled {
-  const local = reportAt(report, sw.prefix) ?? report;
+function settle(local: Report, sw: FoundSwitch, aim: string): Settled {
   const took = local.nodes[sw.at.split('.').pop() ?? '']?.selected;
   const out: Settled = {
     status: local.status === 'blocked' ? 'BLOCKED' : local.status,
@@ -226,27 +235,6 @@ interface Walk extends Reached {
 }
 
 /**
- * A branch of this switch is about where it routes. What the graph it routes into then decides is that graph's own
- * business, reported under its own decision -- so steer those to the branch that answers, and this decision reports
- * its routing rather than an incidental downstream refusal.
- */
-function downstreamOf(walk: Walk, sw: FoundSwitch): Record<string, unknown> {
-  const downstream: Record<string, unknown> = {};
-  const here = sw.prefix.join('.');
-  for (const other of walk.found) {
-    if (other === sw) continue;
-    // strictly inside a node this switch routes to: its prefix extends this switch's own
-    const there = other.prefix.join('.');
-    if (there === here || !(here === '' || there.startsWith(`${here}.`))) continue;
-    const answering = casesFor(other, walk.stubbing).find(
-      one => one.branch.rule >= 0 && !one.branch.unsolved && !one.unreachable?.length,
-    );
-    if (answering) Object.assign(downstream, answering.stubs);
-  }
-  return downstream;
-}
-
-/**
  * The guard a decision is, where the switch is one the compiler lowered rather than one the author wrote (RFC 0007);
  * nothing where it is an ordinary switch. Which sites
  * carry a guard is never re-derived here: `guardsOf` is the compiler's own answer, and the ids it occupies are
@@ -274,7 +262,8 @@ const guardSaid = (guard: Guard, at: Where): Decision['guard'] => ({
 /** One switch as a decision: every branch, and what each settled to. */
 async function decisionFor(walk: Walk, sw: FoundSwitch): Promise<Decision> {
   const pre = reach(walk, sw);
-  const downstream = downstreamOf(walk, sw);
+  // a branch of this switch is about where it routes: every other decision on the run answers, before it and after it
+  const others = answering(walk, sw);
   const at = whereOf(walk.probe, walk.trigger, sw.prefix);
   const node = sw.at.split('.').pop() ?? '';
   const guard = guardAt(walk.probe, at, node);
@@ -295,7 +284,7 @@ async function decisionFor(walk: Walk, sw: FoundSwitch): Promise<Decision> {
       decision.branches.push({ when: one.branch.when, to: one.branch.to, held });
       continue;
     }
-    const { said, ran } = await branchOf(walk, sw, one, { pre, downstream });
+    const { said, ran } = await branchOf(walk, sw, one, { pre, others });
     decision.branches.push(said);
     // a guard's switch is the compiler's, in no document a scenario can name: it is not recorded
     const recorded = guard ? undefined : recordedOf(walk, decision, { one, cases, ran });
@@ -309,7 +298,7 @@ async function branchOf(
   walk: Walk,
   sw: FoundSwitch,
   one: Case,
-  steer: { pre: Steering; downstream: Record<string, unknown> },
+  steer: { pre: Steering; others: Pick<Steering, 'stubs' | 'input'> },
 ): Promise<{ said: Decision['branches'][number]; ran?: Ran }> {
   const at = { when: one.branch.when, to: one.branch.to };
   const uncovered = uncoveredBy(one);
@@ -320,10 +309,44 @@ async function branchOf(
   const emb = embedderFor(walk.load, { seed: walk.seed, profile: walk.profile, broken, record });
   // a demand on the graph's own input is met by firing with a patched input, not by a stub
   let fired = walk.input;
-  for (const patch of [...steer.pre.input, ...(one.input ?? [])]) fired = setPath(fired, patch.path, patch.value);
-  const given = unbroken({ ...steer.downstream, ...steer.pre.stubs, ...one.stubs }, broken);
+  const patches = [...steer.others.input, ...steer.pre.input, ...(one.input ?? [])];
+  for (const patch of patches) fired = setPath(fired, patch.path, patch.value);
+  const given = unbroken({ ...steer.others.stubs, ...steer.pre.stubs, ...one.stubs }, broken);
   const report = await emb.fire(walk.trigger.doc, fired, walk.context, { stubs: given });
+  // a run that never got to the switch proves nothing of the branch, and is not recorded as though it did
+  const local = ranAt(report, sw);
+  if (!local) return { said: { ...at, uncovered: notReached(report) } };
   // a stubbed node's handler never runs, so what the case gave is written over what the run generated
   const ran = { input: fired, stubs: { ...record, ...given }, report, broke: broken.size > 0 };
-  return { said: { ...at, settled: settle(report, sw, one.branch.to) }, ran };
+  return { said: { ...at, settled: settle(local, sw, one.branch.to) }, ran };
+}
+
+/**
+ * Why a branch's run proved nothing of it, in the words the report prints after `NEVER RUN`: the rehearsal steered the
+ * switch's inputs, and the run ended before it -- in which graph, at which node, and how -- or took a path that does
+ * not pass it.
+ */
+function notReached(report: Report): string {
+  const ended = endedIn(report);
+  if (!ended)
+    return `the rehearsal did not reach it: the run ${WENT[report.status]} along a path that does not pass it`;
+  const how = ended.kind === 'refused' ? `refused as ${ended.reason}` : `broke: ${ended.error}`;
+  return `the rehearsal did not reach it: the run ended at '${ended.at}' in ${short(ended.graph)}, which ${how}`;
+}
+
+/** How a run that did not end at a refusal or a fault went, as the words after `the run`. */
+const WENT: Record<Report['status'], string> = {
+  done: 'answered',
+  failed: 'failed',
+  blocked: 'blocked',
+  cancelled: 'was cancelled',
+};
+
+/** Where a run that did not answer ended: the innermost graph, through each failed call's own run, and its outcome. */
+function endedIn(report: Report): (Extract<Outcome, { kind: 'refused' | 'faulted' }> & { graph: string }) | undefined {
+  const outcome = outcomeOf(report);
+  if (outcome.kind !== 'refused' && outcome.kind !== 'faulted') return undefined;
+  const node = report.nodes[outcome.at];
+  const deeper = node?.sub ?? node?.items?.find(item => item.status === 'failed')?.sub;
+  return (deeper && endedIn(deeper)) || { ...outcome, graph: report.graph };
 }
