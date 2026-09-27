@@ -78,11 +78,11 @@ generated ones do not. The three live apart:
 ```
 scenarios/
   rehearsed/            written by wilanis rehearse --record; owned by it: regenerate, never edit
-    get-customer/
+    customers.get-customer/
       customers.get-row.route.missing.scenario.json
       customers.get-row.route.row.scenario.json
       customers.get-row.route.failed.scenario.json
-    list-customers/
+    customers.list-customers/
       customer.list-customers.route.byTier.scenario.json
       ...
     policies/
@@ -90,7 +90,7 @@ scenarios/
         access.require-employee.decide.granted.scenario.json
         access.require-employee.decide.forbidden.scenario.json
         access.require-employee.decide.anonymous.scenario.json
-    hello-gated/
+    hello.hello-gated/
       whole.scenario.json                       a trigger whose graph has no switch: one run is the whole of it
   edges/                written by wilanis fuzz --edges; owned by it
     get-customer/
@@ -159,9 +159,9 @@ graph declared.
 rule to `status == 410` and:
 
 ```
-scenarios/rehearsed/get-customer/customers.get-row.route.missing.scenario.json: DIFF branch 'status == 404' → missing no longer routes there: op.route routed missing → failed; op.missing: failed → cancelled; op.failed: cancelled → failed; reason missing → upstream
-scenarios/rehearsed/get-customer/customers.get-row.route.row.scenario.json: same
-scenarios/rehearsed/get-customer/customers.get-row.route.failed.scenario.json: same
+scenarios/rehearsed/customers.get-customer/customers.get-row.route.missing.scenario.json: DIFF branch 'status == 404' → missing no longer routes there: op.route routed missing → failed; op.missing: failed → cancelled; op.failed: cancelled → failed; reason missing → upstream
+scenarios/rehearsed/customers.get-customer/customers.get-row.route.row.scenario.json: same
+scenarios/rehearsed/customers.get-customer/customers.get-row.route.failed.scenario.json: same
 ```
 
 The first clause is new: a scenario with a `branch` says the decision that moved, before the nodes that moved with
@@ -169,7 +169,7 @@ it. The recorded file is now stale as well as failing, and the second command sa
 
 ```
 $ wilanis rehearse example --check
-stale    scenarios/rehearsed/get-customer/customers.get-row.route.missing.scenario.json
+stale    scenarios/rehearsed/customers.get-customer/customers.get-row.route.missing.scenario.json
 1 file(s) differ from what the solver writes for this tree -- run wilanis rehearse --record and review the diff
 ```
 
@@ -254,7 +254,7 @@ whether it is current.
 **The refusal an author meets.** Rename `get-row`'s `missing` node to `gone` and forget the scenarios:
 
 ```
-S0n2  @scenarios/rehearsed/get-customer/customers.get-row.route.missing.scenario.json#branch/to
+S0n2  @scenarios/rehearsed/customers.get-customer/customers.get-row.route.missing.scenario.json#branch/to
     the branch names node 'missing' of switch 'route' in @features/customers/data/get-row.graph.json, which no rule of the switch routes to
     → wilanis rehearse --record rewrites scenarios/rehearsed/ from the tree as it stands; a hand-written scenario names a node the switch has
 ```
@@ -290,7 +290,7 @@ stay as they are. The baseline in `packages/core/test/validate.test.ts` gains a 
 scenario; an `unreachable` without the status, a `branch` missing `to`, and `generated: "hand"` are refused.
 
 **Placement**: unchanged. `HOME.scenario` is `{ dir: 'scenarios' }`, and `misplacedDir` compares the first segment,
-so `scenarios/rehearsed/get-customer/x.scenario.json` is home. The three generated directories are not a rule of the
+so `scenarios/rehearsed/customers.get-customer/x.scenario.json` is home. The three generated directories are not a rule of the
 checker: they are where the three commands write and what `--check` owns.
 
 **`packages/runtime/templates/CLAUDE.md`**: the `scenario` row becomes "a recorded run: `wilanis rehearse --record`
@@ -356,13 +356,17 @@ can name it.
 one file:
 
 ```
-scenarios/rehearsed/<trigger stem>/<feature>.<graph stem>.<switch id>.<to>[.<n>].scenario.json
-scenarios/rehearsed/<trigger stem>/whole.scenario.json
+scenarios/rehearsed/<trigger feature>.<trigger stem>/<feature>.<graph stem>.<switch id>.<to>[.<n>].scenario.json
+scenarios/rehearsed/<trigger feature>.<trigger stem>/whole.scenario.json
 scenarios/rehearsed/policies/<policy stem>/<feature>.<graph stem>.<switch id>.<to>[.<n>].scenario.json
 ```
 
 `<feature>` is the graph's feature (`customers`, `access`), so two features' `get-row` graphs do not collide; `<n>` is
 the rule's index and appears only when two rules of the switch route to the same node, so the common case has none.
+`<trigger feature>` is the trigger's, for the same reason: D009 keeps a feature's name unique across the tree and the
+trees it includes, so a host trigger named `refresh` and `@wilanis/access`'s sit apart (`hello.refresh/`,
+`access.refresh/`), and the host, which cannot rename an included trigger, never has to. Two triggers of one feature
+and one name (one under `edge/`, one under `edge/v2/`) would share a directory and are refused, naming both files.
 A decision reached from three triggers (`list-rows` via `digest`, `export-customers` and `list-customers`) is three
 files, since a scenario replays a way in and the three runs differ in their inputs; the rehearsal's lines still
 report it once, as `gather` does today.
@@ -583,16 +587,17 @@ Decided during implementation:
   and marks none default is refused until it marks one. Another profile's bindings are still rehearsed by the plain
   walk under `--profile`.
 - **Where `--record <dir>` may write.** Strictly below `scenarios/` and outside `scenarios/fuzz/`, judged on the
-  path as written and on its real path (`refusedDir` in `packages/runtime/src/record.ts`), and refused before the walk
+  path as written and on its real path (`refusedDir` in `packages/runtime/src/recorded-dir.ts`), and refused before the walk
   with where it may go. Every scenario in the directory that `--record` did not write is removed, so it may never be
   the home the hand-written scenarios sit in, nor a directory another command owns; #221 adds `scenarios/edges/`
   beside `scenarios/fuzz/`. The directory is walked through real directories only, so what a link inside it leads
   to is never removed, and a write a link would carry elsewhere is refused.
 - **Two triggers of one name.** The checker accepts them: a document's name is its file's stem (`register` in
-  `packages/core/src/documents.ts`), no rule asks that two triggers' differ, and the loader walks an included
+  `packages/core/src/documents.ts`), no rule asks that two triggers' names differ, and the loader walks an included
   tree's features as the tree's own, so a host trigger named `refresh` beside `@wilanis/access`'s checks, as does a
-  second `get-customer` under `edge/v2/`. A trigger's files sit under its name, as *Naming* has them and as the
-  rehearsal's lines and each `description` name it, so `--record` and `--check` refuse two recorded triggers of one
-  name, naming both; before, the first kept every file the two shared and the second's runs were dropped without a
-  word. A directory per canonical path, the feature before the name, was the other answer; it would move every file
-  off the layout *Naming* and the guide show, for a tree whose rehearsal lines already name the two alike.
+  second `get-customer` under `edge/v2/`. A trigger's directory is therefore its feature before its name
+  (`customers.get-customer/`, *Naming*), which D009 makes unique across features: a host cannot rename an included
+  trigger, and a host including two libraries that share a trigger name could fix nothing, so no collision across
+  features may be the host's to resolve. Two triggers of one feature and one name are the author's own and are
+  refused, naming both files; before either, the first kept every file the two shared and the second's runs were
+  dropped without a word. A directory of a trigger always holds a dot, so none is taken for `policies/`.

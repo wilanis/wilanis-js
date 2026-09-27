@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { planted, plantedAll, plantedEditingAllSaying, plantedPointing } from './example-harness.js';
 
 const SCHEMAS = 'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas';
-const FILE = 'scenarios/rehearsed/get-customer/customers.get-row.outcome.noCustomer.scenario.json';
+const FILE = 'scenarios/rehearsed/customers.get-customer/customers.get-row.outcome.noCustomer.scenario.json';
 const GET = '@features/customers/edge/get-customer.trigger.json';
 const DELETE = '@features/customers/edge/delete-customer.trigger.json';
 const GRAPH = '@features/customers/data/get-row.graph.json';
