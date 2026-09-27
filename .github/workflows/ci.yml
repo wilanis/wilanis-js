@@ -24,17 +24,24 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
+      # The branch name and the author's login are the pull request's own text, so they reach each script as a
+      # variable: an expression written into `run:` is pasted in before the shell reads it, and a name holding
+      # `$(`, a backtick or `;` would run before the first step could refuse it.
       - name: the head branch names the issue it serves
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          b="${{ github.head_ref }}"
+          b="$HEAD_REF"
           echo "$b" | grep -Eq '^[0-9]+-[a-z0-9-]+$' && echo "ok: $b" || { echo "branch '$b' must be <issue>-<short-title>, e.g. 4-storage-plugin"; exit 1; }
 
       - name: the issue it names is claimed by its author, and by no one else
         env:
           GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.head_ref }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
-          n="${{ github.head_ref }}"; n="${n%%-*}"
-          author="${{ github.event.pull_request.user.login }}"
+          n="$HEAD_REF"; n="${n%%-*}"
+          author="$AUTHOR"
           holders=$(gh api "repos/${{ github.repository }}/issues/$n" --jq '[.assignees[].login] | join(" ")' 2>/dev/null) || {
             echo "issue #$n does not exist: name the branch after the issue it serves"; exit 1; }
           others=$(gh pr list -R "${{ github.repository }}" --state open --search "$n in:title,body" \
@@ -160,7 +167,9 @@ jobs:
       - run: node --test .github/board/*.test.mjs
 
   # What the pull request touches, so `decision` can tell whether anything waits for the maintainer. A job
-  # cannot read a diff in its own `if:`, so this one reads it and hands the answer on.
+  # cannot read a diff in its own `if:`, so this one reads it and hands the answer on. A rename is listed under
+  # both its names, so a decision renamed out of `*.fitness.ts` still waits; a listing that fails or comes up
+  # short of the pull request's `changed_files` counts as gated, since a gate that cannot tell asks.
   changes:
     name: what the pull request touches
     if: github.event_name == 'pull_request'
@@ -172,8 +181,14 @@ jobs:
         name: a decision or a schema, if the pull request changes one
         env:
           GH_TOKEN: ${{ github.token }}
+          CHANGED: ${{ github.event.pull_request.changed_files }}
         run: |
-          files=$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename')
+          ask() { echo "waits for the maintainer: $1"; echo "gated=true" >> "$GITHUB_OUTPUT"; exit 0; }
+          files=$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
+            --jq '.[] | .filename, (.previous_filename // empty)') \
+            || ask "the pull request's files could not be listed"
+          [ "$(printf '%s\n' "$files" | grep -c .)" -ge "$CHANGED" ] \
+            || ask "the pull request changes $CHANGED files and only some were listed"
           gated=$(echo "$files" | grep -E '^(fitness/[^/]+\.fitness\.ts|packages/core/schemas/.+\.json)$' || true)
           if [ -n "$gated" ]; then
             echo "waits for the maintainer:"; echo "$gated" | sed 's/^/  /'
