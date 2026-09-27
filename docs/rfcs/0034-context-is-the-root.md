@@ -1,6 +1,6 @@
 # RFC 0034: `context` is the root: one word for what a kind hands, where it is declared and where it is read
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:core`, `area:compiler`, `area:engine`, `area:runtime`, `area:view`, `area:access`
 - **Tracking issue:** #525
 - **Depends on:** none. RFC 0029 fixed the three places the request is read and is unchanged by this; RFC 0009,
@@ -276,3 +276,10 @@ alike, and a resolver serves data graphs behind operations fired from three kind
 ## Decided during implementation
 
 - The exact wording of the `describe` line on a trigger and of `kind`'s description in `trigger.schema.json`.
+  Both landed as the Reference writes them: `fireLines` prints
+  `context is what <kind> hands  → wilanis describe <kind>` (#529), and `kind` carries the sentence under
+  "Documents and schemas" (#528).
+- RFC 0009 and RFC 0015 stay as written. Step 4 was to amend them with RFC 0020, but both were implemented after
+  this RFC was accepted and before step 4 landed, and an implemented RFC is not edited (RFC 0001). They keep
+  `request.*` as the record of what they decided, as RFC 0005, RFC 0012 and RFC 0029 do; RFC 0020 alone moved
+  (#531).
