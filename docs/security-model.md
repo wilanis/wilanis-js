@@ -112,10 +112,11 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
   and in every input filled from such a field, in a policy's decision, and in what the schedule log and
   `wilanis fuzz` record of a run's answer; its bounds are that a secret read into a type that does not mark it
   (a `@std/object.port.json#make` typed `string` of `{{in.password}}`) is shown in clear from that node on, and
-  that a call of a graph seeded through the engine API, as a replay seeds one, is shown by the marks of its
-  operation's `returns` alone, because a seeded call runs no nested run to carry the marks of the node that
-  answers the graph. (`packages/engine/src/redact.ts`, applied in `packages/engine/src/run.ts` and
-  `packages/engine/src/map.ts`; `shownRoots` in `packages/runtime/src/shown.ts`;
+  wherever an answer so typed is recorded, and that a call of a graph seeded through the engine API, as a replay
+  seeds one, is shown by the marks of its operation's `returns` alone, because a seeded call runs no nested run
+  to carry the marks of the node that answers the graph. (`packages/engine/src/redact.ts`, applied in
+  `packages/engine/src/run.ts` and `packages/engine/src/map.ts`; `redactOf` in
+  `packages/compiler/src/guard-lowering.ts`; `shownRoots` in `packages/runtime/src/shown.ts`;
   `packages/plugin-schedule/src/fire.ts`, `packages/runtime/src/fuzz.ts`; `secretPaths` and `SECRET_DEPTH` in
   `packages/core/src/secret.ts`; before the RFCs)
 - A `{{secrets.*}}` read is substituted into plugin settings, connection settings and a startup step's `in`, and
