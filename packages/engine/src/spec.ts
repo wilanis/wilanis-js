@@ -24,6 +24,11 @@ export interface KCall {
   /** Every value the handler takes, literal or read; the compiler lowers a node's `in` to this. */
   in: Record<string, KSource>;
   redact?: Redact;
+  /**
+   * The handler answers a function of its inputs alone, as the compiler says of it: a report shows its answer as the
+   * marker whole where it read a secret and hands back none of what it read so (`redact.ts`).
+   */
+  pure?: boolean;
   /** An opaque tag the compiler gives this call, handed to the handler as `ctx.site`. The kernel never reads it. */
   site?: string;
 }
@@ -51,6 +56,8 @@ export interface KMap {
   /** How many elements run at once; the rest wait for a slot, in index order. Absent: every element at once. */
   concurrency?: number;
   redact?: Redact;
+  /** The operation answers a function of its inputs alone: each element's answer is shown as a pure call's is. */
+  pure?: boolean;
   /** An opaque tag the compiler gives this map, handed to every element's handler as `ctx.site`. The kernel never reads it. */
   site?: string;
 }

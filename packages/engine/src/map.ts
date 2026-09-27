@@ -102,14 +102,32 @@ export function shownAnswer(node: KMap, answer: unknown[], items: NodeReport[]):
 
 /**
  * What a seeded map's report shows of the answer it was given: each element redacted as the map's own answer is,
- * and carrying the mark of what the map reads as a secret, where what it reads was supplied.
+ * and carrying the mark of what the map reads as a secret, where what it reads was supplied. A pure map's elements
+ * are each shown as that element's report would have shown it, since each answers its own reads alone.
  */
 export function seededAnswer(node: KMap, answer: unknown[], host: Pick<MapHost, 'values' | 'showing'>): unknown[] {
   const reads = readsOf(node, host);
+  if (node.pure) return answer.map((result, index) => seededElement(node, reads, result, index));
   const given = { ...reads.broadcast, over: reads.over };
   const secrets = readAsSecret(given, shownIn(node, reads.shown.broadcast, reads.shown.over));
   return carried(answer, redactEach(answer, answerPaths(node)), secrets) as unknown[];
 }
+
+/**
+ * One element of a seeded pure map's answer, as its report would have shown it had it run: over what that element
+ * would have read, and under its `value` where failures are collected.
+ */
+function seededElement(node: KMap, reads: Reads, result: unknown, index: number): unknown {
+  const list = Array.isArray(reads.over) ? reads.over : [];
+  const { given, shown } = elementReads({ node, broadcast: reads.broadcast, over: list, shown: reads.shown }, index);
+  const secrets = readAsSecret(given, shown);
+  if (node.onItemFailure !== 'collect') return shownOut(undefined, result, node, secrets);
+  const outcome = result as ElementResult;
+  return outcome.ok ? { ...outcome, value: shownOut(undefined, outcome.value, node, secrets) } : outcome;
+}
+
+/** What a map reads, as `readsOf` answers it. */
+type Reads = ReturnType<typeof readsOf>;
 
 /**
  * What a map reads: the list and the shared inputs, as the values it is handed and as its report shows them, each
@@ -128,7 +146,7 @@ function readsOf(node: KMap, host: Pick<MapHost, 'values' | 'showing'>) {
 
 /** What one element's handler is handed, and what its report shows it was handed, as the operation marks it. */
 function elementReads(
-  site: MapSite,
+  site: Pick<MapSite, 'node' | 'broadcast' | 'over' | 'shown'>,
   index: number,
 ): { given: Record<string, unknown>; shown: Record<string, unknown> } {
   const { node, broadcast, over, shown } = site;
@@ -145,7 +163,7 @@ function elementReport(host: MapHost, site: MapSite, index: number): NodeReport 
   const report = initialReport(host.values, `${site.id}.${index}`);
   if (report.status !== 'seeded') return report;
   const reads = elementReads(site, index);
-  report.out = shownOut(undefined, report.out, site.node.redact?.out, readAsSecret(reads.given, reads.shown));
+  report.out = shownOut(undefined, report.out, site.node, readAsSecret(reads.given, reads.shown));
   return report;
 }
 
@@ -211,7 +229,7 @@ async function runElement(host: MapHost, site: MapSite, index: number): Promise<
   const secrets = readAsSecret(reads.given, reads.shown);
   try {
     const value = await host.call(site.node, [site.id, String(index)], reads.given, element);
-    element.out = shownOut(element.sub, value, site.node.redact?.out, secrets);
+    element.out = shownOut(element.sub, value, site.node, secrets);
     element.status = 'done';
     return { ok: true, value };
   } catch (error) {
