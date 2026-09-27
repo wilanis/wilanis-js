@@ -163,7 +163,7 @@ was renamed -- which is a change, and the diff says so.
 `types.ts` gain `provided?: 'site'`, filled by `TypeResolver.field`.
 
 **One shape the `@std` plugin grants.** `packages/runtime/docs/std/Site.shape.json`, listed under `grants.shapes` in
-`docs/std/plugin.json` (the first customer there): "Where a native operation was called, in the author's words. The
+`docs/std/plugin.json` (the first entry there): "Where a native operation was called, in the author's words. The
 compiler writes it for every field marked `provided: site`; nothing else does." Fields:
 
 | Field | Type | Description |

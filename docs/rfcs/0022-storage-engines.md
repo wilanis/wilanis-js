@@ -46,7 +46,7 @@ planner, each of which is written against a real database and currently has one 
 
 The second is the vocabulary. Three RFCs already lean on a fact about the engine that no document states. RFC 0017
 says a plan is one transaction "where the engine can" and names `transactionalDdl` as this RFC's word. RFC 0003 has a
-rule, `a unique or refs customer names a field an engine cannot constrain`, with nothing to read. RFC 0004 lets a graph
+rule, `a unique or refs entry names a field an engine cannot constrain`, with nothing to read. RFC 0004 lets a graph
 declare `atomic` and RFC 0021 wonders aloud whether every connection "can carry that". Each of those is, today, a
 sentence in prose about PostgreSQL. Kysely speaks several dialects, and the temptation is to promise them all on the
 first day and let the differences surface as run-time failures. This RFC takes the opposite bet, as the stub did: the
@@ -140,7 +140,7 @@ MySQL is the same story with a URL. `example/connections/customers.connection.js
   "label": "Customers",
   "description": "The customers's customers, in the team's MySQL.",
   "kind": "@storage-mysql/mysql.connection-kind.json",
-  "settings": { "email": "{{secrets.customersUrl}}", "pool": { "max": 10 } }
+  "settings": { "url": "{{secrets.customersUrl}}", "pool": { "max": 10 } }
 }
 ```
 
@@ -198,7 +198,7 @@ comparison, SQLite's case-insensitive `LIKE` -- the engine sets the dialect righ
 
 **Two existing kinds gain the block.** `@storage-memory/memory.connection-kind.json`:
 `{ "transactionalDdl": true, "unique": ["string", "number", "boolean", "shape", "list", "unknown"], "refs": true }`,
-every customer at its widest, which is the truth: it keeps any value, enforces `unique` and `refs` in `put` and `remove`
+every entry at its widest, which is the truth: it keeps any value, enforces `unique` and `refs` in `put` and `remove`
 (RFC 0003), and has nothing to migrate (RFC 0017), so a plan of zero steps is trivially one transaction.
 `@storage-postgres/postgres.connection-kind.json`: `{ "transactionalDdl": true, "unique": ["string", "number",
 "boolean"], "refs": true }`. PostgreSQL *can* put a unique constraint on a `jsonb` column; this RFC says a storage kind
@@ -298,7 +298,7 @@ The compiler, RFC 0003's rule given its fact (its code is assigned when RFC 0003
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
-| C0nn (RFC 0003) | `checkStore`, `check/contracts.ts` (or `check/stores.ts` once split) | a `unique` customer names a field whose `fieldClass` is not in the connection's kind's `capabilities.unique`, or a collection declares `refs` and the kind's `capabilities.refs` is false; the kind is read through `scope.get('connection-kind', kind)` from the connection `Judge.connectionOf` resolves | `'<field>' is a <class>; <kind> constrains unique over <list>` / `<kind> does not enforce refs; check the target with a get, or move the store to a connection that does` |
+| C0nn (RFC 0003) | `checkStore`, `check/contracts.ts` (or `check/stores.ts` once split) | a `unique` entry names a field whose `fieldClass` is not in the connection's kind's `capabilities.unique`, or a collection declares `refs` and the kind's `capabilities.refs` is false; the kind is read through `scope.get('connection-kind', kind)` from the connection `Judge.connectionOf` resolves | `'<field>' is a <class>; <kind> constrains unique over <list>` / `<kind> does not enforce refs; check the target with a get, or move the store to a connection that does` |
 
 Missing block on a storage kind: schema validation when the plugin loads (D001 family, existing), never a compiler
 rule; the compiler may assume every kind it reads with `storage: true` carries one.
@@ -520,7 +520,7 @@ those RFCs' shared suites, the sqlite ones unconditionally.
 
 ## Drawbacks and alternatives
 
-- **The matrix.** Every engine is a package, a README, a release customer and one run of every shared suite -- RFC 0002's
+- **The matrix.** Every engine is a package, a README, a release entry and one run of every shared suite -- RFC 0002's
   port suite, RFC 0004's atomic, RFC 0003's constraints, RFC 0015's scope, RFC 0017's planner, and RFC 0009's and
   0010's when they land. Seven suites by four engines is the cost the stub warned of, and it is paid by design rather
   than by accident: the suites are the definition of a store, and an engine that ran fewer of them would be an engine

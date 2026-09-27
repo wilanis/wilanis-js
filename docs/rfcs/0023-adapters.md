@@ -393,7 +393,7 @@ operation path and its inputs, as it does for `@http`. The words `idempotent` an
 are RFC 0011's change, made once there; an adapter published before that change would not validate, which is why the
 plan's first step is blocked on RFC 0011's. A tree that names none of the four plugins is unaffected in every way.
 
-The example changes: a plugin customer, an alias, one connection, a feature and one edited `obtain` string.
+The example changes: a plugin entry, an alias, one connection, a feature and one edited `obtain` string.
 It is a workspace member and not a published package, so nothing downstream sees the change; its tests are the
 RFC's proof that the adapters compose with the http, blob and auth plugins already there. `@wilanis/access` is
 unchanged: its `deliverCode` still answers the code, its `issue-otp` command still prints it, and its README's one
@@ -469,7 +469,7 @@ picks it up (the demo: a challenged `hello` is unlocked from a code read out of 
    `good first issue`.
 ## Drawbacks and alternatives
 
-- **Three packages to keep.** Each is a README, a release customer, a real-provider suite someone must run, and a
+- **Three packages to keep.** Each is a README, a release entry, a real-provider suite someone must run, and a
   dependency a tree installs. The stub said an abandoned adapter is worse than none; this RFC's answer is the shared
   suite and the owner line: a kind that does not pass the suite is not released, and a package whose owner line is
   empty is dropped from `npm run release` at the next release rather than shipped as a promise nobody keeps. The
