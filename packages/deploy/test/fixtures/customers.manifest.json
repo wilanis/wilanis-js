@@ -404,13 +404,6 @@
       "included": "@wilanis/access"
     },
     {
-      "path": "@features/access/domain/CodeIssue.shape.json",
-      "kind": "shape",
-      "feature": "access",
-      "layer": "domain",
-      "included": "@wilanis/access"
-    },
-    {
       "path": "@features/access/domain/Credential.shape.json",
       "kind": "shape",
       "feature": "access",
