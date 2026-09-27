@@ -7,14 +7,21 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkTree, walkedUnder } from '@wilanis/compiler';
-import { edges, LONG_EDGE, loadTree, Scope } from '@wilanis/core';
+import { edges, LONG_EDGE, loadTree, type PluginModule, Scope, schemaRef } from '@wilanis/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { EDGES, embedderFor, type Fuzzing, fuzz, RECORDED, regress, rehearse } from '../src/index.js';
 import { recordedProfile } from '../src/profile.js';
-import { copyOfExample, INCLUDES, PLUGINS } from './example-harness.js';
+import { copyOfExample, docsDir, INCLUDES, PLUGINS } from './example-harness.js';
 
 const load = (dir: string) => loadTree(dir, PLUGINS, INCLUDES);
 const read = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
+
+/** Edit one document of a copied tree in place. */
+function edit(dir: string, file: string, change: (doc: any) => void) {
+  const doc = read(join(dir, file));
+  change(doc);
+  writeFileSync(join(dir, file), JSON.stringify(doc, null, 2));
+}
 
 /** Every file under a directory with its bytes, by its path inside it. */
 function bytesUnder(dir: string): Record<string, string> {
@@ -243,13 +250,46 @@ describe('fuzz --edges: what the edges directory owns', () => {
     );
     expect(checkTree(load(dir)).items).toEqual([]);
     const before = bytesUnder(join(dir, EDGES));
-    await expect(fuzz(load(dir), { edges: true })).rejects.toThrow(
-      "two triggers of feature 'customers' are named 'get-customer', and a trigger's edges are written under its " +
-        `feature and name (${EDGES}/customers.get-customer/): rename ` +
-        '@features/customers/edge/get-customer.trigger.json or @features/customers/edge/v2/get-customer.trigger.json',
-    );
+    // the refusal rehearse --record makes, word for word, since the directory is the same rule's
+    const refusal =
+      "two triggers of feature 'customers' are named 'get-customer', and a recorded trigger's scenarios are written " +
+      'under its feature and name (customers.get-customer/): rename ' +
+      '@features/customers/edge/get-customer.trigger.json or @features/customers/edge/v2/get-customer.trigger.json';
+    await expect(fuzz(load(dir), { edges: true })).rejects.toThrow(refusal);
+    await expect(rehearse(load(dir), { record: RECORDED })).rejects.toThrow(refusal);
     expect(bytesUnder(join(dir, EDGES))).toEqual(before);
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('names the directory of a trigger outside a feature as rehearse --record does', { timeout: 60_000 }, async () => {
+    const dir = copyOfExample();
+    // a tree's own trigger outside a feature is refused as D008 before it is registered, so the one trigger in no
+    // feature is one a plugin ships: read off its path as the recorded runs are, its directory is the plugin's root
+    // before its name, never `undefined`
+    const trigger = read(join(dir, 'features/customers/edge/get-customer.trigger.json'));
+    const loose: PluginModule = {
+      root: '@loose',
+      docs: docsDir({
+        'plugin.json': { $schema: schemaRef('plugin'), description: 'a plugin that ships a trigger' },
+        'get-customer.trigger.json': { ...trigger, settings: { ...trigger.settings, route: '/loose/customers/{id}' } },
+      }),
+      handlers: {},
+    };
+    edit(dir, 'project.json', doc => doc.plugins.push({ use: '@loose' }));
+    const loaded = loadTree(dir, { ...PLUGINS, '@loose': loose }, INCLUDES);
+    const shipped = loaded.registry.all('trigger').find(one => one.path === '@loose/get-customer.trigger.json');
+    expect(shipped?.name).toBe('get-customer');
+    expect(shipped?.feature).toBeUndefined();
+    const edged = await fuzz(loaded, { edges: true });
+    const recorded = await rehearse(loaded, { record: RECORDED });
+    const dirsOf = (written: string[] | undefined, under: string) => [
+      ...new Set((written ?? []).map(file => file.slice(under.length + 1).split('/')[0])),
+    ];
+    expect(dirsOf(edged.recorded?.written, EDGES)).toContain('loose.get-customer');
+    expect(dirsOf(recorded.recorded?.written, RECORDED)).toContain('loose.get-customer');
+    expect(dirsOf(edged.recorded?.written, EDGES).filter(one => one.startsWith('undefined'))).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(loose.docs, { recursive: true, force: true });
   });
 
   it('refuses what would make the directory depend on more than the tree', async () => {
