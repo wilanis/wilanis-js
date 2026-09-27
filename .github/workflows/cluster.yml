@@ -1,12 +1,14 @@
 name: cluster
 
-# The example on a local Kubernetes cluster (RFC 0024): the chart lints and renders on the example's generated values,
-# then scripts/cluster.sh builds the example's image from the workspace's packages as `npm pack` writes them, installs
-# charts/wilanis-tree on a kind cluster with values-local.yaml, and signs in and reads GET /customers through the
-# NodePort for a 200, and the cluster is deleted. It takes minutes and a container runtime, so it runs where the chart,
-# the script or the tool that writes the chart's values changes, on main as on a pull request, and when dispatched. No
-# branch rule requires it, and ci's `test` job keeps `wilanis-deploy --check` as the cheap guard that the files under
-# example/deploy/ are current.
+# The example on a local Kubernetes cluster and under docker compose (RFC 0024). In the `cluster` job the chart lints
+# and renders on the example's generated values, then scripts/cluster.sh builds the example's image from the
+# workspace's packages as `npm pack` writes them, installs charts/wilanis-tree on a kind cluster with values-local.yaml,
+# and signs in and reads GET /customers through the NodePort for a 200, and the cluster is deleted. In the `compose` job
+# the same script builds the same image through example/deploy/compose.yaml, brings it up beside a PostgreSQL, signs in
+# and reads GET /customers on the port the Compose file publishes for a 200, and takes it down. It takes minutes and a
+# container runtime, so it runs where the chart, the script, the example's deploy/ files or the tool that writes them
+# changes, on main as on a pull request, and when dispatched. No branch rule requires it, and ci's `test` job keeps
+# `wilanis-deploy --check` as the cheap guard that the files under example/deploy/ are current.
 
 on:
   push:
@@ -15,12 +17,14 @@ on:
       - charts/**
       - scripts/cluster.sh
       - packages/deploy/**
+      - example/deploy/**
       - .github/workflows/cluster.yml
   pull_request:
     paths:
       - charts/**
       - scripts/cluster.sh
       - packages/deploy/**
+      - example/deploy/**
       - .github/workflows/cluster.yml
   workflow_dispatch:
 
@@ -96,3 +100,24 @@ jobs:
       - name: the cluster is deleted
         if: always()
         run: scripts/cluster.sh down
+
+  compose:
+    name: the example under docker compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # `compose` builds the image as `up` does, from the packed tarballs, but through compose.yaml's own build; fills
+      # deploy/.env with values-local.yaml's demo values and the URL of the PostgreSQL an override stands up beside the
+      # tree, the generated compose.yaml left as it is; waits for both healthchecks; signs in and reads GET /customers on
+      # localhost:8099, the port compose.yaml publishes, for a 200; and ends with `docker compose down -v`, which it runs
+      # after printing the services' logs where a step before it fails. docker and its compose plugin are the runner's.
+      - name: the example comes up under docker compose, and a signed-in GET /customers answers 200
+        run: |
+          docker compose version
+          scripts/cluster.sh compose

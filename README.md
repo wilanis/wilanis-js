@@ -299,6 +299,7 @@ npx wilanis-deploy example --profile production --target image,compose,helm   # 
 docker compose -f example/deploy/compose.yaml up --build   # a tree installed from npm, with deploy/.env filled in
 scripts/cluster.sh up      # the example on a local kind cluster, installed from the chart
 scripts/cluster.sh down
+scripts/cluster.sh compose # the same image under the example's compose.yaml, beside a PostgreSQL, then down
 ```
 
 The Compose line builds from the tree's own `package-lock.json`, which a tree installed from npm has. The example
@@ -307,8 +308,10 @@ up` builds its image from the workspace's packages as `npm pack` writes them, th
 publish: it locks a staging copy of the tree to those tarballs, builds the generated Dockerfile unchanged, installs
 the chart on a kind cluster with `charts/wilanis-tree/values-local.yaml` (PostgreSQL through CloudNativePG, and a
 Secret holding the demo's values), and last signs in and reads `GET /customers` on http://localhost:8080, failing
-unless it answers 200. It is the one thing here that needs docker, kind, kubectl and helm, and it names whichever
-is missing.
+unless it answers 200. `scripts/cluster.sh compose` builds the same image through the generated `compose.yaml`,
+fills `deploy/.env` with the same demo values, brings the file's service up beside a PostgreSQL an override adds,
+runs the same check on the port the file publishes, 8099, and takes both down with their volumes. The script
+is the one thing here that needs docker, kind, kubectl and helm, and it names whichever is missing.
 
 ## The rest
 
