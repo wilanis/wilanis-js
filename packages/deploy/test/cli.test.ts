@@ -4,16 +4,7 @@
  * fails check, and the plan on stdout as JSON the published schema accepts.
  */
 import { spawnSync } from 'node:child_process';
-import {
-  cpSync,
-  existsSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,6 +31,12 @@ const pathsUnder = (dir: string): string[] =>
     .filter(path => !path.startsWith('node_modules'))
     .sort();
 
+/** Every file directly under a directory with its text, by name: what a command that writes nothing leaves as it was. */
+const contentsUnder = (dir: string): [string, string][] =>
+  readdirSync(dir)
+    .sort()
+    .map(name => [name, readFileSync(join(dir, name), 'utf8')]);
+
 /** The profiles project.json declares, as RFC 0013's message lists them, the default marked. */
 function declared(): string {
   const profiles: Record<string, { default?: boolean }> = read(join(EXAMPLE, 'project.json')).profiles;
@@ -54,14 +51,16 @@ describe('wilanis-deploy', () => {
     expect(ran.code).toBe(1);
     expect(ran.stdout).toBe('');
     expect(ran.stderr).toMatch(/^--profile is required/);
-    expect(ran.stderr).toContain('wilanis-deploy [root] --profile <name> [--profile <name>]... [--target plan]');
+    expect(ran.stderr).toContain(
+      'wilanis-deploy [root] --profile <name> [--profile <name>]... [--target image,compose,plan] [-o <dir>]',
+    );
   });
 
   it('exits 1 naming the targets it renders where a target is not one of them', () => {
-    const ran = deploy(join(EXAMPLE, '..'), 'example', '--profile', 'production', '--target', 'compose');
+    const ran = deploy(join(EXAMPLE, '..'), 'example', '--profile', 'production', '--target', 'helm');
     expect(ran.code).toBe(1);
     expect(ran.stdout).toBe('');
-    expect(ran.stderr).toMatch(/^no target compose; this version renders: plan\n/);
+    expect(ran.stderr).toMatch(/^no target helm; this version renders: image, compose, plan\n/);
   });
 
   it('exits 1 with RFC 0013’s message where no profile has the name, and prints no plan', { timeout: 60_000 }, () => {
@@ -94,9 +93,23 @@ describe('wilanis-deploy', () => {
     }
   });
 
+  it('finds the example’s checked-in deploy/ as the tree renders it, as CI checks it', { timeout: 60_000 }, () => {
+    const ran = deploy(
+      join(EXAMPLE, '..'),
+      'example',
+      '--profile',
+      'production',
+      '--target',
+      'image,compose',
+      '--check',
+    );
+    expect(ran).toEqual({ code: 0, stdout: '', stderr: 'example/deploy: every file is as the tree renders it\n' });
+  });
+
   it('prints the plan with --target plan as JSON the published schema accepts, and writes no file', {
     timeout: 60_000,
   }, () => {
+    const generated = contentsUnder(join(EXAMPLE, 'deploy'));
     const ran = deploy(
       join(EXAMPLE, '..'),
       'example',
@@ -113,6 +126,6 @@ describe('wilanis-deploy', () => {
     expect(planValid(plan) ? [] : planValid.errors).toEqual([]);
     expect(plan.image.reference).toBe(`customers:${read(join(EXAMPLE, 'package.json')).version}`);
     expect(plan.workloads.map((one: { profile: string }) => one.profile)).toEqual(['live', 'production']);
-    expect(existsSync(join(EXAMPLE, 'deploy'))).toBe(false);
+    expect(contentsUnder(join(EXAMPLE, 'deploy'))).toEqual(generated);
   });
 });
