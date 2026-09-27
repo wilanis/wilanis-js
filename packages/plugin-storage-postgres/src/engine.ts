@@ -215,20 +215,27 @@ export class PostgresEngine implements Engine {
   /**
    * The record after the change, or `record` absent where the collection holds none under that key within
    * the scope. A scope column is never among the changes -- it is not a field of the shape -- so the row
-   * stays under the scope it was written with.
+   * stays under the scope it was written with. A `unique` or a `refs` the change would break is held by the
+   * database, and its refusal is answered as the `violated` a `put` answers, with the row left as it was.
    */
   async patch(at: At, key: unknown, changes: Record_, written?: Written) {
     const { db, table } = await this.scoped(at, written?.scope);
     const values = changed(changes, at);
     if (!Object.keys(values).length) return this.get(at, key, written?.scope);
-    const after = await db
-      .updateTable(table as never)
-      .set(values as never)
-      .where(folded(at.key) as never, '=', key as never)
-      .where(eb => within(eb as never, written?.scope) as never)
-      .returning(columns(at) as never)
-      .executeTakeFirst();
-    return { record: record(after as Record<string, unknown> | undefined, at) };
+    try {
+      const after = await db
+        .updateTable(table as never)
+        .set(values as never)
+        .where(folded(at.key) as never, '=', key as never)
+        .where(eb => within(eb as never, written?.scope) as never)
+        .returning(columns(at) as never)
+        .executeTakeFirst();
+      return { record: record(after as Record<string, unknown> | undefined, at) };
+    } catch (error) {
+      const violated = violation(error, at, written?.scope);
+      if (violated) return { violated };
+      throw error;
+    }
   }
 
   /**

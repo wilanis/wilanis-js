@@ -169,7 +169,7 @@
       }
     },
     "patch": {
-      "description": "Change some fields of one record, leaving the rest as they are. It never removes a field -- absence is written by put -- and it never touches the key. Answers record absent where the collection holds none under that key. It is idempotent because each field it names is set to the value given, never to one reckoned from what is kept, so the same changes made again find those values already there.",
+      "description": "Change some fields of one record, leaving the rest as they are. It never removes a field -- absence is written by put -- and it never touches the key. Answers record absent where the collection holds none under that key. A constraint the store declares holds of the record as the change leaves it, as it holds of one put: a unique another record already holds, or a refs pointing at a record that is not there, answers violated and writes nothing. It is idempotent because each field it names is set to the value given, never to one reckoned from what is kept, so the same changes made again find those values already there.",
       "transactional": true,
       "idempotent": true,
       "accepts": {
@@ -206,7 +206,12 @@
           "record": {
             "type": "$T",
             "required": false,
-            "description": "absent where there is none"
+            "description": "the record after the change; absent where there is none, or where a violated constraint stopped the write"
+          },
+          "violated": {
+            "type": "string",
+            "required": false,
+            "description": "the constraint that stopped the write, named as the store declares it -- \"unique [url, method]\" or \"refs notes.entryId -> entries\". Absent where none did, so a graph routes on has(violated)"
           }
         }
       }
