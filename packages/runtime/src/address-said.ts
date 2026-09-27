@@ -6,7 +6,7 @@
 import type { Bound, ConnectionDoc, Loaded, Operation, Scope } from '@wilanis/core';
 
 /** One part of an address, in the order it is taken: the step's input, the plugin's setting, the default. */
-function boundSaid(part: string, bound: Bound<unknown>, root: string | undefined, otherwise: string): string {
+function partSaid(part: string, bound: Bound<unknown>, root: string | undefined, otherwise: string): string {
   const from = [
     ...(bound.input ? [`in.${bound.input}`] : []),
     ...(bound.setting ? [`${root ?? 'the plugin'} settings.${bound.setting}`] : []),
@@ -23,8 +23,8 @@ function boundSaid(part: string, bound: Bound<unknown>, root: string | undefined
 export function listensSaid(op: Operation, root: string | undefined): string {
   if (!op.listens) return '';
   const { port, host } = op.listens;
-  const parts = [boundSaid('port', port, root, 'nothing fixes it')];
-  if (host) parts.push(boundSaid('host', host, root, 'every interface'));
+  const parts = [partSaid('port', port, root, 'nothing fixes it')];
+  if (host) parts.push(partSaid('host', host, root, 'every interface'));
   return `; ${parts.join('; ')}`;
 }
 
