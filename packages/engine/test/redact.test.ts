@@ -83,6 +83,34 @@ describe('a redacted value', () => {
     redactValue(value, [['password']]);
     expect(value).toEqual(accounts());
   });
+
+  /** A marked field that is there, and one that is not: the two paths a later mutation could reach. */
+  const marks = [
+    ['user', 'password'],
+    ['meta', 'key'],
+  ];
+
+  it('copies only what a path walks through, and shares the rest with the value', () => {
+    const value = { user: { name: 'ada', password: 'p-ada' }, meta: { note: 'n' }, tags: { t: 1 } };
+    const shown = redactValue(value, marks) as typeof value;
+    expect(shown.user).not.toBe(value.user);
+    expect(shown.meta).not.toBe(value.meta);
+    expect(shown.tags).toBe(value.tags);
+  });
+
+  it('keeps the marker, and keeps a marked position empty, whatever is done to the value later', () => {
+    const value: Record<string, Record<string, unknown>> = {
+      user: { name: 'ada', password: 'p-ada' },
+      meta: { note: 'n' },
+      tags: { t: 1 },
+    };
+    const shown = redactValue(value, marks);
+    value.user.password = 'p-new';
+    value.meta.key = 'k-leak';
+    value.tags.t = 2;
+    // an unmarked part is the value's own, so it shows the change; no marked position does
+    expect(shown).toEqual({ user: { name: 'ada', password: SECRET }, meta: { note: 'n' }, tags: { t: 2 } });
+  });
 });
 
 describe('a report of a call or a map that answers a list', () => {
