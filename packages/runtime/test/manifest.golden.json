@@ -3263,7 +3263,8 @@
             "@auth settings"
           ]
         }
-      ]
+      ],
+      "permits": null
     },
     "local": {
       "default": false,
@@ -3422,7 +3423,8 @@
             "@auth settings"
           ]
         }
-      ]
+      ],
+      "permits": null
     },
     "production": {
       "default": false,
@@ -3576,6 +3578,21 @@
             "@connections/employees-production.connection.json"
           ]
         }
+      ],
+      "permits": [
+        "@auth/challenge.port.json#issue",
+        "@auth/identity.port.json#verify",
+        "@auth/session.port.json",
+        "@auth/token.port.json",
+        "@blob/csv.port.json",
+        "@connections/customers-postgres.connection.json",
+        "@connections/employees-production.connection.json",
+        "@connections/people.connection.json",
+        "@http/server.port.json#listen",
+        "@otel/exporter.port.json#export",
+        "@queue/queue.port.json",
+        "@storage/storage.port.json#ensure",
+        "@storage/store.port.json"
       ]
     },
     "production-scheduler": {
@@ -3670,7 +3687,8 @@
             "@auth settings"
           ]
         }
-      ]
+      ],
+      "permits": null
     },
     "production-worker": {
       "default": false,
@@ -3764,7 +3782,8 @@
             "@auth settings"
           ]
         }
-      ]
+      ],
+      "permits": null
     }
   }
 }

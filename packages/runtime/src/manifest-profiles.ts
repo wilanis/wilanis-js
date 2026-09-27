@@ -2,9 +2,9 @@
  * The per-profile half of the manifest (RFC 0026): one block per profile the tree is judged under, each what the
  * profile writes (its bindings and stand-ins, canonical on both sides) beside what `reachOf` derives from it (the
  * effects reached and the connections they were reached with, what is held open, the startup steps that run there
- * and the variables read) and what `listensOf` reads off the steps that run there (the addresses listened on). It
- * reads the Scope and never the environment: which profile a process would pick is `activeProfile`'s question, and
- * the manifest describes the tree, not the process.
+ * and the variables read), what `listensOf` reads off the steps that run there (the addresses listened on), and
+ * what RFC 0016 has the profile permit. It reads the Scope and never the environment: which profile a process would
+ * pick is `activeProfile`'s question, and the manifest describes the tree, not the process.
  */
 import { profilesOf, type Reach, reachOf } from '@wilanis/compiler';
 import { runsUnder, type Scope } from '@wilanis/core';
@@ -23,7 +23,7 @@ export interface NeedRow {
   key: string;
   readBy: string[];
 }
-/** One profile: what it chooses, and what the tree reaches, holds, listens on, starts and needs under it. */
+/** One profile: what it chooses and permits, and what the tree reaches, holds, listens on, starts and needs under it. */
 export interface ProfileBlock {
   default: boolean;
   description: string | null;
@@ -34,6 +34,8 @@ export interface ProfileBlock {
   listens: ListenRow[];
   starts: (string | null)[];
   needs: NeedRow[];
+  /** What the profile permits (RFC 0016), canonical and sorted; null where it writes no `permits`, so everything. */
+  permits: string[] | null;
 }
 
 /** The key the unnamed profile of a tree that declares none is written under: JSON has no key for nothing. */
@@ -43,6 +45,15 @@ export const UNNAMED = '';
 function canonMap(scope: Scope, written: Record<string, string> | undefined): Record<string, string> {
   const pairs = Object.entries(written ?? {}).map(([from, to]) => [scope.canon(from), scope.canon(to)] as const);
   return Object.fromEntries(sortedBy([...pairs], ([from]) => from));
+}
+
+/**
+ * What a profile's `permits` names, each entry canonical, by entry: an operation as path#operation, a whole port or a
+ * connection as its path. Null where the profile writes none, which permits everything (RFC 0016); the checker holds
+ * a list that is written to what the profile reaches, in both directions (C021, C022).
+ */
+function permitsOf(scope: Scope, written: string[] | undefined): string[] | null {
+  return written ? sorted(written.map(entry => scope.canon(entry))) : null;
 }
 
 /** Every effectful operation reached, once, by operation, with the connections its sites named, sorted. */
@@ -90,6 +101,7 @@ function profileBlock(scope: Scope, name: string | undefined): ProfileBlock {
     listens: listensOf(scope, name),
     starts: (scope.project?.startup ?? []).filter(step => runsUnder(step, name)).map(step => step.label ?? null),
     needs: needRows(reach),
+    permits: permitsOf(scope, written?.permits),
   };
 }
 

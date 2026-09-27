@@ -383,7 +383,7 @@
     "profile": {
       "description": "One place the tree runs (RFC 0013): what the profile writes, and what `reachOf` derives from it.",
       "type": "object",
-      "required": ["default", "description", "bindings", "connections", "reaches", "holds", "listens", "starts", "needs"],
+      "required": ["default", "description", "bindings", "connections", "reaches", "holds", "listens", "starts", "needs", "permits"],
       "additionalProperties": false,
       "properties": {
         "default": {
@@ -428,6 +428,12 @@
           "description": "Every environment variable the profile reads through a secret, once per secret key, by variable and then key: the variable's name, never its value.",
           "type": "array",
           "items": { "$ref": "#/$defs/need" }
+        },
+        "permits": {
+          "description": "What the profile permits (RFC 0016), its `permits` with each entry canonical, sorted: an effectful native operation as path#operation, a whole native port as its path, a connection as its path. The checker holds a written list to what the profile reaches in both directions (C021, C022): nothing under `reaches` goes unpermitted, and no entry permits nothing reached. Null where the profile writes none, and so permits everything, as the unnamed profile of a tree that declares none does.",
+          "type": ["array", "null"],
+          "items": { "type": "string" },
+          "uniqueItems": true
         }
       }
     },
