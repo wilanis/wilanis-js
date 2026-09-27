@@ -2,7 +2,8 @@
  * What the rehearsal reaches (#637). Every other decision on a branch's run is steered to answer, so a switch behind a
  * call that decides on a generated answer is still reached; a list the trigger hands down under another name is made
  * to hold an element; and a branch whose run never got to its switch is reported as not reached -- never credited
- * with whatever ended the run -- and is not recorded as though it ran.
+ * with whatever ended the run -- and is not recorded as though it ran. A switch in the same graph that routes what a
+ * switch reads is steered to route it there, and not only to answer (#569).
  */
 import { readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -13,6 +14,7 @@ import { codes, copyOfExample, EXAMPLE, INCLUDES, PLUGINS } from './example-harn
 
 const load = (dir: string) => loadTree(dir, PLUGINS, INCLUDES);
 const GET_ROW = 'features/customers/data/get-row.graph.json';
+const KEPT_GET = 'features/customers/data/kept-get.graph.json';
 
 /** One decision of a rehearsal, by the graph that declares it and the switch's id. */
 const decisionOf = (run: Rehearsal, graph: string, node: string) =>
@@ -49,6 +51,42 @@ describe('the rehearsal reaches a switch behind a call that decides first', () =
     const row = decisionOf(run, 'data/delete-row.graph.json', 'outcome');
     expect(row?.triggers).toContain('delete-customers');
     for (const one of row?.branches ?? []) expect(one.uncovered, one.uncovered).toBeUndefined();
+  });
+});
+
+describe("the rehearsal steers a guard's own graph to the node it judges (#569)", () => {
+  it("routes kept-get's switch to the made node a guard judges, not to its first branch that answers", {
+    timeout: 60_000,
+  }, async () => {
+    const dir = copyOfExample();
+    // a gold record is answered first, from a node of its own: the guarded `customer` is now the second branch that
+    // answers, so a run steered only to answer takes the gold branch, and the guard over `customer` never runs
+    const doc = JSON.parse(readFileSync(join(dir, KEPT_GET), 'utf8'));
+    const decides = doc.nodes.find((node: any) => node.type.endsWith('/switch.schema.json'));
+    decides.rules.unshift({ when: "has(record) && record.tier == 'gold'", to: 'goldCustomer' });
+    const customer = doc.nodes.find((node: any) => node.id === 'customer');
+    doc.nodes.push({ ...customer, id: 'goldCustomer', label: 'The gold record' });
+    doc.out.from.unshift('goldCustomer');
+    writeFileSync(join(dir, KEPT_GET), JSON.stringify(doc, null, 2));
+    expect(codes(dir)).toEqual([]);
+    // what the read answers is drawn from the seed, so the guard is reached under every seed, not one that happens to
+    // generate the record it needs
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      const run = await rehearse(load(dir), { seed, profile: 'local' });
+      expect(run.ok, run.lines.join('\n')).toBe(true);
+      const guard = decisionOf(run, 'data/kept-get.graph.json', 'customer:check');
+      expect(guard?.branches.map(one => [one.to, one.settled?.status, one.settled?.declared?.reason])).toEqual([
+        ['customer', 'done', undefined],
+        ['customer:violated', 'failed', 'invariant'],
+      ]);
+      const kept = decisionOf(run, 'data/kept-get.graph.json', decides.id);
+      expect(kept?.branches.map(one => [one.to, one.settled?.status])).toEqual([
+        ['goldCustomer:made', 'done'],
+        ['customer:made', 'done'],
+        ['noCustomer', 'failed'],
+      ]);
+    }
+    rmSync(dir, { recursive: true, force: true });
   });
 });
 

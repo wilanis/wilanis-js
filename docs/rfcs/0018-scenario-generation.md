@@ -665,9 +665,12 @@ Decided during implementation:
   recorded file `is reachable now`. The rehearsal fails, so `--check` fails with it, and the branch's file appears
   as `missing` once a fix reaches it. What the rehearsal steers so that such a branch is rare is in
   `packages/runtime/src/rehearse-reached.ts`: every other decision on the run routed to its first case that a run
-  can take and whose target is not a refusal (`answering`), a switch routing to a guard's `<id>:made` counted as
-  governing the guarded call, and a switch's outermost list made to hold an element where the frames on the way
-  hand it the trigger's own input under another name.
+  can take and whose target is not a refusal (`answering`); laid over that, each switch that routes a node the
+  switch or a call enclosing it waits for, in the same spec, routed to that node (`reach`, #569), so that a guard's
+  `<id>:check` behind its graph's own `has(record)` switch is reached through the branch into `<id>:made` whichever
+  branch answers first, and a guarded list's map through the branch into the list moved aside there; and a switch's
+  outermost list made to hold an element where the frames on the way hand it the trigger's own input under another
+  name.
 - **A policy's decision is not its trigger's (#222).** The `scenarios` line of `wilanis describe <trigger>` counts
   the scenarios whose `trigger` names it and that name no `policy` (`scenariosOf` in
   `packages/runtime/src/scenario-said.ts`), and the viewer's trigger page groups the same list. A policy scenario
