@@ -46,6 +46,7 @@ export { LIMIT_SETTINGS, type Limit, type LimitSetting, limitsOf, type TriggerLi
 export { cli as cliTriggers } from './plugins/cli-trigger.js';
 export { BUILTIN_PLUGINS } from './plugins/index.js';
 export { std } from './plugins/std.js';
+export { triggersGatedBy } from './policy-gates.js';
 export { postLoad } from './post-load.js';
 export { activeProfile, declaredProfile, PROFILE_VARIABLE, secretsRefusal, unsetSecrets } from './profile.js';
 export {

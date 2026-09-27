@@ -15,7 +15,7 @@
 import { checkTree } from '@wilanis/compiler';
 import type { GraphDoc, Kind, Loaded, LoadResult, PolicyDoc, PortDoc, Refusal, TriggerDoc } from '@wilanis/core';
 import { pageUrl, policyPath, SCHEMA_BASE, Scope, WILANIS } from '@wilanis/core';
-import { endpointSaid, limitsOf, listensParts, profilesOf, settingsSaid } from '@wilanis/runtime';
+import { endpointSaid, limitsOf, listensParts, profilesOf, settingsSaid, triggersGatedBy } from '@wilanis/runtime';
 import { attemptsOf } from './attempts.js';
 import { deliveryView, receivesView } from './delivery.js';
 import { graphView } from './graphs.js';
@@ -182,10 +182,7 @@ function policyView(scope: Scope, doc: Loaded, view: DocView) {
   view.decides = targetOf(scope, policy.decide.run).target;
   view.outcomes = policy.outcomes;
   if (policy.proves?.length) view.proves = policy.proves;
-  view.gates = scope.registry
-    .all('trigger')
-    .filter(trigger => (trigger.doc.policies ?? []).some(ref => scope.canon(policyPath(ref)) === doc.path))
-    .map(trigger => ({ path: trigger.path, label: labelOf(trigger) }));
+  view.gates = triggersGatedBy(scope, doc.path).map(trigger => ({ path: trigger.path, label: labelOf(trigger) }));
 }
 
 /**

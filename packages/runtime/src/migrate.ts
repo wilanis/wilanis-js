@@ -8,16 +8,17 @@
  * step and builds no `Served`: nothing listens.
  */
 import { checkTree, type ReachedSecret } from '@wilanis/compiler';
-import type {
-  Applied,
-  LoadResult,
-  MigrateContext,
-  Plan,
-  PlanStep,
-  PlanTarget,
-  PluginModule,
-  Refusal,
-  Scope,
+import {
+  type Applied,
+  type LoadResult,
+  type MigrateContext,
+  type Plan,
+  type PlanStep,
+  type PlanTarget,
+  type PluginModule,
+  type Refusal,
+  type Scope,
+  secretKeysRead,
 } from '@wilanis/core';
 import { FileBlobStore } from './blobs.js';
 import type { Embedder } from './embed.js';
@@ -237,11 +238,11 @@ function storeSecrets(scope: Scope, profile: string | undefined): ReachedSecret[
   return scope.registry.all('store').flatMap(store => {
     const connection = scope.connectionFor(store.doc.connection, profile);
     if (typeof connection === 'string') return [];
-    return scope
-      .templateReads(connection.doc.settings)
-      .flatMap(([root, key]) =>
-        root === 'secrets' && key ? [{ key, variable: scope.project?.secrets?.[key], readBy: connection.path }] : [],
-      );
+    return secretKeysRead(connection.doc.settings).map(key => ({
+      key,
+      variable: scope.project?.secrets?.[key],
+      readBy: connection.path,
+    }));
   });
 }
 

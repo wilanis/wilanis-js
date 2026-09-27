@@ -115,7 +115,7 @@ export function manifestOf(load: LoadResult & { resolved?: Resolved }, options: 
     documents: documentRows(load),
     triggers,
     ports: { domain: domainPortRows(scope, triggers), native: nativePortRows(load) },
-    policies: policyRows(load, triggers),
+    policies: policyRows(scope),
     connections: connectionRows(scope),
     secrets: secretRows(load),
     startup: startupRows(load),

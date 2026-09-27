@@ -19,6 +19,7 @@ import { graphLines } from './graph-said.js';
 import { holdsLines, invariantLines } from './invariant-lines.js';
 import { LIMIT_SETTINGS, limitLines } from './limits-said.js';
 import { fieldLine, portLines, shower, storeLines } from './lines.js';
+import { triggersGatedBy } from './policy-gates.js';
 import { permittedLines } from './profiles-said.js';
 import { requiredByLines, requiresLines } from './required-said.js';
 import { scenarioLines, triggerScenarioLines, writtenMark } from './scenario-said.js';
@@ -94,7 +95,7 @@ function guardLines(declared: TriggerKindDoc, showType: (spec: unknown) => strin
   return lines;
 }
 /** A policy: what decides it, what it can answer, and the triggers it gates. */
-function policyLines(doc: Loaded, load: LoadResult): string[] {
+function policyLines(doc: Loaded, scope: Scope): string[] {
   const lines: string[] = [];
   const declared = doc.doc as PolicyDoc;
   lines.push(`decides through  ${declared.decide.run}`);
@@ -105,9 +106,7 @@ function policyLines(doc: Loaded, load: LoadResult): string[] {
     lines.push(
       `    ${reason} → ${outcome.effect}${outcome.method ? ` (${outcome.method})` : ''}${outcome.description ? `  -- ${outcome.description}` : ''}`,
     );
-  const gated = load.registry
-    .all('trigger')
-    .filter(trigger => (trigger.doc.policies ?? []).some(ref => load.resolve(policyPath(ref)) === doc.path));
+  const gated = triggersGatedBy(scope, doc.path);
   lines.push(
     gated.length
       ? `gates: ${gated.map(trigger => trigger.path).join(', ')}`
@@ -237,7 +236,7 @@ function kindBody(doc: Loaded, load: LoadResult, scope: Scope, showType: (spec: 
   if (doc.kind === 'connection-kind') return [...deliveryKindLines(doc), ...kindLines(doc, showType)];
   if (doc.kind === 'shape') return shapeLines(doc, scope, load, showType);
   if (doc.kind === 'store') return storeLines(doc, load, scope);
-  if (doc.kind === 'policy') return policyLines(doc, load);
+  if (doc.kind === 'policy') return policyLines(doc, scope);
   if (doc.kind === 'trigger') return triggerLines(doc, scope);
   if (doc.kind === 'invariant') return invariantLines(doc, scope);
   if (doc.kind === 'graph') return graphLines(doc, scope);

@@ -22,4 +22,5 @@ export * from './secret.js';
 export * from './templates.js';
 export * from './types.js';
 export * from './validate.js';
+export { secretKeysRead } from './value-reads.js';
 export * from './values.js';

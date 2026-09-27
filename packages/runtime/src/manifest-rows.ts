@@ -15,10 +15,12 @@ import {
   type PortDoc,
   policyPath,
   type Scope,
+  secretKeysRead,
   type TriggerDoc,
 } from '@wilanis/core';
 import { endpointOf } from './address-said.js';
 import { byUnits } from './diagnostics.js';
+import { triggersGatedBy } from './policy-gates.js';
 import { RUNTIME_VERSION } from './runtime-version.js';
 
 /** One document of the tree, its plugins' and its includes' among them. */
@@ -242,12 +244,12 @@ export function nativePortRows(load: LoadResult): NativePortRow[] {
 }
 
 /** Every policy, by path, with the triggers that attach it. */
-export function policyRows(load: LoadResult, triggers: TriggerRow[]): PolicyRow[] {
-  const rows = load.registry.all('policy').map(policy => ({
+export function policyRows(scope: Scope): PolicyRow[] {
+  const rows = scope.registry.all('policy').map(policy => ({
     path: policy.path,
-    decides: load.resolve(policy.doc.decide.run),
+    decides: scope.canon(policy.doc.decide.run),
     proves: sorted(policy.doc.proves ?? []),
-    gates: sorted(triggers.filter(trigger => trigger.policies.includes(policy.path)).map(trigger => trigger.path)),
+    gates: sorted(triggersGatedBy(scope, policy.path).map(trigger => trigger.path)),
     included: policy.included ?? null,
   }));
   return sortedBy(rows, row => row.path);
@@ -269,9 +271,7 @@ export function connectionRows(scope: Scope): ConnectionRow[] {
     kind: scope.canon(connection.doc.kind),
     endpoint: endpointIn(scope, connection.doc),
     settings: settingsOf(connection.doc.settings),
-    secrets: sorted(
-      scope.templateReads(connection.doc.settings).flatMap(([root, key]) => (root === 'secrets' && key ? [key] : [])),
-    ),
+    secrets: sorted(secretKeysRead(connection.doc.settings)),
   }));
   return sortedBy(rows, row => row.path);
 }
