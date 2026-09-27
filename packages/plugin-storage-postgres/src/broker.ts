@@ -5,9 +5,9 @@
  *
  * What makes it the store's own rather than a broker that happens to share a database is the transaction. A
  * publish inside an atomic graph joins the transaction that graph's store calls run in -- through the same
- * `atomic.join` on the same connection, opened by this plugin's engine whichever of the two reaches it first --
- * so the message exists exactly when the graph's writes commit: the transactional outbox, with no document
- * naming it.
+ * `atomic.join` on the same connection as the profile reaches it, opened by this plugin's engine whichever of
+ * the two reaches it first -- so the message exists exactly when the graph's writes commit: the transactional
+ * outbox, with no document naming it.
  *
  * The acknowledgement is not in that transaction, and the RFC says why: the worker acknowledges after the run
  * has answered, so a process that dies between the two leaves the message to be delivered again. At least once,
@@ -15,18 +15,15 @@
  */
 import type { Atomic } from '@wilanis/core';
 import type { Broker, Handle, Message } from '@wilanis/plugin-queue';
-import type { Transaction } from '@wilanis/plugin-storage';
+import type { On, Transaction } from '@wilanis/plugin-storage';
 import { TableConsumer } from './consumer.js';
 import type { Opened, PostgresEngine } from './engine.js';
 import { Listeners } from './listener.js';
-import { poolFor, type Settings } from './pool.js';
+import { poolFor, reachedOn, type Settings } from './pool.js';
 import { ensureQueue, parkedOn, payloadOf, putMessage, type Table } from './queue-table.js';
 
 /** How long a delivery holds its message before another worker may take it, where the plugin's settings say nothing. */
 const VISIBILITY_SECONDS = 30;
-
-/** The connections an environment carries, with their kinds and their settings, secrets substituted. */
-type Connections = Record<string, { kind: string; settings: Record<string, unknown> }>;
 
 /**
  * A table the statement named that is not there, said as the step that makes it: the queue table is made by
@@ -94,11 +91,11 @@ export class TableBroker implements Broker {
     return this.listeners.close();
   }
 
-  /** A connection of this tree, as the environment carries it. */
-  private connectionOf(connection: string): { connection: string; kind: string; settings: Record<string, unknown> } {
-    const conn = (this.env as { connections?: Connections }).connections?.[connection];
-    if (!conn) throw new Error(`queue on '${connection}': not a connection of this tree`);
-    return { connection, kind: conn.kind, settings: conn.settings };
+  /** A connection of this tree, as the environment carries it, under the path it reaches (`reachedOn`). */
+  private connectionOf(connection: string): On {
+    const on = reachedOn(this.env, connection);
+    if (!on) throw new Error(`queue on '${connection}': not a connection of this tree`);
+    return on;
   }
 
   /** The table a connection's messages are kept in, reached through the connection's pool. */
@@ -108,11 +105,13 @@ export class TableBroker implements Broker {
 
   /**
    * The table on the atomic graph's transaction: the one already open on the connection, or one this engine
-   * opens now and every store call after this publish then joins.
+   * opens now and every store call after this publish then joins. It joins under the connection reached, not
+   * the name the publish gave, so a queue a profile keeps beside the stores in their connection is published in
+   * the store's transaction whichever name each call used.
    */
   private async inTransaction(connection: string, atomic: Atomic): Promise<Table> {
     const on = this.connectionOf(connection);
-    const joined = await atomic.join<Transaction>(connection, () => this.engine.begin(on));
+    const joined = await atomic.join<Transaction>(on.connection, () => this.engine.begin(on));
     const trx = (joined as Partial<Opened>).trx;
     if (!trx)
       throw new Error(`the transaction on '${connection}' was opened by another engine, so a publish cannot join it`);

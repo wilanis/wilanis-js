@@ -3,6 +3,7 @@ import type { Scope } from '@wilanis/core';
 import { splitPath, TEMPLATE } from '@wilanis/core';
 import { Kernel, type Report, type RunOptions } from '@wilanis/engine';
 import type { Compiled } from './compiled.js';
+import { connectionUnder } from './documents.js';
 
 type Settings = Record<string, unknown>;
 
@@ -39,29 +40,33 @@ class Secrets {
   }
 }
 
-/** One connection as a handler reads it: its kind, and its settings with every secret substituted. */
+/**
+ * One connection as a handler reads it: its kind, its settings with every secret substituted, and its path, the
+ * connection document they are read from. Whatever a handler keeps per connection -- a pool, the transaction of
+ * an atomic graph -- is keyed by that path, never by the name it asked with.
+ */
 interface Connection {
   kind: string;
   settings: Settings;
+  path: string;
 }
 
 /**
- * Every connection a handler may ask for, keyed by the path the documents name, each answering the settings of
- * the connection `connectionFor` reaches under the profile. A handler asking for a connection a stand-in
- * replaces receives the stand-in's settings and never learns a stand-in exists. Every connection is substituted,
- * so `missing` notes what it noted before profiles chose stand-ins.
+ * Every connection a handler may ask for, keyed by the path the documents name, each answering the connection
+ * `connectionUnder` reaches under the profile: a handler asking for one a stand-in replaces receives the
+ * stand-in, path and all. So two names the profile resolves to one connection hand a handler one path, and a
+ * store written through one and a queue published through the other share one pool and join one transaction
+ * -- the connection the checker's walk judges an atomic graph by (L010), since it asks the same function.
+ * Every connection is substituted, so `missing` notes what it noted before profiles chose stand-ins.
  */
 function connectionsOf(scope: Scope, secrets: Secrets, profile: string | undefined): Record<string, Connection> {
   const own: Record<string, Connection> = {};
   for (const connection of scope.registry.all('connection')) {
     const settings = secrets.substitute(connection.doc.settings) as Settings;
-    own[connection.path] = { kind: scope.canon(connection.doc.kind), settings };
+    own[connection.path] = { kind: scope.canon(connection.doc.kind), settings, path: connection.path };
   }
   const connections: Record<string, Connection> = {};
-  for (const path of Object.keys(own)) {
-    const reached = scope.connectionFor(path, profile);
-    connections[path] = typeof reached === 'string' ? own[path] : (own[reached.path] ?? own[path]);
-  }
+  for (const path of Object.keys(own)) connections[path] = own[connectionUnder(scope, path, profile)] ?? own[path];
   return connections;
 }
 

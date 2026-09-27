@@ -22,9 +22,11 @@ export class AtomicScope implements Atomic {
   private opening?: Promise<Participant>;
 
   /**
-   * The transaction on that connection: opened on the first call, and the same one on every later call. A
-   * join on a second connection is a fault -- the checker has already refused it, so reaching here means the
-   * tree was not the one that was checked, and being wrong quietly is worse than failing.
+   * The transaction on that connection: opened on the first call, and the same one on every later call. The
+   * connection is the path the environment hands a handler for the one it asked for, which is the connection
+   * the profile reaches (`connectionUnder`), so two names for one connection join one transaction. A join on a
+   * second connection is a fault -- the checker has already refused it (L010, over the same connections), so
+   * reaching here means the tree was not the one that was checked, and being wrong quietly is worse than failing.
    */
   async join<T extends Participant>(connection: string, open: () => Promise<T>): Promise<T> {
     if (this.opening === undefined) {
