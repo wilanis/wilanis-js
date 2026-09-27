@@ -65,6 +65,12 @@ export const fake: PluginModule = {
           accepts: { key: { type: 'string', secret: true } },
           holds: true,
         },
+        // a header built from a secret, which the operation does not mark
+        announce: {
+          description: 'say the vault is open, with a header to say it with',
+          accepts: { header: { type: 'string' } },
+          holds: true,
+        },
       },
     },
   }),
@@ -73,6 +79,7 @@ export const fake: PluginModule = {
     '@fake/vault.port.json#account': async () => ({ ...ADA }),
     '@fake/vault.port.json#plain': async () => ({ ...ADA }),
     '@fake/vault.port.json#open': async () => undefined,
+    '@fake/vault.port.json#announce': async () => undefined,
   },
 };
 

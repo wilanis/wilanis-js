@@ -11,7 +11,7 @@ import { type BlobChoice, blobStoreOf, FileBlobStore } from './blobs.js';
 import { correlationOf, type Fired, type Ran, runId, type Started } from './fired.js';
 import { gate } from './gate.js';
 import { portsOf } from './ports.js';
-import { shownRoots } from './shown.js';
+import { shownRoots, shownStep } from './shown.js';
 import { coerceWire, fillTemplates, prune } from './values.js';
 
 export { coerceWire, fillTemplates, prune } from './values.js';
@@ -176,8 +176,9 @@ export class Embedder {
 
   /**
    * Run one of the project's startup steps: the domain port operation it names, with its `in` written as
-   * literals and {{secrets.*}}. Nothing has been received, so the run is given no context -- the checker
-   * has already refused any step that reaches a read of one. What it did is told to whoever is listening as a
+   * literals and {{secrets.*}}; its reports show every field filled from a secret as the marker. Nothing has been
+   * received, so the run is given no context -- the checker has already refused any step that reaches a read of
+   * one. What it did is told to whoever is listening as a
    * `Started` and never as a `Fired`: a step is not a trigger, it has no kind, no correlation and no gate.
    * `at` is required and never defaulted: a step's index is a real position in `project.json → startup`, which
    * the record exports as `wilanis.startup.at`, so a caller that does not know it must not be given a false one.
@@ -188,6 +189,7 @@ export class Embedder {
     const startedAt = this.clock();
     const answer = await runGraph(compiled, {
       initial: { in: input },
+      shown: shownStep(step.in ?? {}, input),
       signal: opts.signal,
       clock: this.clock,
       env: this.envFor(opts.blobs),

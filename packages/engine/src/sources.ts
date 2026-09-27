@@ -51,26 +51,33 @@ export function readPath(value: unknown, path: string[]): unknown {
   return current;
 }
 
-/** How one read of a root at a path is answered: the values settled so far, or a reader over what reports show. */
-export type Reader = (ref: string, path: string[]) => unknown;
+/**
+ * How sources are read: the value one read of a root at a path yields, and -- for a reader over what reports show
+ * -- what text with sources interpolated reads as, given the text. The values settled so far answer the text itself.
+ */
+export interface Reader {
+  at(ref: string, path: string[]): unknown;
+  text?(joined: string): unknown;
+}
 
 /** A reader over settled values: the value at the path inside the root's value. */
 const readerOf = (values: Map<string, unknown> | Reader): Reader =>
-  values instanceof Map ? (ref, path) => readPath(values.get(ref), path) : values;
+  values instanceof Map ? { at: (ref, path) => readPath(values.get(ref), path) } : values;
 
 /** The value a source yields, given the values settled so far -- or what a reader answers for each read. */
 export function readSource(source: KSource, values: Map<string, unknown> | Reader): unknown {
   const read = readerOf(values);
   if ('value' in source) return source.value;
-  if ('ref' in source) return read(source.ref, source.path);
+  if ('ref' in source) return read.at(source.ref, source.path);
   if ('list' in source) return source.list.map(part => readSource(part, read)).filter(item => item !== undefined);
-  if ('concat' in source) return source.concat.map(part => interpolated(part, read)).join('');
+  if ('concat' in source) return textOf(source.concat, read);
   return readAll(source.object, read);
 }
 
-/** One piece of interpolated text: literal text as it is, a source as text, a missing value as nothing. */
-function interpolated(part: string | KSource, read: Reader): string {
-  return typeof part === 'string' ? part : String(readSource(part, read) ?? '');
+/** Interpolated text: literal text as it is, a source as text, a missing value as nothing -- as the reader reads such text. */
+function textOf(parts: (string | KSource)[], read: Reader): unknown {
+  const joined = parts.map(part => (typeof part === 'string' ? part : String(readSource(part, read) ?? ''))).join('');
+  return read.text ? read.text(joined) : joined;
 }
 
 /** Every named source read; a key whose value is undefined is left out. */
