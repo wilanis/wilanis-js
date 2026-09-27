@@ -5,7 +5,16 @@
  * reads as it did -- the regression that would catch a target writing a `.json` the loader would take for a document.
  */
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -185,7 +194,8 @@ describe('wilanis-deploy, writing into a tree', () => {
     const ran = deploy(dir, '.', '--profile', 'production', '-o', '../elsewhere');
     expect(ran.code).toBe(1);
     expect(ran.stderr).toMatch(/^-o \.\.\/elsewhere is outside the tree at \.: the files are written inside it/);
-    expect(readdirSync(join(dir, '..'))).not.toContain('elsewhere');
+    // the one path it would have written, rather than a listing of the whole temporary directory it sits in
+    expect(existsSync(join(dir, '..', 'elsewhere'))).toBe(false);
   });
 
   it('leaves a tree every target wrote into as wilanis check reads it, with no .json in it', {
