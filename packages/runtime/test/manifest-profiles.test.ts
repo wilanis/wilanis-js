@@ -1,8 +1,8 @@
 /**
- * RFC 0026's manifest, step 2: the profile blocks `manifestOf` answers beside the inventory, each what RFC 0013's
- * `reachOf` derives under one profile, and `--profile`, which narrows them to one. The inventory, its determinism
- * and the command's other cases are in manifest.test.ts; this file holds the per-profile half, the `--profile
- * staging` case among it, since manifest.test.ts is at the house rules' length.
+ * RFC 0026's manifest, steps 2 and 3: the profile blocks `manifestOf` answers beside the inventory, each what RFC
+ * 0013's `reachOf` derives under one profile and what RFC 0016 has it permit, and `--profile`, which narrows them to
+ * one. The inventory, its determinism and the command's other cases are in manifest.test.ts; this file holds the
+ * per-profile half, the `--profile staging` case among it, since manifest.test.ts is at the house rules' length.
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -143,9 +143,30 @@ describe('manifestOf: one block per profile', () => {
   it('writes the unnamed profile of a tree that declares none under "", as the default', () => {
     const access = manifestOf(loadTree(INCLUDES[0].dir, PLUGINS), { root: 'access' });
     expect(Object.keys(access.profiles)).toEqual(['']);
-    expect(access.profiles['']).toMatchObject({ default: true, description: null, bindings: {}, connections: {} });
+    expect(access.profiles['']).toMatchObject({
+      default: true,
+      description: null,
+      bindings: {},
+      connections: {},
+      permits: null,
+    });
     expect(access.profiles[''].starts).toEqual(['Listen']);
     expect(valid(access)).toBe(true);
+  });
+});
+
+describe('manifestOf: permits, what a profile permits', () => {
+  it('is null under live, and under every profile that writes none, which permits everything', () => {
+    expect(block('live').permits).toBeNull();
+    for (const [name, profile] of Object.entries(example.registry.project?.doc.profiles ?? {}))
+      if (profile.permits === undefined) expect(block(name).permits).toBeNull();
+  });
+
+  it('under production, is the list project.json writes, in code-unit order whatever order it is written in', () => {
+    const written: string[] = read(join(EXAMPLE, 'project.json')).profiles.production.permits;
+    expect(written.length).toBeGreaterThan(0);
+    expect(written).not.toEqual([...written].sort());
+    expect(block('production').permits).toEqual([...written].sort());
   });
 });
 
@@ -166,12 +187,27 @@ describe('manifestOf: --profile', () => {
 describe('manifest.schema.json: the profile block', () => {
   it('refuses a key it does not name, on a block and on a reach row', () => {
     const production = block('production');
+    // RFC 0026 set `scheduled` aside: a scheduled job is a trigger of RFC 0010's kind
     expect(
-      valid({ ...manifest, profiles: { ...manifest.profiles, production: { ...production, permits: null } } }),
+      valid({ ...manifest, profiles: { ...manifest.profiles, production: { ...production, scheduled: [] } } }),
     ).toBe(false);
     const [first, ...rest] = production.reaches;
     const widened = { ...production, reaches: [{ ...first, raw: true }, ...rest] };
     expect(valid({ ...manifest, profiles: { ...manifest.profiles, production: widened } })).toBe(false);
+  });
+
+  it('requires permits on every block: a list of paths, or null', () => {
+    const production = block('production');
+    const permitting = (permits: unknown) => ({
+      ...manifest,
+      profiles: { ...manifest.profiles, production: { ...production, permits } },
+    });
+    expect(valid(permitting(production.permits))).toBe(true);
+    expect(valid(permitting(null))).toBe(true);
+    expect(valid(permitting([42]))).toBe(false);
+    expect(valid(permitting('@http/server.port.json#listen'))).toBe(false);
+    const { permits: _, ...unsaid } = production;
+    expect(valid({ ...manifest, profiles: { ...manifest.profiles, production: unsaid } })).toBe(false);
   });
 });
 
