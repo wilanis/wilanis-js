@@ -80,7 +80,9 @@ describe('rehearse --record: what the recorded directory owns', () => {
     writeFileSync(join(dir, 'scenarios/mine.scenario.json'), '{}');
     writeFileSync(join(dir, 'scenarios/fuzz/get-customer.1.scenario.json'), '{}');
     const where = 'it may be any directory below scenarios/ outside scenarios/fuzz/, as scenarios/rehearsed/ is';
-    for (const refused of ['scenarios', 'scenarios/', 'scenarios/fuzz', 'scenarios/fuzz/rehearsed', '.', 'features']) {
+    const refusals = ['scenarios', 'scenarios/', 'scenarios/fuzz', 'scenarios/fuzz/rehearsed', '.', 'features'];
+    // and in another case, which a case-insensitive filesystem reads as the same directory
+    for (const refused of [...refusals, 'scenarios/FUZZ', 'Scenarios/fuzz', 'SCENARIOS', 'scenarios/Fuzz/new']) {
       expect(() => writeRecorded(dir, refused, {})).toThrow(`--record owns ${refused} and removes every scenario`);
       expect(() => checkRecorded(dir, refused, {})).toThrow(where);
     }
@@ -89,6 +91,9 @@ describe('rehearse --record: what the recorded directory owns', () => {
     // judged before the walk, so a refused directory costs no run
     await expect(rehearse(loaded, { record: 'scenarios' })).rejects.toThrow(where);
     expect(readFileSync(join(dir, 'scenarios/mine.scenario.json'), 'utf8')).toBe('{}');
+    expect(readFileSync(join(dir, 'scenarios/fuzz/get-customer.1.scenario.json'), 'utf8')).toBe('{}');
+    for (const cased of ['scenarios/FUZZ', 'Scenarios/fuzz'])
+      await expect(rehearse(loaded, { record: cased })).rejects.toThrow(where);
     expect(readFileSync(join(dir, 'scenarios/fuzz/get-customer.1.scenario.json'), 'utf8')).toBe('{}');
     // beside fuzz's directory, under a name of its own, is below the home and outside fuzz's
     expect(writeRecorded(dir, 'scenarios/fuzzy', {})).toEqual([]);
