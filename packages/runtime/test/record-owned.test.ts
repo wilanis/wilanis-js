@@ -103,7 +103,7 @@ describe('rehearse --record: what the recorded directory owns', () => {
     rmSync(elsewhere, { recursive: true, force: true });
   });
 
-  it('owns only a directory below scenarios/ and outside scenarios/fuzz/, and says where one may go', {
+  it('owns only a directory below scenarios/ and outside scenarios/fuzz/ and scenarios/edges/, and says where one may go', {
     timeout: 60_000,
   }, async () => {
     const dir = copyOfExample();
@@ -111,10 +111,14 @@ describe('rehearse --record: what the recorded directory owns', () => {
     mkdirSync(join(dir, 'scenarios/fuzz'), { recursive: true });
     writeFileSync(join(dir, 'scenarios/mine.scenario.json'), '{}');
     writeFileSync(join(dir, 'scenarios/fuzz/get-customer.1.scenario.json'), '{}');
-    const where = 'it may be any directory below scenarios/ outside scenarios/fuzz/, as scenarios/rehearsed/ is';
+    const where =
+      'it may be any directory below scenarios/ outside scenarios/fuzz/ and scenarios/edges/, as scenarios/rehearsed/ is';
     const refusals = ['scenarios', 'scenarios/', 'scenarios/fuzz', 'scenarios/fuzz/rehearsed', '.', 'features'];
+    // fuzz --edges owns its directory as plain fuzz does
+    const edged = ['scenarios/edges', 'scenarios/edges/rehearsed', 'scenarios/Edges'];
     // and in another case, which a case-insensitive filesystem reads as the same directory
-    for (const refused of [...refusals, 'scenarios/FUZZ', 'Scenarios/fuzz', 'SCENARIOS', 'scenarios/Fuzz/new']) {
+    const cased = ['scenarios/FUZZ', 'Scenarios/fuzz', 'SCENARIOS', 'scenarios/Fuzz/new'];
+    for (const refused of [...refusals, ...edged, ...cased]) {
       expect(() => writeRecorded(dir, refused, {})).toThrow(`--record may not own ${refused}, beside the scenarios`);
       expect(() => checkRecorded(dir, refused, {})).toThrow(where);
     }
@@ -129,6 +133,7 @@ describe('rehearse --record: what the recorded directory owns', () => {
     expect(readFileSync(join(dir, 'scenarios/fuzz/get-customer.1.scenario.json'), 'utf8')).toBe('{}');
     // beside fuzz's directory, under a name of its own, is below the home and outside fuzz's
     expect(writeRecorded(dir, 'scenarios/fuzzy', {})).toEqual([]);
+    expect(writeRecorded(dir, 'scenarios/edgesmith', {})).toEqual([]);
     rmSync(dir, { recursive: true, force: true });
   });
 

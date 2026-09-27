@@ -6,22 +6,17 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { walkedUnder } from '@wilanis/compiler';
 import type { Loaded, LoadResult } from '@wilanis/core';
-import { HOME, type ScenarioDoc, Scope, schemaUrl, secretPaths, type TriggerDoc } from '@wilanis/core';
+import { type ScenarioDoc, Scope, schemaUrl, secretPaths, type TriggerDoc } from '@wilanis/core';
 import { outcomeOf, type Report, redactValue, refusalOf } from '@wilanis/engine';
+import { type Fuzzing, fuzzEdges } from './fuzz-edges.js';
 import { activeProfile, skippedLines } from './profile.js';
+import { HOME_DIR, SCENARIOS } from './recorded-dir.js';
 import { replayedDoc } from './rehearse-recorded.js';
 import { embedderFor, generatedFire } from './stubbing.js';
 
+export { HOME_DIR, SCENARIOS } from './recorded-dir.js';
+
 // ---- fuzz / regress ----------------------------------------------------------------------------------
-
-/** The one directory placement says a scenario lives in (HOME, D008). */
-export const HOME_DIR = HOME.scenario?.dir ?? 'scenarios';
-
-/**
- * Where plain fuzz writes, under the root: a directory of its own inside the scenarios' home, so what fuzz owns sits
- * apart from what a person wrote and from what the other commands record (RFC 0018).
- */
-export const SCENARIOS = `${HOME_DIR}/fuzz`;
 
 /**
  * What one node did: how it ended, the reason it refused with, the operation it ran, where a switch routed, and
@@ -103,16 +98,25 @@ function scenarioOf({ trigger, seed, input, context, record, report, secret }: F
 }
 
 /**
+ * Run each trigger the profile serves with stubbed effects and write one scenario per run: under N seeds, or with
+ * `edges` once per fixed edge of its input, to the directory `fuzz --edges` owns or under `check` compared with it
+ * (`fuzzEdges`).
+ */
+export function fuzz(
+  load: LoadResult,
+  opts: { runs?: number; profile?: string; out?: string; edges?: boolean; check?: boolean } = {},
+): Promise<Fuzzing> {
+  return opts.edges || opts.check ? fuzzEdges(load, opts) : fuzzSeeds(load, opts);
+}
+
+/**
  * Run each trigger the profile serves under N seeds with stubbed effects and write one scenario per run -- but never
  * one of a fault. The stubbed world never throws, so a run that faults under stubs is the tree's own bug (a `make`
  * whose value does not fit, a `refuse` whose reason is not a word, a wiring hole), and a scenario pinning it would
  * hold the tree to breaking: the fault is said, nothing is written for it, and the answer is not ok. A trigger the
  * profile does not serve (`walkedUnder`) is not run, and `skipped` says how many and where they are served.
  */
-export async function fuzz(
-  load: LoadResult,
-  opts: { runs?: number; profile?: string; out?: string } = {},
-): Promise<{ ok: boolean; written: string[]; lines: string[]; skipped: string[] }> {
+async function fuzzSeeds(load: LoadResult, opts: { runs?: number; profile?: string; out?: string }): Promise<Fuzzing> {
   const written: string[] = [];
   const lines: string[] = [];
   const profile = activeProfile(load.registry.project?.doc, { flag: opts.profile, env: process.env });
