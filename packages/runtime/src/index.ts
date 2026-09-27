@@ -53,6 +53,7 @@ export {
   needSaid,
   type ProfileNeed,
   type ProfileReach,
+  permitsSaid,
   profilesOf,
   type ReachedGroup,
   type StandIn,

@@ -1057,10 +1057,11 @@
    * A block per profile (RFC 0013), the rows `wilanis describe project.json` prints: what it binds and stands in,
    * and what the tree reaches, holds, starts and needs there. Reaches and holds are grouped by port, the
    * operations of one port reached with the same connections on one row with those connections beside them.
+   * Below them, what the place permits (RFC 0016): the entries as the profile writes them, or everything.
    */
   function profilesEl(page, profiles) {
     page.appendChild(el('h2', null, 'Profiles'));
-    page.appendChild(el('p', null, 'Each profile is one place the tree runs. What it reaches is derived from its choices, not written: every effectful operation the tree runs there, the connections those name, what it holds open, and the variables it needs set before it starts.'));
+    page.appendChild(el('p', null, 'Each profile is one place the tree runs. What it reaches is derived from its choices, not written: every effectful operation the tree runs there, the connections those name, what it holds open, and the variables it needs set before it starts. What it permits is written, by whoever answers for the place, and the checker holds it to what the profile reaches in both directions; a profile that writes no permits permits everything.'));
     for (const p of profiles) {
       const h = el('h3', null, p.name === undefined ? 'none declared' : p.name); if (p.default) h.appendChild(el('span', 'badge ok', 'default')); if (p.name !== undefined && !STATIC) h.appendChild(el('code')).appendChild(manifestLink(p.name)); page.appendChild(h);
       page.appendChild(el('p', null, p.name === undefined ? 'The project declares no profile: each port is met by its one binding.' : (p.description || '')));
@@ -1071,6 +1072,7 @@
       if (p.standsIn.length) row('stands in', p.standsIn.map(s => pair(s.named, s.standIn)), '');
       row('reaches', p.reaches.map(groupEl), 'nothing effectful');
       row('holds', p.holds.map(groupEl), 'nothing open');
+      row('permits', (p.permits || []).map(permitEl), 'everything (no permits)');
       row('starts', p.starts.length ? [frag(...p.starts.flatMap((s, i) => [...(i ? [' · '] : []), link(s.run.split('#')[0], s.label || showOp(s.run))]))] : [], 'nothing');
       row('needs', p.needs.map(needEl), 'no variable');
       page.appendChild(t);
@@ -1081,6 +1083,11 @@
     const f = frag(link(g.port), ' ' + g.operations.map(op => '#' + op).join(', '));
     g.connections.forEach((c, i) => { f.appendChild(document.createTextNode(i ? ', ' : '  via ')); f.appendChild(link(c)); });
     return f;
+  }
+  /** One entry of a profile's permits: the port or connection it names, and the operation where it names one. */
+  function permitEl(entry) {
+    const i = entry.indexOf('#');
+    return i < 0 ? link(entry) : frag(link(entry.slice(0, i)), ' #' + entry.slice(i + 1));
   }
   /** One variable a profile needs: the variable, the secret it answers, and who reads it. */
   function needEl(n) {

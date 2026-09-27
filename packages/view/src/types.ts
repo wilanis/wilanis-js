@@ -319,7 +319,8 @@ export interface DocView {
   invariant?: VInvariant;
   /**
    * On the project: a block per profile (the one unnamed profile where none is declared) -- what it binds and
-   * stands in, and what the tree reaches, holds, starts and needs there -- as `wilanis describe project.json` says it.
+   * stands in, what the tree reaches and holds there, what the place permits of it (RFC 0016), and what it starts and
+   * needs there -- as `wilanis describe project.json` says it.
    */
   profiles?: ProfileReach[];
 }
