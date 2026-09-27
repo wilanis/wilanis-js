@@ -22,7 +22,7 @@ upstream API. Draws on RFC 0002 and the call-site rules of RFC 0003.
 
 ```
 npx wilanis start example
-curl -X POST :8099/customers -d '{...}'   # then GET /customers/{id} answers what you posted
+curl -X POST localhost:8099/customers -d '{...}'   # then GET /customers/{id} answers what you posted
 npx wilanis describe @customers/data/customers.store.json
 ```
 
@@ -100,9 +100,11 @@ and RFC 0010. Which job the example schedules is not yet chosen. This row named 
 reads the customers of every tenant: a tick has no caller for its tenant or its policy to be about, so the
 example's nightly run of it was taken out, and its `Keep the schedule` step schedules nothing.
 
+`CUSTOMERS_JWT_SECRET`, `$TOKEN` and a customer to remove are set up as [`example/README.md`](../example/README.md) shows.
+
 ```
 npx wilanis start example --profile local
-curl -X POST :8099/customers/{id}/removal -H "authorization: Bearer $TOKEN"   # 202, the message's id
+curl -X POST localhost:8099/customers/{id}/removal -H "authorization: Bearer $TOKEN"   # 202, the message's id
 queue removals dc05cb59-… attempt 1 → ack (1ms, @customers/domain/customer.port.json#remove done)
 ```
 
