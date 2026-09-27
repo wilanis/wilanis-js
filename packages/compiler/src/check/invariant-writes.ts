@@ -2,11 +2,11 @@
  * The whole record before the write (RFC 0035). A guarded shape is a core shape some `holds` invariant is `on`,
  * and a guarded field is one its `when` reads. A write of a guarded shape takes the whole record, and the record
  * reaches the write from a site RFC 0007 already judges, upstream of the effect: a `#patch` whose `changes` name
- * a guarded field is refused (I007), since a rule over the whole record cannot be held on a part of one, and a
- * `#put` whose `record` is anything but one whole read of a site of the shape is refused (I008), since a record no
- * site made or took is a value nothing judged. Both hold on every path a write takes: a graph's `run` node, a
- * `map`'s bound element, and a binding's delegation straight to the store. Nothing is added to the guard; these
- * rules only keep the write downstream of it. They run after `checkInvariantSites`.
+ * a guarded field, or are of a type open to one, is refused (I007), since a rule over the whole record cannot be
+ * held on a part of one, and a `#put` whose `record` is anything but one whole read of a site of the shape is
+ * refused (I008), since a record no site made or took is a value nothing judged. Both hold on every path a write
+ * takes: a graph's `run` node, a `map`'s bound element, and a binding's delegation straight to the store. Nothing is
+ * added to the guard; these rules only keep the write downstream of it. They run after `checkInvariantSites`.
  */
 import {
   type BindingDoc,
@@ -199,30 +199,43 @@ const typed = (read: { type: Type } | string): Type | undefined => (typeof read 
 
 // ---- I007 ----------------------------------------------------------------------------------------
 
-/** I007: a patch whose `changes` name a field some invariant on the collection's shape reads. */
+/**
+ * I007: a patch whose `changes` name a field some invariant on the collection's shape reads, or are of a type that
+ * admits fields it does not declare, and so may carry every field those invariants read.
+ */
 function checkPatch(judge: Judge, write: Write): void {
-  const changed = changedFields(write);
+  const changes = changedFields(write);
+  const changed = changes.open ? [...new Set(write.guards.flatMap(guard => [...guard.fields]))] : changes.fields;
   const reading = write.guards.filter(guard => changed.some(field => guard.fields.has(field)));
   if (!reading.length) return;
   const fields = changed.filter(field => reading.some(guard => guard.fields.has(field)));
   const which = listed(reading.map(guard => named(guard.invariant)));
-  const message = `patch writes ${listed(fields.map(field => `'${field}'`))}, which ${which} ${reading.length > 1 ? 'read' : 'reads'}; a rule over the whole record cannot be held on a part of one`;
+  const writes = changes.open ? `writes changes ${changes.open}, so it may write` : 'writes';
+  const message = `patch ${writes} ${listed(fields.map(field => `'${field}'`))}, which ${which} ${reading.length > 1 ? 'read' : 'reads'}; a rule over the whole record cannot be held on a part of one`;
   const hint = `load the record, make the new one with @std/object.port.json#merge in a domain graph, and #put it whole through an operation that takes a ${shapeName(judge, write.shape)}`;
   judge.refuser(write.file)('I007', message, write.inputAt('changes'), hint);
 }
 
+/** What a patch's `changes` writes: the fields it names, and, where its type admits any field, how that is said. */
+interface Changes {
+  fields: string[];
+  /** 'of an open type' or 'of type unknown': the type may carry a field it does not name, so it writes every one */
+  open?: string;
+}
+
 /**
- * The fields a patch's `changes` name: its keys where it is written out; the fields of its type where it is one
- * whole read, of `in` or of a node; and for a `map` that binds it from each element, the fields of what it binds.
- * None where the type cannot be told.
+ * What a patch's `changes` writes: its keys where it is written out; what its type writes where it is one whole
+ * read, of `in`, a constant or a node; and for a `map` that binds it from each element, what the bound type writes.
+ * No field where the type cannot be told: a read that does not resolve is refused where the graph is judged.
  */
-function changedFields(write: Write): string[] {
+function changedFields(write: Write): Changes {
   const changes = write.given.changes;
-  if (typeof changes === 'object' && changes !== null && !Array.isArray(changes)) return Object.keys(changes);
+  if (typeof changes === 'object' && changes !== null && !Array.isArray(changes))
+    return { fields: Object.keys(changes) };
   const path = readWhole(changes);
   if (path) return fieldsOf(write.typeOf(path));
   const bound = write.element?.bind.changes;
-  return bound === undefined ? [] : fieldsOf(elementType(write, bound));
+  return bound === undefined ? { fields: [] } : fieldsOf(elementType(write, bound));
 }
 
 /** The type one input a `map` binds takes: the path it names within an element of the list the map runs over. */
@@ -232,8 +245,15 @@ function elementType(write: Write, bound: string): Type | undefined {
   return list?.kind === 'list' ? typed(typeAt(list.of, bound ? bound.split('.') : [])) : undefined;
 }
 
-/** The fields of an object type; none of anything else. */
-const fieldsOf = (type: Type | undefined): string[] => (type?.kind === 'object' ? Object.keys(type.fields) : []);
+/**
+ * What a value of a type writes as `changes`: an object's declared fields, and any field at all where the object is
+ * open or the type is `unknown`, since the document then shows the patch may carry one it does not name.
+ */
+function fieldsOf(type: Type | undefined): Changes {
+  if (type?.kind === 'unknown') return { fields: [], open: 'of type unknown' };
+  if (type?.kind !== 'object') return { fields: [] };
+  return { fields: Object.keys(type.fields), open: type.open === false ? undefined : 'of an open type' };
+}
 
 // ---- I008 ----------------------------------------------------------------------------------------
 

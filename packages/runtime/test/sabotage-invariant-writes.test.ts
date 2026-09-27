@@ -1,10 +1,10 @@
 /**
  * Sabotage: a write of a shape a field invariant guards (RFC 0035). The example's customers are held to 'A customer
  * is reachable', whose rule reads name, email, tier and note, and keep-customer writes the record whole, read from
- * its `in`, where RFC 0007 guards it. Turning that write into a patch of a field the rule reads (I007), or writing a
- * record no site of the shape made or took (I008), is what these rules answer, on every path a write takes: a
- * graph's node, a map's bound element, and a binding's delegation straight to the store. A patch of a field no rule
- * reads, and a record read whole from a site, are not.
+ * its `in`, where RFC 0007 guards it. Turning that write into a patch of a field the rule reads, or of changes whose
+ * type may carry one (I007), or writing a record no site of the shape made or took (I008), is what these rules
+ * answer, on every path a write takes: a graph's node, a map's bound element, and a binding's delegation straight to
+ * the store. A patch of a field no rule reads, and a record read whole from a site, are not.
  */
 import { schemaUrl } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
@@ -225,6 +225,72 @@ describe('sabotage: a guarded write read from what is no site of the shape', () 
     expect(saying(docs)).toEqual([
       `I008 the Customer written here is read from 'in', which is no site of it, ${UNJUDGED}`,
     ]);
+  });
+});
+
+// ---- a changes whose type may carry any field (#489) ----------------------------------------------
+
+const REF = '@customers/domain/CustomerRef.shape.json';
+const OPEN = { fields: {}, open: 'string' };
+const EVERY = `'name', 'email', 'tier' and 'note', which ${REACHABLE} reads; ${WHOLE}`;
+/** A planted data graph that patches the customer `in.id` names with `changes`, after `before`. */
+const patchingOne = (takes: string, before: unknown[], changes: string) =>
+  writingOne(takes, before, run('stored', '@storage/store.port.json#patch', { ...STORE, key: '{{in.id}}', changes }));
+/** The same graph patching with `{{const.delta}}`, a constant of this type and value. */
+const patchingConst = (type: unknown, value: unknown) => ({
+  ...patchingOne(REF, [], '{{const.delta}}'),
+  constants: { delta: { type, value } },
+});
+
+describe('sabotage: a patch whose changes may carry any field', () => {
+  it('I007 a changes read from a constant of an open type, at the changes', () => {
+    const docs = { [PLANTED]: patchingConst(OPEN, { tier: 'gold' }) };
+    expect(plantedPointing(docs)).toEqual([`I007 @${PLANTED}#nodes/stored/in/changes`]);
+    expect(saying(docs)).toEqual([`I007 patch writes changes of an open type, so it may write ${EVERY}`]);
+  });
+
+  it('I007 a changes read from a field of in of an open type, at the changes', () => {
+    const docs = {
+      'features/customers/domain/CustomerDelta.shape.json': shape({ id: { type: 'string' }, delta: { type: OPEN } }),
+      [PLANTED]: patchingOne('@customers/domain/CustomerDelta.shape.json', [], '{{in.delta}}'),
+    };
+    expect(plantedPointing(docs)).toEqual([`I007 @${PLANTED}#nodes/stored/in/changes`]);
+  });
+
+  it('I007 a changes read from the untyped body of an http request, narrowed by has, at the changes', () => {
+    const fetched = run('upstream', '@http/http.port.json#request', {
+      connection: '@connections/customers-api.connection.json',
+      method: 'GET',
+      path: '/delta/{{in.id}}',
+      produces: 'application/json',
+    });
+    const answered = {
+      type: '@wilanis/node/switch.schema.json',
+      id: 'answered',
+      in: { body: '{{upstream.body}}' },
+      rules: [{ when: 'has(body)', to: 'stored' }],
+      else: 'unanswered',
+    };
+    const unanswered = run('unanswered', '@std/outcome.port.json#refuse', {
+      reason: 'upstream',
+      message: 'no change for {{in.id}}',
+      type: CUSTOMER,
+    });
+    const probe = patchingOne(REF, [fetched, answered, unanswered], '{{upstream.body}}');
+    const docs = { [PLANTED]: { ...probe, out: { type: CUSTOMER, from: ['kept', 'gone', 'unanswered'] } } };
+    expect(plantedPointing(docs)).toEqual([`I007 @${PLANTED}#nodes/stored/in/changes`]);
+    expect(saying(docs)).toEqual([`I007 patch writes changes of type unknown, so it may write ${EVERY}`]);
+  });
+
+  it('I007 an open changes that declares only active, which no invariant reads, since it may still carry tier', () => {
+    const type = { fields: { active: { type: 'boolean' } }, open: 'string' };
+    const docs = { [PLANTED]: patchingConst(type, { active: true, tier: 'gold' }) };
+    expect(plantedPointing(docs)).toEqual([`I007 @${PLANTED}#nodes/stored/in/changes`]);
+  });
+
+  it('none for a changes read whole from a closed type that declares only active', () => {
+    const type = { fields: { active: { type: 'boolean' } } };
+    expect(plantedAll({ [PLANTED]: patchingConst(type, { active: true }) })).toEqual([]);
   });
 });
 
