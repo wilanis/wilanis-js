@@ -9,6 +9,7 @@ import {
   generate,
   hasVars,
   type Loaded,
+  type PolicyDoc,
   policyPath,
   type Resolves,
   resolvedHere,
@@ -201,33 +202,56 @@ export function generatedFire(
 }
 
 /**
+ * A policy's decision as a trigger of one kind, and -- where the trigger whose kind and settings it borrowed attaches
+ * the policy -- that trigger, which a recorded run of the root names as its way in (RFC 0018).
+ */
+export type PolicyRoot = Loaded<TriggerDoc> & { attaching?: Loaded<TriggerDoc> };
+
+/** Whether a trigger attaches a policy under `policies`, matched by canonical path. */
+const attaches = (load: LoadResult, trigger: Loaded<TriggerDoc>, policy: Loaded<PolicyDoc>) =>
+  (trigger.doc.policies ?? []).some(ref => load.resolve(policyPath(ref)) === policy.path);
+
+/**
+ * A policy as a trigger of the kind `trigger` has: its `decide` fired under that trigger's kind and settings, since a
+ * kind's context (route placeholders, the body's shape) is written in them. The root carries the trigger where it
+ * attaches the policy, and nothing where it does not.
+ */
+export function policyRoot(load: LoadResult, policy: Loaded<PolicyDoc>, trigger: Loaded<TriggerDoc>): PolicyRoot {
+  const doc: TriggerDoc = {
+    $schema: schemaUrl('trigger'),
+    description: policy.doc.description,
+    label: policy.doc.label,
+    kind: trigger.doc.kind,
+    settings: trigger.doc.settings,
+    fire: policy.doc.decide,
+  };
+  const root = { ...policy, kind: 'trigger', doc } as unknown as PolicyRoot;
+  return attaches(load, trigger, policy) ? { ...root, attaching: trigger } : root;
+}
+
+/** Canonical paths in order, so which trigger a root borrows from is the tree's to say and not the disk's. */
+const byPath = (one: Loaded<TriggerDoc>, other: Loaded<TriggerDoc>) =>
+  one.path < other.path ? -1 : Number(one.path > other.path);
+
+/**
  * Every policy as a trigger of each kind that attaches it, for the gates that run triggers. A policy's decision
  * is a domain operation fired with an input read from the context, the way a trigger's is; rehearsed as a
  * root of its own, every branch of the decision graph is walked with a caller that is there and one that is
- * not. The settings are borrowed from an attaching trigger, since a kind's context (route placeholders, the
- * body's shape) is written in them; a policy nothing attaches is rehearsed under the first trigger's kind.
+ * not. Each kind's root borrows from the first trigger of that kind to attach the policy, in path order, so the
+ * first root of a policy borrows from the first attaching trigger of all; a policy nothing attaches is rehearsed
+ * under the first trigger's kind.
  */
-export function policyRoots(load: LoadResult): Loaded<TriggerDoc>[] {
-  const out: Loaded<TriggerDoc>[] = [];
+export function policyRoots(load: LoadResult): PolicyRoot[] {
+  const out: PolicyRoot[] = [];
   const triggers = load.registry.all('trigger');
   for (const policy of load.registry.all('policy')) {
-    const attaching = triggers.filter(type =>
-      (type.doc.policies ?? []).some(ref => load.resolve(policyPath(ref)) === policy.path),
-    );
+    const attaching = triggers.filter(type => attaches(load, type, policy)).sort(byPath);
     const seen = new Set<string>();
     for (const type of attaching.length ? attaching : triggers.slice(0, 1)) {
       const kind = load.resolve(type.doc.kind);
       if (seen.has(kind)) continue;
       seen.add(kind);
-      const doc: TriggerDoc = {
-        $schema: schemaUrl('trigger'),
-        description: policy.doc.description,
-        label: policy.doc.label,
-        kind: type.doc.kind,
-        settings: type.doc.settings,
-        fire: policy.doc.decide,
-      };
-      out.push({ ...policy, kind: 'trigger', doc } as unknown as Loaded<TriggerDoc>);
+      out.push(policyRoot(load, policy, type));
     }
   }
   return out;

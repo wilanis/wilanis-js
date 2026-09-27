@@ -1,15 +1,17 @@
 /**
  * What the rehearsal hands `record.ts` of a run it made (RFC 0018): what it was fired with, what every effect
  * answered, the report, the fields the trigger's `out` marks secret, and for a branch's run the branch it proves, as
- * the graph document names it.
+ * the graph document names it. A policy's decision is recorded as a run of the root `policyRoot` builds, naming the
+ * policy and the attaching trigger that lent it a kind, and replayed through the same root.
  */
-import type { Loaded, LoadResult, TriggerDoc } from '@wilanis/core';
+import type { Loaded, LoadResult, ScenarioDoc, TriggerDoc } from '@wilanis/core';
 import { isSwitch, secretPaths } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
 import type { Case } from './branches.js';
 import type { Embedder } from './embed.js';
 import type { RecordedRun } from './record.js';
 import type { Decision } from './rehearsal-report.js';
+import { type PolicyRoot, policyRoot } from './stubbing.js';
 
 /** What a branch's run hands back to be recorded: what it was fired with, what answered, and whether a node broke. */
 export interface Ran {
@@ -31,6 +33,40 @@ interface Walked {
 /** Where the trigger's `out` marks a field secret: a recorded output is written with those as the marker. */
 export const secretOut = (emb: Embedder, trigger: Loaded<TriggerDoc>) => secretPaths(emb.types(trigger.doc).out);
 
+/**
+ * What a recorded run of a walked root names: the trigger it fired, or for a policy's decision the policy and the
+ * attaching trigger whose kind and settings the root borrowed, the way in a replay goes through.
+ */
+export const namedBy = (walked: PolicyRoot): Pick<RecordedRun, 'trigger' | 'policy'> =>
+  walked.attaching ? { trigger: walked.attaching, policy: walked } : { trigger: walked };
+
+/**
+ * Where the rehearsal records a walked root's runs: every trigger's, and a policy's decision once, from the first root
+ * of it the profile serves -- which borrows from the first attaching trigger in path order where that one is served --
+ * since its files are named by the policy and not by the kind. A policy nothing attaches is not recorded: a scenario
+ * replays a decision under a trigger that attaches it (S005). Nothing where the rehearsal does not record.
+ */
+export function recordsInto(triggers: Loaded<TriggerDoc>[], runs: RecordedRun[] | undefined) {
+  const recorded = new Set<string>();
+  return (walked: PolicyRoot): RecordedRun[] | undefined => {
+    if (!runs || triggers.includes(walked)) return runs;
+    if (!walked.attaching || recorded.has(walked.path)) return undefined;
+    recorded.add(walked.path);
+    return runs;
+  };
+}
+
+/**
+ * The trigger document a scenario's replay fires: its trigger's, or where it names a policy, the root `policyRoot`
+ * builds of that policy under the trigger, so the decision is fired under the kind and settings it was recorded under.
+ */
+export function replayedDoc(load: LoadResult, sc: ScenarioDoc, trigger: Loaded<TriggerDoc>): TriggerDoc {
+  if (sc.policy === undefined) return trigger.doc;
+  const policy = load.registry.get('policy', load.resolve(sc.policy));
+  if (!policy) throw new Error(`scenario names unknown policy '${sc.policy}', which wilanis check refuses as S005`);
+  return policyRoot(load, policy, trigger).doc;
+}
+
 /** One branch's run as it is recorded, named by the branch it proves and, where a sibling shares its target, its place. */
 export function recordedOf(walk: Walked, decision: Decision, of: { one: Case; cases: Case[]; ran: Ran }): RecordedRun {
   const { one, cases, ran } = of;
@@ -45,7 +81,7 @@ export function recordedOf(walk: Walked, decision: Decision, of: { one: Case; ca
   };
   const { input, stubs, report } = ran;
   const secret = secretOut(walk.probe, walk.trigger);
-  return { trigger: walk.trigger, branch, seed: walk.seed, input, context: walk.context, stubs, report, secret };
+  return { ...namedBy(walk.trigger), branch, seed: walk.seed, input, context: walk.context, stubs, report, secret };
 }
 
 /**

@@ -86,7 +86,7 @@ scenarios/
       customer.list-customers.route.byTier.scenario.json
       ...
     policies/
-      employees-only/
+      access.employees-only/
         access.require-employee.decide.granted.scenario.json
         access.require-employee.decide.forbidden.scenario.json
         access.require-employee.decide.anonymous.scenario.json
@@ -358,7 +358,7 @@ one file:
 ```
 scenarios/rehearsed/<trigger feature>.<trigger stem>/<feature>.<graph stem>.<switch id>.<to>[.<n>].scenario.json
 scenarios/rehearsed/<trigger feature>.<trigger stem>/whole.scenario.json
-scenarios/rehearsed/policies/<policy stem>/<feature>.<graph stem>.<switch id>.<to>[.<n>].scenario.json
+scenarios/rehearsed/policies/<policy feature>.<policy stem>/<feature>.<graph stem>.<switch id>.<to>[.<n>].scenario.json
 ```
 
 `<feature>` is the graph's feature (`customers`, `access`), so two features' `get-row` graphs do not collide; `<n>` is
@@ -481,7 +481,7 @@ Runtime, in `packages/runtime/test/tools.test.ts`, on a copy of the example (`cp
 | a routing change is a diff and a stale file | `get-row`'s first rule changed to `status == 410`: `regress` prints `DIFF branch 'status == 404' → missing no longer routes there` for the `missing` file; `check` lists it `stale` |
 | a renamed target | `missing` renamed `gone` in `get-row` (rule and `out.from` too): `check` answers one `missing` (`...route.gone`) and one `extra` (`...route.missing`); `checkTree` refuses the extra as S0n2 |
 | ownership | a hand-written `scenarios/mine.scenario.json` survives `--record`; a stray `scenarios/rehearsed/old.scenario.json` is removed |
-| a policy's decision | `policies/employees-only/access.require-employee.decide.anonymous.scenario.json` exists with `policy` set, `trigger` naming `delete-customers` and `expect.reason: 'anonymous'`; `regress` replays it `same`; with `require-employee`'s `anonymous` node changed to refuse as `nobody`, `DIFF reason anonymous → nobody` |
+| a policy's decision | `policies/access.employees-only/access.require-employee.decide.anonymous.scenario.json` exists with `policy` set, `trigger` naming the first attaching trigger in path order and `expect.reason: 'anonymous'`; `regress` replays it `same`; with `require-employee`'s `anonymous` node changed to refuse as `nobody`, `DIFF reason anonymous → nobody` |
 | unreachable | `list-rows` reordered as `example.test.ts` reorders it: `rehearse` is not ok, the `rows` branch is written with `status: 'unreachable'` and no `in`; `regress` answers `same`; the order restored, `regress` on the stale directory answers `DIFF ... is reachable now` and `check` lists the file stale |
 | edges | `fuzz(load, { edges: true })` writes `get-customer/id.empty`, `id.one`, `id.long`; `record-customer`'s `RegisterRequest` yields three for `url` and five `method.enum.<member>`; `list-customers`'s `ListRequest`, whose `method` is optional, yields the five members and `method.absent`; every file has `generated: 'edges'`; a second run is byte-identical; `regress` replays them `same` |
 | the CLI | `wilanis rehearse <copy> --check` exits 1 on a stale directory and prints the hint; `--record --check` behaves as `--check` |
@@ -553,8 +553,8 @@ three branchless runs under its own `scenarios/rehearsed/` (its own triggers, th
 - **An include's scenarios stay with the include.** `libraries/access` records its own rehearsal under its
   `scenarios/rehearsed/`, through its `-dev` binding, and its tests replay them; the loader leaves an include's
   `scenarios/` behind as it leaves its connections (`load.ts`: features and aliases come along, nothing else). The
-  host records the included decisions again under its own triggers -- `policies/employees-only/...` in the example
-  names `delete-customers`, a host trigger -- because a scenario replays a way in, and the way in is the host's. The stub's third
+  host records the included decisions again under its own triggers -- `policies/access.employees-only/...` in the example
+  names `delete-customer`, a host trigger -- because a scenario replays a way in, and the way in is the host's. The stub's third
   question is settled so; the cost is that a decision in a library is recorded twice, once per side of the seam,
   which is also what the seam means.
 
@@ -609,3 +609,16 @@ Decided during implementation:
   features may be the host's to resolve. Two triggers of one feature and one name are the author's own and are
   refused, naming both files; before either, the first kept every file the two shared and the second's runs were
   dropped without a word. A directory of a trigger always holds a dot, so none is taken for `policies/`.
+- **A policy's directory, and one record of its decision (#219).** A policy's decision is recorded under
+  `policies/<policy feature>.<policy stem>/`, for the reason a trigger's directory is its feature before its name: a
+  host's `signed-in` beside `@wilanis/access`'s would otherwise share one, and the host cannot rename the included
+  one. It is recorded once, from the first root of it the profile serves (`recordsInto` in
+  `packages/runtime/src/rehearse-recorded.ts`), which is the root borrowed from the first attaching trigger in path
+  order: `employees-only` is attached under the http, cli and queue kinds in the example, and its three files name
+  `delete-customer`. The other kinds' roots are still walked and reported; *Naming* has no kind segment, so their
+  files would bear the same names over the same graph. `policyRoots` orders a policy's attaching triggers by path
+  before it picks one per kind, so which trigger a root borrows from is the tree's to say and not the order a
+  directory is read in. A policy no trigger attaches is walked under the first trigger's kind, as before, and not
+  recorded, since S005 refuses a scenario whose trigger does not attach its policy. `regress` fires a policy
+  scenario through `policyRoot` under the trigger it names; one naming a policy the tree does not have is thrown on
+  rather than replayed, since `wilanis check` refuses it first (S005).

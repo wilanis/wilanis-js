@@ -14,7 +14,7 @@ import { type Recorded, type RecordedRun, recordRuns } from './record.js';
 import { recordedDir } from './recorded-dir.js';
 import { type Decision, format, gather, type PlainRun, statedOf, stateName } from './rehearsal-report.js';
 import { heldUpstream } from './rehearse-held.js';
-import { type Ran, recordedOf, secretOut } from './rehearse-recorded.js';
+import { namedBy, type Ran, recordedOf, recordsInto, secretOut } from './rehearse-recorded.js';
 import { atomicAt, declaredAt, rootGraph, specBehind, type Where, whereOf } from './rehearse-where.js';
 import { embedderFor, failedBelow, generatedFire, policyRoots, unbroken } from './stubbing.js';
 
@@ -160,15 +160,15 @@ interface Gathered {
 
 /**
  * Walk every trigger the profile serves, and every policy as a trigger of each kind that attaches it: a decision is
- * walked like any other graph. Only a trigger's runs are recorded: a scenario names a trigger, and a policy's
- * decision is not yet one.
+ * walked like any other graph. A trigger's runs are recorded, and a policy's decision once (`recordsInto`).
  */
 async function walkServed(load: LoadResult, how: { seed: number; profile?: string; scope: Scope }, into: Gathered) {
   const { seed, profile, scope } = how;
   const triggers = load.registry.all('trigger');
+  const runsOf = recordsInto(triggers, into.runs);
   for (const trigger of [...triggers, ...policyRoots(load)]) {
     if (!walkedUnder(scope, trigger.doc, profile)) continue;
-    const one = { seed, profile, runs: triggers.includes(trigger) ? into.runs : undefined };
+    const one = { seed, profile, runs: runsOf(trigger) };
     const found = await rehearseTrigger(load, trigger, one, into.decisions);
     if (!found) into.plain.push(await wholeOf(load, trigger, one));
   }
@@ -192,7 +192,7 @@ async function wholeOf(load: LoadResult, trigger: Loaded<TriggerDoc>, how: How):
   const { input, context } = generatedFire(emb, trigger, seed);
   const report = await emb.fire(trigger.doc, input, context);
   // the output is written as the trigger's out type marks it, so a recorded scenario holds no secret in clear
-  how.runs?.push({ trigger, seed, input, context, stubs: record, report, secret: secretOut(emb, trigger) });
+  how.runs?.push({ ...namedBy(trigger), seed, input, context, stubs: record, report, secret: secretOut(emb, trigger) });
   const outcome = outcomeOf(report);
   return {
     trigger: trigger.name,

@@ -14,7 +14,10 @@ export const RECORD_HINT = 'run wilanis rehearse --record and review the diff';
 
 /** One run the rehearsal made, as it is recorded: what was fired, what every effect answered, what it produced. */
 export interface RecordedRun {
+  /** The trigger the scenario replays through: for a policy's decision, an attaching one whose kind the run borrowed. */
   trigger: { path: string; name: string };
+  /** The policy whose `decide` the run fired in the trigger's place, for a policy's decision. */
+  policy?: { path: string; name: string };
   /**
    * The decision the run proves; none for a trigger with no switch under it, which one run covers whole. `n` is the
    * case's position among its switch's cases (a rule's index, then the else, then each catch), set only where another
@@ -55,11 +58,11 @@ function partsOf(path: string): { feature: string; stem: string } {
 /** What a recorded scenario says it proves, in its first line. */
 function descriptionOf(run: RecordedRun): string {
   const ended = endedAs(run.report);
-  if (!run.branch)
-    return `${run.trigger.name}: no switch under it, so one run is the whole of it, and it ${ended}. ${WRITTEN}`;
+  const way = run.policy ? `${run.policy.name} as attached by ${run.trigger.name}` : run.trigger.name;
+  if (!run.branch) return `${way}: no switch under it, so one run is the whole of it, and it ${ended}. ${WRITTEN}`;
   const { graph, node, when, to } = run.branch;
   const rule = when === 'else' ? 'otherwise' : `when ${when}`;
-  return `${run.trigger.name}: ${partsOf(graph).stem} '${node}' ${rule} routes to ${to}, which ${ended}. ${WRITTEN}`;
+  return `${way}: ${partsOf(graph).stem} '${node}' ${rule} routes to ${to}, which ${ended}. ${WRITTEN}`;
 }
 
 /** The stubs in the order of their paths, so the file does not depend on the order the effects happened to answer in. */
@@ -79,6 +82,7 @@ export function scenarioOf(run: RecordedRun): ScenarioDoc {
     description: descriptionOf(run),
     generated: 'rehearse',
     trigger: run.trigger.path,
+    ...(run.policy ? { policy: run.policy.path } : {}),
     ...(branch ? { branch } : {}),
     seed: run.seed,
     in: run.input,
@@ -88,23 +92,33 @@ export function scenarioOf(run: RecordedRun): ScenarioDoc {
   };
 }
 
+/** Where the policies' decisions are recorded, inside the recorded directory: no trigger's directory, which holds a dot. */
+const POLICIES = 'policies';
+
 /**
- * The directory a trigger's recorded runs sit in, inside the recorded directory: `<feature>.<trigger stem>`. D009 keeps
- * a feature's name unique across the tree and every tree it includes, so two features' triggers of one name never
- * share one -- a host trigger beside an included library's among them, which the host cannot rename.
+ * The directory a document's recorded runs sit in: `<feature>.<stem>`. D009 keeps a feature's name unique across the
+ * tree and every tree it includes, so two features' triggers, or policies, of one name never share one -- a host's
+ * beside an included library's among them, which the host cannot rename.
  */
-function triggerDir(trigger: { path: string }): string {
-  const { feature, stem: name } = partsOf(trigger.path);
+function dirOf(doc: { path: string }): string {
+  const { feature, stem: name } = partsOf(doc.path);
   return `${feature}.${name}`;
 }
 
 /**
+ * The directory one run is recorded in, inside the recorded directory: its trigger's, or for a policy's decision the
+ * policy's under `policies/`, since that run replays the decision and the trigger only lends it a kind.
+ */
+const underOf = (run: RecordedRun) => (run.policy ? `${POLICIES}/${dirOf(run.policy)}` : dirOf(run.trigger));
+
+/**
  * Where one recorded run is written, inside the recorded directory: `<feature>.<trigger stem>/<feature>.<graph
  * stem>.<switch id>.<to>[.<n>].scenario.json`, or `<feature>.<trigger stem>/whole.scenario.json` for a trigger with no
- * switch. Named by what it proves, so a reorder of rules moves nothing and a change of target renames one file.
+ * switch, and a policy's decision the same under `policies/<feature>.<policy stem>/`. Named by what it proves, so a
+ * reorder of rules moves nothing and a change of target renames one file.
  */
 export function fileOf(run: RecordedRun): string {
-  const under = triggerDir(run.trigger);
+  const under = underOf(run);
   if (!run.branch) return `${under}/whole.scenario.json`;
   const { feature, stem: graph } = partsOf(run.branch.graph);
   const nth = run.branch.n === undefined ? '' : `.${run.branch.n}`;
@@ -137,29 +151,32 @@ export interface Recorded {
 /**
  * The runs as documents by file. Where two runs of one trigger name one file the first keeps it, since they prove one
  * branch. Two triggers of one feature and one name -- one under `edge/`, one under `edge/v2/` -- would share a
- * directory, and are refused, naming both, rather than one's runs being dropped for the other's.
+ * directory, and are refused, naming both, rather than one's runs being dropped for the other's; two policies alike.
  */
 function docsOf(runs: RecordedRun[]): Record<string, ScenarioDoc> {
   const held = new Map<string, string>();
   const docs: Record<string, ScenarioDoc> = {};
   for (const run of runs) {
-    const under = triggerDir(run.trigger);
-    const other = held.get(under) ?? run.trigger.path;
-    if (other !== run.trigger.path) throw new Error(sameDir(under, [other, run.trigger.path]));
-    held.set(under, run.trigger.path);
+    const under = underOf(run);
+    const owner = (run.policy ?? run.trigger).path;
+    const other = held.get(under) ?? owner;
+    if (other !== owner) throw new Error(sameDir(under, [other, owner], run.policy ? 'policy' : 'trigger'));
+    held.set(under, owner);
     const file = fileOf(run);
     if (!(file in docs)) docs[file] = scenarioOf(run);
   }
   return docs;
 }
 
-/** Why two triggers of one feature and one name cannot both be recorded, and the two files one of which to rename. */
-function sameDir(under: string, paths: string[]): string {
+const MANY = { trigger: 'triggers', policy: 'policies' };
+
+/** Why two triggers, or policies, of one feature and one name cannot both be recorded, and the files to rename one of. */
+function sameDir(under: string, paths: string[], what: keyof typeof MANY): string {
   const [one, two] = paths.sort();
   const { feature, stem: name } = partsOf(one);
   return (
-    `two triggers of feature '${feature}' are named '${name}', and a recorded trigger's scenarios are written under ` +
-    `its feature and name (${under}/): rename ${one} or ${two}`
+    `two ${MANY[what]} of feature '${feature}' are named '${name}', and a recorded ${what}'s scenarios are written ` +
+    `under its feature and name (${under}/): rename ${one} or ${two}`
   );
 }
 
