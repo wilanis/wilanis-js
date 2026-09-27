@@ -30,22 +30,28 @@ function strictlyInside(root: string, abs: string): boolean {
   return Boolean(inside) && !inside.startsWith('..') && !isAbsolute(inside);
 }
 
-/** The real path of a path that may not exist yet: its nearest existing ancestor's, followed by the rest as written. */
+/**
+ * The real path of a path that may not exist yet: its nearest existing ancestor's, followed by the rest as written.
+ * The operating system's own answer (`realpathSync.native`), so a case-insensitive filesystem answers the case on
+ * disk and `scenarios/FUZZ` is read as the `scenarios/fuzz` it is.
+ */
 function realOf(abs: string): string {
   const rest: string[] = [];
   let at = abs;
   for (; !existsSync(at) && dirname(at) !== at; at = dirname(at)) rest.unshift(basename(at));
-  return join(realpathSync(at), ...rest);
+  return join(realpathSync.native(at), ...rest);
 }
 
 /**
  * Whether a path below the root may hold the recorded directory: strictly below the scenarios' home, where no
- * hand-written scenario sits in it, and outside what fuzz owns.
+ * hand-written scenario sits in it, and outside what fuzz owns. Compared without case, since on a filesystem that
+ * ignores it `Scenarios/fuzz` is fuzz's directory, and one not made yet has no case on disk to read.
  */
 function ownable(root: string, abs: string): boolean {
-  const inside = relative(root, abs).split(sep).join('/');
-  const fuzzed = inside === FUZZED || inside.startsWith(`${FUZZED}/`);
-  return inside.startsWith(`${HOME_DIR}/`) && !fuzzed;
+  const inside = relative(root, abs).split(sep).join('/').toLowerCase();
+  const [home, fuzzed] = [HOME_DIR.toLowerCase(), FUZZED.toLowerCase()];
+  const inFuzz = inside === fuzzed || inside.startsWith(`${fuzzed}/`);
+  return inside.startsWith(`${home}/`) && !inFuzz;
 }
 
 /**
