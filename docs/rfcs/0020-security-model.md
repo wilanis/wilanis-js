@@ -31,7 +31,7 @@ true, and every RFC that lands a guarantee or an enforcement adds its line in th
 ## Motivation
 
 The claims exist and are scattered. `README.md` says a JSON file cannot open a socket or read the disk
-(`README.md:166-167`), that a trigger with no policies is public (`:223-224`), that `request.*` is legal in three
+(`README.md:166-167`), that a trigger with no policies is public (`:223-224`), that `context.*` is legal in three
 places and nowhere else (`:274`), that `from` is a package name and never a path (`:289-290`), that a graph may
 never start a server (`:338-341`). The template's `CLAUDE.md` repeats four of them for an agent
 (`packages/runtime/templates/CLAUDE.md:100-114`). Each plugin's README states its own: the guard identifies and
@@ -88,13 +88,13 @@ these is an RFC that edits this page first.
 - Every reference resolves, and every document is a kind the schemas know, in the directory its kind lives in.
   [D001, D008, R001] (before the RFCs)
 - A document's layer is read off its path, never inferred from what references it. [D008, L001] (before the RFCs)
-- A domain graph reaches no effect and reads no request; a data graph reaches only the effects its feature
+- A domain graph reaches no effect and reads no context; a data graph reaches only the effects its feature
   allows. [L002, L003] (before the RFCs)
 - A graph never starts something that outlives its run, and a startup step names a domain operation or a native
   operation marked `holds`. [L008, B006] (before the RFCs)
 - A trigger never names a graph and never fires a native operation. [L006] (before the RFCs)
-- The request is read in three places only: a trigger's `fire.in`, a policy's `decide.in`, a resolvers document.
-  [L002, P001, P002, A001, B008] (before the RFCs)
+- The context a trigger kind hands is read as `context.*` in three places only: a trigger's `fire.in`, a
+  policy's `decide.in`, a resolvers document. [L002, P001, P002, A001, B008] (before the RFCs)
 - Every refusal a trigger can reach is mapped to an answer, and every mapped reason is reached. [T005, T006, A002,
   A003] (before the RFCs)
 - A credential a policy needs is one the guard verifies, and a `required` resolver is proved by a policy.
@@ -181,15 +181,15 @@ today (`packages/core/src/{documents,validate,load,placement}.ts`, `packages/com
 | a document's layer is its directory; a type crosses a layer only where the layer allows | D008 L001 |
 | a plugin or include is an npm package the project names; an include's plugins are the project's | D006 D009 D010 |
 | an alias names one thing: not a plugin root, not a reserved root, not a folder, and not two things across an include | D007 |
-| a domain graph reaches no effect and reads no request; a data graph runs no domain operation | L002 |
+| a domain graph reaches no effect and reads no context; a data graph runs no domain operation | L002 |
 | a data graph reaches only the effects its feature allows | L003 |
 | a domain graph does more than forward; a binding lives inside a feature | L007 |
 | a trigger and a policy fire a domain operation and never a native one; a graph never runs a `holds` operation | L006 L008 |
-| a startup step names a domain operation or a native `holds` operation, with inputs it has and no request | B006 B007 B008 |
+| a startup step names a domain operation or a native `holds` operation, with inputs it has and no read of the context | B006 B007 B008 |
 | every value fits the type declared for it, and every input is given, once, from something that exists | G003 G004 G005 G006 G013 B005 T002 T003 C002 T001 |
 | a graph is acyclic and every node, constant and input is read | G001 G007 G008 G009 G010 G012 |
 | a switch rule is a boolean expression over the node's inputs | G011 |
-| the request is read in a trigger's `fire.in`, a policy's `decide.in` and a resolvers document only; a resolver is a read | P001 P002 P003 T004 A001 |
+| the context a trigger kind hands is read as `context.*` in a trigger's `fire.in`, a policy's `decide.in` and a resolvers document only; a resolver is a read | P001 P002 P003 T004 A001 |
 | every refusal a trigger can reach is mapped, and every mapped reason is reached; a challenge names its method | T005 T006 A002 A003 |
 | a credential a policy asks for is one the guard verifies, and a trigger that attaches a policy gives the guard its credentials | A004 A005 |
 | a `required` resolver is proved by a policy on every trigger that reads it | A006 |
@@ -206,7 +206,7 @@ Lines added by accepted RFCs when their rules land, each in the pull request tha
 | a trigger that reaches an operation an access invariant covers attaches a policy that satisfies it | I001 I002 I003 | RFC 0007 |
 | a field invariant a graph can decide statically is decided; a rule parses and types against its shape | I004 I005 I006 | RFC 0007 |
 | a store's scope is fed from what the guard hands and never from what the caller could send | the codes of RFC 0015 | RFC 0015 |
-| a document names each read it takes from the request | P004 P005 P006 | RFC 0029 |
+| a document names each read it takes from the context | P004 P005 P006 | RFC 0029 |
 | a profile names one default, a stand-in is a connection of the same kind, every secret is read, a step names declared profiles | C0nn B0nn | RFC 0013 |
 | a profile with `permits` reaches exactly what it permits, and permits only effects and connections | C0nn | RFC 0016 |
 | a field the compiler provides is never written by an author | L0nn G0nn | RFC 0032 |
@@ -220,7 +220,7 @@ None changes. The first version of *Enforced by the runtime*, each line with the
 |---|---|
 | the guard verifies a credential before any graph runs, on every fire of a trigger that attaches a policy; a refusal ends the run as `identify` and no policy and no graph runs | `Embedder.gate`, `packages/runtime/src/embed.ts:174-192`; `guard` in `packages/core/src/plugin.ts:161-179` |
 | the stubbed gates never call the guard: `rehearse`, `fuzz` and `regress` prove nothing about identity | `embed.ts:80-81, 171, 179` |
-| what the guard learned reaches a graph as `request.principal`, `request.session`, `request.challenge` and by no other path; no graph sees a raw credential | `embed.ts:185`; `packages/plugin-auth/src/guard.ts:148-165` |
+| what the guard learned reaches a graph as `context.principal`, `context.session`, `context.challenge` and by no other path; no graph sees a raw credential | `embed.ts:185`; `packages/plugin-auth/src/guard.ts:148-165` |
 | a field marked `secret` is `«secret»` in every report's `in` and `out`, to a depth of six fields inside a type | `packages/engine/src/redact.ts`; `secretPaths`, `packages/compiler/src/lower.ts:76-92`; `run.ts:212-244` |
 | a `{{secrets.*}}` read is substituted into plugin and connection settings only, and the variable's value reaches no report | `Secrets`, `packages/compiler/src/env.ts:10-52` |
 | a blob's bytes live once, in the store; a graph carries a handle; a handle opens only what the store holds, and nothing reads a blob whole | `packages/runtime/src/blobs.ts:22, 58-61`; `fitness/a-blob-is-never-read-whole.fitness.ts` |

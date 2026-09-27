@@ -62,11 +62,12 @@ reaches an operation is a trigger, and a trigger is one file. Two of them, from 
 
 A GET on `/customers/{id}`, for a signed-in caller: `signed-in` is a policy of the included access tree, given
 the token from the header or the session cookie. It takes an `IdRequest` and answers a `CustomerView`, both
-declared in files of their own, and runs `get` with the id from the URL. When the operation refuses, the reason
-becomes the status this file maps it to, and the checker refuses a mapping for a reason nothing behind the route
-can produce. It answers only a customer of the caller's own tenant, and nothing in this file says so: the store
-keeps its customers per tenant, and the compiler carries the tenant the sign-in wrote into the session to every
-read of them.
+declared in files of their own, and runs `get` with the id from the URL. The `context` the route reads is
+declared by its kind, `@http/http.trigger-kind.json`, and the checker types every path in `fire.in` against that
+declaration. When the operation refuses, the reason becomes the status this file maps it to, and the checker
+refuses a mapping for a reason nothing behind the route can produce. It answers only a customer of the caller's
+own tenant, and nothing in this file says so: the store keeps its customers per tenant, and the compiler carries
+the tenant the sign-in wrote into the session to every read of them.
 
 ```json
 {
