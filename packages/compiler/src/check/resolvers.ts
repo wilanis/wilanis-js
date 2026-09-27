@@ -56,7 +56,7 @@ function judgeResolver(judge: Judge, refuse: Refuser, name: string, spec: Resolv
     return undefined;
   }
   const path = splitPath(spec.read).slice(1);
-  const read = judge.scope.requestRead(path);
+  const read = judge.scope.contextRead(path);
   if (typeof read === 'string') {
     const hint = 'wilanis describe <trigger kind> shows what each kind hands as context.*';
     refuse('P002', `resolver '${name}': ${read}`, `${at}/read`, hint);
