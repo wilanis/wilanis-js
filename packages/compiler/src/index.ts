@@ -47,6 +47,7 @@ export {
   hasGuard,
   INVARIANT,
   idsOf,
+  REFUSE,
   TAKEN_IDS,
   type Unproved,
   violatedIds,

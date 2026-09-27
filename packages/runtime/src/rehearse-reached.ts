@@ -6,7 +6,7 @@
  * switch is here too: the enclosing switches routed towards it (`reach`), and every other decision on the run routed
  * to a branch that answers (`answering`), so a switch behind a call that decides first is still reached (#637).
  */
-import { guardIds } from '@wilanis/compiler';
+import { guardIds, REFUSE } from '@wilanis/compiler';
 import type { Loaded, LoadResult, TriggerDoc, Type } from '@wilanis/core';
 import {
   CAUGHT,
@@ -159,12 +159,10 @@ export function answering(walk: Reached, sw: FoundSwitch): Pick<Steering, 'stubs
   return { stubs, input };
 }
 
-/** The handler a refuse node runs: a branch routed to one does not answer. */
-const REFUSE = '@std/outcome.port.json#refuse';
-
 /**
  * The first case of a switch that answers: a rule's or the else, one a run can take, routing to a node that is not a
- * refusal. Nothing where every branch refuses, or none can be taken.
+ * refusal -- a node that runs `REFUSE`, the native operation a guard refuses with too. Nothing where every branch
+ * refuses, or none can be taken.
  */
 function answeringCase(walk: Reached, other: FoundSwitch): Case | undefined {
   const spec = specOf(walk, other);
