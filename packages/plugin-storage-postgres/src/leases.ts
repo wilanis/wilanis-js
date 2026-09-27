@@ -14,10 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import type { Leases } from '@wilanis/plugin-storage';
 import { type Kysely, type RawBuilder, sql } from 'kysely';
-import { poolFor, type Settings } from './pool.js';
-
-/** The connections an environment carries, with their kinds and their settings, secrets substituted. */
-type Connections = Record<string, { kind: string; settings: Record<string, unknown> }>;
+import { poolFor, reachedOn, type Settings } from './pool.js';
 
 /** Where one connection's leases are kept: its pool, and the lease table qualified by the connection's schema. */
 interface Kept {
@@ -79,11 +76,11 @@ export class TableLeases implements Leases {
     return opening;
   }
 
-  /** Reach the connection's database and make sure the lease table is there. */
+  /** Reach the connection's database through the pool it reaches (`reachedOn`), and make sure the lease table is there. */
   private async open(connection: string): Promise<Kept> {
-    const conn = (this.env as { connections?: Connections }).connections?.[connection];
-    if (!conn) throw new Error(`lease on '${connection}': not a connection of this tree`);
-    const { db, schema } = poolFor({ connection, kind: conn.kind, settings: conn.settings }, this.settings);
+    const on = reachedOn(this.env, connection);
+    if (!on) throw new Error(`lease on '${connection}': not a connection of this tree`);
+    const { db, schema } = poolFor(on, this.settings);
     await ensureLeases(db, schema);
     return { db, table: tableIn(schema) };
   }

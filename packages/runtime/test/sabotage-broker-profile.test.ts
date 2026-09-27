@@ -17,6 +17,7 @@ import { codes, EXAMPLE, loadedWith, sabotage, sabotageSaying, withBrokenPluginD
 
 const JOBS = '@connections/jobs.connection.json';
 const API = '@connections/customers-api.connection.json';
+const CUSTOMERS = '@connections/customers-postgres.connection.json';
 const POSTGRES_KIND = '@storage-postgres/postgres.connection-kind.json';
 
 describe('sabotage: a broker standing in for another (C018)', () => {
@@ -24,12 +25,20 @@ describe('sabotage: a broker standing in for another (C018)', () => {
     expect(codes(EXAMPLE)).toEqual([]);
     const { load, dir } = loadedWith({});
     const scope = new Scope(load.registry, load.resolve);
-    const kindUnder = (profile: string) =>
-      (buildEnv(scope, { CUSTOMERS_DATABASE_URL: 'postgres://x' }, profile).env.connections as any)[JOBS].kind;
+    const under = (profile: string, named: string) =>
+      (buildEnv(scope, { CUSTOMERS_DATABASE_URL: 'postgres://x' }, profile).env.connections as any)[named];
+    const kindUnder = (profile: string) => under(profile, JOBS).kind;
     expect(kindUnder('production')).toBe(POSTGRES_KIND);
     expect(kindUnder('production-scheduler')).toBe(POSTGRES_KIND);
     expect(kindUnder('production-worker')).toBe(POSTGRES_KIND);
     expect(kindUnder('local')).toBe('@queue-memory/memory.connection-kind.json');
+    // and under the path of the connection it stands for, which the stores' own name is handed too: one
+    // connection, so one pool and one transaction for a store call and a publish (#653)
+    for (const profile of ['production', 'production-scheduler', 'production-worker']) {
+      expect(under(profile, JOBS).path).toBe(CUSTOMERS);
+      expect(under(profile, CUSTOMERS).path).toBe(CUSTOMERS);
+    }
+    expect(under('local', JOBS).path).toBe(JOBS);
     rmSync(dir, { recursive: true, force: true });
   });
 

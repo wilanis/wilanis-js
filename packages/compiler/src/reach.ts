@@ -23,7 +23,7 @@ import {
   type TriggerDoc,
   type Values,
 } from '@wilanis/core';
-import { connectionOf } from './documents.js';
+import { connectionOf, connectionUnder } from './documents.js';
 
 /**
  * One call the walk follows: what it names, what it gives, where it is written, and what it descended from.
@@ -169,7 +169,7 @@ export interface Reach {
  * walks (`walkedUnder`: its startup serves the trigger, or no profile's does), every policy such a trigger
  * attaches, every operation of a port a plugin requires (RFC 0005), and every startup step that runs under the
  * profile (`startup[].profiles`); a route under a profile that never listens, and a policy only such routes
- * attach, run nowhere there and are not walked. A connection a site names is the one `connectionFor` reaches
+ * attach, run nowhere there and are not walked. A connection a site names is the one `connectionUnder` reaches
  * under the profile: a stand-in replaces what it stands in for, and its settings are the ones whose secrets the
  * reach reads.
  */
@@ -318,9 +318,7 @@ class Reaching implements Listener<Root> {
 
   /** The connection a named one reaches under the profile: its stand-in, else itself where the stand-in is unknown (R001). */
   private standingIn(named: string | undefined): string | undefined {
-    if (!named) return undefined;
-    const reached = this.scope.connectionFor(named, this.profile);
-    return typeof reached === 'string' ? named : reached.path;
+    return named ? connectionUnder(this.scope, named, this.profile) : undefined;
   }
 
   /**

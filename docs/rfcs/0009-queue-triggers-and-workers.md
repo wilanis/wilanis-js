@@ -321,10 +321,12 @@ by a broker that keeps no store would pass both and fail every store call, so C0
 `jobs.connection.json` is the in-process broker as written; under the three production profiles it
 stands for `customers-postgres.connection.json`, so the removals queue is a table beside the customers, and a
 startup step under all three fires `@customers/domain/jobs.port.json#prepare`, whose one binding runs
-`@queue/queue.port.json#ensure` on it. A handler asking for `jobs.connection.json` is handed the stand-in's kind
-and settings under its own name, so the stand-in keeps its own pool: an atomic graph that writes the customers
-and publishes to `jobs.connection.json` would name two connections to `Atomic.join`, and the example has none
-(#653).
+`@queue/queue.port.json#ensure` on it. A handler asking for `jobs.connection.json` is handed the stand-in's kind,
+settings and path, and keys the pool and `Atomic.join` by that path, so an atomic graph that writes the customers
+and publishes to `jobs.connection.json` is one transaction on the customer database. When step 10 landed the
+handler was handed the kind and settings alone and keyed both by the name it asked with, so such a graph named
+two connections to `Atomic.join` and failed; #653 keyed them by the connection the profile reaches, which is the
+connection L010 counts too, since both ask `connectionUnder` in `packages/compiler/src/documents.ts`.
 
 ### Checker rules
 
