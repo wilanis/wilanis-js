@@ -70,10 +70,20 @@ export function docsDir(docs: Record<string, unknown>): string {
   return dir;
 }
 
-/** A throwaway copy of the example, without what a check must not read. The caller removes it. */
+/** The scenarios the example keeps, which the commands wrote and committed-scenarios.test.ts holds where they are. */
+const KEPT_SCENARIOS = join(EXAMPLE, 'scenarios');
+
+/**
+ * A throwaway copy of the example, without what a check must not read and without the scenarios it keeps: a case
+ * that breaks a document judges that document and not the recorded runs naming it, and a case that records into the
+ * copy counts what it wrote. The caller removes it.
+ */
 export function copyOfExample(): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-'));
-  cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
+  cpSync(EXAMPLE, dir, {
+    recursive: true,
+    filter: path => !path.includes('node_modules') && path !== KEPT_SCENARIOS,
+  });
   return dir;
 }
 

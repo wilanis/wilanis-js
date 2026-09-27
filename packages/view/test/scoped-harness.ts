@@ -40,6 +40,12 @@ const INCLUDES: ResolvedInclude[] = [
   },
 ];
 
+/**
+ * What a copy of the example takes: all but its node_modules and the scenarios it keeps, so a case sees the scenarios
+ * it plants and no others.
+ */
+const copied = (from: string) => !from.includes('node_modules') && from !== join(EXAMPLE, 'scenarios');
+
 /** The store the local profile keeps its customers in. */
 export const STORE_FILE = 'features/customers/data/customers.store.json';
 
@@ -79,13 +85,13 @@ const viewed = (root: string, path: string): DocView => {
 };
 
 /**
- * The views of some documents of a copy of the example with these documents written into it, by path in the tree: a
- * scenario, which the example keeps none of, among them. The copy lives for the length of the call and no longer.
+ * The views of some documents of a copy of the example with these documents written into it, by path in the tree:
+ * scenarios among them, beside none of the example's own. The copy lives for the length of the call and no longer.
  */
 export function plantedViews(docs: Record<string, unknown>, paths: string[]): DocView[] {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-view-planted-'));
   try {
-    cpSync(EXAMPLE, dir, { recursive: true, filter: from => !from.includes('node_modules') });
+    cpSync(EXAMPLE, dir, { recursive: true, filter: copied });
     for (const [file, doc] of Object.entries(docs)) {
       mkdirSync(dirname(join(dir, file)), { recursive: true });
       writeFileSync(join(dir, file), JSON.stringify(doc));
@@ -110,7 +116,7 @@ export function scopedView(path: string, edits?: Edits): DocView {
   if (!edits) return viewed(EXAMPLE, path);
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-view-scoped-'));
   try {
-    cpSync(EXAMPLE, dir, { recursive: true, filter: from => !from.includes('node_modules') });
+    cpSync(EXAMPLE, dir, { recursive: true, filter: copied });
     for (const [file, edit] of Object.entries(edits)) editing(dir, file, edit);
     return viewed(dir, path);
   } finally {

@@ -392,8 +392,9 @@ beyond what this script already runs; `build.mjs` runs it as its last step.
 
 ## Reset
 
-`docs/demo/reset.sh` copies the example to `${1:-$TMPDIR/wilanis-demo}`, replacing what is there, links the
-repository's `node_modules` into it, and prints the lines to paste:
+`docs/demo/reset.sh` copies the example to `${1:-$TMPDIR/wilanis-demo}`, replacing what is there and leaving
+behind the scenarios the example keeps, links the repository's `node_modules` into it, and prints the lines to
+paste:
 
 ```
 bash docs/demo/reset.sh /tmp/wilanis-demo

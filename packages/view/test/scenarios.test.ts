@@ -2,16 +2,16 @@
  * What the viewer shows of scenarios (RFC 0018, step 8): a scenario's page links the trigger it replays and the
  * policy whose decision it fires, draws the branch it proves as a chain opening the graph, says the refusal it
  * expects or why no input reaches its branch, and marks one a command wrote; a trigger's page lists the scenarios
- * replaying it, grouped by who wrote them as `wilanis ls` marks them. The example keeps no scenario, so a copy of it
- * is planted with one of each kind. The page's functions are lifted from its source and run over a stand-in for the
- * DOM, since the page is one static file.
+ * replaying it, grouped by who wrote them as `wilanis ls` marks them. A copy of the example, without the scenarios it
+ * keeps, is planted with one of each kind. The page's functions are lifted from its source and run over a stand-in
+ * for the DOM, since the page is one static file.
  */
 import { readFile } from 'node:fs/promises';
 import { schemaUrl } from '@wilanis/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { DocView } from '../src/index.js';
 import { type Drawn, drawn, lifted, PAGE, words } from './page-harness.js';
-import { plantedViews, scopedView } from './scoped-harness.js';
+import { plantedViews } from './scoped-harness.js';
 
 const GET_CUSTOMER = '@features/customers/edge/get-customer.trigger.json';
 const DELETE_CUSTOMER = '@features/customers/edge/delete-customer.trigger.json';
@@ -113,7 +113,7 @@ describe('the view model: scenarios', () => {
 
   it("leaves a policy's decision to the policy, and carries no group on a trigger no scenario replays", () => {
     expect(views[DELETE_CUSTOMER].scenarios).toEqual([]);
-    expect(scopedView(GET_CUSTOMER).scenarios).toEqual([]);
+    expect(plantedViews({}, [GET_CUSTOMER])[0]?.scenarios).toEqual([]);
   });
 
   it('marks a scenario a command wrote with the sentence describe prints, and one kept by hand with none', () => {
