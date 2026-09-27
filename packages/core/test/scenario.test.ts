@@ -7,6 +7,15 @@ import { at, doc, refused } from './documents.js';
 
 const recorded = (nodes: Record<string, unknown>) => doc('scenario', { expect: { status: 'failed', nodes } });
 
+describe('what a scenario was fired with', () => {
+  it('keeps the context the run read under context, and has no request (RFC 0034)', () => {
+    expect(refused(doc('scenario', { in: { id: 'golf' }, context: { params: { id: 'golf' } } }))).toEqual([]);
+    expect(refused(doc('scenario', { request: { params: { id: 'golf' } } }))).toEqual([
+      at(undefined, "unknown property 'request'"),
+    ]);
+  });
+});
+
 describe('a scenario node', () => {
   it('may pin the reason it refused with, on the refusing node and on the call that ran its graph', () => {
     const nodes = {

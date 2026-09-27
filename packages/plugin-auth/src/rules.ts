@@ -60,7 +60,7 @@ function checkAnswerable(scope: Scope, refuse: Refuse) {
         message:
           'a policy of this trigger may challenge the caller, but no attachment gives the guard a challenge answer, so the challenge could never be met',
         at: 'policies',
-        hint: 'give it: "in": { "challenge": { "id": "{{request.flags[\'challenge-id\']}}", "code": "{{request.flags.code}}" } }',
+        hint: 'give it: "in": { "challenge": { "id": "{{context.flags[\'challenge-id\']}}", "code": "{{context.flags.code}}" } }',
       });
   }
 }

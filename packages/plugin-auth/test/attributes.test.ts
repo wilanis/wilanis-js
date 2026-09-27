@@ -155,7 +155,7 @@ const shapeOf = (attribute: string) => ({
 const scoping = (attribute: string) => ({
   'features/customers/edge/request.resolvers.json': (doc: any) => {
     doc.resolvers[attribute] = {
-      read: `request.session.attributes.${attribute}`,
+      read: `context.session.attributes.${attribute}`,
       required: true,
       description: "the caller's tenant, written into the session at sign-in",
     };

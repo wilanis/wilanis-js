@@ -3,7 +3,7 @@
  *
  * What runs the schedule is the `holds` operation a project's startup list names, not this module's own
  * doing: a tree that names no step schedules nothing, as a tree that names no listener serves nothing. The
- * trigger kind's runtime is here for `encode` and `requestOf` -- `wilanis run` and the tick's log line then say the
+ * trigger kind's runtime is here for `encode` and `contextOf` -- `wilanis run` and the tick's log line then say the
  * same thing about the same report.
  */
 import { fileURLToPath } from 'node:url';
@@ -58,7 +58,7 @@ const runtime: TriggerRuntime = {
     return refused ? { reason: refused.reason, message: refused.message, ...(refused.detail ?? {}) } : report.output;
   },
   // `wilanis run` fires a tick by hand: the kind's context, from --at
-  requestOf: (_trigger, { flags }) => tickOf(flags),
+  contextOf: (_trigger, { flags }) => tickOf(flags),
 };
 
 const schedule: PluginModule = {

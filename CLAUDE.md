@@ -79,12 +79,12 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   checker reads it off the path rather than inferring a role from who references a document. A trigger fires
   a domain port operation through its `fire` run node and never names a graph, so the port is the one seam
   between the edge and the business. A binding says how a port is met and never cares which layer it is in.
-  The request is read in three places only: a trigger's `fire.in`, a policy's `decide.in`, and a `resolvers`
+  The context a trigger kind hands is read as `context.*` in three places only: a trigger's `fire.in`, a policy's `decide.in`, and a `resolvers`
   document (edge/) whose named reads a data graph or a binding uses as `{{name}}`. A resolver is a read, never
   an operation; the compiler lowers it to a source reference and nothing runs.
   Who is calling is the guard's business and what they may do is a policy's: the one plugin with a `guard`
-  (`@auth`) verifies a credential before any graph runs and adds `request.principal`, `request.session`,
-  `request.challenge` to every kind's context; a `policy` (edge/) fires a domain operation over those, and its
+  (`@auth`) verifies a credential before any graph runs and adds `context.principal`, `context.session`,
+  `context.challenge` to every kind's context; a `policy` (edge/) fires a domain operation over those, and its
   graph refuses with a reason the policy maps to `deny` or `challenge`. A trigger attaches its policies
   in order, and where it attaches one it gives the guard the credentials it verifies (`in: { token: ... }`), read from
   the kind's context like any input; the runtime's embedder runs the gate (`gate` in `packages/runtime/src/gate.ts`), never a kind. No graph

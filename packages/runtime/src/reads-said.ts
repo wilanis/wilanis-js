@@ -1,11 +1,11 @@
 /**
- * What `wilanis describe` says about the reads a document takes from the request, read from both ends: a data
+ * What `wilanis describe` says about the reads a document takes from the context, read from both ends: a data
  * graph's or a binding's `reads` block above the nodes or the operations it stands over, and, on the resolvers
  * document itself, every graph and binding that names one of its resolvers.
  *
  * A read is the one thing in a tree whose value comes from outside it, and RFC 0029 made each one a path a
  * reader can open. `describe` closes the loop: the block says what `{{name}}` is before the reader meets it,
- * with the `request.*` path the resolver declares and whether a trigger must prove it; and a resolvers
+ * with the `context.*` path the resolver declares and whether a trigger must prove it; and a resolvers
  * document, which until now said only what it read, says who reads it and under which local name. Nothing is
  * inferred -- the map is the read set, so both directions are that map, read forwards and backwards.
  */

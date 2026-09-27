@@ -1,5 +1,5 @@
 /** Small judgements over types that more than one rule family makes. */
-import { assignable, type Read, type Type, typeAt } from '@wilanis/core';
+import { assignable, joinPath, type Read, type Type, typeAt } from '@wilanis/core';
 import type { Resolve } from './judge.js';
 
 /** Why `from` cannot feed `to`; nothing when it can, or when either side is unknown (refused elsewhere). */
@@ -13,9 +13,17 @@ export function readAt(base: Read, path: string[]): Read | string {
   return typeof read === 'string' ? read : { type: read.type, optional: base.optional || read.optional };
 }
 
-/** A resolver of template roots where only `request.*` may be read, typed against a trigger kind's context. */
-export function requestOnly(ctx: Type, otherwise: string): Resolve {
-  return (root, path) => (root === 'request' ? typeAt(ctx, path) : `'${root}': ${otherwise}`);
+/**
+ * A resolver of template roots where only `context.*` may be read, typed against a trigger kind's context. The
+ * retired root `request` is named for what it became, so a read spelt the old way is told the new spelling.
+ */
+export function contextOnly(ctx: Type, otherwise: string): Resolve {
+  return (root, path) => {
+    if (root === 'context') return typeAt(ctx, path);
+    if (root === 'request')
+      return `'request': the root is context, what the trigger kind hands; write {{${joinPath(['context', ...path])}}}`;
+    return `'${root}': ${otherwise}`;
+  };
 }
 
 /** Is a dotted path the prefix itself, or below it? */

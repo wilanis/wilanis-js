@@ -19,7 +19,7 @@ npm install @wilanis/plugin-blob
 Every operation is an effect (it touches the registry), so it lives in a data graph and is listed in the
 feature's `effects`. In a rehearsal it is stubbed like any effect. A route uploads a file through a content
 type mapped to `@http/codecs/blob.codec.json`, and downloads one by answering a `blob` through it; on the
-command line, `wilanis run --file path` hands a file as `request.file` and `--out path` receives a blob answer.
+command line, `wilanis run --file path` hands a file as `context.file` and `--out path` receives a blob answer.
 
 Depends on `@wilanis/core` and `@wilanis/engine`.
 

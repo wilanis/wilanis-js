@@ -252,7 +252,7 @@ function edge(): Docs {
       },
       in: ID_REQUEST,
       out: '@features/customers/edge/CustomerView.shape.json',
-      fire: { run: '@features/customers/domain/customer.port.json#remove', in: { id: '{{request.message.id}}' } },
+      fire: { run: '@features/customers/domain/customer.port.json#remove', in: { id: '{{context.message.id}}' } },
     },
     'features/customers/edge/enqueue.trigger.json': {
       $schema: schemaRef('trigger'),
@@ -261,7 +261,7 @@ function edge(): Docs {
       settings: { command: 'enqueue' },
       in: ID_REQUEST,
       out: '@features/customers/edge/QueuedView.shape.json',
-      fire: { run: '@features/customers/domain/customer.port.json#enqueue', in: { id: '{{request.flags.id}}' } },
+      fire: { run: '@features/customers/domain/customer.port.json#enqueue', in: { id: '{{context.flags.id}}' } },
     },
   };
 }

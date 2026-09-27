@@ -181,14 +181,14 @@ export function gatedTree(identifies: () => Identifies) {
   put('features/gate/edge/signed-in.policy.json', {
     $schema: schemaRef('policy'),
     description: 'a caller the guard named',
-    decide: { run: '@features/gate/domain/gate.port.json#signedIn', in: { principal: '{{request.principal}}' } },
-    proves: ['request.principal'],
+    decide: { run: '@features/gate/domain/gate.port.json#signedIn', in: { principal: '{{context.principal}}' } },
+    proves: ['context.principal'],
     outcomes: { anonymous: { effect: 'deny' } },
   });
   put('features/gate/edge/roled.policy.json', {
     $schema: schemaRef('policy'),
     description: 'a caller holding the role',
-    decide: { run: '@features/gate/domain/gate.port.json#roled', in: { principal: '{{request.principal}}' } },
+    decide: { run: '@features/gate/domain/gate.port.json#roled', in: { principal: '{{context.principal}}' } },
     outcomes: { forbidden: { effect: 'deny' } },
   });
   put('features/gate/edge/greet.trigger.json', {
@@ -198,7 +198,7 @@ export function gatedTree(identifies: () => Identifies) {
     settings: { command: 'greet' },
     out: 'string',
     policies: [
-      { policy: '@features/gate/edge/signed-in.policy.json', in: { token: '{{request.flags.token}}' } },
+      { policy: '@features/gate/edge/signed-in.policy.json', in: { token: '{{context.flags.token}}' } },
       '@features/gate/edge/roled.policy.json',
     ],
     kind: '@cli/cli.trigger-kind.json',

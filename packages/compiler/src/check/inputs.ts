@@ -53,7 +53,7 @@ export function reader(judge: Judge, resolve: Resolve, file: string): Reader {
   return (value, at) => {
     const read = judge.scope.valueRead(value, resolve);
     if (typeof read !== 'string') return read;
-    refuse('G003', read, at, 'read in, const, request or a node that runs before this one');
+    refuse('G003', read, at, 'read in, const, context or a node that runs before this one');
     return undefined;
   };
 }

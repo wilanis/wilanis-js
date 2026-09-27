@@ -11,17 +11,17 @@ describe('sabotage: access, as the example attaches the included policies', () =
   it('A004 a credential the guard does not verify, one read where the kind hands nothing, and one no policy of the trigger reads', () => {
     expect(
       sabotage('features/customers/edge/register-customer.trigger.json', trigger => {
-        trigger.policies[0].in = { badge: '{{request.headers.authorization}}' };
+        trigger.policies[0].in = { badge: '{{context.headers.authorization}}' };
       }),
     ).toContain('A004');
     expect(
       sabotage('features/customers/edge/register-customer.trigger.json', trigger => {
-        trigger.policies[0].in = { token: '{{request.flags.token}}' };
+        trigger.policies[0].in = { token: '{{context.flags.token}}' };
       }),
     ).toContain('A004');
     expect(
       sabotage('features/customers/edge/register-customer.trigger.json', trigger => {
-        trigger.policies[0].in.challenge = { id: '{{request.query.cid}}', code: '{{request.query.code}}' };
+        trigger.policies[0].in.challenge = { id: '{{context.query.cid}}', code: '{{context.query.code}}' };
       }),
     ).toEqual(['A004']);
   });

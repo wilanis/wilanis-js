@@ -70,7 +70,7 @@ interface Fuzzed {
   trigger: Loaded<TriggerDoc>;
   seed: number;
   input: unknown;
-  request: Record<string, unknown>;
+  context: Record<string, unknown>;
   record: Record<string, unknown>;
   report: Report;
   /** Where the trigger's `out` marks a field secret: the output is written with those as the marker. */
@@ -81,13 +81,13 @@ interface Fuzzed {
 async function fuzzed(load: LoadResult, trigger: Loaded<TriggerDoc>, seed: number, profile?: string): Promise<Fuzzed> {
   const record: Record<string, unknown> = {};
   const emb = embedderFor(load, { seed, record, profile });
-  const { input, request } = generatedFire(emb, trigger, seed);
-  const report = await emb.fire(trigger.doc, input, request);
-  return { trigger, seed, input, request, record, report, secret: secretPaths(emb.types(trigger.doc).out) };
+  const { input, context } = generatedFire(emb, trigger, seed);
+  const report = await emb.fire(trigger.doc, input, context);
+  return { trigger, seed, input, context, record, report, secret: secretPaths(emb.types(trigger.doc).out) };
 }
 
 /** The scenario a fuzzed run is written as. */
-function scenarioOf({ trigger, seed, input, request, record, report, secret }: Fuzzed): ScenarioDoc {
+function scenarioOf({ trigger, seed, input, context, record, report, secret }: Fuzzed): ScenarioDoc {
   return {
     $schema: schemaUrl('scenario'),
     description: `${trigger.path} under seed ${seed}: ${report.status}. Written by wilanis fuzz; regenerate it, do not edit it -- to pin a case, copy it up into ${HOME_DIR}/, give it a description of its own, and drop generated.`,
@@ -95,7 +95,7 @@ function scenarioOf({ trigger, seed, input, request, record, report, secret }: F
     trigger: trigger.path,
     seed,
     in: input,
-    request,
+    context,
     stubs: record,
     expect: expectOf(report, secret),
   };
@@ -233,7 +233,7 @@ export async function regress(load: LoadResult, opts: { profile?: string } = {})
     }
     const report = sc.doc.cancelAt
       ? await cancelledReplay(load, stubbed, trigger.doc, sc.doc)
-      : await emb.fire(trigger.doc, sc.doc.in, sc.doc.request ?? {}, { stubs: sc.doc.stubs });
+      : await emb.fire(trigger.doc, sc.doc.in, sc.doc.context ?? {}, { stubs: sc.doc.stubs });
     const diffs = diffOf(report, sc.doc, secretPaths(emb.types(trigger.doc).out));
     results.push({ scenario: sc.path, same: diffs.length === 0, diffs });
     lines.push(`${sc.path}: ${diffs.length ? `DIFF ${diffs.join('; ')}` : 'same'}`);
@@ -257,7 +257,7 @@ function cancelledReplay(
   const control = new AbortController();
   const emb = embedderFor(load, { ...stubbed, cancelAt: { path, abort: () => control.abort() } });
   const { [path]: _, ...stubs } = sc.stubs ?? {};
-  return emb.fire(trigger, sc.in, sc.request ?? {}, { stubs, signal: control.signal });
+  return emb.fire(trigger, sc.in, sc.context ?? {}, { stubs, signal: control.signal });
 }
 
 function fakeEnvFor(load: LoadResult): NodeJS.ProcessEnv {

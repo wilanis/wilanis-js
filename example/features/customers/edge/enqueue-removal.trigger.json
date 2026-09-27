@@ -23,7 +23,7 @@
     {
       "policy": "@access/edge/employees-only.policy.json",
       "in": {
-        "token": "{{request.headers.authorization}}"
+        "token": "{{context.headers.authorization}}"
       }
     },
     "@access/edge/can-register.policy.json"
@@ -32,7 +32,7 @@
   "fire": {
     "run": "@customers/domain/customer.port.json#enqueueRemoval",
     "in": {
-      "id": "{{request.params.id}}"
+      "id": "{{context.params.id}}"
     }
   }
 }

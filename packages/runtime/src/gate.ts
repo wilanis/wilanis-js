@@ -21,7 +21,7 @@ export interface Gating {
   /** The environment a decision graph runs against, with this run's blob scope where it has one. */
   envFor(blobs: unknown): Record<string, unknown>;
   /** What the guard is handed on this fire. */
-  guardArgs(trigger: TriggerDoc, request: Record<string, unknown>): GuardArgs;
+  guardArgs(trigger: TriggerDoc, context: Record<string, unknown>): GuardArgs;
   /** The clock every stamp of this fire is read from. */
   clock(): number;
 }
@@ -42,16 +42,16 @@ export interface Gated {
 export async function gate(
   emb: Gating,
   trigger: TriggerDoc,
-  request: Record<string, unknown>,
+  context: Record<string, unknown>,
   opts: { stubbed?: boolean; signal?: AbortSignal; blobs?: unknown },
 ): Promise<Gated> {
   const gated: Gated = { decisions: [] };
   if (opts.stubbed || !trigger.policies?.length) return gated;
-  const args = emb.guardArgs(trigger, request);
-  gated.ended = await identifies(emb, args, request, gated);
+  const args = emb.guardArgs(trigger, context);
+  gated.ended = await identifies(emb, args, context, gated);
   if (gated.ended) return gated;
   for (const use of trigger.policies) {
-    const ended = await decide(emb, policyPath(use), { request, args, opts }, gated);
+    const ended = await decide(emb, policyPath(use), { context, args, opts }, gated);
     if (ended) {
       gated.ended = ended;
       return gated;
@@ -64,7 +64,7 @@ export async function gate(
 async function identifies(
   emb: Gating,
   args: GuardArgs,
-  request: Record<string, unknown>,
+  context: Record<string, unknown>,
   gated: Gated,
 ): Promise<Report | undefined> {
   const identify = emb.guard?.guard?.identify;
@@ -77,31 +77,31 @@ async function identifies(
     return refused(`${emb.guard.root} guard`, 'identify', id.refuse);
   }
   gated.identify = { ...timing, added: Object.keys(id.context) };
-  Object.assign(request, id.context);
+  Object.assign(context, id.context);
   return undefined;
 }
 
 /**
  * One policy's decision, kept whichever way it went: nothing when it allows and the run goes on, else the
  * report that ends it. A policy that allows is recorded all the same -- a reader of a gate that only kept the
- * refusal could not tell an unguarded run from one that passed two policies. The decision is handed the request
+ * refusal could not tell an unguarded run from one that passed two policies. The decision is handed the context
  * and its input as they are, and its reports show both as a trigger's run shows them: what the kind's context
  * marks is the marker, and so is an input `decide.in` fills from it.
  */
 async function decide(
   emb: Gating,
   ref: string,
-  run: { request: Record<string, unknown>; args: GuardArgs; opts: { signal?: AbortSignal; blobs?: unknown } },
+  run: { context: Record<string, unknown>; args: GuardArgs; opts: { signal?: AbortSignal; blobs?: unknown } },
   gated: Gated,
 ): Promise<Report | undefined> {
   const policy = emb.scope.get('policy', ref);
   if (!policy) throw new Error(`unknown policy '${ref}'`);
   const filledBy = policy.doc.decide.in ?? {};
-  const input = fillTemplates(filledBy, { request: run.request });
+  const input = fillTemplates(filledBy, { context: run.context });
   // what the decision's operation accepts it marks itself, on the one call its run makes
-  const roots = { request: run.request, input, inType: undefined, filledBy };
+  const roots = { context: run.context, input, inType: undefined, filledBy };
   const report = await runGraph(emb.operation(policy.doc.decide.run), {
-    initial: { in: input, request: run.request },
+    initial: { in: input, context: run.context },
     shown: shownRoots(emb.scope, run.args.trigger, roots),
     signal: run.opts.signal,
     clock: emb.clock,

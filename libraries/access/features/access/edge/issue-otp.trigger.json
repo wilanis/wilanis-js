@@ -11,7 +11,7 @@
   "fire": {
     "run": "@access/domain/access.port.json#deliverCode",
     "in": {
-      "id": "{{request.flags['challenge-id']}}"
+      "id": "{{context.flags['challenge-id']}}"
     }
   }
 }

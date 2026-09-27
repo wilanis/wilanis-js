@@ -52,8 +52,8 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
                    refuse a variable the profile reads that is unset, then run postLoad and the profile's
                    startup steps; what listens is what those steps say
   wilanis run      <trigger> [root] [--in json] [--file path] [--out path] [--at iso] [--trace[=text|json]] [--flag=v ...]
-                   fire one trigger; --file hands a file as request.file, --out receives a blob answer;
-                   --at 2026-09-11T03:00:00Z fires a scheduled trigger's tick for that instant (request.scheduled);
+                   fire one trigger; --file hands a file as context.file, --out receives a blob answer;
+                   --at 2026-09-11T03:00:00Z fires a scheduled trigger's tick for that instant (context.scheduled);
                    --trace prints what the run did, span by span, on stderr
   wilanis migrate  [root] [--profile word] [--apply] [--allow-destructive a,b] [--adopt] [--history] [--json]   plan the stores against the database; apply when told
                    --allow-destructive names each as <connection>/<target>, the pair that names a table

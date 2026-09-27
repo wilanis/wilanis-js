@@ -174,7 +174,7 @@ const SCAFFOLDS: Record<string, Build> = {
         {
           $schema: schemaOf('resolvers'),
           description: 'TODO',
-          resolvers: { caller: { read: "request.headers['user-agent']", description: 'TODO' } },
+          resolvers: { caller: { read: "context.headers['user-agent']", description: 'TODO' } },
         },
       ],
     ];
@@ -232,7 +232,7 @@ const SCAFFOLDS: Record<string, Build> = {
           description: 'TODO',
           decide: {
             run: opts.run ?? '@features/TODO/domain/TODO.port.json#todo',
-            in: { principal: '{{request.principal}}' },
+            in: { principal: '{{context.principal}}' },
           },
           outcomes: { anonymous: { effect: 'deny' } },
         },
@@ -243,7 +243,7 @@ const SCAFFOLDS: Record<string, Build> = {
     // a rule of the business, in exactly one of its two forms: --over names the operations an access invariant
     // gates, and without it the rule is over a core shape's fields, written as the one that always holds.
     const body = opts.over
-      ? { access: { over: [opts.over], requires: { proves: ['request.principal'] } } }
+      ? { access: { over: [opts.over], requires: { proves: ['context.principal'] } } }
       : { holds: { on: opts.on ?? '@features/TODO/domain/TODO.shape.json', when: 'true' } };
     return [[into(target, 'domain', 'invariant'), { $schema: schemaOf('invariant'), description: 'TODO', ...body }]];
   },

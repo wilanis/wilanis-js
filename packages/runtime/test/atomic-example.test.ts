@@ -32,7 +32,7 @@ const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 const people = (rows: unknown): { email: string; tier: string }[] =>
   (rows as { email: string; tier: string }[]).map(row => ({ email: row.email, tier: row.tier }));
 
-/** The request a signed-in customer of tenant acme is read from: all the scoped store asks of it is the tenant. */
+/** The context a signed-in customer of tenant acme is read from: all the scoped store asks of it is the tenant. */
 const ACME = { session: { attributes: { tenant: 'acme' } } };
 
 /**
@@ -48,13 +48,13 @@ async function serving(profile = 'local') {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-atomic-e2e-'));
 
   /**
-   * Fire one operation of the customer port, with what it accepts, and answer the whole report. The request is
+   * Fire one operation of the customer port, with what it accepts, and answer the whole report. The context is
    * acme's, as a trigger past its gate hands it on; a startup step has none, so it could not reach the scoped
    * collection at all (B008).
    */
   const run = (op: string, input: Record<string, unknown> = {}) =>
     runGraph(emb.operation(`@customers/domain/customer.port.json#${op}`), {
-      initial: { in: input, request: ACME },
+      initial: { in: input, context: ACME },
       env: emb.envFor(blobs),
     });
 

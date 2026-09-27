@@ -152,7 +152,7 @@ export class Scope {
     return this.get('graph', graphPath)?.layer === 'data' ? 'data' : 'domain';
   }
 
-  // ---- the request's type -------------------------------------------------------------------
+  // ---- the context's type -------------------------------------------------------------------
 
   /**
    * A trigger kind's context type for one trigger. A `type` setting binds its variable to the type it names
@@ -214,14 +214,14 @@ export class Scope {
       .find(plugin => plugin.doc.guard && this.project?.plugins.some(use => use.use === plugin.native));
   }
 
-  /** Every trigger kind's context that has `path`; used to type request.* reads in resolvers (kind unknown there). */
+  /** Every trigger kind's context that has `path`; used to type context.* reads in resolvers (kind unknown there). */
   requestRead(path: string[]): Read | string {
     const hits: Read[] = [];
     for (const kind of this.registry.all('trigger-kind')) {
       const read = typeAt(this.contextType(kind.doc as TriggerKindDoc), path);
       if (typeof read !== 'string') hits.push(read);
     }
-    if (!hits.length) return `no trigger kind hands request.${path.join('.')}`;
+    if (!hits.length) return `no trigger kind hands context.${path.join('.')}`;
     return { type: hits[0].type, optional: hits.some(hit => hit.optional) };
   }
 

@@ -89,7 +89,7 @@ describe('sabotage: ports, bindings and secrets', () => {
   it('C001 settings that read anything but a secret', () => {
     expect(
       sabotage('connections/customers-api.connection.json', connection => {
-        connection.settings.baseUrl = '{{request.host}}';
+        connection.settings.baseUrl = '{{context.host}}';
       }),
     ).toEqual(['C001']);
   });

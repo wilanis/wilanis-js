@@ -118,9 +118,9 @@ function checkIn(one: Scheduled, refuse: Refuse): void {
     code: 'X252',
     file: one.file,
     message:
-      'a scheduled trigger declares in and no fire.in: nobody is calling, so the input would be request.body, which this kind never hands, and every tick would be refused at the edge',
+      'a scheduled trigger declares in and no fire.in: nobody is calling, so the input would be context.body, which this kind never hands, and every tick would be refused at the edge',
     at: 'in',
-    hint: 'write fire.in reading request.scheduled, or fire an operation that takes nothing and drop in',
+    hint: 'write fire.in reading context.scheduled, or fire an operation that takes nothing and drop in',
   });
 }
 

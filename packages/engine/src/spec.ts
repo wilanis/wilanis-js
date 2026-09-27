@@ -3,7 +3,7 @@
  * nodes, sources, handlers, and pre-supplied values. The compiler lowers a graph document to this.
  */
 
-/** Where a node's value comes from at run time. `ref` may be a node id or a pseudo-node ('in', 'const', 'request'). */
+/** Where a node's value comes from at run time. `ref` may be a node id or a pseudo-node ('in', 'const', 'context'). */
 export type KSource =
   | { ref: string; path: string[] }
   | { list: KSource[] }
@@ -159,15 +159,15 @@ export interface RunContext {
   site?: string;
   /** Pre-recorded results by dotted node path; when present the handler is not called. */
   stubs?: Record<string, unknown>;
-  /** The trigger context (`request`) of this run, forwarded to nested graphs. */
-  request?: unknown;
+  /** The trigger context (`context`) of this run, forwarded to nested graphs. */
+  context?: unknown;
   /**
    * What this node's report shows it was given, secrets as the marker: what a nested run is told its `in` is
    * shown as, so its reports read the caller's marks as well as their own.
    */
   shownIn?: Record<string, unknown>;
   /** The trigger context as this run's reports show it, forwarded so a nested run's reports show it the same. */
-  shownRequest?: unknown;
+  shownContext?: unknown;
   signal?: AbortSignal;
   /** The clock this run stamps its reports with, forwarded so a nested run stamps by the same one. */
   clock: () => number;
@@ -184,13 +184,13 @@ export type Handlers = Record<string, Handler>;
 
 export interface RunOptions {
   /**
-   * Pre-supplied values: pseudo-nodes (`in`, `request`), any node id (replay: the node is seeded, not
+   * Pre-supplied values: pseudo-nodes (`in`, `context`), any node id (replay: the node is seeded, not
    * executed), and `<mapId>.<index>` for one element of a map (that element is seeded, the others run).
    */
   initial?: Record<string, unknown>;
   /**
    * How a report shows a pre-supplied value where it is not the value itself: `in` with the secrets its caller
-   * marks as the marker, `request` with those its trigger kind's context marks. A report reads every value through
+   * marks as the marker, `context` with those its trigger kind's context marks. A report reads every value through
    * what the report of its source shows; a value not named here, or named as nothing, is shown as it is.
    */
   shown?: Record<string, unknown>;

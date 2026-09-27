@@ -1,14 +1,14 @@
 /**
- * P resolvers. A resolvers document names reads of the request; a data graph, a binding or a store binds each
+ * P resolvers. A resolvers document names reads of the context; a data graph, a binding or a store binds each
  * read it takes under `reads`, local name -> `@path#resolver`, and reads {{name}}. Each document is judged once
  * here (P002, P003) and each entry of a `reads` map is judged where it is written (P004, P006, L002); whether
  * the trigger kinds that reach a read hand it is judged at the trigger (T004). Also `opNeeds`, which finds every
- * request.* path an operation reaches through its binding -- what B008, B009 and T004 hold their callers to --
+ * context.* path an operation reaches through its binding -- what B008, B009 and T004 hold their callers to --
  * as one reader of the walk `reach.ts` makes for the reach of a profile.
  *
  * The reads have one edge no document writes: a native call site over a scoped collection reads the reads that
  * collection is scoped by, because the compiler carries them there at lowering (RFC 0015). So a graph that
- * names no request at all still reaches one, and A006, T004 and B008 judge a scope's read the way they judge
+ * names no context at all still reaches one, and A006, T004 and B008 judge a scope's read the way they judge
  * any read a trigger reaches.
  */
 import {
@@ -24,10 +24,10 @@ import { Walk } from '../reach.js';
 import { type Judge, type JudgedResolver, RESERVED, type Refuser, readValuesOf } from './judge.js';
 
 /**
- * One request.* path read under a trigger: where, and -- when the resolver declared itself required -- the
+ * One context.* path read under a trigger: where, and -- when the resolver declared itself required -- the
  * resolver's own path, which the trigger must guarantee.
  */
-export interface RequestNeed {
+export interface ContextNeed {
   path: string[];
   file: string;
   required?: string[];
@@ -51,14 +51,14 @@ function judgeResolver(judge: Judge, refuse: Refuser, name: string, spec: Resolv
       'P003',
       `resolver name '${name}' is reserved`,
       at,
-      'in, const, request and secrets are roots; pick another name',
+      'in, const, context and secrets are roots; pick another name',
     );
     return undefined;
   }
   const path = splitPath(spec.read).slice(1);
   const read = judge.scope.requestRead(path);
   if (typeof read === 'string') {
-    const hint = 'wilanis describe <trigger kind> shows what each kind hands as request.*';
+    const hint = 'wilanis describe <trigger kind> shows what each kind hands as context.*';
     refuse('P002', `resolver '${name}': ${read}`, `${at}/read`, hint);
     return undefined;
   }
@@ -70,7 +70,7 @@ function judgeResolver(judge: Judge, refuse: Refuser, name: string, spec: Resolv
 /**
  * The resolvers a document may read, one per entry of its `reads` map, under the local name the entry gave
  * it -- a data graph's, a binding's or a store's, since every kind that binds a read is judged here. A domain
- * graph takes none: the request is the world's, and the domain never sees it (L002).
+ * graph takes none: the context is the world's, and the domain never sees it (L002).
  */
 export function resolversFor(
   judge: Judge,
@@ -81,8 +81,8 @@ export function resolversFor(
   if (!reads) return {};
   const refuse = judge.refuser(from.path);
   if (!allowed) {
-    const hint = 'read the request in the data layer: the data graph or the binding binds it under reads';
-    refuse('L002', 'a domain graph never reads the request', 'reads', hint);
+    const hint = 'read the context in the data layer: the data graph or the binding binds it under reads';
+    refuse('L002', 'a domain graph never reads the context', 'reads', hint);
     return {};
   }
   const judged: Record<string, JudgedResolver> = {};
@@ -147,9 +147,9 @@ function quietResolvers(judge: Judge, reads: Record<string, string> | undefined)
   return judged;
 }
 
-/** The request.* paths a set of reads touches through the resolvers they name: what a trigger kind must hand. */
-function requestNeedsOf(resolvers: Record<string, JudgedResolver>, reads: string[][], file: string): RequestNeed[] {
-  const out: RequestNeed[] = [];
+/** The context.* paths a set of reads touches through the resolvers they name: what a trigger kind must hand. */
+function contextNeedsOf(resolvers: Record<string, JudgedResolver>, reads: string[][], file: string): ContextNeed[] {
+  const out: ContextNeed[] = [];
   for (const read of reads) {
     const resolver = resolvers[read[0]];
     if (!resolver) continue;
@@ -167,32 +167,32 @@ function requestNeedsOf(resolvers: Record<string, JudgedResolver>, reads: string
  * the store's own `reads` for the names those columns fill, as if the site had written them. Nothing else
  * reaches them, and they are what makes a scope a read the trigger must guarantee.
  */
-function scopeNeeds(judge: Judge, run: string, given: Values | undefined): RequestNeed[] {
+function scopeNeeds(judge: Judge, run: string, given: Values | undefined): ContextNeed[] {
   const site = collectionOf(judge.scope, { key: run, given });
   if (!site) return [];
   const store = judge.scope.registry.get('store', site.store);
   const scoped = store?.doc.collections[site.collection]?.scoped;
   if (!store || !scoped) return [];
   const resolvers = quietResolvers(judge, store.doc.reads);
-  return requestNeedsOf(resolvers, judge.scope.templateReads(Object.values(scoped)), store.path);
+  return contextNeedsOf(resolvers, judge.scope.templateReads(Object.values(scoped)), store.path);
 }
 
 /**
- * Every request.* path reachable from a domain port operation, through the binding that meets it under a
+ * Every context.* path reachable from a domain port operation, through the binding that meets it under a
  * profile: one reader of the walk `reachOf` makes (reach.ts). A graph reads through its own `reads` and every
  * value its nodes write, a delegation through the binding's `reads` and its `in`, and a native site through the
  * reads the collection it is over is scoped by.
  */
-export function opNeeds(judge: Judge, opRef: string, profile: string | undefined): RequestNeed[] {
-  const out: RequestNeed[] = [];
+export function opNeeds(judge: Judge, opRef: string, profile: string | undefined): ContextNeed[] {
+  const out: ContextNeed[] = [];
   const walk = new Walk<undefined>(judge.scope, profile, {
     graph: graph => {
       const reads = graph.doc.nodes.flatMap(node => judge.scope.templateReads(readValuesOf(node)));
-      out.push(...requestNeedsOf(quietResolvers(judge, graph.doc.reads), reads, graph.path));
+      out.push(...contextNeedsOf(quietResolvers(judge, graph.doc.reads), reads, graph.path));
     },
     delegation: (binding, _, bound) => {
       const resolvers = quietResolvers(judge, binding.doc.reads);
-      out.push(...requestNeedsOf(resolvers, judge.scope.templateReads(bound.in), binding.path));
+      out.push(...contextNeedsOf(resolvers, judge.scope.templateReads(bound.in), binding.path));
     },
     native: site => out.push(...scopeNeeds(judge, site.key, site.given)),
   });

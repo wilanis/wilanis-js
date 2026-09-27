@@ -11,8 +11,8 @@
       "policy": "@access/edge/otp-verified.policy.json",
       "in": {
         "challenge": {
-          "id": "{{request.flags['challenge-id']}}",
-          "code": "{{request.flags.code}}"
+          "id": "{{context.flags['challenge-id']}}",
+          "code": "{{context.flags.code}}"
         }
       }
     }

@@ -12,7 +12,7 @@ import { outcomeOf, type Report } from '@wilanis/engine';
 export interface Identified {
   startedAt: number;
   endedAt: number;
-  /** The context keys the guard established -- request.principal, request.session, request.challenge. */
+  /** The context keys the guard established -- context.principal, context.session, context.challenge. */
   added: string[];
   /** The declared reason it refused with, where it did; the run ended here. */
   refused?: string;
@@ -85,9 +85,9 @@ export function runId(now: number): string {
 }
 
 /** The value at a dotted path within a kind's context, where it is a string; anything else correlates nothing. */
-export function correlationOf(request: Record<string, unknown>, path: string | undefined): string | undefined {
+export function correlationOf(context: Record<string, unknown>, path: string | undefined): string | undefined {
   if (!path) return undefined;
-  let value: unknown = request;
+  let value: unknown = context;
   for (const step of path.split('.')) {
     if (!value || typeof value !== 'object') return undefined;
     value = (value as Record<string, unknown>)[step];

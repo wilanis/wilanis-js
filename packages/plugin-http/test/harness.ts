@@ -85,11 +85,11 @@ function writeUploadForm(dir: string) {
       policies: [
         {
           policy: '@access/edge/employees-only.policy.json',
-          in: { token: ['{{request.headers.authorization}}', '{{request.cookies.session}}'] },
+          in: { token: ['{{context.headers.authorization}}', '{{context.cookies.session}}'] },
         },
         '@access/edge/can-register.policy.json',
       ],
-      fire: { run: '@features/customers/domain/customer.port.json#import', in: { file: '{{request.body.file}}' } },
+      fire: { run: '@features/customers/domain/customer.port.json#import', in: { file: '{{context.body.file}}' } },
     }),
   );
 }

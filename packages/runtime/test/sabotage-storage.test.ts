@@ -61,7 +61,7 @@ const TENANCY = {
     $schema: schemaUrl('resolvers'),
     label: 'Tenancy',
     description: 'Which tenant the caller speaks for, as the sign-in wrote it into their session.',
-    resolvers: { tenant: { read: 'request.session.attributes.displayName', required: true } },
+    resolvers: { tenant: { read: 'context.session.attributes.displayName', required: true } },
   },
 };
 const READS = { tenant: '@customers/edge/tenancy.resolvers.json#tenant' };

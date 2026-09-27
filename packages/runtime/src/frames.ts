@@ -20,7 +20,7 @@ export function sourceOf(spec_: unknown): { ref: string; path: string[] } | unde
  * Which node's output holds the list a map runs over, and where in it. A sibling of the map, usually; but a map
  * whose `over` reads `in` iterates what the frame was handed, so the answer is one hop out -- the call that
  * entered the frame, and the source it was given under that name. Nothing when the list is composed, literal,
- * the request's or the trigger's own: a composed list is no single node's output to stub, and the trigger's
+ * the context's or the trigger's own: a composed list is no single node's output to stub, and the trigger's
  * input the rehearsal steers is met before this is asked.
  */
 export function listHolder(list: FoundList): { target: string; path: string[] } | undefined {
@@ -36,7 +36,7 @@ export function listHolder(list: FoundList): { target: string; path: string[] } 
     if (given === 'opaque') return undefined;
     if (given) src = given;
   }
-  if (!src || src.ref === 'in' || src.ref === 'request' || src.ref === 'const') return undefined;
+  if (!src || src.ref === 'in' || src.ref === 'context' || src.ref === 'const') return undefined;
   return { target: [...at.split('.').slice(0, -1), src.ref].join('.'), path: src.path };
 }
 
@@ -93,7 +93,7 @@ function tracedOut(read: { ref: string; path: string[] } | undefined, frames: Fr
     at = frames[frame].at;
     if (given) src = given;
   }
-  if (!at || ['in', 'request', 'const'].includes(src.ref)) return undefined;
+  if (!at || ['in', 'context', 'const'].includes(src.ref)) return undefined;
   if (src.path.join('.') !== read.path.join('.')) return undefined;
   return { prefix: at.split('.').slice(0, -1), node: src.ref };
 }

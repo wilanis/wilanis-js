@@ -9,7 +9,7 @@
  * from `CUSTOMERS_DATABASE_URL`, so the case hands its own along under that name and puts back whatever was
  * there, and it prepares the store first the way the tree's own startup step does. Every other operation runs
  * as a caller whose session carries the tenant `acme`, as a trigger past its gate hands it on: the store keeps
- * its customers per tenant, and a run with no request -- a startup step's -- could not reach them (B008).
+ * its customers per tenant, and a run with no context -- a startup step's -- could not reach them (B008).
  *
  * The plugins come from the example through `resolvePlugins`, never from imports here: this package is one
  * engine, and a tree naming seven plugins is no reason for it to depend on the other six.
@@ -23,7 +23,7 @@ import { closePools } from '../src/pool.js';
 
 const url = process.env.WILANIS_TEST_POSTGRES_URL;
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
-/** The request a signed-in customer of tenant acme is read from: all the scoped store asks of it is the tenant. */
+/** The context a signed-in customer of tenant acme is read from: all the scoped store asks of it is the tenant. */
 const ACME = { session: { attributes: { tenant: 'acme' } } };
 
 afterAll(async () => {
@@ -44,7 +44,7 @@ describe.skipIf(!url)('the example, importing into PostgreSQL under one transact
     const scope = emb.blobs.scope();
     const run = (op: string, input: Record<string, unknown> = {}) =>
       runGraph(emb.operation(`@customers/domain/customer.port.json#${op}`), {
-        initial: { in: input, request: ACME },
+        initial: { in: input, context: ACME },
         env: emb.envFor(scope),
       });
     const upload = (text: string) => scope.put(text, { contentType: 'text/csv', filename: 'customers.csv' });

@@ -64,14 +64,14 @@ npm install @wilanis/access @wilanis/plugin-auth @wilanis/plugin-http
 
    ```json
    "policies": [
-     { "policy": "@access/edge/employees-only.policy.json", "in": { "token": "{{request.headers.authorization}}" } },
+     { "policy": "@access/edge/employees-only.policy.json", "in": { "token": "{{context.headers.authorization}}" } },
      "@access/edge/can-register.policy.json"
    ]
    ```
 
    `signed-in` allows any caller the token names; `employees-only` allows realm `employee`; `can-register`
    allows the `registrar` role; `otp-verified` allows a challenge answered on the call and challenges otherwise
-   (`"in": { "challenge": { "id": "{{request.flags['challenge-id']}}", "code": "{{request.flags.code}}" } }`).
+   (`"in": { "challenge": { "id": "{{context.flags['challenge-id']}}", "code": "{{context.flags.code}}" } }`).
    A feature that attaches them declares `"dependsOn": ["access"]`.
 
 ## What it ships
@@ -81,7 +81,7 @@ npm install @wilanis/access @wilanis/plugin-auth @wilanis/plugin-http
   `employee`) and write the directory's groups as roles; 401 as `bad_credentials`, 503 as `directory_unavailable`.
 - `POST /api/v1/token/refresh`, `POST /api/v1/sign-out`, `GET|PUT /api/v1/me/preferences`.
 - `Session.shape.json`: `displayName`, `realm` and `tenant` written at sign-in, `theme` written by the preferences
-  route. A host's store may scope its records by `request.session.attributes.tenant` (RFC 0015), and nothing
+  route. A host's store may scope its records by `context.session.attributes.tenant` (RFC 0015), and nothing
   writes the tenant again (X105 refuses a graph that would).
   `wilanis describe @access/domain/Session.shape.json` lists who writes what.
 - `wilanis run @access/edge/issue-otp.trigger.json --challenge-id=XXXX-XXXX`: gives an open challenge its code
@@ -98,7 +98,7 @@ npm install @wilanis/access @wilanis/plugin-auth @wilanis/plugin-http
   session's first contents: `displayName` from the directory, `realm` from the graph's constant, and `tenant` from
   what the customer directory said about the account, or the constant `operator` for an employee. The binding
   delegates `issue` to `@auth/token.port.json#issue`, which opens the session and signs the token that names it.
-- **How a graph finds it:** `edge/session.resolvers.json` reads `request.session.id` as `{{sid}}`, declared
+- **How a graph finds it:** `edge/session.resolvers.json` reads `context.session.id` as `{{sid}}`, declared
   `required` because the `signed-in` policy proves the session is there.
 - **How it is updated:** `data/write-theme.graph.json` runs `@auth/session.port.json#set` with `session: {{sid}}`,
   `values: { "theme": "{{in.theme}}" }` and the shape as `type`. Copy that node to write any attribute; `#remove`

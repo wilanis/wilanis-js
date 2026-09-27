@@ -40,7 +40,7 @@ describe('wilanis describe and map: the scope a store keeps its rows under', () 
   it('prints the reads block above the collections, so no {{name}} is met before what binds it', () => {
     const lines = storeSaid().split('\n');
     expect(lines).toContain(
-      '    tenant ← @customers/edge/request.resolvers.json#tenant  (request.session.attributes.tenant, required)',
+      '    tenant ← @customers/edge/request.resolvers.json#tenant  (context.session.attributes.tenant, required)',
     );
     expect(lines.indexOf('reads:')).toBeLessThan(lines.findIndex(line => line.startsWith('  collection customers')));
   });

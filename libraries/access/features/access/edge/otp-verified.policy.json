@@ -5,7 +5,7 @@
   "decide": {
     "run": "@access/domain/access.port.json#requireOtp",
     "in": {
-      "challenge": "{{request.challenge}}"
+      "challenge": "{{context.challenge}}"
     }
   },
   "outcomes": {

@@ -21,7 +21,7 @@ function filledString(value: string, roots: Record<string, unknown>): unknown {
   });
 }
 
-/** Fill a templated literal from roots (request, ...). Whole templates take the value; embedded ones interpolate. */
+/** Fill a templated literal from roots (context, ...). Whole templates take the value; embedded ones interpolate. */
 export function fillTemplates(value: unknown, roots: Record<string, unknown>): unknown {
   if (typeof value === 'string') return filledString(value, roots);
   if (Array.isArray(value)) return value.map(each => fillTemplates(each, roots));

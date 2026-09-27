@@ -68,7 +68,7 @@ function checkSecretsRead(judge: Judge): void {
 /**
  * The project's startup steps: each fires a domain port operation once, before any trigger kind starts.
  * A step runs with nothing received, so it may neither fire a native operation nor reach a read of
- * request.*; its inputs must meet the operation's contract, written as literals and secrets.
+ * context.*; its inputs must meet the operation's contract, written as literals and secrets.
  */
 export function checkStartup(judge: Judge): void {
   for (const [index, step] of (judge.project.doc.startup ?? []).entries()) checkStep(judge, step, index);
@@ -132,13 +132,13 @@ function checkStepInputs(judge: Judge, step: StartupStep, index: number, op: Ope
     refuse('B007', `startup step ${index}: '${step.run}' takes no input`, at, 'remove in');
 }
 
-/** B008: nothing has been received when a step runs, so no read of request.* can be met, under any profile it runs under. */
+/** B008: nothing has been received when a step runs, so no read of context.* can be met, under any profile it runs under. */
 function checkStepReads(judge: Judge, step: StartupStep, index: number): void {
   const refuse = judge.refuser(judge.project.path);
-  const hint = 'fire this operation from a trigger, or bind the port to a graph that reads no request';
+  const hint = 'fire this operation from a trigger, or bind the port to a graph that reads no context';
   for (const profile of judge.profiles().filter(one => runsUnder(step, one))) {
     for (const need of opNeeds(judge, step.run, profile)) {
-      const message = `startup step ${index}: ${need.file} reads request.${need.path.join('.')}, but a startup step runs before anything is received${underProfile(profile)}`;
+      const message = `startup step ${index}: ${need.file} reads context.${need.path.join('.')}, but a startup step runs before anything is received${underProfile(profile)}`;
       refuse('B008', message, `startup/${index}/run`, hint);
     }
   }

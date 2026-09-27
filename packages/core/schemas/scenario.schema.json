@@ -75,8 +75,8 @@
     "in": {
       "description": "The input the trigger was fired with, generated from the seed and recorded as it was."
     },
-    "request": {
-      "description": "The request the run read, for a trigger whose kind hands one; what fire.in and any policy read from.",
+    "context": {
+      "description": "The context the run read, for a trigger whose kind hands one; what `fire.in` and any policy read from.",
       "type": "object"
     },
     "stubs": {

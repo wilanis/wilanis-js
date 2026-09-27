@@ -31,7 +31,7 @@ const listLine = (label: string, values: string[] | undefined): string[] =>
   values?.length ? [`${label}  ${values.join(', ')}`] : [];
 
 /**
- * A binding: the port it meets, the reads its operations take from the request, and how each is answered --
+ * A binding: the port it meets, the reads its operations take from the context, and how each is answered --
  * by a graph, or by delegating to another operation, and how often and how long it is tried. The port is said once above, since every row shares it,
  * and the reads stand above the operations, since a delegation's `{{name}}` is one of them.
  */

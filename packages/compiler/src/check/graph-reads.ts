@@ -37,13 +37,13 @@ export interface GraphTable {
 }
 
 /**
- * G003's hint. A root that named nothing in scope is most often a read of the request the graph never bound,
+ * G003's hint. A root that named nothing in scope is most often a read of the context the graph never bound,
  * so the hint writes the `reads` entry that would bind it; where the reason was something else, it says the
  * four roots a value may read.
  */
 function hintForRoot(root: string | undefined): string {
   if (!root) return 'read in, const, or a node that runs before this one';
-  return `to read the request, bind the name: "reads": { "${root}": "@<feature>/edge/<file>.resolvers.json#${root}" }`;
+  return `to read the context, bind the name: "reads": { "${root}": "@<feature>/edge/<file>.resolvers.json#${root}" }`;
 }
 
 /**
@@ -182,8 +182,8 @@ export class GraphReads {
   private rootReadRaw(root: string, path: string[]): Read | string | undefined {
     if (root === 'in') return this.readIn(path);
     if (root === 'const') return this.readConst(path);
-    if (root === 'request')
-      return 'graphs do not read request.* -- a resolvers document does; bind it under reads and read {{name}}';
+    if (root === 'context')
+      return 'graphs do not read context.* -- a resolvers document does; bind it under reads and read {{name}}';
     if (root in this.table.resolvers) {
       this.readsResolvers.add(root);
       return readAt(this.table.resolvers[root].read, path);
@@ -208,7 +208,7 @@ export class GraphReads {
 
   private readNode(root: string, path: string[]): Read | string | undefined {
     if (!this.table.nodes.has(root)) {
-      // a root that is none of the four is most often a read of the request the graph never bound (RFC 0029)
+      // a root that is none of the four is most often a read of the context the graph never bound (RFC 0029)
       this.unbound = root;
       return `'${root}' is not in, const, a node that runs before this one, or a name under reads`;
     }

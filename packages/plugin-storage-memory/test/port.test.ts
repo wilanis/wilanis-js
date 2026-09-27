@@ -200,14 +200,14 @@ function treeServing(): string {
     'features/customers/edge/record.trigger.json',
     trigger('record', 'record', '@features/customers/edge/KeptView.shape.json', {
       in: '@features/customers/edge/EntryRequest.shape.json',
-      fire: { id: '{{request.flags.id}}', url: '{{request.flags.url}}' },
+      fire: { id: '{{context.flags.id}}', url: '{{context.flags.url}}' },
     }),
   );
   write(
     'features/customers/edge/get.trigger.json',
     trigger('get', 'get', '@features/customers/edge/FoundView.shape.json', {
       in: '@features/customers/edge/IdRequest.shape.json',
-      fire: { id: '{{request.flags.id}}' },
+      fire: { id: '{{context.flags.id}}' },
     }),
   );
   write('features/customers/edge/count.trigger.json', trigger('count', 'howMany', 'number'));

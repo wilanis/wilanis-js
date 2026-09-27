@@ -24,7 +24,7 @@ A trigger attaches the **policies** that gate it, in order, and where it attache
 ```json
 "policies": [
   { "policy": "@access/edge/employees-only.policy.json",
-    "in": { "token": ["{{request.headers.authorization}}", "{{request.cookies.session}}"] } },
+    "in": { "token": ["{{context.headers.authorization}}", "{{context.cookies.session}}"] } },
   "@access/edge/can-register.policy.json"
 ]
 ```
@@ -36,14 +36,14 @@ reuses what an earlier attachment gave. A trigger with no policies is public. On
 trigger, for every trigger kind alike, the runtime calls this plugin's guard:
 
 1. **identify.** The token (a `Bearer ` prefix is stripped) is verified as one of *our* tokens -- signature,
-   issuer, audience, expiry, a session that has not ended -- and the context gains `request.principal`
-   (`subject`, `realm`, `roles`, `claims`) and `request.session` (`id`, `attributes`). A challenge answer
-   (`{ "id": "{{request.flags['challenge-id']}}", "code": "{{request.flags.code}}" }`) is verified and handed as
-   `request.challenge`. A credential that is there and does not verify is refused with `invalid_credential`,
+   issuer, audience, expiry, a session that has not ended -- and the context gains `context.principal`
+   (`subject`, `realm`, `roles`, `claims`) and `context.session` (`id`, `attributes`). A challenge answer
+   (`{ "id": "{{context.flags['challenge-id']}}", "code": "{{context.flags.code}}" }`) is verified and handed as
+   `context.challenge`. A credential that is there and does not verify is refused with `invalid_credential`,
    which every trigger giving one maps like any other reason (T005). No credential is not an error: the caller
    is anonymous, and the policies decide what that means.
-2. **decide.** Each policy fires its domain operation with what it reads from the request
-   (`{{request.principal}}`), and the graph behind it allows by answering or refuses with a reason;
+2. **decide.** Each policy fires its domain operation with what it reads from the context
+   (`{{context.principal}}`), and the graph behind it allows by answering or refuses with a reason;
    the policy's `outcomes` say whether that reason is a `deny` or a `challenge`.
 3. **challenge.** When an outcome challenges, the guard opens a challenge -- an id, the method, an expiry,
    bound to the caller when one is known -- and the refusal carries it to the caller with `how`: what to do
@@ -66,7 +66,7 @@ trigger, for every trigger kind alike, the runtime calls this plugin's guard:
 - `@auth/session.port.json#get`, `#set`, `#remove`, `#end` read and write a session's attributes -- typed by the
   shape `settings.session` names, judged at run time and by the checker (X103) -- and end a session, after
   which its tokens no longer verify. The session id reaches a data graph as `{{sid}}` through a resolvers
-  document reading `request.session.id`, declared `required` and proven by the policy that gates the trigger (A006).
+  document reading `context.session.id`, declared `required` and proven by the policy that gates the trigger (A006).
 - `@auth/challenge.port.json#issue` gives an open challenge its code. A tree binds the domain operation that
   calls it to whatever delivers the code: printed in the example, mailed in production.
 

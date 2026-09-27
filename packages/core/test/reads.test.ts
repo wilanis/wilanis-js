@@ -1,5 +1,5 @@
 /**
- * `reads`: what a data graph or a binding takes from the request. Each entry is a local name bound to the
+ * `reads`: what a data graph or a binding takes from the context. Each entry is a local name bound to the
  * resolver that declares it, as `@feature/edge/file.resolvers.json#name`, so a name's origin is one openable
  * path above its use. It replaces the `resolvers` header, which named a document and left the reader to
  * search it (RFC 0029).
@@ -32,8 +32,8 @@ describe('reads', () => {
     expect(refused(doc(kind, { reads: { agent: '@features/f/edge/request.resolvers.json' } }))).toEqual([
       at('reads/agent', 'the resolver'),
     ]);
-    // a request path is what a resolver declares, not what a reader of one writes
-    expect(refused(doc(kind, { reads: { agent: "request.headers['user-agent']" } }))).toEqual([
+    // a context path is what a resolver declares, not what a reader of one writes
+    expect(refused(doc(kind, { reads: { agent: "context.headers['user-agent']" } }))).toEqual([
       at('reads/agent', 'the resolver'),
     ]);
   });

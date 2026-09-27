@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { KernelSpec } from '../src/index.js';
-import { isRefusal, Kernel, outcomeOf, Refusal, refusalOf } from '../src/index.js';
+import { isRefusal, Kernel, outcomeOf, PSEUDO, Refusal, refusalOf } from '../src/index.js';
 import { handlers } from './handlers.js';
 
 /** A one-node spec over a shared handler, so each outcome is named by the handler it ends in. */
@@ -39,6 +39,19 @@ describe('the scheduler', () => {
     const report = await new Kernel(handlers).run(spec, {});
     expect(report.status).toBe('blocked');
     expect(report.needs).toEqual(['in.x']);
+  });
+  it('reads the context the embedder supplies as a pseudo-node, and blocks on it when it is not supplied', async () => {
+    const spec: KernelSpec = {
+      name: 't',
+      output: ['a'],
+      nodes: { a: { kind: 'call', handler: 'echo', in: { id: { ref: 'context', path: ['params', 'id'] } } } },
+    };
+    const report = await new Kernel(handlers).run(spec, { initial: { context: { params: { id: 'golf' } } } });
+    expect(report.status).toBe('done');
+    expect(report.output).toEqual({ id: 'golf' });
+    const unsupplied = await new Kernel(handlers).run(spec, {});
+    expect(unsupplied.needs).toEqual(['context.params.id']);
+    expect([...PSEUDO]).toEqual(['in', 'const', 'context']);
   });
   it('replays a seeded node without calling its handler', async () => {
     const spec: KernelSpec = {

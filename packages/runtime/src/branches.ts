@@ -298,7 +298,7 @@ function meet(
   }
   // inside a map, `in` is the element: what steers it is the list the map runs over
   if (src.ref === 'in' && at.element) return ofElement(at.element, [...src.path, ...within], domain);
-  if (src.ref === 'in' || src.ref === 'request' || src.ref === 'const') return 'unreachable';
+  if (src.ref === 'in' || src.ref === 'context' || src.ref === 'const') return 'unreachable';
   return { stub: { target: stubTarget(at.prefix, src.ref, from), path: [...src.path, ...within], value: domain } };
 }
 

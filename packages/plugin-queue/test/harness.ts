@@ -35,7 +35,7 @@ export function trigger(
     description: 'a queue trigger, for a test',
     kind: KIND,
     settings: { connection: JOBS, queue: 'removals', message: 'IdRequest', ...settings },
-    fire: { run, in: { id: '{{request.message.id}}' } },
+    fire: { run, in: { id: '{{context.message.id}}' } },
   } as TriggerDoc;
 }
 
@@ -57,19 +57,19 @@ function counted(counts: { scopes: number; released: number }): BlobStore {
 /** What a test hands the worker in place of the runtime: the triggers served and what a fire answers. */
 export function serving(
   triggers: TriggerDoc[],
-  answering: (request: Record<string, unknown>) => Answering = () => ({}),
+  answering: (context: Record<string, unknown>) => Answering = () => ({}),
 ) {
-  const fired: { run: string; request: Record<string, unknown> }[] = [];
+  const fired: { run: string; context: Record<string, unknown> }[] = [];
   const logs: string[] = [];
   const open: (() => void)[] = [];
   const blobs = { scopes: 0, released: 0 };
   let set = triggers;
-  let inputFor: Serving['inputFor'] = (_trigger, request) => ({ input: request.message });
+  let inputFor: Serving['inputFor'] = (_trigger, context) => ({ input: context.message });
   const serving = {
     triggers: (kind: string) => (kind === KIND ? set : []),
-    fire: async ({ trigger, request }: FireArgs) => {
-      fired.push({ run: trigger.fire.run, request });
-      const answer = answering(request);
+    fire: async ({ trigger, context }: FireArgs) => {
+      fired.push({ run: trigger.fire.run, context });
+      const answer = answering(context);
       if (answer.hold) await new Promise<void>(done => open.push(done));
       if (answer.error) throw new Error(answer.error);
       return {
@@ -82,7 +82,7 @@ export function serving(
         ...answer.report,
       } as Report;
     },
-    inputFor: (trigger: TriggerDoc, request: Record<string, unknown>) => inputFor(trigger, request),
+    inputFor: (trigger: TriggerDoc, context: Record<string, unknown>) => inputFor(trigger, context),
     blobs: counted(blobs),
     log: (line: string) => logs.push(line),
   } as unknown as Serving;

@@ -17,7 +17,7 @@ import {
 } from './example-harness.js';
 
 describe('sabotage: the reads a document takes from the request', () => {
-  it('T004 a resolver reading request.* under a kind that hands none', () => {
+  it('T004 a resolver reading context.* under a kind that hands none', () => {
     // list-rows is reached from the digest, a cli trigger: the command line hands no headers
     expect(
       sabotage('features/customers/data/list-rows.graph.json', graph => {
@@ -62,7 +62,7 @@ describe('sabotage: the reads a document takes from the request', () => {
         delete graph.reads;
       }),
     ).toEqual([
-      'G003 to read the request, bind the name: "reads": { "agent": "@<feature>/edge/<file>.resolvers.json#agent" }',
+      'G003 to read the context, bind the name: "reads": { "agent": "@<feature>/edge/<file>.resolvers.json#agent" }',
     ]);
   });
   it('P004 a read of a resolver the named document does not declare', () => {
@@ -109,7 +109,7 @@ describe('sabotage: the reads a document takes from the request', () => {
             $schema:
               'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/resolvers.schema.json',
             description: 'Which tenant the caller speaks for.',
-            resolvers: { tenant: { read: 'request.headers.host' } },
+            resolvers: { tenant: { read: 'context.headers.host' } },
           },
         },
         'features/customers/data/create-row.graph.json',
@@ -127,7 +127,7 @@ describe('sabotage: the reads a document takes from the request', () => {
             $schema:
               'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/resolvers.schema.json',
             description: 'Which tenant the caller speaks for.',
-            resolvers: { tenant: { read: 'request.headers.host' } },
+            resolvers: { tenant: { read: 'context.headers.host' } },
           },
         },
         'features/customers/data/create-row.graph.json',
@@ -195,7 +195,7 @@ describe('sabotage: the reads a document takes from the request', () => {
       expect(p006(sabotageSaying(file, named))).toEqual(["P006 read name 'in' is reserved"]);
       expect(p006(sabotagePointing(file, named))).toEqual([`P006 @${file}#reads/in`]);
       expect(p006(sabotageHinting(file, named))).toEqual([
-        'P006 in, const, request, secrets are roots; pick another name',
+        'P006 in, const, context, secrets are roots; pick another name',
       ]);
     }
   });
@@ -209,14 +209,14 @@ describe('sabotage: the reads a document takes from the request', () => {
   it('P002 a resolver reading a path no trigger kind hands', () => {
     expect(
       sabotage('features/customers/edge/request.resolvers.json', resolvers => {
-        resolvers.resolvers.agent.read = 'request.nowhere.session';
+        resolvers.resolvers.agent.read = 'context.nowhere.session';
       }),
     ).toContain('P002');
   });
   it('P003 a resolver named like a root', () => {
     expect(
       sabotage('features/customers/edge/request.resolvers.json', resolvers => {
-        resolvers.resolvers.in = { read: 'request.headers.host' };
+        resolvers.resolvers.in = { read: 'context.headers.host' };
       }),
     ).toContain('P003');
   });

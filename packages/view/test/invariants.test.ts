@@ -111,7 +111,7 @@ describe('the view of an access invariant', () => {
 
   it('names what must be proved where the invariant says that instead of naming a policy', async () => {
     const seen = await access(SESSION);
-    expect(seen.proves).toEqual(['request.principal']);
+    expect(seen.proves).toEqual(['context.principal']);
     expect(seen.policy).toBeUndefined();
   });
 
@@ -169,7 +169,7 @@ describe('the view of an access invariant', () => {
     ]);
     for (const one of seen.reached) expect(one.satisfiedBy.map(policy => policy.label)).toContain('Signed in');
     // which path a policy proved is carried, so the page says it without working it out again
-    for (const one of seen.reached) expect(one.satisfiedBy.map(policy => policy.proves)).toEqual(['request.principal']);
+    for (const one of seen.reached) expect(one.satisfiedBy.map(policy => policy.proves)).toEqual(['context.principal']);
   });
 
   it('judges the rule the way the checker does, so nothing is shown satisfied that check refuses', async () => {

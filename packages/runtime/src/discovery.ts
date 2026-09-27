@@ -66,7 +66,7 @@ function kindLines(doc: Loaded, showType: (spec: unknown) => string): string[] {
     );
   if (declared.correlation)
     lines.push(
-      `correlation: request.${declared.correlation} correlates a run with the caller's trace, copied opaquely (T007)`,
+      `correlation: context.${declared.correlation} correlates a run with the caller's trace, copied opaquely (T007)`,
     );
   if ('grants' in (declared as unknown as { grants?: unknown }))
     lines.push(`grants: ${JSON.stringify((declared as unknown as { grants: unknown }).grants)}`);
@@ -92,7 +92,7 @@ function guardLines(declared: TriggerKindDoc, showType: (spec: unknown) => strin
   lines.push('  takes, where one trigger attaches one policy ("in"):');
   for (const [name, credential] of Object.entries(guard.credentials ?? {}))
     lines.push(
-      `    ${name}: ${typeof credential.type === 'string' ? credential.type : showType(credential.type)}  yields request.${credential.yields.join(', request.')}${credential.description ? `  -- ${credential.description}` : ''}`,
+      `    ${name}: ${typeof credential.type === 'string' ? credential.type : showType(credential.type)}  yields context.${credential.yields.join(', context.')}${credential.description ? `  -- ${credential.description}` : ''}`,
     );
   return lines;
 }

@@ -28,7 +28,7 @@
   "fire": {
     "run": "@access/domain/access.port.json#refresh",
     "in": {
-      "refreshToken": "{{request.body.refreshToken}}"
+      "refreshToken": "{{context.body.refreshToken}}"
     }
   }
 }

@@ -89,7 +89,7 @@ const MORE = {
   $schema: `${SCHEMAS}/resolvers.schema.json`,
   label: 'More context',
   description: 'A second resolvers document of the feature, so one graph reads two of them.',
-  resolvers: { host: { label: 'The host asked for', read: 'request.headers.host' } },
+  resolvers: { host: { label: 'The host asked for', read: 'context.headers.host' } },
 };
 
 /** A data graph that reads whatever `reads` says, forwarding each read to the API as a header. */
@@ -199,7 +199,7 @@ describe('the request node, one port per name a graph reads', () => {
           $schema: `${SCHEMAS}/resolvers.schema.json`,
           label: 'More context',
           description: 'A resolver with nothing to say about itself: only what it reads.',
-          resolvers: { host: { read: 'request.headers.host' } },
+          resolvers: { host: { read: 'context.headers.host' } },
         },
         'features/customers/data/two-reads.graph.json': forwards(
           { host: '@customers/edge/more.resolvers.json#host' },

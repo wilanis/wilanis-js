@@ -59,7 +59,7 @@ function needs(run: Settled): string[] {
   return [...new Set(paths.filter(path => unsupplied(run.values, path)))].sort();
 }
 
-/** Whether a path reads a root (`in`, `request`, ...) the run was never given. */
+/** Whether a path reads a root (`in`, `context`, ...) the run was never given. */
 function unsupplied(values: Map<string, unknown>, path: string): boolean {
   const root = path.split('.')[0];
   return PSEUDO.has(root) && !values.has(root);

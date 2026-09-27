@@ -79,7 +79,7 @@ export function gated(outcomes: Record<string, string> = PARKED, settings: Recor
     ...settings,
     outcomes: { ...trigger.settings.outcomes, ...outcomes },
   };
-  trigger.policies = [{ policy: EMPLOYEES_ONLY, in: { token: '{{request.headers.authorization}}' } }, CAN_REGISTER];
+  trigger.policies = [{ policy: EMPLOYEES_ONLY, in: { token: '{{context.headers.authorization}}' } }, CAN_REGISTER];
   (docs['features/customers/feature.json'] as any).dependsOn = ['access'];
   return { ...docs, 'project.json': project(docs), ...directories() };
 }

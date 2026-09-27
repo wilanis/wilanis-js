@@ -1,7 +1,7 @@
 /**
  * `wilanis run <scheduled trigger> --at <time>`: the kind builds the tick a hand-fired run hands, through the
- * trigger runtime's `requestOf`, and the runtime fires it without learning what `--at` means (RFC 0010, open
- * question 1). A trigger whose `fire.in` reads `request.scheduled` gets the instant `--at` names.
+ * trigger runtime's `contextOf`, and the runtime fires it without learning what `--at` means (RFC 0010, open
+ * question 1). A trigger whose `fire.in` reads `context.scheduled` gets the instant `--at` names.
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -70,7 +70,7 @@ function planted(): Docs {
       settings: { cron: '0 3 * * *', timezone: 'UTC' },
       in: '@features/customers/edge/Cutoff.shape.json',
       out: '@features/customers/edge/Cutoff.shape.json',
-      fire: { run: '@features/customers/domain/since.port.json#since', in: { before: '{{request.scheduled}}' } },
+      fire: { run: '@features/customers/domain/since.port.json#since', in: { before: '{{context.scheduled}}' } },
     },
   };
 }
@@ -109,12 +109,12 @@ describe('tickOf: the context a hand-fired tick hands', () => {
     },
   );
 
-  it('is the kind runtime’s requestOf', () => {
-    const request = schedule.triggers?.[KIND]?.requestOf?.({} as never, {
+  it('is the kind runtime’s contextOf', () => {
+    const context = schedule.triggers?.[KIND]?.contextOf?.({} as never, {
       flags: { at: '2026-09-11T03:00Z' },
       args: [],
     });
-    expect(request?.scheduled).toBe('2026-09-11T03:00:00.000Z');
+    expect(context?.scheduled).toBe('2026-09-11T03:00:00.000Z');
   });
 });
 
@@ -123,7 +123,7 @@ describe('wilanis run <scheduled trigger> --at', () => {
     expect(refusals(planted())).toEqual([]);
   });
 
-  it('fills request.scheduled from --at, and the graph reads it', async () => {
+  it('fills context.scheduled from --at, and the graph reads it', async () => {
     const { report, answer } = await runTrigger(
       loaded(),
       `@${SINCE}`,

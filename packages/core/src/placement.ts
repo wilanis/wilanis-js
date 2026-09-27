@@ -16,7 +16,7 @@ interface Home {
 /** The one place placement lives: the layers (or top-level directory) each kind is at home in, and why. */
 export const HOME: Partial<Record<Kind, Home>> = {
   trigger: { layers: ['edge'], why: "a trigger is a way in: it speaks the world's vocabulary" },
-  policy: { layers: ['edge'], why: 'a policy gates a way in: it reads the request the way a trigger does' },
+  policy: { layers: ['edge'], why: 'a policy gates a way in: it reads the context the way a trigger does' },
   graph: { layers: ['domain', 'data'], why: 'a graph is business rules (domain/) or a translation (data/)' },
   binding: { layers: ['data'], why: "a binding says how a domain port is met, which is the data layer's job" },
   store: { layers: ['data'], why: "a store says how records are kept, which is the data layer's job" },
@@ -25,7 +25,7 @@ export const HOME: Partial<Record<Kind, Home>> = {
   shape: { layers: ['edge', 'domain'], why: "a shape is the world's (edge/) or ours (domain/)" },
   resolvers: {
     layers: ['edge'],
-    why: "a resolvers document names what is read from the request, which is the world's vocabulary",
+    why: "a resolvers document names what is read from the context, which is the world's vocabulary",
   },
   connection: { dir: 'connections', why: 'a connection is a channel to an external system, shared across features' },
   scenario: { dir: 'scenarios', why: 'a scenario is a recorded run' },

@@ -5,7 +5,7 @@
   "resolvers": {
     "sid": {
       "label": "The caller's session id",
-      "read": "request.session.id",
+      "read": "context.session.id",
       "description": "present on every trigger a signed-in policy gates: the guard verified the token and found its session, and the policy proves it (A006)",
       "required": true
     }

@@ -80,7 +80,7 @@ export function edge(write: Write): void {
       op: 'record',
       in: '@features/customers/edge/EntryRequest.shape.json',
       out: '@features/customers/edge/WrittenView.shape.json',
-      fire: { id: '{{request.flags.id}}', url: '{{request.flags.url}}', method: '{{request.flags.method}}' },
+      fire: { id: '{{context.flags.id}}', url: '{{context.flags.url}}', method: '{{context.flags.method}}' },
     }),
   );
   write(
@@ -89,7 +89,7 @@ export function edge(write: Write): void {
       op: 'note',
       in: '@features/customers/edge/NoteRequest.shape.json',
       out: '@features/customers/edge/NotedView.shape.json',
-      fire: { id: '{{request.flags.id}}', entryId: '{{request.flags.entryId}}', text: '{{request.flags.text}}' },
+      fire: { id: '{{context.flags.id}}', entryId: '{{context.flags.entryId}}', text: '{{context.flags.text}}' },
     }),
   );
   write(
@@ -98,7 +98,7 @@ export function edge(write: Write): void {
       op: 'forget',
       in: '@features/customers/edge/IdRequest.shape.json',
       out: '@features/customers/edge/GoneView.shape.json',
-      fire: { id: '{{request.flags.id}}' },
+      fire: { id: '{{context.flags.id}}' },
     }),
   );
 }

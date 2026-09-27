@@ -64,7 +64,7 @@ const signedIn = (headers: Record<string, unknown> = {}) => ({ ...headers, autho
  */
 async function fire(
   ref: string,
-  given: { input: unknown; request: Record<string, unknown>; stubs?: Record<string, unknown> },
+  given: { input: unknown; context: Record<string, unknown>; stubs?: Record<string, unknown> },
   profile = 'live',
 ): Promise<{ ran: Ran; scope: ReturnType<typeof embedderFor>['scope'] }> {
   const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);
@@ -73,7 +73,7 @@ async function fire(
   const served = new Served({ load, emb }, () => {});
   emb.serve(Object.assign(served, { ran: (what: Ran) => heard.push(what) }));
   const trigger = load.registry.get('trigger', load.resolve(ref));
-  await emb.fire(trigger?.doc as never, given.input, given.request, { stubs: given.stubs });
+  await emb.fire(trigger?.doc as never, given.input, given.context, { stubs: given.stubs });
   return { ran: heard[0], scope: emb.scope };
 }
 
@@ -81,7 +81,7 @@ async function fire(
 async function getCustomer(status: number, level: 'summary' | 'full' = 'full'): Promise<Trace> {
   const { ran, scope } = await fire(GET_CUSTOMER, {
     input: { id: 'golf' },
-    request: { params: { id: 'golf' }, headers: signedIn() },
+    context: { params: { id: 'golf' }, headers: signedIn() },
     stubs: {
       'op.fetched': {
         status,
@@ -145,7 +145,7 @@ describe('one fire, said as spans', () => {
     const parent = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
     const { ran, scope } = await fire(GET_CUSTOMER, {
       input: { id: 'golf' },
-      request: { params: { id: 'golf' }, headers: signedIn({ traceparent: parent }) },
+      context: { params: { id: 'golf' }, headers: signedIn({ traceparent: parent }) },
       stubs: { 'op.fetched': { status: 500 } },
     });
 
@@ -304,7 +304,7 @@ describe('the record and the trace are two things', () => {
   it('leaves the record untouched: traceOf reads and never writes', async () => {
     const { ran, scope } = await fire(GET_CUSTOMER, {
       input: { id: 'golf' },
-      request: { params: { id: 'golf' }, headers: signedIn() },
+      context: { params: { id: 'golf' }, headers: signedIn() },
       stubs: { 'op.fetched': { status: 500 } },
     });
     const before = JSON.stringify(ran);
@@ -325,7 +325,7 @@ describe('a run that calls another port operation', () => {
     // single node called `op`, which names nothing an author wrote and must not reach a reader
     const { ran, scope } = await fire(
       '@customers/edge/export-customers.trigger.json',
-      { input: undefined, request: { params: {}, headers: signedIn() } },
+      { input: undefined, context: { params: {}, headers: signedIn() } },
       'local',
     );
     const trace = traceOf(ran, scope);

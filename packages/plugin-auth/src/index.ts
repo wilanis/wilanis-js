@@ -4,7 +4,7 @@
  * attributes (session.port.json) and one-time challenges (challenge.port.json), kept through state.port.json -- a port
  * it requires and the host binds, to files.port.json for one process -- and guards every trigger that names
  * policy: before any policy runs it verifies the credentials the trigger's policy attachments give it, and hands
- * request.principal, request.session and request.challenge. What a caller may do is never decided
+ * context.principal, context.session and context.challenge. What a caller may do is never decided
  * here; the policies' graphs do that.
  */
 import { fileURLToPath } from 'node:url';

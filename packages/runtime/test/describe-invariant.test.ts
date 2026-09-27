@@ -112,11 +112,11 @@ describe('describe: an access invariant that names what must be proved', () => {
   const said = () => describeDoc(example, SESSION);
 
   it('says what must be proved rather than which policy proves it', () => {
-    expect(said()).toContain('requires: attaches a policy proving request.principal');
+    expect(said()).toContain('requires: attaches a policy proving context.principal');
   });
 
   it('names the policy that proves it, and the path it proves, once above the three triggers', () => {
-    expect(said()).toContain(`reached by (every one met by ${SIGNED_IN} (proves request.principal)):`);
+    expect(said()).toContain(`reached by (every one met by ${SIGNED_IN} (proves context.principal)):`);
     expect(said()).toContain('    @features/access/edge/sign-out.trigger.json  #signOut');
   });
 });
@@ -133,7 +133,7 @@ describe('describe: a trigger an invariant holds over', () => {
 
   it('says the proving policy and the path where the invariant asks for a proof', () => {
     const said = describeDoc(example, '@access/edge/sign-out.trigger.json');
-    expect(said).toContain(`  holds  ${SESSION}  through ${SIGNED_IN} (proves request.principal)`);
+    expect(said).toContain(`  holds  ${SESSION}  through ${SIGNED_IN} (proves context.principal)`);
   });
 });
 

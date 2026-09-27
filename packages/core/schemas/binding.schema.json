@@ -26,7 +26,7 @@
       "$ref": "common.schema.json#/$defs/path"
     },
     "reads": {
-      "description": "The reads this binding takes from the request: local name -> the resolver that declares it, as @feature/edge/file.resolvers.json#name. A delegation reads each as {{name}} or {{name.field}} in its in; every entry is read by some value, and no name is a reserved root.",
+      "description": "The reads this binding takes from the context: local name -> the resolver that declares it, as @feature/edge/file.resolvers.json#name. A delegation reads each as {{name}} or {{name.field}} in its in; every entry is read by some value, and no name is a reserved root.",
       "type": "object",
       "minProperties": 1,
       "propertyNames": {

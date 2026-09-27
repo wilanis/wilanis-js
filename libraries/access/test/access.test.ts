@@ -34,23 +34,36 @@ function copyOfTree(): string {
   return dir;
 }
 
-/** The refusal codes a copy answers with, once it has been broken; the copy does not outlive the answer. */
-function codesAfter(change: (dir: string) => void): string[] {
+/** What a copy answers once it has been broken, read however the case needs it; the copy does not outlive it. */
+function after(change: (dir: string) => void, read: (dir: string) => string[]): string[] {
   const dir = copyOfTree();
   change(dir);
-  const out = codes(dir);
+  const out = read(dir);
   rmSync(dir, { recursive: true, force: true });
   return out;
 }
 
+/** The refusal codes a copy answers with, once it has been broken. */
+const codesAfter = (change: (dir: string) => void): string[] => after(change, codes);
+
+/** Apply an edit to one document of a copied tree, in place. */
+const editing = (file: string, edit: (doc: Doc) => void) => (dir: string) => {
+  const path = join(dir, file);
+  const doc = JSON.parse(readFileSync(path, 'utf8'));
+  edit(doc);
+  writeFileSync(path, JSON.stringify(doc));
+};
+
 /** Copy the tree, apply an edit to one file, answer the refusal codes. */
 function sabotage(file: string, edit: (doc: Doc) => void): string[] {
-  return codesAfter(dir => {
-    const path = join(dir, file);
-    const doc = JSON.parse(readFileSync(path, 'utf8'));
-    edit(doc);
-    writeFileSync(path, JSON.stringify(doc));
-  });
+  return codesAfter(editing(file, edit));
+}
+
+/** The same sabotage, answered as code and what each refusal says, where the words are the claim. */
+function sabotageSaying(file: string, edit: (doc: Doc) => void): string[] {
+  return after(editing(file, edit), dir =>
+    checkTree(loadTree(dir, PLUGINS)).items.map(one => `${one.code} ${one.at ?? ''} ${one.message}`),
+  );
 }
 
 /** Copy the tree, move one document, answer the refusal codes. */
@@ -93,7 +106,7 @@ describe('the access tree on its own', () => {
 });
 
 describe('sabotage: what a policy declares', () => {
-  it("A001 a policy whose input reads outside the request, or does not fit the decision under the trigger's kind", () => {
+  it("A001 a policy whose input reads outside the context, or does not fit the decision under the trigger's kind", () => {
     expect(
       sabotage('features/access/edge/signed-in.policy.json', policy => {
         policy.decide.in.principal = '{{in.principal}}';
@@ -101,12 +114,12 @@ describe('sabotage: what a policy declares', () => {
     ).toContain('A001');
     expect(
       sabotage('features/access/edge/signed-in.policy.json', policy => {
-        policy.decide.in.principal = '{{request.headers}}';
+        policy.decide.in.principal = '{{context.headers}}';
       }),
     ).toContain('A001');
     expect(
       sabotage('features/access/edge/signed-in.policy.json', policy => {
-        policy.decide.in.principal = '{{request.nothing}}';
+        policy.decide.in.principal = '{{context.nothing}}';
       }),
     ).toContain('A001');
     expect(
@@ -114,6 +127,25 @@ describe('sabotage: what a policy declares', () => {
         port.operations.requireSignedIn.accepts.principal.required = true;
       }),
     ).toContain('A001');
+  });
+  it('A001 a decision reading the retired root, told what to write instead; D001 a proof spelt that way', () => {
+    const decided = sabotageSaying('features/access/edge/signed-in.policy.json', policy => {
+      policy.decide.in.principal = '{{request.principal}}';
+    });
+    expect(decided.filter(one => one.startsWith('A001 decide/in'))).toEqual([
+      "A001 decide/in decide.in reads 'request', but a policy's input reads context.* only",
+    ]);
+    // and under the kind of each trigger that attaches it, the read is named for what it became
+    expect(decided).toContain(
+      "A001 policies/0 policy '@features/access/edge/signed-in.policy.json' under kind '@http/http.trigger-kind.json': principal: 'request': the root is context, what the trigger kind hands; write {{context.principal}}",
+    );
+    // what a policy proves is a context.* path, and its schema says so before any rule is asked
+    const proved = sabotageSaying('features/access/edge/signed-in.policy.json', policy => {
+      policy.proves = ['request.principal', 'context.session'];
+    });
+    expect(proved.filter(one => one.startsWith('D001'))).toEqual([
+      expect.stringMatching(/^D001 proves\/0 must match "\^context\(/),
+    ]);
   });
   it('A002 a reason the decision can reach that outcomes does not map, and a challenge without a method', () => {
     expect(
@@ -140,7 +172,7 @@ describe('sabotage: a policy against the trigger that attaches it', () => {
   it('A004 a credential read where the kind hands nothing: a flag on an http route', () => {
     expect(
       sabotage('features/access/edge/get-preferences.trigger.json', trigger => {
-        trigger.policies[0].in.token = '{{request.flags.token}}';
+        trigger.policies[0].in.token = '{{context.flags.token}}';
       }),
     ).toEqual(['A004']);
   });

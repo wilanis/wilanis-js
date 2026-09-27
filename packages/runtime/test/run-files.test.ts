@@ -84,7 +84,7 @@ describe('wilanis run with files', () => {
       settings: {},
       in: '@features/files/edge/Upload.shape.json',
       out: 'string',
-      fire: { run: '@features/files/domain/files.port.json#read', in: { file: '{{request.file}}' } },
+      fire: { run: '@features/files/domain/files.port.json#read', in: { file: '{{context.file}}' } },
     });
     put('features/files/edge/hello.trigger.json', {
       $schema: schemaOf('trigger'),
@@ -97,7 +97,7 @@ describe('wilanis run with files', () => {
     writeFileSync(join(dir, 'in.csv'), 'url,method\nhttps://a.example/,GET\n');
     return dir;
   }
-  it('hands --file as a blob in request.file: the graph gets a handle, the operation streams the bytes', async () => {
+  it('hands --file as a blob in context.file: the graph gets a handle, the operation streams the bytes', async () => {
     const dir = filesTree();
     const load = loadTree(dir, PLUGINS);
     expect(checkTree(load).items).toEqual([]);

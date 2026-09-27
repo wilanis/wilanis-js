@@ -166,16 +166,16 @@ function encoded(runtime: TriggerRuntime | undefined, trigger: TriggerDoc, repor
 type Puts = { put: (source: Readable, meta: { contentType: string; filename: string }) => Promise<BlobHandle> };
 
 /**
- * What a command line hands a trigger: the context its kind builds from the flags and arguments (`requestOf`),
+ * What a command line hands a trigger: the context its kind builds from the flags and arguments (`contextOf`),
  * else a command line's own. The runtime never learns a kind's vocabulary; the kind says what its flags mean.
  */
-async function requestOf(
+async function contextOf(
   runtime: TriggerRuntime | undefined,
   trigger: TriggerDoc,
   given: { flags: Record<string, string>; args: string[] },
   blobs: Puts,
 ): Promise<Record<string, unknown>> {
-  if (runtime?.requestOf) return runtime.requestOf(trigger, given);
+  if (runtime?.contextOf) return runtime.contextOf(trigger, given);
   return commandLine(given.flags, given.args, blobs);
 }
 
@@ -185,14 +185,14 @@ async function commandLine(
   args: string[],
   blobs: Puts,
 ): Promise<Record<string, unknown>> {
-  const request: Record<string, unknown> = { flags, args, cwd: process.cwd() };
-  if (flags.in !== undefined) request.body = JSON.parse(flags.in);
+  const context: Record<string, unknown> = { flags, args, cwd: process.cwd() };
+  if (flags.in !== undefined) context.body = JSON.parse(flags.in);
   if (flags.file !== undefined)
-    request.file = await blobs.put(createReadStream(flags.file), {
+    context.file = await blobs.put(createReadStream(flags.file), {
       contentType: contentTypeOf(flags.file),
       filename: basename(flags.file),
     });
-  return request;
+  return context;
 }
 
 /** What one command-line run is fired through: the trigger, the embedder set up for it, and its teardown. */
@@ -231,7 +231,7 @@ async function readied(
 /**
  * Fire a trigger from the command line with a context built from flags and args. A real run (no seed)
  * runs postLoad first and its teardown after; a seeded run stubs every effect and skips the hooks. `--file`
- * streams a file into the blob registry and hands its handle as request.file; a blob answer is streamed to
+ * streams a file into the blob registry and hands its handle as context.file; a blob answer is streamed to
  * `--out`, or to stdout, by `deliver`. The run's blobs are released once delivered. An `observe` given here is
  * handed the trace of the fire, the same one a tree being served would hand an exporter.
  */
@@ -252,10 +252,10 @@ export async function runTrigger(
   const blobs = emb.blobs.scope();
   try {
     const runtime = runtimeOf(load, found.doc);
-    const request = await requestOf(runtime, found.doc, { flags: given.flags ?? {}, args: given.args ?? [] }, blobs);
-    const built = emb.inputFor(found.doc, request);
+    const context = await contextOf(runtime, found.doc, { flags: given.flags ?? {}, args: given.args ?? [] }, blobs);
+    const built = emb.inputFor(found.doc, context);
     if ('error' in built) throw new Error(`input: ${built.error}`);
-    const report = await emb.fire(found.doc, built.input, request, { blobs });
+    const report = await emb.fire(found.doc, built.input, context, { blobs });
     const answer = encoded(runtime, found.doc, report);
     if (isBlobHandle(answer) && opts.deliver) await opts.deliver(blobs.open(answer), answer);
     return { report, answer };

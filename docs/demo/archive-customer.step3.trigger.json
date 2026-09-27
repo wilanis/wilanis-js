@@ -24,14 +24,14 @@
     {
       "policy": "@access/edge/can-register.policy.json",
       "in": {
-        "token": "{{request.headers.authorization}}"
+        "token": "{{context.headers.authorization}}"
       }
     }
   ],
   "fire": {
     "run": "@customers/domain/customer.port.json#remove",
     "in": {
-      "id": "{{request.params.id}}"
+      "id": "{{context.params.id}}"
     }
   }
 }

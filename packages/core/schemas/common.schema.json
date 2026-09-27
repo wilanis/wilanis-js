@@ -155,7 +155,7 @@
       }
     },
     "value": {
-      "description": "A value where an operation is called. Literals are written as they are: a string, a number, a boolean, a list or an object of values. A string may carry {{root.path}} templates: alone it takes that value and its type; embedded in text it is interpolated (scalars only). A path segment is .name, or ['a key'] for a key that is not an identifier. Roots in a graph node: in (the graph's input), const (a constant), a node id, a name under reads. In a binding delegation's in: in (the operation's accepts) and the names under reads. In a trigger's fire.in: request."
+      "description": "A value where an operation is called. Literals are written as they are: a string, a number, a boolean, a list or an object of values. A string may carry {{root.path}} templates: alone it takes that value and its type; embedded in text it is interpolated (scalars only). A path segment is .name, or ['a key'] for a key that is not an identifier. Roots in a graph node: in (the graph's input), const (a constant), a node id, a name under reads. In a binding delegation's in: in (the operation's accepts) and the names under reads. In a trigger's fire.in: context."
     },
     "values": {
       "description": "The values given where an operation is called, by name: each is a literal or a {{root.path}} template read from what is in scope.",
