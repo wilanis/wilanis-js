@@ -16,8 +16,8 @@ type ProfileBlock = Manifest['profiles'][string];
 export const PLAN_SCHEMA =
   'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/deploy/schemas/plan.schema.json';
 
-/** Where the image is built from and the file that builds it, relative to the tree's root. */
-const BUILT = { context: '.', dockerfile: 'deploy/Dockerfile' };
+/** The file that builds the image, relative to the tree's root, where the command is not told to write elsewhere. */
+export const DOCKERFILE = 'deploy/Dockerfile';
 
 /** The one image every workload runs: where it is built from, and the reference it is tagged with. */
 export interface PlanImage {
@@ -68,10 +68,14 @@ export interface Plan {
   workloads: Workload[];
   requires: Requirement[];
 }
-/** What the command supplies, as `manifestOf` is given its root: the profiles asked for, and the image's reference. */
+/**
+ * What the command supplies, as `manifestOf` is given its root: the profiles asked for, the image's reference, and
+ * the file that builds it, relative to the root, where the command writes it elsewhere than `deploy/Dockerfile`.
+ */
 export interface PlanOptions {
   profiles: string[];
   image: string;
+  dockerfile?: string;
 }
 
 /** The command a profile's process starts with; the unnamed profile, keyed `""`, is started naming none. */
@@ -142,7 +146,7 @@ export function planOf(manifest: Manifest, options: PlanOptions): Plan {
     format: 1,
     name: manifest.name,
     node: manifest.node,
-    image: { ...BUILT, reference: options.image },
+    image: { context: '.', dockerfile: options.dockerfile ?? DOCKERFILE, reference: options.image },
     workloads: blocks.map(([profile, block]) => workloadOf(profile, block)),
     requires: requiresOf(manifest, blocks),
   };

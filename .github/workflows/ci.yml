@@ -150,6 +150,11 @@ jobs:
         env:
           CUSTOMERS_JWT_SECRET: ci-only-not-a-secret
           CUSTOMERS_DATABASE_URL: postgres://postgres:wilanis@127.0.0.1:5432/customers
+      # example/deploy/ is what wilanis-deploy writes for production, checked in (RFC 0024). --check writes nothing
+      # and fails when a file there has gone stale against the tree; it needs no container runtime and no cluster.
+      - name: the example's deployment files are what the tree renders
+        if: steps.reads.outputs.skip != 'true'
+        run: npx wilanis-deploy example --profile production --target image,compose --check
 
   fitness:
     name: fitness
