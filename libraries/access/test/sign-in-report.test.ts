@@ -222,8 +222,8 @@ describe('what rehearse --record records of a sign-in', () => {
       expect(ok, lines.join('\n')).toBe(true);
       // the branch each realm's sign-in answers on: TokensView marks both tokens, so the stubbed ones never reach it
       const issued = [
-        `${RECORDED}/auth-customers/access.sign-in-customer.verdict.issued.scenario.json`,
-        `${RECORDED}/auth-employees/access.sign-in-employee.verdict.issued.scenario.json`,
+        `${RECORDED}/access.auth-customers/access.sign-in-customer.verdict.issued.scenario.json`,
+        `${RECORDED}/access.auth-employees/access.sign-in-employee.verdict.issued.scenario.json`,
       ];
       expect(recorded?.written).toEqual(expect.arrayContaining(issued));
       for (const file of issued)

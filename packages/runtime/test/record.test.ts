@@ -11,7 +11,7 @@ import { type GraphDoc, isSwitch, type LoadResult, loadTree, type ProjectDoc } f
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PROFILE_VARIABLE, RECORDED, type Rehearsal, regress, rehearse } from '../src/index.js';
 import { recordedProfile } from '../src/profile.js';
-import { copyOfExample, INCLUDES, PLUGINS } from './example-harness.js';
+import { copyOfExample, EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
 const RUNTIME = fileURLToPath(new URL('..', import.meta.url));
 const WORKSPACE = fileURLToPath(new URL('../../..', import.meta.url));
@@ -57,14 +57,22 @@ function expectedFiles(loaded: LoadResult, rehearsal: Rehearsal): number {
   return count;
 }
 
-/** The triggers whose runs reach a graph, as the rehearsal reported them. */
+/** The directory a trigger's runs are recorded in, `<feature>.<trigger>`, by the trigger's name in the example. */
+function underOf(name: string): string {
+  const trigger = load(EXAMPLE)
+    .registry.all('trigger')
+    .find(one => one.name === name);
+  return `${RECORDED}/${trigger?.feature}.${name}`;
+}
+
+/** The directories of the triggers whose runs reach a graph, as the rehearsal reported them. */
 const reaching = (rehearsal: Rehearsal, graph: string) =>
-  rehearsal.decisions.find(one => one.graph.endsWith(graph))?.triggers ?? [];
+  (rehearsal.decisions.find(one => one.graph.endsWith(graph))?.triggers ?? []).map(underOf);
 
 /** The recorded files of one target of get-row's switch, one per trigger that reaches the graph. */
 const filesOf = (rehearsal: Rehearsal, to: string) =>
   reaching(rehearsal, GET_ROW)
-    .map(trigger => `${RECORDED}/${trigger}/customers.get-row.outcome.${to}.scenario.json`)
+    .map(under => `${under}/customers.get-row.outcome.${to}.scenario.json`)
     .sort();
 
 describe('rehearse --record: the recorded directory', () => {
@@ -81,9 +89,9 @@ describe('rehearse --record: the recorded directory', () => {
     const written = first.recorded?.written ?? [];
     expect(written).toHaveLength(expectedFiles(load(dir), first));
     expect(Object.keys(bytesUnder(join(dir, RECORDED))).map(file => `${RECORDED}/${file}`)).toEqual(written);
-    expect(written).toContain(`${RECORDED}/get-customer/customers.get-row.outcome.noCustomer.scenario.json`);
-    expect(written).toContain(`${RECORDED}/hello-gated/whole.scenario.json`);
-    const sc = read(join(dir, RECORDED, 'get-customer/customers.get-row.outcome.noCustomer.scenario.json'));
+    expect(written).toContain(`${RECORDED}/customers.get-customer/customers.get-row.outcome.noCustomer.scenario.json`);
+    expect(written).toContain(`${RECORDED}/hello.hello-gated/whole.scenario.json`);
+    const sc = read(join(dir, RECORDED, 'customers.get-customer/customers.get-row.outcome.noCustomer.scenario.json'));
     expect(sc).toMatchObject({
       description:
         "get-customer: get-row 'outcome' when status == 404 routes to noCustomer, which refuses as missing. Written by wilanis rehearse --record; regenerate it, do not edit it.",
@@ -95,7 +103,9 @@ describe('rehearse --record: the recorded directory', () => {
       expect: { status: 'failed', reason: 'missing' },
     });
     // a branch is named by the node the document routes to, not by where a guard moved the made node aside
-    expect(written).toContain(`${RECORDED}/list-customers/customers.list-rows-by-tier.outcome.none.scenario.json`);
+    expect(written).toContain(
+      `${RECORDED}/customers.list-customers/customers.list-rows-by-tier.outcome.none.scenario.json`,
+    );
   });
 
   it('is deterministic: solved under seed 1 whatever seed is asked, and byte-identical a second time', async () => {
@@ -153,7 +163,7 @@ describe('rehearse --check: a recorded directory the tree has moved away from', 
     const extra = filesOf(recorded, 'noCustomer');
     expect(checked.recorded?.check).toMatchObject({ missing: filesOf(recorded, 'gone'), extra });
     // every other run through get-row recorded the node under its old name, so those files are stale and no others
-    const through = reaching(recorded, GET_ROW).map(trigger => `${RECORDED}/${trigger}/`);
+    const through = reaching(recorded, GET_ROW).map(under => `${under}/`);
     expect(checked.recorded?.check?.stale.length).toBeGreaterThan(0);
     for (const file of checked.recorded?.check?.stale ?? []) expect(through.some(at => file.startsWith(at))).toBe(true);
     const refused = checkTree(load(dir)).items.map(one => `${one.code} ${one.file}#${one.at}`);
@@ -249,7 +259,7 @@ describe('rehearse --record and --check on the command line', () => {
     const set = wilanisWith({ [PROFILE_VARIABLE]: 'production-worker' }, dir, 'rehearse', '.', '--check');
     expect(set.code, set.stdout).toBe(0);
     expect(set.stdout).toBe(current.stdout);
-    const file = 'scenarios/rehearsed/get-customer/customers.get-row.outcome.noCustomer.scenario.json';
+    const file = 'scenarios/rehearsed/customers.get-customer/customers.get-row.outcome.noCustomer.scenario.json';
     edit(dir, file, doc => {
       doc.expect.reason = 'gone';
     });

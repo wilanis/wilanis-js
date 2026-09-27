@@ -29,7 +29,7 @@ describe('rehearse --record: what the recorded directory owns', () => {
   }, async () => {
     const dir = copyOfExample();
     await rehearse(load(dir), { record: RECORDED });
-    const { generated: _, ...kept } = read(join(dir, RECORDED, 'hello-gated/whole.scenario.json'));
+    const { generated: _, ...kept } = read(join(dir, RECORDED, 'hello.hello-gated/whole.scenario.json'));
     const mine = JSON.stringify({ ...kept, description: 'the gated hello, kept by hand' }, null, 2);
     writeFileSync(join(dir, 'scenarios/mine.scenario.json'), mine);
     mkdirSync(join(dir, RECORDED, 'gone-trigger'));
@@ -54,11 +54,13 @@ describe('rehearse --record: what the recorded directory owns', () => {
     expect(readFileSync(join(elsewhere, 'keep.scenario.json'), 'utf8')).toBe('{}');
     expect(answer.recorded?.written).not.toContain(`${RECORDED}/link/keep.scenario.json`);
     // a link where a trigger's files go is refused before anything is written or removed
-    const docs = { 'linked-trigger/x.scenario.json': read(join(dir, RECORDED, 'hello-gated/whole.scenario.json')) };
+    const docs = {
+      'linked-trigger/x.scenario.json': read(join(dir, RECORDED, 'hello.hello-gated/whole.scenario.json')),
+    };
     symlinkSync(elsewhere, join(dir, RECORDED, 'linked-trigger'));
     expect(() => writeRecorded(dir, RECORDED, docs)).toThrow(/would be written through a link/);
     expect(readdirSync(elsewhere)).toEqual(['keep.scenario.json']);
-    expect(existsSync(join(dir, RECORDED, 'hello-gated/whole.scenario.json'))).toBe(true);
+    expect(existsSync(join(dir, RECORDED, 'hello.hello-gated/whole.scenario.json'))).toBe(true);
     // and so is a recorded directory that is itself a link out of the tree, or back onto the scenarios' home
     symlinkSync(elsewhere, join(dir, 'scenarios/linked'));
     symlinkSync(join(dir, 'scenarios'), join(dir, 'scenarios/home'));
@@ -93,12 +95,24 @@ describe('rehearse --record: what the recorded directory owns', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('refuses two triggers of one name, an included one among them, naming both, rather than drop one', {
+  it("records two features' triggers of one name apart, an included one among them, and refuses two of one feature", {
     timeout: 60_000,
   }, async () => {
     const dir = copyOfExample();
-    // a second get-customer under the feature's edge/, reaching the same branches, and a host trigger named as the
-    // included access tree's refresh is: the checker accepts both
+    // a host trigger named as the included access tree's refresh is, which the host cannot rename: the checker accepts
+    // it, and each is recorded under its own feature
+    const hello = read(join(dir, 'features/hello/edge/hello-gated.trigger.json'));
+    writeFileSync(
+      join(dir, 'features/hello/edge/refresh.trigger.json'),
+      JSON.stringify({ ...hello, settings: { command: 'hello-refresh' } }),
+    );
+    expect(checkTree(load(dir)).items).toEqual([]);
+    const both = await rehearse(load(dir), { record: RECORDED });
+    expect(both.recorded?.written).toContain(`${RECORDED}/hello.refresh/whole.scenario.json`);
+    expect(both.recorded?.written).toContain(`${RECORDED}/access.refresh/access.refresh.wasGood.renewed.scenario.json`);
+    expect((await rehearse(load(dir), { check: true })).recorded?.check).toEqual({ stale: [], missing: [], extra: [] });
+    // a second get-customer under the same feature's edge/v2/ would share customers.get-customer/: refused, naming
+    // the two files, rather than one's runs dropped for the other's
     const again = read(join(dir, 'features/customers/edge/get-customer.trigger.json'));
     mkdirSync(join(dir, 'features/customers/edge/v2'));
     writeFileSync(
@@ -106,23 +120,13 @@ describe('rehearse --record: what the recorded directory owns', () => {
       JSON.stringify({ ...again, settings: { ...again.settings, route: '/v2/customers/{id}' } }),
     );
     expect(checkTree(load(dir)).items).toEqual([]);
+    const written = readdirSync(join(dir, RECORDED, 'customers.get-customer'));
     await expect(rehearse(load(dir), { record: RECORDED })).rejects.toThrow(
-      "two triggers are named 'get-customer' (@features/customers/edge/get-customer.trigger.json and " +
-        "@features/customers/edge/v2/get-customer.trigger.json), and a recorded trigger's scenarios are written " +
-        'under its name (get-customer/): rename one of them',
+      "two triggers of feature 'customers' are named 'get-customer', and a recorded trigger's scenarios are written " +
+        'under its feature and name (customers.get-customer/): rename ' +
+        '@features/customers/edge/get-customer.trigger.json or @features/customers/edge/v2/get-customer.trigger.json',
     );
-    rmSync(join(dir, 'features/customers/edge/v2'), { recursive: true });
-    const hello = read(join(dir, 'features/hello/edge/hello-gated.trigger.json'));
-    writeFileSync(
-      join(dir, 'features/hello/edge/refresh.trigger.json'),
-      JSON.stringify({ ...hello, settings: { command: 'hello-refresh' } }),
-    );
-    expect(checkTree(load(dir)).items).toEqual([]);
-    await expect(rehearse(load(dir), { check: true })).rejects.toThrow(
-      "two triggers are named 'refresh' (@features/access/edge/refresh.trigger.json and " +
-        '@features/hello/edge/refresh.trigger.json)',
-    );
-    expect(existsSync(join(dir, RECORDED))).toBe(false);
+    expect(readdirSync(join(dir, RECORDED, 'customers.get-customer'))).toEqual(written);
     rmSync(dir, { recursive: true, force: true });
   });
 });

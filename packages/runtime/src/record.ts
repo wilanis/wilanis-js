@@ -89,15 +89,26 @@ export function scenarioOf(run: RecordedRun): ScenarioDoc {
 }
 
 /**
- * Where one recorded run is written, inside the recorded directory: `<trigger stem>/<feature>.<graph stem>.<switch
- * id>.<to>[.<n>].scenario.json`, or `<trigger stem>/whole.scenario.json` for a trigger with no switch. Named by what
- * it proves, so a reorder of rules moves nothing and a change of target renames one file.
+ * The directory a trigger's recorded runs sit in, inside the recorded directory: `<feature>.<trigger stem>`. D009 keeps
+ * a feature's name unique across the tree and every tree it includes, so two features' triggers of one name never
+ * share one -- a host trigger beside an included library's among them, which the host cannot rename.
+ */
+function triggerDir(trigger: { path: string }): string {
+  const { feature, stem: name } = partsOf(trigger.path);
+  return `${feature}.${name}`;
+}
+
+/**
+ * Where one recorded run is written, inside the recorded directory: `<feature>.<trigger stem>/<feature>.<graph
+ * stem>.<switch id>.<to>[.<n>].scenario.json`, or `<feature>.<trigger stem>/whole.scenario.json` for a trigger with no
+ * switch. Named by what it proves, so a reorder of rules moves nothing and a change of target renames one file.
  */
 export function fileOf(run: RecordedRun): string {
-  if (!run.branch) return `${run.trigger.name}/whole.scenario.json`;
+  const under = triggerDir(run.trigger);
+  if (!run.branch) return `${under}/whole.scenario.json`;
   const { feature, stem: graph } = partsOf(run.branch.graph);
   const nth = run.branch.n === undefined ? '' : `.${run.branch.n}`;
-  return `${run.trigger.name}/${feature}.${graph}.${run.branch.node}.${run.branch.to}${nth}.scenario.json`;
+  return `${under}/${feature}.${graph}.${run.branch.node}.${run.branch.to}${nth}.scenario.json`;
 }
 
 /** What `--check` prints: one line per file that differs, then how many and the one command, or that it is current. */
@@ -123,27 +134,32 @@ export interface Recorded {
 
 /**
  * The runs as documents by file. Where two runs of one trigger name one file the first keeps it, since they prove one
- * branch. A trigger's files sit under its name, so two triggers of one name -- an included tree's among them, since
- * its features load as the tree's own -- are refused, naming both, rather than one's runs being dropped for the other's.
+ * branch. Two triggers of one feature and one name -- one under `edge/`, one under `edge/v2/` -- would share a
+ * directory, and are refused, naming both, rather than one's runs being dropped for the other's.
  */
 function docsOf(runs: RecordedRun[]): Record<string, ScenarioDoc> {
-  const named = new Map<string, string>();
+  const held = new Map<string, string>();
   const docs: Record<string, ScenarioDoc> = {};
   for (const run of runs) {
-    const { name, path } = run.trigger;
-    const other = named.get(name) ?? path;
-    if (other !== path) throw new Error(sameName(name, [other, path]));
-    named.set(name, path);
+    const under = triggerDir(run.trigger);
+    const other = held.get(under) ?? run.trigger.path;
+    if (other !== run.trigger.path) throw new Error(sameDir(under, [other, run.trigger.path]));
+    held.set(under, run.trigger.path);
     const file = fileOf(run);
     if (!(file in docs)) docs[file] = scenarioOf(run);
   }
   return docs;
 }
 
-/** Why two triggers of one name cannot both be recorded, and the edit that lets them. */
-const sameName = (name: string, paths: string[]) =>
-  `two triggers are named '${name}' (${paths.sort().join(' and ')}), and a recorded trigger's scenarios are ` +
-  `written under its name (${name}/): rename one of them`;
+/** Why two triggers of one feature and one name cannot both be recorded, and the two files one of which to rename. */
+function sameDir(under: string, paths: string[]): string {
+  const [one, two] = paths.sort();
+  const { feature, stem: name } = partsOf(one);
+  return (
+    `two triggers of feature '${feature}' are named '${name}', and a recorded trigger's scenarios are written under ` +
+    `its feature and name (${under}/): rename ${one} or ${two}`
+  );
+}
 
 /** Write the runs to the recorded directory, or under `check` compare them with it and write nothing. */
 export function recordRuns(root: string, how: { record?: string; check?: boolean }, runs: RecordedRun[]): Recorded {
