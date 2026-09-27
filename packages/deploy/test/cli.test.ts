@@ -52,15 +52,15 @@ describe('wilanis-deploy', () => {
     expect(ran.stdout).toBe('');
     expect(ran.stderr).toMatch(/^--profile is required/);
     expect(ran.stderr).toContain(
-      'wilanis-deploy [root] --profile <name> [--profile <name>]... [--target image,compose,plan] [-o <dir>]',
+      'wilanis-deploy [root] --profile <name> [--profile <name>]... [--target image,compose,helm,plan]',
     );
   });
 
   it('exits 1 naming the targets it renders where a target is not one of them', () => {
-    const ran = deploy(join(EXAMPLE, '..'), 'example', '--profile', 'production', '--target', 'helm');
+    const ran = deploy(join(EXAMPLE, '..'), 'example', '--profile', 'production', '--target', 'kubernetes');
     expect(ran.code).toBe(1);
     expect(ran.stdout).toBe('');
-    expect(ran.stderr).toMatch(/^no target helm; this version renders: image, compose, plan\n/);
+    expect(ran.stderr).toMatch(/^no target kubernetes; this version renders: image, compose, helm, plan\n/);
   });
 
   it('exits 1 with RFC 0013’s message where no profile has the name, and prints no plan', { timeout: 60_000 }, () => {
@@ -100,7 +100,7 @@ describe('wilanis-deploy', () => {
       '--profile',
       'production',
       '--target',
-      'image,compose',
+      'image,compose,helm',
       '--check',
     );
     expect(ran).toEqual({ code: 0, stdout: '', stderr: 'example/deploy: every file is as the tree renders it\n' });

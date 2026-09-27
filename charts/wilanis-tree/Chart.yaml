@@ -1,0 +1,32 @@
+# One wilanis tree on Kubernetes (RFC 0024). Written once and reviewed like code; what differs per tree is its
+# values, which `wilanis-deploy <root> --profile <name> --target helm` derives from the tree's manifest.
+apiVersion: v2
+name: wilanis-tree
+description: >-
+  One wilanis tree: a Deployment per workload wilanis-deploy plans, a Service for each that listens, every variable
+  read from one Secret by name, and, off by default, what a demo stands up beside it on a laptop.
+type: application
+version: 0.1.0
+home: https://github.com/wilanis/wilanis-js/tree/main/charts/wilanis-tree
+sources:
+  - https://github.com/wilanis/wilanis-js
+keywords:
+  - wilanis
+# Each pinned, each behind its switch in values.yaml and off by default, each chosen for images that pull without a
+# vendor account. `helm dependency build` fetches them as Chart.lock pins them.
+dependencies:
+  # The CloudNativePG operator; the one Cluster it runs is templates/postgresql.yaml, behind the same switch.
+  - name: cloudnative-pg
+    version: 0.29.1
+    repository: https://cloudnative-pg.github.io/charts
+    condition: postgresql.enabled
+  # The MinIO project's own chart: the S3 API.
+  - name: minio
+    version: 5.4.0
+    repository: https://charts.min.io/
+    condition: minio.enabled
+  # Jaeger, receiving OTLP.
+  - name: jaeger
+    version: 4.14.0
+    repository: https://jaegertracing.github.io/helm-charts
+    condition: jaeger.enabled

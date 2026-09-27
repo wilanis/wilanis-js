@@ -3,6 +3,7 @@
  * holds, what was written, and the command that takes it from there -- or, under `--check`, what a write would change
  * and the command that writes it. stdout is the plan's alone, so none of this is printed there.
  */
+import { CHART } from './helm.js';
 import type { Plan } from './plan.js';
 import type { Written } from './write.js';
 
@@ -31,13 +32,14 @@ function summaryOf(plan: Plan): string {
   );
 }
 
-/** The commands that take the written files from there: the image's build, and the Compose file's start. */
+/** The commands that take the written files from there: the image's build, the Compose file's start, the install. */
 function nextOf({ plan, targets, places }: Report): string[] {
   return [
     ...(targets.includes('image')
       ? [`→ docker build -f ${places.out}/Dockerfile -t ${plan.image.reference} ${places.root}`]
       : []),
     ...(targets.includes('compose') ? [`→ docker compose -f ${places.out}/compose.yaml up --build`] : []),
+    ...(targets.includes('helm') ? [`→ helm install ${plan.name} ${CHART} -f ${places.out}/values.yaml`] : []),
   ];
 }
 

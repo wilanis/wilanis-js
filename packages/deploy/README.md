@@ -14,6 +14,7 @@ npx wilanis-deploy example --profile production
 npx wilanis-deploy example --profile production --profile production-worker
 npx wilanis-deploy example --profile production --target plan
 npx wilanis-deploy example --profile production --check
+npx wilanis-deploy example --profile production --target helm
 ```
 
 `--profile` is required and may be repeated: a deployment is of one place, and the asker knows which. A tree
@@ -35,6 +36,7 @@ for either.
 |---|---|---|
 | `image` | `Dockerfile`, `Dockerfile.dockerignore` | the one image every workload runs: the tree installed with `npm ci --omit=dev`, run as `node`, one `EXPOSE` per port, the first workload's command |
 | `compose` | `compose.yaml`, `.env.example` | one service per workload, on a read-only root with `/tmp` writable, probed by a TCP connect on its first port; `.env.example` names every variable, its key and who reads it, and holds no value |
+| `helm` | `values.yaml` | the values of [`charts/wilanis-tree`](https://github.com/wilanis/wilanis-js/tree/main/charts/wilanis-tree), the chart this repository ships: each workload's command, replicas, ports (named `tcp-<port>`), probe and variables, the Secret's keys by name, what the environment must provide, and every switch off |
 | `plan` | nothing | the plan as JSON on stdout |
 
 The files go into `<root>/deploy`, or where `-o` says; the image is built from the root either way. None of
@@ -42,9 +44,14 @@ them is JSON, so the loader, which reads every `*.json` under the root, never ta
 `wilanis check` reads the tree exactly as before. The ignore file is `Dockerfile.dockerignore` because Docker
 reads a plain `.dockerignore` only at the root of the build's context, which is the tree's root, and reads
 `<Dockerfile>.dockerignore` beside the Dockerfile; one named `.dockerignore` inside `deploy/` would be read by
-nothing. `compose` refuses an address bound to a fixed interface that is no wildcard, such as `127.0.0.1`: a
-published port arrives on the container's own address, so such a listener would answer nobody. The plan does not
-refuse it, and a sidecar sharing the network namespace renders `--target plan` and writes its own objects.
+nothing. `compose` and `helm` refuse an address bound to a fixed interface that is no wildcard, such as
+`127.0.0.1`: a published port and a Service both arrive on the container's own address, so such a listener would
+answer nobody. The plan does not refuse it, and a sidecar sharing the network namespace renders `--target plan` and
+writes its own objects.
+
+The chart is not generated: it is written once and reviewed like code, and `helm` writes only what differs per
+tree, so a fix to the chart reaches every tree without regenerating anything. Its README says what it expects
+beside the values (an image and a Secret) and what each switch stands up.
 
 Every file begins with two lines saying it is generated, from which tree and profiles, and the command that
 renders it again. The tree is the source, so regenerate rather than edit. A file whose first line is not that
