@@ -413,7 +413,7 @@ duplicate a rehearsed file. The plain `fuzz` moves its output to `scenarios/fuzz
 is fired through the root `policyRoots` builds -- the construction moves to an exported `policyRoot(load, policy,
 trigger)` in `stubbing.ts` and both callers use it. A scenario with `expect.status: 'unreachable'` is not fired: the
 switches of its trigger are found as `rehearseTrigger` finds them (the probe run, `switchesOf`, `casesFor`; the
-discovery is factored into `switchesReached(load, trigger, seed)` in `rehearse.ts` and shared), the case whose
+discovery is factored into `switchesReached(load, trigger, seed, profile?)` in `rehearse-reached.ts` and shared), the case whose
 `branch.to` and rule text match the scenario's `branch` is read, and the replay is `same` when it is still unsolved or
 unsteerable and `DIFF branch '<when>' → <to> is reachable now` when it is not. `diffOf` compares `expect.reason` to
 `refusalOf(report)?.reason` and says `reason <was> → <now>`. When the scenario has a `branch` and the switch's
@@ -637,3 +637,22 @@ Decided during implementation:
   out is set in one generated whole under seed 1, so the input stays a value of its type. A file's name escapes each
   part as a URI component, so an enum member holding a `/` names a file and not a directory. `wilanis scenarios
   --check` prints what `rehearse --check` prints, then what `fuzz --edges --check` prints, and takes no other flag.
+- **What an unreachable branch is, and how `regress` solves it again (#220).** A branch is recorded unreachable when
+  its case is one the solver could not solve or steer -- what `uncoveredBy` in `packages/runtime/src/rehearse-reached.ts`
+  says, the sentence the report prints after `NEVER RUN` -- and never for a guard's switch, which no document holds,
+  or a branch held upstream, which no run was made for. `switchesReached` lives in `rehearse-reached.ts`, with the
+  steering that reaches a nested switch, rather than in `rehearse.ts`: `rehearse.ts` imports `record.ts`, which imports
+  `fuzz.ts`, so `regress` importing it there would be a cycle; and it takes the profile, since `regress` solves under
+  the profile it replays under. It answers the switches and what their cases are built from after the warm-up runs,
+  so the rehearsal and `regress` build every case from the same recording. `solvedAgain` in
+  `packages/runtime/src/rehearse-recorded.ts` reads the first switch the walk reaches with the branch's graph and id,
+  as the first run of a trigger keeps the file two runs name, and the case of it with the branch's rule text and
+  authored target. A scenario whose rule is no longer a case there, and one that says `unreachable` and names no
+  branch, replay as a `DIFF` (`branch '<when>' → <to> is no longer a case of '<node>' where this trigger reaches it`,
+  `unreachable names no branch to solve again`): there is nothing left to solve, and `same` would pin nothing. The test
+  reorders `list-rows` as `status >= 200` to `upstreamFailed` before `status == 200 && has(body)` to `customers` and
+  not as `example.test.ts` does: that one routes `status >= 200` to `customers` too, which `wilanis check` refuses
+  (G004, `customers` makes the body without a `has(body)` narrowing it), and a fixture the checker refuses proves
+  nothing. Routed apart, the covered branch keeps the name its file has in the tree as it was, so restoring the order
+  is `stale` under `--check`, as *A branch nothing reaches* has it; the solver's sentence for it is `no inputs satisfy
+  'status == 200 && has(body)'`, since the rule before it leaves `status < 200`, and not every input, uncovered.

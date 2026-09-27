@@ -49,8 +49,9 @@ function attachedPolicies(loaded: LoadResult): Set<string> {
 
 /**
  * How many files the rehearsal records, read off what it reported: every branch a trigger reached that ran without
- * breaking a node, once per trigger reaching it -- guards aside, since the compiler wrote their switch -- and one
- * whole run per trigger with no switch; a policy's decision once, however many kinds its root was walked under.
+ * breaking a node, or that no input reaches, once per trigger reaching it -- guards aside, since the compiler wrote
+ * their switch -- and one whole run per trigger with no switch; a policy's decision once, however many kinds its root
+ * was walked under.
  */
 function expectedFiles(loaded: LoadResult, rehearsal: Rehearsal): number {
   const triggers = new Set(loaded.registry.all('trigger').map(one => one.name));
@@ -61,7 +62,7 @@ function expectedFiles(loaded: LoadResult, rehearsal: Rehearsal): number {
   for (const decision of rehearsal.decisions) {
     if (decision.guard) continue;
     const ran = decision.branches.filter(
-      one => one.settled && !caught(loaded, decision.graph, decision.node, one.when),
+      one => (one.settled || one.uncovered) && !caught(loaded, decision.graph, decision.node, one.when),
     );
     count += ran.length * decision.triggers.filter(recorded).length;
   }
