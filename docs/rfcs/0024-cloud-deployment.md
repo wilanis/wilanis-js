@@ -1,6 +1,6 @@
 # RFC 0024: Deployment: one plan, a Compose file and a Helm chart
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:core` (one additive key on `port.schema.json`, one on `connection-kind.schema.json`;
   `Operation` and `ConnectionKindDoc`), `area:compiler` (two rules in `check/contracts.ts`, and the first
   judgement of a connection kind document), `area:runtime` (three fields on RFC 0026's manifest and the one
@@ -832,3 +832,75 @@ plans.
 - The exact default image reference (`<name>:<package.json version>` here) and whether `-o` outside the tree
   should suppress the build context rewrite.
 - Whether `charts/wilanis-tree` is published to an OCI registry at 1.0, and under which name.
+
+## Decided during implementation
+
+- `wilanis new project` scaffolds no `host`. No step wrote one, so a new tree binds every interface as every tree
+  did before this RFC, and whether a new tree should start on loopback stays the maintainer's decision about
+  defaults; nothing here forecloses it.
+- The plan did not grow `volumes`. RFC 0005 was implemented before this RFC's third step, and every workload is
+  still planned at `replicas: 1`. What keeps a profile off the instance's disk is the chart's read-only root, which
+  refuses a write inside the tree at the first one rather than losing it at the next restart (#749). A rule refusing
+  `replicas > 1` for a profile that reaches a file store stays unwritten, since the plan still detects no disk state.
+- The default image reference is `<project.json name>:<package.json version>`, and `<name>:latest` where the tree's
+  `package.json` has no version (#741). `-o` outside the tree is refused: `compose.yaml` names the build context
+  relative to where it sits, and from outside the tree that path runs through a directory the plan cannot name. An
+  `-o` inside the tree moves `image.dockerfile` with it (#748).
+- `charts/wilanis-tree` is not published to a registry. Whether it is at 1.0, and under which name, is still open.
+- Step 1 landed the three rules as L014 (`listens` without `holds`), L015 (a `listens` input the operation does not
+  accept, or not of the part's type) and C020 (an `endpoint` naming no string setting of its kind), and
+  `checkConnectionKind` runs in its own loop in `judgeContracts` (#658). A fourth, L017 in `check/listen-settings.ts`,
+  holds a part's `setting` to a setting of that type the granting plugin declares: a misspelt one had passed `check`
+  and been planned on the default without a word (#735).
+- `listensOf` lives in `manifest-listens.ts`, exported beside `manifestOf`. The order places are taken in, and the
+  dotted path into a connection's settings, live once in `address-said.ts`, which `describe`, the manifest and the
+  viewer's port and connection pages read (#729, #727). A port of `0` answers `null`, since it asks the system for
+  any port; an empty host answers `null`, since `serve.ts` binds every interface for `""`; a `{{secrets.*}}` port on
+  the step answers `null` even where the settings write a number, because the handler takes the step's value first
+  (#729).
+- The deploy-time refusals carry no code and so no page: they are what `wilanis-deploy` verifies, as a missing
+  variable is what `start` verifies, and no refusal family has a home in `packages/deploy/src`. `refusalsOf` throws
+  every refusal of every profile asked for at once, each a message and a `→` hint. The port refusal names the step
+  and the granting plugin's settings and points at `wilanis describe`, since the manifest does not say which key
+  `listens.port` reads. The package depends on `@wilanis/compiler` too, for `checkTree`; the unnamed profile is
+  asked for with `--profile ''`, the root defaults to `.`, and the plan leaves out `permits`, which no target
+  renders (#741).
+- The ignore file is `deploy/Dockerfile.dockerignore`, the name BuildKit reads beside a Dockerfile: the build
+  context is the tree's root, where a `.dockerignore` inside `deploy/` is read by nothing. The Dockerfile adds
+  `ENV PATH=/app/node_modules/.bin:$PATH`, without which the container cannot find `wilanis`. `.env.example` puts
+  each comment on its own line, since `docker run --env-file` reads an inline comment as the value. `compose.yaml`
+  double-quotes every string and names its project after the tree, and a workload that listens on nothing gets
+  neither `ports` nor a healthcheck. The header's second line is the command that renders the file again, naming
+  `--target` and `-o` only where they are not the defaults; `--check` names each file with its first line that
+  differs; stdout carries the plan alone. The loopback refusal is `unreachableOf` in `reachable.ts`, which `compose`
+  and `helm` both ask. Two workloads on one port would both publish it in one Compose file, and nothing refuses that
+  yet (#748).
+- The chart makes a Service only for a workload that listens, its ports named `tcp-<port>`, with a nodePort per
+  profile and port under `service.nodePorts`, and runs the pod as uid 1000, the base image's `node` user by number.
+  `postgresql.variables` names the variables the CloudNativePG cluster answers, each read from the `uri` of the
+  Secret its operator writes, `<name>-postgresql-app`, so no database password is in a file. The `Cluster` renders
+  only once the cluster serves its type, so a first install needs a second pass as `helm upgrade` once the operator
+  is ready, and `NOTES.txt` says so. Nothing inside the tree is writable: a profile that keeps `@auth`'s records as
+  files under `.wilanis/auth` must bind `@auth/state.port.json` to a store, as the example's `production` does, and
+  `.wilanis` gets no volume, since an `emptyDir` there would drop a session at the pod's next restart (#749).
+- The example has no `package-lock.json`, which the generated Dockerfile copies, and cannot have one that builds:
+  it is installed through the workspace and its packages are not on npm. The Dockerfile is right for a tree
+  installed from npm and stays as the renderer writes it. `scripts/cluster.sh` builds from a staging copy of the
+  tree instead, whose `package.json` names each packed tarball by URL and whose lockfile the base image's own npm
+  writes, against the tarballs served from a container on docker's default network; `npm ci` in the unchanged
+  Dockerfile then installs exactly what `npm pack` wrote. It packs the tree's closure in the workspace, 17 tarballs
+  (the viewer and the deploy tool are not in the image), and stages the tree as git holds it, uncommitted edits
+  included and whatever `.gitignore` leaves out left out (#323).
+- `GET /customers` is for a signed-in caller, so the smoke check signs in first: the operator whose hash
+  `values-local.yaml` writes signs in at `POST /api/v1/auth-employees`, and `GET /customers` answers 200 with the
+  token, through localhost's 8080 and the node's 30080. It is `scripts/cluster.sh smoke`, which `up` runs last, so a
+  person checks what CI checks. `up` refuses `deploy/` files `--check` finds stale, waits for the operator between
+  step 5's two passes, and restarts the Deployment when the release was already there, since the image keeps its
+  tag. The host port binds 127.0.0.1 alone, helm's repository list is kept in the staging directory, and every
+  kubectl and helm call names the `kind-wilanis` context (#323).
+- The `cluster` workflow runs on a push to `main` or a pull request that changes `charts/`, `scripts/cluster.sh`,
+  `packages/deploy/` or the workflow itself, and on dispatch. No branch rule requires it, and ci's `test` job keeps
+  `--check`. It pins helm as ci.yml does and kind and kubectl beside it, runs shellcheck on the script, lints and
+  renders the chart on the example's values, then runs `up` and `down` (#323).
+- The *Guide*'s output is the example at acceptance. The example now listens on 8099, `production` reads three
+  variables and requires no host, and `pack:` counts 17 tarballs.
