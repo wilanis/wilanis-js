@@ -57,7 +57,7 @@ function kindLines(doc: Loaded, showType: (spec: unknown) => string): string[] {
     for (const [name, field] of Object.entries(declared.settings.fields)) lines.push(fieldLine(name, field, showType));
   }
   if ('context' in declared) {
-    lines.push('context (request.*):');
+    lines.push('context:');
     for (const [name, field] of Object.entries(declared.context.fields)) lines.push(fieldLine(name, field, showType));
   }
   if (declared.refusals)
@@ -86,7 +86,7 @@ function guardLines(declared: TriggerKindDoc, showType: (spec: unknown) => strin
     }
   ).guard;
   if (!guard) return [];
-  const lines = ['guard: identifies callers before any policy runs', '  adds to request.*:'];
+  const lines = ['guard: identifies callers before any policy runs', '  adds to context:'];
   for (const [name, field] of Object.entries(guard.context.fields)) lines.push(fieldLine(name, field, showType));
   for (const [reason, why] of Object.entries(guard.refuses ?? {})) lines.push(`  refuses '${reason}': ${why}`);
   lines.push('  takes, where one trigger attaches one policy ("in"):');
@@ -133,8 +133,8 @@ function triggerLines(doc: Loaded, scope: Scope): string[] {
     ...limitLines(doc as Loaded<TriggerDoc>, scope),
     ...receivingLines(doc as Loaded<TriggerDoc>, scope),
     ...crossesLines(declared),
-    ...fireLines(declared),
-    ...gatedLines(declared),
+    ...fireLines(declared, scope),
+    ...gatedLines(declared, scope),
     ...viewLines(doc as Loaded<TriggerDoc>, scope),
     ...holdsLines(doc as Loaded<TriggerDoc>, scope),
   ];
@@ -170,23 +170,34 @@ function crossesLines(declared: TriggerDoc): string[] {
   return [...(declared.in ? [`takes   ${declared.in}`] : []), ...(declared.out ? [`answers ${declared.out}`] : [])];
 }
 
-/** The domain operation this trigger fires, and where each of its inputs is read from. */
-function fireLines(declared: TriggerDoc): string[] {
+/** The domain operation this trigger fires, where each of its inputs is read from, and who hands what they read. */
+function fireLines(declared: TriggerDoc, scope: Scope): string[] {
   const reads = Object.entries(declared.fire.in ?? {});
   return [
     `fires   ${declared.fire.run}`,
     ...reads.map(([name, read]) => `    ${name} ← ${typeof read === 'string' ? read : JSON.stringify(read)}`),
+    ...handedLines(declared.kind, reads, '    ', scope),
   ];
 }
 
-/** The policies gating this trigger, in order, and the credentials each attachment gives the guard. */
-function gatedLines(declared: TriggerDoc): string[] {
+/** The policies gating this trigger, in order, the credentials each attachment gives the guard, and who hands them. */
+function gatedLines(declared: TriggerDoc, scope: Scope): string[] {
   if (!declared.policies?.length) return [];
-  const lines = [`policies, in order: ${declared.policies.map(policyPath).join(', ')}`];
-  for (const use of declared.policies)
-    for (const [name, read] of Object.entries((typeof use === 'string' ? undefined : use.in) ?? {}))
-      lines.push(`  gives the guard '${name}' read from ${JSON.stringify(read)}`);
-  return lines;
+  const given = declared.policies.flatMap(use => Object.entries((typeof use === 'string' ? undefined : use.in) ?? {}));
+  return [
+    `policies, in order: ${declared.policies.map(policyPath).join(', ')}`,
+    ...given.map(([name, read]) => `  gives the guard '${name}' read from ${JSON.stringify(read)}`),
+    ...handedLines(declared.kind, given, '  ', scope),
+  ];
+}
+
+/**
+ * The kind that hands the context the reads above read, said once where any of them is rooted at it (RFC 0034):
+ * `{{context.params.id}}` is `context.fields.params` in that kind, and a reader of the trigger is told where to look.
+ */
+function handedLines(kind: string, reads: [string, unknown][], indent: string, scope: Scope): string[] {
+  const readsContext = reads.some(([, read]) => scope.templateReads(read).some(([root]) => root === 'context'));
+  return readsContext ? [`${indent}context is what ${kind} hands  → wilanis describe ${kind}`] : [];
 }
 
 /** Whether a setting's value has parts of its own worth their own lines, rather than fitting on one. */
