@@ -110,19 +110,26 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
   invariant's guard, a graph that takes its input whole, a nested run, a node seeded in a replay), in a trigger's
   context where its kind marks it (an http request's headers and cookies, a queue message's headers)
   and in every input filled from such a field, in a policy's decision, and in what the schedule log and
-  `wilanis fuzz` record of a run's answer; its bounds are that a secret read into a type that does not mark it
-  (a `@std/object.port.json#make` typed `string` of `{{in.password}}`) is shown in clear from that node on, and
-  wherever an answer so typed is recorded, and that a call of a graph seeded through the engine API, as a replay
-  seeds one, is shown by the marks of its operation's `returns` alone, because a seeded call runs no nested run
-  to carry the marks of the node that answers the graph. (`packages/engine/src/redact.ts`, applied in
-  `packages/engine/src/run.ts` and `packages/engine/src/map.ts`; `redactOf` in
+  `wilanis fuzz` record of a run's answer; a value made from a marked read carries the mark whatever type it is
+  read into, so text that interpolates one (`Bearer {{in.token}}`) is `«secret»` whole, and a node's answer is
+  `«secret»` wherever it holds a value the node read as `«secret»` (a `@std/object.port.json#make` typed
+  `string` of `{{in.password}}`), in its own report and in every read of it; nothing a handler later does to a
+  value puts anything at a marked position of a report; its bounds are that an operation that turns a secret
+  into another value (a `@std/text.port.json#join` or `#fill` of it) answers something its node never read, so
+  its answer is shown by the operation's own marks alone, that the schedule log and `wilanis fuzz` redact a run's
+  answer by the marks of the trigger's `out` type alone, so an answer carrying a secret its `out` type does not
+  mark is recorded in clear, and that a node seeded through the engine API, as a replay seeds one, carries the
+  marks of what it reads only where that was seeded too, and as a call of a graph runs no nested run to carry a
+  mark only the graph's own nodes make. (`packages/engine/src/redact.ts`, applied in
+  `packages/engine/src/run.ts`, `packages/engine/src/map.ts` and `packages/engine/src/seeds.ts`; `redactOf` in
   `packages/compiler/src/guard-lowering.ts`; `shownRoots` in `packages/runtime/src/shown.ts`;
   `packages/plugin-schedule/src/fire.ts`, `packages/runtime/src/fuzz.ts`; `secretPaths` and `SECRET_DEPTH` in
   `packages/core/src/secret.ts`; before the RFCs)
 - A `{{secrets.*}}` read is substituted into plugin settings, connection settings and a startup step's `in`, and
-  nowhere else; settings reach no report, and a step's `in` is redacted where its operation marks the field
-  `secret`. (`Secrets` in `packages/compiler/src/env.ts`; `Embedder.startup` in `packages/runtime/src/embed.ts`;
-  before the RFCs)
+  nowhere else; settings reach no report, and a step's `in` is `«secret»` in its reports wherever it reads a
+  secret, whole or inside text, or its operation marks the field `secret`. (`Secrets` in
+  `packages/compiler/src/env.ts`; `Embedder.startup` in `packages/runtime/src/embed.ts`, `shownStep` in
+  `packages/runtime/src/shown.ts`; before the RFCs)
 - A blob's bytes live once, in the store; a graph carries a handle, a handle opens a blob of the store and never
   a path a caller wrote, and nothing reads a blob whole. (`packages/runtime/src/blobs.ts`,
   `packages/plugin-s3/src/store.ts`; `fitness/a-blob-is-never-read-whole.fitness.ts`; before the RFCs)
