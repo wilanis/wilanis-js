@@ -1,0 +1,124 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
+  "description": "remove-queued: delete-row 'outcome' when status == 200 && has(body) routes to customer, which answers. Written by wilanis rehearse --record; regenerate it, do not edit it.",
+  "generated": "rehearse",
+  "trigger": "@features/customers/edge/remove-queued.trigger.json",
+  "branch": {
+    "graph": "@features/customers/data/delete-row.graph.json",
+    "node": "outcome",
+    "when": "status == 200 && has(body)",
+    "to": "customer"
+  },
+  "seed": 1,
+  "in": {
+    "id": "golf"
+  },
+  "context": {
+    "id": "juliet527",
+    "attempt": 963,
+    "queue": "echo",
+    "headers": {},
+    "message": {
+      "id": "golf"
+    },
+    "principal": {
+      "subject": "hotel403",
+      "realm": "delta489",
+      "roles": [],
+      "claims": {}
+    },
+    "challenge": {
+      "id": "charlie427",
+      "method": "india",
+      "verified": true
+    }
+  },
+  "stubs": {
+    "op.deleted": {
+      "status": 200,
+      "headers": {
+        "extra7": "lima"
+      },
+      "body": {
+        "id": "juliet527",
+        "name": "Zulu-9",
+        "email": "echo",
+        "tier": "kilo",
+        "registrar": "hotel403",
+        "note": "charlie",
+        "createdAt": "foxtrot",
+        "extra2": "golf"
+      }
+    }
+  },
+  "expect": {
+    "status": "done",
+    "output": {
+      "id": "juliet527",
+      "name": "Zulu-9",
+      "email": "echo",
+      "tier": "kilo"
+    },
+    "nodes": {
+      "op": {
+        "status": "done",
+        "handler": "graph:@features/customers/data/delete-row.graph.json",
+        "out": {
+          "id": "juliet527",
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo",
+          "registrar": "hotel403",
+          "note": "charlie",
+          "createdAt": "foxtrot",
+          "extra2": "golf"
+        }
+      },
+      "op.deleted": {
+        "status": "done",
+        "handler": "@http/http.port.json#request",
+        "out": {
+          "status": 200,
+          "headers": {
+            "extra7": "lima"
+          },
+          "body": {
+            "id": "juliet527",
+            "name": "Zulu-9",
+            "email": "echo",
+            "tier": "kilo",
+            "registrar": "hotel403",
+            "note": "charlie",
+            "createdAt": "foxtrot",
+            "extra2": "golf"
+          }
+        }
+      },
+      "op.outcome": {
+        "status": "done",
+        "selected": "customer",
+        "out": "customer"
+      },
+      "op.customer": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "id": "juliet527",
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo",
+          "registrar": "hotel403",
+          "note": "charlie",
+          "createdAt": "foxtrot",
+          "extra2": "golf"
+        }
+      },
+      "op.noCustomer": {
+        "status": "cancelled"
+      },
+      "op.upstreamFailed": {
+        "status": "cancelled"
+      }
+    }
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
+  "description": "get-customer under seed 1 with id one: failed. Written by wilanis fuzz --edges; regenerate it, do not edit it.",
+  "generated": "edges",
+  "trigger": "@features/customers/edge/get-customer.trigger.json",
+  "seed": 1,
+  "in": {
+    "id": "x"
+  },
+  "context": {
+    "method": "juliet527",
+    "path": "Zulu-9",
+    "headers": {
+      "extra6": "kilo"
+    },
+    "cookies": {},
+    "query": {},
+    "params": {
+      "id": "hotel403"
+    },
+    "body": 200,
+    "principal": {
+      "subject": "foxtrot",
+      "realm": "echo42",
+      "roles": [
+        "india"
+      ],
+      "claims": {
+        "extra2": "x"
+      }
+    }
+  },
+  "stubs": {
+    "op.fetched": {
+      "status": 500,
+      "headers": {
+        "extra7": "charlie87"
+      },
+      "body": {
+        "id": "india",
+        "name": "",
+        "email": "hotel",
+        "tier": "lima",
+        "active": true,
+        "registrar": "bravo",
+        "note": "india",
+        "extra8": [
+          "lima",
+          "Zulu-9"
+        ]
+      }
+    }
+  },
+  "expect": {
+    "status": "failed",
+    "reason": "upstream",
+    "nodes": {
+      "op": {
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "graph:@features/customers/data/get-row.graph.json"
+      },
+      "op.fetched": {
+        "status": "done",
+        "handler": "@http/http.port.json#request",
+        "out": {
+          "status": 500,
+          "headers": {
+            "extra7": "charlie87"
+          },
+          "body": {
+            "id": "india",
+            "name": "",
+            "email": "hotel",
+            "tier": "lima",
+            "active": true,
+            "registrar": "bravo",
+            "note": "india",
+            "extra8": [
+              "lima",
+              "Zulu-9"
+            ]
+          }
+        }
+      },
+      "op.outcome": {
+        "status": "done",
+        "selected": "upstreamFailed",
+        "out": "upstreamFailed"
+      },
+      "op.customer": {
+        "status": "cancelled"
+      },
+      "op.noCustomer": {
+        "status": "cancelled"
+      },
+      "op.upstreamFailed": {
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "@std/outcome.port.json#refuse"
+      },
+      "op.unreachable": {
+        "status": "cancelled"
+      }
+    }
+  }
+}

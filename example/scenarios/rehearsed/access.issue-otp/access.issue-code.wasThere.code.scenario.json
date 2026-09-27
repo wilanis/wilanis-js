@@ -1,0 +1,91 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
+  "description": "issue-otp: issue-code 'wasThere' when issued == true && has(id) && has(code) && has(expiresAt) routes to code, which answers. Written by wilanis rehearse --record; regenerate it, do not edit it.",
+  "generated": "rehearse",
+  "trigger": "@features/access/edge/issue-otp.trigger.json",
+  "branch": {
+    "graph": "@features/access/data/issue-code.graph.json",
+    "node": "wasThere",
+    "when": "issued == true && has(id) && has(code) && has(expiresAt)",
+    "to": "code"
+  },
+  "seed": 1,
+  "in": {
+    "id": "delta"
+  },
+  "context": {
+    "flags": {},
+    "args": [],
+    "cwd": "hotel",
+    "file": {
+      "id": "blob-6515",
+      "contentType": "application/octet-stream",
+      "size": 27905
+    },
+    "principal": {
+      "subject": "hotel403",
+      "realm": "delta489",
+      "roles": [],
+      "claims": {}
+    },
+    "challenge": {
+      "id": "charlie427",
+      "method": "india",
+      "verified": true
+    }
+  },
+  "stubs": {
+    "op.issued": {
+      "issued": true,
+      "code": "echo",
+      "expiresAt": "foxtrot",
+      "id": "juliet527"
+    }
+  },
+  "expect": {
+    "status": "done",
+    "output": {
+      "id": "juliet527",
+      "code": "«secret»",
+      "expiresAt": "foxtrot"
+    },
+    "nodes": {
+      "op": {
+        "status": "done",
+        "handler": "graph:@features/access/data/issue-code.graph.json",
+        "out": {
+          "id": "juliet527",
+          "code": "«secret»",
+          "expiresAt": "foxtrot"
+        }
+      },
+      "op.issued": {
+        "status": "done",
+        "handler": "@auth/challenge.port.json#issue",
+        "out": {
+          "issued": true,
+          "code": "«secret»",
+          "expiresAt": "foxtrot",
+          "id": "juliet527"
+        }
+      },
+      "op.wasThere": {
+        "status": "done",
+        "selected": "code",
+        "out": "code"
+      },
+      "op.code": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "id": "juliet527",
+          "code": "«secret»",
+          "expiresAt": "foxtrot"
+        }
+      },
+      "op.unknown": {
+        "status": "cancelled"
+      }
+    }
+  }
+}

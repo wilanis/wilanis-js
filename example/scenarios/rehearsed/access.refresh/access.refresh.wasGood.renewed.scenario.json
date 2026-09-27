@@ -1,0 +1,106 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
+  "description": "refresh: refresh 'wasGood' when refreshed == true && has(tokens) routes to renewed, which answers. Written by wilanis rehearse --record; regenerate it, do not edit it.",
+  "generated": "rehearse",
+  "trigger": "@features/access/edge/refresh.trigger.json",
+  "branch": {
+    "graph": "@features/access/domain/refresh.graph.json",
+    "node": "wasGood",
+    "when": "refreshed == true && has(tokens)",
+    "to": "renewed"
+  },
+  "seed": 1,
+  "in": {
+    "refreshToken": "hotel403"
+  },
+  "context": {
+    "method": "juliet527",
+    "path": "Zulu-9",
+    "headers": {
+      "extra6": "kilo"
+    },
+    "cookies": {},
+    "query": {},
+    "params": {},
+    "body": {
+      "refreshToken": "hotel403"
+    },
+    "principal": {
+      "subject": "charlie",
+      "realm": "bravo",
+      "roles": [
+        "echo42",
+        "golf",
+        "lima205"
+      ],
+      "claims": {}
+    }
+  },
+  "stubs": {
+    "op.traded": {
+      "refreshed": true,
+      "tokens": {
+        "accessToken": "hotel",
+        "refreshToken": "Zulu-9612",
+        "tokenType": "kilo",
+        "expiresIn": 200,
+        "sessionId": "hotel403"
+      }
+    }
+  },
+  "expect": {
+    "status": "done",
+    "output": {
+      "accessToken": "«secret»",
+      "refreshToken": "«secret»",
+      "tokenType": "kilo",
+      "expiresIn": 200
+    },
+    "nodes": {
+      "op": {
+        "status": "done",
+        "handler": "graph:@features/access/domain/refresh.graph.json",
+        "out": {
+          "accessToken": "«secret»",
+          "refreshToken": "«secret»",
+          "tokenType": "kilo",
+          "expiresIn": 200,
+          "sessionId": "«secret»"
+        }
+      },
+      "op.traded": {
+        "status": "done",
+        "handler": "@features/directories/data/identity.binding.json#refresh",
+        "out": {
+          "refreshed": true,
+          "tokens": {
+            "accessToken": "«secret»",
+            "refreshToken": "«secret»",
+            "tokenType": "kilo",
+            "expiresIn": 200,
+            "sessionId": "«secret»"
+          }
+        }
+      },
+      "op.wasGood": {
+        "status": "done",
+        "selected": "renewed",
+        "out": "renewed"
+      },
+      "op.renewed": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "accessToken": "«secret»",
+          "refreshToken": "«secret»",
+          "tokenType": "kilo",
+          "expiresIn": 200,
+          "sessionId": "«secret»"
+        }
+      },
+      "op.invalid": {
+        "status": "cancelled"
+      }
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
+  "description": "remove-queued: delete-row 'outcome' otherwise routes to upstreamFailed, which refuses as upstream. Written by wilanis rehearse --record; regenerate it, do not edit it.",
+  "generated": "rehearse",
+  "trigger": "@features/customers/edge/remove-queued.trigger.json",
+  "branch": {
+    "graph": "@features/customers/data/delete-row.graph.json",
+    "node": "outcome",
+    "when": "else",
+    "to": "upstreamFailed"
+  },
+  "seed": 1,
+  "in": {
+    "id": "golf"
+  },
+  "context": {
+    "id": "juliet527",
+    "attempt": 963,
+    "queue": "echo",
+    "headers": {},
+    "message": {
+      "id": "golf"
+    },
+    "principal": {
+      "subject": "hotel403",
+      "realm": "delta489",
+      "roles": [],
+      "claims": {}
+    },
+    "challenge": {
+      "id": "charlie427",
+      "method": "india",
+      "verified": true
+    }
+  },
+  "stubs": {
+    "op.deleted": {
+      "status": 500,
+      "headers": {
+        "extra7": "lima"
+      }
+    }
+  },
+  "expect": {
+    "status": "failed",
+    "reason": "upstream",
+    "nodes": {
+      "op": {
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "graph:@features/customers/data/delete-row.graph.json"
+      },
+      "op.deleted": {
+        "status": "done",
+        "handler": "@http/http.port.json#request",
+        "out": {
+          "status": 500,
+          "headers": {
+            "extra7": "lima"
+          }
+        }
+      },
+      "op.outcome": {
+        "status": "done",
+        "selected": "upstreamFailed",
+        "out": "upstreamFailed"
+      },
+      "op.customer": {
+        "status": "cancelled"
+      },
+      "op.noCustomer": {
+        "status": "cancelled"
+      },
+      "op.upstreamFailed": {
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "@std/outcome.port.json#refuse"
+      }
+    }
+  }
+}

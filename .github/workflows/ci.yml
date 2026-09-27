@@ -150,6 +150,12 @@ jobs:
         env:
           CUSTOMERS_JWT_SECRET: ci-only-not-a-secret
           CUSTOMERS_DATABASE_URL: postgres://postgres:wilanis@127.0.0.1:5432/customers
+      # example/scenarios/rehearsed/ and example/scenarios/edges/ are what rehearse --record and fuzz --edges write,
+      # checked in (RFC 0018). --check writes nothing, and fails when a file there has gone stale against the tree or
+      # the rehearsal itself fails; it solves under the default profile alone, so no profile is named here.
+      - name: the example's scenarios are what the tree writes
+        if: steps.reads.outputs.skip != 'true'
+        run: npx wilanis scenarios example --check
       # example/deploy/ is what wilanis-deploy writes for production, checked in (RFC 0024). --check writes nothing
       # and fails when a file there has gone stale against the tree; it needs no container runtime and no cluster.
       - name: the example's deployment files are what the tree renders

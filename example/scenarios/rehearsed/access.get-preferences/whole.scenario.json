@@ -1,0 +1,61 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
+  "description": "get-preferences: no switch under it, so one run is the whole of it, and it answers. Written by wilanis rehearse --record; regenerate it, do not edit it.",
+  "generated": "rehearse",
+  "trigger": "@features/access/edge/get-preferences.trigger.json",
+  "seed": 1,
+  "context": {
+    "method": "juliet527",
+    "path": "Zulu-9",
+    "headers": {
+      "extra6": "kilo"
+    },
+    "cookies": {},
+    "query": {},
+    "params": {},
+    "body": true,
+    "principal": {
+      "subject": "delta489",
+      "realm": "bravo",
+      "roles": [
+        "echo42",
+        "golf",
+        "lima205"
+      ],
+      "claims": {}
+    }
+  },
+  "stubs": {
+    "op.attributes": {
+      "displayName": "Zulu-9",
+      "realm": "hotel",
+      "tenant": "juliet"
+    }
+  },
+  "expect": {
+    "status": "done",
+    "output": {
+      "displayName": "Zulu-9"
+    },
+    "nodes": {
+      "op": {
+        "status": "done",
+        "handler": "graph:@features/access/data/read-session.graph.json",
+        "out": {
+          "displayName": "Zulu-9",
+          "realm": "hotel",
+          "tenant": "juliet"
+        }
+      },
+      "op.attributes": {
+        "status": "done",
+        "handler": "@auth/session.port.json#get",
+        "out": {
+          "displayName": "Zulu-9",
+          "realm": "hotel",
+          "tenant": "juliet"
+        }
+      }
+    }
+  }
+}

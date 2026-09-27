@@ -1,0 +1,126 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
+  "description": "import-customers: create-row 'outcome' otherwise routes to upstreamFailed, which refuses as upstream. Written by wilanis rehearse --record; regenerate it, do not edit it.",
+  "generated": "rehearse",
+  "trigger": "@features/customers/edge/import-customers.trigger.json",
+  "branch": {
+    "graph": "@features/customers/data/create-row.graph.json",
+    "node": "outcome",
+    "when": "else",
+    "to": "upstreamFailed"
+  },
+  "seed": 1,
+  "in": {
+    "file": {
+      "id": "blob-4633",
+      "contentType": "text/csv",
+      "size": 10125,
+      "filename": "golf.csv"
+    }
+  },
+  "context": {
+    "method": "juliet527",
+    "path": "Zulu-9",
+    "headers": {
+      "extra6": "kilo"
+    },
+    "cookies": {},
+    "query": {},
+    "params": {},
+    "body": {
+      "id": "blob-4633",
+      "contentType": "text/csv",
+      "size": 10125,
+      "filename": "golf.csv"
+    },
+    "principal": {
+      "subject": "foxtrot",
+      "realm": "echo42",
+      "roles": [
+        "india"
+      ],
+      "claims": {
+        "extra2": "x"
+      }
+    }
+  },
+  "stubs": {
+    "op.drafts": [
+      {
+        "name": "alpha",
+        "email": "Zulu-9",
+        "tier": "bronze"
+      },
+      {
+        "name": "juliet",
+        "email": "golf",
+        "tier": "silver"
+      }
+    ],
+    "op.recorded.op.recorded.0.op.customer:made": {
+      "id": "juliet527",
+      "name": "Zulu-9",
+      "email": "echo",
+      "tier": "kilo",
+      "active": true,
+      "note": "golf154"
+    },
+    "op.recorded.op.recorded.0.op.registered.op.posted": {
+      "status": 500,
+      "headers": {}
+    },
+    "op.recorded.op.recorded.1.op.registered.op.posted": {
+      "status": 42,
+      "headers": {},
+      "body": {
+        "id": "charlie",
+        "name": "Zulu-9247",
+        "email": "lima",
+        "tier": "alpha",
+        "active": true
+      }
+    }
+  },
+  "expect": {
+    "status": "failed",
+    "reason": "upstream",
+    "nodes": {
+      "op": {
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "graph:@features/customers/domain/import-customers.graph.json"
+      },
+      "op.drafts": {
+        "status": "done",
+        "handler": "@features/customers/data/customers-rest.binding.json#parseDrafts",
+        "out": [
+          {
+            "name": "alpha",
+            "email": "Zulu-9",
+            "tier": "bronze"
+          },
+          {
+            "name": "juliet",
+            "email": "golf",
+            "tier": "silver"
+          }
+        ]
+      },
+      "op.recorded": {
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "@features/customers/data/customers-rest.binding.json#registerAll"
+      },
+      "op.recorded.op": {
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "graph:@features/customers/domain/register-each.graph.json"
+      },
+      "op.recorded.op.recorded": {
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "@features/customers/data/customers-rest.binding.json#submit"
+      }
+    }
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
+  "description": "auth-customers: sign-in-customer 'verdict' otherwise routes to unavailable, which refuses as directory_unavailable. Written by wilanis rehearse --record; regenerate it, do not edit it.",
+  "generated": "rehearse",
+  "trigger": "@features/access/edge/auth-customers.trigger.json",
+  "branch": {
+    "graph": "@features/access/domain/sign-in-customer.graph.json",
+    "node": "verdict",
+    "when": "else",
+    "to": "unavailable"
+  },
+  "seed": 1,
+  "in": {
+    "username": "hotel403",
+    "password": "delta489"
+  },
+  "context": {
+    "method": "juliet527",
+    "path": "Zulu-9",
+    "headers": {
+      "extra6": "kilo"
+    },
+    "cookies": {},
+    "query": {},
+    "params": {},
+    "body": {
+      "username": "hotel403",
+      "password": "delta489"
+    },
+    "principal": {
+      "subject": "foxtrot",
+      "realm": "echo42",
+      "roles": [
+        "india"
+      ],
+      "claims": {
+        "extra2": "x"
+      }
+    }
+  },
+  "stubs": {
+    "op.checked": {
+      "status": "",
+      "identity": {
+        "subject": "hotel",
+        "name": "Zulu-9612",
+        "groups": [
+          "golf",
+          "golf"
+        ],
+        "attributes": {
+          "tenant": "golf154"
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "failed",
+    "reason": "directory_unavailable",
+    "nodes": {
+      "op": {
+        "status": "failed",
+        "reason": "directory_unavailable",
+        "handler": "graph:@features/access/domain/sign-in-customer.graph.json"
+      },
+      "op.checked": {
+        "status": "done",
+        "handler": "@features/access-dev/data/identity.binding.json#verifyCustomer",
+        "out": {
+          "status": "",
+          "identity": {
+            "subject": "hotel",
+            "name": "Zulu-9612",
+            "groups": [
+              "golf",
+              "golf"
+            ],
+            "attributes": {
+              "tenant": "golf154"
+            }
+          }
+        }
+      },
+      "op.verdict": {
+        "status": "done",
+        "selected": "unavailable",
+        "out": "unavailable"
+      },
+      "op.issued": {
+        "status": "cancelled"
+      },
+      "op.rejected": {
+        "status": "cancelled"
+      },
+      "op.unavailable": {
+        "status": "failed",
+        "reason": "directory_unavailable",
+        "handler": "@std/outcome.port.json#refuse"
+      }
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
+  "description": "delete-customer: delete-row 'outcome' otherwise routes to upstreamFailed, which refuses as upstream. Written by wilanis rehearse --record; regenerate it, do not edit it.",
+  "generated": "rehearse",
+  "trigger": "@features/customers/edge/delete-customer.trigger.json",
+  "branch": {
+    "graph": "@features/customers/data/delete-row.graph.json",
+    "node": "outcome",
+    "when": "else",
+    "to": "upstreamFailed"
+  },
+  "seed": 1,
+  "in": {
+    "id": "hotel403"
+  },
+  "context": {
+    "method": "juliet527",
+    "path": "Zulu-9",
+    "headers": {
+      "extra6": "kilo"
+    },
+    "cookies": {},
+    "query": {},
+    "params": {
+      "id": "hotel403"
+    },
+    "body": 200,
+    "principal": {
+      "subject": "foxtrot",
+      "realm": "echo42",
+      "roles": [
+        "india"
+      ],
+      "claims": {
+        "extra2": "x"
+      }
+    }
+  },
+  "stubs": {
+    "op.deleted": {
+      "status": 500,
+      "headers": {
+        "extra7": "lima"
+      }
+    }
+  },
+  "expect": {
+    "status": "failed",
+    "reason": "upstream",
+    "nodes": {
+      "op": {
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "graph:@features/customers/data/delete-row.graph.json"
+      },
+      "op.deleted": {
+        "status": "done",
+        "handler": "@http/http.port.json#request",
+        "out": {
+          "status": 500,
+          "headers": {
+            "extra7": "lima"
+          }
+        }
+      },
+      "op.outcome": {
+        "status": "done",
+        "selected": "upstreamFailed",
+        "out": "upstreamFailed"
+      },
+      "op.customer": {
+        "status": "cancelled"
+      },
+      "op.noCustomer": {
+        "status": "cancelled"
+      },
+      "op.upstreamFailed": {
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "@std/outcome.port.json#refuse"
+      }
+    }
+  }
+}

@@ -1,0 +1,216 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
+  "description": "digest: list-rows 'outcome' when status == 200 && has(body) routes to customers, which answers. Written by wilanis rehearse --record; regenerate it, do not edit it.",
+  "generated": "rehearse",
+  "trigger": "@features/customers/edge/digest.trigger.json",
+  "branch": {
+    "graph": "@features/customers/data/list-rows.graph.json",
+    "node": "outcome",
+    "when": "status == 200 && has(body)",
+    "to": "customers"
+  },
+  "seed": 1,
+  "context": {
+    "flags": {},
+    "args": [],
+    "cwd": "hotel",
+    "file": {
+      "id": "blob-6515",
+      "contentType": "application/octet-stream",
+      "size": 27905
+    },
+    "principal": {
+      "subject": "hotel403",
+      "realm": "delta489",
+      "roles": [],
+      "claims": {}
+    },
+    "challenge": {
+      "id": "charlie427",
+      "method": "india",
+      "verified": true
+    }
+  },
+  "stubs": {
+    "op.all.op.fetched": {
+      "status": 200,
+      "headers": {},
+      "body": [
+        {
+          "id": "alpha",
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo",
+          "registrar": "hotel403",
+          "note": "charlie",
+          "createdAt": "foxtrot",
+          "extra2": "golf"
+        },
+        {
+          "id": "lima205",
+          "name": "juliet",
+          "email": "lima720",
+          "tier": "golf",
+          "registrar": "lima323",
+          "note": "delta726",
+          "extra3": "juliet"
+        }
+      ]
+    }
+  },
+  "expect": {
+    "status": "done",
+    "output": {
+      "count": 2,
+      "text": "- Zulu-9 <echo> kilo\n- juliet <lima720> golf"
+    },
+    "nodes": {
+      "op": {
+        "status": "done",
+        "handler": "graph:@features/customers/domain/digest.graph.json",
+        "out": {
+          "count": 2,
+          "text": "- Zulu-9 <echo> kilo\n- juliet <lima720> golf"
+        }
+      },
+      "op.all": {
+        "status": "done",
+        "handler": "@features/customers/data/customers-rest.binding.json#listEvery",
+        "out": [
+          {
+            "id": "alpha",
+            "name": "Zulu-9",
+            "email": "echo",
+            "tier": "kilo",
+            "registrar": "hotel403",
+            "note": "charlie",
+            "createdAt": "foxtrot",
+            "extra2": "golf"
+          },
+          {
+            "id": "lima205",
+            "name": "juliet",
+            "email": "lima720",
+            "tier": "golf",
+            "registrar": "lima323",
+            "note": "delta726",
+            "extra3": "juliet"
+          }
+        ]
+      },
+      "op.all.op": {
+        "status": "done",
+        "handler": "graph:@features/customers/data/list-rows.graph.json",
+        "out": [
+          {
+            "id": "alpha",
+            "name": "Zulu-9",
+            "email": "echo",
+            "tier": "kilo",
+            "registrar": "hotel403",
+            "note": "charlie",
+            "createdAt": "foxtrot",
+            "extra2": "golf"
+          },
+          {
+            "id": "lima205",
+            "name": "juliet",
+            "email": "lima720",
+            "tier": "golf",
+            "registrar": "lima323",
+            "note": "delta726",
+            "extra3": "juliet"
+          }
+        ]
+      },
+      "op.all.op.fetched": {
+        "status": "done",
+        "handler": "@http/http.port.json#request",
+        "out": {
+          "status": 200,
+          "headers": {},
+          "body": [
+            {
+              "id": "alpha",
+              "name": "Zulu-9",
+              "email": "echo",
+              "tier": "kilo",
+              "registrar": "hotel403",
+              "note": "charlie",
+              "createdAt": "foxtrot",
+              "extra2": "golf"
+            },
+            {
+              "id": "lima205",
+              "name": "juliet",
+              "email": "lima720",
+              "tier": "golf",
+              "registrar": "lima323",
+              "note": "delta726",
+              "extra3": "juliet"
+            }
+          ]
+        }
+      },
+      "op.all.op.outcome": {
+        "status": "done",
+        "selected": "customers",
+        "out": "customers"
+      },
+      "op.all.op.customers": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": [
+          {
+            "id": "alpha",
+            "name": "Zulu-9",
+            "email": "echo",
+            "tier": "kilo",
+            "registrar": "hotel403",
+            "note": "charlie",
+            "createdAt": "foxtrot",
+            "extra2": "golf"
+          },
+          {
+            "id": "lima205",
+            "name": "juliet",
+            "email": "lima720",
+            "tier": "golf",
+            "registrar": "lima323",
+            "note": "delta726",
+            "extra3": "juliet"
+          }
+        ]
+      },
+      "op.all.op.upstreamFailed": {
+        "status": "cancelled"
+      },
+      "op.lines": {
+        "status": "done",
+        "handler": "@std/text.port.json#fill",
+        "out": [
+          "- Zulu-9 <echo> kilo",
+          "- juliet <lima720> golf"
+        ]
+      },
+      "op.joined": {
+        "status": "done",
+        "handler": "@std/text.port.json#join",
+        "out": "- Zulu-9 <echo> kilo\n- juliet <lima720> golf"
+      },
+      "op.count": {
+        "status": "done",
+        "handler": "@std/list.port.json#count",
+        "out": 2
+      },
+      "op.digest": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "count": 2,
+          "text": "- Zulu-9 <echo> kilo\n- juliet <lima720> golf"
+        }
+      }
+    }
+  }
+}

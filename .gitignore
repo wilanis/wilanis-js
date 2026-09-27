@@ -7,6 +7,15 @@ coverage
 *.log
 .wilanis/
 scenarios/
+# but the directories rehearse --record and fuzz --edges write for the two trees here are committed (RFC 0018), so
+# a file a command adds shows in git status and goes into the commit with the rest
+!/example/scenarios/
+/example/scenarios/*
+!/example/scenarios/rehearsed/
+!/example/scenarios/edges/
+!/libraries/access/scenarios/
+/libraries/access/scenarios/*
+!/libraries/access/scenarios/rehearsed/
 _site
 # written by node docs/demo/build.mjs from a passing run, at deploy; the arena's page stays committed
 docs/demo/index.html
