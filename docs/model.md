@@ -200,7 +200,9 @@ graph, over every effect it reaches under each profile (G018); and a `retry.when
 fields of the answer (G019). Nothing below an atomic graph retries (G020): a failed statement has aborted the
 transaction, so the retry belongs on the binding operation that runs the atomic graph, whose every try is a
 transaction of its own and whose transactional effects G018 does not hold to idempotency. A retry repeats a
-fault or a timeout, and an answer `when` accepts; never a refusal.
+fault or a timeout, and an answer `when` accepts; never a refusal. In the stubbed gates (`rehearse`, `fuzz`,
+`regress`, `run --seed`) the tries are made and recorded as the site says, with no backoff between them, since no
+stub recovers by being waited on.
 
 What a feature's data layer may reach is `feature.json → effects` (L003), the same under every profile; what a
 place allows the whole tree is its profile's `permits` (absent, everything), held to what the profile reaches in

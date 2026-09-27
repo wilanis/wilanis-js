@@ -89,6 +89,22 @@ describe('a node that says retry', () => {
     expect(third.startedAt - second.endedAt).toBeGreaterThanOrEqual(19);
   });
 
+  it('tries as often where every effect is stubbed, as rehearse and fuzz run it, and waits nothing between tries', async () => {
+    const upstream = scripted([503, 503, 503]);
+    const retry = { times: 2, backoffMs: 60_000, when: 'status >= 500' };
+    const report = await running('ask', upstream, { asked: { retry } }, true);
+    const [first, second] = asked(report).attempts ?? [];
+
+    expect(asked(report).out).toEqual({ status: 503 });
+    expect(asked(report).attempts?.map(one => one.error)).toEqual([
+      'answer retried: status >= 500',
+      'answer retried: status >= 500',
+    ]);
+    expect(upstream.calls).toHaveLength(3);
+    // a minute's backoff, and then two, where the effect is real
+    expect(second.startedAt - first.endedAt).toBeLessThan(1000);
+  });
+
   it('keeps the operation as the handler the report says ran', async () => {
     const report = await running('ask', scripted(['fault']), { asked: { retry: { times: 1 } } });
 

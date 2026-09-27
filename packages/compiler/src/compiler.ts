@@ -151,9 +151,12 @@ export class Compiler {
     return { handler: key, op: hit.op };
   }
 
-  /** A handler the compiler registers, tried as the site of each call says (RFC 0011); at no site, once. */
+  /**
+   * A handler the compiler registers, tried as the site of each call says (RFC 0011); at no site, once. Under
+   * stubbed effects the tries are made without the backoff between them, since no stub recovers by being waited on.
+   */
   private attempting(base: Handler): Handler {
-    return attempting(base, this.sites);
+    return attempting(base, this.sites, this.opts.stubEffects === undefined);
   }
 
   /**
