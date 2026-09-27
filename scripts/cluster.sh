@@ -214,18 +214,20 @@ EOF
   say "kind: cluster '$CLUSTER' ready (1 node, $HOST_PORT → $NODE_PORT)"
 }
 
-# A copy of the chart with its pinned dependencies fetched as Chart.lock records them, into $STAGE/chart. Helm's
-# repository list is kept in $STAGE too, so this machine's is not touched.
+# A copy of the chart with its pinned dependencies, into $STAGE/chart. The archives charts/wilanis-tree/charts/ already
+# holds are copied in, and nothing else from it, and scripts/subcharts.sh fetches the subcharts as Chart.lock records
+# them only when those are not every one it pins: in CI the chart step has left them there, from the cache or fetched.
+# Helm's repository list is kept in $STAGE too, so this machine's is not touched.
 stage_chart() {
-  local n=0 url
+  local archive
   export HELM_REPOSITORY_CONFIG="$STAGE/helm/repositories.yaml" HELM_REPOSITORY_CACHE="$STAGE/helm/cache"
   cp -R "$REPO/charts/wilanis-tree" "$STAGE/chart"
   rm -rf "$STAGE/chart/charts"
-  while IFS= read -r url; do
-    n=$((n + 1))
-    helm repo add "pinned-$n" "$url" >/dev/null
-  done < <(grep -o 'https://[^ ]*' "$STAGE/chart/Chart.lock" | sort -u)
-  helm dependency build "$STAGE/chart" >/dev/null
+  mkdir -p "$STAGE/chart/charts"
+  for archive in "$REPO/charts/wilanis-tree/charts/"*.tgz; do
+    if [ -f "$archive" ]; then cp "$archive" "$STAGE/chart/charts/"; fi
+  done
+  "$REPO/scripts/subcharts.sh" "$STAGE/chart"
 }
 
 # One `helm upgrade --install` of the release with the tree's values and the local demo's.

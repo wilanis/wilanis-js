@@ -173,8 +173,7 @@ jobs:
       # already holds them. The key changes with Chart.yaml as well as the lock: a hit skips `helm dependency build`,
       # and with it helm's refusal of a lock out of step with Chart.yaml, so an edit to either misses and builds. The
       # action is pinned by commit, since a tag can be moved.
-      - id: subcharts
-        name: the chart's pinned subcharts, from the cache
+      - name: the chart's pinned subcharts, from the cache
         if: steps.reads.outputs.skip != 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -182,42 +181,13 @@ jobs:
           key: helm-subcharts-${{ hashFiles('charts/wilanis-tree/Chart.lock', 'charts/wilanis-tree/Chart.yaml') }}
       # charts/wilanis-tree is written by hand and its values by wilanis-deploy (RFC 0024): the chart lints on its own
       # values and on the example's, and renders the example's, alone, with the local demo's values, and with every
-      # switch on and the operator's Cluster type known, so each pinned dependency renders too. The dependencies are
-      # the cache's when it restored every archive Chart.lock names, as helm saves it (<name>-<version>.tgz).
-      # Otherwise they are fetched as the lock pins them, which needs each repository it names added first, and a
-      # fetch that fails is tried twice more before the step fails naming the host that did not answer.
+      # switch on and the operator's Cluster type known, so each pinned dependency renders too. scripts/subcharts.sh
+      # leaves the dependencies the cache restored when they are every one Chart.lock pins, and otherwise fetches them
+      # as the lock pins them, up to 3 times, failing with the host that did not answer.
       - name: the chart lints and renders the example's values
         if: steps.reads.outputs.skip != 'true'
-        env:
-          CACHE_HIT: ${{ steps.subcharts.outputs.cache-hit }}
         run: |
-          set -o pipefail
-          chart=charts/wilanis-tree
-          log="$RUNNER_TEMP/subcharts.log"
-          pinned=$(awk '/^- name: /{name=$3} /^  version: /{print name "-" $2 ".tgz"}' "$chart/Chart.lock")
-          missing=$(printf '%s\n' "$pinned" | while read -r tgz; do [ -f "$chart/charts/$tgz" ] || echo "$tgz"; done)
-          fetch() {
-            grep -o 'https://[^ ]*' "$chart/Chart.lock" | sort -u | nl -w1 -s' ' \
-              | while read -r n url; do helm repo add "pinned-$n" "$url" || exit; done &&
-              helm dependency build "$chart"
-          }
-          if [ "$CACHE_HIT" = true ] && [ -n "$pinned" ] && [ -z "$missing" ]; then
-            echo "skips helm dependency build: the cache restored every subchart Chart.lock pins"
-            printf '%s\n' "$pinned" | sed 's/^/  /'
-          else
-            echo "fetches the subcharts Chart.lock pins: the cache does not hold all of them"
-            for attempt in 1 2 3; do
-              fetch 2>&1 | tee "$log" && break
-              if [ "$attempt" = 3 ]; then
-                hosts=$(grep -i error "$log" | grep -o 'https://[^/ :"]*' | sed 's|^https://||' | sort -u \
-                  | paste -sd, - | sed 's/,/, /g') || true
-                echo "::error::the subcharts Chart.lock pins could not be fetched in 3 attempts, from ${hosts:-the repositories it names}; re-run the job once that host is back"
-                exit 1
-              fi
-              echo "attempt $attempt of 3 failed; trying again in $((attempt * 10))s"
-              sleep $((attempt * 10))
-            done
-          fi
+          scripts/subcharts.sh charts/wilanis-tree
           helm lint --strict charts/wilanis-tree
           helm lint --strict charts/wilanis-tree -f example/deploy/values.yaml
           helm lint --strict charts/wilanis-tree -f example/deploy/values.yaml -f charts/wilanis-tree/values-local.yaml
