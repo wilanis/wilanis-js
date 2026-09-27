@@ -1,7 +1,7 @@
 /**
  * What `wilanis describe` says about the kinds that carry no body of their own: a binding, a resolvers
- * document, a feature, a connection, a codec, a scenario and the project. Each used to print
- * `JSON.stringify(doc.doc)` and leave a reader to parse the document they had just asked about in words.
+ * document, a feature, a connection, a codec and the project (a scenario's is in `scenario-said.ts`). Each used to
+ * print `JSON.stringify(doc.doc)` and leave a reader to parse the document they had just asked about in words.
  *
  * The viewer never shows raw JSON by default and the CLI should not either: a reader who wanted the file can
  * open the file, whose path is on the second line of every `describe`. What they asked `describe` for is what
@@ -17,7 +17,6 @@ import type {
   LoadResult,
   ProjectDoc,
   ResolversDoc,
-  ScenarioDoc,
   Scope,
 } from '@wilanis/core';
 import { IR_READ } from '@wilanis/core';
@@ -113,17 +112,6 @@ export function codecLines(doc: Loaded): string[] {
   const { yields } = doc.doc as CodecDoc;
   const said = yields === 'declared' ? "the type its call site declares ('declared')" : JSON.stringify(yields);
   return [`yields  ${said}`];
-}
-
-/** A scenario: the trigger it drives, the seed it runs under, and what it expects back. */
-export function scenarioLines(doc: Loaded): string[] {
-  const declared = doc.doc as ScenarioDoc;
-  const lines = [`drives  ${declared.trigger}`, `seed    ${declared.seed}`];
-  if (declared.in !== undefined) lines.push(`in      ${JSON.stringify(declared.in)}`);
-  if (declared.stubs) lines.push(...listLine('stubs  ', Object.keys(declared.stubs)));
-  lines.push('expects:');
-  for (const [name, value] of Object.entries(declared.expect)) lines.push(`    ${name}: ${JSON.stringify(value)}`);
-  return lines;
 }
 
 /** The plugins a project loads, each with the package it came from and whether it is configured. */

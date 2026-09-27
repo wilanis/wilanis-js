@@ -14,32 +14,28 @@ import {
   type TriggerKindDoc,
 } from '@wilanis/core';
 import { deliveryKindLines, receivingLines } from './delivery-said.js';
-import {
-  bindingLines,
-  codecLines,
-  connectionLines,
-  featureLines,
-  projectLines,
-  resolversLines,
-  scenarioLines,
-} from './doc-said.js';
+import { bindingLines, codecLines, connectionLines, featureLines, projectLines, resolversLines } from './doc-said.js';
 import { graphLines } from './graph-said.js';
 import { holdsLines, invariantLines } from './invariant-lines.js';
 import { LIMIT_SETTINGS, limitLines } from './limits-said.js';
 import { fieldLine, portLines, shower, storeLines } from './lines.js';
 import { permittedLines } from './profiles-said.js';
 import { requiredByLines, requiresLines } from './required-said.js';
+import { scenarioLines, triggerScenarioLines, writtenMark } from './scenario-said.js';
 import { viewsOfTrigger } from './scope-said.js';
 import { shapeLines } from './shape-said.js';
 
 // ---- discovery --------------------------------------------------------------------------------------
 
-/** Every document one tree holds, one line each, sorted by kind then path, and saying which are not the tree's own. */
+/**
+ * Every document one tree holds, one line each, sorted by kind then path, saying which are not the tree's own and
+ * which scenarios a command wrote.
+ */
 export function ls(load: LoadResult, kind?: Kind): string[] {
   return load.registry.files
     .filter(file => !kind || file.kind === kind)
     .sort((one, other) => one.kind.localeCompare(other.kind) || one.path.localeCompare(other.path))
-    .map(file => `${file.kind.padEnd(16)} ${file.path}${whereFrom(file)}`);
+    .map(file => `${file.kind.padEnd(16)} ${file.path}${whereFrom(file)}${writtenMark(file)}`);
 }
 
 /** Where one document came from, when it is not the tree's own. */
@@ -122,8 +118,9 @@ function policyLines(doc: Loaded, load: LoadResult): string[] {
 
 /**
  * A trigger: the document, the bounds its run ends up with and where each came from, the connection it receives
- * from and who sends to it there, the policies it attaches, what each gives the guard, and the invariants that hold over it -- a rule stated once elsewhere is a rule about
- * this trigger, and a reader of the trigger sees it.
+ * from and who sends to it there, the policies it attaches, what each gives the guard, the scenarios that replay it,
+ * and the invariants that hold over it -- a rule stated once elsewhere is a rule about this trigger, and a reader of
+ * the trigger sees it.
  */
 function triggerLines(doc: Loaded, scope: Scope): string[] {
   const declared = doc.doc as TriggerDoc;
@@ -136,6 +133,7 @@ function triggerLines(doc: Loaded, scope: Scope): string[] {
     ...crossesLines(declared),
     ...fireLines(declared, scope),
     ...gatedLines(declared, scope),
+    ...triggerScenarioLines(doc, scope),
     ...viewLines(doc as Loaded<TriggerDoc>, scope),
     ...holdsLines(doc as Loaded<TriggerDoc>, scope),
   ];
