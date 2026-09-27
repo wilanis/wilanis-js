@@ -42,11 +42,16 @@ export function tagSite(sites: Sites, name: string, said: Said): { site?: string
   return { site: name };
 }
 
-/** A handler that tries `base` as its call's site says; a call at no site, or at an untagged one, is `base` once. */
-export function attempting(base: Handler, sites: Sites): Handler {
+/**
+ * A handler that tries `base` as its call's site says; a call at no site, or at an untagged one, is `base` once.
+ * With `waits` false it tries as often and waits nothing between tries: where every effect is stubbed (rehearse,
+ * fuzz, regress, run --seed) nothing outside the run is given time to recover, so a backoff would only be idle.
+ */
+export function attempting(base: Handler, sites: Sites, waits = true): Handler {
   return args => {
     const policy = args.ctx.site === undefined ? undefined : sites.get(args.ctx.site);
-    return policy ? tried(base, args, policy) : base(args);
+    if (!policy) return base(args);
+    return tried(base, args, waits ? policy : { ...policy, backoffMs: 0 });
   };
 }
 

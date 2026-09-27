@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkTree, runGraph } from '@wilanis/compiler';
 import { type Kind, loadTree, type PluginModule, type Retry, Scope, schemaRef, schemaUrl } from '@wilanis/core';
-import { Refusal, type Report } from '@wilanis/engine';
+import { type Handler, Refusal, type Report } from '@wilanis/engine';
 import { BUILTIN_PLUGINS, Embedder } from '../src/index.js';
 import { docsDir } from './example-harness.js';
 
@@ -74,15 +74,18 @@ function flaky(upstream: Upstream): PluginModule {
         },
       },
     }),
-    handlers: {
-      '@flaky/flaky.port.json#ask': async ({ in: input, ctx }) => {
-        const item = String(input.item);
-        const before = upstream.calls.filter(one => one === item).length;
-        upstream.calls.push(item);
-        upstream.signals.push(ctx.signal);
-        return act(upstream.next(item, before), ctx.signal);
-      },
-    },
+    handlers: { '@flaky/flaky.port.json#ask': asking(upstream) },
+  };
+}
+
+/** The scripted upstream as a handler: it counts the call and does what the script says of it. */
+function asking(upstream: Upstream): Handler {
+  return async ({ in: input, ctx }) => {
+    const item = String(input.item);
+    const before = upstream.calls.filter(one => one === item).length;
+    upstream.calls.push(item);
+    upstream.signals.push(ctx.signal);
+    return act(upstream.next(item, before), ctx.signal);
   };
 }
 
@@ -134,14 +137,27 @@ function flakyTree(placed: Placed): string {
   return dir;
 }
 
-/** Run one operation of the tree against `upstream`, and answer the report of the binding's call. */
-export async function running(op: 'ask' | 'each', upstream: Upstream, placed: Placed = {}): Promise<Report> {
+/**
+ * Run one operation of the tree against `upstream`, and answer the report of the binding's call. `stubbed` runs it
+ * as rehearse and fuzz do, with the upstream handed in as the stub of every effect rather than as the plugin's.
+ */
+export async function running(
+  op: 'ask' | 'each',
+  upstream: Upstream,
+  placed: Placed = {},
+  stubbed = false,
+): Promise<Report> {
   const dir = flakyTree(placed);
   try {
     const loaded = loadTree(dir, { ...BUILTIN_PLUGINS, '@flaky': flaky(upstream) });
     const refused = checkTree(loaded).format();
     if (refused) throw new Error(`the tree a case runs must itself pass:\n${refused}`);
-    const embedder = new Embedder(new Scope(loaded.registry, loaded.resolve), loaded.plugins, { env: {}, root: dir });
+    const stubEffects = stubbed ? () => asking(upstream) : undefined;
+    const embedder = new Embedder(new Scope(loaded.registry, loaded.resolve), loaded.plugins, {
+      env: {},
+      root: dir,
+      stubEffects,
+    });
     const compiled = embedder.operation(`@features/flaky/domain/flaky.port.json#${op}`);
     return await runGraph(compiled, { initial: { in: op === 'ask' ? { item: 'a' } : {} }, env: embedder.env });
   } finally {
