@@ -110,8 +110,11 @@ function tree(bound: boolean, edit: (doc: any) => void): string {
   project.plugins.push({ use: '@keep' });
   if (bound) {
     writeFileSync(join(dir, 'features/keeping/data/keep-files.binding.json'), JSON.stringify(binding(edit)));
-    for (const profile of Object.values<{ bindings: Record<string, string> }>(project.profiles))
+    for (const profile of Object.values<{ bindings: Record<string, string>; permits?: string[] }>(project.profiles)) {
       profile.bindings['@keep/memory.port.json'] = BINDING;
+      // what the binding reaches, where the profile lists what its place permits
+      profile.permits?.push('@keep/files.port.json#get');
+    }
   }
   writeFileSync(join(dir, 'project.json'), JSON.stringify(project));
   return dir;

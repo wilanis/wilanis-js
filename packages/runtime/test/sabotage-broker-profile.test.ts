@@ -37,7 +37,8 @@ describe('sabotage: a broker standing in for another (C018)', () => {
     const said = sabotageSaying('project.json', doc => {
       doc.profiles.production.connections[JOBS] = API;
     });
-    expect(said.map(one => one.split(' ')[0])).toEqual(['C018']);
+    // and production's permits do not list the API the queue now reaches (C021)
+    expect(said.map(one => one.split(' ')[0])).toEqual(['C018', 'C021']);
     expect(said[0]).toContain('which delivers nothing, where the other delivers at-least-once');
   });
 
@@ -60,7 +61,8 @@ describe('sabotage: a broker standing in for another (C018)', () => {
     const said = sabotageSaying('project.json', doc => {
       doc.profiles.production.connections['@connections/customers-postgres.connection.json'] = JOBS;
     });
-    expect(said.map(one => one.split(' ')[0])).toEqual(['C018']);
+    // and production's permits name the store this replaces (C023), leaving it and the broker in its place unlisted (C021)
+    expect(said.map(one => one.split(' ')[0])).toEqual(['C018', 'C023', 'C021', 'C021']);
     expect(said[0]).toContain('marked storage and leases too');
   });
 });

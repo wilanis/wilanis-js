@@ -202,6 +202,12 @@ transaction, so the retry belongs on the binding operation that runs the atomic 
 transaction of its own and whose transactional effects G018 does not hold to idempotency. A retry repeats a
 fault or a timeout, and an answer `when` accepts; never a refusal.
 
+What a feature's data layer may reach is `feature.json → effects` (L003), the same under every profile; what a
+place allows the whole tree is its profile's `permits` (absent, everything), held to what the profile reaches in
+both directions, so an effectful native operation or a connection reached and not listed is C021, an entry nothing
+reaches is C022, and one that is no permit (a domain port, a pure operation, a connection the profile replaces) is
+C023.
+
 ## The engine
 
 Stateless and clockless. It runs all ready nodes concurrently, answers `blocked` with `needs` when input is
