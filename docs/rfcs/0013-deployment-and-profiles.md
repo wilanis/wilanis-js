@@ -262,7 +262,9 @@ It is what `start` verifies, below.
   `connectionFor(path, profile)`, keyed by the path the documents name: a handler asking `env.connections`
   for `@connections/customers-api.connection.json` under `production` receives the stand-in's settings and
   never learns a stand-in exists. `Secrets.missing` stays what it is, every declared variable not set; the
-  refusal is scoped by the reach.
+  refusal is scoped by the reach. (Since #653 the connection also carries its `path`, the stand-in's, which a
+  handler keys a pool and an atomic graph's transaction by, so two names a profile resolves to one connection
+  share both.)
 - **`start`** in `serve.ts`: after `check`, `activeProfile`; log `profile <name>` (or `profile none declared`);
   `reachOf(scope, profile).secrets` minus the variables set → throw `missing secrets: VAR (key, read by
   <document or '@plugin settings'>), ...; nothing is serving`, before `postLoad`. Then `postLoad`, then

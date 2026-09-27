@@ -218,6 +218,19 @@ export function plantedEditingAllSaying(
   return after(plantingAndEditingAll(docs, edits), refusalsSaying);
 }
 
+/**
+ * Copy the example, add documents and edit several it has, and answer the tree as loaded together with the
+ * directory it sits in: what a case needs when it runs a graph the example does not have. The caller removes it.
+ */
+export function loadedEditingAll(
+  docs: Record<string, unknown>,
+  edits: Record<string, (doc: any) => void>,
+): { load: LoadResult; dir: string } {
+  const dir = copyOfExample();
+  plantingAndEditingAll(docs, edits)(dir);
+  return { load: loadTree(dir, PLUGINS, INCLUDES), dir };
+}
+
 /** The same, answered as `code file#at`: for a case whose claim is which document a refusal points at. */
 export function plantedEditingAllAt(
   docs: Record<string, unknown>,

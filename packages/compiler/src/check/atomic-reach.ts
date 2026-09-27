@@ -6,7 +6,7 @@
  * told what it found in `atomic-said.ts`; neither walks again.
  */
 import { type GraphDoc, isMap, isSwitch, type Loaded, type Retry, type Scope, type Values } from '@wilanis/core';
-import { connectionOf } from '../documents.js';
+import { connectionOf, connectionUnder } from '../documents.js';
 
 /** One effect an atomic graph reaches: what it runs, where that call is written, and whether it may take part. */
 export interface Reached {
@@ -14,7 +14,11 @@ export interface Reached {
   key: string;
   /** The operation as the port declares it, for the flags a rule reads. */
   transactional: boolean;
-  /** The connection it goes to, where the call says statically; nothing where it says none. */
+  /**
+   * The connection it goes to under the walk's profile, where the call says statically; nothing where it says
+   * none. A name the profile stands another connection in for is that other connection (`connectionUnder`), as
+   * the environment a handler reads keys it, so the walk's "one connection" is the one a run joins.
+   */
   connection: string | undefined;
   /** The document the call is written in, and the node of it that makes the call. */
   file: string;
@@ -114,10 +118,11 @@ class Walk {
       return;
     }
     if (hit.op.pure === true) return;
+    const named = connectionOf(this.scope, hit.op, call.given);
     this.found.effects.push({
       key: `${hit.path}#${hit.opName}`,
       transactional: hit.op.transactional === true,
-      connection: connectionOf(this.scope, hit.op, call.given),
+      connection: named === undefined ? undefined : connectionUnder(this.scope, named, this.profile),
       file: call.file,
       node: call.node,
       from: call.from,
