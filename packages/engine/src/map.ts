@@ -6,7 +6,7 @@
  * decides when the map starts and what its answer is taken for; this module runs the elements and says what came
  * of each.
  */
-import { redactEach, redactValue, shownOut, shownRead } from './redact.js';
+import { carried, readAsSecret, redactEach, redactValue, shownOut, shownRead } from './redact.js';
 import { initialReport, noteRefusal } from './report.js';
 import { type Reader, readAll, readPath, readSource } from './sources.js';
 import type { KMap, NodeReport } from './spec.js';
@@ -100,15 +100,52 @@ export function shownAnswer(node: KMap, answer: unknown[], items: NodeReport[]):
   return redactEach(shown, answerPaths(node));
 }
 
-/** What a seeded map's report shows of the answer it was given: each element redacted as the map's own answer is. */
-export function seededAnswer(node: KMap, answer: unknown[]): unknown[] {
-  return redactEach(answer, answerPaths(node));
+/**
+ * What a seeded map's report shows of the answer it was given: each element redacted as the map's own answer is,
+ * and carrying the mark of what the map reads as a secret, where what it reads was supplied.
+ */
+export function seededAnswer(node: KMap, answer: unknown[], host: Pick<MapHost, 'values' | 'showing'>): unknown[] {
+  const reads = readsOf(node, host);
+  const given = { ...reads.broadcast, over: reads.over };
+  const secrets = readAsSecret(given, shownIn(node, reads.shown.broadcast, reads.shown.over));
+  return carried(answer, redactEach(answer, answerPaths(node)), secrets) as unknown[];
 }
 
-/** One element's report before any element runs: seeded where `<id>.<index>` was pre-supplied, shown as the operation marks what it answers. */
-function elementReport(host: MapHost, node: KMap, key: string): NodeReport {
-  const report = initialReport(host.values, key);
-  if (report.status === 'seeded') report.out = redactValue(report.out, node.redact?.out);
+/**
+ * What a map reads: the list and the shared inputs, as the values it is handed and as its report shows them, each
+ * element shown as the list's report shows it -- the marker, where the list is shown as the marker whole.
+ */
+function readsOf(node: KMap, host: Pick<MapHost, 'values' | 'showing'>) {
+  const over = readSource(node.over, host.values);
+  const list = Array.isArray(over) ? over : [];
+  const shownOver = readSource(node.over, host.showing);
+  const shown = {
+    broadcast: readAll(node.in, host.showing),
+    over: list.map((_, at) => shownRead(list, shownOver, [String(at)])),
+  };
+  return { over, broadcast: readAll(node.in, host.values), shown };
+}
+
+/** What one element's handler is handed, and what its report shows it was handed, as the operation marks it. */
+function elementReads(
+  site: MapSite,
+  index: number,
+): { given: Record<string, unknown>; shown: Record<string, unknown> } {
+  const { node, broadcast, over, shown } = site;
+  const given = elementInputs(node, broadcast, over[index]);
+  const seen = elementInputs(node, shown.broadcast, shown.over[index]);
+  return { given, shown: redactValue(seen, node.redact?.in) as Record<string, unknown> };
+}
+
+/**
+ * One element's report before any element runs: seeded where `<id>.<index>` was pre-supplied, shown as the
+ * operation marks what it answers and carrying the mark of what the element would have read as a secret.
+ */
+function elementReport(host: MapHost, site: MapSite, index: number): NodeReport {
+  const report = initialReport(host.values, `${site.id}.${index}`);
+  if (report.status !== 'seeded') return report;
+  const reads = elementReads(site, index);
+  report.out = shownOut(undefined, report.out, site.node.redact?.out, readAsSecret(reads.given, reads.shown));
   return report;
 }
 
@@ -128,22 +165,15 @@ function collectMap(id: string, node: KMap, results: ElementResult[]): unknown[]
 
 /** What a map answers: every element run, its report under `items`; throws as the node's failure when one failed under `fail`. */
 export async function runMap(host: MapHost, id: string, node: KMap, report: NodeReport): Promise<unknown[]> {
-  const over = readSource(node.over, host.values);
+  const { over, broadcast, shown } = readsOf(node, host);
   if (!Array.isArray(over)) throw new Error(`map '${id}': over is not a list`);
-  const broadcast = readAll(node.in, host.values);
-  // each element as the list's report shows it: the marker, where the list is shown as the marker whole
-  const shownOver = readSource(node.over, host.showing);
-  const shown = {
-    broadcast: readAll(node.in, host.showing),
-    over: over.map((_, at) => shownRead(over, shownOver, [String(at)])),
-  };
   report.in = shownIn(node, shown.broadcast, shown.over);
   if (node.limit !== undefined && over.length > node.limit)
     throw new Error(`map '${id}': ${over.length} elements, limit ${node.limit}`);
+  const site: MapSite = { id, node, broadcast, over, shown, items: [], results: [], cursor: 0, broken: false };
   // one report per element; an element supplied in initial as '<id>.<index>' is seeded and never runs
-  const items = over.map((_, index) => elementReport(host, node, `${id}.${index}`));
-  report.items = items;
-  const site: MapSite = { id, node, broadcast, over, shown, items, results: [], cursor: 0, broken: false };
+  site.items = over.map((_, index) => elementReport(host, site, index));
+  report.items = site.items;
   // every element settles before the node does, whatever happened to the others
   const workers = Math.min(node.concurrency ?? over.length, over.length);
   await Promise.all(Array.from({ length: workers }, () => work(host, site)));
@@ -173,15 +203,15 @@ async function runElement(host: MapHost, site: MapSite, index: number): Promise<
   const element = site.items[index];
   if (element.status === 'seeded') return { ok: true, value: host.values.get(`${site.id}.${index}`) };
   if (element.status === 'cancelled') return { ok: false, error: 'cancelled', cancelled: true };
-  const inputs = elementInputs(site.node, site.broadcast, site.over[index]);
+  const reads = elementReads(site, index);
   element.status = 'running';
   element.startedAt = host.clock();
   element.handler = site.node.handler;
-  const shownInputs = elementInputs(site.node, site.shown.broadcast, site.shown.over[index]);
-  element.in = redactValue(shownInputs, site.node.redact?.in) as Record<string, unknown>;
+  element.in = reads.shown;
+  const secrets = readAsSecret(reads.given, reads.shown);
   try {
-    const value = await host.call(site.node, [site.id, String(index)], inputs, element);
-    element.out = shownOut(element, value, site.node.redact?.out);
+    const value = await host.call(site.node, [site.id, String(index)], reads.given, element);
+    element.out = shownOut(element.sub, value, site.node.redact?.out, secrets);
     element.status = 'done';
     return { ok: true, value };
   } catch (error) {

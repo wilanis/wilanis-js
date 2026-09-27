@@ -5,10 +5,11 @@
  * that breaks does not end the run: that switch routes its fault. When the run's signal fires, nothing more
  * starts: what had not started is cancelled, what was in flight settles as it settles.
  */
-import { type MapHost, runMap, seededAnswer, shownAnswer } from './map.js';
+import { type MapHost, runMap, shownAnswer } from './map.js';
 import { type Plan, planOf, targetsOf } from './plan.js';
-import { redactAttempt, redactReport, redactValue, shownOut, shownRead } from './redact.js';
+import { readAsSecret, redactAttempt, redactReport, redactValue, showingOf, shownOut } from './redact.js';
 import { answered, type Ending, initialReport, noteRefusal, reportOf } from './report.js';
+import { showSeeds } from './seeds.js';
 import { nodeRefs, PSEUDO, type Reader, readAll } from './sources.js';
 import {
   type Handlers,
@@ -35,7 +36,7 @@ export class Run {
   /** What a report shows of each value: a node's `out`, secrets as the marker; a root as the run was told to show it. */
   private readonly shown = new Map<string, unknown>();
   /** How a report reads a source: over what the reports of its sources show, where the value holds something. */
-  private readonly showing: Reader = (ref, path) => shownRead(this.values.get(ref), this.shown.get(ref), path);
+  private readonly showing: Reader = showingOf(this.values, this.shown);
   private readonly reports: Record<string, NodeReport> = {};
   private readonly plan: Plan;
   private readonly root: string[];
@@ -59,7 +60,7 @@ export class Run {
     this.clock = opts.clock ?? Date.now;
     this.startedAt = this.clock();
     for (const [key, value] of Object.entries(opts.initial ?? {})) this.values.set(key, value);
-    for (const [key, value] of Object.entries(opts.initial ?? {})) this.shown.set(key, this.shownSeed(key, value));
+    showSeeds(spec, opts, { values: this.values, shown: this.shown, showing: this.showing });
     // a seeded node's report shows its value as every read of it does: as the node would have shown its answer
     for (const id of Object.keys(spec.nodes)) this.reports[id] = initialReport(this.shown, id);
     this.mapHost = {
@@ -70,18 +71,6 @@ export class Run {
       call: (node, path, inputs, report) =>
         this.invoke(node.handler, inputs, this.contextFor(node, [...this.root, ...path], report)),
     };
-  }
-
-  /**
-   * A pre-supplied value as a report shows it: a root as the run was told to show it, else as it is; a seeded node's
-   * as its own report would have shown what it answered, redacted by its operation's paths.
-   */
-  private shownSeed(key: string, value: unknown): unknown {
-    const told = this.opts.shown?.[key];
-    if (told !== undefined) return told;
-    const node = Object.hasOwn(this.spec.nodes, key) ? this.spec.nodes[key] : undefined;
-    if (node?.kind === 'call') return redactValue(value, node.redact?.out);
-    return node?.kind === 'map' && Array.isArray(value) ? seededAnswer(node, value) : value;
   }
 
   /** Fire everything ready, wait for any settle, repeat until quiescence; then answer. An abort ends the run cancelled. */
@@ -265,12 +254,16 @@ export class Run {
     return broke?.[1];
   }
 
-  /** A call's report shows its inputs as their sources' reports show them and marked by its own operation; its answer likewise. */
+  /**
+   * A call's report shows its inputs as their sources' reports show them and marked by its own operation; its answer
+   * likewise, carrying the mark of each input it shows as the marker wherever the answer hands that input back.
+   */
   private async runCall(id: string, node: KCall, report: NodeReport): Promise<void> {
     const inputs = readAll(node.in, this.values);
     report.in = redactValue(readAll(node.in, this.showing), node.redact?.in) as Record<string, unknown>;
+    const secrets = readAsSecret(inputs, report.in);
     const out = await this.invoke(node.handler, inputs, this.contextFor(node, [...this.root, id], report));
-    this.finish(id, report, out, shownOut(report, out, node.redact?.out));
+    this.finish(id, report, out, shownOut(report.sub, out, node.redact?.out, secrets));
   }
 
   private async runMap(id: string, node: KMap, report: NodeReport): Promise<void> {

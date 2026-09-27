@@ -2,7 +2,8 @@
  * What a run a trigger starts shows of the roots it starts from: its operation's run, and each policy's decision
  * before it. The context with every field the kind's context marks secret as the marker -- an open map such as a
  * queue message's headers is marked whole -- and the input built from it with the same fields where what fills it
- * (`fire.in`, or a policy's `decide.in`) reads them, and those the input's own type marks. The run is handed the
+ * (`fire.in`, or a policy's `decide.in`) reads them, and those the input's own type marks. A startup step's run
+ * is started from its `in` alone, every field filled from a secret shown as the marker. The run is handed the
  * values; only its reports read these.
  */
 import {
@@ -32,18 +33,26 @@ export function shownRoots(scope: Scope, trigger: TriggerDoc, roots: RunRoots): 
   const context = redactValue(roots.context, marked);
   if (roots.input === undefined) return { context };
   const given = roots.filledBy ?? trigger.fire.in;
-  const read = given === undefined ? below(marked, ['body'], []) : readInto(given, marked);
+  const read = given === undefined ? below(marked, ['body'], []) : readInto(given, marked, 'context');
   return { context, in: redactValue(roots.input, [...secretPaths(roots.inType), ...read]) };
 }
 
-/** The paths of the input `fire.in` fills from a marked field of the context, one input at a time. */
-function readInto(given: Record<string, unknown>, marked: string[][]): string[][] {
+/**
+ * The input a startup step's run starts from as its reports show it: every field its `in` fills from a
+ * `{{secrets.*}}` read, whole or inside text, a list or an object, is the marker, whatever the operation marks.
+ */
+export function shownStep(written: Record<string, unknown>, input: Record<string, unknown>): { in: unknown } {
+  return { in: redactValue(input, readInto(written, [[]], 'secrets')) };
+}
+
+/** The paths of the input `fire.in` fills from a marked field of the root it reads, one input at a time. */
+function readInto(given: Record<string, unknown>, marked: string[][], root: string): string[][] {
   return Object.entries(given).flatMap(([name, value]) => {
     const whole = typeof value === 'string' ? WHOLE_TEMPLATE.exec(value) : null;
-    const read = whole ? contextPath(whole[1]) : undefined;
+    const read = whole ? pathBelow(whole[1], root) : undefined;
     if (read) return below(marked, read, [name]);
     // a read inside text, a list or an object: the input is shown as the marker whole where any read is marked
-    return readsIn(value).some(path => below(marked, path, []).length) ? [[name]] : [];
+    return readsIn(value, root).some(path => below(marked, path, []).length) ? [[name]] : [];
   });
 }
 
@@ -56,19 +65,19 @@ function below(marked: string[][], read: string[], at: string[]): string[][] {
   });
 }
 
-/** Every read of the context inside a value of `fire.in`, however deep it sits in text, lists and objects. */
-function readsIn(value: unknown): string[][] {
+/** Every read of the root inside a value of `fire.in`, however deep it sits in text, lists and objects. */
+function readsIn(value: unknown, root: string): string[][] {
   if (typeof value === 'string')
     return [...value.matchAll(TEMPLATE)]
-      .map(match => contextPath(match[1]))
+      .map(match => pathBelow(match[1], root))
       .filter((path): path is string[] => path !== undefined);
-  if (Array.isArray(value)) return value.flatMap(readsIn);
-  if (value && typeof value === 'object') return Object.values(value).flatMap(readsIn);
+  if (Array.isArray(value)) return value.flatMap(part => readsIn(part, root));
+  if (value && typeof value === 'object') return Object.values(value).flatMap(part => readsIn(part, root));
   return [];
 }
 
-/** The segments a template reads below `context`, or nothing where it reads another root. */
-function contextPath(template: string): string[] | undefined {
-  const [root, ...path] = splitPath(template);
-  return root === 'context' ? path : undefined;
+/** The segments a template reads below `root`, or nothing where it reads another root. */
+function pathBelow(template: string, root: string): string[] | undefined {
+  const [read, ...path] = splitPath(template);
+  return read === root ? path : undefined;
 }
