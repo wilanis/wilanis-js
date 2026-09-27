@@ -3,13 +3,23 @@
  * and that directory judged against what the tree writes today, on copies of the example.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkTree, walkedUnder } from '@wilanis/compiler';
 import { type GraphDoc, isSwitch, type LoadResult, loadTree, Scope } from '@wilanis/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { RECORDED, type Rehearsal, regress, rehearse } from '../src/index.js';
+import { RECORDED, type Rehearsal, regress, rehearse, writeRecorded } from '../src/index.js';
 import { copyOfExample, INCLUDES, PLUGINS } from './example-harness.js';
 
 const RUNTIME = fileURLToPath(new URL('..', import.meta.url));
@@ -175,6 +185,32 @@ describe('rehearse --check: a recorded directory the tree has moved away from', 
     expect(readFileSync(join(dir, 'scenarios/mine.scenario.json'), 'utf8')).toBe(mine);
     expect(answer.recorded?.written).not.toContain(`${RECORDED}/gone-trigger/old.scenario.json`);
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('never reaches through a link: what a link inside the directory leads to is left where it is', {
+    timeout: 60_000,
+  }, async () => {
+    const dir = copyOfExample();
+    const loaded = load(dir);
+    const elsewhere = mkdtempSync(join(tmpdir(), 'wilanis-elsewhere-'));
+    writeFileSync(join(elsewhere, 'keep.scenario.json'), '{}');
+    mkdirSync(join(dir, RECORDED), { recursive: true });
+    symlinkSync(elsewhere, join(dir, RECORDED, 'link'));
+    const answer = await rehearse(loaded, { record: RECORDED });
+    expect(readFileSync(join(elsewhere, 'keep.scenario.json'), 'utf8')).toBe('{}');
+    expect(answer.recorded?.written).not.toContain(`${RECORDED}/link/keep.scenario.json`);
+    // a link where a trigger's files go is refused before anything is written or removed
+    const docs = { 'linked-trigger/x.scenario.json': read(join(dir, RECORDED, 'hello-gated/whole.scenario.json')) };
+    symlinkSync(elsewhere, join(dir, RECORDED, 'linked-trigger'));
+    expect(() => writeRecorded(dir, RECORDED, docs)).toThrow(/would be written through a link/);
+    expect(readdirSync(elsewhere)).toEqual(['keep.scenario.json']);
+    expect(existsSync(join(dir, RECORDED, 'hello-gated/whole.scenario.json'))).toBe(true);
+    // and so is a recorded directory that is itself a link out of the tree
+    symlinkSync(elsewhere, join(dir, 'scenarios/linked'));
+    expect(() => writeRecorded(dir, 'scenarios/linked', {})).toThrow(/leads through a link to .*outside the tree/);
+    expect(readdirSync(elsewhere)).toEqual(['keep.scenario.json']);
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(elsewhere, { recursive: true, force: true });
   });
 });
 
