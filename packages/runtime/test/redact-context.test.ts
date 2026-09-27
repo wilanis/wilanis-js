@@ -47,7 +47,7 @@ function withHeaders(): string {
   const project = JSON.parse(readFileSync(join(dir, 'project.json'), 'utf8'));
   put('project.json', { ...project, plugins: [...project.plugins, ...NAMED] });
   put('connections/jobs.connection.json', { kind: '@queue-memory/memory.connection-kind.json', settings: {} });
-  put('features/vault/edge/request.resolvers.json', { resolvers: { agent: { read: "request.headers['x-agent']" } } });
+  put('features/vault/edge/request.resolvers.json', { resolvers: { agent: { read: "context.headers['x-agent']" } } });
   put('features/vault/edge/Ping.shape.json', { layer: 'edge', fields: { n: { type: 'number' } } });
   put('features/vault/edge/SeenView.shape.json', {
     layer: 'edge',
@@ -138,9 +138,9 @@ describe("a header of the request, in the reports of a trigger's run", () => {
   it("shows an http request's cookies as the marker whole, as it shows its headers", async () => {
     const shown = await withTree(async load => {
       const route = load.registry.get('trigger', load.resolve('@features/vault/edge/agent-route.trigger.json'));
-      const request = { headers: { authorization: 'Bearer t-1' }, cookies: { session: 's-1' }, query: {} };
-      return shownRoots(embedderFor(load).scope, route?.doc as never, { request, input: undefined, inType: undefined });
+      const context = { headers: { authorization: 'Bearer t-1' }, cookies: { session: 's-1' }, query: {} };
+      return shownRoots(embedderFor(load).scope, route?.doc as never, { context, input: undefined, inType: undefined });
     });
-    expect(shown.request).toEqual({ headers: SECRET, cookies: SECRET, query: {} });
+    expect(shown.context).toEqual({ headers: SECRET, cookies: SECRET, query: {} });
   });
 });

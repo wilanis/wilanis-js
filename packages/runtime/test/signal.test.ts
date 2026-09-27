@@ -28,8 +28,8 @@ function servingWith(effect: Handler) {
 function getCustomer(serving: ReturnType<typeof servingWith>, signal: AbortSignal): Promise<Report> {
   const trigger = serving.triggers('@http/http.trigger-kind.json').find(one => one.label === 'GET /customers/{id}');
   if (!trigger) throw new Error('the example has no GET /customers/{id}');
-  const request = { params: { id: 'c1' }, headers: {}, cookies: {} };
-  return serving.fire({ trigger, input: { id: 'c1' }, request, signal });
+  const context = { params: { id: 'c1' }, headers: {}, cookies: {} };
+  return serving.fire({ trigger, input: { id: 'c1' }, context, signal });
 }
 
 describe('the signal a kind hands to Serving.fire', () => {

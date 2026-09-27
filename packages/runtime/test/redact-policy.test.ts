@@ -81,7 +81,7 @@ function keyedTree(): string {
   put('features/keyed/edge/keyed.policy.json', {
     decide: {
       run: `${PORT}#keyed`,
-      in: { key: "{{request.headers['x-api-key']}}", session: '{{request.cookies.session}}' },
+      in: { key: "{{context.headers['x-api-key']}}", session: '{{context.cookies.session}}' },
     },
     outcomes: { unkeyed: { effect: 'deny' } },
   });

@@ -18,7 +18,7 @@ const NO_GUARD_HINT = 'add a guarding plugin to project.json → plugins, such a
  * A007: every read a store's collections are scoped by reads what the guard hands. A scope decides whose rows
  * a caller sees, so the value filling it is established before any graph runs -- a header, a route parameter
  * or a query string is the caller's own word for who they are, and a store scoped by one is scoped by nothing.
- * The judgement is over the document, because after lowering a resolver read and a hand-written request read
+ * The judgement is over the document, because after lowering a resolver read and a hand-written context read
  * are the same source and nothing downstream can tell them apart.
  */
 export function checkStoreScopes(judge: Judge, store: Loaded<StoreDoc>): void {
@@ -68,8 +68,8 @@ function refuseNotHanded(
   refuse: Refuser,
   fault: { store: Loaded<StoreDoc>; name: string; read: JudgedResolver; handed: Set<string>; guard: string },
 ): void {
-  const hands = [...fault.handed].map(key => `request.${key}`).join(', ');
-  const message = `scopes ${scopesOf(fault.store, fault.name)}, and reads request.${fault.read.path.join('.')}: a caller may send any value there`;
+  const hands = [...fault.handed].map(key => `context.${key}`).join(', ');
+  const message = `scopes ${scopesOf(fault.store, fault.name)}, and reads context.${fault.read.path.join('.')}: a caller may send any value there`;
   const hint = `a scope reads what the guard hands once it identified the caller (${hands}); wilanis describe ${fault.guard}`;
   refuse('A007', message, `reads/${fault.name}`, hint);
 }

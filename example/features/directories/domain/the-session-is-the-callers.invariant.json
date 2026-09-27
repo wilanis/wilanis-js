@@ -10,7 +10,7 @@
     ],
     "requires": {
       "proves": [
-        "request.principal"
+        "context.principal"
       ]
     }
   }

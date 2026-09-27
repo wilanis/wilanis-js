@@ -147,7 +147,7 @@ function nodeLines(graph: GraphDoc, guards: Guard[], path: string, scope: Scope)
 }
 
 /**
- * A graph: what it takes and answers, the reads it takes from the request, the nodes it runs -- the compiler's
+ * A graph: what it takes and answers, the reads it takes from the context, the nodes it runs -- the compiler's
  * guards among them -- and, where it says so, what its being atomic means. The reads stand above the nodes,
  * since every `{{name}}` below them is one of them and a reader should not meet the use before the binding.
  * The document itself is the file named on the line above; what a reader asked for is what it does.

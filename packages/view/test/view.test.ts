@@ -94,7 +94,7 @@ describe('the view model of the example', () => {
       implementation: '@features/access/domain/require-employee.graph.json',
     });
     expect(seen.outcomes!.forbidden).toMatchObject({ effect: 'deny' });
-    expect(seen.proves).toEqual(['request.principal', 'request.session']);
+    expect(seen.proves).toEqual(['context.principal', 'context.session']);
     expect(seen.gates?.map(gate => gate.path)).toEqual(
       expect.arrayContaining([
         '@features/customers/edge/register-customer.trigger.json',
@@ -109,7 +109,7 @@ describe('the view model of the example', () => {
       path: '@features/access/edge/employees-only.policy.json',
       label: 'Employees only',
       decide: '@access/domain/access.port.json#requireEmployee',
-      gives: { token: ['{{request.headers.authorization}}', '{{request.cookies.session}}'] },
+      gives: { token: ['{{context.headers.authorization}}', '{{context.cookies.session}}'] },
     });
     expect(trigger.policies![1].gives).toBeUndefined();
     const reasons = trigger.answers!.map(answer => answer.reason);

@@ -27,8 +27,8 @@
       "policy": "@access/edge/employees-only.policy.json",
       "in": {
         "token": [
-          "{{request.headers.authorization}}",
-          "{{request.cookies.session}}"
+          "{{context.headers.authorization}}",
+          "{{context.cookies.session}}"
         ]
       }
     },
@@ -38,11 +38,11 @@
   "fire": {
     "run": "@customers/domain/customer.port.json#update",
     "in": {
-      "id": "{{request.params.id}}",
-      "name": "{{request.body.name}}",
-      "email": "{{request.body.email}}",
-      "tier": "{{request.body.tier}}",
-      "note": "{{request.body.note}}"
+      "id": "{{context.params.id}}",
+      "name": "{{context.body.name}}",
+      "email": "{{context.body.email}}",
+      "tier": "{{context.body.tier}}",
+      "note": "{{context.body.note}}"
     }
   }
 }

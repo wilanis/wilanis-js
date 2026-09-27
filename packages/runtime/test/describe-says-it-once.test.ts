@@ -53,7 +53,7 @@ describe('describe: no kind answers with the document as JSON', () => {
     const said = describeDoc(example, '@customers/edge/register-customer.trigger.json');
     expect(said).toContain('kind  @http/http.trigger-kind.json');
     expect(said).toContain('fires   @customers/domain/customer.port.json#submit');
-    expect(said).toContain('    name ← {{request.body.name}}');
+    expect(said).toContain('    name ← {{context.body.name}}');
     // the description is prose at the top of every describe; printing the document repeated it verbatim below
     const description = (example.registry.get('trigger', '@features/customers/edge/register-customer.trigger.json')?.doc
       .description ?? '') as string;
@@ -85,7 +85,7 @@ describe('describe: no kind answers with the document as JSON', () => {
       'meets  @customers/domain/customer.port.json',
     );
     expect(describeDoc(example, '@features/customers/edge/request.resolvers.json')).toContain(
-      "    agent  ← request.headers['user-agent']",
+      "    agent  ← context.headers['user-agent']",
     );
     expect(describeDoc(example, '@features/customers/feature.json')).toContain('depends on   access');
     expect(describeDoc(example, '@connections/customers.connection.json')).toContain(

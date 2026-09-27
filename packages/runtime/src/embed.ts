@@ -1,6 +1,6 @@
 /**
  * The embedder: what every trigger kind calls to fire a graph. Compiles once per graph, supplies `in`
- * and `request`, runs the kernel, then judges the answer against the trigger's out type and prunes keys
+ * and `context`, runs the kernel, then judges the answer against the trigger's out type and prunes keys
  * a closed shape does not declare -- the trigger is where the domain's value becomes the edge's.
  */
 import { buildEnv, type Compiled, type CompileOptions, Compiler, runGraph } from '@wilanis/compiler';
@@ -38,29 +38,29 @@ function present(value: unknown): boolean {
  * The credential one read gives: a list is the places it may sit, the first present wins; anything else is the value
  * where it is present, and undefined where it is not.
  */
-function credentialFrom(written: unknown, request: Record<string, unknown>): unknown {
-  const filled = fillTemplates(written, { request });
+function credentialFrom(written: unknown, context: Record<string, unknown>): unknown {
+  const filled = fillTemplates(written, { context });
   const value = Array.isArray(written) ? (filled as unknown[]).find(present) : filled;
   return present(value) ? value : undefined;
 }
 
 /** The credentials every attachment of a trigger gives, and the reads as written; the first attachment to give one wins. */
-function gathered(trigger: TriggerDoc, request: Record<string, unknown>) {
+function gathered(trigger: TriggerDoc, context: Record<string, unknown>) {
   const found = { credentials: {} as Record<string, unknown>, reads: {} as Record<string, unknown> };
-  for (const use of trigger.policies ?? []) if (typeof use !== 'string') take(use.in ?? {}, request, found);
+  for (const use of trigger.policies ?? []) if (typeof use !== 'string') take(use.in ?? {}, context, found);
   return found;
 }
 
 /** What one attachment gives, added to what earlier attachments already gave. */
 function take(
   given: Record<string, unknown>,
-  request: Record<string, unknown>,
+  context: Record<string, unknown>,
   found: { credentials: Record<string, unknown>; reads: Record<string, unknown> },
 ) {
   for (const [name, written] of Object.entries(given)) {
     found.reads[name] ??= written;
     if (found.credentials[name] !== undefined) continue;
-    const value = credentialFrom(written, request);
+    const value = credentialFrom(written, context);
     if (value !== undefined) found.credentials[name] = value;
   }
 }
@@ -176,7 +176,7 @@ export class Embedder {
 
   /**
    * Run one of the project's startup steps: the domain port operation it names, with its `in` written as
-   * literals and {{secrets.*}}. Nothing has been received, so the run is given no request -- the checker
+   * literals and {{secrets.*}}. Nothing has been received, so the run is given no context -- the checker
    * has already refused any step that reaches a read of one. What it did is told to whoever is listening as a
    * `Started` and never as a `Fired`: a step is not a trigger, it has no kind, no correlation and no gate.
    * `at` is required and never defaulted: a step's index is a real position in `project.json → startup`, which
@@ -227,12 +227,12 @@ export class Embedder {
    * the places one may sit, the first present wins; a value with nothing in it is no credential -- and the reads as
    * written, so the guard can say where an answer goes.
    */
-  guardArgs(trigger: TriggerDoc, request: Record<string, unknown>): GuardArgs {
+  guardArgs(trigger: TriggerDoc, context: Record<string, unknown>): GuardArgs {
     const settings = this.guard
       ? ((this.env.plugins as Record<string, Record<string, unknown>>)[this.guard.root] ?? {})
       : {};
-    const { credentials, reads } = gathered(trigger, request);
-    return { trigger, kind: this.scope.canon(trigger.kind), request, credentials, reads, settings, env: this.env };
+    const { credentials, reads } = gathered(trigger, context);
+    return { trigger, kind: this.scope.canon(trigger.kind), context, credentials, reads, settings, env: this.env };
   }
 
   /** The codec table of a plugin's settings, resolved to implementations: content type -> codec. */
@@ -253,10 +253,10 @@ export class Embedder {
    * Build the trigger's input from its context: the `input` mapping when declared, else the decoded body.
    * Answers the input, or the reason it does not conform to the trigger's in type.
    */
-  inputFor(trigger: TriggerDoc, request: Record<string, unknown>): { input: unknown } | { error: string } {
+  inputFor(trigger: TriggerDoc, context: Record<string, unknown>): { input: unknown } | { error: string } {
     const type = this.types(trigger).in;
     if (!type) return { input: undefined };
-    const raw = trigger.fire.in !== undefined ? fillTemplates(trigger.fire.in, { request }) : request.body;
+    const raw = trigger.fire.in !== undefined ? fillTemplates(trigger.fire.in, { context }) : context.body;
     const input =
       type.kind === 'object' && raw && typeof raw === 'object' && !Array.isArray(raw)
         ? Object.fromEntries(
@@ -280,14 +280,14 @@ export class Embedder {
   async fire(
     trigger: TriggerDoc,
     input: unknown,
-    request: Record<string, unknown>,
+    context: Record<string, unknown>,
     opts: FireOptions = {},
   ): Promise<Report> {
     const startedAt = this.clock();
-    const gated = await gate(this, trigger, request, { stubbed: this.stubbed, ...opts });
-    const run = gated.ended ? undefined : await this.ran(trigger, input, request, opts);
+    const gated = await gate(this, trigger, context, { stubbed: this.stubbed, ...opts });
+    const run = gated.ended ? undefined : await this.ran(trigger, input, context, opts);
     const answer = gated.ended ?? (run as Report);
-    const correlation = this.correlation(trigger, request);
+    const correlation = this.correlation(trigger, context);
     this.observed({
       id: runId(startedAt),
       trigger: this.pathOf(trigger),
@@ -307,14 +307,14 @@ export class Embedder {
   private async ran(
     trigger: TriggerDoc,
     input: unknown,
-    request: Record<string, unknown>,
+    context: Record<string, unknown>,
     opts: FireOptions,
   ): Promise<Report> {
-    const initial: Record<string, unknown> = { request };
+    const initial: Record<string, unknown> = { context };
     if (input !== undefined) initial.in = input;
     const report = await runGraph(this.operation(trigger.fire.run), {
       initial,
-      shown: shownRoots(this.scope, trigger, { request, input, inType: this.types(trigger).in }),
+      shown: shownRoots(this.scope, trigger, { context, input, inType: this.types(trigger).in }),
       stubs: opts.stubs,
       signal: opts.signal,
       clock: this.clock,
@@ -322,7 +322,7 @@ export class Embedder {
     });
     const guard = this.guard?.guard;
     if (guard?.settle && !this.stubbed && trigger.policies?.length)
-      await guard.settle({ ...this.guardArgs(trigger, request), report });
+      await guard.settle({ ...this.guardArgs(trigger, context), report });
     const declared = trigger.out ? this.types(trigger).out : undefined;
     return report.status === 'done' && declared ? judged(report, declared, trigger.out ?? '') : report;
   }
@@ -334,9 +334,9 @@ export class Embedder {
   }
 
   /** What correlates this run with its caller's own trace: the value at the path the trigger's kind declares. */
-  private correlation(trigger: TriggerDoc, request: Record<string, unknown>): string | undefined {
+  private correlation(trigger: TriggerDoc, context: Record<string, unknown>): string | undefined {
     const kind = this.scope.get('trigger-kind', trigger.kind);
-    return correlationOf(request, kind?.doc.correlation);
+    return correlationOf(context, kind?.doc.correlation);
   }
 }
 

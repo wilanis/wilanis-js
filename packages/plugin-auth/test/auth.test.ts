@@ -305,7 +305,7 @@ describe("the plugin's own rules", () => {
     ).toContain('X101');
   });
   it('X102 a challenge no attachment of the trigger could answer', () => {
-    // the bare attachment also leaves the policy's read of request.challenge unsupplied (A005)
+    // the bare attachment also leaves the policy's read of context.challenge unsupplied (A005)
     expect(
       sabotage({
         'features/hello/edge/hello-gated.trigger.json': trigger => {

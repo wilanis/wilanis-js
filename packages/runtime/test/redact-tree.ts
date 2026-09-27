@@ -182,7 +182,7 @@ function edge(put: (rel: string, doc: object) => void): void {
     settings: {},
     in: '@features/vault/edge/Key.shape.json',
     out: 'string',
-    fire: { run: `${PORT}#unlock`, in: { key: '{{request.flags.key}}' } },
+    fire: { run: `${PORT}#unlock`, in: { key: '{{context.flags.key}}' } },
   });
 }
 

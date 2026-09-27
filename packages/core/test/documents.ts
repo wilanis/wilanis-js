@@ -33,7 +33,7 @@ export const minimal: Record<Kind, Record<string, unknown>> = {
   feature: {},
   shape: { layer: 'core', fields: {} },
   scenario: { trigger: '@features/f/edge/t.trigger.json', seed: 1, expect: { status: 'done', nodes: {} } },
-  resolvers: { resolvers: { caller: { read: "request.headers['user-agent']" } } },
+  resolvers: { resolvers: { caller: { read: "context.headers['user-agent']" } } },
   store: {
     connection: '@connections/records.connection.json',
     collections: { customers: { of: '@features/f/domain/Customer.shape.json', key: 'id' } },

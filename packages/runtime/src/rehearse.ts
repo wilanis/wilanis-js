@@ -141,8 +141,8 @@ const brokeAt = (fault: { at: string; error: string }) => (fault.at ? `${fault.a
 /** A trigger with no switch anywhere under it: one run is the whole of it. */
 async function wholeOf(load: LoadResult, trigger: Loaded<TriggerDoc>, seed: number, profile?: string) {
   const emb = embedderFor(load, { seed, profile });
-  const { input, request } = generatedFire(emb, trigger, seed);
-  const report = await emb.fire(trigger.doc, input, request);
+  const { input, context } = generatedFire(emb, trigger, seed);
+  const report = await emb.fire(trigger.doc, input, context);
   const outcome = outcomeOf(report);
   return {
     trigger: trigger.name,
@@ -170,8 +170,8 @@ async function rehearseTrigger(
   const record: Record<string, unknown> = {};
   const types: Record<string, Type> = {};
   const probe = embedderFor(load, { seed, record, types, profile: opts.profile });
-  const { input, request } = generatedFire(probe, trigger, seed);
-  await probe.fire(trigger.doc, input, request);
+  const { input, context } = generatedFire(probe, trigger, seed);
+  await probe.fire(trigger.doc, input, context);
 
   const spec = probe.operation(trigger.doc.fire.run).spec;
   const found = switchesOf(spec, handler => specBehind(probe, handler));
@@ -187,7 +187,7 @@ async function rehearseTrigger(
     inputSeed: input,
     inType,
   };
-  const walk: Walk = { load, trigger, seed, profile, found, stubbing, input, request, probe };
+  const walk: Walk = { load, trigger, seed, profile, found, stubbing, input, context, probe };
 
   // The probe took one path, so nodes behind every branch it did not take are absent from the recording
   // and their declared types are unknown -- a case built from nothing cannot generate a typed value. One
@@ -206,7 +206,7 @@ interface Walk {
   found: FoundSwitch[];
   stubbing: Stubbing;
   input: unknown;
-  request: Record<string, unknown>;
+  context: Record<string, unknown>;
   probe: Embedder;
 }
 
@@ -265,7 +265,7 @@ async function warmUp(walk: Walk, sw: FoundSwitch, record: Record<string, unknow
   for (const patch of pre.input) warm = setPath(warm, patch.path, patch.value);
   const broken = new Set(pre.broken);
   const emb = embedderFor(walk.load, { seed: walk.seed, record, types, profile: walk.profile, broken });
-  await emb.fire(walk.trigger.doc, warm, walk.request, { stubs: unbroken(pre.stubs, broken) });
+  await emb.fire(walk.trigger.doc, warm, walk.context, { stubs: unbroken(pre.stubs, broken) });
 }
 
 /**
@@ -359,7 +359,7 @@ async function branchOf(
   // a demand on the graph's own input is met by firing with a patched input, not by a stub
   let fired = walk.input;
   for (const patch of [...steer.pre.input, ...(one.input ?? [])]) fired = setPath(fired, patch.path, patch.value);
-  const report = await emb.fire(walk.trigger.doc, fired, walk.request, {
+  const report = await emb.fire(walk.trigger.doc, fired, walk.context, {
     stubs: unbroken({ ...steer.downstream, ...steer.pre.stubs, ...one.stubs }, broken),
   });
   return { ...at, settled: settle(report, sw, one.branch.to) };

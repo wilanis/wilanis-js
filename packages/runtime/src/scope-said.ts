@@ -31,10 +31,10 @@ import {
   type Values,
 } from '@wilanis/core';
 
-/** Is a dotted path the prefix itself, or below it? What a policy proving `request.session` proves. */
+/** Is a dotted path the prefix itself, or below it? What a policy proving `context.session` proves. */
 const atOrBelow = (path: string, prefix: string): boolean => path === prefix || path.startsWith(`${prefix}.`);
 
-/** The `request.*` path one of a store's reads resolves to, or nothing where the resolver cannot be read. */
+/** The `context.*` path one of a store's reads resolves to, or nothing where the resolver cannot be read. */
 export function readPathOf(store: StoreDoc, name: string, scope: Scope): string | undefined {
   const ref = store.reads?.[name];
   if (!ref) return undefined;
@@ -81,7 +81,7 @@ function policiesOf(trigger: Loaded<TriggerDoc>, scope: Scope): Loaded<PolicyDoc
 /**
  * Every trigger reaching a scoped collection, and which of its policies guarantee the read the scope is
  * filled from. A policy guarantees it by `proves` naming the read's path or a prefix of it, which is how
- * A006 reads the same list -- a policy that proves `request.session` proves every attribute of it.
+ * A006 reads the same list -- a policy that proves `context.session` proves every attribute of it.
  */
 export function guaranteedBy(
   store: Loaded<StoreDoc>,
@@ -96,7 +96,7 @@ export function guaranteedBy(
   }));
 }
 
-/** The attached policies of one trigger whose `proves` covers one `request.*` path. */
+/** The attached policies of one trigger whose `proves` covers one `context.*` path. */
 function provingPolicies(trigger: Loaded<TriggerDoc>, read: string, scope: Scope): string[] {
   return policiesOf(trigger, scope)
     .filter(policy => (policy.doc.proves ?? []).some(proof => atOrBelow(read, splitPath(proof).slice(1).join('.'))))

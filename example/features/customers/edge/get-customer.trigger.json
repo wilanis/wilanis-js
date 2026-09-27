@@ -25,8 +25,8 @@
       "policy": "@access/edge/signed-in.policy.json",
       "in": {
         "token": [
-          "{{request.headers.authorization}}",
-          "{{request.cookies.session}}"
+          "{{context.headers.authorization}}",
+          "{{context.cookies.session}}"
         ]
       }
     }
@@ -34,7 +34,7 @@
   "fire": {
     "run": "@customers/domain/customer.port.json#get",
     "in": {
-      "id": "{{request.params.id}}"
+      "id": "{{context.params.id}}"
     }
   }
 }

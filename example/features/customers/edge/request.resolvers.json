@@ -5,18 +5,18 @@
   "resolvers": {
     "agent": {
       "label": "The caller's user agent",
-      "read": "request.headers['user-agent']",
+      "read": "context.headers['user-agent']",
       "description": "absent when the caller sent none; the header is then not forwarded"
     },
     "tenant": {
       "label": "The caller's tenant",
-      "read": "request.session.attributes.tenant",
+      "read": "context.session.attributes.tenant",
       "required": true,
       "description": "Written into the session at sign-in from what the directory said about the account; every customer kept in a store belongs to one"
     },
     "token": {
       "label": "The caller's token",
-      "read": "request.headers.authorization",
+      "read": "context.headers.authorization",
       "description": "The Authorization header as the caller sent it, forwarded in a queued message's headers so the worker's gate verifies the same caller the route did"
     }
   }

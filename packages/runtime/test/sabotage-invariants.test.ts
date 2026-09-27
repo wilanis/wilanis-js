@@ -43,7 +43,7 @@ describe('sabotage: invariants, the access form', () => {
   it('I001 the proves form: a path none of the policies a reaching trigger attaches establishes', () => {
     expect(
       sabotage(SESSIONS, invariant => {
-        invariant.access.requires.proves = ['request.challenge'];
+        invariant.access.requires.proves = ['context.challenge'];
       }),
     ).toEqual(['I001', 'I001', 'I001']);
   });
@@ -56,7 +56,7 @@ describe('sabotage: invariants, the access form', () => {
     ).toEqual(['I002', 'I003']);
     expect(
       sabotage(SESSIONS, invariant => {
-        invariant.access.requires.proves = ['request.nope'];
+        invariant.access.requires.proves = ['context.nope'];
       }),
     ).toEqual(['I002']);
   });

@@ -69,7 +69,7 @@ or prove the rule where the value is made.
 A node's `in` gives every value an operation takes, in one grammar: a literal as written, or `{{fetched.status}}`
 to read another node, the graph's `in`, a constant (`{{const.initial}}`) or a resolver. Embedded in text it
 interpolates (`"/tasks/{{in.id}}"`). A key that is not an identifier is quoted in brackets:
-`{{request.headers['user-agent']}}`. A contract marks the fields that must be literals `static` (a connection,
+`{{context.headers['user-agent']}}`. A contract marks the fields that must be literals `static` (a connection,
 a content type); a `type` field always is.
 
 ## Types are declared, never inferred
@@ -101,7 +101,7 @@ answered.
 
 A trigger names its kind (an http route, a cli command, whatever a plugin grants), the settings that kind
 judges, edge `in`/`out` types, and `fire`: the domain port operation it runs, with its inputs read from the
-kind's context (`{{request.body.title}}`). **A trigger never names a graph**; the port's binding decides how
+kind's context (`{{context.body.title}}`). **A trigger never names a graph**; the port's binding decides how
 the operation is met.
 
 A trigger with no `policies` is called by anyone, so every list its edge shapes take -- its `in`, and each
@@ -115,12 +115,12 @@ credentials it verifies, read from the kind's context like any input:
 
 ```json
 { "policy": "@access/edge/employees-only.policy.json",
-  "in": { "token": ["{{request.headers.authorization}}", "{{request.cookies.session}}"] } }
+  "in": { "token": ["{{context.headers.authorization}}", "{{context.cookies.session}}"] } }
 ```
 
 A list is the places a credential may sit, the first present wins; a later policy written bare reuses what an
 earlier one gave. A **policy** lives in `edge/` and fires a domain operation the way a trigger does, reading
-what the guard hands: `request.principal`, `request.session`, `request.challenge`. Its graph allows by
+what the guard hands: `context.principal`, `context.session`, `context.challenge`. Its graph allows by
 answering and refuses with a reason; `outcomes` says whether a reason is a `deny` or a `challenge`, and the
 trigger maps every reason it can reach, its policies' included (T005).
 
@@ -130,7 +130,7 @@ Validating a credential happens in the guarding plugin, before any policy, never
 on the left of `&&` may be read on the right.
 
 A session is opened when a token is issued and carries attributes of a shape the project names; a graph reads
-and writes them through `@auth/session.port.json`, keyed by `request.session.id`, and `wilanis describe` on the
+and writes them through `@auth/session.port.json`, keyed by `context.session.id`, and `wilanis describe` on the
 shape lists who writes what.
 
 ## Invariants are stated once
@@ -174,9 +174,9 @@ is not a tree (or one using a plugin this project does not name) is D010. `@wila
 
 ## Resolvers are reads
 
-A `resolvers` document in a feature's `edge/` names what the data layer takes from the request
-(`request.headers['user-agent']`); a data graph or a binding names the document and reads `{{agent}}`.
-`request.*` is legal in a trigger's `fire.in`, a policy's `decide.in` and a resolver's `read`; nowhere else.
+A `resolvers` document in a feature's `edge/` names what the data layer takes from the context
+(`context.headers['user-agent']`); a data graph or a binding names the document and reads `{{agent}}`.
+`context.*` is legal in a trigger's `fire.in`, a policy's `decide.in` and a resolver's `read`; nowhere else.
 A resolver declared `required` is read as present, and every trigger reaching it must guarantee that: its kind
 hands the path always, or a policy of the trigger lists it under `proves` (A006). A resolver is a read, never
 an operation -- the compiler lowers it to a source reference and nothing runs.
@@ -264,7 +264,7 @@ A plugin package exports its `PluginModule` as the default export. Three hooks o
 - `check(ctx)` adds the plugin's own rules (the `X` codes) to `wilanis check`.
 - `guard` -- on the one plugin that identifies callers, declared in its `plugin.json` -- is called by the
   runtime around every fire of a trigger that attaches a policy, for every trigger kind alike: `identify`
-  reads and verifies the credential and hands `request.principal`, `request.session`, `request.challenge`;
+  reads and verifies the credential and hands `context.principal`, `context.session`, `context.challenge`;
   `challenge` opens a challenge a policy asked for; `settle` spends what was single-use. The stubbed gates
   never call it.
 - `postLoad(ctx)` runs once after the tree is loaded and judged, before any trigger starts, with the plugin's
@@ -291,7 +291,7 @@ that a tree with http triggers should open a port.
 
 Each step names one port operation. Most name a **domain port**, so the active profile's binding decides how it
 is met -- a fake in development, the real connection in production, without touching the step. Its `in` is
-written as literals and `{{secrets.*}}`; nothing has been received yet, so a step that reads `request.*` -- or
+written as literals and `{{secrets.*}}`; nothing has been received yet, so a step that reads `context.*` -- or
 whose bound graph does -- is refused before it ever runs (B007, B008).
 
 A step may also name a `holds` operation: one that starts something outliving the run -- a listener, a watcher,

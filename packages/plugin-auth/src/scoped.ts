@@ -1,7 +1,7 @@
 /**
  * X105: a session attribute some store scopes a collection by is written at sign-in and never again. Only @auth
  * knows that `session.port.json#set` and `#remove` write the attributes the guard hands back as
- * request.session.attributes, so only @auth can refuse a graph that writes one over again. What it reads is two
+ * context.session.attributes, so only @auth can refuse a graph that writes one over again. What it reads is two
  * core kinds -- every `store`, for the collections it keeps and the reads they are scoped by, and the `resolvers`
  * documents those reads name -- and nothing of what a scope means to a statement, which is the storage plugin's.
  */
@@ -13,14 +13,14 @@ export interface ScopedAttribute {
   collection: string;
 }
 
-/** The session attribute a resolver reads, where it reads exactly one: request.session.attributes.<key>. */
+/** The session attribute a resolver reads, where it reads exactly one: context.session.attributes.<key>. */
 function attributeOf(scope: Scope, ref: string): string | undefined {
   const { path, op: name } = splitRef(ref);
   const doc = scope.get('resolvers', path)?.doc as ResolversDoc | undefined;
   const read = name ? doc?.resolvers[name]?.read : undefined;
   if (!read) return undefined;
   const segments = splitPath(read);
-  const reads = segments.length === 4 && segments[0] === 'request' && segments[1] === 'session';
+  const reads = segments.length === 4 && segments[0] === 'context' && segments[1] === 'session';
   return reads && segments[2] === 'attributes' ? segments[3] : undefined;
 }
 

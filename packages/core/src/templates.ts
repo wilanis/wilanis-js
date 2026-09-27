@@ -1,7 +1,7 @@
 /**
  * The grammar of a read. A template `{{root.path}}` reads a value where it is written; a read path is a root,
  * then segments: `.name` for an identifier, or a quoted key in brackets for a name that is not one --
- * request.headers['user-agent']. Single or double quotes; single needs no escaping inside a JSON string.
+ * context.headers['user-agent']. Single or double quotes; single needs no escaping inside a JSON string.
  */
 
 /** The {name} placeholders of a templated string setting, such as an http route. */
@@ -19,7 +19,7 @@ export const WHOLE_TEMPLATE = new RegExp(String.raw`^\{\{\s*(${ROOT}${SEGMENT}*)
 export const READ_PATH = new RegExp(`^${ROOT}${SEGMENT}*$`);
 const SEGMENTS = new RegExp(String.raw`^(${ROOT})|\.([A-Za-z0-9_]+)|\[(?:'([^'\]]*)'|"([^"\]]*)")\]`, 'g');
 
-/** The root and segments of a read path, quotes stripped: request.headers['user-agent'] → ['request', 'headers', 'user-agent']. */
+/** The root and segments of a read path, quotes stripped: context.headers['user-agent'] → ['context', 'headers', 'user-agent']. */
 export function splitPath(path: string): string[] {
   const out: string[] = [];
   for (const match of path.matchAll(SEGMENTS)) out.push(match[1] ?? match[2] ?? match[3] ?? match[4] ?? '');

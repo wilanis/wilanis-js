@@ -84,13 +84,13 @@ const naming = (trigger: TriggerDoc, decided: Decided): Decided => ({
 });
 
 /** Fire the trigger for one delivery, in a blob scope of its own, and decide the outcome of its report. */
-async function fired(worked: Worked, trigger: TriggerDoc, request: Record<string, unknown>, attempt: number) {
-  const built = worked.serving.inputFor(trigger, request);
+async function fired(worked: Worked, trigger: TriggerDoc, context: Record<string, unknown>, attempt: number) {
+  const built = worked.serving.inputFor(trigger, context);
   // a message whose input does not fit will not fit on any later delivery either, so it is parked at once
   if ('error' in built) return { outcome: 'dead', ended: `input does not conform: ${built.error}` } as Decided;
   const scope = worked.serving.blobs.scope();
   try {
-    const report = await worked.serving.fire({ trigger, input: built.input, request, blobs: scope });
+    const report = await worked.serving.fire({ trigger, input: built.input, context, blobs: scope });
     return naming(trigger, outcomeOf(trigger, report, attempt));
   } catch (error) {
     return naming(trigger, faultOf(trigger, (error as Error).message, attempt));

@@ -33,7 +33,7 @@
           },
           "required": false,
           "secret": true,
-          "description": "what rides beside the body, by name; the consuming trigger reads them as request.headers"
+          "description": "what rides beside the body, by name; the consuming trigger reads them as context.headers"
         },
         "delayMs": {
           "type": "number",
@@ -45,7 +45,7 @@
         "fields": {
           "id": {
             "type": "string",
-            "description": "the broker's id for the message, which the consuming trigger reads as request.id"
+            "description": "the broker's id for the message, which the consuming trigger reads as context.id"
           }
         }
       }

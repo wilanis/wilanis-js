@@ -19,8 +19,8 @@
       "policy": "@access/edge/signed-in.policy.json",
       "in": {
         "token": [
-          "{{request.headers.authorization}}",
-          "{{request.cookies.session}}"
+          "{{context.headers.authorization}}",
+          "{{context.cookies.session}}"
         ]
       }
     }

@@ -46,9 +46,9 @@ The context hands the graph three things, read like any input through `fire.in`:
 
 | Read | What it is |
 |---|---|
-| `request.scheduled` | the tick's instant, ISO 8601 in UTC |
-| `request.fired` | when this run began, later than `scheduled` when the process was busy |
-| `request.missed` | ticks since the last run that were not fired |
+| `context.scheduled` | the tick's instant, ISO 8601 in UTC |
+| `context.fired` | when this run began, later than `scheduled` when the process was busy |
+| `context.missed` | ticks since the last run that were not fired |
 
 Nothing in the tree calls a clock: time enters as a string, so `wilanis rehearse` and `wilanis run --seed`
 replay a tick like any request.

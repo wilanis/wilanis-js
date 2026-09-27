@@ -47,7 +47,7 @@ route published last is still worked. It takes `concurrency` (messages of one qu
   "out": "@customers/edge/CustomerView.shape.json",
   "fire": {
     "run": "@customers/domain/customer.port.json#remove",
-    "in": { "id": "{{request.message.id}}" }
+    "in": { "id": "{{context.message.id}}" }
   }
 }
 ```
@@ -56,14 +56,14 @@ The context hands the graph what the message carries, read like any input throug
 
 | Read | What it is |
 |---|---|
-| `request.message` | the body, of the edge type `settings.message` names |
-| `request.headers` | what the publisher put beside the body; where a credential rides |
-| `request.id` | the broker's id for the message, the same on every delivery of it |
-| `request.attempt` | 1 on the first delivery, one more on each redelivery |
-| `request.queue` | the queue it arrived on |
+| `context.message` | the body, of the edge type `settings.message` names |
+| `context.headers` | what the publisher put beside the body; where a credential rides |
+| `context.id` | the broker's id for the message, the same on every delivery of it |
+| `context.attempt` | 1 on the first delivery, one more on each redelivery |
+| `context.queue` | the queue it arrived on |
 
 A message is gated like a request: a policy attachment gives the guard a token read from the headers
-(`"in": { "token": "{{request.headers.authorization}}" }`), and a queue trigger with no policies is public to
+(`"in": { "token": "{{context.headers.authorization}}" }`), and a queue trigger with no policies is public to
 whoever can publish to the broker. The answer is judged against `out` and logged; nobody receives it. The
 kind declares `correlation: headers.traceparent`, as the route kind does, so a publisher that puts its W3C
 `traceparent` in the headers finds the run it caused under its own trace.

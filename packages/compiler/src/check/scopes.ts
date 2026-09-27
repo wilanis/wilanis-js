@@ -59,7 +59,7 @@ const HINT_ONE_READ = (column: string, name: string) =>
 /**
  * C012: a scope is a column the store keeps beside the record, filled by exactly one read the store binds.
  * The judgement is made here, over the document, because after lowering a resolver read and a hand-written
- * `{{request.session.attributes.tenant}}` are the same source and nothing downstream can tell them apart.
+ * `{{context.session.attributes.tenant}}` are the same source and nothing downstream can tell them apart.
  */
 function checkColumn(scoping: Scoping, column: Column): void {
   const at = `collections/${column.name}/scoped/${column.column}`;
@@ -108,7 +108,7 @@ function checkNotAField(scoping: Scoping, column: Column, at: string): void {
 /**
  * C012: what the bound resolver must be. Required, so the read is present wherever the collection is reached
  * and A006 holds every trigger reaching it to a policy that proves it; and a string or a number, since a
- * column holds one value -- a read that types `unknown`, as a claim of the open `request.principal.claims`
+ * column holds one value -- a read that types `unknown`, as a claim of the open `context.principal.claims`
  * does and as a session attribute does in a tree whose guard names no session shape, is refused here.
  */
 function checkResolver(scoping: Scoping, column: Column, at: string, resolver: JudgedResolver): void {
@@ -118,7 +118,7 @@ function checkResolver(scoping: Scoping, column: Column, at: string, resolver: J
   }
   const kind = resolver.read.type.kind;
   if (kind === 'string' || kind === 'number') return;
-  const read = `request.${resolver.path.join('.')}`;
+  const read = `context.${resolver.path.join('.')}`;
   const message = `the read '${column.value}' is ${read}, which is ${show(resolver.read.type)}, and a column holds a string or a number`;
   const hint = 'a scope is a string or a number: declare the attribute in the shape the guard’s settings.session names';
   scoping.refuse('C012', message, at, hint);

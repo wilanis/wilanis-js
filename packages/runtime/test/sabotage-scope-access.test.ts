@@ -32,22 +32,22 @@ describe('sabotage: who a scope may read', () => {
   it('A007 a scope read from a header or a route parameter', () => {
     // each of these is the caller's own word for who they are: a store scoped by one is scoped by nothing,
     // since the value arrives with the request and the caller wrote it. The body is not among them because
-    // no kind of this example hands request.body, so P002 refuses such a resolver before a store can bind it
-    for (const read of ["request.headers['x-tenant']", 'request.params.id', "request.query['tenant']"])
+    // no kind of this example hands context.body, so P002 refuses such a resolver before a store can bind it
+    for (const read of ["context.headers['x-tenant']", 'context.params.id', "context.query['tenant']"])
       expect(scopedCodes(reading(read))).toContain('A007');
   });
   it('A007 names the collections the read scopes and what the caller could do', () => {
-    expect(scopedSaying(reading("request.headers['x-tenant']"))).toContain(
-      'A007 scopes customers, and reads request.headers.x-tenant: a caller may send any value there',
+    expect(scopedSaying(reading("context.headers['x-tenant']"))).toContain(
+      'A007 scopes customers, and reads context.headers.x-tenant: a caller may send any value there',
     );
   });
   it('A007 offers the roots the guard hands, and the command that lists them', () => {
-    expect(scopedHinting(reading('request.params.id'))).toContain(
-      'A007 a scope reads what the guard hands once it identified the caller (request.principal, request.session, request.challenge); wilanis describe @auth/plugin.json',
+    expect(scopedHinting(reading('context.params.id'))).toContain(
+      'A007 a scope reads what the guard hands once it identified the caller (context.principal, context.session, context.challenge); wilanis describe @auth/plugin.json',
     );
   });
   it('A007 points at the reads entry, since that is the line an author would change', () => {
-    expect(scopedPointing(reading('request.params.id'))).toContain(
+    expect(scopedPointing(reading('context.params.id'))).toContain(
       'A007 @features/customers/data/customers.store.json#reads/tenant',
     );
   });
@@ -68,8 +68,8 @@ describe('sabotage: who a scope may read', () => {
     );
   });
   it('A007 says nothing of a read the guard does hand', () => {
-    // request.session is a key of the guard's context, so the example's own scope is not this rule's business
-    expect(scopedCodes(reading('request.principal.subject'))).not.toContain('A007');
+    // context.session is a key of the guard's context, so the example's own scope is not this rule's business
+    expect(scopedCodes(reading('context.principal.subject'))).not.toContain('A007');
   });
   it('A007 says nothing of a store that scopes nothing, whatever it reads', () => {
     // a reads entry no scoped column fills is P005's business, not this rule's: A007 judges what a scope
@@ -82,7 +82,7 @@ describe('sabotage: who a scope may read', () => {
     const codes = scopedCodes({
       [STORE]: scopingNothing,
       [POSTGRES_STORE]: scopingNothing,
-      ...reading("request.headers['x-tenant']"),
+      ...reading("context.headers['x-tenant']"),
     });
     expect(codes).not.toContain('A007');
     expect(codes).toContain('P005');

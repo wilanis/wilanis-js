@@ -67,14 +67,14 @@ export function layerOf(path: string): Layer | undefined {
   return match && (LAYERS as string[]).includes(match[1]) ? (match[1] as Layer) : undefined;
 }
 
-/** One resolver: a named read of the trigger kind's context, request.params.id or request.headers['user-agent']. Nothing runs. */
+/** One resolver: a named read of the trigger kind's context, context.params.id or context.headers['user-agent']. Nothing runs. */
 export interface ResolverRead {
   read: string;
   label?: string;
   description?: string /** read as present: every trigger reaching it must guarantee it, by its kind or by a policy that proves it (A006) */;
   required?: boolean;
 }
-/** The resolvers a feature reads from the request, in one edge document a data graph or a binding names. */
+/** The resolvers a feature reads from the context, in one edge document a data graph or a binding names. */
 export interface ResolversDoc extends Envelope {
   resolvers: Record<string, ResolverRead>;
 }
@@ -133,8 +133,8 @@ export interface ProjectDoc extends Envelope {
   blobs?: { dir?: string; connection?: string };
 }
 /**
- * What a guarding plugin adds to every trigger kind's context once it has identified the caller (request.principal,
- * request.session, request.challenge), and the reasons it refuses with on its own -- a credential that does not
+ * What a guarding plugin adds to every trigger kind's context once it has identified the caller (context.principal,
+ * context.session, context.challenge), and the reasons it refuses with on its own -- a credential that does not
  * verify -- which every trigger giving it a credential must map like any other reason (T005).
  */
 export interface GuardDoc {
@@ -194,7 +194,7 @@ export interface BindingOp {
   timeoutMs?: number;
   description?: string;
 }
-/** How a domain port is met. `reads` names each read of the request a delegation may use, as `@path#resolver`. */
+/** How a domain port is met. `reads` names each read of the context a delegation may use, as `@path#resolver`. */
 export interface BindingDoc extends Envelope {
   port: string;
   /** Local name -> the resolver that declares it (`@feature/edge/file.resolvers.json#name`). */
@@ -256,7 +256,7 @@ export interface Outcome {
 }
 /**
  * A gate on a trigger: `decide` fires a domain port operation the way a trigger's `fire` does, reading what the kind
- * and the guard hand as request.*; the graph behind it allows by answering and refuses with a reason, and `outcomes`
+ * and the guard hand as context.*; the graph behind it allows by answering and refuses with a reason, and `outcomes`
  * says what each reason means. Validating a credential never happens here: the guard has already done that.
  */
 export interface PolicyDoc extends Envelope {
@@ -264,7 +264,7 @@ export interface PolicyDoc extends Envelope {
   outcomes: Record<
     string,
     Outcome
-  > /** request.* paths present once this policy allows -- request.principal, request.session -- which a required resolver may lean on (A006) */;
+  > /** context.* paths present once this policy allows -- context.principal, context.session -- which a required resolver may lean on (A006) */;
   proves?: string[];
 }
 /** `refusals`: the dotted settings path holding the map from a refusal's reason to how this kind answers it; every reason a trigger can reach must be a key there (T005). */
@@ -395,7 +395,8 @@ export interface ScenarioDoc extends Envelope {
   branch?: ScenarioBranch;
   seed: number;
   in?: unknown;
-  request?: Record<string, unknown>;
+  /** The context the run read, for a trigger whose kind hands one: what `fire.in` and any policy read from. */
+  context?: Record<string, unknown>;
   stubs?: Record<string, unknown>;
   /** The stubbed node at which a replay aborts the run's signal: one of the keys of `stubs`. */
   cancelAt?: string;

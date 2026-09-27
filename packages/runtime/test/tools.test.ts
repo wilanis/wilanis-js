@@ -75,7 +75,7 @@ describe('wilanis new', () => {
     // document is a valid instance of its schema. What is left is the three TODOs a scaffold cannot decide for
     // the author: the trigger must declare what it answers (T002); the field invariant names a shape no graph
     // makes or takes yet, since the author has not written one (I003); and the access invariant's proves names
-    // request.principal, which only a guarding plugin hands and a fresh project names none (I002).
+    // context.principal, which only a guarding plugin hands and a fresh project names none (I002).
     expect(checkTree(loadTree(dir, PLUGINS)).items.map(refusal => refusal.code)).toEqual(['T002', 'I003', 'I002']);
     expect(() => scaffold(dir, 'nonsense', 'x', {})).toThrow("unknown kind 'nonsense'");
     rmSync(dir, { recursive: true, force: true });
@@ -241,13 +241,13 @@ describe('wilanis describe: the reads a document takes from the request', () => 
   it('names each read, the resolver it is bound to, and what that resolver reads of the request', () => {
     // the ref is openable and the read beside it spares the reader opening it to learn what {{agent}} is
     expect(said()).toContain(
-      "    agent ← @customers/edge/request.resolvers.json#agent  (request.headers['user-agent'])",
+      "    agent ← @customers/edge/request.resolvers.json#agent  (context.headers['user-agent'])",
     );
   });
 
   it('says of a required read that it is required, since a trigger reaching it must prove it (A006)', () => {
     const lines = describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@access/data/read-session.graph.json');
-    expect(lines).toContain('    sid ← @access/edge/session.resolvers.json#sid  (request.session.id, required)');
+    expect(lines).toContain('    sid ← @access/edge/session.resolvers.json#sid  (context.session.id, required)');
   });
 
   it('prints no block at all for a graph that reads nothing, rather than an empty heading', () => {
@@ -262,7 +262,7 @@ describe('wilanis describe: the reads a document takes from the request', () => 
     });
     const lines = describeDoc(load, '@customers/data/customers-rest.binding.json').split('\n');
     expect(lines).toContain(
-      "    agent ← @customers/edge/request.resolvers.json#agent  (request.headers['user-agent'])",
+      "    agent ← @customers/edge/request.resolvers.json#agent  (context.headers['user-agent'])",
     );
     expect(lines.indexOf('reads:')).toBeLessThan(lines.indexOf('answers:'));
     rmSync(dir, { recursive: true, force: true });
@@ -284,7 +284,7 @@ describe('wilanis describe: a resolvers document and who reads it', () => {
   const said = () => describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), '@customers/edge/request.resolvers.json');
 
   it('prints one line per resolver, saying what it reads', () => {
-    expect(said()).toContain("    agent  ← request.headers['user-agent']");
+    expect(said()).toContain("    agent  ← context.headers['user-agent']");
   });
 
   it('names every document that binds it, and the local name each gave it', () => {
@@ -300,7 +300,7 @@ describe('wilanis describe: a resolvers document and who reads it', () => {
 
   it('says so where a resolver is declared and nothing binds it', () => {
     const { load, dir } = loadedEditing('features/customers/edge/request.resolvers.json', doc => {
-      doc.resolvers.region = { read: 'request.session.attributes.region' };
+      doc.resolvers.region = { read: 'context.session.attributes.region' };
     });
     expect(describeDoc(load, '@customers/edge/request.resolvers.json')).toContain(
       '        used by nothing yet -- bind it under a data graph’s or a binding’s reads',

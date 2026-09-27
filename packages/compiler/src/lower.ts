@@ -1,6 +1,6 @@
 /**
  * Lowering values to kernel sources. A literal bakes; a whole {{template}} reads a node, the input, a resolver
- * (a read below request) or a constant; text with templates concatenates; lists and objects lower each member.
+ * (a read below context) or a constant; text with templates concatenates; lists and objects lower each member.
  * Also the scope a site over a scoped collection carries, which no document writes, and the secret paths of a
  * type, which a call's report redacts.
  */
@@ -24,12 +24,12 @@ import { bindings, type CallSite, collectionOf } from './documents.js';
 
 /** The roots a value may read where it is written, and how each lowers. */
 export interface Roots {
-  /** resolver name -> the segments it reads below request */
+  /** resolver name -> the segments it reads below context */
   resolvers: Record<string, string[]>;
   /** constant name -> baked value */
   consts?: Record<string, unknown>;
-  /** may read request.* (a resolver's own in) */
-  request?: boolean;
+  /** may read context.* (a resolver's own in) */
+  context?: boolean;
   /** may read other nodes by id (a graph node's in) */
   nodes?: boolean;
   /**
@@ -41,14 +41,14 @@ export interface Roots {
   aliases?: Record<string, string>;
 }
 
-/** One template read as a source: a resolver reads below request, a constant bakes, the rest read their root. */
+/** One template read as a source: a resolver reads below context, a constant bakes, the rest read their root. */
 function lowerRef(template: string, roots: Roots): KSource {
   const [named, ...path] = splitPath(template);
-  if (roots.resolvers[named]) return { ref: 'request', path: [...roots.resolvers[named], ...path] };
+  if (roots.resolvers[named]) return { ref: 'context', path: [...roots.resolvers[named], ...path] };
   const root = roots.aliases?.[named] ?? named;
   if (named === 'in') return { ref: root, path };
   if (named === 'const' && roots.consts) return { value: readPath(roots.consts[path[0]], path.slice(1)) };
-  if (named === 'request' && roots.request) return { ref: root, path };
+  if (named === 'context' && roots.context) return { ref: root, path };
   if (roots.nodes) return { ref: root, path };
   throw new Error(`unresolvable template {{${template}}}`);
 }
@@ -127,7 +127,7 @@ export function takesScope(scope: Scope, key: string): boolean {
   return Boolean(scope.types.accepted(hit.op.accepts)[SCOPE]);
 }
 
-/** A store's `reads`: local name -> the segments read below request, as a graph's `reads` lower. */
+/** A store's `reads`: local name -> the segments read below context, as a graph's `reads` lower. */
 function storeRoots(scope: Scope, store: Loaded<StoreDoc>): Record<string, string[]> {
   const out: Record<string, string[]> = {};
   for (const [name, ref] of Object.entries(store.doc.reads ?? {})) {

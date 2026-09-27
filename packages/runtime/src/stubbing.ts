@@ -176,28 +176,28 @@ function fakeEnv(scope: Scope): NodeJS.ProcessEnv {
   return env;
 }
 
-/** A generated request context for a trigger kind, and a generated input for the trigger. */
+/** A generated context for a trigger kind, and a generated input for the trigger. */
 export function generatedFire(
   emb: Embedder,
   type: Loaded<TriggerDoc>,
   seed: number,
-): { input: unknown; request: Record<string, unknown> } {
+): { input: unknown; context: Record<string, unknown> } {
   const kind = emb.scope.get('trigger-kind', type.doc.kind)?.doc as TriggerKindDoc;
   const random = rng(seed);
-  const request = generate(emb.scope.contextType(kind, type.doc.settings), random) as Record<string, unknown>;
+  const context = generate(emb.scope.contextType(kind, type.doc.settings), random) as Record<string, unknown>;
   const types = emb.types(type.doc);
   // the body/input is generated from the trigger's in type so it always conforms; the mapping is then honoured
   if (types.in) {
     if (type.doc.fire.in !== undefined) {
-      const built = emb.inputFor(type.doc, request);
-      if ('input' in built) return { input: built.input, request };
-      return { input: generate(types.in, random), request };
+      const built = emb.inputFor(type.doc, context);
+      if ('input' in built) return { input: built.input, context };
+      return { input: generate(types.in, random), context };
     }
     const input = generate(types.in, random);
-    request.body = input;
-    return { input, request };
+    context.body = input;
+    return { input, context };
   }
-  return { input: undefined, request };
+  return { input: undefined, context };
 }
 
 /**

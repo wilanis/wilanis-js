@@ -113,7 +113,7 @@
       "additionalProperties": false
     },
     "startup": {
-      "description": "What runs once when the tree is served, in this order, after every plugin's postLoad and before any trigger kind starts. Each entry names a domain port operation; the active profile's binding decides how it is met, so a connection can be real in one profile and a fake in another. This is where a pool is opened, a queue declared, a topic subscribed: the work is declared here rather than hidden in a plugin's code, so a reader sees at the root what happens before the first request. An entry takes no request -- nothing has been received yet -- so the operation it names must not read request.*. wilanis serve runs these; wilanis check, rehearse and run do not.",
+      "description": "What runs once when the tree is served, in this order, after every plugin's postLoad and before any trigger kind starts. Each entry names a domain port operation; the active profile's binding decides how it is met, so a connection can be real in one profile and a fake in another. This is where a pool is opened, a queue declared, a topic subscribed: the work is declared here rather than hidden in a plugin's code, so a reader sees at the root what happens before the first request. An entry takes no context -- nothing has been received yet -- so the operation it names must not read context.*. wilanis serve runs these; wilanis check, rehearse and run do not.",
       "type": "array",
       "items": {
         "type": "object",
@@ -132,7 +132,7 @@
             "$ref": "common.schema.json#/$defs/opRef"
           },
           "in": {
-            "description": "Every value the operation takes, written as literals. A startup step runs before anything is received, so only const and {{secrets.*}} may appear here -- never {{request.*}}.",
+            "description": "Every value the operation takes, written as literals. A startup step runs before anything is received, so only const and {{secrets.*}} may appear here -- never {{context.*}}.",
             "$ref": "common.schema.json#/$defs/values"
           },
           "required": {

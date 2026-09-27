@@ -144,7 +144,7 @@ export interface Serving {
   /** The trigger's in/out types, resolved. */
   types(trigger: TriggerDoc): { in?: Type; out?: Type };
   /** Build and judge the trigger's input from the context this kind assembled (body already decoded). */
-  inputFor(trigger: TriggerDoc, request: Record<string, unknown>): { input: unknown } | { error: string };
+  inputFor(trigger: TriggerDoc, context: Record<string, unknown>): { input: unknown } | { error: string };
   /** content type -> codec, from a plugin's settings table. */
   codecs(root: string): Codecs;
   /** The tree's blob registry; a listener opens a scope per request and releases it once it has answered. */
@@ -189,8 +189,8 @@ export interface FireArgs {
   trigger: TriggerDoc;
   /** The decoded input, already judged against the trigger's in type. */
   input: unknown;
-  /** The context this kind hands: what resolvers read as request.* */
-  request: Record<string, unknown>;
+  /** The context this kind hands: what `fire.in`, a policy and a resolver read as context.* */
+  context: Record<string, unknown>;
   /** The blob scope of this run: what the graph stores through it is released when the kind has answered. */
   blobs?: BlobStore;
   /**
@@ -212,7 +212,7 @@ export interface TriggerRuntime {
       /** The trigger's in/out types, resolved. */
       types: (trigger: TriggerDoc) => { in?: Type; out?: Type };
       /** Build and judge the trigger's input from the context this kind assembled (body already decoded). */
-      inputFor: (trigger: TriggerDoc, request: Record<string, unknown>) => { input: unknown } | { error: string };
+      inputFor: (trigger: TriggerDoc, context: Record<string, unknown>) => { input: unknown } | { error: string };
       /** content type -> codec, from this plugin's settings table. */
       codecs: Codecs;
       /** The tree's blob registry; a kind opens a scope per run and releases it once it has answered. */
@@ -226,7 +226,7 @@ export interface TriggerRuntime {
    * arguments in the kind's own vocabulary; throws, naming the flag, where a flag cannot be read. A kind without
    * it is handed a command line's context (`flags`, `args`, `cwd`, `body` from `--in`, `file` from `--file`).
    */
-  requestOf?(trigger: TriggerDoc, given: { flags: Record<string, string>; args: string[] }): Record<string, unknown>;
+  contextOf?(trigger: TriggerDoc, given: { flags: Record<string, string>; args: string[] }): Record<string, unknown>;
 }
 
 /**
@@ -255,10 +255,10 @@ export interface GuardArgs {
   /** The trigger kind, canonical. */
   kind: string;
   /** The kind's context as assembled so far; what `identify` answers is added to it. */
-  request: Record<string, unknown>;
-  /** The credentials the trigger's policy attachments gave, by the names the guard's plugin.json declares, read from the context; absent when the request carried none. */
+  context: Record<string, unknown>;
+  /** The credentials the trigger's policy attachments gave, by the names the guard's plugin.json declares, read from the context; absent when the caller presented none. */
   credentials: Record<string, unknown>;
-  /** The same, as written on the trigger: the {{request.*}} reads, so the guard can tell a caller where to present an answer. */
+  /** The same, as written on the trigger: the {{context.*}} reads, so the guard can tell a caller where to present an answer. */
   reads: Record<string, unknown>;
   /** The guarding plugin's settings from project.json, secrets substituted. */
   settings: Record<string, unknown>;
@@ -272,8 +272,8 @@ export interface GuardArgs {
  */
 export interface Guard {
   /**
-   * Verify the credentials the trigger gave and answer what the context gains: request.principal, request.session,
-   * request.challenge. A credential that is there and does not verify is refused here with one of the plugin's
+   * Verify the credentials the trigger gave and answer what the context gains: context.principal, context.session,
+   * context.challenge. A credential that is there and does not verify is refused here with one of the plugin's
    * declared reasons; an absent one is not -- the caller is anonymous and the policies decide.
    */
   identify(

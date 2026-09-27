@@ -5,12 +5,12 @@
   "decide": {
     "run": "@access/domain/access.port.json#requireSignedIn",
     "in": {
-      "principal": "{{request.principal}}"
+      "principal": "{{context.principal}}"
     }
   },
   "proves": [
-    "request.principal",
-    "request.session"
+    "context.principal",
+    "context.session"
   ],
   "outcomes": {
     "anonymous": {

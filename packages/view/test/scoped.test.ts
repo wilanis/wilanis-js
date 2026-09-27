@@ -110,7 +110,7 @@ describe('a scope, and the view across it', () => {
         path: EMPLOYEES_ONLY,
         label: 'Employees only',
         decide: '@access/domain/access.port.json#requireEmployee',
-        gives: { token: '{{request.flags.token}}' },
+        gives: { token: '{{context.flags.token}}' },
         // the one attachment the author could not have dropped: A008 would refuse the trigger without it, under
         // each profile whose store's view the digest reads
         required: [

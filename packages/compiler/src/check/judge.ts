@@ -44,7 +44,7 @@ export type Resolve = (root: string, path: string[]) => Read | string | undefine
 /** Types a whole value at a call site; undefined when the reason it cannot be typed was already reported. */
 export type Reader = (value: unknown, at: string) => Read | undefined;
 
-/** A resolver as judged: the segments below request, the read's type and optionality, and whether the document declared it required. */
+/** A resolver as judged: the segments below context, the read's type and optionality, and whether the document declared it required. */
 export interface JudgedResolver {
   path: string[];
   read: Read;
@@ -78,7 +78,7 @@ export function allowing(effects: Effects, key: string): Hint {
 }
 
 /** Names no resolver, node or constant may take: they are the roots a template reads. */
-export const RESERVED = new Set(['in', 'const', 'request', 'secrets']);
+export const RESERVED = new Set(['in', 'const', 'context', 'secrets']);
 
 const LAYER_HINTS: Record<'edge' | 'core', string> = {
   core: 'core speaks core shapes; a trigger or binding translates edge to core',

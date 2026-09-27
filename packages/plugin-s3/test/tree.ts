@@ -77,7 +77,7 @@ function documents(endpoint: string, bucket: string): Record<string, unknown> {
       settings: {},
       in: `${FILES}/edge/Upload.shape.json`,
       out: 'string',
-      fire: { run: `${FILES}/domain/files.port.json#read`, in: { file: '{{request.file}}' } },
+      fire: { run: `${FILES}/domain/files.port.json#read`, in: { file: '{{context.file}}' } },
     },
     'features/files/edge/hello.trigger.json': {
       $schema: schemaRef('trigger'),

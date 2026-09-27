@@ -28,7 +28,7 @@ const INVARIANT = '@features/customers/domain/writes-are-for-registrars.invarian
 const REFUSALS = `${AT}#settings/response/refusals`;
 const STORE = '@features/customers/data/customers.store.json';
 const PG_STORE = '@features/customers/data/customers-postgres.store.json';
-const TENANT = 'request.session.attributes.tenant';
+const TENANT = 'context.session.attributes.tenant';
 
 /** One copy of the example, driven through the whole script in order; the beats below share it. */
 let dir: string;
@@ -122,13 +122,13 @@ describe('beat 3, following the hints', () => {
 
     expect(refusalsAt(dir)).toEqual([`A005 ${AT}#policies/0`, `T005 ${REFUSALS}`, `T005 ${REFUSALS}`]);
     expect(refusalsSaying(dir)).toEqual([
-      "A005 policy '@features/access/edge/can-register.policy.json' reads request.principal, which the guard hands once it verified a token, but no attachment on this trigger gives one",
+      "A005 policy '@features/access/edge/can-register.policy.json' reads context.principal, which the guard hands once it verified a token, but no attachment on this trigger gives one",
       "T005 @features/access/domain/require-registrar.graph.json may refuse with reason 'forbidden', which settings.response.refusals does not map",
       "T005 @features/access/domain/require-registrar.graph.json may refuse with reason 'anonymous', which settings.response.refusals does not map",
     ]);
     // the JSON in the hint is what the finished route pastes
     expect(refusalsHinting(dir)[0]).toBe(
-      `A005 write { "policy": "${POLICY}", "in": { "token": "{{request.headers.authorization}}" } } -- the read is where this kind hands the credential`,
+      `A005 write { "policy": "${POLICY}", "in": { "token": "{{context.headers.authorization}}" } } -- the read is where this kind hands the credential`,
     );
   });
   it(`the finished route yields ok, at ${DOCUMENTS.finished} documents`, () => {

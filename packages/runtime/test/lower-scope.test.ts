@@ -14,7 +14,7 @@ import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 import { scopedTree, UNSCOPED } from './scoping-harness.js';
 
 /** What the store's one read lowers to: the session attribute the sign-in wrote, read off what the guard hands. */
-const tenant = { ref: 'request', path: ['session', 'attributes', 'tenant'] };
+const tenant = { ref: 'context', path: ['session', 'attributes', 'tenant'] };
 /** The binding whose operations a case plants a delegation in, to reach the other shape a site takes. */
 const binding = 'features/customers/data/customers-store.binding.json';
 const modules = Object.values(PLUGINS) as PluginModule[];

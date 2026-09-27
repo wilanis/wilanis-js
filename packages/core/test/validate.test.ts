@@ -268,10 +268,10 @@ describe('invariant', () => {
 
   it('the access form: operations, and the policy or the proofs every reaching trigger must carry', () => {
     expect(refused(form({ access: access({ policy: '@access/edge/can-register.policy.json' }) }))).toEqual([]);
-    expect(refused(form({ access: access({ proves: ['request.principal'] }) }))).toEqual([]);
+    expect(refused(form({ access: access({ proves: ['context.principal'] }) }))).toEqual([]);
     expect(
       refused(
-        form({ access: access({ policy: '@access/edge/can-register.policy.json', proves: ['request.session.id'] }) }),
+        form({ access: access({ policy: '@access/edge/can-register.policy.json', proves: ['context.session.id'] }) }),
       ),
     ).toEqual([]);
   });
@@ -282,7 +282,7 @@ describe('invariant', () => {
   });
 
   it('a document is exactly one of the two forms: both is refused, and neither', () => {
-    expect(refused(form({ access: access({ proves: ['request.principal'] }), holds }))).toEqual([
+    expect(refused(form({ access: access({ proves: ['context.principal'] }), holds }))).toEqual([
       at('holds', "'holds' is not allowed here"),
       at('access', "'access' is not allowed here"),
     ]);
@@ -290,20 +290,20 @@ describe('invariant', () => {
   });
 
   it('over names at least one operation without repeating one, and requires says at least one thing', () => {
-    expect(refused(form({ access: { over: [], requires: { proves: ['request.principal'] } } }))).toEqual([
+    expect(refused(form({ access: { over: [], requires: { proves: ['context.principal'] } } }))).toEqual([
       at('access/over', 'fewer than 1 items'),
     ]);
     const twice = ['@features/f/domain/f.port.json#write', '@features/f/domain/f.port.json#write'];
-    expect(refused(form({ access: { over: twice, requires: { proves: ['request.principal'] } } }))).toEqual([
+    expect(refused(form({ access: { over: twice, requires: { proves: ['context.principal'] } } }))).toEqual([
       at('access/over', 'duplicate items'),
     ]);
     expect(refused(form({ access: access({}) }))).toEqual([at('access/requires', 'fewer than 1 properties')]);
     expect(refused(form({ access: access({ proves: ['principal'] }) }))).toEqual([
-      at('access/requires/proves/0', '^request'),
+      at('access/requires/proves/0', '^context'),
     ]);
     expect(
       refused(
-        form({ access: { over: ['@features/f/domain/f.port.json'], requires: { proves: ['request.principal'] } } }),
+        form({ access: { over: ['@features/f/domain/f.port.json'], requires: { proves: ['context.principal'] } } }),
       ),
     ).toEqual([at('access/over/0', 'path#operation')]);
   });

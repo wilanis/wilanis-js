@@ -27,7 +27,7 @@
       "type": "boolean"
     },
     "reads": {
-      "description": "The reads this graph takes from the request: local name -> the resolver that declares it, as @feature/edge/file.resolvers.json#name. The body reads each as {{name}} or {{name.field}}; every entry is read by some value, and no name is a node's id or a reserved root. Data graphs only: a domain graph never reads the request.",
+      "description": "The reads this graph takes from the context: local name -> the resolver that declares it, as @feature/edge/file.resolvers.json#name. The body reads each as {{name}} or {{name.field}}; every entry is read by some value, and no name is a node's id or a reserved root. Data graphs only: a domain graph never reads the context.",
       "type": "object",
       "minProperties": 1,
       "propertyNames": {

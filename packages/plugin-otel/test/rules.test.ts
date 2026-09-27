@@ -63,7 +63,7 @@ describe('X301: an endpoint nothing could be sent to', () => {
   });
 
   it('a read of something that is not a secret is not one either', () => {
-    const found = judging({ endpoint: '{{request.headers.host}}', service: 'customers' });
+    const found = judging({ endpoint: '{{context.headers.host}}', service: 'customers' });
     expect(found).toHaveLength(1);
   });
 });

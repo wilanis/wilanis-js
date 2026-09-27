@@ -50,7 +50,7 @@ describe("a queue trigger's correlation", () => {
     expect(loaded.registry.get('trigger-kind', KIND)?.doc.correlation).toBe('headers.traceparent');
     expect(checkTree(loaded).items.map(one => one.code)).not.toContain('T007');
     expect(describeDoc(loaded, KIND)).toContain(
-      "correlation: request.headers.traceparent correlates a run with the caller's trace, copied opaquely (T007)",
+      "correlation: context.headers.traceparent correlates a run with the caller's trace, copied opaquely (T007)",
     );
     // the rule judges this kind too: a path its context has no field for is refused at the kind
     expect(withCorrelation('traceparent')).toEqual([`T007 ${KIND}#correlation`]);

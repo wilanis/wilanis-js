@@ -139,13 +139,13 @@ export function serving(triggers: TriggerDoc[], answering: () => Answering = () 
   const serving: Serving = {
     triggers: kind => (kind === KIND ? set : []),
     pathOf: doc => paths.get(doc),
-    fire: async ({ trigger, request, signal }: FireArgs) => {
-      const context = request as unknown as Fired;
+    fire: async ({ trigger, context, signal }: FireArgs) => {
+      const tick = context as unknown as Fired;
       fired.push({
         run: trigger.fire.run,
-        scheduled: context.scheduled,
-        fired: context.fired,
-        missed: context.missed,
+        scheduled: tick.scheduled,
+        fired: tick.fired,
+        missed: tick.missed,
         signalled: signal !== undefined,
       });
       const answer = answering();

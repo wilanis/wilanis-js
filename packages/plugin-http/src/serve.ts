@@ -170,13 +170,13 @@ async function readBody(
   }
 }
 
-/** The request a graph reads, or why this one cannot be answered. */
-async function requestOf(
+/** The context a graph reads, or why this one cannot be answered. */
+async function contextOf(
   incoming: IncomingMessage,
   url: URL,
   route: Route,
   writer: Writer & { scope: BlobStore },
-): Promise<{ request: Record<string, unknown> } | { refuse: Answer }> {
+): Promise<{ context: Record<string, unknown> } | { refuse: Answer }> {
   const headers = headersOf(incoming);
   const carries = hasBody(headers);
   if (route.settings.body && !carries) return { refuse: { status: 400, body: { error: 'a body is required' } } };
@@ -187,7 +187,7 @@ async function requestOf(
     body = read.body;
   }
   return {
-    request: {
+    context: {
       method: incoming.method,
       path: url.pathname,
       headers,
@@ -231,15 +231,15 @@ async function answerFor(
   if (!route)
     return { status: 404, body: { error: `no trigger for ${incoming.method} ${url.pathname}` }, why: 'no trigger' };
   const produces = route.settings.produces ?? 'application/json';
-  const read = await requestOf(incoming, url, route, writer);
+  const read = await contextOf(incoming, url, route, writer);
   if ('refuse' in read) return edge({ ...read.refuse, produces });
-  const built = writer.serving.inputFor(route.trigger, read.request);
+  const built = writer.serving.inputFor(route.trigger, read.context);
   if ('error' in built)
     return edge({ status: 400, body: { error: `input does not conform: ${built.error}` }, produces });
   // the runtime gates the run: the guard identifies the caller and the trigger's policies decide before the operation
   // fires. The deadline counts from here, once the body is read and judged: a slow upload is the body's bound, not the run's
   const { deadlineMs } = limitsOf(route.settings, writer.defaults);
-  const fire = { trigger: route.trigger, input: built.input, request: read.request, blobs: writer.scope };
+  const fire = { trigger: route.trigger, input: built.input, context: read.context, blobs: writer.scope };
   const report = await heardIn(heard, () =>
     withDeadline(deadlineMs, signal => writer.serving.fire(signal ? { ...fire, signal } : fire)),
   );

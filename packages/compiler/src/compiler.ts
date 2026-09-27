@@ -157,7 +157,7 @@ export class Compiler {
   }
 
   /**
-   * A handler that runs a nested spec with the caller's `in` and forwards request, stubs, clock and env. A graph that
+   * A handler that runs a nested spec with the caller's `in` and forwards context, stubs, clock and env. A graph that
    * takes its input whole (an `in` that is not a shape) is handed it under the one key `in`, and unwraps it. Its
    * reports show that `in` as the caller's report shows what it handed down, so a mark the caller's operation
    * carries holds inside a graph whose own `in` cannot say it.
@@ -288,7 +288,7 @@ export class Compiler {
     };
   }
 
-  /** A delegation as one call: the statement's own values, the caller's by name for the rest, reads taken below request. */
+  /** A delegation as one call: the statement's own values, the caller's by name for the rest, reads taken below context. */
   private delegateCall(binding: Loaded<BindingDoc>, bound: BindingOp, op: Operation): KCall {
     if (!bound.run) throw new Error(`${binding.path}: an operation binds a graph or a run`);
     const { handler, op: target } = this.handlerFor(bound.run);
@@ -324,12 +324,12 @@ export class Compiler {
     }
   }
 
-  /** A document's `reads`: local name -> the segments read below request. A resolver is a read, so it lowers to no node. */
+  /** A document's `reads`: local name -> the segments read below context. A resolver is a read, so it lowers to no node. */
   private resolverRoots(reads: Record<string, string> | undefined): Record<string, string[]> {
     return Object.fromEntries(Object.entries(reads ?? {}).map(([name, ref]) => [name, this.resolverPath(ref)]));
   }
 
-  /** The segments one `@path#name` reads below request; the checker refused every reference that names nothing. */
+  /** The segments one `@path#name` reads below context; the checker refused every reference that names nothing. */
   private resolverPath(ref: string): string[] {
     const { path, op } = splitRef(ref);
     const doc = this.scope.get('resolvers', path);
@@ -340,7 +340,7 @@ export class Compiler {
 }
 
 /**
- * What a nested run starts from: the caller's `in` -- unwrapped where the graph takes it whole -- and request, and
+ * What a nested run starts from: the caller's `in` -- unwrapped where the graph takes it whole -- and context, and
  * both as the caller's reports show them, which the nested reports read.
  */
 function nestedRoots(
@@ -348,7 +348,7 @@ function nestedRoots(
   ctx: RunContext,
   whole: boolean,
 ): Pick<RunOptions, 'initial' | 'shown'> {
-  const initial = { in: whole ? input.in : input, ...(ctx.request !== undefined ? { request: ctx.request } : {}) };
+  const initial = { in: whole ? input.in : input, ...(ctx.context !== undefined ? { context: ctx.context } : {}) };
   const shownIn = ctx.shownIn && (whole ? ctx.shownIn.in : ctx.shownIn);
-  return { initial, shown: { in: shownIn, request: ctx.shownRequest } };
+  return { initial, shown: { in: shownIn, context: ctx.shownContext } };
 }

@@ -332,7 +332,7 @@
           "type": "string"
         },
         "proves": {
-          "description": "The request.* paths present once it allows, sorted; empty where it proves none.",
+          "description": "The context.* paths present once it allows, sorted; empty where it proves none.",
           "type": "array",
           "items": { "type": "string" }
         },

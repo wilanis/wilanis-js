@@ -1,7 +1,7 @@
 /**
  * Firing a port a plugin requires (RFC 0005): `env.ports` runs the binding the active profile chose and answers
  * what the operation returns, throws a PortError saying how a binding that did not answer ended, and refuses any
- * port no manifest requires. The binding is judged for what the plugin fires it with: no request (B009), and an
+ * port no manifest requires. The binding is judged for what the plugin fires it with: no context (B009), and an
  * answer or a failure, never a run ended on purpose (B010).
  */
 import { type FirePort, PortError, Scope } from '@wilanis/core';
@@ -62,16 +62,16 @@ describe('env.ports', () => {
 });
 
 describe('a binding of a required port', () => {
-  it('B009 when it reads the request, since the plugin fires it with none judged', async () => {
+  it('B009 when it reads the context, since the plugin fires it with none to read', async () => {
     const said = await refusals(true, keeper(), binding => {
       binding.reads = { agent: '@customers/edge/request.resolvers.json#agent' };
       binding.operations.get.in = { key: '{{agent}}' };
     });
     expect(said.filter(one => one.startsWith('B009'))).toEqual([
-      "B009 binding of '@keep/memory.port.json' declares reads, but @keep fires it with no request judged → remove reads; an operation of a port a plugin requires reads only its in",
+      "B009 binding of '@keep/memory.port.json' declares reads, but @keep fires it with no context to read → remove reads; an operation of a port a plugin requires reads only its in",
       ...PROFILES.map(
         profile =>
-          `B009 @keep/memory.port.json#get reaches @features/keeping/data/keep-files.binding.json, which reads request.headers.user-agent, but @keep fires it with no request judged (profile '${profile}') → remove reads; an operation of a port a plugin requires reads only its in`,
+          `B009 @keep/memory.port.json#get reaches @features/keeping/data/keep-files.binding.json, which reads context.headers.user-agent, but @keep fires it with no context to read (profile '${profile}') → remove reads; an operation of a port a plugin requires reads only its in`,
       ),
     ]);
   });

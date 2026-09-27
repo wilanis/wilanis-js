@@ -6,7 +6,7 @@
 import type { KNode, KSource } from './spec.js';
 
 /** The roots the embedder supplies rather than a node computes. */
-export const PSEUDO = new Set(['in', 'const', 'request']);
+export const PSEUDO = new Set(['in', 'const', 'context']);
 
 /** The sources nested inside a composite source; none for a leaf. */
 function partsOf(source: KSource): KSource[] {

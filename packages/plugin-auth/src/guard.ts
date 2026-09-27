@@ -1,6 +1,6 @@
 /**
  * The guard: before any policy of a trigger runs, it verifies the credentials that trigger's attachments give it and
- * hands request.principal, request.session and request.challenge. What a caller may do is decided by the policies.
+ * hands context.principal, context.session and context.challenge. What a caller may do is decided by the policies.
  */
 import { randomInt } from 'node:crypto';
 import { type Guard, type GuardArgs, splitPath, WHOLE_TEMPLATE } from '@wilanis/core';
@@ -150,11 +150,11 @@ export const guard: Guard = {
     return { context };
   },
 
-  async challenge({ request, reads, settings, env, trigger, policy, message, method }) {
+  async challenge({ context, reads, settings, env, trigger, policy, message, method }) {
     const declared = settings as Settings;
     const id = challengeId();
     const expiresAt = iso(now() + (declared.challenge?.ttl ?? 300) * 1000);
-    const subject = (request.principal as { subject?: string } | undefined)?.subject;
+    const subject = (context.principal as { subject?: string } | undefined)?.subject;
     const record: ChallengeRecord = {
       id,
       method: method ?? 'otp',
@@ -183,9 +183,9 @@ export const guard: Guard = {
     };
   },
 
-  async settle({ request, env, report }) {
+  async settle({ context, env, report }) {
     // a challenge is single-use: answered and acted on, it is spent
-    const answered = request.challenge as { id?: string; verified?: boolean } | undefined;
+    const answered = context.challenge as { id?: string; verified?: boolean } | undefined;
     if (answered?.verified && answered.id && report.status === 'done') await removeChallenge(env as Env, answered.id);
   },
 };

@@ -279,7 +279,7 @@ export class Run {
   }
 
   /**
-   * What a handler sees: where it runs and the site it was tagged with, the request, the embedder's env, and the
+   * What a handler sees: where it runs and the site it was tagged with, the context, the embedder's env, and the
    * two doors into its own report -- where to hang a nested run, and where to record a try that did not stand.
    */
   private contextFor(node: KCall | KMap, nodePath: string[], report: NodeReport): RunContext {
@@ -293,9 +293,9 @@ export class Run {
         report.attempts = [...(report.attempts ?? []), redactAttempt(attempt, node.redact?.out)];
       },
       stubs: this.opts.stubs,
-      request: this.values.get('request'),
+      context: this.values.get('context'),
       shownIn: report.in,
-      shownRequest: this.shown.get('request'),
+      shownContext: this.shown.get('context'),
       signal: this.opts.signal,
       clock: this.clock,
       env: this.opts.env ?? {},

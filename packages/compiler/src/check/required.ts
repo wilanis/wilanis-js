@@ -1,6 +1,6 @@
 /**
  * A binding of a port a plugin requires (RFC 0005). The plugin fires it through env.ports from inside its own
- * code -- the guard's among them, which runs before any policy -- so the binding runs with no request judged
+ * code -- the guard's among them, which runs before any policy -- so the binding runs with no context to read
  * and must not read one (B009), and it answers or fails but never ends the run on purpose (B010).
  */
 import type { BindingDoc, Loaded, PortDoc } from '@wilanis/core';
@@ -8,7 +8,7 @@ import { effectsReachable, refusalsReachable } from '../refusals.js';
 import { type Judge, underProfile } from './judge.js';
 import { opNeeds } from './resolvers.js';
 
-/** B009, B010: every binding of a port a plugin requires reads no request, and reaches nothing that holds or refuses. */
+/** B009, B010: every binding of a port a plugin requires reads no context, and reaches nothing that holds or refuses. */
 export function checkRequired(judge: Judge): void {
   for (const binding of judge.scope.registry.all('binding')) {
     const port = judge.scope.get('port', binding.doc.port);
@@ -30,18 +30,18 @@ function checkOperations(judge: Judge, port: Loaded<PortDoc>): void {
 
 const NO_READS = 'remove reads; an operation of a port a plugin requires reads only its in';
 
-/** B009: the binding declares no reads, since a plugin fires it with no request judged. */
+/** B009: the binding declares no reads, since a plugin fires it with no context to read. */
 function checkNoReads(judge: Judge, binding: Loaded<BindingDoc>, plugin: string): void {
   if (!Object.keys(binding.doc.reads ?? {}).length) return;
-  const message = `binding of '${binding.doc.port}' declares reads, but ${plugin} fires it with no request judged`;
+  const message = `binding of '${binding.doc.port}' declares reads, but ${plugin} fires it with no context to read`;
   judge.refuser(binding.path)('B009', message, 'reads', NO_READS);
 }
 
-/** B009: nothing a required operation reaches under a profile reads request.*. */
+/** B009: nothing a required operation reaches under a profile reads context.*. */
 function checkReached(judge: Judge, opRef: string, profile: string | undefined): void {
   const plugin = judge.scope.get('port', opRef.split('#')[0])?.requiredBy;
   for (const need of opNeeds(judge, opRef, profile)) {
-    const message = `${opRef} reaches ${need.file}, which reads request.${need.path.join('.')}, but ${plugin} fires it with no request judged${underProfile(profile)}`;
+    const message = `${opRef} reaches ${need.file}, which reads context.${need.path.join('.')}, but ${plugin} fires it with no context to read${underProfile(profile)}`;
     judge.refuser(need.file)('B009', message, undefined, NO_READS);
   }
 }

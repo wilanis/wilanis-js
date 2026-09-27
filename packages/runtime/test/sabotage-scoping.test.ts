@@ -53,16 +53,16 @@ describe('sabotage: how a store is scoped', () => {
     // no document of get-customer names the session: the read reaches it because the compiler carries the
     // store's read to every site over the collection, under each profile whose store scopes it
     expect(scopedSaying(UNGATED)).toContain(
-      "A006 @features/customers/data/customers.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'local')",
+      "A006 @features/customers/data/customers.store.json reads context.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'local')",
     );
     expect(scopedSaying(UNGATED)).toContain(
-      "A006 @features/customers/data/customers-postgres.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')",
+      "A006 @features/customers/data/customers-postgres.store.json reads context.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')",
     );
     expect(scopedPointing(UNGATED)).toContain('A006 @features/customers/edge/get-customer.trigger.json#policies');
   });
   it('A006 names the read the store made, and offers the policy that would prove it', () => {
     expect(scopedHinting(UNGATED)).toContain(
-      'A006 gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence',
+      'A006 gate this trigger with a policy whose proves lists "context.session.attributes.tenant", or drop required from the resolver and route around its absence',
     );
   });
   it('B008 a startup step that reaches the scoped collection rather than the view', () => {
@@ -70,7 +70,7 @@ describe('sabotage: how a store is scoped', () => {
     // scoped collection is unreachable from it by construction, and the example's step reads listEvery instead
     expect(scopedPointing(SCOPED_STEP)).toContain('B008 @project.json#startup/2/run');
     expect(scopedSaying(SCOPED_STEP)).toContain(
-      "B008 startup step 2: @features/customers/data/customers.store.json reads request.session.attributes.tenant, but a startup step runs before anything is received (profile 'local')",
+      "B008 startup step 2: @features/customers/data/customers.store.json reads context.session.attributes.tenant, but a startup step runs before anything is received (profile 'local')",
     );
   });
   it('C012 a scope that is a literal, an interpolation, or a field of a read', () => {
@@ -112,11 +112,11 @@ describe('sabotage: how a store is scoped', () => {
     );
   });
   it('C012 a scope reading a list, and one reading an open object, which types unknown', () => {
-    expect(scopedSaying({ [RESOLVERS]: doc => (doc.resolvers.tenant.read = 'request.principal.roles') })).toContain(
-      "C012 the read '{{tenant}}' is request.principal.roles, which is string[], and a column holds a string or a number",
+    expect(scopedSaying({ [RESOLVERS]: doc => (doc.resolvers.tenant.read = 'context.principal.roles') })).toContain(
+      "C012 the read '{{tenant}}' is context.principal.roles, which is string[], and a column holds a string or a number",
     );
     expect(
-      scopedCodes({ [RESOLVERS]: doc => (doc.resolvers.tenant.read = 'request.principal.claims.tenant') }),
+      scopedCodes({ [RESOLVERS]: doc => (doc.resolvers.tenant.read = 'context.principal.claims.tenant') }),
     ).toContain('C012');
   });
   it('C012 a session attribute of a tree whose guard names no session shape reads unknown', () => {

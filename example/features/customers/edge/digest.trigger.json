@@ -11,7 +11,7 @@
     {
       "policy": "@access/edge/employees-only.policy.json",
       "in": {
-        "token": "{{request.flags.token}}"
+        "token": "{{context.flags.token}}"
       }
     }
   ],

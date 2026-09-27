@@ -90,7 +90,7 @@ describe('sabotage: the project, its plugins and its startup', () => {
   it('B007 a startup step reading the request, which nothing has sent yet', () => {
     expect(
       sabotage('project.json', project => {
-        project.startup[0].in = { x: '{{request.body}}' };
+        project.startup[0].in = { x: '{{context.body}}' };
       }),
     ).toContain('B007');
   });

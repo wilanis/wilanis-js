@@ -1,5 +1,5 @@
 /**
- * A access. A policy decides through a domain port operation, reads the request only, and says what every
+ * A access. A policy decides through a domain port operation, reads the context only, and says what every
  * reason its decision can refuse with means (A001, A002, A003). Where a trigger attaches policies, each
  * attachment's `in` gives the guard a credential it declares, read where the kind hands it (A004); a policy
  * that reads what the guard hands leans on a credential yielding it, which some attachment must give (A005);
@@ -28,7 +28,7 @@ import {
 import { refusalsReachable } from '../refusals.js';
 import type { Judge, Refuser } from './judge.js';
 import { checkViewGates } from './scope-access.js';
-import { assignableWire, requestOnly } from './typing.js';
+import { assignableWire, contextOnly } from './typing.js';
 
 const NO_GUARD_HINT = 'add a guarding plugin to project.json → plugins, such as @wilanis/plugin-auth';
 
@@ -41,7 +41,7 @@ export interface ProvesFault {
 }
 
 /**
- * The A001 judgement of one path claimed proved: it reads `request.*`, and the guard or a kind hands what it
+ * The A001 judgement of one path claimed proved: it reads `context.*`, and the guard or a kind hands what it
  * names. Nothing when it does. A policy's `proves` is judged with it, and so is an invariant's
  * `requires.proves` (I002), since what may be proved is one rule wherever it is written.
  */
@@ -56,12 +56,12 @@ export function provesFault(judge: Judge, path: string): ProvesFault | undefined
  */
 export function provesFaultIn(scope: Scope, path: string): ProvesFault | undefined {
   const segments = READ_PATH.test(path) ? splitPath(path) : [];
-  if (segments[0] !== 'request' || segments.length < 2)
-    return { said: `'${path}', which is not a request.* path`, hint: 'write request.principal, request.session...' };
+  if (segments[0] !== 'context' || segments.length < 2)
+    return { said: `'${path}', which is not a context.* path`, hint: 'write context.principal, context.session...' };
   const read = scope.requestRead(segments.slice(1));
   if (typeof read !== 'string') return undefined;
   return {
-    said: `request.${segments.slice(1).join('.')}: ${read}`,
+    said: `context.${segments.slice(1).join('.')}: ${read}`,
     hint: 'wilanis describe the guarding plugin shows what it hands',
   };
 }
@@ -70,7 +70,7 @@ export function provesFaultIn(scope: Scope, path: string): ProvesFault | undefin
 
 /**
  * The refusals for a policy judged on its own: the domain operation it decides through (R001, L006), its
- * request-only input and the paths it proves (A001), and its outcomes against the reasons that decision can
+ * context-only input and the paths it proves (A001), and its outcomes against the reasons that decision can
  * reach (A002, A003). What its reads are worth under a kind is `checkAccess`, since the context differs per kind.
  */
 export function checkPolicy(judge: Judge, policy: Loaded<PolicyDoc>): void {
@@ -109,17 +109,17 @@ class PolicyCheck {
     this.checkOutcomes();
   }
 
-  /** A001: the decision's input reads the request only. */
+  /** A001: the decision's input reads the context only. */
   private checkReads(): void {
     for (const read of this.judge.scope.templateReads(this.doc.decide.in)) {
-      if (read[0] === 'request') continue;
+      if (read[0] === 'context') continue;
       const hint =
-        'read what the kind and the guard hand: request.principal, request.session, request.challenge, request.headers...';
-      this.refuse('A001', `decide.in reads '${read[0]}', but a policy's input reads request.* only`, 'decide/in', hint);
+        'read what the kind and the guard hand: context.principal, context.session, context.challenge, context.headers...';
+      this.refuse('A001', `decide.in reads '${read[0]}', but a policy's input reads context.* only`, 'decide/in', hint);
     }
   }
 
-  /** A001: what the policy proves present once it allows is a request.* path the guard or a kind hands; a required resolver leans on it (A006). */
+  /** A001: what the policy proves present once it allows is a context.* path the guard or a kind hands; a required resolver leans on it (A006). */
   private checkProves(): void {
     for (const [index, path] of (this.doc.proves ?? []).entries()) {
       const wrong = provesFault(this.judge, path);
@@ -139,7 +139,7 @@ class PolicyCheck {
         'A001',
         `'${run}' takes ${show(takes)} but decide gives nothing`,
         'decide',
-        'write in: what the decision reads from the request',
+        'write in: what the decision reads from the context',
       );
   }
 
@@ -221,7 +221,7 @@ class AccessCheck {
     checkViewGates(this.judge, this.trigger);
     for (const name of given) {
       if (this.yieldsOf(name).some(key => this.needed.has(key))) continue;
-      const message = `credential '${name}' is given, but no policy of this trigger reads what it yields (request.${this.yieldsOf(name).join(', request.')})`;
+      const message = `credential '${name}' is given, but no policy of this trigger reads what it yields (context.${this.yieldsOf(name).join(', context.')})`;
       this.refuse('A004', message, 'policies', 'drop it, or attach a policy that decides on it');
     }
   }
@@ -277,7 +277,7 @@ class AccessCheck {
   }
 
   private checkCredentialRead(name: string, value: unknown, want: Type | undefined, at: string): void {
-    const read = this.judge.scope.valueRead(value, requestOnly(this.ctx, 'a credential is read from the request'));
+    const read = this.judge.scope.valueRead(value, contextOnly(this.ctx, 'a credential is read from the context'));
     if (typeof read === 'string') {
       this.refuse(
         'A004',
@@ -312,7 +312,7 @@ class AccessCheck {
     const hit = this.judge.scope.op(policy.doc.decide.run);
     if (typeof hit === 'string' || hit.port.native) return; // refused at the policy
     for (const read of this.judge.scope.templateReads(policy.doc.decide.in)) {
-      if (read[0] === 'request') this.checkGuardRead(policy, ref, read, at);
+      if (read[0] === 'context') this.checkGuardRead(policy, ref, read, at);
     }
     this.checkPolicyInput(policy, hit.op, at);
   }
@@ -322,7 +322,7 @@ class AccessCheck {
     const key = read[1];
     if (!this.guard) {
       if (typeof typeAt(this.ctx, read.slice(1)) !== 'string') return;
-      const message = `policy '${policy.path}' reads request.${key}, which no trigger kind hands and no plugin of this project identifies callers to supply`;
+      const message = `policy '${policy.path}' reads context.${key}, which no trigger kind hands and no plugin of this project identifies callers to supply`;
       this.refuse('A005', message, at, NO_GUARD_HINT);
       return;
     }
@@ -333,9 +333,9 @@ class AccessCheck {
       .filter(([, cred]) => cred.yields.includes(key))
       .map(([name]) => name);
     const verified = from.length ? `a ${from.join(' or a ')}` : 'nothing it verifies';
-    const message = `policy '${policy.path}' reads request.${key}, which the guard hands once it verified ${verified}, but no attachment on this trigger gives one`;
+    const message = `policy '${policy.path}' reads context.${key}, which the guard hands once it verified ${verified}, but no attachment on this trigger gives one`;
     const hint = from.length
-      ? `write { "policy": "${ref}", "in": { "${from[0]}": "{{request.headers.authorization}}" } } -- the read is where this kind hands the credential`
+      ? `write { "policy": "${ref}", "in": { "${from[0]}": "{{context.headers.authorization}}" } } -- the read is where this kind hands the credential`
       : 'a policy reads only what the guard hands';
     this.refuse('A005', message, at, hint);
   }
@@ -347,7 +347,7 @@ class AccessCheck {
     const under = `policy '${policy.path}' under kind '${this.doc.kind}'`;
     const read = this.judge.scope.valueRead(
       policy.doc.decide.in,
-      requestOnly(this.ctx, "a policy's input reads request.* only"),
+      contextOnly(this.ctx, "a policy's input reads context.* only"),
     );
     if (typeof read === 'string') {
       this.refuse('A001', `${under}: ${read}`, at, `wilanis describe ${this.doc.kind} shows what this kind hands`);

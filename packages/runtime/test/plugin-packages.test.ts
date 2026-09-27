@@ -46,7 +46,7 @@ describe('plugin packages and hooks', () => {
     expect(describeDoc(loaded, '@http/server.port.json')).toContain('#listen  (holds until stopped)');
     // a kind that says what correlates a run with its caller says so where its other rules are said
     expect(describeDoc(loaded, '@http/http.trigger-kind.json')).toContain(
-      "correlation: request.headers.traceparent correlates a run with the caller's trace, copied opaquely (T007)",
+      "correlation: context.headers.traceparent correlates a run with the caller's trace, copied opaquely (T007)",
     );
     expect(describeDoc(loaded, '@cli/cli.trigger-kind.json')).not.toContain('correlation:');
     expect(loaded.registry.get('graph', '@features/customers/data/get-row.graph.json')?.file).toBe(

@@ -45,8 +45,8 @@ reaches an operation is a trigger, and a trigger is one file. Two of them, from 
       "policy": "@access/edge/signed-in.policy.json",
       "in": {
         "token": [
-          "{{request.headers.authorization}}",
-          "{{request.cookies.session}}"
+          "{{context.headers.authorization}}",
+          "{{context.cookies.session}}"
         ]
       }
     }
@@ -54,7 +54,7 @@ reaches an operation is a trigger, and a trigger is one file. Two of them, from 
   "fire": {
     "run": "@customers/domain/customer.port.json#get",
     "in": {
-      "id": "{{request.params.id}}"
+      "id": "{{context.params.id}}"
     }
   }
 }
@@ -80,7 +80,7 @@ read of them.
     {
       "policy": "@access/edge/employees-only.policy.json",
       "in": {
-        "token": "{{request.flags.token}}"
+        "token": "{{context.flags.token}}"
       }
     }
   ],
@@ -209,7 +209,7 @@ deliver alike. A worker is nothing new: it is `wilanis start` on a tree whose st
 
 The clock is a way in as well. A trigger of kind `@schedule/schedule.trigger-kind.json` fires at every instant a
 five-field `cron` expression names in its `timezone`, or at every multiple of an `everyMs` interval, into a domain
-port operation like any route. The tick's instant reaches the graph as `request.scheduled`, a string read through
+port operation like any route. The tick's instant reaches the graph as `context.scheduled`, a string read through
 `fire.in`, so nothing in the tree calls a clock and a rehearsal runs a scheduled trigger's branches as it runs a
 route's. It takes a `deadlineMs` as a route does, and a tick whose run passes it is cancelled and logged as such.
 Nobody is calling on a tick, so the trigger gives the guard nothing: a policy that reads the caller is refused on

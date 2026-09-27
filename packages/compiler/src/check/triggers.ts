@@ -1,6 +1,6 @@
 /**
  * T triggers. A trigger names a kind and settings that fit it (R001, T001), fires a domain port whose contract
- * its edge shapes meet (L006, T002), reads the request into its input (T003), reaches only request.* paths its
+ * its edge shapes meet (L006, T002), reads the context into its input (T003), reaches only context.* paths its
  * kind hands (T004) and guarantees the ones a resolver requires (A006), and maps every refusal reason it can
  * reach, and no other (T005, T006). A kind itself is judged once: what it says correlates a run must be a path
  * into its own context (T007). A public trigger bounds every list its edge shapes take (T008). One that receives
@@ -26,12 +26,12 @@ import { checkAccess } from './access.js';
 import { shapeName, unboundedLists } from './bounds.js';
 import { checkDelivery } from './delivery.js';
 import { type Judge, type Refuser, underProfile } from './judge.js';
-import { opNeeds, type RequestNeed } from './resolvers.js';
-import { assignableWire, atOrBelow, mismatch, requestOnly } from './typing.js';
+import { type ContextNeed, opNeeds } from './resolvers.js';
+import { assignableWire, atOrBelow, contextOnly, mismatch } from './typing.js';
 
 /**
  * Every refusal a trigger can earn: the kind and settings it names (R001, T001), the domain port it fires and
- * whether its edge shapes meet that contract (L006, T002), the request it reads into its input (T003) and the
+ * whether its edge shapes meet that contract (L006, T002), the context it reads into its input (T003) and the
  * paths its kind hands (T004), what the connection it receives from delivers (T009, T010), the reasons it maps
  * (T005, T006), and what gates it (A001, A004, A005, A006).
  */
@@ -50,7 +50,7 @@ export function checkTriggerKind(judge: Judge, kind: Loaded<TriggerKindDoc>): vo
   if (typeof read !== 'string') return;
   judge.refuser(kind.path)(
     'T007',
-    `correlation reads request.${path}, which this kind's context does not hand: ${read}`,
+    `correlation reads context.${path}, which this kind's context does not hand: ${read}`,
     'correlation',
     'name a field of context, as in headers.traceparent, or remove correlation',
   );
@@ -106,7 +106,7 @@ class TriggerCheck {
     this.checkContract(hit.op, inType, outType);
     if (kind.doc.connection)
       checkDelivery(this.judge, { trigger: this.trigger, setting: kind.doc.connection, op: hit.op });
-    this.checkRequestReach(ctx);
+    this.checkContextReach(ctx);
     checkAccess(this.judge, this.trigger, ctx);
     if (kind.doc.refusals) this.checkRefusalTable(kind.doc.refusals);
   }
@@ -170,7 +170,7 @@ class TriggerCheck {
   }
 
   /**
-   * T003: fire.in reads the request only and fits the trigger's in, wire-loosely: a read that may be missing (a
+   * T003: fire.in reads the context only and fits the trigger's in, wire-loosely: a read that may be missing (a
    * query key, a flag, a header) may feed a required field. The edge judges the input when it arrives, and a
    * request without it is refused there (a 400, a usage error), never run.
    */
@@ -187,7 +187,7 @@ class TriggerCheck {
     }
     const read = this.judge.scope.valueRead(
       this.doc.fire.in,
-      requestOnly(ctx, "a trigger's input reads request.* only"),
+      contextOnly(ctx, "a trigger's input reads context.* only"),
     );
     if (typeof read === 'string') {
       this.refuse(
@@ -255,11 +255,11 @@ class TriggerCheck {
   }
 
   /**
-   * T004, A006: every request.* a resolver reads under this trigger is in the kind's context; a required one is
+   * T004, A006: every context.* a resolver reads under this trigger is in the kind's context; a required one is
    * guaranteed. Judged under each profile that serves the trigger, since which binding meets what it fires decides
    * what is read, and a profile that never opens the trigger reads nothing on its behalf.
    */
-  private checkRequestReach(ctx: Type): void {
+  private checkContextReach(ctx: Type): void {
     const policies = this.policies();
     const decides = policies.map(policy => policy.doc.decide.run);
     const proven = policies.flatMap(policy => policy.doc.proves ?? []).map(path => splitPath(path).slice(1).join('.'));
@@ -270,10 +270,10 @@ class TriggerCheck {
     }
   }
 
-  private checkNeed(need: RequestNeed, ctx: Type, proven: string[], profile: string | undefined): void {
+  private checkNeed(need: ContextNeed, ctx: Type, proven: string[], profile: string | undefined): void {
     const reach = typeAt(ctx, need.path);
     if (typeof reach === 'string') {
-      const message = `${need.file} reads request.${need.path.join('.')} but trigger kind '${this.doc.kind}' hands no such value${underProfile(profile)}`;
+      const message = `${need.file} reads context.${need.path.join('.')} but trigger kind '${this.doc.kind}' hands no such value${underProfile(profile)}`;
       this.refuse(
         'T004',
         message,
@@ -288,8 +288,8 @@ class TriggerCheck {
     const path = need.required.join('.');
     const guaranteed = (typeof own === 'object' && !own.optional) || proven.some(proof => atOrBelow(path, proof));
     if (guaranteed) return;
-    const message = `${need.file} reads request.${path} as required, but trigger kind '${this.doc.kind}' hands it only sometimes and no policy of this trigger proves it${underProfile(profile)}`;
-    const hint = `gate this trigger with a policy whose proves lists "request.${path}", or drop required from the resolver and route around its absence`;
+    const message = `${need.file} reads context.${path} as required, but trigger kind '${this.doc.kind}' hands it only sometimes and no policy of this trigger proves it${underProfile(profile)}`;
+    const hint = `gate this trigger with a policy whose proves lists "context.${path}", or drop required from the resolver and route around its absence`;
     this.refuse('A006', message, 'policies', hint);
   }
 

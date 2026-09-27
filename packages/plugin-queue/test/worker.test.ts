@@ -41,7 +41,7 @@ describe('what becomes of a message', () => {
     expect(given.fired).toEqual([
       {
         run: '@customers/domain/customer.port.json#remove',
-        request: { id, attempt: 1, queue: 'removals', headers: { authorization: 'Bearer t' }, message: { id: 'golf' } },
+        context: { id, attempt: 1, queue: 'removals', headers: { authorization: 'Bearer t' }, message: { id: 'golf' } },
       },
     ]);
     expect(given.blobs).toEqual({ scopes: 1, released: 1 });
@@ -73,7 +73,7 @@ describe('what becomes of a message', () => {
       { id, attempt: 2, outcome: 'retry', backoffMs: 20 },
       { id, attempt: 3, outcome: 'dead' },
     ]);
-    expect(given.fired.map(one => one.request.attempt)).toEqual([1, 2, 3]);
+    expect(given.fired.map(one => one.context.attempt)).toEqual([1, 2, 3]);
     expect(broker.parked(JOBS, 'removals')).toEqual([{ id, body: { id: 'golf' } }]);
   });
 

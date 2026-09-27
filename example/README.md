@@ -55,7 +55,7 @@ PostgreSQL there stay two bindings the profile chooses between.
 
 **Both stores keep their customers per tenant, and no graph says so.** `customers` is
 `"scoped": { "tenant": "{{tenant}}" }`, and the store's `reads` binds `tenant` to the resolver of that name in
-`request.resolvers.json`, which reads `request.session.attributes.tenant`: what the sign-in wrote into the
+`request.resolvers.json`, which reads `context.session.attributes.tenant`: what the sign-in wrote into the
 session from what the directory said about the account (ana is in `acme`, dee in `globex`, and every employee's
 session carries `operator`). `Customer` has no tenant field and no data graph names one: the compiler carries
 the read to every storage operation over `customers`, and the engine keeps the column and puts it on every
@@ -231,8 +231,8 @@ answers is the caller's tenant's customers and an anonymous caller has no tenant
     "policy": "@access/edge/employees-only.policy.json",
     "in": {
       "token": [
-        "{{request.headers.authorization}}",
-        "{{request.cookies.session}}"
+        "{{context.headers.authorization}}",
+        "{{context.cookies.session}}"
       ]
     }
   },
@@ -271,7 +271,7 @@ curl -s localhost:8099/api/v1/auth-employees -d '{"username":"bo","password":"bo
 curl -s localhost:8099/customers -d '{"name":"Ada","email":"ada@example.com","tier":"silver"}' -H 'content-type: application/json' -H "authorization: Bearer $TOKEN"
 ```
 
-On a write, the `@auth` guard verifies the token and hands `request.principal`; then `employees-only` decides
+On a write, the `@auth` guard verifies the token and hands `context.principal`; then `employees-only` decides
 on the realm (an account holder's token is `forbidden`, a 403) and `can-register` on the role (cy is
 `forbidden` too; no token is `anonymous`, a 401; a bad token is `invalid_credential`, a 401). Each decision
 is a domain graph in `features/access/domain/require-*.graph.json`, one `switch` each --
@@ -317,7 +317,7 @@ $ npx wilanis run @hello/edge/hello-gated.trigger.json . --challenge-id=K7Q2-M9X
 and `--code`; the policy's outcome for `otp` is a challenge. The guard opens one and tells the caller how to
 answer it in the kind's own words; `issue-otp` gives it a code (printed here, delivered by whatever a
 production profile binds `deliverCode` to); the guard verifies the code the caller presents and hands
-`request.challenge`, the policy allows, and the challenge is spent by the run. The three processes share the
+`context.challenge`, the policy allows, and the challenge is spent by the run. The three processes share the
 challenge through the plugin's store under `.wilanis/auth/`.
 
 ## The digest, across tenants
@@ -411,7 +411,7 @@ against the API at a time, whatever the map allows.
 `POST /customers/{id}/removal` does one removal off the request. It fires `enqueueRemoval`, which every
 binding meets with the one data graph `publish-removal`: a message `{ "id": ... }` on the `removals` queue of
 `jobs.connection.json`, carrying the caller's `Authorization` header, read through the `token` resolver since a
-data graph never reads the request itself. The route answers 202 with the message's id and nothing about the
+data graph never reads the context itself. The route answers 202 with the message's id and nothing about the
 customer. `remove-queued.trigger.json` is a queue trigger on the same queue: it fires the same `remove` that
 `DELETE /customers/{id}` fires, reading the id from the message, and attaches the same two policies with the
 token read from the message's headers, so the worker's gate judges the caller the route judged. What each

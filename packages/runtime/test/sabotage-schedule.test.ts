@@ -180,12 +180,12 @@ describe('sabotage: what a scheduled trigger shares with a route', () => {
     expect(
       codesOf(trigger => {
         trigger.in = '@customers/edge/ListRequest.shape.json';
-        trigger.fire.in = { method: '{{request.body.method}}' };
+        trigger.fire.in = { method: '{{context.body.method}}' };
       }),
     ).toContain('T003');
   });
   it('T004 a resolver, under this trigger, reading a header a tick has none of', () => {
-    // record-entry reaches create-row.graph.json, which reads the agent resolver (request.headers['user-agent']);
+    // record-entry reaches create-row.graph.json, which reads the agent resolver (context.headers['user-agent']);
     // fire that path from the clock and the kind hands no headers at all
     expect(
       codesOf(trigger => {

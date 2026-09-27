@@ -29,8 +29,8 @@
   "fire": {
     "run": "@access/domain/access.port.json#signInCustomer",
     "in": {
-      "username": "{{request.body.username}}",
-      "password": "{{request.body.password}}"
+      "username": "{{context.body.username}}",
+      "password": "{{context.body.password}}"
     }
   }
 }

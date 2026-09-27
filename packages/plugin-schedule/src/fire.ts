@@ -63,15 +63,15 @@ export async function fireTick(
   signal?: AbortSignal,
 ): Promise<Fired> {
   const started = Date.now();
-  const request = { ...tick } as Record<string, unknown>;
-  const built = serving.inputFor(trigger, request);
+  const context = { ...tick } as Record<string, unknown>;
+  const built = serving.inputFor(trigger, context);
   if ('error' in built) return { error: built.error, atEdge: true, ms: Date.now() - started };
   const scope = serving.blobs.scope();
   try {
     const report = await serving.fire({
       trigger,
       input: built.input,
-      request,
+      context,
       blobs: scope,
       ...(signal ? { signal } : {}),
     });

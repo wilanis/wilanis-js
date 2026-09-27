@@ -29,8 +29,8 @@
       "policy": "@access/edge/employees-only.policy.json",
       "in": {
         "token": [
-          "{{request.headers.authorization}}",
-          "{{request.cookies.session}}"
+          "{{context.headers.authorization}}",
+          "{{context.cookies.session}}"
         ]
       }
     },
@@ -40,7 +40,7 @@
   "fire": {
     "run": "@customers/domain/customer.port.json#import",
     "in": {
-      "file": "{{request.body}}"
+      "file": "{{context.body}}"
     }
   }
 }

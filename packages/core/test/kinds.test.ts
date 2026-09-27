@@ -85,14 +85,18 @@ describe('port and binding', () => {
 });
 
 describe('resolvers', () => {
-  it('a resolver reads a path into the request; a key that is not an identifier is quoted in brackets', () => {
-    expect(refused(doc('resolvers', { resolvers: { a: { read: 'request.params.id' } } }))).toEqual([]);
-    expect(refused(doc('resolvers', { resolvers: { a: { read: 'request.headers["user-agent"]' } } }))).toEqual([]);
+  it('a resolver reads a path into the context; a key that is not an identifier is quoted in brackets', () => {
+    expect(refused(doc('resolvers', { resolvers: { a: { read: 'context.params.id' } } }))).toEqual([]);
+    expect(refused(doc('resolvers', { resolvers: { a: { read: 'context.headers["user-agent"]' } } }))).toEqual([]);
     expect(refused(doc('resolvers', { resolvers: { a: { read: 'params.id' } } }))).toEqual([
-      at('resolvers/a/read', 'A path into the request'),
+      at('resolvers/a/read', 'A path into the context'),
     ]);
-    expect(refused(doc('resolvers', { resolvers: { a: { read: 'request' } } }))).toEqual([
-      at('resolvers/a/read', 'A path into the request'),
+    expect(refused(doc('resolvers', { resolvers: { a: { read: 'context' } } }))).toEqual([
+      at('resolvers/a/read', 'A path into the context'),
+    ]);
+    // the root is context, and nothing else: a read spelt the retired way is not a read of it
+    expect(refused(doc('resolvers', { resolvers: { a: { read: 'request.params.id' } } }))).toEqual([
+      at('resolvers/a/read', 'A path into the context'),
     ]);
     expect(refused(doc('resolvers', { resolvers: { a: { run: '@std/text.port.json#fill' } } }))).toEqual([
       at('resolvers/a', "missing 'read'"),
@@ -104,6 +108,16 @@ describe('resolvers', () => {
   });
 });
 
+describe('the root a trigger and a policy read (RFC 0034)', () => {
+  it('is context: a trigger fires with it, and a policy decides over it and proves paths of it', () => {
+    const fire = { run: '@features/f/domain/f.port.json#get', in: { id: '{{context.params.id}}' } };
+    expect(refused(doc('trigger', { in: '@features/f/edge/IdRequest.shape.json', fire }))).toEqual([]);
+    const decide = { run: '@features/f/domain/f.port.json#decide', in: { principal: '{{context.principal}}' } };
+    expect(refused(doc('policy', { decide, proves: ['context.principal', 'context.session'] }))).toEqual([]);
+    expect(refused(doc('policy', { proves: ['request.principal'] }))).toEqual([at('proves/0', '^context')]);
+  });
+});
+
 describe('trigger, kinds, connection, codec', () => {
   it('a trigger names a kind by path and fires one port operation; its settings are an object', () => {
     expect(refused(doc('trigger', { kind: 'http' }))).toEqual([at('kind', 'A document path')]);
@@ -111,7 +125,7 @@ describe('trigger, kinds, connection, codec', () => {
     expect(refused(doc('trigger', { in: { fields: {} } }))).toEqual([at('in', 'must be string')]);
     expect(
       refused(
-        doc('trigger', { fire: { run: '@features/f/domain/f.port.json#get', in: { id: '{{request.params.id}}' } } }),
+        doc('trigger', { fire: { run: '@features/f/domain/f.port.json#get', in: { id: '{{context.params.id}}' } } }),
       ),
     ).toEqual([]);
     // the node type is the schema's declaration, never restated on the document

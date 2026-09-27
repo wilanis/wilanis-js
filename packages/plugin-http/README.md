@@ -43,7 +43,7 @@ broke) is a 500.
   "response": { "refusals": { "missing": 404, "upstream": 502, "anonymous": 401, "forbidden": 403 } } }
 ```
 
-The request's cookies are in the context as `request.cookies`, so a policy attachment may read a token from one. An
+The request's cookies are in the context as `context.cookies`, so a policy attachment may read a token from one. An
 answer sets cookies through `response.cookies`: each names the field of the answer it takes (`from`), or
 `clear` to drop it, and `omit` keeps the field out of the body once the cookie has it. HttpOnly and
 SameSite=Lax unless said otherwise.
