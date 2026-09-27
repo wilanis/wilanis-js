@@ -214,8 +214,11 @@ export class Scope {
       .find(plugin => plugin.doc.guard && this.project?.plugins.some(use => use.use === plugin.native));
   }
 
-  /** Every trigger kind's context that has `path`; used to type context.* reads in resolvers (kind unknown there). */
-  requestRead(path: string[]): Read | string {
+  /**
+   * The type of `context.<path>` under every trigger kind that hands it, where no one kind is known: a resolver's
+   * read, and a path a policy or an invariant claims proved. Optional where any kind hands it only sometimes.
+   */
+  contextRead(path: string[]): Read | string {
     const hits: Read[] = [];
     for (const kind of this.registry.all('trigger-kind')) {
       const read = typeAt(this.contextType(kind.doc as TriggerKindDoc), path);

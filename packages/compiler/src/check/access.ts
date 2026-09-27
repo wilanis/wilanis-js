@@ -58,7 +58,7 @@ export function provesFaultIn(scope: Scope, path: string): ProvesFault | undefin
   const segments = READ_PATH.test(path) ? splitPath(path) : [];
   if (segments[0] !== 'context' || segments.length < 2)
     return { said: `'${path}', which is not a context.* path`, hint: 'write context.principal, context.session...' };
-  const read = scope.requestRead(segments.slice(1));
+  const read = scope.contextRead(segments.slice(1));
   if (typeof read !== 'string') return undefined;
   return {
     said: `context.${segments.slice(1).join('.')}: ${read}`,

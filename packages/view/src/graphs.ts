@@ -291,7 +291,7 @@ class GraphBuilder {
   private typeAtOf(node: VNode): (path: string[]) => Type | undefined {
     if (node.kind === 'request')
       return path => {
-        const read = this.scope.requestRead(path);
+        const read = this.scope.contextRead(path);
         return typeof read === 'string' ? undefined : read.type;
       };
     return path => {
