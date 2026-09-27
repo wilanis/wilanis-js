@@ -105,11 +105,11 @@ T002  @features/customers/edge/archive-customer.trigger.json#out
     '@customers/domain/customer.port.json#remove' answers @features/customers/domain/Customer.shape.json but the trigger declares no out
     → declare out on the trigger, or fire an operation that answers nothing
 A006  @features/customers/edge/archive-customer.trigger.json#policies
-    @features/customers/data/customers.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'local')
-    → gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence
+    @features/customers/data/customers.store.json reads context.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'local')
+    → gate this trigger with a policy whose proves lists "context.session.attributes.tenant", or drop required from the resolver and route around its absence
 A006  @features/customers/edge/archive-customer.trigger.json#policies
-    @features/customers/data/customers-postgres.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')
-    → gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence
+    @features/customers/data/customers-postgres.store.json reads context.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')
+    → gate this trigger with a policy whose proves lists "context.session.attributes.tenant", or drop required from the resolver and route around its absence
 T005  @features/customers/edge/archive-customer.trigger.json#settings/response/refusals
     @features/customers/data/delete-row.graph.json may refuse with reason 'missing', which settings.response.refusals does not map
     → add "missing" under settings.response.refusals: how this trigger answers that outcome
@@ -159,11 +159,11 @@ npx wilanis check .
 
 ```
 A006  @features/customers/edge/archive-customer.trigger.json#policies
-    @features/customers/data/customers.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'local')
-    → gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence
+    @features/customers/data/customers.store.json reads context.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'local')
+    → gate this trigger with a policy whose proves lists "context.session.attributes.tenant", or drop required from the resolver and route around its absence
 A006  @features/customers/edge/archive-customer.trigger.json#policies
-    @features/customers/data/customers-postgres.store.json reads request.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')
-    → gate this trigger with a policy whose proves lists "request.session.attributes.tenant", or drop required from the resolver and route around its absence
+    @features/customers/data/customers-postgres.store.json reads context.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')
+    → gate this trigger with a policy whose proves lists "context.session.attributes.tenant", or drop required from the resolver and route around its absence
 I001  @features/customers/edge/archive-customer.trigger.json#policies
     trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for registrars' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy
     → attach "@access/edge/can-register.policy.json" under policies, or take @features/customers/domain/customer.port.json#remove out of the invariant's over
@@ -184,8 +184,8 @@ npx wilanis check .
 
 ```
 A005  @features/customers/edge/archive-customer.trigger.json#policies/0
-    policy '@features/access/edge/can-register.policy.json' reads request.principal, which the guard hands once it verified a token, but no attachment on this trigger gives one
-    → write { "policy": "@access/edge/can-register.policy.json", "in": { "token": "{{request.headers.authorization}}" } } -- the read is where this kind hands the credential
+    policy '@features/access/edge/can-register.policy.json' reads context.principal, which the guard hands once it verified a token, but no attachment on this trigger gives one
+    → write { "policy": "@access/edge/can-register.policy.json", "in": { "token": "{{context.headers.authorization}}" } } -- the read is where this kind hands the credential
 T005  @features/customers/edge/archive-customer.trigger.json#settings/response/refusals
     @features/access/domain/require-registrar.graph.json may refuse with reason 'forbidden', which settings.response.refusals does not map
     → add "forbidden" under settings.response.refusals: how this trigger answers that outcome
@@ -325,7 +325,7 @@ the route mapped the reason to 403 in beat 3; the guard, the policy and the grap
 **If asked.** *"Where is the role check? I want to read what the agent wrote."* The agent wrote none. One
 switch, in `features/access/domain/require-registrar.graph.json`: `has(principal) && 'registrar' in
 principal.roles`, the only place a condition can be written, and the rehearsal walked all three branches.
-The route never saw the token: the guard verified it before any graph ran and handed `request.principal` to
+The route never saw the token: the guard verified it before any graph ran and handed `context.principal` to
 the policy. No document validates a token and no graph checks access, so an agent cannot get that wrong.
 
 ## 5. The closer: all of it or none of it
