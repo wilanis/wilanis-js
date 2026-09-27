@@ -6,6 +6,7 @@
  * it writes, `writeInto` is what puts them on disk, and `wilanis-deploy` is the command.
  */
 export { composeFiles } from './compose.js';
+export { CHART, helmFiles, SWITCHES } from './helm.js';
 export { imageFiles, majorOf, NODE_MAJOR } from './image.js';
 export {
   commandOf,

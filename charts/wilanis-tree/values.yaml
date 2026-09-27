@@ -1,0 +1,81 @@
+# The values of one wilanis tree, in the shape `wilanis-deploy <root> --profile <name> --target helm` writes into
+# <root>/deploy/values.yaml. These defaults deploy nothing: a tree's values come from its manifest, and are installed
+# with the file the tool wrote,
+#   helm install <name> charts/wilanis-tree -f <root>/deploy/values.yaml
+# Every key below the tool's is the cluster's to choose, in a values file of the operator's own.
+
+# The tree's name (project.json -> name). Every object is named after it, a workload's as <name>-<profile>.
+name: ""
+
+# The one image every workload runs, built from the Dockerfile the image target writes.
+image:
+  repository: ""
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# One entry per profile the deployment runs, each a Deployment, and a Service where it listens:
+#   profile   the profile it starts; "" for a tree that declares none
+#   command   what its container runs: wilanis start . --profile <profile>
+#   replicas  1 until RFC 0005 makes a second safe
+#   ports     [{ name, port }]: every port it listens on, each a containerPort and a port of its Service
+#   probe     a Kubernetes probe handler, { tcpSocket: { port } } on its first port; absent where it listens on none
+#   env       [{ name, secretKey }]: every variable it reads, from the Secret below
+workloads: []
+
+# Where every variable is read from: one Secret, by key. The chart holds no value unless it is told to create it.
+secret:
+  # The Secret the operator created; empty: the one named after the tree, <name>. From the Compose target's
+  # .env.example, filled in and saved as .env:
+  #   kubectl create secret generic <name> --from-env-file=<root>/deploy/.env
+  existingSecret: ""
+  # Every key a workload reads.
+  keys: []
+  # Make the Secret <name> from `values` instead, one per key. For a laptop's cluster, never for production: the
+  # values are then in the release, and in whatever file passed them.
+  create: false
+  values: {}
+
+# What the environment must provide: every connection a workload reaches whose kind declares an endpoint, as
+# { connection, kind, endpoint }. No template reads it; NOTES.txt prints it after an install. It is a floor: a
+# connection whose kind declares no endpoint is not in it.
+requires: []
+
+# How each listening workload's Service is reached.
+service:
+  type: ClusterIP
+  # A nodePort for a listened port, by profile and then port, where `type` is NodePort:
+  #   nodePorts: { production: { "8099": 30080 } }
+  nodePorts: {}
+
+# Requests and limits for every workload's container: the cluster's to decide, so none by default.
+resources: {}
+
+# What the chart may stand up beside the tree, each off. The switches exist so the roadmap's demos stand up on a
+# laptop; none is provisioned for production, where a connection names a host the operator runs.
+
+# A PostgreSQL cluster, run by the CloudNativePG operator (the `cloudnative-pg` dependency, whose own values go under
+# `cloudnative-pg:`). The Cluster is created once the operator's resource types exist in the cluster: on a first
+# install they do not, so the Cluster follows on the next `helm upgrade` (NOTES.txt says so).
+postgresql:
+  enabled: false
+  instances: 1
+  size: 1Gi
+  # The variables the cluster answers: each read from the key `uri` of the Secret the operator writes for the
+  # cluster's application user, <name>-postgresql-app, in place of the tree's Secret.
+  variables: []
+
+# The MinIO project's chart (its values go here): the S3 API. One server on one volume, which is what a laptop has
+# room for; the chart's own default is sixteen servers.
+minio:
+  enabled: false
+  mode: standalone
+  replicas: 1
+  persistence:
+    size: 1Gi
+  resources:
+    requests:
+      memory: 512Mi
+
+# The Jaeger chart (its values go here): one process, traces in memory, OTLP received on 4317 and 4318.
+jaeger:
+  enabled: false

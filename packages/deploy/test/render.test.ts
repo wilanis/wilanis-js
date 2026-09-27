@@ -1,8 +1,9 @@
 /**
- * RFC 0024's renderers, step 4: `imageFiles` and `composeFiles` over the plan of the committed manifest fixture, the
- * Compose file parsed back with `yaml` -- one service per workload, its command, ports, variables, read-only root and
- * probe; `.env.example` naming every variable and holding no value; the Dockerfile's base, user, ports and command;
- * the header on every file; and the one refusal the renderers make that `planOf` does not.
+ * RFC 0024's renderers, steps 4 and 5: `imageFiles`, `composeFiles` and `helmFiles` over the plan of the committed
+ * manifest fixture, the YAML parsed back with `yaml` -- one service per workload, its command, ports, variables,
+ * read-only root and probe; `.env.example` naming every variable and holding no value; the Dockerfile's base, user,
+ * ports and command; the chart's values, their workloads, the Secret's keys, the switches and what is required; the
+ * header on every file; and the one refusal the renderers make that `planOf` does not.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -14,12 +15,14 @@ import {
   composeFiles,
   GENERATED,
   headerOf,
+  helmFiles,
   imageFiles,
   majorOf,
   type Origin,
   type Plan,
   planOf,
   type Rendered,
+  SWITCHES,
   stamped,
 } from '../src/index.js';
 
@@ -185,12 +188,75 @@ describe('image: the Dockerfile', () => {
   });
 });
 
+describe('helm: the values of charts/wilanis-tree', () => {
+  const both = plan(['production', 'production-worker']);
+  const values = parse(fileOf(helmFiles(both), 'values.yaml'));
+
+  it('has one workload per workload of the plan, with its command, replicas, ports, probe and variables', () => {
+    expect(values.workloads).toEqual(
+      both.workloads.map(workload => ({
+        profile: workload.profile,
+        command: workload.command,
+        replicas: 1,
+        ports: workload.listens.map(listen => ({ name: `tcp-${listen.port}`, port: listen.port })),
+        ...(workload.probe ? { probe: { tcpSocket: { port: workload.probe.tcp } } } : {}),
+        env: workload.needs.map(need => ({ name: need.variable, secretKey: need.variable })),
+      })),
+    );
+    expect(values.workloads[0].ports).toEqual([{ name: 'tcp-8099', port: 8099 }]);
+    expect(values.workloads[1]).not.toHaveProperty('probe');
+  });
+
+  it('names every variable once among the Secret’s keys, and the Secret the operator creates, with no value', () => {
+    const variables = both.workloads.flatMap(workload => workload.needs.map(need => need.variable));
+    expect(values.secret).toEqual({ existingSecret: '', keys: [...new Set(variables)].sort() });
+    expect(values.secret.keys).toEqual([
+      'CUSTOMERS_DATABASE_URL',
+      'CUSTOMERS_JWT_SECRET',
+      'CUSTOMERS_OPERATOR_PASSWORD_HASH',
+    ]);
+  });
+
+  it('turns every switch off, whatever the tree reaches', () => {
+    expect(SWITCHES).toEqual(['postgresql', 'minio', 'jaeger']);
+    for (const name of SWITCHES) expect(values[name]).toEqual({ enabled: false });
+  });
+
+  it('carries what the environment must provide, with the endpoint the tree wrote', () => {
+    expect(values.requires).toEqual([]);
+    const live = parse(fileOf(helmFiles(plan(['live'])), 'values.yaml'));
+    expect(live.requires).toEqual([
+      {
+        connection: '@connections/customers-api.connection.json',
+        kind: '@http/http.connection-kind.json',
+        endpoint: 'https://6aa009e23e0d88d3d7e5525d.mockapi.io/api/v1',
+      },
+    ]);
+  });
+
+  it('splits the image into repository and tag, the tag a string, a registry’s port in the repository', () => {
+    expect(values.image).toEqual({ repository: 'customers', tag: '0.1.0', pullPolicy: 'IfNotPresent' });
+    const imaged = (image: string) =>
+      parse(fileOf(helmFiles(planOf(FIXTURE, { profiles: ['production'], image })), 'values.yaml')).image;
+    expect(imaged('registry.local:5000/team/customers:1.10')).toMatchObject({
+      repository: 'registry.local:5000/team/customers',
+      tag: '1.10',
+    });
+    expect(imaged('registry.local:5000/customers')).toMatchObject({
+      repository: 'registry.local:5000/customers',
+      tag: '',
+    });
+    expect(fileOf(helmFiles(both), 'values.yaml')).toContain('  tag: "0.1.0"\n');
+  });
+});
+
 describe('the header', () => {
   const origin: Origin = { root: 'example', profiles: ['production'], flags: [] };
 
   it('is the first two lines of every rendered file, naming the tree, the profile and the command again', () => {
     const production = plan(['production']);
-    for (const file of [...imageFiles(production), ...composeFiles(production)].map(one => stamped(one, origin))) {
+    const rendered = [...imageFiles(production), ...composeFiles(production), ...helmFiles(production)];
+    for (const file of rendered.map(one => stamped(one, origin))) {
       const [first, second] = file.contents.split('\n');
       expect(first).toBe(`${GENERATED} from example (profile production) -- do not edit`);
       expect(second).toBe('# regenerate: npx wilanis-deploy example --profile production');
@@ -213,10 +279,11 @@ describe('a host a published port would not reach', () => {
     '→ drop "host" to bind every interface, which is what a container wants; to keep a loopback bind on purpose -- ' +
     'a sidecar sharing the network namespace -- render --target plan and write the objects yourself';
 
-  it('is refused by compose, and neither by the plan nor by the image, which publish nothing', () => {
+  it('is refused by compose and helm, and neither by the plan nor by the image, which publish nothing', () => {
     const loopback = boundTo('127.0.0.1');
     expect(loopback.workloads[0]?.listens[0]?.host).toBe('127.0.0.1');
     expect(() => composeFiles(loopback)).toThrow(new Error(Refused));
+    expect(() => helmFiles(loopback)).toThrow(new Error(Refused));
     expect(() => imageFiles(loopback)).not.toThrow();
   });
 
@@ -225,6 +292,9 @@ describe('a host a published port would not reach', () => {
       const bound = boundTo(host);
       expect(bound.workloads[0]?.listens[0]?.host).toBe(host);
       expect(composed(bound).services['customers-production'].ports).toEqual(['8099:8099']);
+      expect(parse(fileOf(helmFiles(bound), 'values.yaml')).workloads[0].ports).toEqual([
+        { name: 'tcp-8099', port: 8099 },
+      ]);
       expect(fileOf(imageFiles(bound), 'Dockerfile')).toContain('EXPOSE 8099');
     }
   });

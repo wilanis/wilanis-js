@@ -1,0 +1,90 @@
+{{- /*
+One Deployment per workload: the image, its command, its ports, its variables from the Secret, and a readiness probe
+on its first port. The socket opens only after every startup step before the listener succeeded, so it is the
+readiness the tree already declares.
+
+The pod runs as RFC 0020's deployment half asks: not as root, on a read-only root filesystem, with no capabilities,
+no service account token, and one writable directory, /tmp, an emptyDir for the file blob registry. Nothing else in
+the tree is writable. A profile that keeps @auth's sessions in files (@auth/state.port.json bound to
+@auth/files.port.json, under .wilanis/auth) is refused a write at its first sign-in: bind the port to a store, as
+the example's production profile does. The chart gives .wilanis no volume of its own, since an emptyDir there would
+be one pod's and gone at its next restart, and a session one replica wrote would be unknown to the next.
+*/ -}}
+{{- range $workload := .Values.workloads }}
+{{- $scope := dict "root" $ "workload" $workload }}
+{{- $secret := include "wilanis-tree.secret" $ }}
+{{- $wired := include "wilanis-tree.wired" $ | fromJsonArray }}
+{{- $cluster := include "wilanis-tree.postgresql" $ }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "wilanis-tree.workload" $scope }}
+  labels:
+    {{- include "wilanis-tree.labels" $scope | nindent 4 }}
+spec:
+  replicas: {{ hasKey $workload "replicas" | ternary $workload.replicas 1 }}
+  selector:
+    matchLabels:
+      {{- include "wilanis-tree.selector" $scope | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "wilanis-tree.labels" $scope | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        # the node user of the node image the Dockerfile starts from, by number, so the kubelet can tell it is not root
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: tree
+          image: {{ include "wilanis-tree.image" $ | quote }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          command: {{ required (printf "workloads[%s].command is required" ($workload.profile | quote)) $workload.command | toJson }}
+          {{- with $workload.ports }}
+          ports:
+            {{- range . }}
+            - name: {{ .name }}
+              containerPort: {{ .port }}
+              protocol: TCP
+            {{- end }}
+          {{- end }}
+          {{- with $workload.env }}
+          env:
+            {{- range . }}
+            - name: {{ .name }}
+              valueFrom:
+                secretKeyRef:
+                  {{- if has .name $wired }}
+                  name: {{ $cluster }}-app
+                  key: uri
+                  {{- else }}
+                  name: {{ $secret }}
+                  key: {{ .secretKey | default .name }}
+                  {{- end }}
+            {{- end }}
+          {{- end }}
+          {{- with $workload.probe }}
+          readinessProbe:
+            {{- toYaml (merge (deepCopy .) (dict "periodSeconds" 10 "timeoutSeconds" 2 "failureThreshold" 6)) | nindent 12 }}
+          {{- end }}
+          {{- with $.Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

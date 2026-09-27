@@ -1,0 +1,23 @@
+{{- /*
+The one PostgreSQL cluster the postgresql switch stands up, run by the CloudNativePG operator the same switch
+installs. The operator's resource types are among what it installs, so on a first install the cluster has no type to
+be yet: it is rendered once the cluster knows postgresql.cnpg.io/v1 Cluster, which the next `helm upgrade` of the same
+release sees, and NOTES.txt says so. The operator writes <cluster>-app, whose `uri` the variables in
+postgresql.variables are read from.
+*/ -}}
+{{- if and .Values.postgresql.enabled (.Capabilities.APIVersions.Has "postgresql.cnpg.io/v1/Cluster") }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "wilanis-tree.postgresql" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "wilanis-tree.name" . | quote }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/component: postgresql
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | quote }}
+spec:
+  instances: {{ .Values.postgresql.instances | default 1 }}
+  storage:
+    size: {{ .Values.postgresql.size | default "1Gi" }}
+{{- end }}

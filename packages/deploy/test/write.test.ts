@@ -201,10 +201,13 @@ describe('wilanis-deploy, writing into a tree', () => {
       '--profile',
       'production-worker',
       '--target',
-      'image,compose,plan',
+      'image,compose,helm,plan',
     );
     expect(ran.code).toBe(0);
     expect(JSON.parse(ran.stdout).workloads).toHaveLength(2);
+    expect(readFileSync(join(dir, 'deploy/values.yaml'), 'utf8').split('\n')[1]).toBe(
+      '# regenerate: npx wilanis-deploy . --profile production --profile production-worker --target helm',
+    );
     expect(readdirSync(join(dir, 'deploy')).filter(path => path.endsWith('.json'))).toEqual([]);
     const after = checkTree(await loadProject(dir));
     expect(after.ok).toBe(true);

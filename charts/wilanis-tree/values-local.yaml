@@ -1,0 +1,27 @@
+# What the example's demo turns on in a local kind cluster, layered over the values wilanis-deploy writes for it:
+#   helm install customers charts/wilanis-tree -f example/deploy/values.yaml -f charts/wilanis-tree/values-local.yaml
+# For a laptop only. Every value below is the demo's, and none works anywhere else.
+
+# The production listener on a NodePort, which the kind cluster maps a host port to.
+service:
+  type: NodePort
+  nodePorts:
+    production:
+      "8099": 30080
+
+# The example's production profile keeps its customers, its sessions and its removals queue in one PostgreSQL
+# database, read from CUSTOMERS_DATABASE_URL: the cluster's operator writes that URL, so no value of it is here.
+postgresql:
+  enabled: true
+  variables: [CUSTOMERS_DATABASE_URL]
+
+# The two variables left, made into the Secret by the chart rather than by an operator. The token secret signs the
+# demo's tokens only, and the hash is the operator account's with the password operator-pass.
+secret:
+  create: true
+  values:
+    CUSTOMERS_JWT_SECRET: local-only-not-a-secret
+    CUSTOMERS_OPERATOR_PASSWORD_HASH: "scrypt:c2FsdC1vcGVyYXRvci0wMQ:CGJ0iksayYFeuhVDtpvIF_Uy9FtRzCzw3Zsj1QOJGfY"
+
+# Neither of the other switches: the example reaches no bucket, and its traces go to the collector @otel's settings
+# name, localhost:4318, which no Service in the cluster answers.

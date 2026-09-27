@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * wilanis-deploy [root] --profile <name> [--profile <name>]... [--target image,compose,plan] [-o <dir>] [--check]
- * [--force]: load and check a tree as `wilanis manifest` does, build its manifest and the plan of the profiles asked
- * for, and render each target -- the files into `-o`, the plan onto stdout. Every target is rendered before anything
- * is written or printed, so a refusal of any leaves the directory as it was and prints no plan.
+ * wilanis-deploy [root] --profile <name> [--profile <name>]... [--target image,compose,helm,plan] [-o <dir>]
+ * [--check] [--force]: load and check a tree as `wilanis manifest` does, build its manifest and the plan of the
+ * profiles asked for, and render each target -- the files into `-o`, the plan onto stdout. Every target is rendered
+ * before anything is written or printed, so a refusal of any leaves the directory as it was and prints no plan.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -11,13 +11,14 @@ import { checkTree } from '@wilanis/compiler';
 import type { ProjectDoc } from '@wilanis/core';
 import { declaredProfile, loadProject, manifestOf, type ProjectLoad } from '@wilanis/runtime';
 import { composeFiles } from './compose.js';
+import { helmFiles } from './helm.js';
 import { imageFiles } from './image.js';
 import { type Plan, planOf, planText } from './plan.js';
 import { reported } from './report.js';
 import { type Rendered, shellWord, stamped, writeInto } from './write.js';
 
-const USAGE = `wilanis-deploy [root] --profile <name> [--profile <name>]... [--target image,compose,plan] [-o <dir>]
-               [--check] [--force]
+const USAGE = `wilanis-deploy [root] --profile <name> [--profile <name>]... [--target image,compose,helm,plan]
+               [-o <dir>] [--check] [--force]
 
 Derives what one deployment of the tree is from its manifest (wilanis manifest) -- one workload per profile asked
 for, with the command that starts it, the addresses it listens on, what it holds open, the variables it needs by
@@ -31,6 +32,8 @@ it. No variable's value is read, and none is written or printed.
                       image    Dockerfile and Dockerfile.dockerignore: the one image every workload runs
                       compose  compose.yaml, one service per workload, and .env.example, which names every
                                variable and holds no value
+                      helm     values.yaml, the values of the chart charts/wilanis-tree: one Deployment per
+                               workload, a Service for each that listens, the Secret's keys by name
                       plan     the plan, as JSON on stdout (packages/deploy/schemas/plan.schema.json); never
                                written into the tree, whose loader reads every *.json under the root
   -o <dir>          where the files go, inside the tree; <root>/deploy where it is not given. The image is built
@@ -40,8 +43,8 @@ it. No variable's value is read, and none is written or printed.
 
 The tree is loaded and checked first, as wilanis manifest does: a tree with refusals prints them and exits 1. So
 does a profile that holds nothing, which would start and exit; an address whose port the tree does not fix; and,
-for compose, an address bound to an interface nothing outside the container reaches. stdout carries the plan and
-nothing else; what was written, and what would change, is said on stderr.`;
+for compose and helm, an address bound to an interface nothing outside the container reaches. stdout carries the
+plan and nothing else; what was written, and what would change, is said on stderr.`;
 
 /** What a target renders from the plan alone: text for stdout, or files for the directory. */
 type Target = { print: (plan: Plan) => string } | { files: (plan: Plan) => Rendered[] };
@@ -50,6 +53,7 @@ type Target = { print: (plan: Plan) => string } | { files: (plan: Plan) => Rende
 const TARGETS: Record<string, Target> = {
   image: { files: imageFiles },
   compose: { files: composeFiles },
+  helm: { files: helmFiles },
   plan: { print: planText },
 };
 
