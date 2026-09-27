@@ -72,7 +72,8 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
   settings declare. [[X101](refusals/X101.md), [X102](refusals/X102.md), [X103](refusals/X103.md)] (before the
   RFCs)
 - A trigger that reaches an operation an access invariant covers attaches the policy it requires, and an
-  invariant names only domain operations, paths the guard hands and core shapes, and is reached.
+  invariant names only domain operations, paths a trigger's kind or the guard hands and core shapes, and is
+  reached.
   [[I001](refusals/I001.md), [I002](refusals/I002.md), [I003](refusals/I003.md)] (RFC 0007)
 - A field invariant's rule parses and types against its shape, a value written in literals that breaks it is
   refused where it is made, and no graph refuses with the word its guards reserve. [[I004](refusals/I004.md),
@@ -98,15 +99,25 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
   its refusal ends the run as `identify` with no policy and no graph run. (`gate` in
   `packages/runtime/src/gate.ts`, run by `Embedder` in `packages/runtime/src/embed.ts`; `Guard` in
   `packages/core/src/plugin.ts`; before the RFCs)
-- The stubbed gates never call the guard: `rehearse`, `fuzz` and `regress` prove nothing about identity.
-  (`gate` in `packages/runtime/src/gate.ts`, `Embedder.stubbed` in `packages/runtime/src/embed.ts`; before the
-  RFCs)
+- The stubbed gates never call the guard: `rehearse`, `fuzz`, `regress` and `run --seed` prove nothing about
+  identity. (`gate` in `packages/runtime/src/gate.ts`; `Embedder.stubbed` in `packages/runtime/src/embed.ts`, set
+  by `embedderFor` in `packages/runtime/src/stubbing.ts` for every run given a seed; before the RFCs)
 - What the guard learned reaches a graph as `request.principal`, `request.session` and `request.challenge` and by
   no other path, and it is what the credential established, never the token or the code itself. (`identifies` in
   `packages/runtime/src/gate.ts`; `guard` in `packages/plugin-auth/src/guard.ts`; before the RFCs)
-- A field marked `secret` is `«secret»` in every report's `in` and `out`, to a depth of six fields inside a type.
-  (`packages/engine/src/redact.ts`, applied in `packages/engine/src/run.ts` and `packages/engine/src/map.ts`;
-  `secretPaths` and `SECRET_DEPTH` in `packages/compiler/src/lower.ts`; before the RFCs)
+- A field marked `secret` is `«secret»` in every report's `in` and `out`, to a depth of six levels inside a type,
+  a list counting as one, whichever node reads it (a call, a switch, a map and each of its elements, an
+  invariant's guard, a graph that takes its input whole, a nested run, a node seeded in a replay), in a trigger's
+  request where its kind's context marks it (an http request's headers and cookies, a queue message's headers)
+  and in every input filled from such a field, in a policy's decision, and in what the schedule log and
+  `wilanis fuzz` record of a run's answer; its bounds are that a secret read into a type that does not mark it
+  (a `@std/object.port.json#make` typed `string` of `{{in.password}}`) is shown in clear from that node on, and
+  that a call of a graph seeded through the engine API, as a replay seeds one, is shown by the marks of its
+  operation's `returns` alone, because a seeded call runs no nested run to carry the marks of the node that
+  answers the graph. (`packages/engine/src/redact.ts`, applied in `packages/engine/src/run.ts` and
+  `packages/engine/src/map.ts`; `shownRoots` in `packages/runtime/src/shown.ts`;
+  `packages/plugin-schedule/src/fire.ts`, `packages/runtime/src/fuzz.ts`; `secretPaths` and `SECRET_DEPTH` in
+  `packages/core/src/secret.ts`; before the RFCs)
 - A `{{secrets.*}}` read is substituted into plugin settings, connection settings and a startup step's `in`, and
   nowhere else; settings reach no report, and a step's `in` is redacted where its operation marks the field
   `secret`. (`Secrets` in `packages/compiler/src/env.ts`; `Embedder.startup` in `packages/runtime/src/embed.ts`;
@@ -135,9 +146,10 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
 - `wilanis start` stops before any plugin's `postLoad` when a variable behind a secret the profile's reach reads
   is unset. (`chosen` in `packages/runtime/src/serve.ts`, `secretsRefusal` in `packages/runtime/src/profile.ts`;
   RFC 0013)
-- A run's trace carries status, timing and what ran, and never a value, at level `summary`; `full` adds the
-  report's `in` and `out`, already redacted, and each node's message as written; a refusal's `detail` enters
-  neither. (`packages/runtime/src/trace.ts`, `valued` in `packages/runtime/src/trace-span.ts`; RFC 0006)
+- A run's trace carries status, timing and what ran, and never a value but the caller's correlation id, copied
+  opaquely, at level `summary`; `full` adds the report's `in` and `out`, already redacted, and each node's message
+  as written; a refusal's `detail` enters neither. (`packages/runtime/src/trace.ts`, `valued` in
+  `packages/runtime/src/trace-span.ts`, `correlationOf` in `packages/runtime/src/fired.ts`; RFC 0006)
 - The guard's sessions and challenges are kept where the project binds `@auth/state.port.json`, and a refresh
   token is kept and compared only as its hash. (`packages/plugin-auth/src/state.ts`; `issueTokens` and `refresh`
   in `packages/plugin-auth/src/tokens.ts`; RFC 0005)
