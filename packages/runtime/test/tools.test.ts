@@ -320,6 +320,35 @@ describe('wilanis describe: a resolvers document and who reads it', () => {
   });
 });
 
+/**
+ * What `wilanis describe` says of the context a trigger reads (RFC 0034): `{{context.params.id}}` is a path into
+ * what the trigger's kind declares under `context`, so the trigger names that kind beside its reads, and the kind
+ * and the guard head their blocks with the word the trigger reads them by.
+ */
+describe('wilanis describe: the kind that hands the context', () => {
+  const http = '@http/http.trigger-kind.json';
+  const handed = `context is what ${http} hands  → wilanis describe ${http}`;
+  const said = (path: string) => describeDoc(loadTree(EXAMPLE, PLUGINS, INCLUDES), path).split('\n');
+
+  it('names the kind below the reads of fires, and below what the attachments give the guard', () => {
+    const lines = said('@customers/edge/get-customer.trigger.json');
+    expect(lines[lines.indexOf('    id ← {{context.params.id}}') + 1]).toBe(`    ${handed}`);
+    expect(lines[lines.findIndex(line => line.startsWith("  gives the guard 'token'")) + 1]).toBe(`  ${handed}`);
+  });
+
+  it('says nothing of the context under fires where fire.in reads nothing from it', () => {
+    // export-customers fires with no input, so the one line naming the kind is its attachment's
+    const lines = said('@customers/edge/export-customers.trigger.json');
+    expect(lines[lines.indexOf('fires   @customers/domain/customer.port.json#export') + 1]).toMatch(/^policies/);
+    expect(lines.filter(line => line.includes('context is what'))).toEqual([`  ${handed}`]);
+  });
+
+  it("heads a kind's block and what the guard adds with context, the word a trigger reads them by", () => {
+    expect(said(http)).toContain('context:');
+    expect(said('@auth/plugin.json')).toContain('  adds to context:');
+  });
+});
+
 describe('wilanis run: stdout is what the tree said, stderr what broke', () => {
   it('prints a fault as its node and message on stderr, and a refusal as { reason, message } on stdout', async () => {
     const { dir, plugins } = askingTree();
