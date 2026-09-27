@@ -9,6 +9,7 @@ import type { Loaded, LoadResult } from '@wilanis/core';
 import { HOME, type ScenarioDoc, Scope, schemaUrl, secretPaths, type TriggerDoc } from '@wilanis/core';
 import { outcomeOf, type Report, redactValue, refusalOf } from '@wilanis/engine';
 import { activeProfile, skippedLines } from './profile.js';
+import { replayedDoc } from './rehearse-recorded.js';
 import { embedderFor, generatedFire } from './stubbing.js';
 
 // ---- fuzz / regress ----------------------------------------------------------------------------------
@@ -258,10 +259,11 @@ export async function regress(load: LoadResult, opts: { profile?: string } = {})
       unserved.push(trigger);
       continue;
     }
+    const fired = replayedDoc(load, sc.doc, trigger);
     const report = sc.doc.cancelAt
-      ? await cancelledReplay(load, stubbed, trigger.doc, sc.doc)
-      : await emb.fire(trigger.doc, sc.doc.in, sc.doc.context ?? {}, { stubs: sc.doc.stubs });
-    const diffs = diffOf(report, sc.doc, secretPaths(emb.types(trigger.doc).out));
+      ? await cancelledReplay(load, stubbed, fired, sc.doc)
+      : await emb.fire(fired, sc.doc.in, sc.doc.context ?? {}, { stubs: sc.doc.stubs });
+    const diffs = diffOf(report, sc.doc, secretPaths(emb.types(fired).out));
     results.push({ scenario: sc.path, same: diffs.length === 0, diffs });
     lines.push(`${sc.path}: ${diffs.length ? `DIFF ${diffs.join('; ')}` : 'same'}`);
   }

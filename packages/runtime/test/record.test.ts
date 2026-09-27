@@ -7,7 +7,7 @@ import { readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'n
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkTree } from '@wilanis/compiler';
-import { type GraphDoc, isSwitch, type LoadResult, loadTree, type ProjectDoc } from '@wilanis/core';
+import { type GraphDoc, isSwitch, type LoadResult, loadTree, type ProjectDoc, policyPath } from '@wilanis/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PROFILE_VARIABLE, RECORDED, type Rehearsal, regress, rehearse } from '../src/index.js';
 import { recordedProfile } from '../src/profile.js';
@@ -39,20 +39,31 @@ function caught(loaded: LoadResult, graph: string, node: string, when: string): 
   return !!sw && isSwitch(sw) && Object.keys(sw.catch ?? {}).some(at => when === `${at} broke`);
 }
 
+/** The names of the policies a trigger of the tree attaches: each one's decision is recorded once, whatever the kinds. */
+function attachedPolicies(loaded: LoadResult): Set<string> {
+  const attached = new Set(
+    loaded.registry.all('trigger').flatMap(one => (one.doc.policies ?? []).map(ref => loaded.resolve(policyPath(ref)))),
+  );
+  return new Set(loaded.registry.all('policy').flatMap(one => (attached.has(one.path) ? [one.name] : [])));
+}
+
 /**
  * How many files the rehearsal records, read off what it reported: every branch a trigger reached that ran without
  * breaking a node, once per trigger reaching it -- guards aside, since the compiler wrote their switch -- and one
- * whole run per trigger with no switch. A policy's decision is walked but not recorded.
+ * whole run per trigger with no switch; a policy's decision once, however many kinds its root was walked under.
  */
 function expectedFiles(loaded: LoadResult, rehearsal: Rehearsal): number {
   const triggers = new Set(loaded.registry.all('trigger').map(one => one.name));
+  const policies = attachedPolicies(loaded);
+  const recorded = (name: string) => triggers.has(name) || policies.has(name);
   let count = rehearsal.plain.filter(one => triggers.has(one.trigger)).length;
+  count += new Set(rehearsal.plain.flatMap(one => (policies.has(one.trigger) ? [one.trigger] : []))).size;
   for (const decision of rehearsal.decisions) {
     if (decision.guard) continue;
     const ran = decision.branches.filter(
       one => one.settled && !caught(loaded, decision.graph, decision.node, one.when),
     );
-    count += ran.length * decision.triggers.filter(one => triggers.has(one)).length;
+    count += ran.length * decision.triggers.filter(recorded).length;
   }
   return count;
 }
