@@ -27,6 +27,7 @@ import {
   RECORDED,
   type Rehearsal,
   recordedLines,
+  refusedDir,
   regress,
   rehearse,
   SCENARIOS,
@@ -51,9 +52,10 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
   wilanis check    [root] [--json]                 judge the whole tree, under every profile; exit 1 with every refusal
   wilanis rehearse [root] [--seed n] [-v] [--json] [--record [dir]] [--check]
                    run every trigger, and every branch of every switch; --record writes each branch's run as a
-                   scenario under scenarios/rehearsed/ (or dir), --check says whether that directory is what the
-                   tree writes today and exits 1 when it is not. Both solve under seed 1 and the profile project.json
-                   marks "default": true, read no WILANIS_PROFILE, and refuse --seed, --profile and --json
+                   scenario under scenarios/rehearsed/ (or dir, below scenarios/ and outside scenarios/fuzz/), --check
+                   says whether that directory is what the tree writes today and exits 1 when it is not. Both solve
+                   under seed 1 and the profile project.json marks "default": true, read no WILANIS_PROFILE, and
+                   refuse --seed, --profile and --json
   wilanis fuzz     [root] [--runs n]               write one scenario per trigger per seed to scenarios/fuzz/
   wilanis regress  [root] [--json]                 replay every scenario and diff node by node
   wilanis start    [root] [--profile word] [--trace[=text|json]] [--level summary|full]
@@ -183,17 +185,19 @@ const BESIDE_RECORDING: Record<string, string> = {
  * What `rehearse` is asked to record: `--record [dir]` and `--check`, `--record --check` being `--check` on that
  * directory. Either refuses `--seed` and `--profile`, since the recorded directory is a function of the tree alone,
  * solved under one fixed seed and the default profile, and `--json`, since the envelope's `ok` is the rehearsal's
- * and the exit code would be the directory's.
+ * and the exit code would be the directory's; and a directory it may not own (`refusedDir`), before any run.
  */
-function recordingOf(flags: Record<string, string>): { record?: string; check?: boolean } {
+function recordingOf(flags: Record<string, string>, root: string): { record?: string; check?: boolean } {
   const check = flags.check !== undefined;
-  const refused = Object.keys(BESIDE_RECORDING).find(flag => flags[flag] !== undefined);
-  if ((flags.record !== undefined || check) && refused) {
-    console.error(BESIDE_RECORDING[refused]);
+  if (flags.record === undefined && !check) return {};
+  const record = flags.record === undefined || flags.record === 'true' ? RECORDED : flags.record;
+  const beside = Object.keys(BESIDE_RECORDING).find(flag => flags[flag] !== undefined);
+  const refused = beside ? BESIDE_RECORDING[beside] : refusedDir(resolve(root), record);
+  if (refused) {
+    console.error(refused);
     process.exit(2);
   }
-  const record = flags.record === 'true' ? RECORDED : flags.record;
-  return { ...(record !== undefined ? { record } : {}), ...(check ? { check } : {}) };
+  return { record, ...(check ? { check } : {}) };
 }
 
 /**
@@ -222,7 +226,7 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     else console.log(`ok: ${loaded.registry.files.length} documents, ${irSaid()}`);
   },
   rehearse: async ({ flags, rootArg }) => {
-    const recording = recordingOf(flags);
+    const recording = recordingOf(flags, rootArg(0));
     const loaded = await check(rootArg(0), jsonOf(flags, 'rehearse'));
     const answer = await rehearse(loaded, {
       seed: flags.seed ? Number(flags.seed) : undefined,

@@ -10,7 +10,7 @@ import { outcomeOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, nonEmpty, type Stubbing, setPath, switchesOf } from './branches.js';
 import type { Embedder } from './embed.js';
 import { activeProfile, recordedProfile, skippedLines } from './profile.js';
-import { type Recorded, type RecordedRun, recordRuns } from './record.js';
+import { type Recorded, type RecordedRun, recordedDir, recordRuns } from './record.js';
 import { type Decision, format, gather, type PlainRun, statedOf, stateName } from './rehearsal-report.js';
 import { heldUpstream } from './rehearse-held.js';
 import { type Ran, recordedOf, secretOut } from './rehearse-recorded.js';
@@ -129,6 +129,8 @@ export async function rehearse(
   opts: { seed?: number; profile?: string; verbose?: boolean; record?: string; check?: boolean } = {},
 ): Promise<Rehearsal> {
   const recording = opts.record !== undefined || Boolean(opts.check);
+  // the recorded directory is judged before the walk, so one it may not own costs no run
+  if (recording) recordedDir(load.root, opts.record);
   const seed = recording ? 1 : (opts.seed ?? 1);
   const project = load.registry.project?.doc;
   const profile = recording

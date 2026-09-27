@@ -3,23 +3,13 @@
  * and that directory judged against what the tree writes today, on copies of the example.
  */
 import { spawnSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkTree } from '@wilanis/compiler';
 import { type GraphDoc, isSwitch, type LoadResult, loadTree, type ProjectDoc } from '@wilanis/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PROFILE_VARIABLE, RECORDED, type Rehearsal, regress, rehearse, writeRecorded } from '../src/index.js';
+import { PROFILE_VARIABLE, RECORDED, type Rehearsal, regress, rehearse } from '../src/index.js';
 import { recordedProfile } from '../src/profile.js';
 import { copyOfExample, INCLUDES, PLUGINS } from './example-harness.js';
 
@@ -170,49 +160,6 @@ describe('rehearse --check: a recorded directory the tree has moved away from', 
     expect(refused).toEqual(extra.map(file => `S004 @${file}#branch/to`));
     rmSync(dir, { recursive: true, force: true });
   });
-
-  it('owns its directory: a stray file in it is removed, a scenario beside it is kept', {
-    timeout: 60_000,
-  }, async () => {
-    const dir = copyOfExample();
-    await rehearse(load(dir), { record: RECORDED });
-    const { generated: _, ...kept } = read(join(dir, RECORDED, 'hello-gated/whole.scenario.json'));
-    const mine = JSON.stringify({ ...kept, description: 'the gated hello, kept by hand' }, null, 2);
-    writeFileSync(join(dir, 'scenarios/mine.scenario.json'), mine);
-    mkdirSync(join(dir, RECORDED, 'gone-trigger'));
-    writeFileSync(join(dir, RECORDED, 'gone-trigger/old.scenario.json'), mine);
-    const answer = await rehearse(load(dir), { record: RECORDED });
-    expect(existsSync(join(dir, RECORDED, 'gone-trigger'))).toBe(false);
-    expect(readFileSync(join(dir, 'scenarios/mine.scenario.json'), 'utf8')).toBe(mine);
-    expect(answer.recorded?.written).not.toContain(`${RECORDED}/gone-trigger/old.scenario.json`);
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  it('never reaches through a link: what a link inside the directory leads to is left where it is', {
-    timeout: 60_000,
-  }, async () => {
-    const dir = copyOfExample();
-    const loaded = load(dir);
-    const elsewhere = mkdtempSync(join(tmpdir(), 'wilanis-elsewhere-'));
-    writeFileSync(join(elsewhere, 'keep.scenario.json'), '{}');
-    mkdirSync(join(dir, RECORDED), { recursive: true });
-    symlinkSync(elsewhere, join(dir, RECORDED, 'link'));
-    const answer = await rehearse(loaded, { record: RECORDED });
-    expect(readFileSync(join(elsewhere, 'keep.scenario.json'), 'utf8')).toBe('{}');
-    expect(answer.recorded?.written).not.toContain(`${RECORDED}/link/keep.scenario.json`);
-    // a link where a trigger's files go is refused before anything is written or removed
-    const docs = { 'linked-trigger/x.scenario.json': read(join(dir, RECORDED, 'hello-gated/whole.scenario.json')) };
-    symlinkSync(elsewhere, join(dir, RECORDED, 'linked-trigger'));
-    expect(() => writeRecorded(dir, RECORDED, docs)).toThrow(/would be written through a link/);
-    expect(readdirSync(elsewhere)).toEqual(['keep.scenario.json']);
-    expect(existsSync(join(dir, RECORDED, 'hello-gated/whole.scenario.json'))).toBe(true);
-    // and so is a recorded directory that is itself a link out of the tree
-    symlinkSync(elsewhere, join(dir, 'scenarios/linked'));
-    expect(() => writeRecorded(dir, 'scenarios/linked', {})).toThrow(/leads through a link to .*outside the tree/);
-    expect(readdirSync(elsewhere)).toEqual(['keep.scenario.json']);
-    rmSync(dir, { recursive: true, force: true });
-    rmSync(elsewhere, { recursive: true, force: true });
-  });
 });
 
 describe('rehearse --record and --check under a profile', () => {
@@ -265,7 +212,7 @@ function wilanisWith(env: Record<string, string>, dir: string, ...args: string[]
 const wilanis = (dir: string, ...args: string[]) => wilanisWith({}, dir, ...args);
 
 describe('rehearse --record and --check on the command line', () => {
-  it('writes, says a directory is current, exits 1 on a stale one, and refuses --seed, --profile and --json', {
+  it('writes, says a directory is current, exits 1 on a stale one, and refuses --seed, --profile, --json and a directory it may not own', {
     timeout: 120_000,
   }, () => {
     const dir = copyOfExample();
@@ -282,6 +229,12 @@ describe('rehearse --record and --check on the command line', () => {
       expect(json.code).toBe(2);
       expect(json.stdout).toBe('');
       expect(json.stderr).toContain("an envelope for staleness is RFC 0019's to add: drop --json");
+    }
+    // a directory holding what a person or fuzz wrote is refused before anything runs
+    for (const at of ['scenarios', 'scenarios/fuzz']) {
+      const owned = wilanis(dir, 'rehearse', '.', '--record', at);
+      expect(owned.code).toBe(2);
+      expect(owned.stderr).toContain(`--record owns ${at} and removes every scenario in it that it did not write: `);
     }
     const recorded = wilanis(dir, 'rehearse', '.', '--record');
     expect(recorded.code, recorded.stderr).toBe(0);

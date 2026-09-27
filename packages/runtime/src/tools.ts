@@ -33,6 +33,7 @@ export {
   type Recorded,
   type RecordedRun,
   recordedLines,
+  refusedDir,
   scenarioOf,
   writeRecorded,
 } from './record.js';
