@@ -77,6 +77,15 @@ describe('a unique the store declares', () => {
     const other = await fire('record', { id: '5', url: 'https://x', method: 'POST' });
     expect(other.output).toEqual({ record: { id: '5', url: 'https://x', method: 'POST' } });
   });
+
+  it('a patch repeating one is answered as a put is, and the record keeps what it had', async () => {
+    await fire('record', { id: '6', url: 'https://z', method: 'GET' });
+    const repeat = await fire('move', { id: '6', url: 'https://x', method: 'GET' });
+    expect(repeat.status).toBe('done');
+    expect(repeat.output).toEqual({ violated: 'unique [url, method]' });
+    const moved = await fire('move', { id: '6', url: 'https://z', method: 'PUT' });
+    expect(moved.output).toEqual({ record: { id: '6', url: 'https://z', method: 'PUT' } });
+  });
 });
 
 describe('a refs the store declares', () => {

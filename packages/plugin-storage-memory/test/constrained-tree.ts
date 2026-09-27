@@ -77,7 +77,7 @@ export function treeServing(): string {
     $schema: '@wilanis/feature.schema.json',
     description: 'what the registry keeps',
     exports: ['@features/customers/domain/entries.port.json', ENTRY],
-    effects: ['@storage/store.port.json#put', '@storage/store.port.json#remove'],
+    effects: ['@storage/store.port.json#put', '@storage/store.port.json#patch', '@storage/store.port.json#remove'],
   });
   write('features/customers/domain/Customer.shape.json', {
     $schema: '@wilanis/shape.schema.json',
@@ -130,6 +130,11 @@ export function treeServing(): string {
         accepts: { id: { type: 'string' }, url: { type: 'string' }, method: { type: 'string' } },
         returns: '@features/customers/domain/Written.shape.json',
       },
+      move: {
+        description: 'Change where one entry was observed, or say which constraint stopped it.',
+        accepts: { id: { type: 'string' }, url: { type: 'string' }, method: { type: 'string' } },
+        returns: '@features/customers/domain/Written.shape.json',
+      },
       note: {
         description: 'Keep one note about an entry, or say which constraint stopped it.',
         accepts: { id: { type: 'string' }, entryId: { type: 'string' }, text: { type: 'string' } },
@@ -148,6 +153,7 @@ export function treeServing(): string {
     port: '@features/customers/domain/entries.port.json',
     operations: {
       record: { graph: '@features/customers/data/register-customer.graph.json' },
+      move: { graph: '@features/customers/data/move-entry.graph.json' },
       note: { graph: '@features/customers/data/record-note.graph.json' },
       forget: { graph: '@features/customers/data/forget-entry.graph.json' },
     },
@@ -175,6 +181,29 @@ export function treeServing(): string {
           store: STORE,
           collection: 'entries',
           record: { id: '{{in.id}}', url: '{{in.url}}', method: '{{in.method}}' },
+        },
+      },
+      reads: ['violated'],
+      rules: [{ when: 'has(violated)', to: 'broke' }],
+      else: 'kept',
+      answers: kept,
+    }),
+  );
+  write(
+    'features/customers/data/move-entry.graph.json',
+    routing({
+      description: 'patch the entry, and say which unique stopped it where one did',
+      in: ENTRY,
+      out: '@features/customers/domain/Written.shape.json',
+      from: ['kept', 'broke'],
+      write: {
+        id: 'saved',
+        run: '@storage/store.port.json#patch',
+        in: {
+          store: STORE,
+          collection: 'entries',
+          key: '{{in.id}}',
+          changes: { url: '{{in.url}}', method: '{{in.method}}' },
         },
       },
       reads: ['violated'],

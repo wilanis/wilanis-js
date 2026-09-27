@@ -1,6 +1,6 @@
 /**
  * The edge of the tree `constraints.test.ts` drives: what the command line sends, what it prints, and the
- * three triggers that fire the domain port. It is a file of its own because the domain half is the part a
+ * four triggers that fire the domain port. It is a file of its own because the domain half is the part a
  * reader comes for -- the store's constraints and the graphs that route on them -- and the views are here
  * only so the tree checks.
  */
@@ -78,6 +78,15 @@ export function edge(write: Write): void {
     'features/customers/edge/record.trigger.json',
     trigger('record', {
       op: 'record',
+      in: '@features/customers/edge/EntryRequest.shape.json',
+      out: '@features/customers/edge/WrittenView.shape.json',
+      fire: { id: '{{context.flags.id}}', url: '{{context.flags.url}}', method: '{{context.flags.method}}' },
+    }),
+  );
+  write(
+    'features/customers/edge/move.trigger.json',
+    trigger('move', {
+      op: 'move',
       in: '@features/customers/edge/EntryRequest.shape.json',
       out: '@features/customers/edge/WrittenView.shape.json',
       fire: { id: '{{context.flags.id}}', url: '{{context.flags.url}}', method: '{{context.flags.method}}' },

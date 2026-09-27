@@ -122,6 +122,12 @@ export interface PutAnswer {
   violated?: string;
 }
 
+/** What a patch answers: the record after the change, or the constraint that stopped it. */
+export interface PatchAnswer {
+  record?: Record_;
+  violated?: string;
+}
+
 /** What a remove answers: the record that was removed, or the collection still referencing it. */
 export interface RemoveAnswer {
   record?: Record_;
@@ -161,9 +167,11 @@ export interface Engine extends Recorder {
   /**
    * Change some fields of the record under that key, or answer `record` absent where there is none. A key of
    * another scope is absent and nothing is patched; a scope column is never among the changes, since it is
-   * not a field of the shape.
+   * not a field of the shape. The record after the change is held to the store's constraints as `put` holds
+   * a record, and a `unique` it would repeat or a `refs` it would point at nothing is answered as `violated`,
+   * with nothing written.
    */
-  patch(at: At, key: unknown, changes: Record_, written?: Written): Promise<{ record?: Record_ }>;
+  patch(at: At, key: unknown, changes: Record_, written?: Written): Promise<PatchAnswer>;
   /**
    * Remove the record under that key and answer it, or `record` absent where there was none. A record another
    * still references by a declared `refs` is kept, and the collection that references it is answered. A key

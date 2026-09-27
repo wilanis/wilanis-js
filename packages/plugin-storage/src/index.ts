@@ -17,6 +17,7 @@ export type {
   Engines,
   Made,
   Order,
+  PatchAnswer,
   Put,
   PutAnswer,
   Query,
