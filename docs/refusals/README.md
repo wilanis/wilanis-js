@@ -89,6 +89,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [L014](L014.md) | L | live | an operation declaring `listens` without `holds` |
 | [L015](L015.md) | L | live | a `listens` input the operation does not accept, or not a number for the port or a string for the host |
 | [L016](L016.md) | L | live | a data graph composing a value a field invariant guards that an effect of the graph reads |
+| [L017](L017.md) | L | live | a `listens` setting the granting plugin does not declare, or not a number for the port or a string for the host |
 | [G001](G001.md) | G | live | a node id another node of the graph has, or one of the reserved roots in, const, context, secrets |
 | [G003](G003.md) | G | live | a read that cannot be typed: no such field, constant, earlier node, or name under reads |
 | [G004](G004.md) | G | live | a value that does not fit its input: optional where the contract requires it, or of the wrong type |
