@@ -2,10 +2,11 @@
  * Secrets never appear in a report: a redacted copy of a value replaces every marked path with a marker. Only
  * what is written into a report is redacted; the values the run hands from node to node, and the answer it
  * hands its caller, are the values themselves. A value made from a marked read carries the mark: text that
- * interpolates one is the marker whole, and an answer is the marker wherever it holds what its node read as one.
+ * interpolates one is the marker whole, an answer is the marker wherever it holds what its node read as one, and
+ * a pure node's answer that holds none of what it read as one is the marker whole.
  */
 import { type Reader, readPath } from './sources.js';
-import type { Attempt, Report } from './spec.js';
+import type { Attempt, KCall, Report } from './spec.js';
 
 const SECRET = '«secret»';
 
@@ -114,18 +115,25 @@ export function redactReport(report: Report, paths: string[][] | undefined): Rep
   return { ...report, output: redactValue(shown, paths) };
 }
 
+/** What a node says of how its report shows its answer: the paths its operation marks, and whether it is pure. */
+type Marks = Pick<KCall, 'redact' | 'pure'>;
+
 /**
  * What a node's report shows of its answer: the nested run hung on it, where one answered for it, already shows it
  * with every mark below and the node's own; otherwise the answer redacted by the node's own paths. Either way the
- * answer carries the mark of what the node read as a secret.
+ * answer carries the mark of what the node read as a secret. A pure node answers a function of its inputs alone, so
+ * where it read a secret and its answer holds none of what it read as one -- a `#fill` of `{{in.token}}` -- the
+ * answer is the marker whole; where the answer holds one, that part is marked and the rest is shown as it is.
  */
-export function shownOut(
-  sub: Report | undefined,
-  out: unknown,
-  paths: string[][] | undefined,
-  secrets: Set<unknown>,
-): unknown {
-  return carried(out, sub?.status === 'done' ? sub.output : redactValue(out, paths), secrets);
+export function shownOut(sub: Report | undefined, out: unknown, node: Marks, secrets: Set<unknown>): unknown {
+  if (node.pure && secrets.size && out !== undefined && !handsBack(out, secrets)) return SECRET;
+  return carried(out, sub?.status === 'done' ? sub.output : redactValue(out, node.redact?.out), secrets);
+}
+
+/** Whether an answer holds a value its node read as a secret, whole or as a part: where `carried` puts a marker. */
+function handsBack(value: unknown, secrets: Set<unknown>): boolean {
+  if (secrets.has(value)) return true;
+  return walked(value) && Object.values(value).some(part => handsBack(part, secrets));
 }
 
 /** A try that did not stand as the node's report records it: the nested run it ran, if any, redacted as above. */

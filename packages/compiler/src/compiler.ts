@@ -224,7 +224,10 @@ export class Compiler {
     return this.guardSpecs.get(name);
   }
 
-  /** One node as the kernel runs it; a call or map that says `retry` or `timeoutMs` is tagged `<graph>#<id>`. */
+  /**
+   * One node as the kernel runs it; a call or map that says `retry` or `timeoutMs` is tagged `<graph>#<id>`, and one
+   * whose operation is pure says so, which is how a report knows its answer is a function of its inputs alone.
+   */
   private lowerNode(node: Node, roots: Roots, graphPath: string): KNode {
     if (isSwitch(node)) {
       const rules = node.rules.map(rule => ({ when: expr.compilePredicate(rule.when), to: rule.to, label: rule.when }));
@@ -235,7 +238,8 @@ export class Compiler {
     const inputs = this.withScope(lowerValues(node.in, roots), { key: node.run, given: node.in });
     const redact = redactOf(this.scope, op, node.in);
     const site = tagSite(this.sites, `${graphPath}#${node.id}`, node);
-    if (isRun(node)) return { kind: 'call', handler, in: inputs, redact, ...site };
+    const pure = pureOf(op);
+    if (isRun(node)) return { kind: 'call', handler, in: inputs, redact, ...pure, ...site };
     const over = lowerValue(node.over, roots);
     return {
       kind: 'map',
@@ -244,6 +248,7 @@ export class Compiler {
       in: inputs,
       onItemFailure: node.onItemFailure ?? 'fail',
       redact,
+      ...pure,
       bind: bindPaths(node.bind),
       ...(node.limit === undefined ? {} : { limit: node.limit }),
       ...(node.concurrency === undefined ? {} : { concurrency: node.concurrency }),
@@ -300,6 +305,7 @@ export class Compiler {
       handler,
       in: inputs,
       redact: alsoAnswering(redactOf(this.scope, target, given), op, this.scope),
+      ...pureOf(target),
     };
   }
 
@@ -337,6 +343,11 @@ export class Compiler {
     if (!resolver) throw new Error(`unknown resolver '${ref}'`);
     return splitPath(resolver.read).slice(1);
   }
+}
+
+/** A lowered node's `pure`, present only where the operation it runs declares itself pure. */
+function pureOf(op: Operation): { pure?: true } {
+  return op.pure === true ? { pure: true } : {};
 }
 
 /**

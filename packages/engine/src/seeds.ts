@@ -34,7 +34,7 @@ function shownSeed(spec: KernelSpec, opts: RunOptions, run: Seeding, key: string
   const told = opts.shown?.[key];
   if (told !== undefined) return told;
   const node = Object.hasOwn(spec.nodes, key) ? spec.nodes[key] : undefined;
-  if (node?.kind === 'call') return shownOut(undefined, value, node.redact?.out, readBySeed(node, run));
+  if (node?.kind === 'call') return shownOut(undefined, value, node, readBySeed(node, run));
   return node?.kind === 'map' && Array.isArray(value) ? seededAnswer(node, value, run) : value;
 }
 

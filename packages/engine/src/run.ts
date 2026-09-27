@@ -263,7 +263,7 @@ export class Run {
     report.in = redactValue(readAll(node.in, this.showing), node.redact?.in) as Record<string, unknown>;
     const secrets = readAsSecret(inputs, report.in);
     const out = await this.invoke(node.handler, inputs, this.contextFor(node, [...this.root, id], report));
-    this.finish(id, report, out, shownOut(report.sub, out, node.redact?.out, secrets));
+    this.finish(id, report, out, shownOut(report.sub, out, node, secrets));
   }
 
   private async runMap(id: string, node: KMap, report: NodeReport): Promise<void> {
