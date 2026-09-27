@@ -27,18 +27,14 @@ export {
 export { map } from './map.js';
 export { type MigratedStep, type MigratedTarget, type MigrateOptions, type MigrateResult, migrate } from './migrate.js';
 export {
-  checkRecorded,
   current,
   fileOf,
-  RECORDED,
-  type RecordCheck,
   type Recorded,
   type RecordedRun,
   recordedLines,
-  refusedDir,
   scenarioOf,
-  writeRecorded,
 } from './record.js';
+export { checkRecorded, RECORDED, type RecordCheck, refusedDir, writeRecorded } from './recorded-dir.js';
 export { type Rehearsal, rehearse } from './rehearse.js';
 export { init, scaffold } from './scaffolds.js';
 export {
