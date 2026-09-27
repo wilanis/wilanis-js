@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/scenario.schema.json",
-  "description": "list-customers under seed 1 with tier enum.silver: done. Written by wilanis fuzz --edges; regenerate it, do not edit it.",
+  "description": "list-customers under seed 1 with tier enum.silver: failed. Written by wilanis fuzz --edges; regenerate it, do not edit it.",
   "generated": "edges",
   "trigger": "@features/customers/edge/list-customers.trigger.json",
   "seed": 1,
@@ -29,101 +29,20 @@
     }
   },
   "stubs": {
-    "op.byTier.op.requested": {
-      "status": 200,
-      "headers": {
-        "extra9": "foxtrot"
-      },
-      "body": [
-        {
-          "id": "bravo69",
-          "name": "india790",
-          "email": "Zulu-9",
-          "tier": "hotel415",
-          "active": false,
-          "registrar": "Zulu-9",
-          "note": "foxtrot"
-        },
-        {
-          "id": "delta",
-          "name": "alpha636",
-          "email": "charlie",
-          "tier": "lima174",
-          "active": false,
-          "registrar": "golf",
-          "note": "x",
-          "createdAt": "Zulu-9531",
-          "extra9": null
-        },
-        {
-          "id": "Zulu-9",
-          "name": "bravo",
-          "email": "golf",
-          "tier": "lima",
-          "note": "Zulu-9",
-          "extra2": null
-        }
-      ]
+    "op.byTier.op.fetched": {
+      "status": 500,
+      "headers": {},
+      "body": []
     }
   },
   "expect": {
-    "status": "done",
-    "output": [
-      {
-        "id": "bravo69",
-        "name": "india790",
-        "email": "Zulu-9",
-        "tier": "hotel415",
-        "active": false
-      },
-      {
-        "id": "delta",
-        "name": "alpha636",
-        "email": "charlie",
-        "tier": "lima174",
-        "active": false
-      },
-      {
-        "id": "Zulu-9",
-        "name": "bravo",
-        "email": "golf",
-        "tier": "lima"
-      }
-    ],
+    "status": "failed",
+    "reason": "upstream",
     "nodes": {
       "op": {
-        "status": "done",
-        "handler": "graph:@features/customers/domain/list-customers.graph.json",
-        "out": [
-          {
-            "id": "bravo69",
-            "name": "india790",
-            "email": "Zulu-9",
-            "tier": "hotel415",
-            "active": false,
-            "registrar": "Zulu-9",
-            "note": "foxtrot"
-          },
-          {
-            "id": "delta",
-            "name": "alpha636",
-            "email": "charlie",
-            "tier": "lima174",
-            "active": false,
-            "registrar": "golf",
-            "note": "x",
-            "createdAt": "Zulu-9531",
-            "extra9": null
-          },
-          {
-            "id": "Zulu-9",
-            "name": "bravo",
-            "email": "golf",
-            "tier": "lima",
-            "note": "Zulu-9",
-            "extra2": null
-          }
-        ]
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "graph:@features/customers/domain/list-customers.graph.json"
       },
       "op.tierGiven": {
         "status": "done",
@@ -131,154 +50,36 @@
         "out": "byTier"
       },
       "op.byTier": {
-        "status": "done",
-        "handler": "@features/customers/data/customers-rest.binding.json#listByTier",
-        "out": [
-          {
-            "id": "bravo69",
-            "name": "india790",
-            "email": "Zulu-9",
-            "tier": "hotel415",
-            "active": false,
-            "registrar": "Zulu-9",
-            "note": "foxtrot"
-          },
-          {
-            "id": "delta",
-            "name": "alpha636",
-            "email": "charlie",
-            "tier": "lima174",
-            "active": false,
-            "registrar": "golf",
-            "note": "x",
-            "createdAt": "Zulu-9531",
-            "extra9": null
-          },
-          {
-            "id": "Zulu-9",
-            "name": "bravo",
-            "email": "golf",
-            "tier": "lima",
-            "note": "Zulu-9",
-            "extra2": null
-          }
-        ]
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "@features/customers/data/customers-rest.binding.json#listByTier"
       },
       "op.byTier.op": {
-        "status": "done",
-        "handler": "graph:@features/customers/data/list-rows-by-tier.graph.json",
-        "out": [
-          {
-            "id": "bravo69",
-            "name": "india790",
-            "email": "Zulu-9",
-            "tier": "hotel415",
-            "active": false,
-            "registrar": "Zulu-9",
-            "note": "foxtrot"
-          },
-          {
-            "id": "delta",
-            "name": "alpha636",
-            "email": "charlie",
-            "tier": "lima174",
-            "active": false,
-            "registrar": "golf",
-            "note": "x",
-            "createdAt": "Zulu-9531",
-            "extra9": null
-          },
-          {
-            "id": "Zulu-9",
-            "name": "bravo",
-            "email": "golf",
-            "tier": "lima",
-            "note": "Zulu-9",
-            "extra2": null
-          }
-        ]
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "graph:@features/customers/data/list-rows-by-tier.graph.json"
       },
-      "op.byTier.op.requested": {
+      "op.byTier.op.fetched": {
         "status": "done",
         "handler": "@http/http.port.json#request",
         "out": {
-          "status": 200,
-          "headers": {
-            "extra9": "foxtrot"
-          },
-          "body": [
-            {
-              "id": "bravo69",
-              "name": "india790",
-              "email": "Zulu-9",
-              "tier": "hotel415",
-              "active": false,
-              "registrar": "Zulu-9",
-              "note": "foxtrot"
-            },
-            {
-              "id": "delta",
-              "name": "alpha636",
-              "email": "charlie",
-              "tier": "lima174",
-              "active": false,
-              "registrar": "golf",
-              "note": "x",
-              "createdAt": "Zulu-9531",
-              "extra9": null
-            },
-            {
-              "id": "Zulu-9",
-              "name": "bravo",
-              "email": "golf",
-              "tier": "lima",
-              "note": "Zulu-9",
-              "extra2": null
-            }
-          ]
+          "status": 500,
+          "headers": {},
+          "body": []
         }
       },
       "op.byTier.op.outcome": {
         "status": "done",
-        "selected": "customers",
-        "out": "customers"
+        "selected": "upstreamFailed",
+        "out": "upstreamFailed"
       },
       "op.byTier.op.customers": {
-        "status": "done",
-        "handler": "@std/object.port.json#make",
-        "out": [
-          {
-            "id": "bravo69",
-            "name": "india790",
-            "email": "Zulu-9",
-            "tier": "hotel415",
-            "active": false,
-            "registrar": "Zulu-9",
-            "note": "foxtrot"
-          },
-          {
-            "id": "delta",
-            "name": "alpha636",
-            "email": "charlie",
-            "tier": "lima174",
-            "active": false,
-            "registrar": "golf",
-            "note": "x",
-            "createdAt": "Zulu-9531",
-            "extra9": null
-          },
-          {
-            "id": "Zulu-9",
-            "name": "bravo",
-            "email": "golf",
-            "tier": "lima",
-            "note": "Zulu-9",
-            "extra2": null
-          }
-        ]
+        "status": "cancelled"
       },
       "op.byTier.op.upstreamFailed": {
-        "status": "cancelled"
+        "status": "failed",
+        "reason": "upstream",
+        "handler": "@std/outcome.port.json#refuse"
       },
       "op.byTier.op.none:made": {
         "status": "cancelled"

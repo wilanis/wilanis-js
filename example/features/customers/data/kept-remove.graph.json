@@ -13,7 +13,7 @@
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "gone",
+      "id": "removed",
       "label": "Remove the record",
       "run": "@storage/store.port.json#remove",
       "in": {
@@ -27,7 +27,7 @@
       "id": "wasThere",
       "label": "Was it there?",
       "in": {
-        "record": "{{gone.record}}"
+        "record": "{{removed.record}}"
       },
       "rules": [
         {
@@ -43,7 +43,7 @@
       "label": "The record",
       "run": "@std/object.port.json#make",
       "in": {
-        "value": "{{gone.record}}",
+        "value": "{{removed.record}}",
         "type": "@customers/domain/Customer.shape.json"
       }
     },

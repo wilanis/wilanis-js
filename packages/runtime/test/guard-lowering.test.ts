@@ -56,11 +56,11 @@ describe('lowering a guard', () => {
       'customer:violated',
       'isKept',
       'noCustomer',
-      'storedCustomer',
+      'stored',
     ]);
     // the node that made the entry is the one the author wrote, moved aside and otherwise untouched
     expect((spec.nodes['customer:made'] as KCall).handler).toBe('@std/object.port.json#make');
-    expect((spec.nodes['customer:made'] as KCall).in.value).toEqual({ ref: 'storedCustomer', path: ['record'] });
+    expect((spec.nodes['customer:made'] as KCall).in.value).toEqual({ ref: 'stored', path: ['record'] });
   });
 
   it('routes the rule to the value and the refusal, reading one input per root it names', () => {
@@ -173,7 +173,7 @@ describe('lowering a guard two invariants are unproved at', () => {
       'customer:violated:2',
       'isKept',
       'noCustomer',
-      'storedCustomer',
+      'stored',
     ]);
   });
 
@@ -207,7 +207,7 @@ describe('lowering a guard two invariants are unproved at', () => {
   const judged = async (record: Record<string, unknown>) => {
     const compiled = embedder.graph(KEPT_GET);
     const report = await runGraph(compiled, {
-      initial: { in: { id: 'x' }, storedCustomer: { record } },
+      initial: { in: { id: 'x' }, stored: { record } },
       env: embedder.env,
     });
     return outcomeOf(report);

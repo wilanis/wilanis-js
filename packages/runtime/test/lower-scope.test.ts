@@ -28,12 +28,12 @@ const plainNodesOf = (graph: string) =>
 
 describe('the scope the lowering fills, which no document writes', () => {
   it('carries the store read to a site over a scoped collection, and adds no node for it', () => {
-    // `storedCustomer` is written with a store, a collection and a key and nothing else; the scope is the compiler's,
+    // `stored` is written with a store, a collection and a key and nothing else; the scope is the compiler's,
     // and it is exactly what lowerRef makes of {{tenant}} on a graph
     const nodes = nodesOf('@features/customers/data/kept-get.graph.json');
-    expect(nodes.storedCustomer.in.scope).toEqual({ object: { tenant } });
+    expect(nodes.stored.in.scope).toEqual({ object: { tenant } });
     // the site's own inputs are untouched beside it
-    expect(nodes.storedCustomer.in.key).toEqual({ ref: 'in', path: ['id'] });
+    expect(nodes.stored.in.key).toEqual({ ref: 'in', path: ['id'] });
     // and not one node more than the same graph lowers to unscoped: a scope is a source, never a step
     const plain = plainNodesOf('@features/customers/data/kept-get.graph.json');
     expect(Object.keys(nodes).sort()).toEqual(Object.keys(plain).sort());
@@ -53,11 +53,11 @@ describe('the scope the lowering fills, which no document writes', () => {
   });
   it('carries none where nothing is scoped, so a tree that scopes nothing lowers as it did', () => {
     // the example with both stores unscoped: the same graph, and no scope on its site
-    expect(plainNodesOf('@features/customers/data/kept-get.graph.json').storedCustomer.in.scope).toBeUndefined();
+    expect(plainNodesOf('@features/customers/data/kept-get.graph.json').stored.in.scope).toBeUndefined();
   });
   it('carries the production store read to the postgres graphs, as the local one to its own', () => {
     // two stores, one resolver: each profile's site is scoped by the store it names, filled from the one read
-    expect(nodesOf('@features/customers/data/kept-get-postgres.graph.json').storedCustomer.in.scope).toEqual({
+    expect(nodesOf('@features/customers/data/kept-get-postgres.graph.json').stored.in.scope).toEqual({
       object: { tenant },
     });
   });
