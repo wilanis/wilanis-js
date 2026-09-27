@@ -8,7 +8,7 @@
 import type { Loaded, LoadResult, Scope, StoreDoc, Values } from '@wilanis/core';
 import { keeps, kept, splitRef } from '@wilanis/core';
 import { callsAgainst, engineOf, keyTypeOf, STORE_PORT } from '@wilanis/runtime';
-import { markRequestPorts, readsOf } from './reads.js';
+import { markContextPorts, readsOf } from './reads.js';
 import { type Over, scopedColumns, scopeOf, viewsOf } from './scopes.js';
 import type { VKeeps, VNode, VScopedColumn, VStore, VStoreCall } from './types.js';
 import { labelOf } from './types.js';
@@ -46,7 +46,7 @@ function scopedOf(scope: Scope, doc: Loaded<StoreDoc>): Record<string, VScopedCo
 
 /**
  * What a store adds to its view: the engine that keeps its records, its key types, what runs against it, and --
- * where it scopes a collection -- what it reads from the request, drawn as a graph's request node is, with the
+ * where it scopes a collection -- what it reads from the context, drawn as a graph's context node is, with the
  * scope and the views that cross it. A store that scopes nothing carries none of the three.
  */
 export function storeView(scope: Scope, load: LoadResult, doc: Loaded): VStore {
@@ -63,29 +63,29 @@ export function storeView(scope: Scope, load: LoadResult, doc: Loaded): VStore {
     ...(engine.from ? { from: engine.from } : {}),
     keyTypes: keyTypesOf(store, scope),
     calls: callsOf(doc.path, load, scope),
-    ...storeRequest(scope, store),
+    ...storeContext(scope, store),
     ...(Object.keys(scoped).length ? { scoped } : {}),
     ...(Object.keys(views).length ? { views } : {}),
   };
 }
 
 /**
- * The request node of a store page: one port per name the store binds under `reads`, as a graph's is, so the
+ * The context node of a store page: one port per name the store binds under `reads`, as a graph's is, so the
  * same node a reader knows from a graph says where a scope comes from. Nothing when the store binds no read.
  */
-function storeRequest(scope: Scope, store: StoreDoc): { request?: VNode } {
+function storeContext(scope: Scope, store: StoreDoc): { context?: VNode } {
   const reads = readsOf(scope, store.reads);
   if (!reads.size) return {};
-  const request: VNode = {
-    id: 'request',
-    kind: 'request',
-    label: 'Request',
+  const context: VNode = {
+    id: 'context',
+    kind: 'context',
+    label: 'Context',
     description: `what the trigger kind hands, read to scope this store's collections`,
     inputs: [],
     outputs: [...reads.values()].map(read => ({ name: read.path.join('.'), depth: read.path.length - 1 })),
   };
-  markRequestPorts(request, reads);
-  return { request };
+  markContextPorts(context, reads);
+  return { context };
 }
 
 /**

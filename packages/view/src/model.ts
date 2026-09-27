@@ -3,7 +3,7 @@
  * ports, a data edge for every {{node.field}} read from the field to the input that reads it, one rule node per
  * switch rule with a route from it, the out node's fields, and for each run or map node where its operation leads (a
  * native port, or a binding and the graph behind it). A deep read ({{asked.body.id}}) opens the field it
- * reads as an attribute port under its parent, so the edge leaves the attribute. The request a data graph
+ * reads as an attribute port under its parent, so the edge leaves the attribute. The context a data graph
  * reads through its resolvers is a node of its own, its ports the paths the resolvers name.
  *
  * For every kind, the references the document makes and the documents that make references to it, so a

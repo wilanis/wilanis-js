@@ -186,6 +186,20 @@ describe('the view model of the example', () => {
     });
   });
 
+  it('draws what create-row reads through its resolver as the Context node, its port opening that resolvers document', async () => {
+    const seen = await view('@features/customers/data/create-row.graph.json');
+    const context = seen.graph!.nodes.find(node => node.id === 'context')!;
+    expect(context).toMatchObject({
+      kind: 'context',
+      label: 'Context',
+      description: 'what the trigger kind hands, read through Request context',
+    });
+    // {{agent}} is @customers/edge/request.resolvers.json#agent, and the port opens that document by its canonical path
+    expect(context.outputs.find(port => port.label === 'agent')?.opens).toBe(
+      '@features/customers/edge/request.resolvers.json',
+    );
+  });
+
   it('answers references both ways for a document that is not a graph', async () => {
     const port = await view('@features/customers/domain/customer.port.json');
     expect(port.graph).toBeUndefined();
@@ -246,18 +260,18 @@ describe("the store page's marks the database has not caught up with", () => {
   it('draws them from the store document alone, so the page opens no connection', async () => {
     const store = (await view('@features/customers/data/customers.store.json')).store;
     // the view model says what the tree says: the engine behind the store, its key types, its call sites, the
-    // request its scope reads, the collections it scopes and the view across them, and nothing about what any
+    // context its scope reads, the collections it scopes and the view across them, and nothing about what any
     // database has recorded
     expect(Object.keys(store ?? {}).sort()).toEqual([
       'calls',
       'connection',
       'connectionLabel',
+      'context',
       'from',
       'keyTypes',
       'kind',
       'kindLabel',
       'plugin',
-      'request',
       'scoped',
       'views',
     ]);

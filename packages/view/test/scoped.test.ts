@@ -32,7 +32,7 @@ describe('a scope, and the view across it', () => {
       by: [
         {
           column: 'tenant',
-          // the local name the store reads by, as `scoped` writes it, and where that read lands in the request
+          // the local name the store reads by, as `scoped` writes it, and where that read lands in the context
           read: 'tenant',
           opens: REQUEST_DOC,
           from: 'session.attributes.tenant',
@@ -54,14 +54,14 @@ describe('a scope, and the view across it', () => {
     expect(key?.scope).toBeUndefined();
   });
 
-  it('the store page draws its reads as a request node, one port per name, opening the document that declares it', () => {
+  it('the store page draws its reads as a context node, one port per name, opening the document that declares it', () => {
     const store = scopedView(STORE).store;
-    expect(store?.request).toMatchObject({ id: 'request', kind: 'request', label: 'Request' });
-    expect(store?.request?.outputs).toEqual([
+    expect(store?.context).toMatchObject({ id: 'context', kind: 'context', label: 'Context' });
+    expect(store?.context?.outputs).toEqual([
       {
         name: 'session.attributes.tenant',
         depth: 2,
-        // the name the store reads it by, not the resolver's own label, as a graph's request node does it
+        // the name the store reads it by, not the resolver's own label, as a graph's context node does it
         label: 'tenant',
         opens: REQUEST_DOC,
         description:
@@ -97,7 +97,7 @@ describe('a scope, and the view across it', () => {
       },
     }).store;
     // absent, not empty: an empty map would draw a heading with nothing under it
-    expect(Object.keys(store ?? {})).not.toContain('request');
+    expect(Object.keys(store ?? {})).not.toContain('context');
     expect(Object.keys(store ?? {})).not.toContain('scoped');
     expect(Object.keys(store ?? {})).not.toContain('views');
   });
@@ -142,8 +142,8 @@ describe('a scope, and the view across it', () => {
     // the node's badge, under the records block, opening the store that declares the scope
     expect(page).toContain('if (k.scope) scopeEl(box, k.scope)');
     expect(page).toMatch(/badge scope', 'scoped by ' \+ s\.by\.map/);
-    // the store page: the request node, the scoped column in the collections table, and the views below it
-    expect(page).toContain('if (s.request) storeReadsEl(page, s.request)');
+    // the store page: the context node, the scoped column in the collections table, and the views below it
+    expect(page).toContain('if (s.context) storeReadsEl(page, s.context)');
     expect(page).toContain("'scoped by'");
     expect(page).toContain('if (s.views) storeViewsEl(page, s.views, d.collections)');
     expect(page).toContain('Views across the scope');

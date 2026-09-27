@@ -2,7 +2,7 @@
  * The graph view: nodes with typed input and output ports, a data edge for every {{node.field}} read from the field to
  * the input that reads it, one rule node per switch rule with a route from it, the out node's fields, and for each run
  * or map node where its operation leads. A deep read opens the field it reads as an attribute port under its parent,
- * so the edge leaves the attribute. What a graph reads from the request, and the node that stands for it, are
+ * so the edge leaves the attribute. What a graph reads from the context, and the node that stands for it, are
  * `reads.ts`.
  */
 import { atomicOf } from '@wilanis/compiler';
@@ -24,7 +24,7 @@ import {
   wire,
   written,
 } from './ports.js';
-import { markRequestPorts, type Read, readsOf, requestNode } from './reads.js';
+import { contextNode, markContextPorts, type Read, readsOf } from './reads.js';
 import { answeredBy } from './refusals.js';
 import { said } from './said.js';
 import { keepsOf } from './stores.js';
@@ -41,7 +41,7 @@ class GraphBuilder {
   private readonly edges: VEdge[] = [];
   /** Each node's result type, for typing the attribute ports deep reads open. */
   private readonly types = new Map<string, Type | undefined>();
-  /** What this graph reads from the request, one entry per name under `reads`; see `reads.ts`. */
+  /** What this graph reads from the context, one entry per name under `reads`; see `reads.ts`. */
   private readonly resolvers: Map<string, Read>;
   private readonly doc: GraphDoc;
 
@@ -59,10 +59,10 @@ class GraphBuilder {
     this.addConstants();
     for (const node of this.doc.nodes) this.addNode(node);
     this.addOutput();
-    const request = requestNode(this.scope, this.resolvers, this.edges);
-    if (request) this.nodes.unshift(request);
+    const context = contextNode(this.scope, this.resolvers, this.edges);
+    if (context) this.nodes.unshift(context);
     this.openAttributes();
-    markRequestPorts(request, this.resolvers);
+    markContextPorts(context, this.resolvers);
     const view: NonNullable<DocView['graph']> = {
       nodes: this.nodes,
       edges: this.edges,
@@ -289,7 +289,7 @@ class GraphBuilder {
 
   /** How a node's field is typed, for the attribute ports a deep read opens under it. */
   private typeAtOf(node: VNode): (path: string[]) => Type | undefined {
-    if (node.kind === 'request')
+    if (node.kind === 'context')
       return path => {
         const read = this.scope.contextRead(path);
         return typeof read === 'string' ? undefined : read.type;

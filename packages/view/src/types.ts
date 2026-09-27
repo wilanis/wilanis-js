@@ -18,9 +18,9 @@ export interface VPort {
   name: string;
   /** How deep an attribute port sits under its parent; absent for a top-level port. */
   depth?: number;
-  /** A human label for the port: on the request node, the name the graph reads it by. */
+  /** A human label for the port: on the context node, the name the graph reads it by. */
   label?: string;
-  /** A document this port stands for: the resolvers document that declares a request read. */
+  /** A document this port stands for: the resolvers document that declares a context read. */
   opens?: string;
   /** The type, shown; absent when unknown. */
   type?: string;
@@ -59,7 +59,7 @@ export interface VTarget extends VPromised {
   implementation: string;
 }
 
-export type VNodeKind = 'in' | 'const' | 'request' | 'run' | 'map' | 'rule' | 'out';
+export type VNodeKind = 'in' | 'const' | 'context' | 'run' | 'map' | 'rule' | 'out';
 
 /**
  * One node as a page draws it; a run or map node carries the retry and the bound its call site declares, and a
@@ -185,7 +185,7 @@ export interface VScope {
   by: VScopedColumn[];
 }
 
-/** One scoped column: the column the store keeps beside the record, and the read of the request that fills it. */
+/** One scoped column: the column the store keeps beside the record, and the read of the context that fills it. */
 export interface VScopedColumn {
   /** The column name the collection declares under `scoped`. */
   column: string;
@@ -193,7 +193,7 @@ export interface VScopedColumn {
   read: string;
   /** The resolvers document that declares that read, canonical, when the store binds one. */
   opens?: string;
-  /** The segments below `request` the resolver reads, joined with dots, when it resolves. */
+  /** The segments below `context` the resolver reads, joined with dots, when it resolves. */
   from?: string;
 }
 
@@ -301,7 +301,7 @@ export interface DocView {
   decides?: VTarget;
   /** On a policy: what each reason its decision can refuse with means. */
   outcomes?: Record<string, Outcome>;
-  /** On a policy: the request.* paths present once it allows. */
+  /** On a policy: the context.* paths present once it allows. */
   proves?: string[];
   /** On a policy: every trigger that names it. */
   gates?: { path: string; label: string }[];
@@ -330,7 +330,7 @@ export interface VAccessInvariant {
   /** The policy every reaching trigger attaches, canonical, when the invariant names one. */
   policy?: string;
   policyLabel?: string;
-  /** The request.* paths some attached policy must prove, when the invariant names them instead of a policy. */
+  /** The context.* paths some attached policy must prove, when the invariant names them instead of a policy. */
   proves?: string[];
   /** Each operation the invariant covers, canonical, with the port that declares it. */
   covers: VCovered[];
@@ -409,8 +409,8 @@ export interface VStore {
   keyTypes: Record<string, string>;
   /** Every call that runs an operation against this store. */
   calls: VStoreCall[];
-  /** What the store reads from the request to fill its scopes, drawn as a graph's request node is; absent where it reads nothing. */
-  request?: VNode;
+  /** What the store reads from the context to fill its scopes, drawn as a graph's context node is; absent where it reads nothing. */
+  context?: VNode;
   /** Each scoped collection, by name, with the columns the store keeps and the read filling each. */
   scoped?: Record<string, VScopedColumn[]>;
   /** Each collection that is a view, by name: the collection it sees every scope of, and the policy it is behind. */
