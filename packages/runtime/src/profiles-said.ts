@@ -1,15 +1,16 @@
 /**
  * What a profile is, read back (RFC 0013): the bindings it chooses, the connections it stands in, and what the
  * tree reaches there -- the effectful operations and the connections they were reached with, what it holds
- * open, the startup steps it runs, and the variables it needs. `wilanis describe project.json` prints it and
- * the viewer's project page draws it, both from `profilesOf`, so the two never say different things.
+ * open, what its place permits (RFC 0016), the startup steps it runs, and the variables it needs. `wilanis
+ * describe project.json` prints it and the viewer's project page draws it, both from `profilesOf`, so the two
+ * never say different things.
  *
  * The reach is grouped by port: operations of one port reached with the same connections share a line, which
  * reads as the contract a reviewer already knows (`@storage/store.port.json#find, #get, #put`) rather than as a
  * list of connections with every operation behind each repeated.
  */
 import { type Reach, type ReachedNative, reachOf } from '@wilanis/compiler';
-import { runsUnder, type Scope, splitRef } from '@wilanis/core';
+import { type Loaded, type PortDoc, runsUnder, type Scope, splitRef } from '@wilanis/core';
 
 /** Operations of one port the profile reaches with the same connections: the port, the operations, the connections. */
 export interface ReachedGroup {
@@ -38,6 +39,11 @@ export interface ProfileReach {
   standsIn: { named: string; standIn: string }[];
   reaches: ReachedGroup[];
   holds: ReachedGroup[];
+  /**
+   * The profile's `permits` as it writes them (RFC 0016), which the checker holds to `reaches` and `holds` in both
+   * directions (C021, C022); absent where it writes none, and so permits everything.
+   */
+  permits?: string[];
   starts: { run: string; label?: string }[];
   needs: ProfileNeed[];
 }
@@ -61,6 +67,7 @@ function profileOf(scope: Scope, name: string | undefined): ProfileReach {
     standsIn: pairs(written?.connections).map(([named, standIn]) => ({ named, standIn })),
     reaches: groupsOf(reach.operations.filter(one => !one.holds)),
     holds: groupsOf(reach.operations.filter(one => one.holds)),
+    ...(written?.permits ? { permits: written.permits } : {}),
     starts: (scope.project?.startup ?? [])
       .filter(step => runsUnder(step, name))
       .map(step => ({ run: step.run, ...(step.label ? { label: step.label } : {}) })),
@@ -129,6 +136,24 @@ export function groupSaid(group: ReachedGroup): string {
   return group.connections.length ? `${ops}  via ${group.connections.join(', ')}` : ops;
 }
 
+/** A count and the noun it counts, plural where the count is not one. */
+const counted = (count: number, one: string, many = `${one}s`): string => `${count} ${count === 1 ? one : many}`;
+
+/**
+ * What a profile permits, said against the reach printed above it: `the 19 operations and 3 connections above, by
+ * 13 entries`. The checker holds the list to that reach in both directions (C021, C022), so the block counts what
+ * the entries cover rather than showing a difference, which is `wilanis check`'s to say; a profile that writes no
+ * `permits` permits everything.
+ */
+export function permitsSaid(profile: ProfileReach): string {
+  if (!profile.permits) return 'everything (no permits)';
+  const reached = [...profile.reaches, ...profile.holds];
+  const operations = reached.reduce((sum, group) => sum + group.operations.length, 0);
+  const connections = new Set(reached.flatMap(group => group.connections)).size;
+  const entries = counted(profile.permits.length, 'entry', 'entries');
+  return `the ${counted(operations, 'operation')} and ${counted(connections, 'connection')} above, by ${entries}`;
+}
+
 /** One need: the variable, the key it answers and who reads it; a key no variable answers says so. */
 export function needSaid(need: ProfileNeed): string {
   const readers = `read by ${need.readBy.join(', ')}`;
@@ -163,6 +188,7 @@ export function profileBlock(profile: ProfileReach): string[] {
       : []),
     ...rows('reaches', profile.reaches.map(groupSaid), 'nothing effectful'),
     ...rows('holds', profile.holds.map(groupSaid), 'nothing open'),
+    ...rows('permits', [permitsSaid(profile)], ''),
     ...rows('starts', starts.length ? [starts.join(' · ')] : [], 'nothing'),
     ...rows('needs', profile.needs.map(needSaid), 'no variable'),
   ];
@@ -176,4 +202,34 @@ export function profilesLines(scope: Scope): string[] {
 /** A connection's stand-ins, a line each: what it stands in for, or what replaces it, and under which profile. */
 export function standInLines(scope: Scope, connection: string): string[] {
   return standInsOf(scope, connection).map(one => `${one.role} ${one.other} under ${one.profile}`);
+}
+
+/** Whether a profile's `permits` may name a document at all (C023): a connection, or a native port with an effectful operation. */
+function permittable(doc: Loaded): boolean {
+  if (doc.kind === 'connection') return true;
+  if (doc.kind !== 'port' || !doc.native) return false;
+  return Object.values((doc.doc as PortDoc).operations).some(op => op.pure !== true);
+}
+
+/** How one profile's entries name a document: the profile, with the operations it names where none names the port whole. */
+function permitterSaid(scope: Scope, path: string, profile: string, entries: string[]): string[] {
+  const naming = entries.filter(entry => scope.canon(entry.split('#')[0]) === path);
+  if (!naming.length) return [];
+  const operations = naming.filter(entry => entry.includes('#')).map(entry => `#${splitRef(entry).op}`);
+  return [operations.length < naming.length ? profile : `${profile} (${operations.join(', ')})`];
+}
+
+/**
+ * Who permits a native port or a connection (RFC 0016): `permitted by  production (#ensure)`, every profile whose
+ * `permits` names the document or one of its operations, in the project's order. A profile that writes no
+ * `permits` permits everything and is not named, since its block in `describe project.json` says so once; so a
+ * tree none of whose profiles writes one prints no line, and where one does and none names the document the line
+ * says that, which is what a reader about to reach it needs to know.
+ */
+export function permittedLines(scope: Scope, doc: Loaded): string[] {
+  if (!permittable(doc)) return [];
+  const writing = Object.entries(scope.project?.profiles ?? {}).filter(([, profile]) => profile.permits);
+  if (!writing.length) return [];
+  const named = writing.flatMap(([name, profile]) => permitterSaid(scope, doc.path, name, profile.permits ?? []));
+  return [`permitted by  ${named.length ? named.join(', ') : 'no profile that writes permits'}`];
 }
