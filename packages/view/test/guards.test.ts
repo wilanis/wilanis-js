@@ -156,7 +156,7 @@ describe('the canvas marks a node the compiler guarded', () => {
   });
 
   it('marks nothing on a node that is no site of the shape at all', async () => {
-    const node = await nodeOf(KEPT_GET, 'storedCustomer');
+    const node = await nodeOf(KEPT_GET, 'stored');
     expect(node.guarded).toBeUndefined();
     expect(node.proved).toBeUndefined();
   });

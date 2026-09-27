@@ -261,7 +261,7 @@ npx wilanis map . --profile local
   holds  @features/customers/domain/writes-are-for-registrars.invariant.json  through @features/access/edge/can-register.policy.json
   @customers/domain/customer.port.json#remove
     @features/customers/data/kept-remove.graph.json
-      gone @storage/store.port.json#remove  (effect) → store @features/customers/data/customers.store.json customers (remove), scoped by tenant
+      removed @storage/store.port.json#remove  (effect) → store @features/customers/data/customers.store.json customers (remove), scoped by tenant
       wasThere [switch → customer | noCustomer]
       customer @std/object.port.json#make
       noCustomer @std/outcome.port.json#refuse

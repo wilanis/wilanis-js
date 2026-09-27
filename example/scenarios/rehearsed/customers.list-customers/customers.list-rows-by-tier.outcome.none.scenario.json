@@ -60,6 +60,11 @@
         }
       ]
     },
+    "op.byTier.op.fetched": {
+      "status": 404,
+      "headers": {},
+      "body": []
+    },
     "op.byTier.op.none:made": [
       {
         "id": "alpha",
@@ -76,43 +81,7 @@
         "tier": "india",
         "registrar": "delta"
       }
-    ],
-    "op.byTier.op.requested": {
-      "status": 404,
-      "headers": {
-        "extra9": "foxtrot"
-      },
-      "body": [
-        {
-          "id": "bravo69",
-          "name": "india790",
-          "email": "Zulu-9",
-          "tier": "hotel415",
-          "active": false,
-          "registrar": "Zulu-9",
-          "note": "foxtrot"
-        },
-        {
-          "id": "delta",
-          "name": "alpha636",
-          "email": "charlie",
-          "tier": "lima174",
-          "active": false,
-          "registrar": "golf",
-          "note": "x",
-          "createdAt": "Zulu-9531",
-          "extra9": null
-        },
-        {
-          "id": "Zulu-9",
-          "name": "bravo",
-          "email": "golf",
-          "tier": "lima",
-          "note": "Zulu-9",
-          "extra2": null
-        }
-      ]
-    }
+    ]
   },
   "expect": {
     "status": "done",
@@ -200,44 +169,13 @@
           }
         ]
       },
-      "op.byTier.op.requested": {
+      "op.byTier.op.fetched": {
         "status": "done",
         "handler": "@http/http.port.json#request",
         "out": {
           "status": 404,
-          "headers": {
-            "extra9": "foxtrot"
-          },
-          "body": [
-            {
-              "id": "bravo69",
-              "name": "india790",
-              "email": "Zulu-9",
-              "tier": "hotel415",
-              "active": false,
-              "registrar": "Zulu-9",
-              "note": "foxtrot"
-            },
-            {
-              "id": "delta",
-              "name": "alpha636",
-              "email": "charlie",
-              "tier": "lima174",
-              "active": false,
-              "registrar": "golf",
-              "note": "x",
-              "createdAt": "Zulu-9531",
-              "extra9": null
-            },
-            {
-              "id": "Zulu-9",
-              "name": "bravo",
-              "email": "golf",
-              "tier": "lima",
-              "note": "Zulu-9",
-              "extra2": null
-            }
-          ]
+          "headers": {},
+          "body": []
         }
       },
       "op.byTier.op.outcome": {

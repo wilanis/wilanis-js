@@ -14,7 +14,7 @@
   "nodes": [
     {
       "type": "@wilanis/node/run.schema.json",
-      "id": "requested",
+      "id": "fetched",
       "label": "GET the rows of one method",
       "run": "@http/http.port.json#request",
       "in": {
@@ -30,8 +30,8 @@
       "id": "outcome",
       "label": "What did the API say?",
       "in": {
-        "status": "{{requested.status}}",
-        "body": "{{requested.body}}"
+        "status": "{{fetched.status}}",
+        "body": "{{fetched.body}}"
       },
       "rules": [
         {
@@ -51,7 +51,7 @@
       "label": "The rows",
       "run": "@std/object.port.json#make",
       "in": {
-        "value": "{{requested.body}}",
+        "value": "{{fetched.body}}",
         "type": "@customers/edge/CustomerRow.shape.json[]"
       }
     },
@@ -75,7 +75,7 @@
       "run": "@std/outcome.port.json#refuse",
       "in": {
         "reason": "upstream",
-        "message": "the customer API answered {{requested.status}}",
+        "message": "the customer API answered {{fetched.status}}",
         "type": "@customers/domain/Customer.shape.json[]"
       }
     }

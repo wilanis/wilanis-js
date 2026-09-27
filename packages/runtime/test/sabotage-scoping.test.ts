@@ -216,9 +216,7 @@ describe('sabotage: how a store is scoped', () => {
     // "the agent added the filter by hand" is the one thing a scope makes unwriteable: the store says how
     // customers are scoped, the compiler carries it to every site, and a document that repeats it is refused
     const broken = { [GET]: (graph: any) => (graph.nodes[0].in.scope = { tenant: '{{in.id}}' }) };
-    expect(scopedPointing(broken)).toContain(
-      'X214 @features/customers/data/kept-get.graph.json#nodes/storedCustomer/in/scope',
-    );
+    expect(scopedPointing(broken)).toContain('X214 @features/customers/data/kept-get.graph.json#nodes/stored/in/scope');
     expect(scopedSaying(broken)).toContain(
       "X214 scope is the store's: 'customers' is scoped by tenant ← {{tenant}} of @customers/data/customers.store.json, and the compiler puts it here",
     );
