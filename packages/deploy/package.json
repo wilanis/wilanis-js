@@ -1,0 +1,55 @@
+{
+  "name": "@wilanis/deploy",
+  "version": "0.1.0",
+  "description": "Deployment for wilanis trees: a plan derived from the tree's manifest -- one workload per profile, its command, its addresses, the variables it needs by name, its probe, and what the environment must provide -- that every target renders.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Rafael Fontes <rfontes1987@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wilanis/wilanis-js.git",
+    "directory": "packages/deploy"
+  },
+  "homepage": "https://github.com/wilanis/wilanis-js/tree/main/packages/deploy#readme",
+  "bugs": "https://github.com/wilanis/wilanis-js/issues",
+  "keywords": [
+    "wilanis",
+    "dataflow",
+    "declarative",
+    "deployment",
+    "container"
+  ],
+  "bin": {
+    "wilanis-deploy": "./bin/wilanis-deploy.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "bin",
+    "schemas",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@wilanis/compiler": "0.1.0",
+    "@wilanis/core": "0.1.0",
+    "@wilanis/runtime": "0.1.0"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
