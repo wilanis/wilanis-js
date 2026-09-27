@@ -1,5 +1,4 @@
 import { existsSync, rmSync } from 'node:fs';
-import type { Server } from 'node:http';
 import { join } from 'node:path';
 import { checkTree } from '@wilanis/compiler';
 import { loadTree } from '@wilanis/core';
@@ -10,55 +9,62 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { hashPassword } from '../src/index.js';
 import { Store } from '../src/store.js';
 import {
-  call,
+  baseOf,
+  type CallInit,
   fakeIssuer,
   fakeUpstream,
   INCLUDES,
-  ISSUER,
   issuerKey,
+  listenedOn,
   listening,
   localCopy,
+  over,
   PLUGINS,
   SECRET,
   sabotage,
-  signIn,
-  UPSTREAM,
 } from './harness.js';
 
-let stopUpstream: () => Promise<void>;
-let stopIssuer: () => Promise<void>;
-let stop: () => Promise<void>;
-let dir: string;
+/** How to stop what beforeAll started, in the order it started it: one that failed part way reached only some. */
+const stops: (() => Promise<void>)[] = [];
+let dir: string | undefined;
 let key: { privateKey: KeyLike; jwk: Record<string, unknown> };
 const rows: Record<string, unknown>[] = [];
+/** The calls to the tree, over the port its server was given; set once it listens. */
+let call: ReturnType<typeof over>['call'];
+let signIn: ReturnType<typeof over>['signIn'];
 
 beforeAll(async () => {
   process.env.CUSTOMERS_JWT_SECRET = SECRET;
   // every connection's secrets are substituted whatever the profile, and the example now has one over a
   // database; nothing here dials it, so any well-formed URL will do
   process.env.CUSTOMERS_DATABASE_URL = 'postgres://customers:customers@localhost:5432/customers';
-  const upstream: Server = fakeUpstream(rows);
-  stopUpstream = await listening(upstream, UPSTREAM);
+  const upstream = await listening(fakeUpstream(rows));
+  stops.push(upstream.stop);
   key = await issuerKey();
-  const base = `http://localhost:${ISSUER}`;
-  stopIssuer = await listening(fakeIssuer(base, key), ISSUER);
+  const issuer = await listening(fakeIssuer(key));
+  stops.push(issuer.stop);
+  const base = baseOf(issuer.port);
   // the account holders are an OIDC issuer here; the employees stay the directory written in the connection
-  dir = localCopy({
-    'connections/people.connection.json': connection => {
-      connection.kind = '@auth/oidc.connection-kind.json';
-      connection.settings = { issuer: base, clientId: 'customers', clientSecret: 'shh' };
+  dir = localCopy(
+    {
+      'connections/people.connection.json': connection => {
+        connection.kind = '@auth/oidc.connection-kind.json';
+        connection.settings = { issuer: base, clientId: 'customers', clientSecret: 'shh' };
+      },
     },
-  });
+    upstream.port,
+  );
   const load = loadTree(dir, PLUGINS, INCLUDES);
   expect(checkTree(load).items).toEqual([]);
-  ({ stop } = await start(load, { log: () => {}, profile: 'live' }));
+  const lines: string[] = [];
+  const { stop } = await start(load, { log: line => lines.push(line), profile: 'live' });
+  stops.push(stop);
+  ({ call, signIn } = over(listenedOn(lines)));
 });
 
 afterAll(async () => {
-  await stop();
-  await stopUpstream();
-  await stopIssuer();
-  rmSync(dir, { recursive: true, force: true });
+  for (const stop of stops.reverse()) await stop();
+  if (dir) rmSync(dir, { recursive: true, force: true });
 });
 
 describe('signing in: two directories, one issuer', () => {
@@ -111,8 +117,7 @@ describe('signing in: two directories, one issuer', () => {
 
 describe("policies over the registry's writes", () => {
   const customer = { name: 'Gated', email: 'gated@example.com', tier: 'bronze' };
-  const post = (init: Parameters<typeof call>[1]) =>
-    call('/customers', { method: 'POST', body: JSON.stringify(customer), ...init });
+  const post = (init: CallInit) => call('/customers', { method: 'POST', body: JSON.stringify(customer), ...init });
   it('no token: 401 as anonymous', async () => {
     expect(await post({}).then(answer => [answer.status, answer.body.reason])).toEqual([401, 'anonymous']);
   });

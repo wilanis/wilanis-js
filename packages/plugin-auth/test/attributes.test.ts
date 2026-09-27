@@ -3,11 +3,10 @@
  * directory connection and over the fake OIDC issuer, and without one as before; and X105, which holds a session
  * attribute some store scopes a collection by to the one write the sign-in made.
  */
-import type { Server } from 'node:http';
 import { conforms, type Type } from '@wilanis/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { verify } from '../src/directories.js';
-import { fakeIssuer, ISSUER, issuerKey, listening, sabotage, sabotageInclude } from './harness.js';
+import { baseOf, fakeIssuer, issuerKey, listening, sabotage, sabotageInclude } from './harness.js';
 
 /** The shape a call site's `type` names in these tests: one required tenant, as the RFC's example declares it. */
 const TENANT: Type = {
@@ -86,19 +85,18 @@ describe('verify with a type: what the directory said, judged', () => {
 });
 
 describe('verify with a type over an OIDC issuer: the claims the type names, and no others', () => {
-  let stopIssuer: () => Promise<void>;
-  let base: string;
+  let stopIssuer: (() => Promise<void>) | undefined;
   let oidc: Record<string, unknown>;
 
   beforeAll(async () => {
-    base = `http://localhost:${ISSUER + 4}`;
-    const key = await issuerKey();
-    const server: Server = fakeIssuer(base, key);
-    stopIssuer = await listening(server, ISSUER + 4);
+    const issuer = await listening(fakeIssuer(await issuerKey()));
+    stopIssuer = issuer.stop;
+    const base = baseOf(issuer.port);
     oidc = envWith('@auth/oidc.connection-kind.json', { issuer: base, clientId: 'customers', clientSecret: 'shh' });
   });
+  // a beforeAll whose issuer never listened assigned no way to stop it, and its own error is the one to read
   afterAll(async () => {
-    await stopIssuer();
+    await stopIssuer?.();
   });
 
   const issued = (input: Record<string, unknown>) => run({ connection: '@connections/directory.json', ...input }, oidc);

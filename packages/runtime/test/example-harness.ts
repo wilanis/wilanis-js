@@ -284,3 +284,14 @@ function write(dir: string, docs: Record<string, unknown>): void {
     writeFileSync(join(dir, file), JSON.stringify(doc));
   }
 }
+
+/**
+ * The port a started copy's server was given, read off the line `@http`'s listen logs as it opens it
+ * (`http: listening on <host>:<port> -- <routes>`): a copy that serves writes port 0, so the system chooses one no
+ * other test file, and no other socket on the machine, already holds.
+ */
+export function listenedOn(lines: string[]): number {
+  const said = lines.map(line => /^http: listening on .*:(\d+) -- /.exec(line)).find(found => found !== null);
+  if (!said) throw new Error(`the tree logged no 'http: listening on' line:\n${lines.join('\n')}`);
+  return Number(said[1]);
+}

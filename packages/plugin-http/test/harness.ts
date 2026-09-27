@@ -4,6 +4,7 @@
  */
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,13 +21,6 @@ export const INCLUDES: ResolvedInclude[] = [
   },
 ];
 
-/**
- * The port the fake upstream listens on, spaced apart per vitest worker and clear of the band
- * `plugin-auth`'s harness uses. Vitest runs test files in parallel workers, so a fixed port is one two files
- * can ask for at once: the second gets EADDRINUSE, and a `beforeAll` that was starting a server fails the
- * whole file with a hook timeout. Which one loses is scheduling, so it bites CI rather than a local run.
- */
-export const UPSTREAM = 54900 + Number(process.env.VITEST_POOL_ID ?? 0) * 16;
 export const SECRET = 'secret-secret-secret-secret-secret-1';
 const SCHEMAS = 'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/';
 
@@ -94,12 +88,20 @@ function writeUploadForm(dir: string) {
   );
 }
 
+/** What a copy is pointed at: the port a fake upstream was given, and any further edits. */
+export interface CopyOptions {
+  /** Where the customer API is served; absent, the connection keeps the example's, for a copy that reaches none. */
+  upstream?: number;
+  more?: (edit: Edit) => void;
+}
+
 /**
- * The example, pointed at a fake mockapi on localhost. Its write routes are gated by the access feature's policies,
- * so the tests sign in as bo -- an employee holding the registrar role -- through the example's own route and
- * present our token; nothing about access is edited.
+ * The example, pointed at a fake mockapi on localhost, its server on whatever port the system gives (`listenedOn`
+ * reads it back once it is started). Its write routes are gated by the access feature's policies, so the tests sign
+ * in as bo -- an employee holding the registrar role -- through the example's own route and present our token;
+ * nothing about access is edited.
  */
-export function localCopy(more?: (edit: Edit) => void): string {
+export function localCopy({ upstream, more }: CopyOptions = {}): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-http-'));
   cpSync(EXAMPLE, dir, { recursive: true, filter: path => !path.includes('node_modules') });
   const edit: Edit = (relative, change) => {
@@ -109,16 +111,27 @@ export function localCopy(more?: (edit: Edit) => void): string {
     writeFileSync(path, JSON.stringify(doc));
   };
   edit('connections/customers-api.connection.json', connection => {
-    connection.settings.baseUrl = `http://localhost:${UPSTREAM}/api/v1`;
+    if (upstream !== undefined) connection.settings.baseUrl = `http://localhost:${upstream}/api/v1`;
     connection.settings.throttle = { concurrency: 2 };
   });
   edit('project.json', project => {
-    project.plugins.find((plugin: any) => plugin.use === '@http').settings.codecs['multipart/form-data'] =
-      '@http/codecs/multipart.codec.json';
+    const settings = httpSettings(project);
+    settings.port = 0;
+    (settings.codecs as Record<string, string>)['multipart/form-data'] = '@http/codecs/multipart.codec.json';
   });
   writeUploadForm(dir);
   more?.(edit);
   return dir;
+}
+
+/**
+ * The port a started tree's server was given, read off the line `listen` logs as it opens it
+ * (`http: listening on <host>:<port> -- <routes>`): a copy asks for 0, so the system chooses.
+ */
+export function listenedOn(lines: string[]): number {
+  const said = lines.map(line => /^http: listening on .*:(\d+) -- /.exec(line)).find(found => found !== null);
+  if (!said) throw new Error(`the tree logged no 'http: listening on' line:\n${lines.join('\n')}`);
+  return Number(said[1]);
 }
 
 /** Rewrite one document of a copy, by its path under the tree. */
@@ -211,14 +224,25 @@ export function fakeUpstream(upstream: Upstream): Server {
   });
 }
 
-/** Listen, and answer how to stop. */
-export const listening = async (server: Server, port: number) => {
-  await new Promise<void>(done => server.listen(port, done));
-  return () => new Promise<void>(done => server.close(() => done()));
-};
+/**
+ * Listen on a port the system gives, and answer it with how to stop. A fixed port is one another test file, or
+ * any socket on the machine, may hold first; this rejects where the server cannot listen, so a failure says why
+ * rather than running out the timeout of the hook that was starting it.
+ */
+export async function listening(server: Server): Promise<{ port: number; stop: () => Promise<void> }> {
+  await new Promise<void>((ok, fail) => {
+    server.once('error', fail);
+    server.listen(0, () => {
+      server.off('error', fail);
+      ok();
+    });
+  });
+  const { port } = server.address() as AddressInfo;
+  return { port, stop: () => new Promise<void>(done => server.close(() => done())) };
+}
 
-/** Sign in as bo, an employee holding the registrar role, and answer the token. */
-export async function signInAsRegistrar(port = 8099): Promise<string> {
+/** Sign in as bo, an employee holding the registrar role, on the tree served at `port`, and answer the token. */
+export async function signInAsRegistrar(port: number): Promise<string> {
   const answer = await fetch(`http://localhost:${port}/api/v1/auth-employees`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -228,11 +252,11 @@ export async function signInAsRegistrar(port = 8099): Promise<string> {
   return ((await answer.json()) as { accessToken: string }).accessToken;
 }
 
-/** A call to the tree's own server, with the token when the test presents one. */
+/** A call to the tree's own server, on the port it was given, with the token when the test presents one. */
 export const caller =
-  (token: () => string, port = 8099) =>
+  (token: () => string, port: () => number) =>
   async (method: string, path: string, body?: unknown, authorized = false) => {
-    const answer = await fetch(`http://localhost:${port}${path}`, {
+    const answer = await fetch(`http://localhost:${port()}${path}`, {
       method,
       headers: {
         'content-type': 'application/json',

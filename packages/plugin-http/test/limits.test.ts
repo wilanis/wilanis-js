@@ -2,7 +2,7 @@
  * The limits an http route keeps (RFC 0012): a run past its deadline is cancelled and answered 504, a body past its
  * bound is answered 413 before a codec has finished with it, an upstream's answer past the connection's bound fails
  * the request node, and X004 refuses a limit that could never be met. The example is copied with the limits written
- * in, served on a port of its own against a fake upstream that can stop answering.
+ * in, served on a port the system gives against a fake upstream that can stop answering.
  */
 import { readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -20,27 +20,31 @@ import {
   firstRow,
   httpSettings,
   INCLUDES,
+  listenedOn,
   listening,
   localCopy,
   SECRET,
   signInAsRegistrar,
-  UPSTREAM,
   type Upstream,
 } from './harness.js';
 import { EXAMPLE_PLUGINS as PLUGINS } from './plugins.js';
 
-const BACK = UPSTREAM + 2;
-const PORT = UPSTREAM + 3;
 const EDGE = 'features/customers/edge';
 
 const upstream: Upstream = { rows: [firstRow()], inFlight: { now: 0, peak: 0 } };
 const server = fakeUpstream(upstream);
 const logs: string[] = [];
 const dirs: string[] = [];
-let stopUpstream: () => Promise<void>;
-let stop: () => Promise<void>;
+let stopUpstream: (() => Promise<void>) | undefined;
+let stop: (() => Promise<void>) | undefined;
 let token = '';
-const call = caller(() => token, PORT);
+/** The ports the fake upstream and the tree's own server were given. */
+let back = 0;
+let port = 0;
+const call = caller(
+  () => token,
+  () => port,
+);
 /** The one log line for a request, found by what it asked and answered. */
 const lineFor = (asked: string, status: number) =>
   logs.filter(line => line.startsWith(`${asked} → ${status} (`)).at(-1) ?? '';
@@ -52,7 +56,7 @@ const lineFor = (asked: string, status: number) =>
  */
 function withLimits(edit: Edit) {
   edit('project.json', project => {
-    Object.assign(httpSettings(project), { port: PORT, deadlineMs: 500, maxBodyBytes: 4096 });
+    Object.assign(httpSettings(project), { deadlineMs: 500, maxBodyBytes: 4096 });
     project.blobs = { ...project.blobs, dir: '.blobs' };
   });
   edit(`${EDGE}/get-customer.trigger.json`, trigger => {
@@ -65,7 +69,6 @@ function withLimits(edit: Edit) {
     shape.fields.ids.maxItems = 2;
   });
   edit('connections/customers-api.connection.json', connection => {
-    connection.settings.baseUrl = `http://localhost:${BACK}/api/v1`;
     connection.settings.maxBodyBytes = 600;
   });
   // the example tries a faulted GET again after 200 ms, past the route's 50 ms: without the retry an answer past the
@@ -75,9 +78,9 @@ function withLimits(edit: Edit) {
   });
 }
 
-/** A copy of the example, edited, and loaded with every plugin handed in. */
+/** A copy of the example pointed at the fake upstream, edited, and loaded with every plugin handed in. */
 function loaded(edits: (edit: Edit) => void) {
-  const dir = localCopy(edits);
+  const dir = localCopy({ upstream: back, more: edits });
   dirs.push(dir);
   return loadTree(dir, PLUGINS, INCLUDES);
 }
@@ -103,13 +106,14 @@ const streamed = (text: string) => {
 };
 
 beforeAll(async () => {
-  stopUpstream = await listening(server, BACK);
+  ({ port: back, stop: stopUpstream } = await listening(server));
   process.env.CUSTOMERS_JWT_SECRET = SECRET;
   process.env.CUSTOMERS_DATABASE_URL = 'postgres://customers:customers@localhost:5432/customers';
   const load = loaded(withLimits);
   expect(checkTree(load).items).toEqual([]);
   ({ stop } = await start(load, { log: line => logs.push(line), profile: 'live' }));
-  token = await signInAsRegistrar(PORT);
+  port = listenedOn(logs);
+  token = await signInAsRegistrar(port);
 });
 
 afterEach(() => {
@@ -118,8 +122,8 @@ afterEach(() => {
 });
 
 afterAll(async () => {
-  await stop();
-  await stopUpstream();
+  await stop?.();
+  await stopUpstream?.();
   for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -168,7 +172,7 @@ describe('a body past its bound', () => {
 
   it('a JSON body streamed with no length is cut once it passes 4 KB, 413, and nothing is registered', async () => {
     const before = upstream.rows.length;
-    const answer = await fetch(`http://localhost:${PORT}/customers`, {
+    const answer = await fetch(`http://localhost:${port}/customers`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
       ...streamed(JSON.stringify(tooBig)),
@@ -181,7 +185,7 @@ describe('a body past its bound', () => {
   it("a CSV upload past the route's own 64 bytes is 413 before the blob codec has stored it", async () => {
     const before = upstream.rows.length;
     const csv = `name,email,tier\n${Array.from({ length: 5 }, (_, at) => `Row ${at},row-${at}@x.example,bronze`).join('\n')}\n`;
-    const answer = await fetch(`http://localhost:${PORT}/customers.csv`, {
+    const answer = await fetch(`http://localhost:${port}/customers.csv`, {
       method: 'POST',
       headers: { 'content-type': 'text/csv', authorization: `Bearer ${token}` },
       ...streamed(csv),
@@ -208,7 +212,7 @@ describe('a body past its bound', () => {
       `--${boundary}--`,
       '',
     ].join('\r\n');
-    const answered = fetch(`http://localhost:${PORT}/customers/upload`, {
+    const answered = fetch(`http://localhost:${port}/customers/upload`, {
       method: 'POST',
       headers: { 'content-type': `multipart/form-data; boundary=${boundary}`, authorization: `Bearer ${token}` },
       ...streamed(form),
