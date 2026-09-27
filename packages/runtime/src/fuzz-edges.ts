@@ -25,8 +25,8 @@ import {
 import { outcomeOf, type Report } from '@wilanis/engine';
 import { expectOf } from './fuzz.js';
 import { recordedProfile, skippedLines } from './profile.js';
-import type { Recorded } from './record.js';
-import { checkRecorded, EDGED, EDGES, keptIn, type RecordCheck, writeRecorded } from './recorded-dir.js';
+import { claimDir, dirOf, type Recorded, recordedLines, type Writer } from './record.js';
+import { checkRecorded, EDGED, EDGES, keptIn, writeRecorded } from './recorded-dir.js';
 import { embedderFor, generatedFire } from './stubbing.js';
 import { getPath, setPath } from './stubs.js';
 
@@ -118,7 +118,7 @@ async function fireEdges(load: LoadResult, how: { trigger: Loaded<TriggerDoc>; p
   const emb = embedderFor(load, { seed: SEED, profile: how.profile });
   const type = emb.types(trigger.doc).in;
   if (!type) return;
-  claim(into, trigger);
+  claimDir(into.dirs, dirOf(trigger), { path: trigger.path, what: 'trigger' });
   const { input, context } = generatedFire(emb, trigger, SEED);
   for (const edge of edges(type)) {
     const run = await fired(load, how, { edge, input: withEdge(input, type, edge), context });
@@ -157,36 +157,12 @@ function withEdge(input: unknown, type: Type, edge: Edge): unknown {
 }
 
 /**
- * The directory a trigger's edges sit in, `<feature>.<trigger stem>`, as its recorded runs do: D009 keeps a
- * feature's name unique across the tree and the trees it includes, so an included trigger and a host's of one name
- * sit apart.
- */
-const triggerDir = (trigger: Loaded<TriggerDoc>) => `${trigger.feature}.${trigger.name}`;
-
-/**
- * Hold a trigger's directory for it. Two triggers of one feature and one name -- one under `edge/`, one under
- * `edge/v2/` -- would share one, and are refused, naming both, rather than one's runs being written over the other's.
- */
-function claim(into: Gathered, trigger: Loaded<TriggerDoc>): void {
-  const under = triggerDir(trigger);
-  const other = into.dirs.get(under) ?? trigger.path;
-  if (other !== trigger.path) {
-    const [one, two] = [other, trigger.path].sort();
-    throw new Error(
-      `two triggers of feature '${trigger.feature}' are named '${trigger.name}', and a trigger's edges are written ` +
-        `under its feature and name (${EDGES}/${under}/): rename ${one} or ${two}`,
-    );
-  }
-  into.dirs.set(under, trigger.path);
-}
-
-/**
- * Where one edge's run is written inside the edges directory,
- * `<feature>.<trigger stem>/<dotted field>.<edge>.scenario.json`, each part escaped as a URI component, so an enum
- * member that holds a `/` names a file and not a directory.
+ * Where one edge's run is written inside the edges directory, `<feature>.<trigger stem>/<dotted field>.<edge>.scenario.json`
+ * under the trigger's directory as its recorded runs have it (`dirOf`), each part escaped as a URI component, so an
+ * enum member that holds a `/` names a file and not a directory.
  */
 function fileOf(trigger: Loaded<TriggerDoc>, edge: Edge): string {
-  return `${triggerDir(trigger)}/${[...edge.at, edge.name].map(encodeURIComponent).join('.')}.scenario.json`;
+  return `${dirOf(trigger)}/${[...edge.at, edge.name].map(encodeURIComponent).join('.')}.scenario.json`;
 }
 
 /** An edge in words: the dotted field and the edge's name, `id empty` or `tier absent`. */
@@ -211,21 +187,8 @@ function scenarioOf(run: EdgeRun): ScenarioDoc {
   };
 }
 
-/** What `--check` found: one line per file that differs, then how many and the one command, or that it is current. */
-function checkLines(check: RecordCheck, files: number): string[] {
-  const lines = [
-    ...check.stale.map(file => `stale    ${file}`),
-    ...check.missing.map(file => `missing  ${file}`),
-    ...check.extra.map(file => `extra    ${file}`),
-  ];
-  if (!lines.length) return [`${EDGES}/ is what fuzz --edges writes for this tree: ${files} file(s)`];
-  return [...lines, `${lines.length} file(s) differ from what fuzz --edges writes for this tree -- ${EDGES_HINT}`];
-}
+/** How the lines name `fuzz --edges` over the directory it owns. */
+const EDGER: Writer = { dir: EDGES, writes: EDGED.by, by: EDGED.by, hint: EDGES_HINT };
 
 /** What `fuzz --edges` says of its directory: what it wrote or found, and last the scenarios it left, where it left any. */
-export function edgesLines(recorded: Recorded): string[] {
-  const said = recorded.check
-    ? checkLines(recorded.check, recorded.files)
-    : [`wrote ${recorded.files} scenario(s) under ${EDGES}/ -- regenerate them, do not edit them`];
-  return [...said, ...recorded.kept.map(file => `kept     ${file} -- not written by fuzz --edges, so left as it is`)];
-}
+export const edgesLines = (recorded: Recorded) => recordedLines(recorded, EDGER);
