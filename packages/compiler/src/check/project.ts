@@ -6,7 +6,14 @@
  * that holds) before anything is received, under profiles the project declares (B006, B007, B008, B012). Blobs:
  * the connection the blob registry keeps bytes behind opens a store some plugin offers (C014).
  */
-import { EMPTY_OBJECT, type Operation, type PluginModule, runsUnder, type StartupStep } from '@wilanis/core';
+import {
+  EMPTY_OBJECT,
+  type Operation,
+  type PluginModule,
+  runsUnder,
+  type StartupStep,
+  secretKeysRead,
+} from '@wilanis/core';
 import { type Judge, underProfile } from './judge.js';
 import { checkPermits } from './permits.js';
 import { checkProfiles } from './profiles.js';
@@ -47,13 +54,11 @@ function checkPluginSettings(judge: Judge): void {
  */
 function checkSecretsRead(judge: Judge): void {
   const { path, doc } = judge.project;
-  const read = new Set<string>();
-  const note = (value: unknown) => {
-    for (const [root, key] of judge.scope.templateReads(value)) if (root === 'secrets' && key) read.add(key);
-  };
-  for (const use of doc.plugins) note(use.settings);
-  for (const connection of judge.scope.registry.all('connection')) note(connection.doc.settings);
-  for (const step of doc.startup ?? []) note(step.in);
+  const read = new Set([
+    ...doc.plugins.flatMap(use => secretKeysRead(use.settings)),
+    ...judge.scope.registry.all('connection').flatMap(connection => secretKeysRead(connection.doc.settings)),
+    ...(doc.startup ?? []).flatMap(step => secretKeysRead(step.in)),
+  ]);
   for (const [key, variable] of Object.entries(doc.secrets ?? {})) {
     if (read.has(key)) continue;
     judge.refuser(path)(

@@ -77,3 +77,9 @@ export function templateReads(value: unknown, out: string[][] = []): string[][] 
   }
   return out;
 }
+
+/** Which secrets a value reads: each key it names as `{{secrets.<key>}}` anywhere inside it, once, as first read. */
+export function secretKeysRead(value: unknown): string[] {
+  const keys = templateReads(value).flatMap(([root, key]) => (root === 'secrets' && key ? [key] : []));
+  return [...new Set(keys)];
+}
