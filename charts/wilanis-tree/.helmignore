@@ -1,0 +1,9 @@
+# What `helm package` leaves out of the chart's archive.
+.DS_Store
+.git/
+.gitignore
+*.swp
+*.bak
+*.tmp
+*.orig
+*~

@@ -1,0 +1,31 @@
+{{- /*
+One Service per workload that listens, a port for each port it listens on. A workload that listens on none (a worker,
+a scheduler) has no Service: nothing connects to it.
+*/ -}}
+{{- range $workload := .Values.workloads }}
+{{- if $workload.ports }}
+{{- $scope := dict "root" $ "workload" $workload }}
+{{- $nodePorts := index ($.Values.service.nodePorts | default dict) ($workload.profile | toString) | default dict }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "wilanis-tree.workload" $scope }}
+  labels:
+    {{- include "wilanis-tree.labels" $scope | nindent 4 }}
+spec:
+  type: {{ $.Values.service.type | default "ClusterIP" }}
+  selector:
+    {{- include "wilanis-tree.selector" $scope | nindent 4 }}
+  ports:
+    {{- range $workload.ports }}
+    - name: {{ .name }}
+      port: {{ .port }}
+      targetPort: {{ .name }}
+      protocol: TCP
+      {{- with index $nodePorts (.port | toString) }}
+      nodePort: {{ . }}
+      {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,51 @@
+{{- if not .Values.workloads }}
+Nothing is deployed: these are the chart's own defaults, which name no workload. A tree's values are what
+wilanis-deploy writes from its manifest:
+
+  npx wilanis-deploy <root> --profile <name> --target helm
+  helm install <name> charts/wilanis-tree -f <root>/deploy/values.yaml
+{{- else }}
+{{- $secret := include "wilanis-tree.secret" . }}
+{{- $wired := include "wilanis-tree.wired" . | fromJsonArray }}
+{{ include "wilanis-tree.name" . }} is installed as release {{ .Release.Name }}, in namespace {{ .Release.Namespace }}:
+{{- range $workload := .Values.workloads }}
+{{- $named := include "wilanis-tree.workload" (dict "root" $ "workload" $workload) }}
+  deployment/{{ $named }}{{ with $workload.ports }}, service/{{ $named }} on port{{ if gt (len .) 1 }}s{{ end }} {{ range $at, $port := . }}{{ if $at }}, {{ end }}{{ $port.port }}{{ end }}{{ end }}
+{{- end }}
+
+{{- $keys := list }}
+{{- range .Values.secret.keys }}{{ if not (has . $wired) }}{{ $keys = append $keys . }}{{ end }}{{ end }}
+{{- if $keys }}
+
+The variables are read from the Secret {{ $secret }}: {{ join ", " $keys }}.
+{{- if .Values.secret.create }}
+This release made it from secret.values.
+{{- else }}
+The chart does not make it, and until it exists the pods wait. Make it from the tree's deploy/.env, which is the
+compose target's .env.example filled in:
+
+  kubectl create secret generic {{ $secret }} --namespace {{ .Release.Namespace }} --from-env-file=<root>/deploy/.env
+{{- end }}
+{{- end }}
+{{- if $wired }}
+{{ join ", " $wired }} {{ if gt (len $wired) 1 }}are{{ else }}is{{ end }} read from {{ include "wilanis-tree.postgresql" . }}-app,
+the Secret the PostgreSQL cluster's operator writes.
+{{- end }}
+
+What the environment must provide, as the tree's connection kinds declare it:
+{{- range .Values.requires }}
+  {{ .connection }} ({{ .kind }}): {{ .endpoint }}
+{{- else }}
+  nothing: no connection a workload reaches is of a kind that declares an endpoint
+{{- end }}
+The list is a floor: a connection whose kind declares no endpoint is not in it.
+{{- if and .Values.postgresql.enabled (not (.Capabilities.APIVersions.Has "postgresql.cnpg.io/v1/Cluster")) }}
+
+postgresql is on and the CloudNativePG operator is installed, but its Cluster is not yet: the cluster did not know
+the operator's resource types when this release was rendered. Once the operator is ready,
+
+  kubectl rollout status deployment/{{ .Release.Name }}-cloudnative-pg --namespace {{ .Release.Namespace }}
+
+run the same install again as helm upgrade, with the same values, and {{ include "wilanis-tree.postgresql" . }} is created.
+{{- end }}
+{{- end }}

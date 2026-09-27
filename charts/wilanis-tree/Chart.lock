@@ -1,0 +1,12 @@
+dependencies:
+- name: cloudnative-pg
+  repository: https://cloudnative-pg.github.io/charts
+  version: 0.29.1
+- name: minio
+  repository: https://charts.min.io/
+  version: 5.4.0
+- name: jaeger
+  repository: https://jaegertracing.github.io/helm-charts
+  version: 4.14.0
+digest: sha256:4eb2904110b322b076724423f8534cd2eb294e84e679541280d8f5fb6fd650d4
+generated: "2026-09-27T12:02:43.210476-05:00"
