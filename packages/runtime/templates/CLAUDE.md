@@ -23,6 +23,8 @@ the file, the rule and the fix.
    delete it, or move it into `scenarios/fuzz/`.
 4. When a contract is unclear: `wilanis describe <path>`. When you need the lay of the land: `wilanis ls`, `wilanis map`.
    `wilanis manifest <root>` prints what the tree is, as JSON, before you add to it.
+   `wilanis-deploy <root> --profile <name>` writes the Dockerfile, the Compose file and the chart values for one place
+   this tree runs; the tree is the source, so regenerate rather than edit them.
 
 A Stop hook judges the tree before you may finish: `wilanis check`, then `wilanis rehearse`, then the gate
 named as `gate` in `.claude/wilanis.json` where the tree declares one, and anything that refuses blocks the
