@@ -122,7 +122,8 @@ Draws on RFC 0013, RFC 0016, RFC 0024 and RFC 0026.
 
 ```
 npx wilanis-deploy example --profile production
-scripts/cluster.sh up     # → http://localhost:8099/customers
+scripts/cluster.sh up        # → http://localhost:8080/customers (signed in)
+scripts/cluster.sh compose   # the same image under docker compose: http://localhost:8099/customers (signed in), then down
 ```
 
 RFC 0013 depends on RFC 0005, so this follows M07 and M08; RFC 0024 depends on RFC 0006, so it follows M04.

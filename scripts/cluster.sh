@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
-# The example on a local Kubernetes cluster (RFC 0024).
+# The example on a local Kubernetes cluster, and under docker compose (RFC 0024).
 #
-#   scripts/cluster.sh up      build the example's image from the workspace's packages as `npm pack` writes them, create
-#                              a kind cluster, install charts/wilanis-tree with the example's generated values and
-#                              values-local.yaml, wait until production is ready, and run the smoke check
-#   scripts/cluster.sh smoke   sign in as the demo's operator and GET /customers through the NodePort, for a 200
-#   scripts/cluster.sh down    delete the cluster
+#   scripts/cluster.sh up       build the example's image from the workspace's packages as `npm pack` writes them, create
+#                               a kind cluster, install charts/wilanis-tree with the example's generated values and
+#                               values-local.yaml, wait until production is ready, and run the smoke check
+#   scripts/cluster.sh smoke    sign in as the demo's operator and GET /customers through the NodePort, for a 200
+#   scripts/cluster.sh down     delete the cluster
+#   scripts/cluster.sh compose  build the same image through the example's deploy/compose.yaml, bring up what it
+#                               declares beside a PostgreSQL with deploy/.env holding the demo's values, run the smoke
+#                               check on the port it publishes, and take it all down with its volumes
 #
 # It is the one thing in the repository that needs docker, kind, kubectl and helm, and it names whichever is missing
-# before it starts. It pushes nothing and publishes nothing: the image goes from the local docker into the cluster, and
-# the packed tarballs are served to the build from a container that is removed on exit.
+# before it starts. It pushes nothing and publishes nothing: the image goes from the local docker into the cluster or
+# into compose, and the packed tarballs are served to the build from a container that is removed on exit.
 set -euo pipefail
 
 readonly CLUSTER=wilanis
@@ -23,6 +26,14 @@ readonly NODE_PORT=30080
 # The name the image build reaches the packed tarballs by, and the port they are served on inside their container.
 readonly PACKS_HOST=wilanis-packs
 readonly PACKS_PORT=8080
+# The PostgreSQL `compose` stands up for production's database, pinned by version and digest, and the database on it.
+# The password is the demo's, as values-local.yaml's values are. Its port is published nowhere: the tree reaches it by
+# its service name on the project's own network.
+readonly PG_IMAGE=postgres:18.6-alpine3.24@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+readonly PG_SERVICE=postgresql
+readonly PG_USER=customers
+readonly PG_PASSWORD=local-only-not-a-secret
+readonly PG_DATABASE=customers
 
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO
@@ -30,6 +41,9 @@ STAGE=""
 PACKS_SERVER=""
 PACKS_ADDRESS=""
 LOCKER=""
+TREE_NAME=""
+IMAGE=""
+COMPOSED=""
 
 say() { printf '%s\n' "$*"; }
 die() {
@@ -38,7 +52,7 @@ die() {
 }
 
 usage() {
-  sed -n '4,8p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '4,11p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -67,8 +81,14 @@ need() {
   esac
 }
 
-# Removes the two containers `up` makes and its staging directory, however it ends.
+# Removes the two containers `up` and `compose` make and their staging directory, however they end, and takes down what
+# `compose` brought up if it is still up, with its logs first where the verb failed.
 cleanup() {
+  local status=$?
+  if [ -n "$COMPOSED" ]; then
+    if [ "$status" -ne 0 ]; then compose_files logs --no-color --tail=200 >&2 || true; fi
+    compose_down || true
+  fi
   if [ -n "$LOCKER" ]; then docker rm -f "$LOCKER" >/dev/null 2>&1 || true; fi
   if [ -n "$PACKS_SERVER" ]; then docker rm -f "$PACKS_SERVER" >/dev/null 2>&1 || true; fi
   if [ -n "$STAGE" ]; then rm -rf "$STAGE"; fi
@@ -99,12 +119,13 @@ closure() {
   ' "$REPO" "$TREE"
 }
 
-# Builds the workspace, refuses deploy/ files that have gone stale against the tree, and packs every package the tree
-# needs into $STAGE/packs, with what npm answered for each (its name and its tarball) in $STAGE/packs.json.
+# Builds the workspace, refuses the deploy/ files of the targets it is given (`image,helm`) where they have gone stale
+# against the tree, and packs every package the tree needs into $STAGE/packs, with what npm answered for each (its name
+# and its tarball) in $STAGE/packs.json.
 pack() {
-  local dirs=() dir packed
+  local targets=$1 dirs=() dir packed
   (cd "$REPO" && npm run build --silent)
-  (cd "$REPO" && node_modules/.bin/wilanis-deploy "$TREE" --profile "$PROFILE" --target image,helm --check) ||
+  (cd "$REPO" && node_modules/.bin/wilanis-deploy "$TREE" --profile "$PROFILE" --target "$targets" --check) ||
     die "$TREE/deploy/ is not what the tree renders: run npx wilanis-deploy $TREE --profile $PROFILE --target image,compose,helm"
   packed=$(closure)
   while IFS= read -r dir; do dirs+=(-w "$dir"); done <<<"$packed"
@@ -243,36 +264,134 @@ plan_field() {
       console.log(process.argv[1].split(".").reduce((value, key) => value[key], JSON.parse(text))))' "$1"
 }
 
-up() {
-  local name image node_image count
-  need up docker kind kubectl helm node npm git curl
-  [ -x "$REPO/node_modules/.bin/wilanis-deploy" ] || die "up needs the workspace installed: run npm install first"
+# What `up` and `compose` build the image from: the workspace packed, a staging copy of the tree locked to the tarballs,
+# and the tarballs served where the build reaches them. It is given the verb it runs for and the deploy/ targets that
+# verb reads, and sets TREE_NAME and IMAGE from the plan.
+stage() {
+  local verb=$1 targets=$2 node_image count
+  [ -x "$REPO/node_modules/.bin/wilanis-deploy" ] || die "$verb needs the workspace installed: run npm install first"
   STAGE=$(mktemp -d "${TMPDIR:-/tmp}/wilanis-cluster.XXXXXX")
   trap cleanup EXIT
-  pack
-  name=$(plan_field name)
-  image=$(plan_field image.reference)
+  pack "$targets"
+  TREE_NAME=$(plan_field name)
+  IMAGE=$(plan_field image.reference)
   stage_tree
   node_image=$(sed -n 's/^FROM[[:space:]]\{1,\}\([^[:space:]]*\).*/\1/p' "$STAGE/$TREE/deploy/Dockerfile" | head -n 1)
   serve_packs "$node_image"
   lock "$node_image"
   count=$(grep -c '"filename"' "$STAGE/packs.json")
   say "pack: $count tarballs from packages/ and libraries/, locked into a staging copy of $TREE/"
-  docker build --add-host "$PACKS_HOST:$PACKS_ADDRESS" -f "$STAGE/$TREE/deploy/Dockerfile" -t "$image" "$STAGE/$TREE"
-  say "docker: built $image from $TREE/deploy/Dockerfile"
+}
+
+up() {
+  need up docker kind kubectl helm node npm git curl
+  stage up image,helm
+  docker build --add-host "$PACKS_HOST:$PACKS_ADDRESS" -f "$STAGE/$TREE/deploy/Dockerfile" -t "$IMAGE" "$STAGE/$TREE"
+  say "docker: built $IMAGE from $TREE/deploy/Dockerfile"
   create_cluster
-  kind load docker-image "$image" --name "$CLUSTER"
+  kind load docker-image "$IMAGE" --name "$CLUSTER"
   stage_chart
-  install_chart "$name"
+  install_chart "$TREE_NAME"
   smoke
   say "→ http://localhost:$HOST_PORT/customers (signed in: scripts/cluster.sh smoke signs in as the demo's operator)"
 }
 
+# docker compose over the staged tree's compose.yaml, as wilanis-deploy wrote it, and the demo's override, which sits
+# outside the tree so the build context never holds it. The project is the one compose.yaml names.
+compose_files() {
+  docker compose -f "$STAGE/$TREE/deploy/compose.yaml" -f "$STAGE/compose.override.yaml" "$@"
+}
+
+# Writes the staged tree's deploy/.env from its .env.example, as the chart fills the same variables on the cluster: one
+# the Secret holds in values-local.yaml takes that value, and one values-local.yaml says the PostgreSQL switch answers
+# takes the URL of the override's database. A variable neither answers is refused rather than started empty.
+# Dockerfile.dockerignore leaves the .env out of the image.
+compose_env() {
+  local database="postgres://$PG_USER:$PG_PASSWORD@$PG_SERVICE:5432/$PG_DATABASE" unanswered
+  unanswered=$(node -e '
+    const { readFileSync, writeFileSync } = require("node:fs");
+    const [example, valuesFile, yamlFrom, database, out] = process.argv.slice(1);
+    const { parse } = require(require.resolve("yaml", { paths: [yamlFrom] }));
+    const values = parse(readFileSync(valuesFile, "utf8"));
+    const answers = new Map(Object.entries(values.secret?.values ?? {}));
+    for (const name of values.postgresql?.variables ?? []) answers.set(name, database);
+    const unanswered = [];
+    const lines = readFileSync(example, "utf8").split("\n").map(line => {
+      const name = /^([A-Za-z_][A-Za-z0-9_]*)=$/.exec(line)?.[1];
+      if (name === undefined) return line;
+      if (!answers.has(name)) unanswered.push(name);
+      return name + "=" + (answers.get(name) ?? "");
+    });
+    if (unanswered.length) {
+      console.log(unanswered.join(", "));
+      process.exit(1);
+    }
+    writeFileSync(out, lines.join("\n"));
+  ' "$STAGE/$TREE/deploy/.env.example" "$REPO/charts/wilanis-tree/values-local.yaml" "$REPO/packages/deploy" \
+    "$database" "$STAGE/$TREE/deploy/.env") ||
+    die "charts/wilanis-tree/values-local.yaml has no value for $unanswered, which $TREE/deploy/.env.example names: add each under secret.values"
+}
+
+# Writes the override `compose` lays over compose.yaml: the address the build fetches the packed tarballs from, and the
+# PostgreSQL production keeps its customers in, which the tree's service waits on until it answers.
+compose_override() {
+  local service=$1
+  cat >"$STAGE/compose.override.yaml" <<EOF
+services:
+  $service:
+    build:
+      extra_hosts: ["$PACKS_HOST:$PACKS_ADDRESS"]
+    depends_on:
+      $PG_SERVICE:
+        condition: service_healthy
+  $PG_SERVICE:
+    image: "$PG_IMAGE"
+    environment:
+      POSTGRES_USER: "$PG_USER"
+      POSTGRES_PASSWORD: "$PG_PASSWORD"
+      POSTGRES_DB: "$PG_DATABASE"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "$PG_USER", "-d", "$PG_DATABASE"]
+      interval: "2s"
+      timeout: "2s"
+      retries: 30
+EOF
+}
+
+# Takes down what `compose` brought up, the database's volume with it, so the next run starts from an empty database.
+compose_down() {
+  COMPOSED=""
+  compose_files down -v --remove-orphans
+  say "compose: down, with its volumes"
+}
+
+# Builds the image the way `up` does, but through compose.yaml's own build, brings up what compose.yaml declares with
+# the override, waits for both services' healthchecks, and runs the smoke check on the port compose.yaml publishes.
+compose() {
+  local service port
+  need compose docker node npm git curl
+  docker compose version >/dev/null 2>&1 ||
+    die "compose needs docker's compose plugin (https://docs.docker.com/compose/install/)"
+  stage compose image,compose
+  service="$TREE_NAME-$PROFILE"
+  port=$(plan_field workloads.0.listens.0.port)
+  compose_env
+  compose_override "$service"
+  compose_files build "$service"
+  say "docker: built $IMAGE through $TREE/deploy/compose.yaml"
+  COMPOSED=yes
+  compose_files up --detach --wait --wait-timeout 300
+  say "compose: $service up on localhost:$port, beside $PG_SERVICE"
+  smoke "$port"
+  compose_down
+}
+
 # Signs in as the one operator account values-local.yaml writes the hash of, and reads GET /customers with the token,
-# through localhost:$HOST_PORT and so through the node's $NODE_PORT: the assertion that the image, built from the packed
-# tarballs and installed from the chart, answers a route.
+# through localhost:$HOST_PORT and so through the node's $NODE_PORT, or through the port it is given, where `compose`
+# publishes the tree: the assertion that the image, built from the packed tarballs and run from the chart or from
+# compose.yaml, answers a route.
 smoke() {
-  local url="http://localhost:$HOST_PORT" tokens token answer status
+  local url="http://localhost:${1:-$HOST_PORT}" tokens token answer status
   need smoke curl node
   tokens=$(curl -fsS --retry 20 --retry-delay 3 --retry-all-errors -H 'content-type: application/json' \
     -d '{"username":"operator","password":"operator-pass"}' "$url/api/v1/auth-employees") ||
@@ -294,6 +413,7 @@ case "${1:-}" in
   up) up ;;
   smoke) smoke ;;
   down) down ;;
+  compose) compose ;;
   -h | --help | help) usage ;;
   *) usage 1 >&2 ;;
 esac
