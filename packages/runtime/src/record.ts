@@ -7,7 +7,7 @@
 import { featureOf, type ScenarioBranch, type ScenarioDoc, schemaUrl, stem } from '@wilanis/core';
 import { type Report, refusalOf } from '@wilanis/engine';
 import { expectOf } from './fuzz.js';
-import { checkRecorded, keptIn, RECORDED, type RecordCheck, writeRecorded } from './recorded-dir.js';
+import { checkRecorded, keptIn, RECORDED, REHEARSED, type RecordCheck, writeRecorded } from './recorded-dir.js';
 
 /** What `--check` says after the files it lists: the one command that brings the directory back. */
 export const RECORD_HINT = 'run wilanis rehearse --record and review the diff';
@@ -100,7 +100,7 @@ const POLICIES = 'policies';
  * tree and every tree it includes, so two features' triggers, or policies, of one name never share one -- a host's
  * beside an included library's among them, which the host cannot rename.
  */
-function dirOf(doc: { path: string }): string {
+export function dirOf(doc: { path: string }): string {
   const { feature, stem: name } = partsOf(doc.path);
   return `${feature}.${name}`;
 }
@@ -125,15 +125,31 @@ export function fileOf(run: RecordedRun): string {
   return `${under}/${feature}.${graph}.${run.branch.node}.${run.branch.to}${nth}.scenario.json`;
 }
 
+/**
+ * A command that writes a directory of scenarios, as its lines name it: the directory, what writes the files the tree
+ * would have there (`the solver`), the command a file it did not write is said not to be written by (`--record`), and
+ * the hint that brings the directory back.
+ */
+export interface Writer {
+  dir: string;
+  writes: string;
+  by: string;
+  hint: string;
+}
+
+/** How the lines name `rehearse --record` over the directory it recorded. */
+export const recorder = (dir: string): Writer => ({ dir, writes: 'the solver', by: REHEARSED.by, hint: RECORD_HINT });
+
 /** What `--check` prints: one line per file that differs, then how many and the one command, or that it is current. */
-export function checkLines(dir: string, check: RecordCheck, files: number): string[] {
+export function checkLines(writer: Writer, check: RecordCheck, files: number): string[] {
   const lines = [
     ...check.stale.map(file => `stale    ${file}`),
     ...check.missing.map(file => `missing  ${file}`),
     ...check.extra.map(file => `extra    ${file}`),
   ];
-  if (!lines.length) return [`${dir}/ is what the solver writes for this tree: ${files} file(s)`];
-  return [...lines, `${lines.length} file(s) differ from what the solver writes for this tree -- ${RECORD_HINT}`];
+  const what = `what ${writer.writes} writes for this tree`;
+  if (!lines.length) return [`${writer.dir}/ is ${what}: ${files} file(s)`];
+  return [...lines, `${lines.length} file(s) differ from ${what} -- ${writer.hint}`];
 }
 
 /** What `--record` or `--check` did with the runs: the directory, how many files it holds, and what was written or found. */
@@ -158,10 +174,7 @@ function docsOf(runs: RecordedRun[]): Record<string, ScenarioDoc> {
   const docs: Record<string, ScenarioDoc> = {};
   for (const run of runs) {
     const under = underOf(run);
-    const owner = (run.policy ?? run.trigger).path;
-    const other = held.get(under) ?? owner;
-    if (other !== owner) throw new Error(sameDir(under, [other, owner], run.policy ? 'policy' : 'trigger'));
-    held.set(under, owner);
+    claimDir(held, under, { path: (run.policy ?? run.trigger).path, what: run.policy ? 'policy' : 'trigger' });
     const file = fileOf(run);
     if (!(file in docs)) docs[file] = scenarioOf(run);
   }
@@ -169,6 +182,20 @@ function docsOf(runs: RecordedRun[]): Record<string, ScenarioDoc> {
 }
 
 const MANY = { trigger: 'triggers', policy: 'policies' };
+
+/**
+ * Hold a directory, by the path of the trigger or policy whose runs it holds (`held`). A second of one feature and
+ * one name would share it, and is refused, naming both.
+ */
+export function claimDir(
+  held: Map<string, string>,
+  under: string,
+  owner: { path: string; what: keyof typeof MANY },
+): void {
+  const other = held.get(under) ?? owner.path;
+  if (other !== owner.path) throw new Error(sameDir(under, [other, owner.path], owner.what));
+  held.set(under, owner.path);
+}
 
 /** Why two triggers, or policies, of one feature and one name cannot both be recorded, and the files to rename one of. */
 function sameDir(under: string, paths: string[], what: keyof typeof MANY): string {
@@ -194,10 +221,13 @@ export function recordRuns(root: string, how: { record?: string; check?: boolean
 export const current = (recorded: Recorded) =>
   !recorded.check || Object.values(recorded.check).every(list => list.length === 0);
 
-/** What `--record` or `--check` says after the rehearsal, and last the scenarios it left, where it left any. */
-export function recordedLines(recorded: Recorded): string[] {
+/**
+ * What `--record` or `--check` says after the rehearsal, or what another writer of a directory says of it, and last
+ * the scenarios it left, where it left any.
+ */
+export function recordedLines(recorded: Recorded, writer = recorder(recorded.dir)): string[] {
   const said = recorded.check
-    ? checkLines(recorded.dir, recorded.check, recorded.files)
-    : [`wrote ${recorded.files} scenario(s) under ${recorded.dir}/ -- regenerate them, do not edit them`];
-  return [...said, ...recorded.kept.map(file => `kept     ${file} -- not written by --record, so left as it is`)];
+    ? checkLines(writer, recorded.check, recorded.files)
+    : [`wrote ${recorded.files} scenario(s) under ${writer.dir}/ -- regenerate them, do not edit them`];
+  return [...said, ...recorded.kept.map(file => `kept     ${file} -- not written by ${writer.by}, so left as it is`)];
 }
