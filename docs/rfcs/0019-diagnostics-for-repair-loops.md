@@ -461,8 +461,8 @@ only the codes) and `applyFix(dir, fix)` -- `set`, `add`, `remove` on the parsed
 | determinism | two calls give equal JSON; a copy whose refusals the loader found in another order (two files renamed to swap their walk order) gives the same JSON |
 | the sort | a copy with the R001 typo: R001 before the two G011s (same file, `nodes/asked/run` before `nodes/route/…`) |
 | the untouched tree | `ok: true`, `refusals: []`, `documents: 140` and no other member |
-| `rehearse --json` | `decisions` has 15 customers and 37 branches in all, `plain` the four branchless runs, `ok: true`, `seed: 1`; every `settled` has `status` and `blocked` |
-| `regress --json` | after `fuzz` on a copy, `results` has one customer per scenario with `same: true`; the `missing` rule changed to 410, the `get-customer` customers have `same: false` and non-empty `diffs` |
+| `rehearse --json` | `decisions` has 15 entries and 37 branches in all, `plain` the four branchless runs, `ok: true`, `seed: 1`; every `settled` has `status` and `blocked` |
+| `regress --json` | after `fuzz` on a copy, `results` has one entry per scenario with `same: true`; the `missing` rule changed to 410, the `get-customer` entries have `same: false` and non-empty `diffs` |
 | `scenarios --check --json` | on a copy with its directories recorded, `ok: true` and the three lists empty; with the `missing` rule's threshold moved, `stale` names the recorded `missing` scenario and `ok: false`; `missing` and `extra` after a deleted and a hand-added file |
 | the CLI | `wilanis check <copy> --json` exits 1, writes nothing to stderr, and stdout parses to the envelope; `wilanis rehearse <copy> --json` on the refused copy prints `command: 'rehearse'` with the refusals and exits 1; on the good copy exits 0 with `decisions` |
 

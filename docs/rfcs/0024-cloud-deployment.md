@@ -417,7 +417,7 @@ connection's kind declares `endpoint`. The two keys this RFC adds are the two di
 So exactly one operation in this workspace declares `listens` today, and a second would be a plugin that
 grants a second server: a gRPC listener, an admin or metrics port, a webhook receiver on a port of its own,
 an SMTP listener. Each declares both parts of its address the same way, and each is then a row in the
-manifest, a port on the plan, a `ports:` customer in Compose and a `containerPort` in the chart with no
+manifest, a port on the plan, a `ports:` entry in Compose and a `containerPort` in the chart with no
 renderer learning its name.
 
 Within `listens`, `port` is required and `host` is not, because a listener that cannot choose an interface
@@ -535,7 +535,7 @@ deployment is where it runs, which the asker always knows.
 
 **The chart**, `charts/wilanis-tree/`, hand-written and versioned here: `Chart.yaml` (`apiVersion: v2`,
 `dependencies` naming each upstream chart with a pinned `version` and a `condition`), `values.yaml` (the
-shape the tool writes, with every switch off), `templates/` (one Deployment and one Service per customer of
+shape the tool writes, with every switch off), `templates/` (one Deployment and one Service per entry of
 `workloads`, a Secret only when the operator passes `secret.create`, and `NOTES.txt` printing `requires`),
 and `values-local.yaml` (what the example's demo turns on, and the hosts it wires). The pod's security
 context is what RFC 0020's deployment half asks for and this RFC can give without a rule: `runAsNonRoot`,
@@ -651,7 +651,7 @@ tests without loading a tree):
 
 - golden: the plan of the *Guide*, field for field;
 - determinism: two calls answer equal strings, and a fixture whose arrays are reversed answers the same;
-- two profiles asked for → two workloads, sorted, and `requires` customers carry both in `reachedBy`;
+- two profiles asked for → two workloads, sorted, and `requires` entries carry both in `reachedBy`;
 - a profile whose `holds` is empty → throws, naming the profile;
 - a `listens` whose port is `null` → throws, naming the operation and both places a number may be written;
 - a `listens` whose host is `"127.0.0.1"` → `compose` and `helm` throw, `plan` does not; `"0.0.0.0"`, `"::"`,
