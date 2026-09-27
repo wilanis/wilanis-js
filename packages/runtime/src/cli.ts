@@ -52,7 +52,7 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
   wilanis rehearse [root] [--seed n] [-v] [--json] [--record [dir]] [--check]
                    run every trigger, and every branch of every switch; --record writes each branch's run as a
                    scenario under scenarios/rehearsed/ (or dir), --check says whether that directory is what the
-                   tree writes today and exits 1 when it is not. Both solve under seed 1 and refuse --seed
+                   tree writes today and exits 1 when it is not. Both solve under seed 1 and refuse --seed and --json
   wilanis fuzz     [root] [--runs n]               write one scenario per trigger per seed to scenarios/fuzz/
   wilanis regress  [root] [--json]                 replay every scenario and diff node by node
   wilanis start    [root] [--profile word] [--trace[=text|json]] [--level summary|full]
@@ -83,7 +83,8 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
   wilanis stop-hook [root]                         the Stop hook: judge the tree, answer the harness on stdout
 
 check, rehearse, regress and migrate take --json: one JSON object on stdout (RFC 0019's envelope, packages/runtime/
-schemas/diagnostics.schema.json), the refusals as data on a refused tree whichever was asked, and the same exit codes.
+schemas/diagnostics.schema.json), the refusals as data on a refused tree whichever was asked, and the same exit codes;
+rehearse refuses it beside --record or --check, whose exit code the envelope's ok would not say.
 rehearse, fuzz, regress, start, run and migrate take --profile word, and run under it; else under WILANIS_PROFILE,
 else under the profile project.json marks "default": true. A project that declares no profile runs its one unnamed one.
 Under a profile, rehearse, fuzz and regress skip a trigger whose kind no startup step of that profile serves (a
@@ -165,14 +166,24 @@ const accepted = (loaded: LoadResult, command: string, root: string) =>
 /** The command's name when `--json` was given, which is what `check` needs to print the envelope; else nothing. */
 const jsonOf = (flags: Record<string, string>, command: string) => (flags.json ? command : undefined);
 
+/** What `--record` and `--check` refuse beside them, and why each is refused. */
+const BESIDE_RECORDING: Record<string, string> = {
+  seed: 'the recorded directory is solved under seed 1: drop --seed',
+  json:
+    "--json prints the rehearsal's envelope, whose ok does not say whether the recorded directory is current, and " +
+    "an envelope for staleness is RFC 0019's to add: drop --json",
+};
+
 /**
  * What `rehearse` is asked to record: `--record [dir]` and `--check`, `--record --check` being `--check` on that
- * directory. Either refuses `--seed`, since the recorded directory is a function of the tree and one fixed seed.
+ * directory. Either refuses `--seed`, since the recorded directory is a function of the tree and one fixed seed, and
+ * `--json`, since the envelope's `ok` is the rehearsal's and the exit code would be the directory's.
  */
 function recordingOf(flags: Record<string, string>): { record?: string; check?: boolean } {
   const check = flags.check !== undefined;
-  if ((flags.record !== undefined || check) && flags.seed !== undefined) {
-    console.error('the recorded directory is solved under seed 1: drop --seed');
+  const refused = Object.keys(BESIDE_RECORDING).find(flag => flags[flag] !== undefined);
+  if ((flags.record !== undefined || check) && refused) {
+    console.error(BESIDE_RECORDING[refused]);
     process.exit(2);
   }
   const record = flags.record === 'true' ? RECORDED : flags.record;
