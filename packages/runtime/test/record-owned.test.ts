@@ -14,6 +14,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { checkTree } from '@wilanis/compiler';
 import { loadTree } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { checkRecorded, RECORDED, rehearse, writeRecorded } from '../src/index.js';
@@ -89,6 +90,39 @@ describe('rehearse --record: what the recorded directory owns', () => {
     expect(readFileSync(join(dir, 'scenarios/fuzz/get-customer.1.scenario.json'), 'utf8')).toBe('{}');
     // beside fuzz's directory, under a name of its own, is below the home and outside fuzz's
     expect(writeRecorded(dir, 'scenarios/fuzzy', {})).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('refuses two triggers of one name, an included one among them, naming both, rather than drop one', {
+    timeout: 60_000,
+  }, async () => {
+    const dir = copyOfExample();
+    // a second get-customer under the feature's edge/, reaching the same branches, and a host trigger named as the
+    // included access tree's refresh is: the checker accepts both
+    const again = read(join(dir, 'features/customers/edge/get-customer.trigger.json'));
+    mkdirSync(join(dir, 'features/customers/edge/v2'));
+    writeFileSync(
+      join(dir, 'features/customers/edge/v2/get-customer.trigger.json'),
+      JSON.stringify({ ...again, settings: { ...again.settings, route: '/v2/customers/{id}' } }),
+    );
+    expect(checkTree(load(dir)).items).toEqual([]);
+    await expect(rehearse(load(dir), { record: RECORDED })).rejects.toThrow(
+      "two triggers are named 'get-customer' (@features/customers/edge/get-customer.trigger.json and " +
+        "@features/customers/edge/v2/get-customer.trigger.json), and a recorded trigger's scenarios are written " +
+        'under its name (get-customer/): rename one of them',
+    );
+    rmSync(join(dir, 'features/customers/edge/v2'), { recursive: true });
+    const hello = read(join(dir, 'features/hello/edge/hello-gated.trigger.json'));
+    writeFileSync(
+      join(dir, 'features/hello/edge/refresh.trigger.json'),
+      JSON.stringify({ ...hello, settings: { command: 'hello-refresh' } }),
+    );
+    expect(checkTree(load(dir)).items).toEqual([]);
+    await expect(rehearse(load(dir), { check: true })).rejects.toThrow(
+      "two triggers are named 'refresh' (@features/access/edge/refresh.trigger.json and " +
+        '@features/hello/edge/refresh.trigger.json)',
+    );
+    expect(existsSync(join(dir, RECORDED))).toBe(false);
     rmSync(dir, { recursive: true, force: true });
   });
 });
