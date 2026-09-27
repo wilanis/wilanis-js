@@ -288,8 +288,10 @@ $ npx wilanis manifest example | diff before.json -    # after an edit: what the
 ## The rest
 
 [`docs/model.md`](docs/model.md) is the reference: every document kind and what it means, every rule and its
-refusal code, `project.json`, and what a tree starts. [`docs/compared.md`](docs/compared.md) says what wilanis
-is not, against the frameworks, workflow engines and configuration languages it is taken for.
+refusal code, `project.json`, and what a tree starts. [`docs/security-model.md`](docs/security-model.md) says
+what is guaranteed of every tree `wilanis check` accepts, what the runtime enforces on every run, and what is the
+application's. [`docs/compared.md`](docs/compared.md) says what wilanis is not, against the frameworks, workflow
+engines and configuration languages it is taken for.
 [`docs/roadmap.md`](docs/roadmap.md) is the plan, one demo per milestone, and each draws on RFCs under
 [`docs/rfcs/`](docs/rfcs/README.md), written and accepted before anything is built.
 

@@ -118,6 +118,10 @@ so anything the DSL names can be opened and read like a header file.
 
 ## Rules you will meet
 
+What a tree can never do, and why a refusal is not a suggestion, is
+[`docs/security-model.md`](https://github.com/wilanis/wilanis-js/blob/main/docs/security-model.md) in the wilanis
+repository: each guarantee there names the refusal codes that make it true.
+
 - **One way in.** A node's `in` gives every value the operation takes. A literal is written as it is (`"method": "GET"`); a read is a template: `"{{fetched.status}}"` (another node), `"{{in.id}}"` (the graph's input), `"{{const.initial}}"`, `"{{agent}}"` (a resolver). Alone, a template takes the value and its type; inside text it interpolates: `"/tasks/{{in.id}}"`. Objects and lists are written in place with values inside. A path segment is `.name`; a key that is not an identifier is quoted in brackets: `{{fetched.headers['x-request-id']}}`.
 - **A node is named for what it holds.** Its id is the word every tool uses for it -- `describe` prints it, the viewer draws it, a refusal's `at` names it, the rehearsal reports it, and the compiler builds a guard's ids from it (`customer:check`, `customer:violated`) -- so name it for what it holds once it has answered, or for the effect it performs, never for where it sits in the graph or for the operation's generic role. A `run` that answers a value is that value as a noun (`customer`, `current`, `stored`, `customers`); a `run` whose effect is the point is the effect in the past tense (`patched`, `removed`, `notified`); a `switch` is the question it asks (`wasThere`, `isGold`, `outcome`); a `refuse` is what went wrong (`noCustomer`, `repeated`, `upstreamFailed`); a `map` is the plural of what each element answers (`rows`, `repaired`). Never `asked`, `route`, `row`, `result`, `data`, `node1`: "patched answered, wasThere went to customer" tells a reader what "asked answered, route went to row" does not.
 - **Static fields** (`wilanis describe` marks them) take a literal, never a read: a connection, a content type, a `type`. P001 says you gave a read where the checker needs to see the value.
