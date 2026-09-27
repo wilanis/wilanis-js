@@ -436,7 +436,10 @@ Ollama and once against Anthropic, one connection edit between them, and `--trac
    the two kind documents, `complete.ts` with the connection lookup, the schema, `conforms` and the stop mapping,
    `openai.ts` first (it is the kind the fake and a local server share), the fake provider and `complete.test.ts` for
    that kind, a README. Blocked on RFC 0011's step 1 (the word on the port schema) and, for the retry case, on its
-   step 3. Added to `npm run release` after `plugin-auth`.
+   step 3. Added to `npm run release` after `plugin-auth`. Adds the line RFC 0020 gives this RFC to
+   `docs/security-model.md` under *Enforced by the runtime*, "a model's answer is validated against the declared
+   shape before any node reads it; nothing runs what a model wrote", and its line under *The application's*, "what
+   is sent to a model and what is done with its answer".
 3. **The anthropic kind** (`area:plugin-model`): `anthropic.ts` with the forced tool, `complete.test.ts` run for it.
 4. **Rules** (`area:plugin-model`): `rules.ts`, X0n1 to X0n5, `rules.test.ts`.
 5. **The triage tree** (`area:plugin-model`): `test/tree/` as under *Guide*, `tree.test.ts` with the rehearsal and the
