@@ -93,8 +93,9 @@ scenarios/
     hello.hello-gated/
       whole.scenario.json                       a trigger whose graph has no switch: one run is the whole of it
   edges/                written by wilanis fuzz --edges; owned by it
-    get-customer/
+    customers.get-customer/
       id.empty.scenario.json
+      id.one.scenario.json
       id.long.scenario.json
   fuzz/                 written by wilanis fuzz; owned by it
     get-customer.1.scenario.json
@@ -400,7 +401,7 @@ unknown }[]` beside `generate`: every field path of an object type, with the edg
 
 `fuzz(load, { edges: true })` fires each trigger once per edge: the seed's input with `setPath(input, at, value)`,
 the seed's request, effects stubbed and recorded as under `fuzz` today, `generated: 'edges'`, written to
-`scenarios/edges/<trigger stem>/<dotted field>.<edge>.scenario.json` and owned like the rehearsed directory
+`scenarios/edges/<trigger feature>.<trigger stem>/<dotted field>.<edge>.scenario.json` and owned like the rehearsed directory
 (`--check` on `fuzz --edges` reuses `checkRecorded`). It varies the trigger's `in` only: `regress` fires
 `emb.fire(trigger.doc, sc.doc.in, sc.doc.request, ...)` with the input directly, so the request's own fields are the
 seed's and are read only by resolvers and policies. Boundaries a switch reads are not repeated here: the solver already
@@ -483,7 +484,7 @@ Runtime, in `packages/runtime/test/tools.test.ts`, on a copy of the example (`cp
 | ownership | a hand-written `scenarios/mine.scenario.json` survives `--record`; a stray `scenarios/rehearsed/old.scenario.json` is removed |
 | a policy's decision | `policies/access.employees-only/access.require-employee.decide.anonymous.scenario.json` exists with `policy` set, `trigger` naming the first attaching trigger in path order and `expect.reason: 'anonymous'`; `regress` replays it `same`; with `require-employee`'s `anonymous` node changed to refuse as `nobody`, `DIFF reason anonymous → nobody` |
 | unreachable | `list-rows` reordered as `example.test.ts` reorders it: `rehearse` is not ok, the `rows` branch is written with `status: 'unreachable'` and no `in`; `regress` answers `same`; the order restored, `regress` on the stale directory answers `DIFF ... is reachable now` and `check` lists the file stale |
-| edges | `fuzz(load, { edges: true })` writes `get-customer/id.empty`, `id.one`, `id.long`; `record-customer`'s `RegisterRequest` yields three for `url` and five `method.enum.<member>`; `list-customers`'s `ListRequest`, whose `method` is optional, yields the five members and `method.absent`; every file has `generated: 'edges'`; a second run is byte-identical; `regress` replays them `same` |
+| edges | `fuzz(load, { edges: true })` writes `customers.get-customer/id.empty`, `id.one`, `id.long`; `register-customer`'s `RegisterRequest` yields three each for `name` and `email` and three `tier.enum.<member>`; `list-customers`'s `ListRequest`, whose `tier` is optional, yields the three members and `tier.absent`; every file has `generated: 'edges'`; a second run is byte-identical; `regress` replays them `same` |
 | the CLI | `wilanis rehearse <copy> --check` exits 1 on a stale directory and prints the hint; `--record --check` behaves as `--check` |
 
 Core, in `packages/core/test/validate.test.ts` (the schema cases above) and a new `packages/core/test/edges.test.ts`:
@@ -596,10 +597,10 @@ Decided during implementation:
   their own below `scenarios/` (`scenarios/customers/`), and `--record scenarios/customers` would have removed them.
   Any other scenario is left and named on a `kept` line, `--check` does not count it as `extra`, and one in the way
   of a file `--record` writes refuses the write until it is moved. The directory must also sit strictly below
-  `scenarios/` and outside `scenarios/fuzz/`, judged on the path as written and on its real path, without case
-  (`refusedDir` in `packages/runtime/src/recorded-dir.ts`), and is refused before the walk with where it may go; #221
-  adds `scenarios/edges/` beside `scenarios/fuzz/`. It is walked through real directories only, so what a link
-  inside it leads to is never removed, and a write a link would carry elsewhere is refused.
+  `scenarios/` and outside `scenarios/fuzz/` and `scenarios/edges/`, judged on the path as written and on its real
+  path, without case (`refusedDir` in `packages/runtime/src/recorded-dir.ts`), and is refused before the walk with
+  where it may go. It is walked through real directories only, so what a link inside it leads to is never removed,
+  and a write a link would carry elsewhere is refused.
 - **Two triggers of one name.** The checker accepts them: a document's name is its file's stem (`register` in
   `packages/core/src/documents.ts`), no rule asks that two triggers' names differ, and the loader walks an included
   tree's features as the tree's own, so a host trigger named `refresh` beside `@wilanis/access`'s checks, as does a
@@ -622,3 +623,17 @@ Decided during implementation:
   recorded, since S005 refuses a scenario whose trigger does not attach its policy. `regress` fires a policy
   scenario through `policyRoot` under the trigger it names; one naming a policy the tree does not have is thrown on
   rather than replayed, since `wilanis check` refuses it first (S005).
+- **The edges directory (#221).** `fuzz --edges` writes a trigger's edges under its feature before its name
+  (`scenarios/edges/customers.get-customer/`), as the rehearsed runs are and for the reason *Two triggers of one
+  name* gives, and refuses two triggers of one feature and one name the same way. It owns what it wrote, a scenario
+  saying `"generated": "edges"`, through the same `writeRecorded`, `checkRecorded` and `keptIn`, which take the
+  owning command (`Owner` in `recorded-dir.ts`); its directory is `scenarios/edges/` and no other, judged on its
+  real path too. It fires under seed 1 and the profile `recordedProfile` answers, as `--record` solves, so
+  `--runs`, `--seed`, `--profile` and `--json` are refused beside `--edges`, and `--check` without `--edges` is
+  refused, since the edges directory is the one fuzz's check judges. `--out` stays an option of the `fuzz`
+  function, where plain fuzz reads it, and is refused beside `edges`. *One level of object* reads as the table's
+  `object` row applied once below the input: a field of an object field is varied, dotted (`address.city.empty`),
+  and an object below that is only `absent` where it is optional; an edge inside an optional object the seed left
+  out is set in one generated whole under seed 1, so the input stays a value of its type. A file's name escapes each
+  part as a URI component, so an enum member holding a `/` names a file and not a directory. `wilanis scenarios
+  --check` prints what `rehearse --check` prints, then what `fuzz --edges --check` prints, and takes no other flag.
