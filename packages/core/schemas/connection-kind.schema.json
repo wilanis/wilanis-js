@@ -29,6 +29,41 @@
       "description": "true: a connection of this kind reaches a storage engine, so an @storage store may name it. The plugin that grants the kind registers the engine behind it.",
       "type": "boolean"
     },
+    "capabilities": {
+      "description": "What the storage engine behind a connection of this kind can do: the three facts a rule or the migration planner reads (RFC 0022). Required where `storage` is true, with no default, since an engine's limits are a fact its kind document states. Written by the plugin that grants the kind, never by a tree's author. Not the word a profile's `permits` speaks: that is what an environment allows a tree to do, and this is what an engine can do.",
+      "type": "object",
+      "properties": {
+        "transactionalDdl": {
+          "description": "true: a migration plan applies in one transaction on this engine, so a step that fails leaves the database as it was (RFC 0017). false: the plan applies step by step, the record kept after each.",
+          "type": "boolean"
+        },
+        "unique": {
+          "description": "The field classes a collection's `unique` may name over a connection of this kind (RFC 0003): string, number, boolean, shape, list, unknown -- every shape is one class and every list another. [] when the engine constrains nothing.",
+          "type": "array",
+          "items": {
+            "enum": [
+              "string",
+              "number",
+              "boolean",
+              "shape",
+              "list",
+              "unknown"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "refs": {
+          "description": "true: the engine enforces a collection's `refs` (RFC 0003): a write naming a record that does not exist, and a remove of a record another still names, are refused by the store.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "transactionalDdl",
+        "unique",
+        "refs"
+      ],
+      "additionalProperties": false
+    },
     "leases": {
       "description": "true: a connection of this kind can keep a lease -- a named hold one process of several takes for a while, and the record of what was last done under it. The plugin that grants the kind registers a lease keeper for it; the scheduler's `run` step names such a connection as its `lease` (X254). Absent: a connection of this kind keeps no lease (an HTTP upstream, a directory).",
       "type": "boolean"
@@ -51,5 +86,23 @@
     "description",
     "settings"
   ],
+  "if": {
+    "description": "`storage` is what makes a kind an engine's, so it is what asks for the facts about that engine.",
+    "properties": {
+      "storage": {
+        "description": "Selects the rules of a kind whose connections reach a storage engine.",
+        "const": true
+      }
+    },
+    "required": [
+      "storage"
+    ]
+  },
+  "then": {
+    "description": "A storage kind says what its engine can do: there is no default for an engine's limits.",
+    "required": [
+      "capabilities"
+    ]
+  },
   "additionalProperties": false
 }

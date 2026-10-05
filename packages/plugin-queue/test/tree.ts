@@ -59,6 +59,7 @@ const BROKER_DOCS = docsDir({
     $schema: schemaRef('connection-kind'),
     description: 'A broker whose queue is a table in the store, so a message joins the transaction of an atomic graph.',
     storage: true,
+    capabilities: { transactionalDdl: true, unique: ['string', 'number', 'boolean'], refs: true },
     delivery: 'at-least-once',
     settings: { fields: {} },
   },

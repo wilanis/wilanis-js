@@ -281,10 +281,26 @@ export interface TriggerKindDoc extends Envelope {
   correlation?: string;
   refusals?: string;
 }
+/**
+ * The class of a field as a storage engine sees it: its type, with every shape one class and every list another.
+ * The six words are the column classes an engine maps a field to; `blob` is not one, since no engine keeps bytes.
+ */
+export type FieldClass = 'string' | 'number' | 'boolean' | 'shape' | 'list' | 'unknown';
+/** What the engine behind a storage kind can do: the three facts a rule or the migration planner reads (RFC 0022). */
+export interface StorageCapabilities {
+  /** a migration plan applies in one transaction on this engine; false, step by step */
+  transactionalDdl: boolean;
+  /** the field classes a collection's `unique` may name; [] when the engine constrains nothing */
+  unique: FieldClass[];
+  /** the engine enforces `refs`: a write naming a missing record, and a remove of a named one, are refused by the store */
+  refs: boolean;
+}
 /** `storage`: a connection of this kind reaches a storage engine, so a store may name it; the granting plugin registers the engine. */
 export interface ConnectionKindDoc extends Envelope {
   settings: InlineObject;
   storage?: boolean;
+  /** `capabilities`: what the engine behind a storage kind can do; required where `storage` is true. */
+  capabilities?: StorageCapabilities;
   /** `leases`: a connection of this kind can keep a named hold and the record of what was last done under it; the granting plugin registers the keeper. */
   leases?: boolean;
   /** `delivery`: how many times a connection of this kind may hand one message to a trigger that receives from it; absent, it delivers nothing. */

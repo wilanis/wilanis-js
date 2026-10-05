@@ -97,6 +97,7 @@ describe('a startup step that prepares a store', () => {
           description: 'a connection reaching an engine that exists only while a test runs',
           settings: { fields: {} },
           storage: true,
+          capabilities: { transactionalDdl: true, unique: ['string', 'number', 'boolean'], refs: true },
         },
       }),
       handlers: {},

@@ -10,6 +10,7 @@ import { handlers } from './handlers.js';
 import { applyStores, historyOfStores, planStores } from './migrate.js';
 import { check } from './rules.js';
 
+export { capabilitiesOf } from './capabilities.js';
 export { driftOf } from './drift.js';
 export type {
   At,
