@@ -4,8 +4,8 @@
  * what an operation says about repeating it names its own fields and types as boolean (C015). A field of
  * either bounds its length with maxItems only where it is a list (C016).
  * An operation that says it `listens` holds (L014), and the inputs and settings its address reads are ones it
- * accepts and its granting plugin declares, of the type each part takes (L015; L017 in `listen-settings.ts`). A
- * connection names a kind and its settings fit it, reading secrets only (R001, C001, C002); a connection kind's
+ * accepts and its granting plugin declares, of the type each part takes (L015; L017 in `listen-settings.ts`), where
+ * a port the tree writes is one a socket can bind (L018, beside L017). A connection names a kind and its settings fit it, reading secrets only (R001, C001, C002); a connection kind's
  * `endpoint` names a string setting of its own (C020). What a store declares is judged beside it, in `stores.ts`.
  */
 import {
@@ -22,7 +22,7 @@ import {
   type Type,
 } from '@wilanis/core';
 import type { Judge } from './judge.js';
-import { checkListenSetting, fieldsOf, listed, misfit, PARTS, type Part } from './listen-settings.js';
+import { checkListenPorts, checkListenSetting, fieldsOf, listed, misfit, PARTS, type Part } from './listen-settings.js';
 import { mismatch } from './typing.js';
 
 /**
@@ -205,11 +205,11 @@ export function checkConnection(judge: Judge, connection: Loaded<ConnectionDoc>)
 }
 
 /**
- * L014, L015 and L017: what an operation says about the address it binds. Only something that keeps running can
+ * L014, L015, L017 and L018: what an operation says about the address it binds. Only something that keeps running can
  * listen, so `listens` rides on `holds`; each part's `input` is a field the operation accepts, and its `setting` one
  * the granting plugin's settings declare, of the type that part takes -- a number for the port, a string for the
  * interface -- since the startup step writes the one under `in` and the project the other under the plugin's.
- * The setting is judged in `listen-settings.ts`.
+ * The setting is judged in `listen-settings.ts`, and so is the port the tree writes in either place (L018).
  */
 function checkListens(judge: Judge, port: Loaded<PortDoc>, name: string, op: Operation): void {
   const refuse = judge.refuser(port.path);
@@ -224,6 +224,7 @@ function checkListens(judge: Judge, port: Loaded<PortDoc>, name: string, op: Ope
     if (input !== undefined) checkListenInput(where, accepted, input);
     if (setting !== undefined) checkListenSetting(judge, port, where, setting);
   }
+  checkListenPorts(judge, port, name, op);
 }
 
 /** L015: the input a part is read from is a field the operation accepts, of the part's type. */

@@ -852,6 +852,9 @@ plans.
   `checkConnectionKind` runs in its own loop in `judgeContracts` (#658). A fourth, L017 in `check/listen-settings.ts`,
   holds a part's `setting` to a setting of that type the granting plugin declares: a misspelt one had passed `check`
   and been planned on the default without a word (#735).
+- A fifth, L018 beside L017, holds a port the tree writes where a `listens` reads it, a step's input or the
+  plugin's setting, to a whole number from 0 to 65535: `70000`, `-1` and `1.5` had checked clean and `wilanis start`
+  then threw on `listen` (#771). A port read from a secret is not judged, and `number` carries no range.
 - `listensOf` lives in `manifest-listens.ts`, exported beside `manifestOf`. The order places are taken in, and the
   dotted path into a connection's settings, live once in `address-said.ts`, which `describe`, the manifest and the
   viewer's port and connection pages read (#729, #727). A port of `0` answers `null`, since it asks the system for
