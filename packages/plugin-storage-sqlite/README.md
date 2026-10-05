@@ -35,6 +35,11 @@ the database file, relative to the tree's root, created with its directory if ab
 `:memory:` is refused: a transaction opens a handle of its own on the file, and a second handle on an in-memory
 database is a second, empty database. A database that forgets is what `@storage-memory` is for.
 
+The kind declares what the engine can do (RFC 0022): `"capabilities": { "transactionalDdl": true, "unique":
+["string", "number", "boolean"], "refs": true }`. SQLite's DDL is transactional; a `unique` may name a string,
+a number or a boolean field, not one kept as JSON; and `refs` are enforced, because every handle the engine
+opens sets `PRAGMA foreign_keys = ON`.
+
 The plugin's own settings are engine-wide: `keyType` -- `uuidv7` (the default), what `newKey` answers for a
 string key, or `identity`, a number reserved from the table `wilanis_keys` for a number key; and
 `busyTimeoutMs` (default 5000), how long a writer waits for the file's write lock before the node fails with
