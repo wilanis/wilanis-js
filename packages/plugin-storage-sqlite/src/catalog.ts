@@ -44,10 +44,25 @@ export const columnsOf = (db: Kysely<never>, table: string): Promise<Column[]> =
 export const foreignKeysOf = (db: Kysely<never>, table: string): Promise<ForeignKey[]> =>
   rowsOf(db, sql<ForeignKey>`select "from", "table", "to" from pragma_foreign_key_list(${table})`);
 
-/** The names of every index the file holds, so one is created once and never twice. */
-export async function indexes(db: Kysely<never>): Promise<Set<string>> {
-  const rows = await rowsOf(db, sql<{ name: string }>`select name from sqlite_master where type = 'index'`);
-  return new Set(rows.map(one => one.name.toLowerCase()));
+/**
+ * The column lists a table's unique indexes cover, each folded to lower case: what a declared `unique` is held
+ * by, read off the index rather than off its name, so two declarations whose names would spell alike are
+ * never mistaken for one. The primary key's own index is among them.
+ */
+export async function uniquesOf(db: Kysely<never>, table: string): Promise<string[][]> {
+  const listed = await rowsOf(
+    db,
+    sql<{ name: string }>`select name from pragma_index_list(${table}) where "unique" = 1`,
+  );
+  const covered: string[][] = [];
+  for (const index of listed) {
+    const columns = await rowsOf(
+      db,
+      sql<{ name: string }>`select name from pragma_index_info(${index.name}) order by seqno`,
+    );
+    covered.push(columns.map(one => String(one.name).toLowerCase()));
+  }
+  return covered;
 }
 
 /** How many rows a table holds. */

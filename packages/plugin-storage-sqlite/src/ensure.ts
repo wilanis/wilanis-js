@@ -4,7 +4,7 @@
  * type, a column the shape no longer has, a reference SQLite could add only by rebuilding the table -- each is
  * `drift`, thrown rather than repaired, because what to do about it is a person's decision.
  *
- * A `unique` is a unique index named after the declaration (`wl_u_<collection>_<fields>`), so it can be added
+ * A `unique` is a unique index (`wl_u_` and a hash of the declaration), so it can be added
  * to a table that is already there, which a table constraint cannot. A `refs` is a column's `REFERENCES ...
  * ON DELETE RESTRICT`, which SQLite takes only when the column is made -- in the `CREATE TABLE`, or in the
  * `ADD COLUMN` of a field the table did not have.
@@ -13,15 +13,29 @@
  * the file exactly as it was. The table `wilanis_keys` is made here too where the plugin's `keyType` is
  * `identity`, beside the collections, and never under `uuidv7`.
  */
+import { createHash } from 'node:crypto';
 import type { At, Made } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';
-import { columnsOf, foreignKeysOf, hasTable, indexes, rowCount } from './catalog.js';
+import { columnsOf, foreignKeysOf, hasTable, rowCount, uniquesOf } from './catalog.js';
 import { declaredOf, type Field, fieldsOf, isJson, quoted } from './columns.js';
 import { ensureKeys } from './keys.js';
 import { isIdentity, type Settings } from './settings.js';
 
-/** The name a unique index is created under, by the collection and the fields it holds together. */
-export const uniqueName = (collection: string, fields: string[]) => `wl_u_${collection}_${fields.join('_')}`;
+/**
+ * The name a unique index is created under: `wl_u_` and a short hash of the collection and the fields it
+ * holds together. Joining the names with `_` would spell `["a_b"]` and `["a", "b"]` alike, and index names are
+ * the file's, not the table's; the hash of the list keeps every declaration's name its own. Nothing reads the
+ * name back -- whether a unique is held is read off what the index covers (`uniquesOf`).
+ */
+export const uniqueName = (collection: string, fields: string[]) =>
+  `wl_u_${createHash('sha256')
+    .update(JSON.stringify([collection, fields]))
+    .digest('hex')
+    .slice(0, 16)}`;
+
+/** Whether two column lists are one constraint: the same columns, in any order, compared without case. */
+const sameColumns = (left: string[], right: string[]) =>
+  left.length === right.length && left.every(one => right.includes(one.toLowerCase()));
 
 /** Whether a field is the key and kept as SQLite's own integer key: a number key under `identity`. */
 const integerKey = (at: At, field: Field, settings: Settings) =>
@@ -132,15 +146,20 @@ async function ensureOne(db: Kysely<never>, at: At, settings: Settings): Promise
   return { collections: 0, columns: added.length, constraints: referenced.length };
 }
 
-/** Add the unique indexes a collection declares and the file does not hold yet; answer how many. */
-async function addUniques(db: Kysely<never>, at: At, held: Set<string>): Promise<number> {
+/**
+ * Add the unique indexes a collection declares and its table does not hold yet; answer how many. A unique is
+ * held when some unique index of the table covers exactly its columns, whatever that index is called.
+ */
+async function addUniques(db: Kysely<never>, at: At): Promise<number> {
+  const held = await uniquesOf(db, at.name);
   let made = 0;
   for (const fields of at.unique) {
-    const name = uniqueName(at.name, fields);
-    if (held.has(name.toLowerCase())) continue;
+    if (held.some(columns => sameColumns(fields, columns))) continue;
     const over = fields.map(quoted).join(', ');
-    await sql.raw(`CREATE UNIQUE INDEX ${quoted(name)} ON ${quoted(at.name)} (${over})`).execute(db);
-    held.add(name.toLowerCase());
+    await sql
+      .raw(`CREATE UNIQUE INDEX ${quoted(uniqueName(at.name, fields))} ON ${quoted(at.name)} (${over})`)
+      .execute(db);
+    held.push(fields.map(one => one.toLowerCase()));
     made += 1;
   }
   return made;
@@ -158,8 +177,7 @@ export async function ensureTables(db: Kysely<never>, collections: At[], setting
     made.columns += one.columns;
     made.constraints += one.constraints;
   }
-  const held = await indexes(db);
-  for (const at of collections) made.constraints += await addUniques(db, at, held);
+  for (const at of collections) made.constraints += await addUniques(db, at);
   if (isIdentity(settings)) await ensureKeys(db);
   return made;
 }

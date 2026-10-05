@@ -52,9 +52,10 @@ holds the process, since the driver is synchronous.
 | a shape, a list, `unknown` | `TEXT`, `CHECK (json_valid(x))` |
 | `blob` | no column: bytes live in the blob registry |
 
-A required field is `NOT NULL` and the key is the primary key. A `unique` the store declares is a unique index
-(`wl_u_<collection>_<fields>`) and a `refs` is `REFERENCES ... ON DELETE RESTRICT`, enforced because every
-handle the engine opens sets `PRAGMA foreign_keys = ON`. A violation comes back as the `violated` or
+A required field is `NOT NULL` and the key is the primary key. A `unique` the store declares is a unique index,
+named `wl_u_` and a hash of the declaration; whether one is already held is read off the columns an index
+covers, never off its name. A `refs` is `REFERENCES ... ON DELETE RESTRICT`, enforced because every handle the
+engine opens sets `PRAGMA foreign_keys = ON`. A violation comes back as the `violated` or
 `referencedBy` the port promises: **a constraint is answered, not thrown**.
 
 ## Every handle
@@ -74,10 +75,14 @@ is compared through `json()` and never ordered by; an absent value orders last a
 ## Not yet
 
 This package is RFC 0022's fourth step. Its check rules (X231 to X233) are the fifth. Keeping a scope
-(RFC 0015) and the migration planner's members (RFC 0017) are the sixth: until then an operation carrying a
-scope fails the node, `wilanis migrate` skips a connection of this kind and says so, and a startup step's
-`@storage/storage.port.json#ensure` fails the start naming the step, rather than leaving the first write to meet
-a missing table.
+(RFC 0015) and the migration planner's members (RFC 0017) are the sixth
+([#260](https://github.com/wilanis/wilanis-js/issues/260)).
+
+**Until that step lands, a tree on this kind cannot prepare its tables.** A startup step's
+`@storage/storage.port.json#ensure` goes through the planner, and this engine's `apply` refuses: the start
+fails in the open, naming the step, rather than serving a store whose first write would meet a missing table.
+`wilanis migrate` skips a connection of this kind and says so, and an operation carrying a scope fails the
+node.
 
 ## Tests
 

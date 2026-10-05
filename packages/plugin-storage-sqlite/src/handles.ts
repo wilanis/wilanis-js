@@ -69,6 +69,8 @@ const kyselyOf = (db: Database.Database) => new Kysely<never>({ dialect: new Sql
 /** Every handle one load of a tree made, by the connection it was made for. */
 export class Handles {
   private readonly open = new Map<string, Kysely<never>>();
+  /** The handles transactions hold, until each ends -- or until teardown, which rolls back whichever has not. */
+  private readonly held = new Set<Kysely<never>>();
 
   /** `root` is the tree's directory, which a relative `file` is read against. */
   constructor(
@@ -87,12 +89,13 @@ export class Handles {
 
   /**
    * A handle of its own on the connection's file, holding the write lock: `BEGIN IMMEDIATE` waits for the lock
-   * up to `busyTimeoutMs` and fails the node past it. The caller ends the transaction and destroys the handle.
+   * up to `busyTimeoutMs` and fails the node past it. The caller ends it through `end`.
    */
   async transaction(on: On): Promise<Kysely<never>> {
     const db = kyselyOf(openDatabase(fileOf(on, this.root), busyTimeoutOf(this.settings)));
     try {
       await sql`begin immediate`.execute(db);
+      this.held.add(db);
       return db;
     } catch (error) {
       await db.destroy();
@@ -100,10 +103,28 @@ export class Handles {
     }
   }
 
-  /** Close every handle opened outside a transaction, and forget them: what `postLoad` hands back. */
+  /**
+   * End a transaction's handle with `commit` or `rollback`, and close it whether the word went through or
+   * not. A handle already ended, or closed by teardown, is left alone, so a second ending is no ending.
+   */
+  async end(db: Kysely<never>, word: 'commit' | 'rollback'): Promise<void> {
+    if (!this.held.delete(db)) return;
+    try {
+      await sql.raw(word).execute(db);
+    } finally {
+      await db.destroy();
+    }
+  }
+
+  /**
+   * Close every handle this load opened, and forget them: what `postLoad` hands back. A transaction still open
+   * at teardown is rolled back first, so a stopped tree neither commits half a run nor leaves the file held.
+   */
   async close(): Promise<void> {
     const open = [...this.open.values()];
     this.open.clear();
+    const held = [...this.held];
+    await Promise.all(held.map(db => this.end(db, 'rollback').catch(() => undefined)));
     await Promise.all(open.map(db => db.destroy()));
   }
 }
