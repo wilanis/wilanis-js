@@ -610,6 +610,22 @@
     p.appendChild(frag('.')); return p;
   }
 
+  /**
+   * What the engine behind a storage kind can do (RFC 0022): the kind's `capabilities` block as three labelled facts,
+   * the same three `wilanis describe` prints on its capabilities line, each with what it means for a tree.
+   */
+  function capabilitiesEl(page, c) {
+    page.appendChild(el('h2', null, 'What its engine can do'));
+    const said = fact => (fact ? 'yes' : 'no');
+    const t = el('table'); const head = el('tr'); for (const h of ['fact', 'value', 'meaning']) head.appendChild(el('th', null, h)); t.appendChild(head);
+    for (const [k, v, means] of [
+      ['transactional DDL', said(c.transactionalDdl), c.transactionalDdl ? 'a migration plan applies in one transaction' : 'a migration plan applies step by step'],
+      ['unique over', c.unique.length ? c.unique.join(', ') : 'none', c.unique.length ? 'the field classes a collection\'s unique may name' : 'a collection\'s unique may name nothing'],
+      ['refs', said(c.refs), c.refs ? 'the engine enforces a collection\'s refs' : 'the engine does not enforce a collection\'s refs'],
+    ]) { const tr = el('tr'); tr.appendChild(el('td', 'name', k)); tr.appendChild(el('td', 'val', v)); tr.appendChild(el('td', null, means)); t.appendChild(tr); }
+    page.appendChild(t);
+  }
+
   /** What a connection reaches, where its kind names the setting that holds the address: `wilanis describe`'s endpoint line. */
   function endpointEl(e) {
     const p = el('p'); p.appendChild(frag('Reaches ')); p.appendChild(el('code', null, e.value));
@@ -899,6 +915,7 @@
       }
       case 'connection-kind': {
         page.appendChild(el('h2', null, 'Settings a connection of this kind writes')); page.appendChild(fieldsTable(d.settings.fields, { open: d.settings.open }));
+        if (d.capabilities) capabilitiesEl(page, d.capabilities);
         break;
       }
       case 'codec': {

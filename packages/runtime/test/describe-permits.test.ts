@@ -94,11 +94,12 @@ describe('wilanis describe <native port>: the profiles that permit it', () => {
 });
 
 describe('wilanis describe <connection>: the profiles that permit it', () => {
-  it('names production after the kind line and what the kind delivers', () => {
+  it('names production after the kind line, what its engine can do and what the kind delivers', () => {
     const postgres = said(POSTGRES);
     const kind = postgres.findIndex(line => line.startsWith('kind  '));
-    expect(postgres[kind + 1]).toMatch(/^delivery {2}at-least-once/);
-    expect(postgres[kind + 2]).toBe('permitted by  production');
+    expect(postgres[kind + 1]).toMatch(/^capabilities {2}transactional DDL/);
+    expect(postgres[kind + 2]).toMatch(/^delivery {2}at-least-once/);
+    expect(postgres[kind + 3]).toBe('permitted by  production');
     const people = said('@connections/people.connection.json');
     expect(people[people.findIndex(line => line.startsWith('kind  ')) + 1]).toBe('permitted by  production');
   });
