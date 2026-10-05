@@ -10,5 +10,10 @@
       }
     }
   },
-  "storage": true
+  "storage": true,
+  "capabilities": {
+    "transactionalDdl": true,
+    "unique": ["string", "number", "boolean"],
+    "refs": true
+  }
 }

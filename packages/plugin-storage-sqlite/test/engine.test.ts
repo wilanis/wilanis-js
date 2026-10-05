@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { checkTree } from '@wilanis/compiler';
 import { loadTree, type PluginModule, TypeResolver } from '@wilanis/core';
-import storage, { type At, engines } from '@wilanis/plugin-storage';
+import storage, { type At, capabilitiesOf, engines } from '@wilanis/plugin-storage';
 import { cases } from '@wilanis/plugin-storage/suite';
 import { BUILTIN_PLUGINS, embedderFor, FileBlobStore, postLoad } from '@wilanis/runtime';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -145,6 +145,20 @@ describe('a tree that names this engine', () => {
     const kind = loadTree(dir, PLUGINS).registry.get('connection-kind', KIND);
     expect(kind?.doc.storage).toBe(true);
     expect(Object.keys(kind?.doc.settings.fields ?? {})).toEqual(['file']);
+  });
+
+  it('the kind says what the engine can do: transactional DDL, unique over the three scalars, and refs', async () => {
+    const tree = loadTree(dir, PLUGINS);
+    const emb = embedderFor(tree);
+    try {
+      expect(capabilitiesOf(emb.env, tree.resolve(CONNECTION))).toEqual({
+        transactionalDdl: true,
+        unique: ['string', 'number', 'boolean'],
+        refs: true,
+      });
+    } finally {
+      if (emb.blobs instanceof FileBlobStore) emb.blobs.destroy();
+    }
   });
 
   it('what one load of the tree kept, a second load reads back from the file', async () => {
