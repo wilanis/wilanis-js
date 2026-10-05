@@ -20,12 +20,12 @@ import {
   type Type,
 } from '@wilanis/core';
 import type { Judge, Refuser } from './judge.js';
-import { checkRefsEnforced, checkUniqueClasses, type Engine, enginesOf } from './store-engines.js';
+import { checkRefsEnforced, checkUniqueClasses, type Engine, engineOf, unholdable } from './store-engines.js';
 
 /**
  * The refusals for a store: the connection it names and every collection's shape exist (R001) and are
  * visible to it (L005), what each collection holds its records to is judged against that shape (C003 to
- * C008) and against what the engine of each connection it reaches constrains (C008), and its rename marks name
+ * C008) and against what the engine behind its connection constrains (C008), and its rename marks name
  * something to rename (C010, C011). Nothing here judges what a store *means* -- that a connection reaches an
  * engine and that a key is a required field of its shape are `@storage`'s (X202, X203), since only the plugin
  * granting the port knows them. Nor does it judge whether a
@@ -38,7 +38,7 @@ export function checkStore(judge: Judge, store: Loaded<StoreDoc>): void {
   else refuse('R001', `unknown connection '${store.doc.connection}'`, 'connection', 'wilanis ls connection');
   const keeping = kept(store.doc);
   const keptNames = keeping.map(([name]) => name);
-  const engines = enginesOf(judge, store.doc);
+  const engine = engineOf(judge, store.doc);
   for (const [name, collection] of keeping) {
     const at = `collections/${name}/of`;
     const shape = judge.scope.get('shape', collection.of);
@@ -48,7 +48,7 @@ export function checkStore(judge: Judge, store: Loaded<StoreDoc>): void {
     }
     judge.visible(store, shape, at);
     const type = judge.type(collection.of, store.path, at);
-    if (type) checkConstraints({ judge, refuse, store, name, collection, fields: fieldsOf(type), keptNames, engines });
+    if (type) checkConstraints({ judge, refuse, store, name, collection, fields: fieldsOf(type), keptNames, engine });
   }
   checkWas(judge, store);
 }
@@ -63,14 +63,11 @@ interface Kept {
   fields: Record<string, ObjField>;
   /** the collections of this store a reference may name: the ones that keep records. */
   keptNames: string[];
-  /** the storage kinds the store's connection reaches, under every profile. */
-  engines: Engine[];
+  /** the storage kind behind the store's connection, where it names one. */
+  engine: Engine | undefined;
 }
 
 const fieldsOf = (type: Type): Record<string, ObjField> => (type.kind === 'object' ? type.fields : {});
-
-/** Whether an engine holds no single value of a field: bytes live in the blob registry, and neither a shape nor a list is one value to refer by. */
-const unholdable = (type: Type): boolean => type.kind === 'blob' || type.kind === 'object' || type.kind === 'list';
 
 /**
  * Whether a constraint names a field no engine can hold it over, whatever its kind says: a blob for either, and a

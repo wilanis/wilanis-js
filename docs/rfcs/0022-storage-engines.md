@@ -296,13 +296,14 @@ on too hard.
 
 The compiler, RFC 0003's rule given its fact. Its code is C008, the one RFC 0003's implementing pull request gave the
 rule; the reading landed in `check/store-engines.ts` beside `check/stores.ts`, and reads the kind of the connection
-the store names and of each profile's stand-in for it (`Scope.connectionFor`), so a store a profile moves to a
-narrower engine is judged against that one too. What every engine shares stays judged by type: no constraint names a
-`blob`, and no `refs` names a shape or a list.
+the store names (`scope.get('connection', ...)`, then `scope.get('connection-kind', ...)`). A profile's stand-in for
+that connection is of the same kind (C018), so there is no other kind to read. What every engine shares stays judged
+by type: no constraint names a `blob`, and no `refs` names a shape or a list; a `refs` refused by type is not refused
+again for the kind.
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
-| C008 (RFC 0003) | `checkStore`, `check/contracts.ts` (or `check/stores.ts` once split) | a `unique` entry names a field whose `fieldClass` is not in the connection's kind's `capabilities.unique`, or a collection declares `refs` and the kind's `capabilities.refs` is false; the kind is read through `scope.get('connection-kind', kind)` from the connection `Judge.connectionOf` resolves | `'<field>' is a <class>; <kind> constrains unique over <list>` / `<kind> does not enforce refs; check the target with a get, or move the store to a connection that does` |
+| C008 (RFC 0003) | `checkStore` in `check/stores.ts`, reading the kind in `check/store-engines.ts` | a `unique` entry names a field whose `fieldClass` is not in the connection's kind's `capabilities.unique`, or a collection declares `refs` and the kind's `capabilities.refs` is false; the kind is read through `scope.get('connection-kind', kind)` from the connection the store names | `'<field>' is a <class>; <kind> constrains unique over <list>` / `<kind> does not enforce refs; check the target with a get, or move the store to a connection that does` |
 
 Missing block on a storage kind: schema validation when the plugin loads (D001 family, existing), never a compiler
 rule; the compiler may assume every kind it reads with `storage: true` carries one.
@@ -494,9 +495,9 @@ those RFCs' shared suites, the sqlite ones unconditionally.
    the conditional on `connection-kind.schema.json`, `StorageCapabilities` and `fieldClass` in core, the validate
    cases, the block on the memory and postgres kinds, `capabilitiesOf` in `@storage`, the postgres version check in
    its `postLoad`. Blocked on RFC 0002's steps 1, 4, 5 and 7.
-2. **RFC 0003's rule reads it** (`area:compiler`): `checkStore` reads the kind through `Judge.connectionOf`, refuses
-   over `unique` and `refs`, the two hints; the sabotages in `rules.test.ts` with the test-only kind. Blocked on RFC
-   0003's `checkStore` extension.
+2. **RFC 0003's rule reads it** (`area:compiler`): C008 in `checkStore` reads the kind of the store's connection
+   (`check/store-engines.ts`), refuses over `unique` and `refs`, the two hints; the sabotages in
+   `capabilities.test.ts` with the test-only kind. Blocked on RFC 0003's `checkStore` extension.
 3. **`describe` and the viewer** (`area:runtime`, `area:view`): `describeCapabilities`, the line on a connection and
    on a kind, the kind page. `good first issue` for the viewer page.
 4. **`@wilanis/plugin-storage-sqlite`, the engine** (`area:plugin-storage`): the package, its kind with `file`, the

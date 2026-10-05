@@ -163,3 +163,27 @@ describe('a tree that names this engine', () => {
     expect(kind?.doc.settings).toEqual({ fields: {} });
   });
 });
+
+/**
+ * Memory's own, not the shared suite's: its kind is the one that constrains `unique` over a shape or a list, and
+ * the suite's shape has neither -- the engines whose kinds do not list them are refused such a store by C008.
+ */
+describe('a unique over a shape or a list, which this kind constrains', () => {
+  const shaped: Type = types.inline({
+    fields: {
+      id: { type: 'string' },
+      where: { type: { fields: { host: { type: 'string' }, port: { type: 'number' } } } },
+    },
+  });
+
+  it('a second record holding an equal value repeats the first, whatever order its keys were written in', async () => {
+    const engine = new MemoryEngine();
+    const kept = { ...at(shaped, 'id'), unique: [['where']] };
+    await engine.put(kept, { id: 'a', where: { host: 'x', port: 1 } }, { replace: true });
+    const repeat = await engine.put(kept, { id: 'b', where: { port: 1, host: 'x' } }, { replace: true });
+    expect(repeat.violated).toBe('unique [where]');
+    expect((await engine.get(kept, 'b')).record).toBeUndefined();
+    const other = await engine.put(kept, { id: 'c', where: { host: 'x', port: 2 } }, { replace: true });
+    expect(other.violated).toBeUndefined();
+  });
+});
