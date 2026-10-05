@@ -11,7 +11,18 @@
  * The driver is synchronous: a statement runs to its end on the event loop. That is the price of SQLite, and
  * the reason this kind is the development database rather than the production one.
  */
-import type { At, Engine, Put, Query, Record_, Scope, Transaction, Where, Written } from '@wilanis/plugin-storage';
+import type {
+  At,
+  Engine,
+  PatchAnswer,
+  Put,
+  Query,
+  Record_,
+  Scope,
+  Transaction,
+  Where,
+  Written,
+} from '@wilanis/plugin-storage';
 import type { Kysely } from 'kysely';
 import { typeOf } from './columns.js';
 import { ensureTables } from './ensure.js';
@@ -101,9 +112,8 @@ export class SqliteEngine extends Unrecorded implements Engine {
    */
   async put(at: At, given: Record_, { replace, scope }: Put) {
     unscoped(at, scope);
-    const db = this.db(at);
     const values = rowOf(given, at);
-    try {
+    return this.answering(at, given, { conflict: false }, async db => {
       const written = await db
         .insertInto(at.name as never)
         .values(values as never)
@@ -114,25 +124,49 @@ export class SqliteEngine extends Unrecorded implements Engine {
         .executeTakeFirst();
       if (!written) return { conflict: true };
       return { record: recordOf(written as Row, at), conflict: false };
+    });
+  }
+
+  /**
+   * Run one write, and answer a `unique` or a `refs` the file refused as the `violated` the port promises,
+   * beside what the operation answers when nothing was written (`refused`). `given` is what the write named --
+   * the whole record of a put, the changes of a patch -- since a refused reference is found among its fields.
+   * Anything else the write throws passes up. `put` and `patch` share it, so the two name a violation alike.
+   */
+  private async answering<T>(
+    at: At,
+    given: Record_,
+    refused: T,
+    write: (db: Kysely<never>) => Promise<T>,
+  ): Promise<T | (T & { violated: string })> {
+    const db = this.db(at);
+    try {
+      return await write(db);
     } catch (error) {
       const violated = await writeViolation(error, db, at, given);
-      if (violated) return { conflict: false, violated };
+      if (violated) return { ...refused, violated };
       throw error;
     }
   }
 
-  /** The record after the change, or `record` absent where the collection holds none under that key. */
-  async patch(at: At, key: unknown, changes: Record_, written?: Written) {
+  /**
+   * The record after the change, or `record` absent where the collection holds none under that key. A change
+   * that repeats a declared `unique` or points a `refs` at no record writes nothing and answers `violated`,
+   * named as `put` names it.
+   */
+  async patch(at: At, key: unknown, changes: Record_, written?: Written): Promise<PatchAnswer> {
     unscoped(at, written?.scope);
     const values = changedOf(changes, at);
     if (!Object.keys(values).length) return this.get(at, key);
-    const after = await this.db(at)
-      .updateTable(at.name as never)
-      .set(values as never)
-      .where(at.key as never, '=', keyIn(at, key) as never)
-      .returning(columnsOf(at) as never)
-      .executeTakeFirst();
-    return { record: recordOf(after as Row | undefined, at) };
+    return this.answering<PatchAnswer>(at, changes, {}, async db => {
+      const after = await db
+        .updateTable(at.name as never)
+        .set(values as never)
+        .where(at.key as never, '=', keyIn(at, key) as never)
+        .returning(columnsOf(at) as never)
+        .executeTakeFirst();
+      return { record: recordOf(after as Row | undefined, at) };
+    });
   }
 
   /**
