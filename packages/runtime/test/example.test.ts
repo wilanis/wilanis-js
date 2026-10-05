@@ -107,6 +107,7 @@ describe('the example tree', () => {
       '@storage',
       '@storage-memory',
       '@storage-postgres',
+      '@storage-sqlite',
     ]);
   });
 });

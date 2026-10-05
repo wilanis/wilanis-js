@@ -85,6 +85,10 @@
       "from": "@wilanis/plugin-storage-postgres"
     },
     {
+      "use": "@storage-sqlite",
+      "from": "@wilanis/plugin-storage-sqlite"
+    },
+    {
       "use": "@otel",
       "from": "@wilanis/plugin-otel",
       "settings": {
