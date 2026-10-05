@@ -22,6 +22,11 @@
     }
   },
   "storage": true,
+  "capabilities": {
+    "transactionalDdl": true,
+    "unique": ["string", "number", "boolean"],
+    "refs": true
+  },
   "leases": true,
   "delivery": "at-least-once"
 }

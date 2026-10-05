@@ -4,12 +4,14 @@
  * package of its own because every engine is a plugin, and the second engine obeying that is what keeps the
  * claim honest rather than decorative.
  *
- * It registers itself from `postLoad`, opening nothing, three times: as @storage's engine for the kind it
- * grants, as the lease keeper @schedule holds a tick through (RFC 0010), and as the broker @queue keeps a queue
- * through (RFC 0009), so a queue on a connection of this kind is a table beside the stores and a publish in an
- * atomic graph joins their transaction. The first operation against a connection makes its pool. The teardown
- * closes every listening session the broker opened and destroys every pool it made, so a reload leaves no
- * socket behind.
+ * It registers itself from `postLoad` three times: as @storage's engine for the kind it grants, as the lease
+ * keeper @schedule holds a tick through (RFC 0010), and as the broker @queue keeps a queue through (RFC 0009),
+ * so a queue on a connection of this kind is a table beside the stores and a publish in an atomic graph joins
+ * their transaction. Before it registers, it asks each server a connection of the kind reaches for its version,
+ * on a connection closed at once, and fails the start on one older than the kind's `capabilities` assume
+ * (RFC 0022); it opens no pool. The first operation against a connection makes its pool. The teardown closes
+ * every listening session the broker opened and destroys every pool it made, so a reload leaves no socket
+ * behind.
  */
 import { fileURLToPath } from 'node:url';
 import type { PluginModule } from '@wilanis/core';
@@ -20,6 +22,7 @@ import { PostgresEngine } from './engine.js';
 import { TableLeases } from './leases.js';
 import { closePools, type Settings } from './pool.js';
 import { check } from './rules.js';
+import { holdVersions } from './version.js';
 
 export { TableBroker } from './broker.js';
 export { PostgresEngine } from './engine.js';
@@ -36,6 +39,7 @@ const plugin: PluginModule = {
   check,
   async postLoad(ctx) {
     const kind = ctx.scope.canon(KIND);
+    await holdVersions(ctx.env, kind, KIND);
     const settings = ctx.settings as Settings;
     const engine = new PostgresEngine(settings);
     const broker = new TableBroker(ctx.env, settings, engine);

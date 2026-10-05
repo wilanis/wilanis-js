@@ -43,6 +43,7 @@ function keeper(log: Log, opened: { count: number }): PluginModule {
         description: 'a connection to rows that live only while a test runs',
         settings: { fields: {} },
         storage: true,
+        capabilities: { transactionalDdl: true, unique: ['string', 'number', 'boolean'], refs: true },
       },
       'keeper.port.json': {
         $schema: schemaRef('port'),

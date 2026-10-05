@@ -150,7 +150,8 @@ describe('trigger, kinds, connection, codec', () => {
   it('a connection kind has settings; a connection names a kind; storage says the kind reaches an engine', () => {
     expect(refused(doc('connection-kind', { settings: {} }))).toEqual([at('settings', "missing 'fields'")]);
     expect(refused(doc('connection', { kind: 'postgres' }))).toEqual([at('kind', 'A document path')]);
-    expect(refused(doc('connection-kind', { storage: true }))).toEqual([]);
+    const capabilities = { transactionalDdl: true, unique: [], refs: false };
+    expect(refused(doc('connection-kind', { storage: true, capabilities }))).toEqual([]);
     expect(refused(doc('connection-kind', { storage: 'yes' }))).toEqual([at('storage', 'must be boolean')]);
   });
   it('a connection kind names leases as a boolean: a plugin registers a lease keeper for it', () => {

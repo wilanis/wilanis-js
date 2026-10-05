@@ -3,6 +3,7 @@ import {
   assignable,
   BLOB,
   conforms,
+  fieldClass,
   generate,
   isBlobHandle,
   rng,
@@ -42,5 +43,20 @@ describe('the blob type', () => {
   it('generates a handle under a seed, and describes itself as the handle in JSON Schema', () => {
     expect(isBlobHandle(generate(BLOB, rng(7)))).toBe(true);
     expect(toJsonSchema(BLOB)).toMatchObject({ type: 'object', required: ['id', 'contentType', 'size'] });
+  });
+});
+
+describe('the class of a field, as a storage engine names it', () => {
+  it('is one of six words: a shape is a shape and a list a list, whatever they hold', () => {
+    const classOf = (ref: string) => fieldClass(types.ref(ref));
+    expect(['string', 'number', 'boolean', 'unknown'].map(classOf)).toEqual(['string', 'number', 'boolean', 'unknown']);
+    expect(fieldClass(types.inline({ fields: { id: { type: 'string' } } }))).toBe('shape');
+    expect(['string[]', 'number[][]', 'blob[]'].map(classOf)).toEqual(['list', 'list', 'list']);
+    expect(fieldClass({ kind: 'string', enum: ['open', 'closed'] })).toBe('string');
+  });
+  it('is nothing for a blob, which no engine keeps, nor for a type variable or a type', () => {
+    expect(fieldClass(BLOB)).toBeUndefined();
+    expect(fieldClass({ kind: 'var', name: '$T' })).toBeUndefined();
+    expect(fieldClass({ kind: 'type' })).toBeUndefined();
   });
 });

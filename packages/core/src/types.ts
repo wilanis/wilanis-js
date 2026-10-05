@@ -2,7 +2,7 @@
  * The type system the checker reasons with. A TypeRef string or an InlineObject becomes a Type; every edge,
  * param and contract is judged by `assignable` (assign.ts), and every dotted read by `typeAt` (values.ts).
  */
-import type { Field, Fields, InlineObject, ShapeDoc, TypeRef, TypeSpec } from './model.js';
+import type { Field, FieldClass, Fields, InlineObject, ShapeDoc, TypeRef, TypeSpec } from './model.js';
 
 export type Type =
   | { kind: 'string'; enum?: string[] }
@@ -190,6 +190,26 @@ export function show(type: Type): string {
     default:
       return type.kind;
   }
+}
+
+/** The words a storage engine's capabilities name a field's type by, for the kinds of type that have one. */
+const CLASSES: Partial<Record<Type['kind'], FieldClass>> = {
+  string: 'string',
+  number: 'number',
+  boolean: 'boolean',
+  object: 'shape',
+  list: 'list',
+  unknown: 'unknown',
+};
+
+/**
+ * Which of the six field classes a field of this type is in, as a storage kind's `capabilities.unique` names
+ * them: a string with an enum is a string, every shape is `shape` and every list `list`, whatever they hold.
+ * Nothing for a `blob`, which no engine keeps (its bytes live in the blob registry), nor for a type variable
+ * or `type`, which no record's field is: there is no word for them to be judged by.
+ */
+export function fieldClass(type: Type): FieldClass | undefined {
+  return CLASSES[type.kind];
 }
 
 function showFields(type: ObjectType): string {
