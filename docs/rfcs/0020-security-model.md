@@ -1,6 +1,6 @@
 # RFC 0020: The security model: what is guaranteed, what is enforced, what is the application's
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:process` (`docs/security-model.md`, `SECURITY.md`, two fitness functions under `fitness/`, a
   sentence in `CONTRIBUTING.md`), `area:runtime` (one sentence in `packages/runtime/templates/CLAUDE.md`; the
   README's *Reference: the model in one page* section points at the page). Nothing in the engine, the compiler
