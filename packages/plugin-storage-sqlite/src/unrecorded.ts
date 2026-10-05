@@ -10,6 +10,7 @@
  * that it made nothing and leaving the first write to fail on a missing table.
  */
 import type { Applied, Declared, FieldType, On, Recorder, Step } from '@wilanis/plugin-storage';
+import { folded } from './names.js';
 
 /** The Recorder members of an engine whose planner has not landed. */
 export abstract class Unrecorded implements Recorder {
@@ -51,7 +52,7 @@ export abstract class Unrecorded implements Recorder {
    * `auditlog` are one table, and saying so keeps a plan from reading them as two.
    */
   named(collection: string): string {
-    return collection.toLowerCase();
+    return folded(collection);
   }
 
   /** No cast is written: nothing is applied yet. */

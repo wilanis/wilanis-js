@@ -142,6 +142,9 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
 - A collection kept in PostgreSQL holds no blob, is keyed by a field the engine can make a key for, and has a name
   PostgreSQL keeps as a table of its own. [[X221](refusals/X221.md), [X222](refusals/X222.md),
   [X223](refusals/X223.md)] (RFC 0022)
+- A collection kept in SQLite holds no blob, is keyed by a field the engine can make a key for under its `keyType`,
+  and has a name SQLite will create as a table and keep apart from every other collection of its file once case is
+  ignored. [[X231](refusals/X231.md), [X232](refusals/X232.md), [X233](refusals/X233.md)] (RFC 0022)
 - The blob registry is kept over a connection a plugin of the project offers a blob store for.
   [[C014](refusals/C014.md)] (RFC 0005)
 - A graph, a binding or a store names under `reads` each read it takes from the context, and no other.

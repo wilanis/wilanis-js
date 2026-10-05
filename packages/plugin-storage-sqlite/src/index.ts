@@ -12,6 +12,7 @@ import type { PluginModule, PostLoadContext } from '@wilanis/core';
 import { engines } from '@wilanis/plugin-storage';
 import { SqliteEngine } from './engine.js';
 import { Handles } from './handles.js';
+import { check } from './rules.js';
 import type { Settings } from './settings.js';
 
 export { SqliteEngine } from './engine.js';
@@ -38,6 +39,7 @@ const plugin: PluginModule = {
   root: ROOT,
   docs: fileURLToPath(new URL('../docs', import.meta.url)),
   handlers: {},
+  check,
   async postLoad(ctx) {
     const { engine, close } = makeSqliteEngine(ctx);
     engines(ctx.env).register(ctx.scope.canon(KIND), engine);
