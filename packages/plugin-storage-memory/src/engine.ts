@@ -9,7 +9,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Type } from '@wilanis/core';
 import type { At, Engine, Put, Query, Record_, Ref, Scope, Transaction, Where, Written } from '@wilanis/plugin-storage';
-import { matches, ordered, paged } from './match.js';
+import { matches, ordered, paged, sameValue } from './match.js';
 
 /** The type of the field that identifies a record, so a new key can be one the collection would accept. */
 function keyType(at: At): Type | undefined {
@@ -125,7 +125,7 @@ export class MemoryEngine implements Engine {
       .filter(([under, row]) => under !== key && within(row, scope))
       .map(([, row]) => row.record);
     const constraint = at.unique.find(fields =>
-      others.some(other => fields.every(field => Object.is(other[field], record[field]))),
+      others.some(other => fields.every(field => sameValue(other[field], record[field]))),
     );
     return constraint && `unique [${constraint.join(', ')}]`;
   }

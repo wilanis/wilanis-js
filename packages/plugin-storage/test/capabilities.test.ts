@@ -138,4 +138,14 @@ describe('C008 reads the block: a store asks no more of its engine than the kind
       `${NARROW} does not enforce refs; check the target with a get, or move the store to a connection that does`,
     );
   });
+
+  it('C008 once for a reference over a list on such a kind: the type refuses it, and the kind adds nothing', () => {
+    const overList = (collection: any) => {
+      collection.refs = { tags: { collection: 'customers' } };
+    };
+    const found = c008(over(NARROW, '@narrow-engine', overList));
+    expect(found.map(one => [one.at, one.message])).toEqual([
+      ['collections/customers/refs/tags', expect.stringMatching(/a reference holds one value/)],
+    ]);
+  });
 });

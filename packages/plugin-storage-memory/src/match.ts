@@ -12,6 +12,26 @@ export function compare(left: unknown, right: unknown): number {
   return String(left ?? '').localeCompare(String(right ?? ''));
 }
 
+/**
+ * Whether two values a record holds under one field are one value to a `unique`: the same scalar, or a shape or a
+ * list equal entry by entry, whatever order an object's keys were written in -- two records are compared by what
+ * they hold, never by whether they hold the same object.
+ */
+export function sameValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  const composite = (value: unknown) => typeof value === 'object' && value !== null;
+  return composite(left) && composite(right) && settled(left) === settled(right);
+}
+
+/** A value spelled as JSON with every object's keys in order, so two equal shapes spell alike. */
+function settled(value: unknown): string {
+  return JSON.stringify(value, (_key, held: unknown) =>
+    held && typeof held === 'object' && !Array.isArray(held)
+      ? Object.fromEntries(Object.entries(held).sort(([one], [other]) => one.localeCompare(other)))
+      : held,
+  );
+}
+
 const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 const text = (value: unknown): string => String(value ?? '');
 

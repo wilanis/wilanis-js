@@ -423,3 +423,10 @@ have no way to know what else went with it. The graph that wants the children go
   section shows.
 - **No `cascade`, ever**, for the reason the section above gives: what a removal means for referring records
   is business, and it belongs to the domain.
+
+## Decided during implementation
+
+- C008's note above, that a genuinely per-engine constraint belongs in the X band, is superseded by RFC 0022: a
+  storage kind declares `capabilities`, and C008 reads them in the compiler (`check/store-engines.ts`), refusing a
+  `unique` over a class the kind does not list and a `refs` over a kind that does not enforce them. What every
+  engine shares -- no constraint over a `blob`, no `refs` over a shape or a list -- stays judged by type.
