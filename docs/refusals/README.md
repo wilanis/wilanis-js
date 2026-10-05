@@ -48,7 +48,7 @@ history rather than a clean slate.
 | I | invariants |
 | C | connections, settings and stores |
 | S | scenarios |
-| X | what a plugin of this workspace judges in its own `check`, numbered by plugin: `@http` X0xx, `@auth` X1xx, `@storage` X2xx (`@storage-postgres` X22x, `@schedule` from X251), `@otel` X3xx, `@queue` X4xx |
+| X | what a plugin of this workspace judges in its own `check`, numbered by plugin: `@http` X0xx, `@auth` X1xx, `@storage` X2xx (`@storage-postgres` X22x, `@storage-sqlite` X23x, `@schedule` from X251), `@otel` X3xx, `@queue` X4xx |
 
 Numbers with no page: no rule makes D002, G002 or L004, and nothing shipped under them. L004 refused a graph both
 fired by a trigger and bound by a binding until the directory became the layer, before the first release. X104 is a
@@ -211,6 +211,9 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [X221](X221.md) | X | live | a field of a collection kept in postgres that is a blob, which this engine has no column for |
 | [X222](X222.md) | X | live | a postgres collection's key that is neither string nor number, or that the plugin's keyType cannot generate |
 | [X223](X223.md) | X | live | a postgres collection name that is no legal table name, or folds to the same table as another's |
+| [X231](X231.md) | X | live | a field of a collection kept in sqlite that is a blob, which this engine has no column for |
+| [X232](X232.md) | X | live | a sqlite collection's key that is neither string nor number, or that the plugin's keyType cannot generate |
+| [X233](X233.md) | X | live | a sqlite collection name that is no legal table name, or folds to the same table as another's |
 | [X251](X251.md) | X | live | a schedule that is not one: cron and everyMs both or neither, a bad cron, interval or zone, or a bad setting |
 | [X252](X252.md) | X | live | a scheduled trigger declares `in` with no `fire.in`, and nothing arrives on a tick |
 | [X253](X253.md) | X | live | `catchUp` is set while no scheduler run step names a lease |

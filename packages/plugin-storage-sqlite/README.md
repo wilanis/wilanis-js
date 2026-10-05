@@ -55,7 +55,7 @@ holds the process, since the driver is synchronous.
 | `number` | `REAL` (`INTEGER PRIMARY KEY` for a number key under `identity`) |
 | `boolean` | `INTEGER`, `CHECK (x IN (0, 1))` |
 | a shape, a list, `unknown` | `TEXT`, `CHECK (json_valid(x))` |
-| `blob` | no column: bytes live in the blob registry |
+| `blob` | refused: X231 |
 
 A required field is `NOT NULL` and the key is the primary key. A `unique` the store declares is a unique index,
 named `wl_u_` and a hash of the declaration; whether one is already held is read off the columns an index
@@ -77,10 +77,20 @@ rather than the suite bending: `contains` and `startsWith` are `instr()` and `su
 ASCII case; `ne` is `IS NOT` and `notIn` keeps a row whose field is absent, as `!==` does; a column holding JSON
 is compared through `json()` and never ordered by; an absent value orders last ascending and first descending.
 
+## Its rules
+
+`wilanis check` refuses these before anything runs, so they are read as output rather than met as a driver
+error later:
+
+| Code | Refuses |
+|---|---|
+| X231 | a field this engine has no column for: a `blob`, whose bytes live in the blob registry |
+| X232 | a key it cannot key by, or one `newKey` cannot answer under the configured `keyType` |
+| X233 | a collection name SQLite will not create (one beginning `sqlite_`), or two of one connection that fold to one table |
+
 ## Not yet
 
-This package is RFC 0022's fourth step. Its check rules (X231 to X233) are the fifth. Keeping a scope
-(RFC 0015) and the migration planner's members (RFC 0017) are the sixth
+Keeping a scope (RFC 0015) and the migration planner's members (RFC 0017) are RFC 0022's sixth step
 ([#260](https://github.com/wilanis/wilanis-js/issues/260)).
 
 **Until that step lands, a tree on this kind cannot prepare its tables.** A startup step's
@@ -92,7 +102,7 @@ node.
 ## Tests
 
 Every suite runs unconditionally, against a file in the test's temporary directory: the shared engine suite,
-a second load of a tree finding what the first kept, the pragmas, the keys, and the bundled SQLite's version
-(3.35 or later, for `RETURNING`).
+a second load of a tree finding what the first kept, the rules (X231 to X233, which open no file), the pragmas,
+the keys, and the bundled SQLite's version (3.35 or later, for `RETURNING`).
 
 Part of [wilanis](https://github.com/wilanis/wilanis-js). Apache-2.0.
