@@ -98,7 +98,8 @@ text and returns data. It never returns a violation, never imports vitest, and n
 therefore not a decision, and a commit changing one needs no `Decision:` line -- the hook and the `decision`
 job match `fitness/*.fitness.ts`, which is where a decision lives.
 `sources.ts` reads TypeScript as text with Babel's parser (import specifiers, exported declarations, the
-comments that lead them, the package a specifier names, the directories under `packages/`), and `jsonc.ts`
+comments that lead them, the calls a file makes of a bare name, the package a specifier names, the directories
+under `packages/`), and `jsonc.ts`
 reads `biome.jsonc`, the plain JSON of a `tsconfig.json`, and a package's manifest as its name and its
 dependency sections.
 
