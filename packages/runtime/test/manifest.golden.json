@@ -89,6 +89,12 @@
       "from": "@wilanis/plugin-storage-postgres",
       "version": "0.1.0",
       "guard": false
+    },
+    {
+      "use": "@storage-sqlite",
+      "from": "@wilanis/plugin-storage-sqlite",
+      "version": "0.1.0",
+      "guard": false
     }
   ],
   "includes": [
@@ -2519,6 +2525,20 @@
     },
     {
       "path": "@storage-postgres/postgres.connection-kind.json",
+      "kind": "connection-kind",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@storage-sqlite/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@storage-sqlite/sqlite.connection-kind.json",
       "kind": "connection-kind",
       "feature": null,
       "layer": null,

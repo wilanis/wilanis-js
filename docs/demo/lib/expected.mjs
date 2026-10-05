@@ -3,7 +3,7 @@
 // to the example that moves a count fails the tests until the script says the new one.
 
 /** `wilanis check .` on the example as it ships, and once the finished route is pasted: `ok: N documents, IR`. */
-export const DOCUMENTS = { shipped: 221, finished: 222 };
+export const DOCUMENTS = { shipped: 223, finished: 224 };
 
 /** What `wilanis check .` says after the count: the tree's IR version and the one the runtime reads (RFC 0008). */
 export const IR = "IR v1, runtime reads v1";

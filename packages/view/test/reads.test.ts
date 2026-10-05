@@ -22,6 +22,7 @@ import schedule from '@wilanis/plugin-schedule';
 import storage from '@wilanis/plugin-storage';
 import memory from '@wilanis/plugin-storage-memory';
 import postgres from '@wilanis/plugin-storage-postgres';
+import sqlite from '@wilanis/plugin-storage-sqlite';
 import { BUILTIN_PLUGINS, loadProject } from '@wilanis/runtime';
 import { describe, expect, it } from 'vitest';
 import { type VNode, viewOf } from '../src/index.js';
@@ -46,6 +47,7 @@ const PLUGINS: Record<string, PluginModule> = {
   '@storage': storage,
   '@storage-memory': memory,
   '@storage-postgres': postgres,
+  '@storage-sqlite': sqlite,
   '@otel': otel,
   '@s3': s3,
 };
