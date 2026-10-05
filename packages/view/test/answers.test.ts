@@ -24,6 +24,28 @@ describe('how the viewer says a refusal is answered', () => {
   it('says how a trigger answers each refusal it can reach, and which node refuses with it', async () => {
     const seen = await view('@features/customers/edge/get-customer.trigger.json');
     expect(seen.answers).toEqual([
+      // no node writes this one down: it is the guard the compiler lowers where the field invariant could not
+      // be proved of the customer `customer` makes, and the viewer names the site it stands at like any other
+      // refusal. get-row makes one of the row the API answered (#787), so it is first: its guard is met first
+      {
+        reason: 'invariant',
+        answer: 500,
+        from: [
+          { graph: GET_ROW, graphLabel: 'Get a row', node: 'customer', nodeLabel: 'The row' },
+          {
+            graph: '@features/customers/data/kept-get.graph.json',
+            graphLabel: 'Get what is kept',
+            node: 'customer',
+            nodeLabel: 'The record',
+          },
+          {
+            graph: '@features/customers/data/kept-get-postgres.graph.json',
+            graphLabel: 'Get what is kept',
+            node: 'customer',
+            nodeLabel: 'The record',
+          },
+        ],
+      },
       // one reason, refused in every binding's graphs: the viewer names each, since which one runs is the
       // profile's choice and a reader of the route wants to see every place the answer can come from
       {
@@ -72,26 +94,6 @@ describe('how the viewer says a refusal is answered', () => {
         reason: 'invalid_credential',
         answer: 401,
         from: [{ graph: '@auth/plugin.json', graphLabel: 'Auth', node: 'identify', nodeLabel: 'Identify' }],
-      },
-      // no node writes this one down: it is the guard the compiler lowers where the field invariant could not
-      // be proved of the customer `customer` makes, and the viewer names the site it stands at like any other refusal
-      {
-        reason: 'invariant',
-        answer: 500,
-        from: [
-          {
-            graph: '@features/customers/data/kept-get.graph.json',
-            graphLabel: 'Get what is kept',
-            node: 'customer',
-            nodeLabel: 'The record',
-          },
-          {
-            graph: '@features/customers/data/kept-get-postgres.graph.json',
-            graphLabel: 'Get what is kept',
-            node: 'customer',
-            nodeLabel: 'The record',
-          },
-        ],
       },
     ]);
     // reached through a domain graph and a map: the batch delete refuses where delete-row does

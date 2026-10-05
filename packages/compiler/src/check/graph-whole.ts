@@ -3,7 +3,7 @@
  * out.from names nodes that answer the out type and are alternatives of one another (G010), and everything
  * declared -- a field of in, a constant, a node -- is read by something (G008).
  */
-import { assignable, type GraphDoc, isSwitch, show, type Type } from '@wilanis/core';
+import { assignable, assignableTrimmed, type GraphDoc, isSwitch, show, type Type } from '@wilanis/core';
 import { outputCandidates } from '../documents.js';
 import type { GraphReads } from './graph-reads.js';
 import { routed } from './graph-routing.js';
@@ -94,8 +94,17 @@ function checkCandidate(graph: WholeGraph, id: string): void {
       'G010',
       `'${id}' answers ${show(answers)} but out is ${show(graph.outType)}: ${bad}`,
       'out/from',
-      `make out.type and what '${id}' answers one type`,
+      outHint(id, answers, graph.outType),
     );
+}
+
+/**
+ * What G010 says to do. Where only a closed out's fields stand between them -- what is answered is open or
+ * declares more -- the fix is to narrow it: `make` of out.type keeps only the fields it declares.
+ */
+function outHint(id: string, answers: Type, out: Type): string {
+  if (assignableTrimmed(answers, out) !== null) return `make out.type and what '${id}' answers one type`;
+  return `make what '${id}' answers a ${show(out)} of the fields it declares: @std/object.port.json#make with "type": "${show(out)}" narrows it`;
 }
 
 /** Candidates are alternatives: one that no switch routes always settles, so later candidates are dead. */

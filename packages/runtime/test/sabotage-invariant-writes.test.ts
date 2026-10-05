@@ -206,8 +206,9 @@ describe('sabotage: a guarded write read from what is no site of the shape', () 
     expect(saying(docs)).toEqual([`I007 ${GUARDED}`]);
   });
 
-  it('I008 a record read whole from an in wider than Customer, which is no site of it', () => {
-    const wide = shape({
+  it("I008 a record read whole from an in of another shape with Customer's fields, which is no site of it", () => {
+    // a shape wider than Customer is G004 at the put since #787: a closed Customer takes no field it does not declare
+    const twin = shape({
       id: { type: 'string' },
       name: { type: 'string' },
       email: { type: 'string' },
@@ -215,12 +216,11 @@ describe('sabotage: a guarded write read from what is no site of the shape', () 
       registrar: { type: 'string', required: false },
       active: { type: 'boolean', required: false },
       note: { type: 'string', required: false },
-      source: { type: 'string' },
     });
     const put = run('stored', '@storage/store.port.json#put', { ...STORE, record: '{{in}}' });
     const docs = {
-      'features/customers/domain/WideCustomer.shape.json': wide,
-      [PLANTED]: writingOne('@customers/domain/WideCustomer.shape.json', [], put),
+      'features/customers/domain/CustomerTwin.shape.json': twin,
+      [PLANTED]: writingOne('@customers/domain/CustomerTwin.shape.json', [], put),
     };
     expect(saying(docs)).toEqual([
       `I008 the Customer written here is read from 'in', which is no site of it, ${UNJUDGED}`,

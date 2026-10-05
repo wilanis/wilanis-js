@@ -79,15 +79,32 @@ function unjudged(from: Type, to: Type): boolean {
   return to.kind === 'unknown' || to.kind === 'var' || from.kind === 'var';
 }
 
-/** Does every value of `from` satisfy `to`? Width subtyping: extra fields pass. Optional never feeds required. */
+/**
+ * Does every value of `from` satisfy `to`? Width subtyping into an open object: extra fields pass where they fit
+ * what it is open to. A closed object takes only a closed value of its own fields. Optional never feeds required.
+ */
 export function assignable(from: Type, to: Type): string | null {
+  return fits(from, to, false);
+}
+
+/**
+ * Does every value of `from` satisfy `to` once trimmed to what each closed object of `to` declares? Where the run
+ * drops the keys a closed type does not declare before judging -- a trigger's `out`, `@std/object.port.json#make`
+ * -- an open or wider value is taken, as width subtyping takes it; everything else is judged as `assignable` does.
+ */
+export function assignableTrimmed(from: Type, to: Type): string | null {
+  return fits(from, to, true);
+}
+
+/** The one judgement both answer through: `trims` says whether a closed object drops what it does not declare. */
+function fits(from: Type, to: Type, trims: boolean): string | null {
   if (unjudged(from, to)) return null;
   if (to.kind === 'type') return from.kind === 'string' ? null : `${show(from)} is not a type reference`;
   if (from.kind === 'unknown') return `unknown cannot feed ${show(to)}`;
   if (from.kind !== to.kind) return `${show(from)} is not ${show(to)}`;
   if (to.kind === 'string') return assignableString(from as StringType, to);
-  if (to.kind === 'list') return assignable((from as { kind: 'list'; of: Type }).of, to.of);
-  if (to.kind === 'object') return assignableObject(from as ObjectType, to);
+  if (to.kind === 'list') return fits((from as { kind: 'list'; of: Type }).of, to.of, trims);
+  if (to.kind === 'object') return assignableObject(from as ObjectType, to, trims);
   return null;
 }
 
@@ -100,25 +117,33 @@ function assignableString(from: StringType, to: StringType): string | null {
   return bad.length ? `${bad.map(value => JSON.stringify(value)).join(', ')} not in ${show(to)}` : null;
 }
 
-function assignableObject(from: ObjectType, to: ObjectType): string | null {
+function assignableObject(from: ObjectType, to: ObjectType, trims: boolean): string | null {
   if (from === to) return null;
   for (const [name, wanted] of Object.entries(to.fields)) {
-    const bad = assignableField(from, name, wanted);
+    const bad = assignableField(from, name, wanted, trims);
     if (bad) return bad;
   }
-  return to.open && to.open.kind !== 'unknown' ? assignableExtras(from, to, to.open) : null;
+  if (!to.open) return trims ? null : closedExtras(from, to);
+  return to.open.kind !== 'unknown' ? assignableExtras(from, to, to.open) : null;
+}
+
+/** A closed `to` refuses a key it does not declare at run time, so `from` may carry none: closed, and no field beyond. */
+function closedExtras(from: ObjectType, to: ObjectType): string | null {
+  if (from.open) return `${show(from)} is open and may carry fields ${show(to)} does not declare`;
+  const extra = Object.keys(from.fields).find(name => !to.fields[name]);
+  return extra ? `field '${extra}' is not declared in ${show(to)}` : null;
 }
 
 /** One field `to` declares: given by name, or admitted through what `from` is open to. */
-function assignableField(from: ObjectType, name: string, wanted: ObjField): string | null {
+function assignableField(from: ObjectType, name: string, wanted: ObjField, trims: boolean): string | null {
   const given = from.fields[name];
   if (!given) {
     if (wanted.required) return `missing required field '${name}'`;
-    const bad = from.open ? assignable(from.open, wanted.type) : null;
+    const bad = from.open ? fits(from.open, wanted.type, trims) : null;
     return bad ? `field '${name}': ${bad}` : null;
   }
   if (wanted.required && !given.required) return `field '${name}' is optional but required here`;
-  const bad = assignable(given.type, wanted.type);
+  const bad = fits(given.type, wanted.type, trims);
   return bad ? `field '${name}': ${bad}` : null;
 }
 

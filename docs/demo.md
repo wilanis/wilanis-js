@@ -38,10 +38,10 @@ npx wilanis check .
 ```
 
 ```
-ok: 220 documents, IR v1, runtime reads v1
+ok: 221 documents, IR v1, runtime reads v1
 ```
 
-Every one of the 220 is a JSON document; there is no JavaScript in the tree, and `check` judged every
+Every one of the 221 is a JSON document; there is no JavaScript in the tree, and `check` judged every
 profile at once. Open the viewer on the rule and search for *Writes are for registrars*:
 
 ```
@@ -111,14 +111,14 @@ A006  @features/customers/edge/archive-customer.trigger.json#policies
     @features/customers/data/customers-postgres.store.json reads context.session.attributes.tenant as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')
     → gate this trigger with a policy whose proves lists "context.session.attributes.tenant", or drop required from the resolver and route around its absence
 T005  @features/customers/edge/archive-customer.trigger.json#settings/response/refusals
+    @features/customers/data/delete-row.graph.json may refuse with reason 'invariant', which settings.response.refusals does not map
+    → add "invariant" under settings.response.refusals: how this trigger answers that outcome
+T005  @features/customers/edge/archive-customer.trigger.json#settings/response/refusals
     @features/customers/data/delete-row.graph.json may refuse with reason 'missing', which settings.response.refusals does not map
     → add "missing" under settings.response.refusals: how this trigger answers that outcome
 T005  @features/customers/edge/archive-customer.trigger.json#settings/response/refusals
     @features/customers/data/delete-row.graph.json may refuse with reason 'upstream', which settings.response.refusals does not map
     → add "upstream" under settings.response.refusals: how this trigger answers that outcome
-T005  @features/customers/edge/archive-customer.trigger.json#settings/response/refusals
-    @features/customers/data/kept-remove.graph.json may refuse with reason 'invariant', which settings.response.refusals does not map
-    → add "invariant" under settings.response.refusals: how this trigger answers that outcome
 I001  @features/customers/edge/archive-customer.trigger.json#policies
     trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for registrars' (@features/customers/domain/writes-are-for-registrars.invariant.json) gates with @access/edge/can-register.policy.json, but attaches no such policy
     → attach "@access/edge/can-register.policy.json" under policies, or take @features/customers/domain/customer.port.json#remove out of the invariant's over
@@ -139,7 +139,7 @@ two edits that would fix it. Nothing has run. Each of the eight has a stable cod
 **If asked.** *"The agent should have read the invariant first."* It would have, had it known there was one
 to read. Instead the checker read the route, the port it fires, the graphs bound to that port and the
 invariant, and told the agent about the rule in the one place it was going to look: the output of the
-command it runs after every edit. `kept-remove` is the graph two ports down that will run under this profile.
+command it runs after every edit. `delete-row` is the graph two ports down, behind the REST binding.
 The two A006 are the same kind of news, once per profile that listens and keeps the customers in a store
 (`local` in memory, `production` in PostgreSQL): the customer stores keep each tenant's rows apart, reading the tenant
 from the caller's session, and nothing on this route proves there is a caller. `production-scheduler` and
@@ -211,7 +211,7 @@ npx wilanis check .
 ```
 
 ```
-ok: 221 documents, IR v1, runtime reads v1
+ok: 222 documents, IR v1, runtime reads v1
 ```
 
 Three rounds of write, check, edit, and the agent read no manual.
@@ -243,7 +243,7 @@ features/access/domain/require-registrar  switch 'isRegistrar'  3/3 branches
 ```
 every branch settled -- 56 branch(es), 25 decision(s), 19 graph(s).
 3 invariant(s) declared:
-  A customer is reachable  proved at 0 site(s), guarded at 23
+  A customer is reachable  proved at 0 site(s), guarded at 30
   Writes are for registrars  holds at 7 trigger(s)
   The session is the caller's  holds at 3 trigger(s)
 ```
@@ -387,7 +387,7 @@ route, policy, shape or business graph differs from `local`, and beat 1 judged i
 over the route (`cp $DEMO/archive-customer.step2.trigger.json features/customers/edge/archive-customer.trigger.json`):
 the log prints `reload refused, still serving the last good tree:` with the two A006 and the I001, hints and all, while
 `curl` keeps answering 401, so an agent editing a live tree cannot make the write public for one request.
-Paste the finished file back and it prints `reload: 221 documents, serving the new tree`. It needs nothing
+Paste the finished file back and it prints `reload: 222 documents, serving the new tree`. It needs nothing
 beyond what this script already runs; `build.mjs` runs it as its last step.
 
 ## Reset

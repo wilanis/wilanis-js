@@ -32,6 +32,23 @@
     }
   },
   "stubs": {
+    "op.all.op.customers:made": [
+      {
+        "id": "alpha",
+        "name": "Zulu-9",
+        "email": "echo",
+        "tier": "kilo",
+        "active": true,
+        "note": "golf154"
+      },
+      {
+        "id": "hotel394",
+        "name": "lima190",
+        "email": "alpha",
+        "tier": "india",
+        "registrar": "delta"
+      }
+    ],
     "op.all.op.fetched": {
       "status": 500,
       "headers": {}
@@ -69,13 +86,16 @@
         "selected": "upstreamFailed",
         "out": "upstreamFailed"
       },
-      "op.all.op.customers": {
-        "status": "cancelled"
-      },
       "op.all.op.upstreamFailed": {
         "status": "failed",
         "reason": "upstream",
         "handler": "@std/outcome.port.json#refuse"
+      },
+      "op.all.op.customers:made": {
+        "status": "cancelled"
+      },
+      "op.all.op.customers": {
+        "status": "cancelled"
       },
       "op.file": {
         "status": "cancelled"

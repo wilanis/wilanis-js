@@ -8,6 +8,7 @@
  */
 import {
   assignable,
+  assignableTrimmed,
   expr,
   type Field,
   type Fields,
@@ -33,6 +34,8 @@ export interface CallSite {
   at: string;
   /** the callee, for messages */
   what: string;
+  /** the callee as `path#operation`, which says whether an input trims what it is given (TRIMS) */
+  op?: string;
   from: Loaded;
   layer: ShapeLayer;
   /** inputs typed elsewhere (a map's bound element) */
@@ -62,6 +65,12 @@ export function reader(judge: Judge, resolve: Resolve, file: string): Reader {
 export function checkInputs(judge: Judge, site: CallSite): Record<string, Type> {
   return new InputCheck(judge, site).run();
 }
+
+/**
+ * The inputs the run trims to the declared type before judging: `make` keeps only what a closed `type` declares,
+ * so an open or wider value is the narrowing a graph writes there, and is judged as `assignableTrimmed` judges.
+ */
+const TRIMS: Record<string, string> = { '@std/object.port.json#make': 'value' };
 
 const BRACES = /^\{\{(.*)\}\}$/s;
 const INDEX = /^[0-9]+$/;
@@ -179,7 +188,8 @@ class InputCheck {
       this.refuse('G004', `'${name}' may be missing at run time but ${this.site.what} requires it`, at, hint);
       return;
     }
-    const bad = assignable(read.type, want);
+    const trims = this.site.op !== undefined && TRIMS[this.site.op] === name;
+    const bad = trims ? assignableTrimmed(read.type, want) : assignable(read.type, want);
     if (!bad) return;
     const hint = joinsAnswers(this.site.given[name])
       ? "two nodes' answers are joined at out.from, one per branch, never with ||: give each branch its own node and list both under out.from"

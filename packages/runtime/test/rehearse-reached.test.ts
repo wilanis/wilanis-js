@@ -30,7 +30,7 @@ describe('the rehearsal reaches a switch behind a call that decides first', () =
     expect(row?.triggers).toEqual(['update-customer']);
     expect(row?.branches.map(one => [one.to, one.settled?.status, one.settled?.declared?.reason])).toEqual([
       ['noCustomer', 'failed', 'missing'],
-      ['customer', 'done', undefined],
+      ['customer:made', 'done', undefined],
       ['upstreamFailed', 'failed', 'upstream'],
     ]);
     // and the guard update-customer lowered over the customer it makes judges it, rather than get-row's refusal

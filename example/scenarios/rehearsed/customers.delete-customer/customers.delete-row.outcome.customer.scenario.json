@@ -37,6 +37,14 @@
     }
   },
   "stubs": {
+    "op.customer:made": {
+      "id": "juliet527",
+      "name": "Zulu-9",
+      "email": "echo",
+      "tier": "kilo",
+      "active": true,
+      "note": "golf154"
+    },
     "op.deleted": {
       "status": 200,
       "headers": {
@@ -60,7 +68,8 @@
       "id": "juliet527",
       "name": "Zulu-9",
       "email": "echo",
-      "tier": "kilo"
+      "tier": "kilo",
+      "active": true
     },
     "nodes": {
       "op": {
@@ -71,10 +80,8 @@
           "name": "Zulu-9",
           "email": "echo",
           "tier": "kilo",
-          "registrar": "hotel403",
-          "note": "charlie",
-          "createdAt": "foxtrot",
-          "extra2": "golf"
+          "active": true,
+          "note": "golf154"
         }
       },
       "op.deleted": {
@@ -99,6 +106,29 @@
       },
       "op.outcome": {
         "status": "done",
+        "selected": "customer:made",
+        "out": "customer:made"
+      },
+      "op.noCustomer": {
+        "status": "cancelled"
+      },
+      "op.upstreamFailed": {
+        "status": "cancelled"
+      },
+      "op.customer:made": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "id": "juliet527",
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo",
+          "active": true,
+          "note": "golf154"
+        }
+      },
+      "op.customer:check": {
+        "status": "done",
         "selected": "customer",
         "out": "customer"
       },
@@ -110,16 +140,11 @@
           "name": "Zulu-9",
           "email": "echo",
           "tier": "kilo",
-          "registrar": "hotel403",
-          "note": "charlie",
-          "createdAt": "foxtrot",
-          "extra2": "golf"
+          "active": true,
+          "note": "golf154"
         }
       },
-      "op.noCustomer": {
-        "status": "cancelled"
-      },
-      "op.upstreamFailed": {
+      "op.customer:violated": {
         "status": "cancelled"
       }
     }

@@ -12,6 +12,14 @@
     },
     "groups": {
       "type": "string[]"
+    },
+    "attributes": {
+      "type": {
+        "fields": {},
+        "open": true
+      },
+      "required": false,
+      "description": "whatever else the directory said about the account, as @auth's Identity carries it under attributes"
     }
   }
 }

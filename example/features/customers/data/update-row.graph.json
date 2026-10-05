@@ -61,7 +61,7 @@
       "run": "@std/object.port.json#make",
       "in": {
         "value": "{{updated.body}}",
-        "type": "@customers/edge/CustomerRow.shape.json"
+        "type": "@customers/domain/Customer.shape.json"
       }
     },
     {

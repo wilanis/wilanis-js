@@ -23,13 +23,13 @@ afterAll(() => rmSync(dir, { recursive: true, force: true }));
 describe('describe: a switch that catches a fault', () => {
   it('names the caught node and its target after the rules, on the switch line', () => {
     expect(describeDoc(example, `@${GET_ROW}`)).toContain(
-      '    outcome  switch → noCustomer | customer | upstreamFailed  catches fetched → unreachable',
+      '    outcome  switch → noCustomer | customer:made | upstreamFailed  catches fetched → unreachable',
     );
   });
 
   it('says nothing of a catch on a switch that has none', () => {
     const said = describeDoc(uncaught, `@${GET_ROW}`);
-    expect(said).toContain('    outcome  switch → noCustomer | customer | upstreamFailed\n');
+    expect(said).toContain('    outcome  switch → noCustomer | customer:made | upstreamFailed\n');
     expect(said).not.toContain('catches');
   });
 });

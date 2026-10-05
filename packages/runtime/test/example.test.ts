@@ -36,10 +36,11 @@ describe('the example tree', () => {
     expect(text.match(/list-rows {2}switch 'outcome'/g)).toHaveLength(1);
     // delete-row is reached directly by the single delete and once per element by the batch delete's map
     expect(text.match(/delete-row {2}switch 'outcome'/g)).toHaveLength(1);
-    // five of the twenty decisions are guards the compiler lowered: the one over the CSV export's list of
+    // eleven of the twenty-six decisions are guards the compiler lowered: the one over the CSV export's list of
     // customers, whose nested spec the walk opens by name, the tier listing's, the two over the customer
-    // register and update make before anything is written, and the REST write's over the customer it is handed
-    expect(text).toMatch(/every branch settled -- 49 branch\(es\), 20 decision\(s\), 18 graph\(s\)/);
+    // register and update make before anything is written, the REST write's over the customer it is handed, and
+    // the six over the Customer each REST data graph now makes of the row the API answered (#787)
+    expect(text).toMatch(/every branch settled -- 61 branch\(es\), 26 decision\(s\), 18 graph\(s\)/);
   });
   it('reaches both the answer and the declared failure of every data graph', async () => {
     const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'live' });
@@ -50,9 +51,9 @@ describe('the example tree', () => {
     // the three graphs behind an id declare what a missing id means, and say so in one word the trigger maps
     expect(text.match(/refused on purpose at 'noCustomer' as missing: "no customer /g)).toHaveLength(3);
     // every branch that answers names the node it answered from, never a bare status word: the customers feature's
-    // thirteen -- the data graphs' seven, the listing's two routes, and the holds of the four guards the walk runs --
-    // and the access feature's eight
-    expect(text.match(/answered from '/g)).toHaveLength(21);
+    // eighteen -- the data graphs' seven, each now the Customer made of the row before its guard, the listing's two
+    // routes, and the holds of the nine guards the walk runs -- and the access feature's eight
+    expect(text.match(/answered from '/g)).toHaveLength(26);
     // the rule is shown as a condition, not as a bare expression next to a node id
     expect(text).toMatch(/when status == 200 && has\(body\)/);
     expect(text).toMatch(/anything else/);

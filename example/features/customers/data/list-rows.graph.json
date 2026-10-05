@@ -46,7 +46,7 @@
       "run": "@std/object.port.json#make",
       "in": {
         "value": "{{fetched.body}}",
-        "type": "@customers/edge/CustomerRow.shape.json[]"
+        "type": "@customers/domain/Customer.shape.json[]"
       }
     },
     {

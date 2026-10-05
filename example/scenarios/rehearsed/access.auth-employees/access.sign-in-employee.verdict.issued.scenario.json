@@ -47,7 +47,8 @@
         "groups": [
           "golf",
           "golf"
-        ]
+        ],
+        "attributes": {}
       }
     },
     "op.issued.op": {
@@ -89,7 +90,8 @@
             "groups": [
               "golf",
               "golf"
-            ]
+            ],
+            "attributes": {}
           }
         }
       },

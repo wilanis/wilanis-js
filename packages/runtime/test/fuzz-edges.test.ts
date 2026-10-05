@@ -173,7 +173,13 @@ describe('fuzz --edges --check: an edges directory the tree has moved away from'
     const where = { fields: { name: { type: 'string' }, limit: { type: 'number' } } };
     doc.fields.where = { type: where, required: false, description: 'What to narrow the answer to.' };
     writeFileSync(shape, JSON.stringify(doc, null, 2));
-    expect(checkTree(load(dir)).items).toEqual([]);
+    // the operations behind IdRequest take an id and no more, so the four triggers handing it them are T002 since
+    // #787; what fuzz --edges writes is read off the trigger's in all the same
+    expect(checkTree(load(dir)).items.map(one => `${one.code} ${one.file}`)).toEqual(
+      ['delete-customer', 'enqueue-removal', 'get-customer', 'remove-queued'].map(
+        name => `T002 @features/customers/edge/${name}.trigger.json`,
+      ),
+    );
     const checked = await fuzz(load(dir), { edges: true, check: true });
     const added = checked.recorded?.check?.missing ?? [];
     const under = `${EDGES}/customers.get-customer`;

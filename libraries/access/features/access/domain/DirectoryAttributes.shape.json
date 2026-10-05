@@ -1,0 +1,8 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Directory attributes",
+  "description": "Whatever a directory says about an account beside its subject, name and groups, when the tree asks nothing of it. The employee sign-in names this shape to verify, so the identity verify answers carries its attributes as an object, which Identity declares, rather than unknown; nothing reads them.",
+  "layer": "core",
+  "fields": {},
+  "open": true
+}

@@ -292,6 +292,7 @@ class GraphCheck {
       file: this.file,
       at: `nodes/${node.id}/in`,
       what: `'${node.run}'`,
+      op: `${hit.path}#${hit.opName}`,
       from: this.graph,
       layer: this.layer,
       extra,

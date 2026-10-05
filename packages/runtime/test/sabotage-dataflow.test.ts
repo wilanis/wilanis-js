@@ -9,14 +9,14 @@
 import { describe, expect, it } from 'vitest';
 import { sabotageHinting, sabotagePointing } from './example-harness.js';
 
-const GRAPH = 'features/customers/data/keep-customer.graph.json';
+const GRAPH = 'features/customers/data/kept-remove.graph.json';
 const STORE = '@storage/store.port.json';
 const STORE_DOC = '@customers/data/customers.store.json';
 const CUSTOMER = '@customers/domain/Customer.shape.json';
 /**
- * What the toggle reads of the customer: its key. keep-customer takes the whole record, and a toggle that writes
- * one field of it leaves the rest unread, which is G008's and not the claim here; the field is one no invariant
- * reads, since patching one an invariant reads is I007's.
+ * What the toggle reads of the customer: its key, which is all kept-remove's operation hands it. A graph behind
+ * keep, which hands the whole record, could not take less (B005), and taking it whole would leave the rest unread
+ * (G008); the field written is one no invariant reads, since patching one an invariant reads is I007's.
  */
 const TAKES = '@customers/domain/CustomerRef.shape.json';
 
@@ -49,7 +49,7 @@ const missing = run('noCustomer', '@std/outcome.port.json#refuse', {
   type: CUSTOMER,
 });
 
-/** keep-customer rewritten as the toggle from the issue: both writes beside the switch, their answers ORed. */
+/** kept-remove rewritten as the toggle from the issue: both writes beside the switch, their answers ORed. */
 const toggle = (graph: any) => {
   graph.in = TAKES;
   graph.out.from = ['customer', 'noCustomer'];

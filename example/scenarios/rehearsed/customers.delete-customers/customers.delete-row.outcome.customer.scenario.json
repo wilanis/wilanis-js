@@ -41,6 +41,14 @@
     }
   },
   "stubs": {
+    "op.removed.0.op.customer:made": {
+      "id": "juliet527",
+      "name": "Zulu-9",
+      "email": "echo",
+      "tier": "kilo",
+      "active": true,
+      "note": "golf154"
+    },
     "op.removed.0.op.deleted": {
       "status": 200,
       "headers": {},
@@ -58,10 +66,11 @@
     "status": "done",
     "output": [
       {
-        "id": "juliet",
-        "name": "",
-        "email": "charlie234",
-        "tier": "bravo"
+        "id": "juliet527",
+        "name": "Zulu-9",
+        "email": "echo",
+        "tier": "kilo",
+        "active": true
       }
     ],
     "nodes": {
@@ -70,12 +79,12 @@
         "handler": "graph:@features/customers/domain/remove-customers.graph.json",
         "out": [
           {
-            "id": "juliet",
-            "name": "",
-            "email": "charlie234",
-            "tier": "bravo",
-            "note": "x",
-            "createdAt": "juliet"
+            "id": "juliet527",
+            "name": "Zulu-9",
+            "email": "echo",
+            "tier": "kilo",
+            "active": true,
+            "note": "golf154"
           }
         ]
       },
@@ -84,12 +93,12 @@
         "handler": "@features/customers/data/customers-rest.binding.json#remove",
         "out": [
           {
-            "id": "juliet",
-            "name": "",
-            "email": "charlie234",
-            "tier": "bravo",
-            "note": "x",
-            "createdAt": "juliet"
+            "id": "juliet527",
+            "name": "Zulu-9",
+            "email": "echo",
+            "tier": "kilo",
+            "active": true,
+            "note": "golf154"
           }
         ]
       }

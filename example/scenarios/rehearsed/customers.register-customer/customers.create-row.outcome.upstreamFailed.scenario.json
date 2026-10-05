@@ -62,6 +62,14 @@
       "active": true,
       "note": "golf154"
     },
+    "op.registered.op.customer:made": {
+      "id": "juliet527",
+      "name": "Zulu-9",
+      "email": "echo",
+      "tier": "kilo",
+      "active": true,
+      "note": "golf154"
+    },
     "op.registered.op.posted": {
       "status": 500,
       "headers": {},
@@ -125,18 +133,56 @@
           }
         }
       },
+      "op.registered.op.record": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo"
+        }
+      },
       "op.registered.op.outcome": {
         "status": "done",
         "selected": "upstreamFailed",
         "out": "upstreamFailed"
       },
-      "op.registered.op.customer": {
-        "status": "cancelled"
-      },
       "op.registered.op.upstreamFailed": {
         "status": "failed",
         "reason": "upstream",
         "handler": "@std/outcome.port.json#refuse"
+      },
+      "op.registered.op.in:check": {
+        "status": "done",
+        "selected": "in:ok",
+        "out": "in:ok"
+      },
+      "op.registered.op.in:ok": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "id": "juliet527",
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo",
+          "active": true,
+          "note": "golf154"
+        }
+      },
+      "op.registered.op.in:violated": {
+        "status": "cancelled"
+      },
+      "op.registered.op.customer:made": {
+        "status": "cancelled"
+      },
+      "op.registered.op.customer:check": {
+        "status": "cancelled"
+      },
+      "op.registered.op.customer": {
+        "status": "cancelled"
+      },
+      "op.registered.op.customer:violated": {
+        "status": "cancelled"
       },
       "op.customer:made": {
         "status": "done",

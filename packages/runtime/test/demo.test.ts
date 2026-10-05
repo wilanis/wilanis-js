@@ -91,9 +91,9 @@ describe('beat 2, the new hire: the scaffolded route', () => {
       `T002 '${REMOVE}' answers @features/customers/domain/Customer.shape.json but the trigger declares no out`,
       `A006 ${STORE} reads ${TENANT} as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'local')`,
       `A006 ${PG_STORE} reads ${TENANT} as required, but trigger kind '@http/http.trigger-kind.json' hands it only sometimes and no policy of this trigger proves it (profile 'production')`,
+      "T005 @features/customers/data/delete-row.graph.json may refuse with reason 'invariant', which settings.response.refusals does not map",
       "T005 @features/customers/data/delete-row.graph.json may refuse with reason 'missing', which settings.response.refusals does not map",
       "T005 @features/customers/data/delete-row.graph.json may refuse with reason 'upstream', which settings.response.refusals does not map",
-      "T005 @features/customers/data/kept-remove.graph.json may refuse with reason 'invariant', which settings.response.refusals does not map",
       `I001 trigger reaches @features/customers/domain/customer.port.json#remove, which 'Writes are for registrars' (${INVARIANT}) gates with ${POLICY}, but attaches no such policy`,
     ]);
   });

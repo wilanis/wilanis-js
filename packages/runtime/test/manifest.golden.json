@@ -425,6 +425,13 @@
       "included": "@wilanis/access"
     },
     {
+      "path": "@features/access/domain/DirectoryAttributes.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
       "path": "@features/access/domain/Grant.shape.json",
       "kind": "shape",
       "feature": "access",

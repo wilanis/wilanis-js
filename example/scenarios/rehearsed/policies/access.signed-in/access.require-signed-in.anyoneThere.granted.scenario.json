@@ -13,9 +13,14 @@
   "seed": 1,
   "in": {
     "principal": {
-      "subject": "kilo",
-      "realm": "lima",
-      "roles": []
+      "subject": "delta489",
+      "realm": "bravo",
+      "roles": [
+        "echo42",
+        "golf",
+        "lima205"
+      ],
+      "claims": {}
     }
   },
   "context": {

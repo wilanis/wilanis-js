@@ -111,17 +111,14 @@
             "tier": "lima174",
             "active": false,
             "registrar": "golf",
-            "note": "x",
-            "createdAt": "Zulu-9531",
-            "extra9": null
+            "note": "x"
           },
           {
             "id": "Zulu-9",
             "name": "bravo",
             "email": "golf",
             "tier": "lima",
-            "note": "Zulu-9",
-            "extra2": null
+            "note": "Zulu-9"
           }
         ]
       },
@@ -150,17 +147,14 @@
             "tier": "lima174",
             "active": false,
             "registrar": "golf",
-            "note": "x",
-            "createdAt": "Zulu-9531",
-            "extra9": null
+            "note": "x"
           },
           {
             "id": "Zulu-9",
             "name": "bravo",
             "email": "golf",
             "tier": "lima",
-            "note": "Zulu-9",
-            "extra2": null
+            "note": "Zulu-9"
           }
         ]
       },
@@ -184,17 +178,14 @@
             "tier": "lima174",
             "active": false,
             "registrar": "golf",
-            "note": "x",
-            "createdAt": "Zulu-9531",
-            "extra9": null
+            "note": "x"
           },
           {
             "id": "Zulu-9",
             "name": "bravo",
             "email": "golf",
             "tier": "lima",
-            "note": "Zulu-9",
-            "extra2": null
+            "note": "Zulu-9"
           }
         ]
       },
@@ -240,10 +231,13 @@
       },
       "op.byTier.op.outcome": {
         "status": "done",
-        "selected": "customers",
-        "out": "customers"
+        "selected": "customers:made",
+        "out": "customers:made"
       },
-      "op.byTier.op.customers": {
+      "op.byTier.op.upstreamFailed": {
+        "status": "cancelled"
+      },
+      "op.byTier.op.customers:made": {
         "status": "done",
         "handler": "@std/object.port.json#make",
         "out": [
@@ -263,22 +257,47 @@
             "tier": "lima174",
             "active": false,
             "registrar": "golf",
-            "note": "x",
-            "createdAt": "Zulu-9531",
-            "extra9": null
+            "note": "x"
           },
           {
             "id": "Zulu-9",
             "name": "bravo",
             "email": "golf",
             "tier": "lima",
-            "note": "Zulu-9",
-            "extra2": null
+            "note": "Zulu-9"
           }
         ]
       },
-      "op.byTier.op.upstreamFailed": {
-        "status": "cancelled"
+      "op.byTier.op.customers": {
+        "status": "done",
+        "handler": "guard:@features/customers/data/list-rows-by-tier.graph.json#customers",
+        "out": [
+          {
+            "id": "bravo69",
+            "name": "india790",
+            "email": "Zulu-9",
+            "tier": "hotel415",
+            "active": false,
+            "registrar": "Zulu-9",
+            "note": "foxtrot"
+          },
+          {
+            "id": "delta",
+            "name": "alpha636",
+            "email": "charlie",
+            "tier": "lima174",
+            "active": false,
+            "registrar": "golf",
+            "note": "x"
+          },
+          {
+            "id": "Zulu-9",
+            "name": "bravo",
+            "email": "golf",
+            "tier": "lima",
+            "note": "Zulu-9"
+          }
+        ]
       },
       "op.byTier.op.none:made": {
         "status": "cancelled"

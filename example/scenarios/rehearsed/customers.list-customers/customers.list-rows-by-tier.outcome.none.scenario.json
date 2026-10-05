@@ -35,6 +35,23 @@
     }
   },
   "stubs": {
+    "op.all.op.customers:made": [
+      {
+        "id": "alpha",
+        "name": "Zulu-9",
+        "email": "echo",
+        "tier": "kilo",
+        "active": true,
+        "note": "golf154"
+      },
+      {
+        "id": "hotel394",
+        "name": "lima190",
+        "email": "alpha",
+        "tier": "india",
+        "registrar": "delta"
+      }
+    ],
     "op.all.op.fetched": {
       "status": 200,
       "headers": {},
@@ -60,6 +77,23 @@
         }
       ]
     },
+    "op.byTier.op.customers:made": [
+      {
+        "id": "alpha",
+        "name": "Zulu-9",
+        "email": "echo",
+        "tier": "kilo",
+        "active": true,
+        "note": "golf154"
+      },
+      {
+        "id": "hotel394",
+        "name": "lima190",
+        "email": "alpha",
+        "tier": "india",
+        "registrar": "delta"
+      }
+    ],
     "op.byTier.op.none:made": [
       {
         "id": "alpha",
@@ -245,10 +279,13 @@
         "selected": "none:made",
         "out": "none:made"
       },
-      "op.byTier.op.customers": {
+      "op.byTier.op.upstreamFailed": {
         "status": "cancelled"
       },
-      "op.byTier.op.upstreamFailed": {
+      "op.byTier.op.customers:made": {
+        "status": "cancelled"
+      },
+      "op.byTier.op.customers": {
         "status": "cancelled"
       },
       "op.byTier.op.none:made": {

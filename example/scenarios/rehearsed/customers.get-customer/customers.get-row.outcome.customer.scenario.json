@@ -37,6 +37,14 @@
     }
   },
   "stubs": {
+    "op.customer:made": {
+      "id": "juliet527",
+      "name": "Zulu-9",
+      "email": "echo",
+      "tier": "kilo",
+      "active": true,
+      "note": "golf154"
+    },
     "op.fetched": {
       "status": 200,
       "headers": {
@@ -60,10 +68,10 @@
   "expect": {
     "status": "done",
     "output": {
-      "id": "india",
-      "name": "",
-      "email": "hotel",
-      "tier": "lima",
+      "id": "juliet527",
+      "name": "Zulu-9",
+      "email": "echo",
+      "tier": "kilo",
       "active": true
     },
     "nodes": {
@@ -71,17 +79,12 @@
         "status": "done",
         "handler": "graph:@features/customers/data/get-row.graph.json",
         "out": {
-          "id": "india",
-          "name": "",
-          "email": "hotel",
-          "tier": "lima",
+          "id": "juliet527",
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo",
           "active": true,
-          "registrar": "bravo",
-          "note": "india",
-          "extra8": [
-            "lima",
-            "Zulu-9"
-          ]
+          "note": "golf154"
         }
       },
       "op.fetched": {
@@ -109,25 +112,8 @@
       },
       "op.outcome": {
         "status": "done",
-        "selected": "customer",
-        "out": "customer"
-      },
-      "op.customer": {
-        "status": "done",
-        "handler": "@std/object.port.json#make",
-        "out": {
-          "id": "india",
-          "name": "",
-          "email": "hotel",
-          "tier": "lima",
-          "active": true,
-          "registrar": "bravo",
-          "note": "india",
-          "extra8": [
-            "lima",
-            "Zulu-9"
-          ]
-        }
+        "selected": "customer:made",
+        "out": "customer:made"
       },
       "op.noCustomer": {
         "status": "cancelled"
@@ -136,6 +122,38 @@
         "status": "cancelled"
       },
       "op.unreachable": {
+        "status": "cancelled"
+      },
+      "op.customer:made": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "id": "juliet527",
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo",
+          "active": true,
+          "note": "golf154"
+        }
+      },
+      "op.customer:check": {
+        "status": "done",
+        "selected": "customer",
+        "out": "customer"
+      },
+      "op.customer": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "id": "juliet527",
+          "name": "Zulu-9",
+          "email": "echo",
+          "tier": "kilo",
+          "active": true,
+          "note": "golf154"
+        }
+      },
+      "op.customer:violated": {
         "status": "cancelled"
       }
     }

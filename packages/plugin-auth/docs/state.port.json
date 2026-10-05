@@ -43,6 +43,16 @@
             "type": "@auth/SessionRecord.shape.json",
             "required": false,
             "description": "the session as it was; absent where there was none"
+          },
+          "removed": {
+            "type": "boolean",
+            "required": false,
+            "description": "the session was there and is gone; false where there was none. Absent where the binding's store does not say, as @auth's own files store does not"
+          },
+          "referencedBy": {
+            "type": "string",
+            "required": false,
+            "description": "the reference that kept the session, as @storage's remove names it; absent where none did"
           }
         }
       }

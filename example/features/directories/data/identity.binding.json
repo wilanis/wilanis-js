@@ -14,7 +14,8 @@
     "verifyEmployee": {
       "run": "@auth/identity.port.json#verify",
       "in": {
-        "connection": "@connections/employees.connection.json"
+        "connection": "@connections/employees.connection.json",
+        "type": "@access/domain/DirectoryAttributes.shape.json"
       }
     },
     "issue": {
