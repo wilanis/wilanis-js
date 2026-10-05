@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/connection-kind.schema.json",
+  "label": "SQLite",
+  "description": "One SQLite database in one file. The development database: no server, no secret, deleted with rm. A tree that serves production traffic from one file is not what this kind is for: the driver is synchronous, so a statement holds the process while it runs.",
+  "settings": {
+    "fields": {
+      "file": {
+        "type": "string",
+        "description": "the database file, relative to the tree's root; created if absent, with its directory. Not :memory: -- a transaction opens a handle of its own on the file, and a second handle on :memory: is a second, empty database."
+      }
+    }
+  },
+  "storage": true
+}

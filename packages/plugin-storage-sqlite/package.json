@@ -1,0 +1,57 @@
+{
+  "name": "@wilanis/plugin-storage-sqlite",
+  "version": "0.1.0",
+  "description": "The @storage-sqlite engine for wilanis: an @storage store kept in one SQLite file, through Kysely and better-sqlite3. The development database: no server, no secret, deleted with rm.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Rafael Fontes <rfontes1987@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wilanis/wilanis-js.git",
+    "directory": "packages/plugin-storage-sqlite"
+  },
+  "homepage": "https://github.com/wilanis/wilanis-js/tree/main/packages/plugin-storage-sqlite#readme",
+  "bugs": "https://github.com/wilanis/wilanis-js/issues",
+  "keywords": [
+    "wilanis",
+    "dataflow",
+    "json-schema",
+    "declarative",
+    "storage",
+    "sqlite",
+    "plugin"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@wilanis/core": "0.1.0",
+    "@wilanis/engine": "0.1.0",
+    "@wilanis/plugin-storage": "0.1.0",
+    "better-sqlite3": "^13.0.3",
+    "kysely": "^0.28.17"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@wilanis/compiler": "0.1.0",
+    "@wilanis/runtime": "0.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

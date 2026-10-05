@@ -32,6 +32,9 @@
       "path": "packages/plugin-storage-postgres"
     },
     {
+      "path": "packages/plugin-storage-sqlite"
+    },
+    {
       "path": "packages/plugin-auth"
     },
     {
