@@ -260,15 +260,6 @@ already refuses G codes against a binding. B0n1 is judged for every profile in `
 promise that holds under `live` and fails under a storage profile is refused with the profile named. A
 `timeoutMs` alone needs no rule beyond the schema's: bounding a call is always safe.
 
-**Implementation note (#780).** As implemented, B0n1 (B011) and G0n2 (G018) judge each effect the walk reaches
-where it is made, and nothing more: a promise or a retry over a graph holds when every reached effect is idempotent
-there, or keyed. They do not judge what the graph composes from its effects, so a graph that reads a record,
-computes from it and writes the result passes -- `get` a counter, add one, `put` it; find the oldest, `remove` it --
-though calling it twice does something different from calling it once. Over such a graph `idempotent: true`, or a
-`retry`, is the author's word. The example's `update` (the given fields laid over what it read, `put` whole) is the
-case such a graph genuinely repeats safely, and any stricter rule must keep accepting it. A rule that refuses a write
-whose input is computed from what the same graph read would be an amendment to this RFC.
-
 ### Runtime behaviour
 
 **Where the loop lives, and where it does not.** A retry is a loop around one handler invocation, with a clock.
@@ -575,3 +566,15 @@ Nothing else must be decided before `accepted`. Decided during implementation:
 2. Whether `Attempt.sub` is kept for a failed nested run or the attempt carries only the innermost failed node's
    path and error (`failedLeaf` in `stubbing.ts` finds it): the full report is more honest, and larger.
 3. The exact text of the timeout's error, `timed out after <n>ms`, which RFC 0014 may turn into a kind.
+
+## Decided during implementation
+
+- B0n1 (B011) and G0n2 (G018) judge each effect the walk reaches where it is made, and nothing more: a promise or a
+  retry over a graph holds when every reached effect is idempotent there, or keyed (#780). They do not judge what
+  the graph composes from its effects, so a graph that reads a record, computes from it and writes the result
+  passes -- `get` a record, `@std/list.port.json#concat` an entry onto the list it holds, `put` it; find the oldest,
+  `remove` it -- though calling it twice does something different from calling it once. Over such a graph
+  `idempotent: true`, or a `retry` outside an atomic graph, is the author's word. The example's `update` (the given
+  fields laid over what it read, `put` whole) is the case such a graph genuinely repeats safely, and any stricter
+  rule must keep accepting it. A rule that refuses a write whose input is computed from what the same graph read,
+  unless the computation cannot change on a repeat, would be an amendment to this RFC.

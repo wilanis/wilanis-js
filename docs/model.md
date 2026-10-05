@@ -193,16 +193,17 @@ recognised by. The words must fit the operation (C015), and a domain operation m
 `idempotent: true`, a promise every profile is held to: each effect the binding that meets it there reaches
 must be idempotent where it is made, or the port is refused naming the profile, the binding and the node
 (B011). B011 and G018 judge each effect where it is made, never what a graph composes from them: a graph that
-`get`s a counter, adds one and `put`s it passes, though calling it twice counts two, so a promise or a retry over a
-graph that writes what it computed from a read is the author's word (#780). The example's `update`, which lays the
-given fields over what it read and `put`s the record whole, is the shape that genuinely repeats safely. Where the data layer names an effect -- a data graph's `run` or `map` node, or a binding's
-operation -- it may say `timeoutMs` and `retry`; a domain graph says neither (L012). The checker refuses a
-retry over what cannot fail transiently, a pure operation or a graph that reaches no effect (G017); over a
-call that is not idempotent where it is made, judged over the literal inputs of the site or, for a binding's
-graph, over every effect it reaches under each profile (G018); and a `retry.when` that is not boolean over the
-fields of the answer (G019). Nothing below an atomic graph retries (G020): a failed statement has aborted the
-transaction, so the retry belongs on the binding operation that runs the atomic graph, whose every try is a
-transaction of its own and whose transactional effects G018 does not hold to idempotency. A retry repeats a
+`get`s a record, `@std/list.port.json#concat`s an entry onto the list it holds and `put`s it passes, though calling
+it twice appends the entry twice, so a promise or a retry over a graph that writes what it computed from a read is
+the author's word (#780). The example's `update`, which lays the given fields over what it read and `put`s the
+record whole, is the shape that genuinely repeats safely. Where the data layer names an effect -- a data graph's
+`run` or `map` node, or a binding's operation -- it may say `timeoutMs` and `retry`; a domain graph says neither
+(L012). The checker refuses a retry over what cannot fail transiently, a pure operation or a graph that reaches no
+effect (G017); over a call that is not idempotent where it is made, judged over the literal inputs of the site or,
+for a binding's graph, over every effect it reaches under each profile (G018); and a `retry.when` that is not
+boolean over the fields of the answer (G019). Nothing below an atomic graph retries (G020): a failed statement has
+aborted the transaction, so the retry belongs on the binding operation that runs the atomic graph, whose every try
+is a transaction of its own and whose transactional effects G018 does not hold to idempotency. A retry repeats a
 fault or a timeout, and an answer `when` accepts; never a refusal. In the stubbed gates (`rehearse`, `fuzz`,
 `regress`, `run --seed`) the tries are made and recorded as the site says, with no backoff between them, since no
 stub recovers by being waited on.
