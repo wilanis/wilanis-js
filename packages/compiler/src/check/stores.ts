@@ -1,8 +1,9 @@
 /**
  * Stores. A store's connection and the shape of every collection resolve and are visible to it (R001, L005);
  * what it holds its records to -- unique, refs and defaults -- names fields that shape has and values it would
- * accept (C003 to C008); and the marks that say what a field or the collection was called before name
- * something a rename could have come from (C010, C011).
+ * accept (C003 to C008), and asks no more than its engine constrains (C008, read in `store-engines.ts`); and the
+ * marks that say what a field or the collection was called before name something a rename could have come from
+ * (C010, C011).
  *
  * Split from `contracts.ts` when the store rules passed the house limit: a shape, a port and a connection say
  * what they are, and a store says what it keeps and what it once called it.
@@ -19,13 +20,15 @@ import {
   type Type,
 } from '@wilanis/core';
 import type { Judge, Refuser } from './judge.js';
+import { checkRefsEnforced, checkUniqueClasses, type Engine, enginesOf } from './store-engines.js';
 
 /**
  * The refusals for a store: the connection it names and every collection's shape exist (R001) and are
  * visible to it (L005), what each collection holds its records to is judged against that shape (C003 to
- * C008), and its rename marks name something to rename (C010, C011). Nothing here judges what a store
- * *means* -- that a connection reaches an engine and that a key is a required field of its shape are
- * `@storage`'s (X202, X203), since only the plugin granting the port knows them. Nor does it judge whether a
+ * C008) and against what the engine of each connection it reaches constrains (C008), and its rename marks name
+ * something to rename (C010, C011). Nothing here judges what a store *means* -- that a connection reaches an
+ * engine and that a key is a required field of its shape are `@storage`'s (X202, X203), since only the plugin
+ * granting the port knows them. Nor does it judge whether a
  * rename *applies* to a database: the checker reads documents, and only the planner has the record.
  */
 export function checkStore(judge: Judge, store: Loaded<StoreDoc>): void {
@@ -35,6 +38,7 @@ export function checkStore(judge: Judge, store: Loaded<StoreDoc>): void {
   else refuse('R001', `unknown connection '${store.doc.connection}'`, 'connection', 'wilanis ls connection');
   const keeping = kept(store.doc);
   const keptNames = keeping.map(([name]) => name);
+  const engines = enginesOf(judge, store.doc);
   for (const [name, collection] of keeping) {
     const at = `collections/${name}/of`;
     const shape = judge.scope.get('shape', collection.of);
@@ -44,7 +48,7 @@ export function checkStore(judge: Judge, store: Loaded<StoreDoc>): void {
     }
     judge.visible(store, shape, at);
     const type = judge.type(collection.of, store.path, at);
-    if (type) checkConstraints({ judge, refuse, store, name, collection, fields: fieldsOf(type), keptNames });
+    if (type) checkConstraints({ judge, refuse, store, name, collection, fields: fieldsOf(type), keptNames, engines });
   }
   checkWas(judge, store);
 }
@@ -59,18 +63,35 @@ interface Kept {
   fields: Record<string, ObjField>;
   /** the collections of this store a reference may name: the ones that keep records. */
   keptNames: string[];
+  /** the storage kinds the store's connection reaches, under every profile. */
+  engines: Engine[];
 }
 
 const fieldsOf = (type: Type): Record<string, ObjField> => (type.kind === 'object' ? type.fields : {});
 
-/** Whether an engine holds no single value of a field: bytes live in the blob registry, and neither a shape nor a list is one value to index. */
+/** Whether an engine holds no single value of a field: bytes live in the blob registry, and neither a shape nor a list is one value to refer by. */
 const unholdable = (type: Type): boolean => type.kind === 'blob' || type.kind === 'object' || type.kind === 'list';
+
+/**
+ * Whether a constraint names a field no engine can hold it over, whatever its kind says: a blob for either, and a
+ * shape or a list for a reference. Which classes a `unique` may name past that is the engine's (`store-engines.ts`).
+ */
+const unconstrainable = (type: Type, constraint: 'unique' | 'refs'): boolean =>
+  constraint === 'unique' ? type.kind === 'blob' : unholdable(type);
+
+/** Why C008 refuses a constraint by its field's type alone. */
+const WHY_NOT = {
+  unique: 'a blob is bytes the blob registry holds, never an engine',
+  refs: 'a reference holds one value: a string, a number or a boolean',
+};
 
 /** What every constraint of a collection is held to, each rule reading the shape the collection declares. */
 function checkConstraints(kept: Kept): void {
   checkNames(kept);
   checkUnique(kept);
+  checkUniqueClasses(kept);
   checkRefs(kept);
+  checkRefsEnforced(kept);
   checkDefaults(kept);
   checkRenamed(kept);
 }
@@ -98,7 +119,7 @@ function named(kept: Kept): { field: string; at: string; constraint: 'unique' | 
 
 /**
  * C003: a constraint names a field of the shape. C008: and one an engine can hold a value of -- bytes live in
- * the blob registry and a shape or a list is a value an engine indexes nothing of, so neither is constrained.
+ * the blob registry, so no constraint names a blob, and a reference holds one value, never a shape or a list.
  */
 function checkNames(kept: Kept): void {
   const { fields, refuse, collection } = kept;
@@ -115,10 +136,10 @@ function checkNames(kept: Kept): void {
       continue;
     }
     if (constraint === 'defaults') continue;
-    if (unholdable(declared.type))
+    if (unconstrainable(declared.type, constraint))
       refuse(
         'C008',
-        `'${field}' is ${show(declared.type)}, and a constraint names a value an engine can hold: a string, a number or a boolean`,
+        `'${field}' is ${show(declared.type)}, and ${WHY_NOT[constraint]}`,
         at,
         `wilanis describe ${kept.store.doc.connection}`,
       );

@@ -126,8 +126,10 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
   (RFC 0015)
 - A store keeps no edge shape, over a connection that reaches a storage engine, keyed by a field every record has; its
   constraints and defaults name fields of its shape; a default is a literal its field accepts, never on the key; a
-  `unique` or `refs` entry names neither the key nor a field of a type an engine cannot index; a reference holds the
-  key of a collection of the same store; and two stores share a collection only with one shape.
+  `unique` or `refs` entry names neither the key nor a field of a type an engine cannot index; a `unique` names only
+  fields of a class the kind of each connection the store reaches lists under `capabilities.unique`, and a `refs` is
+  declared only over a kind whose `capabilities.refs` is true; a reference holds the key of a collection of the same
+  store; and two stores share a collection only with one shape.
   [[X201](refusals/X201.md), [X202](refusals/X202.md), [X203](refusals/X203.md), [X207](refusals/X207.md),
   [C003](refusals/C003.md), [C004](refusals/C004.md), [C005](refusals/C005.md), [C006](refusals/C006.md),
   [C007](refusals/C007.md), [C008](refusals/C008.md)] (RFC 0003)

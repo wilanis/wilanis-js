@@ -1,6 +1,8 @@
 /**
  * What an engine can do is what its kind document says (RFC 0022): `capabilitiesOf` reads the block of the kind
- * a connection names, and a storage kind without one is a broken plugin, refused when the plugin loads.
+ * a connection names, a storage kind without one is a broken plugin, refused when the plugin loads, and a store
+ * whose `unique` or `refs` asks more than the block says is refused by the checker (C008). Those sabotages sit here
+ * rather than in `rules.test.ts`, which holds @storage's own X rules and is at the house limit.
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,9 +12,8 @@ import { loadTree, type PluginModule, Scope, schemaRef } from '@wilanis/core';
 import memory from '@wilanis/plugin-storage-memory';
 import { afterEach, describe, expect, it } from 'vitest';
 import { capabilitiesOf } from '../src/index.js';
-import { CONNECTION, type Docs, PLUGINS, tree } from './harness.js';
+import { CONNECTION, type Docs, MEMORY, NARROW, PLUGINS, refusals, tree } from './harness.js';
 
-const MEMORY = '@storage-memory/memory.connection-kind.json';
 const UPSTREAM = '@connections/upstream.connection.json';
 
 const dirs: string[] = [];
@@ -94,5 +95,47 @@ describe('capabilitiesOf: what the engine behind a connection can do', () => {
     expect(load.refusals.items.map(one => [one.code, one.message])).toEqual([
       ['D001', expect.stringContaining("missing 'capabilities'")],
     ]);
+  });
+});
+
+describe('C008 reads the block: a store asks no more of its engine than the kind constrains', () => {
+  /** The tree over a connection of `kind`, its customers carrying a shape field, their collection edited by `change`. */
+  function over(kind: string, use: string, change: (collection: any) => void): Docs {
+    const docs = tree();
+    (docs['project.json'] as { plugins: { use: string }[] }).plugins.push({ use });
+    (docs['connections/records.connection.json'] as { kind: string }).kind = kind;
+    const customer = docs['features/customers/domain/Customer.shape.json'] as { fields: Record<string, unknown> };
+    customer.fields.wanted = { type: '@features/customers/domain/Ref.shape.json', required: false };
+    change((docs['features/customers/data/customers.store.json'] as any).collections.customers);
+    return docs;
+  }
+  const uniqueOverShape = (collection: any) => {
+    collection.unique = [['email', 'wanted']];
+  };
+  const referring = (collection: any) => {
+    collection.refs = { note: { collection: 'customers' } };
+  };
+  const c008 = (docs: Docs) => refusals(docs).filter(one => one.code === 'C008');
+
+  it('a unique over a shape field passes on the memory kind, whose block constrains every class', () => {
+    expect(refusals(over(MEMORY, '@storage-memory', uniqueOverShape))).toEqual([]);
+  });
+
+  it('C008 the same unique over a kind constraining strings alone, naming the class and the list', () => {
+    const found = c008(over(NARROW, '@narrow-engine', uniqueOverShape));
+    expect(found).toHaveLength(1);
+    expect(found[0].at).toBe('collections/customers/unique/0/1');
+    expect(found[0].message).toBe(`'wanted' is a shape, and ${CONNECTION} keeps no unique constraint over one`);
+    expect(found[0].hint).toBe(`'wanted' is a shape; ${NARROW} constrains unique over string`);
+  });
+
+  it('C008 refs over a kind that enforces none, where memory, which does, passes them', () => {
+    expect(refusals(over(MEMORY, '@storage-memory', referring))).toEqual([]);
+    const found = c008(over(NARROW, '@narrow-engine', referring));
+    expect(found).toHaveLength(1);
+    expect(found[0].at).toBe('collections/customers/refs/note');
+    expect(found[0].hint).toBe(
+      `${NARROW} does not enforce refs; check the target with a get, or move the store to a connection that does`,
+    );
   });
 });

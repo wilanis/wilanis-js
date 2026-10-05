@@ -180,14 +180,14 @@ describe('sabotage: what a store holds its records to', () => {
     expect(codesOf({ rows: entry({ unique: [['email', 'email']] }) })).toEqual(['D001']);
   });
 
-  it('C008 a constraint over a field an engine holds no value of: bytes, a shape or a list', () => {
+  it('C008 a constraint over bytes, which no engine holds; a list is for the kind of its engine to judge, and memory constrains one', () => {
     const uploads = (extra: Record<string, unknown>) => ({
       of: '@customers/domain/Upload.shape.json',
       key: 'id',
       ...extra,
     });
     expect(pointingAt({ uploads: uploads({ unique: [['file']] }) })).toEqual(at('C008', 'uploads/unique/0'));
-    expect(pointingAt({ uploads: uploads({ unique: [['tags']] }) })).toEqual(at('C008', 'uploads/unique/0'));
+    expect(codesOf({ uploads: uploads({ unique: [['tags']] }) })).not.toContain('C008');
     expect(codesOf({ uploads: uploads({ unique: [['id']] }) })).not.toContain('C008');
   });
 

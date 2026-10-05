@@ -9,8 +9,10 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { checkTree } from '@wilanis/compiler';
 import { loadTree, type PluginModule, schemaRef } from '@wilanis/core';
+import memory from '@wilanis/plugin-storage-memory';
 import { BUILTIN_PLUGINS } from '@wilanis/runtime';
 import storage from '../src/index.js';
 
@@ -69,11 +71,27 @@ export const upstream: PluginModule = {
   handlers: {},
 };
 
+export const NARROW = '@narrow-engine/narrow.connection-kind.json';
+export const MEMORY = '@storage-memory/memory.connection-kind.json';
+
+/**
+ * An engine constraining less than any shipped one -- `unique` over strings alone, no `refs` -- so the rule that
+ * reads a kind's `capabilities` has something to refuse. Its documents sit under this test directory, never under
+ * a plugin's `docs/`: no shipped kind is this narrow.
+ */
+export const narrow: PluginModule = {
+  root: '@narrow-engine',
+  docs: fileURLToPath(new URL('./fixtures/narrow-engine', import.meta.url)),
+  handlers: {},
+};
+
 export const PLUGINS: Record<string, PluginModule> = {
   ...BUILTIN_PLUGINS,
   '@storage': storage,
+  '@storage-memory': memory,
   [ENGINE]: engine,
   '@fake-upstream': upstream,
+  '@narrow-engine': narrow,
 };
 
 /** One document of the tree, by the path it sits at. */
