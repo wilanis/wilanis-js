@@ -1,0 +1,7 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/plugin.schema.json",
+  "description": "An engine for tests that constrains less than any shipped one: it grants one storage kind and keeps nothing.",
+  "grants": {
+    "connectionKinds": ["@narrow-engine/narrow.connection-kind.json"]
+  }
+}

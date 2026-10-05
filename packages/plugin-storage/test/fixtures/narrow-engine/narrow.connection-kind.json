@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/connection-kind.schema.json",
+  "description": "A connection reaching an engine that puts a unique constraint on a string column alone and enforces no reference. No shipped kind is this narrow; it exists so the rule reading the block has something to refuse.",
+  "settings": {
+    "fields": {}
+  },
+  "storage": true,
+  "capabilities": {
+    "transactionalDdl": false,
+    "unique": ["string"],
+    "refs": false
+  }
+}

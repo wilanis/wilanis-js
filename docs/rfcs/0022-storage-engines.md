@@ -112,9 +112,9 @@ The refusal an author meets when a declaration asks more than the engine gives. 
 `"unique": [["email", "meta"]]` where `meta` is a shape:
 
 ```
-C0nn  @features/customers/data/customers.store.json#collections/customers/unique/0/1
-    'meta' is a shape; @storage-mysql/mysql.connection-kind.json constrains unique over string, number, boolean
-    → wilanis describe @storage-mysql/mysql.connection-kind.json
+C008  @features/customers/data/customers.store.json#collections/customers/unique/0/1
+    'meta' is a shape, and @connections/customers.connection.json keeps no unique constraint over one
+    → 'meta' is a shape; @storage-mysql/mysql.connection-kind.json constrains unique over string, number, boolean
 ```
 
 The rule is RFC 0003's; what is new is that its message can name the kind and the kind's list, because the list is
@@ -294,11 +294,15 @@ One rule gains its reading; six rules are new, in two bands; the compiler's fami
 design: a capability vocabulary that needed a family of rules over it would be a vocabulary the language was leaning
 on too hard.
 
-The compiler, RFC 0003's rule given its fact (its code is assigned when RFC 0003's implementing pull request lands):
+The compiler, RFC 0003's rule given its fact. Its code is C008, the one RFC 0003's implementing pull request gave the
+rule; the reading landed in `check/store-engines.ts` beside `check/stores.ts`, and reads the kind of the connection
+the store names and of each profile's stand-in for it (`Scope.connectionFor`), so a store a profile moves to a
+narrower engine is judged against that one too. What every engine shares stays judged by type: no constraint names a
+`blob`, and no `refs` names a shape or a list.
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
-| C0nn (RFC 0003) | `checkStore`, `check/contracts.ts` (or `check/stores.ts` once split) | a `unique` entry names a field whose `fieldClass` is not in the connection's kind's `capabilities.unique`, or a collection declares `refs` and the kind's `capabilities.refs` is false; the kind is read through `scope.get('connection-kind', kind)` from the connection `Judge.connectionOf` resolves | `'<field>' is a <class>; <kind> constrains unique over <list>` / `<kind> does not enforce refs; check the target with a get, or move the store to a connection that does` |
+| C008 (RFC 0003) | `checkStore`, `check/contracts.ts` (or `check/stores.ts` once split) | a `unique` entry names a field whose `fieldClass` is not in the connection's kind's `capabilities.unique`, or a collection declares `refs` and the kind's `capabilities.refs` is false; the kind is read through `scope.get('connection-kind', kind)` from the connection `Judge.connectionOf` resolves | `'<field>' is a <class>; <kind> constrains unique over <list>` / `<kind> does not enforce refs; check the target with a get, or move the store to a connection that does` |
 
 Missing block on a storage kind: schema validation when the plugin loads (D001 family, existing), never a compiler
 rule; the compiler may assume every kind it reads with `storage: true` carries one.
@@ -443,7 +447,8 @@ not; a kind without `storage` and without the block still validates (every exist
 
 - `capabilities.test.ts`: `capabilitiesOf` answers the memory kind's block for a connection of it, and throws naming
   the kind for a connection whose kind is not `storage`.
-- `rules.test.ts` (RFC 0002 and RFC 0003's file) gains the C0nn sabotages this RFC gives a reading: a `unique`
+- `capabilities.test.ts` gains the C008 sabotages this RFC gives a reading (they were meant for `rules.test.ts`, which
+  holds @storage's own X rules and is at the house limit of 300 lines): a `unique`
   naming a shape field over the memory kind passes; the same over a small kind document the test ships with
   `unique: ["string"]` is refused naming the class and the list; `refs` over a kind with `refs: false` is refused.
   The test kind lives under the test directory, not under any plugin's `docs/`: no shipped kind constrains nothing.

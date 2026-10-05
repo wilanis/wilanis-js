@@ -166,7 +166,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [C005](C005.md) | C | live | a reference to a collection this store does not keep: absent, or a view |
 | [C006](C006.md) | C | live | a reference whose field's type is not the type of the key it refers to |
 | [C007](C007.md) | C | live | a `unique` or `refs` entry naming the collection's key, which is unique and identifies already |
-| [C008](C008.md) | C | live | a constraint over a blob, shape or list field, which no engine holds one value of |
+| [C008](C008.md) | C | live | a constraint the store's engine cannot keep: any over a blob, a reference over a shape or list, a `unique` over a class its kind does not list, a `refs` over a kind that enforces none |
 | [C009](C009.md) | C | live | a transactional operation that accepts no static `connection` or `store` to resolve one from |
 | [C010](C010.md) | C | live | a `renamed` entry that describes no rename: unknown field, old name still a field, or one name twice |
 | [C011](C011.md) | C | live | a `was` naming the collection itself or a name another collection on the connection holds now |
