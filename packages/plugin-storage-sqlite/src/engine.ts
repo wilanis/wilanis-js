@@ -12,7 +12,7 @@
  * the reason this kind is the development database rather than the production one.
  */
 import type { At, Engine, Put, Query, Record_, Scope, Transaction, Where, Written } from '@wilanis/plugin-storage';
-import { type Kysely, sql } from 'kysely';
+import type { Kysely } from 'kysely';
 import { typeOf } from './columns.js';
 import { ensureTables } from './ensure.js';
 import { conditionOf, orderingsOf } from './filter.js';
@@ -187,20 +187,10 @@ export class SqliteEngine extends Unrecorded implements Engine {
    */
   async begin(at: At): Promise<Transaction> {
     const trx = await this.handles.transaction(at);
-    let ended = false;
-    const end = async (word: 'commit' | 'rollback') => {
-      if (ended) return;
-      ended = true;
-      try {
-        await sql.raw(word).execute(trx);
-      } finally {
-        await trx.destroy();
-      }
-    };
     return {
       engine: new SqliteEngine(this.handles, this.settings, trx),
-      commit: () => end('commit'),
-      rollback: () => end('rollback'),
+      commit: () => this.handles.end(trx, 'commit'),
+      rollback: () => this.handles.end(trx, 'rollback'),
     };
   }
 }

@@ -149,3 +149,24 @@ describe('busyTimeoutMs is honoured', () => {
     expect((await made.engine.get(at, 'a')).record?.url).toBe('https://x');
   });
 });
+
+describe('teardown', () => {
+  it('rolls back a transaction still open and lets go of the file, so another writer goes through at once', async () => {
+    const made = makeSqliteEngine({ root: scratch, settings: { busyTimeoutMs: 100 } });
+    const at = atFile('teardown');
+    await made.engine.ensure([at]);
+    const trx = await made.engine.begin(at);
+    await trx.engine.put(at, entry('left', 'https://left', 'GET'), { replace: true });
+    await made.close();
+
+    const after = makeSqliteEngine({ root: scratch, settings: { busyTimeoutMs: 100 } });
+    try {
+      const next = await after.engine.put(at, entry('next', 'https://next', 'GET'), { replace: true });
+      expect(next.conflict).toBe(false);
+      expect((await after.engine.get(at, 'left')).record).toBeUndefined();
+      await trx.rollback(); // ended already, by teardown: a second ending is no ending
+    } finally {
+      await after.close();
+    }
+  });
+});
