@@ -20,8 +20,10 @@ import {
   substitute,
   type Type,
   type TypeRef,
+  WHOLE_TEMPLATE,
 } from '@wilanis/core';
 import { secretPaths } from '../lower.js';
+import { MAKE } from '../std-ops.js';
 import { type Judge, RESERVED, type Reader, type Refuser, type Resolve, type ShapeLayer } from './judge.js';
 
 /** Where an operation is called: what is given, what it accepts, and how a value given there is typed. */
@@ -34,7 +36,7 @@ export interface CallSite {
   at: string;
   /** the callee, for messages */
   what: string;
-  /** the callee as `path#operation`, which says whether an input trims what it is given (TRIMS) */
+  /** the callee as `path#operation` where the run may trim an input it is given (`trimsAt`); absent, none is */
   op?: string;
   from: Loaded;
   layer: ShapeLayer;
@@ -67,10 +69,14 @@ export function checkInputs(judge: Judge, site: CallSite): Record<string, Type> 
 }
 
 /**
- * The inputs the run trims to the declared type before judging: `make` keeps only what a closed `type` declares,
- * so an open or wider value is the narrowing a graph writes there, and is judged as `assignableTrimmed` judges.
+ * Does the run trim this input to its declared type before judging it? Only `make`'s `value` where it is one whole
+ * read (`{{customer}}`) in a graph's node: that is the narrowing a graph writes, which the compiler lowers to keep
+ * only what a closed `type` declares (`make-narrowing.ts`). An object written out in the node is the author's
+ * own keys, judged strictly, so a misspelt one is refused rather than dropped.
  */
-const TRIMS: Record<string, string> = { '@std/object.port.json#make': 'value' };
+export function trimsAt(op: string | undefined, name: string, given: unknown): boolean {
+  return op === MAKE && name === 'value' && typeof given === 'string' && WHOLE_TEMPLATE.test(given);
+}
 
 const BRACES = /^\{\{(.*)\}\}$/s;
 const INDEX = /^[0-9]+$/;
@@ -188,7 +194,7 @@ class InputCheck {
       this.refuse('G004', `'${name}' may be missing at run time but ${this.site.what} requires it`, at, hint);
       return;
     }
-    const trims = this.site.op !== undefined && TRIMS[this.site.op] === name;
+    const trims = trimsAt(this.site.op, name, this.site.given[name]);
     const bad = trims ? assignableTrimmed(read.type, want) : assignable(read.type, want);
     if (!bad) return;
     const hint = joinsAnswers(this.site.given[name])

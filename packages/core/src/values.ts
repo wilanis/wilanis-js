@@ -136,6 +136,22 @@ function conformsExtras(object: Record<string, unknown>, type: ObjectType, at: s
   return null;
 }
 
+/**
+ * The value with the keys a closed object type does not declare dropped, at every depth; open objects and unknown
+ * pass through. What a trigger's `out` is pruned to, and what a `make` narrowing a value it reads whole keeps.
+ */
+export function prune(value: unknown, type: Type): unknown {
+  if (type.kind === 'list' && Array.isArray(value)) return value.map(each => prune(each, type.of));
+  if (type.kind !== 'object' || !value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const out: Record<string, unknown> = {};
+  for (const [name, each] of Object.entries(value as Record<string, unknown>)) {
+    const field = type.fields[name];
+    if (field) out[name] = prune(each, field.type);
+    else if (type.open) out[name] = each;
+  }
+  return out;
+}
+
 /** JSON Schema (2020-12) for a type: what a trigger validates the wire against. */
 export function toJsonSchema(type: Type): Record<string, unknown> {
   switch (type.kind) {

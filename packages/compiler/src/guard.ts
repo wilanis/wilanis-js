@@ -25,8 +25,7 @@ import { heldWhollyAt } from './check/prove.js';
 import { type Site, type SiteArity, siteId, sitesOf } from './sites.js';
 
 /** The two native operations a guard is built from; both exist, so the guard adds nothing to any port. */
-export const MAKE = '@std/object.port.json#make';
-export const REFUSE = '@std/outcome.port.json#refuse';
+export { MAKE, REFUSE } from './std-ops.js';
 
 /** The one word a guard refuses with, reserved so that a mapped `invariant` always means a guard (I006). */
 export const INVARIANT = 'invariant';
