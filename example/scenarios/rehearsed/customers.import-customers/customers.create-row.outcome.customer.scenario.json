@@ -65,6 +65,14 @@
       "active": true,
       "note": "golf154"
     },
+    "op.recorded.op.recorded.0.op.registered.op.customer:made": {
+      "id": "juliet527",
+      "name": "Zulu-9",
+      "email": "echo",
+      "tier": "kilo",
+      "active": true,
+      "note": "golf154"
+    },
     "op.recorded.op.recorded.0.op.registered.op.posted": {
       "status": 201,
       "headers": {},

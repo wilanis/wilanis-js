@@ -1,9 +1,9 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "List rows as they stand",
-  "description": "Every record of the customer API read through RawRow, which promises only what a seeded row carries. It is what the backfill walks; every other listing reads CustomerRow and is held to what a customer is.",
+  "description": "Every record of the customer API read through RawRow, which promises only what a seeded row carries, and narrowed to RawCustomer: make keeps only the fields it declares. It is what the backfill walks; every other listing reads CustomerRow and is held to what a customer is.",
   "out": {
-    "type": "@customers/edge/RawRow.shape.json[]",
+    "type": "@customers/domain/RawCustomer.shape.json[]",
     "from": [
       "rawRows",
       "upstreamFailed"
@@ -46,7 +46,7 @@
       "run": "@std/object.port.json#make",
       "in": {
         "value": "{{fetched.body}}",
-        "type": "@customers/edge/RawRow.shape.json[]"
+        "type": "@customers/domain/RawCustomer.shape.json[]"
       }
     },
     {
@@ -57,7 +57,7 @@
       "in": {
         "reason": "upstream",
         "message": "the customer API answered {{fetched.status}}",
-        "type": "@customers/edge/RawRow.shape.json[]"
+        "type": "@customers/domain/RawCustomer.shape.json[]"
       }
     }
   ]

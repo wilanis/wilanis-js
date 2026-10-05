@@ -47,7 +47,8 @@
         "groups": [
           "golf",
           "golf"
-        ]
+        ],
+        "attributes": {}
       }
     }
   },
@@ -71,7 +72,8 @@
             "groups": [
               "golf",
               "golf"
-            ]
+            ],
+            "attributes": {}
           }
         }
       },

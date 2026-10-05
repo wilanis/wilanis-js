@@ -3,7 +3,7 @@
  * document reads from the request is its own family, next door in `sabotage-reads.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
-import { relocate, sabotage } from './example-harness.js';
+import { relocate, sabotage, sabotageHinting, sabotageSaying } from './example-harness.js';
 
 describe('sabotage: graphs, layers and triggers', () => {
   it('G003 a deep path that does not exist', () => {
@@ -41,6 +41,26 @@ describe('sabotage: graphs, layers and triggers', () => {
         graph.out.from = ['joined', 'all'];
       }),
     ).toContain('G010');
+  });
+  it('G010 an open row answered where a closed Customer is declared, the run refusing what it carries beyond (#787)', () => {
+    const answeringRow = (graph: any) => {
+      graph.nodes.find((node: { id: string }) => node.id === 'customer').in.type =
+        '@customers/edge/CustomerRow.shape.json';
+    };
+    expect(sabotageSaying('features/customers/data/get-row.graph.json', answeringRow)).toEqual([
+      "G010 'customer' answers @features/customers/edge/CustomerRow.shape.json but out is @features/customers/domain/Customer.shape.json: @features/customers/edge/CustomerRow.shape.json is open and may carry fields @features/customers/domain/Customer.shape.json does not declare",
+    ]);
+    expect(sabotageHinting('features/customers/data/get-row.graph.json', answeringRow)).toEqual([
+      'G010 make what \'customer\' answers a @features/customers/domain/Customer.shape.json of the fields it declares: @std/object.port.json#make with "type": "@features/customers/domain/Customer.shape.json" narrows it',
+    ]);
+  });
+  it('G010 a list of open rows answered where a list of closed Customers is declared', () => {
+    expect(
+      sabotage('features/customers/data/list-rows.graph.json', graph => {
+        graph.nodes.find((node: { id: string }) => node.id === 'customers').in.type =
+          '@customers/edge/CustomerRow.shape.json[]';
+      }),
+    ).toEqual(['G010']);
   });
   it('L002 an effect run from a domain graph', () => {
     expect(

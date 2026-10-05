@@ -217,12 +217,13 @@ describe('the view of a field invariant', () => {
   it('tables every site of the shape, read from the compiler and never worked out here', () => {
     const seen = holds('len(name) > 0');
     expect(Object.keys(seen).sort()).toEqual(['fields', 'form', 'on', 'onLabel', 'sites', 'when']);
-    // the sites are `sitesOf`'s, which is what the checker judges (I005) and the compiler guards by: twenty-three
-    // places a value of Customer comes into being in the example, seventeen nodes that make one, five data graphs
+    // the sites are `sitesOf`'s, which is what the checker judges (I005) and the compiler guards by: thirty
+    // places a value of Customer comes into being in the example, twenty-three nodes that make one, six data graphs
     // that take one whole to write it, and one that takes a list. The viewer counts none of them itself; it asks
     // the one function that already knows.
-    expect(seen.sites.length).toBe(23);
+    expect(seen.sites.length).toBe(30);
     expect(seen.sites.filter(site => site.kind === 'taken').map(site => [site.graph, site.node, site.arity])).toEqual([
+      ['@features/customers/data/create-row.graph.json', 'in', 'one'],
       ['@features/customers/data/keep-customer-postgres.graph.json', 'in', 'one'],
       ['@features/customers/data/keep-customer.graph.json', 'in', 'one'],
       ['@features/customers/data/store-and-latest-postgres.graph.json', 'in', 'one'],

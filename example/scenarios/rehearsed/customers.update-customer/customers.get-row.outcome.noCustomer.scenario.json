@@ -41,6 +41,14 @@
     }
   },
   "stubs": {
+    "op.current.op.customer:made": {
+      "id": "juliet527",
+      "name": "Zulu-9",
+      "email": "echo",
+      "tier": "kilo",
+      "active": true,
+      "note": "golf154"
+    },
     "op.current.op.fetched": {
       "status": 404,
       "headers": {
@@ -60,6 +68,14 @@
       }
     },
     "op.customer:made": {
+      "id": "juliet527",
+      "name": "Zulu-9",
+      "email": "echo",
+      "tier": "kilo",
+      "active": true,
+      "note": "golf154"
+    },
+    "op.kept.op.customer:made": {
       "id": "juliet527",
       "name": "Zulu-9",
       "email": "echo",
@@ -128,9 +144,6 @@
         "selected": "noCustomer",
         "out": "noCustomer"
       },
-      "op.current.op.customer": {
-        "status": "cancelled"
-      },
       "op.current.op.noCustomer": {
         "status": "failed",
         "reason": "missing",
@@ -140,6 +153,18 @@
         "status": "cancelled"
       },
       "op.current.op.unreachable": {
+        "status": "cancelled"
+      },
+      "op.current.op.customer:made": {
+        "status": "cancelled"
+      },
+      "op.current.op.customer:check": {
+        "status": "cancelled"
+      },
+      "op.current.op.customer": {
+        "status": "cancelled"
+      },
+      "op.current.op.customer:violated": {
         "status": "cancelled"
       },
       "op.kept": {

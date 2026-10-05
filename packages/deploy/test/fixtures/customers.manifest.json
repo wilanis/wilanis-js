@@ -425,6 +425,13 @@
       "included": "@wilanis/access"
     },
     {
+      "path": "@features/access/domain/DirectoryAttributes.shape.json",
+      "kind": "shape",
+      "feature": "access",
+      "layer": "domain",
+      "included": "@wilanis/access"
+    },
+    {
       "path": "@features/access/domain/Grant.shape.json",
       "kind": "shape",
       "feature": "access",
@@ -1575,6 +1582,853 @@
     {
       "path": "@s3/plugin.json",
       "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.auth-customers/password.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.auth-customers/password.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.auth-customers/password.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.auth-customers/username.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.auth-customers/username.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.auth-customers/username.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.auth-employees/password.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.auth-employees/password.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.auth-employees/password.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.auth-employees/username.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.auth-employees/username.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.auth-employees/username.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.issue-otp/id.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.issue-otp/id.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.issue-otp/id.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.refresh/refreshToken.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.refresh/refreshToken.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.refresh/refreshToken.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.set-preferences/theme.enum.dark.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/access.set-preferences/theme.enum.light.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.delete-customer/id.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.delete-customer/id.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.delete-customer/id.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.delete-customers/ids.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.delete-customers/ids.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.enqueue-removal/id.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.enqueue-removal/id.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.enqueue-removal/id.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.get-customer/id.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.get-customer/id.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.get-customer/id.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.list-customers/tier.absent.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.list-customers/tier.enum.bronze.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.list-customers/tier.enum.gold.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.list-customers/tier.enum.silver.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.register-customer/email.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.register-customer/email.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.register-customer/email.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.register-customer/name.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.register-customer/name.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.register-customer/name.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.register-customer/tier.enum.bronze.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.register-customer/tier.enum.gold.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.register-customer/tier.enum.silver.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.remove-queued/id.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.remove-queued/id.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.remove-queued/id.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/email.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/email.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/email.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/id.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/id.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/id.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/name.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/name.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/name.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/note.absent.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/note.empty.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/note.long.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/note.one.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/tier.enum.bronze.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/tier.enum.gold.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/edges/customers.update-customer/tier.enum.silver.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/access.auth-customers/access.sign-in-customer.verdict.issued.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/access.auth-customers/access.sign-in-customer.verdict.rejected.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/access.auth-customers/access.sign-in-customer.verdict.unavailable.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/access.auth-employees/access.sign-in-employee.verdict.issued.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/access.auth-employees/access.sign-in-employee.verdict.rejected.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/access.auth-employees/access.sign-in-employee.verdict.unavailable.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/access.get-preferences/whole.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/access.issue-otp/access.issue-code.wasThere.code.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/access.issue-otp/access.issue-code.wasThere.unknown.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/access.refresh/access.refresh.wasGood.invalid.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/access.refresh/access.refresh.wasGood.renewed.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/access.set-preferences/whole.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/access.sign-out/whole.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.delete-customer/customers.delete-row.outcome.customer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.delete-customer/customers.delete-row.outcome.noCustomer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.delete-customer/customers.delete-row.outcome.upstreamFailed.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.delete-customers/customers.delete-row.outcome.customer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.delete-customers/customers.delete-row.outcome.noCustomer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.delete-customers/customers.delete-row.outcome.upstreamFailed.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.digest/customers.list-rows.outcome.customers.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.digest/customers.list-rows.outcome.upstreamFailed.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.enqueue-removal/whole.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.export-customers/customers.list-rows.outcome.customers.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.export-customers/customers.list-rows.outcome.upstreamFailed.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.get-customer/customers.get-row.outcome.customer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.get-customer/customers.get-row.outcome.noCustomer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.get-customer/customers.get-row.outcome.upstreamFailed.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.import-customers/customers.create-row.outcome.customer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.import-customers/customers.create-row.outcome.upstreamFailed.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.list-customers/customers.list-customers.tierGiven.all.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.list-customers/customers.list-customers.tierGiven.byTier.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.list-customers/customers.list-rows-by-tier.outcome.customers.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.list-customers/customers.list-rows-by-tier.outcome.none.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.list-customers/customers.list-rows-by-tier.outcome.upstreamFailed.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.list-customers/customers.list-rows.outcome.customers.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.list-customers/customers.list-rows.outcome.upstreamFailed.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.register-customer/customers.create-row.outcome.customer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.register-customer/customers.create-row.outcome.upstreamFailed.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.remove-queued/customers.delete-row.outcome.customer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.remove-queued/customers.delete-row.outcome.noCustomer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.remove-queued/customers.delete-row.outcome.upstreamFailed.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.update-customer/customers.get-row.outcome.customer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.update-customer/customers.get-row.outcome.noCustomer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.update-customer/customers.get-row.outcome.upstreamFailed.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.update-customer/customers.update-row.outcome.customer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.update-customer/customers.update-row.outcome.noCustomer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.update-customer/customers.update-row.outcome.upstreamFailed.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/hello.hello-gated/whole.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/policies/access.can-register/access.require-registrar.isRegistrar.anonymous.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/policies/access.can-register/access.require-registrar.isRegistrar.forbidden.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/policies/access.can-register/access.require-registrar.isRegistrar.granted.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/policies/access.employees-only/access.require-employee.isEmployee.anonymous.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/policies/access.employees-only/access.require-employee.isEmployee.forbidden.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/policies/access.employees-only/access.require-employee.isEmployee.granted.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/policies/access.otp-verified/access.require-otp.codeAnswered.granted.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/policies/access.otp-verified/access.require-otp.codeAnswered.noCode.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/policies/access.signed-in/access.require-signed-in.anyoneThere.anonymous.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/policies/access.signed-in/access.require-signed-in.anyoneThere.granted.scenario.json",
+      "kind": "scenario",
       "feature": null,
       "layer": null,
       "included": null

@@ -13,11 +13,15 @@
   "seed": 1,
   "in": {
     "principal": {
-      "subject": "kilo",
-      "realm": "lima",
+      "subject": "foxtrot",
+      "realm": "echo42",
       "roles": [
+        "india",
         "registrar"
-      ]
+      ],
+      "claims": {
+        "extra2": "x"
+      }
     }
   },
   "context": {

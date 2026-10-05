@@ -13,9 +13,14 @@
   "seed": 1,
   "in": {
     "principal": {
-      "subject": "kilo",
+      "subject": "foxtrot",
       "realm": "employee",
-      "roles": []
+      "roles": [
+        "india"
+      ],
+      "claims": {
+        "extra2": "x"
+      }
     }
   },
   "context": {

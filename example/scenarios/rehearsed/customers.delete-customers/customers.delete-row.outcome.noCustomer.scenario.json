@@ -41,6 +41,14 @@
     }
   },
   "stubs": {
+    "op.removed.0.op.customer:made": {
+      "id": "juliet527",
+      "name": "Zulu-9",
+      "email": "echo",
+      "tier": "kilo",
+      "active": true,
+      "note": "golf154"
+    },
     "op.removed.0.op.deleted": {
       "status": 404,
       "headers": {},

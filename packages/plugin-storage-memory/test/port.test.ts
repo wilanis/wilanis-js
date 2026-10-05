@@ -74,6 +74,7 @@ function treeServing(): string {
     fields: {
       record: { type: '@features/customers/domain/Customer.shape.json', required: false },
       conflict: { type: 'boolean' },
+      violated: { type: 'string', required: false },
     },
   });
   write('features/customers/domain/Found.shape.json', {

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type { PluginModule } from '@wilanis/core';
 import { conforms, type Type } from '@wilanis/core';
 import { Refusal, readPath } from '@wilanis/engine';
+import { prune } from '../values.js';
 
 const obj = (value: unknown, what: string): Record<string, unknown> => {
   if (value === undefined) return {};
@@ -30,12 +31,18 @@ const declared = (value: unknown, type: unknown, env: Record<string, unknown>): 
   }
   return value;
 };
+/** The value trimmed to what each closed object of the declared type declares, then judged against it: make's narrowing. */
+const narrowed = (value: unknown, type: unknown, env: Record<string, unknown>): unknown => {
+  const resolve = env.resolveType as ((ref: string) => Type) | undefined;
+  const trimmed = resolve && typeof type === 'string' ? prune(value, resolve(type)) : value;
+  return declared(trimmed, type, env);
+};
 
 export const std: PluginModule = {
   root: '@std',
   docs: fileURLToPath(new URL('../../docs/std', import.meta.url)),
   handlers: {
-    '@std/object.port.json#make': async ({ in: input, ctx }) => declared(input.value, input.type, ctx.env),
+    '@std/object.port.json#make': async ({ in: input, ctx }) => narrowed(input.value, input.type, ctx.env),
     '@std/object.port.json#merge': async ({ in: input, ctx }) =>
       declared({ ...obj(input.base, 'base'), ...obj(input.over, 'over') }, input.type, ctx.env),
     '@std/outcome.port.json#refuse': async ({ in: input }) => {

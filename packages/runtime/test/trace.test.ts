@@ -110,10 +110,14 @@ describe('one fire, said as spans', () => {
       '@features/customers/data/get-row.graph.json',
       'fetched @http/http.port.json#request',
       'outcome switch → upstreamFailed',
-      'customer',
       'noCustomer',
       'upstreamFailed @std/outcome.port.json#refuse',
       'unreachable',
+      // the guard the compiler lowered over the Customer get-row makes, never reached on this branch
+      'customer:made',
+      'customer:check',
+      'customer',
+      'customer:violated',
     ]);
   });
 

@@ -35,6 +35,23 @@
     }
   },
   "stubs": {
+    "op.all.op.customers:made": [
+      {
+        "id": "alpha",
+        "name": "Zulu-9",
+        "email": "echo",
+        "tier": "kilo",
+        "active": true,
+        "note": "golf154"
+      },
+      {
+        "id": "hotel394",
+        "name": "lima190",
+        "email": "alpha",
+        "tier": "india",
+        "registrar": "delta"
+      }
+    ],
     "op.all.op.fetched": {
       "status": 200,
       "headers": {},
@@ -60,6 +77,23 @@
         }
       ]
     },
+    "op.byTier.op.customers:made": [
+      {
+        "id": "alpha",
+        "name": "Zulu-9",
+        "email": "echo",
+        "tier": "kilo",
+        "active": true,
+        "note": "golf154"
+      },
+      {
+        "id": "hotel394",
+        "name": "lima190",
+        "email": "alpha",
+        "tier": "india",
+        "registrar": "delta"
+      }
+    ],
     "op.byTier.op.none:made": [
       {
         "id": "alpha",
@@ -118,24 +152,17 @@
     "status": "done",
     "output": [
       {
-        "id": "bravo69",
-        "name": "india790",
-        "email": "Zulu-9",
-        "tier": "hotel415",
-        "active": false
+        "id": "alpha",
+        "name": "Zulu-9",
+        "email": "echo",
+        "tier": "kilo",
+        "active": true
       },
       {
-        "id": "delta",
-        "name": "alpha636",
-        "email": "charlie",
-        "tier": "lima174",
-        "active": false
-      },
-      {
-        "id": "Zulu-9",
-        "name": "bravo",
-        "email": "golf",
-        "tier": "lima"
+        "id": "hotel394",
+        "name": "lima190",
+        "email": "alpha",
+        "tier": "india"
       }
     ],
     "nodes": {
@@ -144,32 +171,19 @@
         "handler": "graph:@features/customers/domain/list-customers.graph.json",
         "out": [
           {
-            "id": "bravo69",
-            "name": "india790",
-            "email": "Zulu-9",
-            "tier": "hotel415",
-            "active": false,
-            "registrar": "Zulu-9",
-            "note": "foxtrot"
+            "id": "alpha",
+            "name": "Zulu-9",
+            "email": "echo",
+            "tier": "kilo",
+            "active": true,
+            "note": "golf154"
           },
           {
-            "id": "delta",
-            "name": "alpha636",
-            "email": "charlie",
-            "tier": "lima174",
-            "active": false,
-            "registrar": "golf",
-            "note": "x",
-            "createdAt": "Zulu-9531",
-            "extra9": null
-          },
-          {
-            "id": "Zulu-9",
-            "name": "bravo",
-            "email": "golf",
-            "tier": "lima",
-            "note": "Zulu-9",
-            "extra2": null
+            "id": "hotel394",
+            "name": "lima190",
+            "email": "alpha",
+            "tier": "india",
+            "registrar": "delta"
           }
         ]
       },
@@ -183,32 +197,19 @@
         "handler": "@features/customers/data/customers-rest.binding.json#listByTier",
         "out": [
           {
-            "id": "bravo69",
-            "name": "india790",
-            "email": "Zulu-9",
-            "tier": "hotel415",
-            "active": false,
-            "registrar": "Zulu-9",
-            "note": "foxtrot"
+            "id": "alpha",
+            "name": "Zulu-9",
+            "email": "echo",
+            "tier": "kilo",
+            "active": true,
+            "note": "golf154"
           },
           {
-            "id": "delta",
-            "name": "alpha636",
-            "email": "charlie",
-            "tier": "lima174",
-            "active": false,
-            "registrar": "golf",
-            "note": "x",
-            "createdAt": "Zulu-9531",
-            "extra9": null
-          },
-          {
-            "id": "Zulu-9",
-            "name": "bravo",
-            "email": "golf",
-            "tier": "lima",
-            "note": "Zulu-9",
-            "extra2": null
+            "id": "hotel394",
+            "name": "lima190",
+            "email": "alpha",
+            "tier": "india",
+            "registrar": "delta"
           }
         ]
       },
@@ -217,32 +218,19 @@
         "handler": "graph:@features/customers/data/list-rows-by-tier.graph.json",
         "out": [
           {
-            "id": "bravo69",
-            "name": "india790",
-            "email": "Zulu-9",
-            "tier": "hotel415",
-            "active": false,
-            "registrar": "Zulu-9",
-            "note": "foxtrot"
+            "id": "alpha",
+            "name": "Zulu-9",
+            "email": "echo",
+            "tier": "kilo",
+            "active": true,
+            "note": "golf154"
           },
           {
-            "id": "delta",
-            "name": "alpha636",
-            "email": "charlie",
-            "tier": "lima174",
-            "active": false,
-            "registrar": "golf",
-            "note": "x",
-            "createdAt": "Zulu-9531",
-            "extra9": null
-          },
-          {
-            "id": "Zulu-9",
-            "name": "bravo",
-            "email": "golf",
-            "tier": "lima",
-            "note": "Zulu-9",
-            "extra2": null
+            "id": "hotel394",
+            "name": "lima190",
+            "email": "alpha",
+            "tier": "india",
+            "registrar": "delta"
           }
         ]
       },
@@ -288,45 +276,53 @@
       },
       "op.byTier.op.outcome": {
         "status": "done",
-        "selected": "customers",
-        "out": "customers"
+        "selected": "customers:made",
+        "out": "customers:made"
       },
-      "op.byTier.op.customers": {
+      "op.byTier.op.upstreamFailed": {
+        "status": "cancelled"
+      },
+      "op.byTier.op.customers:made": {
         "status": "done",
         "handler": "@std/object.port.json#make",
         "out": [
           {
-            "id": "bravo69",
-            "name": "india790",
-            "email": "Zulu-9",
-            "tier": "hotel415",
-            "active": false,
-            "registrar": "Zulu-9",
-            "note": "foxtrot"
+            "id": "alpha",
+            "name": "Zulu-9",
+            "email": "echo",
+            "tier": "kilo",
+            "active": true,
+            "note": "golf154"
           },
           {
-            "id": "delta",
-            "name": "alpha636",
-            "email": "charlie",
-            "tier": "lima174",
-            "active": false,
-            "registrar": "golf",
-            "note": "x",
-            "createdAt": "Zulu-9531",
-            "extra9": null
-          },
-          {
-            "id": "Zulu-9",
-            "name": "bravo",
-            "email": "golf",
-            "tier": "lima",
-            "note": "Zulu-9",
-            "extra2": null
+            "id": "hotel394",
+            "name": "lima190",
+            "email": "alpha",
+            "tier": "india",
+            "registrar": "delta"
           }
         ]
       },
-      "op.byTier.op.upstreamFailed": {
-        "status": "cancelled"
+      "op.byTier.op.customers": {
+        "status": "done",
+        "handler": "guard:@features/customers/data/list-rows-by-tier.graph.json#customers",
+        "out": [
+          {
+            "id": "alpha",
+            "name": "Zulu-9",
+            "email": "echo",
+            "tier": "kilo",
+            "active": true,
+            "note": "golf154"
+          },
+          {
+            "id": "hotel394",
+            "name": "lima190",
+            "email": "alpha",
+            "tier": "india",
+            "registrar": "delta"
+          }
+        ]
       },
       "op.byTier.op.none:made": {
         "status": "cancelled"

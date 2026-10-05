@@ -22,7 +22,7 @@ npm install @wilanis/access @wilanis/plugin-auth @wilanis/plugin-http
    ```json
    { "port": "@access/domain/identity.port.json", "operations": {
        "verifyCustomer": { "run": "@auth/identity.port.json#verify", "in": { "connection": "@connections/customers.connection.json", "type": "@access/domain/Attributes.shape.json" } },
-       "verifyEmployee": { "run": "@auth/identity.port.json#verify", "in": { "connection": "@connections/employees.connection.json" } },
+       "verifyEmployee": { "run": "@auth/identity.port.json#verify", "in": { "connection": "@connections/employees.connection.json", "type": "@access/domain/DirectoryAttributes.shape.json" } },
        "issue": { "run": "@auth/token.port.json#issue" },
        "refresh": { "run": "@auth/token.port.json#refresh" } } }
    ```
@@ -32,7 +32,9 @@ npm install @wilanis/access @wilanis/plugin-auth @wilanis/plugin-http
    customer directory must say which tenant each account belongs to -- `attributes.tenant` on an account
    written in the connection, a `tenant` claim from an OIDC issuer -- and `type` hands `verify` the shape that
    says so (`Attributes.shape.json`, exported): an account that does not say it fails the sign-in rather than
-   opening a session with no tenant.
+   opening a session with no tenant. Nothing is asked of the employee directory, and `type` says so with
+   `DirectoryAttributes.shape.json` (exported, open): without it what `verify` answers under `attributes` is
+   unknown, which the closed `Identity` the port answers cannot take.
 
 2. **Bind `@auth/state.port.json`**, the guard's memory, in a feature of its own (`features/state/`). `@auth`
    requires it and keeps every session and challenge through it; one delegation per operation, to the plugin's

@@ -37,6 +37,12 @@ world imposes) or `core` (ours). An edge shape lives in `edge/`, a core shape in
 only in edge shapes and native contracts. The misspelled field a partner API returns lives in an edge shape
 and never reaches the domain.
 
+A shape is closed unless it says `open`: the run refuses a key a closed shape does not declare, so the checker takes
+only a value of its own fields where one is declared -- never an open value, nor one declaring a field it does not.
+`@std/object.port.json#make` is where a value is narrowed: of a closed `type`, it keeps only the fields that type
+declares. A trigger's `out` is the one other place what a closed shape omits is dropped rather than refused: the run
+prunes the answer to the view.
+
 A list field may say `maxItems`, the most items a value may hold, judged wherever the type is judged at run
 time. It bounds a list and nothing else: written on a field of a shape or a contract that is not a list, it is
 C016.

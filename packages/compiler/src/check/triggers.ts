@@ -8,6 +8,7 @@
  * judged in access.ts; what a scenario of it pins, in scenarios.ts.
  */
 import {
+  assignableTrimmed,
   type Field,
   type Loaded,
   type Operation,
@@ -238,7 +239,8 @@ class TriggerCheck {
         'out',
         `remove out, or declare returns on '${run}'`,
       );
-    const badOut = mismatch(answers, outType);
+    // the run prunes the answer to what a closed out declares (`judged` in embed.ts): a view drops what it omits
+    const badOut = answers && outType ? assignableTrimmed(answers, outType) : null;
     if (badOut)
       this.refuse(
         'T002',

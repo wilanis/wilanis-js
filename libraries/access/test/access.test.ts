@@ -109,6 +109,7 @@ describe('the access tree on its own', () => {
       '@features/access/domain/access.port.json',
       '@features/access/domain/identity.port.json',
       '@features/access/domain/Attributes.shape.json',
+      '@features/access/domain/DirectoryAttributes.shape.json',
       '@features/access/edge/signed-in.policy.json',
       '@features/access/edge/employees-only.policy.json',
       '@features/access/edge/can-register.policy.json',

@@ -12,6 +12,14 @@
     },
     "roles": {
       "type": "string[]"
+    },
+    "claims": {
+      "type": {
+        "fields": {},
+        "open": true
+      },
+      "required": false,
+      "description": "every claim of the verified token, as the guard hands them beside the subject, realm and roles"
     }
   }
 }

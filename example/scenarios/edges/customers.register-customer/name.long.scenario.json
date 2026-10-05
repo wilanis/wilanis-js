@@ -137,7 +137,56 @@
           }
         }
       },
+      "op.registered.op.record": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "email": "delta489",
+          "tier": "bronze",
+          "registrar": "wilanis-example/0.1.0"
+        }
+      },
       "op.registered.op.outcome": {
+        "status": "done",
+        "selected": "customer:made",
+        "out": "customer:made"
+      },
+      "op.registered.op.upstreamFailed": {
+        "status": "cancelled"
+      },
+      "op.registered.op.in:check": {
+        "status": "done",
+        "selected": "in:ok",
+        "out": "in:ok"
+      },
+      "op.registered.op.in:ok": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "id": "",
+          "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "email": "delta489",
+          "tier": "bronze",
+          "registrar": "wilanis-example/0.1.0"
+        }
+      },
+      "op.registered.op.in:violated": {
+        "status": "cancelled"
+      },
+      "op.registered.op.customer:made": {
+        "status": "done",
+        "handler": "@std/object.port.json#make",
+        "out": {
+          "id": "charlie",
+          "name": "alpha136",
+          "email": "echo",
+          "tier": "echo",
+          "registrar": "echo",
+          "note": "india"
+        }
+      },
+      "op.registered.op.customer:check": {
         "status": "done",
         "selected": "customer",
         "out": "customer"
@@ -154,7 +203,7 @@
           "note": "india"
         }
       },
-      "op.registered.op.upstreamFailed": {
+      "op.registered.op.customer:violated": {
         "status": "cancelled"
       },
       "op.customer:made": {
