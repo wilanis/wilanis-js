@@ -242,3 +242,22 @@ describe('sabotage: a policy against the rules of other families', () => {
     ).toContain('X103');
   });
 });
+
+describe('sabotage: a decision handed more than its shape declares (#787)', () => {
+  it('A001 at every policy attachment reading the caller, once Principal no longer declares the claims the guard hands', () => {
+    const dropping = (shape: Doc) => {
+      delete shape.fields.claims;
+    };
+    const said = sabotageSaying('features/access/domain/Principal.shape.json', dropping);
+    expect(said.map(line => line.split(' ')[0])).toEqual(['A001', 'A001', 'A001']);
+    const hints = after(editing('features/access/domain/Principal.shape.json', dropping), dir =>
+      checkTree(loadTree(dir, PLUGINS)).items.map(one => one.hint ?? ''),
+    );
+    for (const hint of hints)
+      expect(hint).toMatch(/^the operation's shape is closed and the kind hands more: declare in it/);
+    for (const line of said)
+      expect(line).toMatch(
+        /decide\.in → @access\/domain\/access\.port\.json#require\w+: field 'principal': field 'claims' is not declared in @features\/access\/domain\/Principal\.shape\.json$/,
+      );
+  });
+});

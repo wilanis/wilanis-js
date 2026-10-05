@@ -53,18 +53,8 @@ export function refused(
   return { graph, status: 'failed', nodes: { [node]: failed }, startedAt: now, endedAt: now };
 }
 
-/** Drop keys a closed object type does not declare, recursively. Open objects and unknown pass through. */
-export function prune(value: unknown, type: Type): unknown {
-  if (type.kind === 'list' && Array.isArray(value)) return value.map(each => prune(each, type.of));
-  if (type.kind !== 'object' || !value || typeof value !== 'object' || Array.isArray(value)) return value;
-  const out: Record<string, unknown> = {};
-  for (const [name, each] of Object.entries(value as Record<string, unknown>)) {
-    const field = type.fields[name];
-    if (field) out[name] = prune(each, field.type);
-    else if (type.open) out[name] = each;
-  }
-  return out;
-}
+/** Drop keys a closed object type does not declare, recursively: core's `prune`, where the edge reads it. */
+export { prune } from '@wilanis/core';
 
 /** Coerce wire strings (query, path, headers, form fields) toward the declared field types. */
 export function coerceWire(value: unknown, type: Type): unknown {

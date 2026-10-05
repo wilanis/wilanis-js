@@ -52,6 +52,7 @@ import {
   redactOf,
   SCOPE,
 } from './lower.js';
+import { type Narrows, narrowing, tagNarrowing } from './make-narrowing.js';
 
 /**
  * Lowers a checked tree to what the kernel runs: the spec of a graph, or of the binding that meets a domain
@@ -65,6 +66,8 @@ export class Compiler {
   private readonly guardSpecs = new Map<string, KernelSpec>();
   /** what each call tagged with a site says about retrying and bounding it; every handler reads it (attempts.ts) */
   private readonly sites: Sites = new Map();
+  /** the type each `make` reading its value whole keeps, by the site its call is tagged with (make-narrowing.ts) */
+  private readonly narrows: Narrows = new Map();
 
   constructor(
     readonly scope: Scope,
@@ -127,7 +130,8 @@ export class Compiler {
     }
     const plugin = this.plugins.find(candidate => candidate.handlers[key]);
     if (!plugin) throw new Error(`no plugin implements '${key}'`);
-    this.handlers[key] = this.attempting(plugin.handlers[key]);
+    const base = plugin.handlers[key];
+    this.handlers[key] = this.attempting(key === MAKE ? narrowing(base, this.narrows) : base);
     return key;
   }
 
@@ -240,7 +244,10 @@ export class Compiler {
     const { handler, op } = this.handlerFor(node.run);
     const inputs = this.withScope(lowerValues(node.in, roots), { key: node.run, given: node.in });
     const redact = redactOf(this.scope, op, node.in);
-    const site = tagSite(this.sites, `${graphPath}#${node.id}`, node);
+    const name = `${graphPath}#${node.id}`;
+    const narrows = handler === MAKE && tagNarrowing(this.narrows, name, node, spec => this.quietType(spec));
+    const tagged = tagSite(this.sites, name, node);
+    const site = narrows ? { site: name } : tagged;
     const pure = pureOf(op);
     if (isRun(node)) return { kind: 'call', handler, in: inputs, redact, ...pure, ...site };
     const over = lowerValue(node.over, roots);

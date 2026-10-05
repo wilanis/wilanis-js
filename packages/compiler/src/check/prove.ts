@@ -10,6 +10,7 @@
  */
 import { expr, isRun, type Node, type Scope, splitPath, type Values, WHOLE_TEMPLATE } from '@wilanis/core';
 import { type Site, siteId } from '../sites.js';
+import { MAKE } from '../std-ops.js';
 import { rootsOf } from './judge.js';
 import { conjunctsOf, Narrowing, renamed } from './narrowing.js';
 
@@ -178,7 +179,7 @@ function passedThrough(site: ProofSite): string | undefined {
 
 /** The native operations that write a value out in place, and the inputs each writes it in. */
 const WRITES: Record<string, string[]> = {
-  '@std/object.port.json#make': ['value'],
+  [MAKE]: ['value'],
   '@std/object.port.json#merge': ['base', 'over'],
 };
 

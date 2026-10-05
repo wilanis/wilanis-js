@@ -9,6 +9,7 @@
  */
 import {
   assignable,
+  assignableTrimmed,
   type GuardCredential,
   type Loaded,
   type Operation,
@@ -355,10 +356,18 @@ class AccessCheck {
     }
     if (!read) return;
     const bad = assignable(read.type, takes);
-    if (bad) {
-      const hint =
-        'a read that may be missing (an anonymous caller) feeds an input the operation declares required: false, and the graph decides on has(...)';
-      this.refuse('A001', `${under}: decide.in → ${policy.doc.decide.run}: ${bad}`, at, hint);
-    }
+    if (bad)
+      this.refuse('A001', `${under}: decide.in → ${policy.doc.decide.run}: ${bad}`, at, inputHint(read.type, takes));
   }
+}
+
+/**
+ * What A001 says to do. Where only a closed shape's fields stand between them -- what the kind hands carries a field
+ * the decision's shape does not declare, or is open -- the shape is to say what it is handed; otherwise the usual
+ * case, a read that may be missing.
+ */
+function inputHint(given: Type, takes: Type): string {
+  if (assignableTrimmed(given, takes) === null)
+    return "the operation's shape is closed and the kind hands more: declare in it each field the read carries (claims as an open object, say), or give decide.in only the fields it declares";
+  return 'a read that may be missing (an anonymous caller) feeds an input the operation declares required: false, and the graph decides on has(...)';
 }

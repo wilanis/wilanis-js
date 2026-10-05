@@ -257,7 +257,6 @@ class BindingCheck {
       file: this.binding.path,
       at: `${contract.at}/in`,
       what: `'${run}'`,
-      op: key,
       from: this.binding,
       layer: null,
     });

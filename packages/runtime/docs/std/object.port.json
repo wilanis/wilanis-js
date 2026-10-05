@@ -4,7 +4,7 @@
   "description": "Objects. `make` gives a value written in place -- or a value another node answered -- a declared type, so other nodes can read its fields; `merge` lays one object over another.",
   "operations": {
     "make": {
-      "description": "The value, as the declared type. Write the object in place: \"in\": { \"value\": { \"count\": \"{{count}}\", \"text\": \"{{joined}}\" }, \"type\": \"@features/f/domain/Digest.shape.json\" }; or hand it a value another node answered, to give it a type. A closed type keeps only the fields it declares: an open or wider value -- a row an API answered through an open edge shape -- is narrowed to them here, at every depth, and this is the one place a value is narrowed so; everywhere else a closed type takes only a value of its own fields. The checker verifies the value fits the type once narrowed; at run time the narrowed value is judged against it.",
+      "description": "The value, as the declared type. Write the object in place: \"in\": { \"value\": { \"count\": \"{{count}}\", \"text\": \"{{joined}}\" }, \"type\": \"@features/f/domain/Digest.shape.json\" }; or hand it a value another node answered, to give it a type. Handed a value whole (\"value\": \"{{fetched.body}}\"), a closed type keeps only the fields it declares: an open or wider value -- a row an API answered through an open edge shape -- is narrowed to them here, at every depth, and this is the one place a value is narrowed so. An object written in place is the author's own keys: one the type does not declare is refused, never dropped. The checker verifies the value fits the type, once narrowed where it is handed whole; at run time the value is judged against it.",
       "accepts": {
         "value": {
           "type": "$T",
