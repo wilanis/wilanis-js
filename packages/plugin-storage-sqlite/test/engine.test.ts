@@ -21,6 +21,7 @@ import sqlite, { makeSqliteEngine } from '../src/index.js';
 
 const KIND = '@storage-sqlite/sqlite.connection-kind.json';
 const CONNECTION = '@connections/records.connection.json';
+const SHARED = '@connections/shared.connection.json';
 
 const scratch = mkdtempSync(join(tmpdir(), 'wilanis-sqlite-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -49,6 +50,19 @@ function treeKeeping(): string {
     description: 'a tree that keeps its entries in one SQLite file',
     name: 'kept-in-sqlite',
     plugins: [{ use: '@std' }, { use: '@storage' }, { use: '@storage-sqlite' }],
+    profiles: {
+      shared: {
+        description: 'the records kept in the shared file, which stands in for their own',
+        bindings: {},
+        connections: { [CONNECTION]: SHARED },
+      },
+    },
+  });
+  write('connections/shared.connection.json', {
+    $schema: '@wilanis/connection.schema.json',
+    description: 'a second file, which the shared profile reaches in place of the records',
+    kind: KIND,
+    settings: { file: '.wilanis/shared.sqlite' },
   });
   write('connections/records.connection.json', {
     $schema: '@wilanis/connection.schema.json',
@@ -87,12 +101,15 @@ const dir = treeKeeping();
  * The tree loaded and every `postLoad` run, as `wilanis start` does, with the engine the plugin registered and
  * the collection as @storage would hand it one: the connection's settings as the tree states them.
  */
-async function loaded() {
+async function loaded(profile?: string) {
   const tree = loadTree(dir, PLUGINS);
-  const emb = embedderFor(tree);
+  const emb = embedderFor(tree, profile ? { profile } : {});
   const down = await postLoad(tree, emb, () => {});
-  const path = tree.resolve(CONNECTION);
-  const conn = (emb.env.connections as Record<string, { kind: string; settings?: Record<string, unknown> }>)[path];
+  const named = tree.resolve(CONNECTION);
+  const conn = (
+    emb.env.connections as Record<string, { kind: string; settings?: Record<string, unknown>; path?: string }>
+  )[named];
+  const path = conn.path ?? named;
   const engine = engines(emb.env).for(conn.kind);
   if (!engine) throw new Error(`no engine registered for '${conn.kind}'`);
   const at: At = {
@@ -111,7 +128,12 @@ async function loaded() {
     await down();
     if (emb.blobs instanceof FileBlobStore) emb.blobs.destroy();
   };
-  return { engine, at, close };
+  const put = (record: Record<string, unknown>) =>
+    storage.handlers['@storage/store.port.json#put']({
+      in: { store: '@features/customers/data/customers.store.json', collection: 'entries', record },
+      ctx: { env: emb.env } as never,
+    });
+  return { engine, at, close, put, resolve: tree.resolve };
 }
 
 describe('a tree that names this engine', () => {
@@ -141,6 +163,33 @@ describe('a tree that names this engine', () => {
       expect(await second.engine.count(second.at, undefined)).toBe(1);
     } finally {
       await second.close();
+    }
+  });
+});
+
+/**
+ * A stand-in: under `shared` the profile reaches `shared.connection.json` wherever `records.connection.json` is
+ * named, and @storage hands the engine the reached connection's path (#774). The engine keeps its handles, and a
+ * transaction's join, by that path, so a store naming the records writes into the shared file, on the handle
+ * every name reaching that file shares.
+ */
+describe('a connection a profile stands in for another', () => {
+  it("is written in the stand-in's file, under the stand-in's path", async () => {
+    const under = await loaded('shared');
+    try {
+      expect(under.at.connection).toBe(under.resolve(SHARED));
+      await under.engine.ensure([under.at]);
+      await under.put({ id: 's', url: 'https://shared.example' });
+      const direct = { ...under.at, connection: under.resolve(SHARED), settings: { file: '.wilanis/shared.sqlite' } };
+      expect((await under.engine.get(direct, 's')).record).toEqual({ id: 's', url: 'https://shared.example' });
+    } finally {
+      await under.close();
+    }
+    const own = await loaded();
+    try {
+      expect((await own.engine.get(own.at, 's')).record).toBeUndefined();
+    } finally {
+      await own.close();
     }
   });
 });
