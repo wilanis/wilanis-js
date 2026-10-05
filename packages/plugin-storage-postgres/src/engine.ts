@@ -38,6 +38,7 @@ import { inspectTable } from './inspect.js';
 import { refName, scopedUniqueName, uniqueName } from './names.js';
 import { poolFor, type Settings } from './pool.js';
 import { currentOf, ensureRecord, historyOf } from './record.js';
+import { writing } from './savepoint.js';
 import { ensureScope, scopeColumns, scopeValues, within } from './scoping.js';
 
 /** What a row becomes on its way back out: the record the shape describes, or the reason it is not one. */
@@ -173,6 +174,8 @@ export class PostgresEngine implements Engine {
    * Write the whole record under its own key. A `unique` the store declares is held by the database, and the
    * violation comes back as an error this engine turns into the `violated` the port promises -- a constraint
    * is answered, not thrown, and which one answered is read off the constraint's own name.
+   * Inside a transaction the statement runs under a savepoint (`savepoint.ts`), as a patch's and a remove's
+   * do, so that answer leaves the transaction usable for whatever the graph writes next.
    *
    * The scope columns are written beside the record, whatever the record says -- it cannot say anything,
    * since they are not its fields. A key already held under another scope is a `conflict` even with
@@ -184,14 +187,17 @@ export class PostgresEngine implements Engine {
     const values = { ...row(given, at), ...scopeValues(scope) };
     const key = folded(at.key);
     try {
-      const written = await db
-        .insertInto(table as never)
-        .values(values as never)
-        .onConflict(oc =>
-          replace ? this.replacing(oc as never, at, values, scope) : oc.column(key as never).doNothing(),
-        )
-        .returning(columns(at) as never)
-        .executeTakeFirst();
+      const [written] = await writing(
+        db,
+        db
+          .insertInto(table as never)
+          .values(values as never)
+          .onConflict(oc =>
+            replace ? this.replacing(oc as never, at, values, scope) : oc.column(key as never).doNothing(),
+          )
+          .returning(columns(at) as never),
+        Boolean(this.on),
+      );
       if (!written) return { conflict: true };
       return { record: record(written as Record<string, unknown>, at), conflict: false };
     } catch (error) {
@@ -223,13 +229,16 @@ export class PostgresEngine implements Engine {
     const values = changed(changes, at);
     if (!Object.keys(values).length) return this.get(at, key, written?.scope);
     try {
-      const after = await db
-        .updateTable(table as never)
-        .set(values as never)
-        .where(folded(at.key) as never, '=', key as never)
-        .where(eb => within(eb as never, written?.scope) as never)
-        .returning(columns(at) as never)
-        .executeTakeFirst();
+      const [after] = await writing(
+        db,
+        db
+          .updateTable(table as never)
+          .set(values as never)
+          .where(folded(at.key) as never, '=', key as never)
+          .where(eb => within(eb as never, written?.scope) as never)
+          .returning(columns(at) as never),
+        Boolean(this.on),
+      );
       return { record: record(after as Record<string, unknown> | undefined, at) };
     } catch (error) {
       const violated = violation(error, at, written?.scope);
@@ -246,12 +255,15 @@ export class PostgresEngine implements Engine {
   async remove(at: At, key: unknown, scope?: Scope) {
     const { db, table } = await this.scoped(at, scope);
     try {
-      const gone = await db
-        .deleteFrom(table as never)
-        .where(folded(at.key) as never, '=', key as never)
-        .where(eb => within(eb as never, scope) as never)
-        .returning(columns(at) as never)
-        .executeTakeFirst();
+      const [gone] = await writing(
+        db,
+        db
+          .deleteFrom(table as never)
+          .where(folded(at.key) as never, '=', key as never)
+          .where(eb => within(eb as never, scope) as never)
+          .returning(columns(at) as never),
+        Boolean(this.on),
+      );
       const before = record(gone as Record<string, unknown> | undefined, at);
       return before ? { record: before, removed: true } : { removed: false };
     } catch (error) {
