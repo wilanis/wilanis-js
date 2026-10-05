@@ -48,9 +48,10 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
 - A startup step names a domain operation or a native `holds` operation, with inputs it has and no read of the
   context. [[B006](refusals/B006.md), [B007](refusals/B007.md), [B008](refusals/B008.md)] (before the RFCs)
 - An operation that listens is one that holds, and each part of the address it binds is read from an input it accepts
-  or a setting its plugin declares, of the part's type; a connection kind's `endpoint` is a string setting it
-  declares. [[L014](refusals/L014.md), [L015](refusals/L015.md), [L017](refusals/L017.md), [C020](refusals/C020.md)]
-  (RFC 0024)
+  or a setting its plugin declares, of the part's type; a port the tree writes as a literal where a `listens` reads it
+  is a whole number from 0 to 65535; a connection kind's `endpoint` is a string setting it declares.
+  [[L014](refusals/L014.md), [L015](refusals/L015.md), [L017](refusals/L017.md), [L018](refusals/L018.md),
+  [C020](refusals/C020.md)] (RFC 0024)
 - Every value fits the type declared for it, every input is given, once, from something that exists, and a field
   the checker must see is written as a literal. [[G003](refusals/G003.md), [G004](refusals/G004.md),
   [G005](refusals/G005.md), [G006](refusals/G006.md), [G013](refusals/G013.md), [B005](refusals/B005.md),
