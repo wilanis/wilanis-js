@@ -55,6 +55,9 @@ describe('what a server answers to SELECT version(), held to the kind', () => {
 
   it('a server that cannot be reached is not refused at start: what uses the connection fails, as before', async () => {
     expect(await versionAt('postgres://wilanis@127.0.0.1:1/none')).toBeUndefined();
+    // a URL pg cannot even parse reaches nothing too, rather than throwing out of postLoad
+    expect(await versionAt('postgres://[bad')).toBeUndefined();
+    expect(engines(await started('postgres://[bad')).for(KIND)).toBeDefined();
     expect(engines(await started('postgres://wilanis@127.0.0.1:1/none')).for(KIND)).toBeDefined();
     // a connection whose secret the profile never reads carries no URL at all, and is not asked
     expect(engines(await started('')).for(KIND)).toBeDefined();
