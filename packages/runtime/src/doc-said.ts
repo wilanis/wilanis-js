@@ -87,16 +87,18 @@ export function featureLines(doc: Loaded): string[] {
 }
 
 /**
- * A connection: the kind that gives it meaning and what that kind delivers, the profiles whose `permits` name it
+ * A connection: the kind that gives it meaning, what the engine behind that kind can do (RFC 0022, said by the
+ * caller off the kind document) and what that kind delivers, the profiles whose `permits` name it
  * (RFC 0016), what it reaches where the kind names the setting that holds the address, the settings it is configured with,
  * where a profile names it under `connections`, what it stands in for or what replaces it there -- a reader of
  * the connection a data graph names learns it is not what every profile reaches -- and, for a broker, the
  * triggers receiving from it and the calls sending to it.
  */
-export function connectionLines(doc: Loaded, scope: Scope): string[] {
+export function connectionLines(doc: Loaded, scope: Scope, capabilities: string[] = []): string[] {
   const declared = doc.doc as ConnectionDoc;
   const lines = [
     `kind  ${declared.kind}`,
+    ...capabilities,
     ...deliveryLines(doc, scope),
     ...permittedLines(scope, doc),
     ...endpointLines(doc, scope),

@@ -30,7 +30,7 @@ export {
   sendersOf,
   sendsOf,
 } from './delivery.js';
-export { UNCAUGHT_FAULT } from './discovery.js';
+export { describeCapabilities, UNCAUGHT_FAULT } from './discovery.js';
 export { coerceWire, Embedder, type FireOptions, fillTemplates, type Observers, prune } from './embed.js';
 export {
   correlationOf,

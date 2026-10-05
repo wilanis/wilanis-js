@@ -4,6 +4,7 @@
  */
 import type { LoadResult } from '@wilanis/core';
 import {
+  type ConnectionKindDoc,
   type Kind,
   type Loaded,
   type PolicyDoc,
@@ -233,7 +234,8 @@ function kindBody(doc: Loaded, load: LoadResult, scope: Scope, showType: (spec: 
   if (doc.kind === 'port') return portLines(doc, showType);
   if (doc.kind === 'plugin') return [...kindLines(doc, showType), ...requiresLines(doc, scope)];
   if (doc.kind === 'trigger-kind') return kindLines(doc, showType);
-  if (doc.kind === 'connection-kind') return [...deliveryKindLines(doc), ...kindLines(doc, showType)];
+  if (doc.kind === 'connection-kind')
+    return [...deliveryKindLines(doc), ...kindLines(doc, showType), ...capabilityLines(doc.doc as ConnectionKindDoc)];
   if (doc.kind === 'shape') return shapeLines(doc, scope, load, showType);
   if (doc.kind === 'store') return storeLines(doc, load, scope);
   if (doc.kind === 'policy') return policyLines(doc, scope);
@@ -248,11 +250,34 @@ function plainBody(doc: Loaded, load: LoadResult, scope: Scope): string[] {
   if (doc.kind === 'binding') return bindingLines(doc, scope);
   if (doc.kind === 'resolvers') return resolversLines(doc, load);
   if (doc.kind === 'feature') return featureLines(doc);
-  if (doc.kind === 'connection') return connectionLines(doc, scope);
+  if (doc.kind === 'connection') return connectionLines(doc, scope, capabilityLines(kindOf(doc, scope)));
   if (doc.kind === 'codec') return codecLines(doc);
   if (doc.kind === 'scenario') return scenarioLines(doc);
   if (doc.kind === 'project') return projectLines(doc, scope);
   return [];
+}
+
+/**
+ * What the engine behind one storage kind can do (RFC 0022), read off the `capabilities` block of the loaded kind
+ * document and never off a plugin's export: the runtime sees a plugin through `PluginModule` alone.
+ */
+export function describeCapabilities(kind: ConnectionKindDoc): string | undefined {
+  const held = kind.capabilities;
+  if (!held) return undefined;
+  const said = (fact: boolean) => (fact ? 'yes' : 'no');
+  const unique = held.unique.length ? held.unique.join(', ') : 'none';
+  return `transactional DDL: ${said(held.transactionalDdl)}; unique over: ${unique}; refs: ${said(held.refs)}`;
+}
+
+/** The capabilities line of one connection kind, where its kind is a storage kind that states them. */
+function capabilityLines(kind: ConnectionKindDoc | undefined): string[] {
+  const said = kind && describeCapabilities(kind);
+  return said ? [`capabilities  ${said}`] : [];
+}
+
+/** The kind document one connection names, when the tree loaded it. */
+function kindOf(doc: Loaded, scope: Scope): ConnectionKindDoc | undefined {
+  return scope.get('connection-kind', (doc.doc as { kind: string }).kind)?.doc;
 }
 
 /** Who granted one document: the plugin that ships it, or the tree it was included from. */
