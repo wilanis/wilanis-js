@@ -36,8 +36,10 @@ export interface CallSite {
   at: string;
   /** the callee, for messages */
   what: string;
-  /** the callee as `path#operation` where the run may trim an input it is given (`trimsAt`); absent, none is */
+  /** the callee as `path#operation`, which says whether an input is trimmed (`trimsAt`) or the compiler's own */
   op?: string;
+  /** a graph's node, where `make` may narrow what it reads whole; a binding's delegation never does */
+  inGraph?: boolean;
   from: Loaded;
   layer: ShapeLayer;
   /** inputs typed elsewhere (a map's bound element) */
@@ -69,14 +71,17 @@ export function checkInputs(judge: Judge, site: CallSite): Record<string, Type> 
 }
 
 /**
- * Does the run trim this input to its declared type before judging it? Only `make`'s `value` where it is one whole
- * read (`{{customer}}`) in a graph's node: that is the narrowing a graph writes, which the compiler lowers to keep
- * only what a closed `type` declares (`make-narrowing.ts`). An object written out in the node is the author's
- * own keys, judged strictly, so a misspelt one is refused rather than dropped.
+ * Is this input of a graph's node trimmed to its declared type before it is judged? Only `make`'s `value` where it
+ * is one whole read (`{{customer}}`): that is the narrowing a graph writes. The checker judges it so, and the
+ * compiler lowers the same node with `trim: true`, asking this, so the two cannot disagree. An object written out in
+ * the node is the author's own keys, judged strictly, so a misspelt one is refused rather than dropped.
  */
 export function trimsAt(op: string | undefined, name: string, given: unknown): boolean {
   return op === MAKE && name === 'value' && typeof given === 'string' && WHOLE_TEMPLATE.test(given);
 }
+
+/** `make`'s `trim`, which the compiler sets where `trimsAt` says and no document writes. */
+const TRIM = 'trim';
 
 const BRACES = /^\{\{(.*)\}\}$/s;
 const INDEX = /^[0-9]+$/;
@@ -115,6 +120,7 @@ class InputCheck {
 
   run(): Record<string, Type> {
     this.checkUnknown();
+    this.checkTrim();
     // what binds comes first: the rest may be typed through the variables bound here
     for (const [name, field] of Object.entries(this.accepts))
       if (this.isTypeField(field)) this.checkTypeField(name, field);
@@ -135,6 +141,17 @@ class InputCheck {
 
   private isTypeField(field: Field): boolean {
     return this.judge.quiet(field.type)?.kind === 'type';
+  }
+
+  /** G004: `make`'s `trim` is the compiler's, lowered where `trimsAt` says; a document never writes it. */
+  private checkTrim(): void {
+    if (this.site.op !== MAKE || !(TRIM in this.site.given)) return;
+    this.refuse(
+      'G004',
+      `'${TRIM}' is set by the compiler, where make reads its value whole, and never written`,
+      `${this.site.at}/${TRIM}`,
+      'remove trim: hand make the value whole ("{{node}}") to keep only what a closed type declares, or write the object out to hold it to the type',
+    );
   }
 
   /** G006: everything given is an input. */
@@ -194,7 +211,7 @@ class InputCheck {
       this.refuse('G004', `'${name}' may be missing at run time but ${this.site.what} requires it`, at, hint);
       return;
     }
-    const trims = trimsAt(this.site.op, name, this.site.given[name]);
+    const trims = this.site.inGraph === true && trimsAt(this.site.op, name, this.site.given[name]);
     const bad = trims ? assignableTrimmed(read.type, want) : assignable(read.type, want);
     if (!bad) return;
     const hint = joinsAnswers(this.site.given[name])
@@ -224,6 +241,7 @@ class InputCheck {
   /** How an input is typed: from `extra`, from the value given (a static field as a literal, P001), or not at all (G005 when required). */
   private readOf(name: string, field: Field): Read | undefined {
     if (name in this.extra) return this.extra[name];
+    if (this.site.op === MAKE && name === TRIM) return undefined; // the compiler's (checkTrim)
     if (!(name in this.site.given)) {
       this.requireGiven(field, `${this.site.what} requires input '${name}'`);
       return undefined;
