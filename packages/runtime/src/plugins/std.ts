@@ -4,7 +4,7 @@
  */
 import { fileURLToPath } from 'node:url';
 import type { PluginModule } from '@wilanis/core';
-import { conforms, type Type } from '@wilanis/core';
+import { conforms, prune, type Type } from '@wilanis/core';
 import { Refusal, readPath } from '@wilanis/engine';
 
 const obj = (value: unknown, what: string): Record<string, unknown> => {
@@ -31,11 +31,18 @@ const declared = (value: unknown, type: unknown, env: Record<string, unknown>): 
   return value;
 };
 
+/** make's narrowing: the value with what each closed object of the declared type does not declare dropped. */
+const trimmed = (value: unknown, type: unknown, env: Record<string, unknown>): unknown => {
+  const resolve = env.resolveType as ((ref: string) => Type) | undefined;
+  return resolve && typeof type === 'string' ? prune(value, resolve(type)) : value;
+};
+
 export const std: PluginModule = {
   root: '@std',
   docs: fileURLToPath(new URL('../../docs/std', import.meta.url)),
   handlers: {
-    '@std/object.port.json#make': async ({ in: input, ctx }) => declared(input.value, input.type, ctx.env),
+    '@std/object.port.json#make': async ({ in: input, ctx }) =>
+      declared(input.trim === true ? trimmed(input.value, input.type, ctx.env) : input.value, input.type, ctx.env),
     '@std/object.port.json#merge': async ({ in: input, ctx }) =>
       declared({ ...obj(input.base, 'base'), ...obj(input.over, 'over') }, input.type, ctx.env),
     '@std/outcome.port.json#refuse': async ({ in: input }) => {

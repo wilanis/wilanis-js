@@ -17,7 +17,7 @@ describe('a secret field, in the report of a run', () => {
 
   it("is the marker in the input of a generic operation, typed through the call's type binding", async () => {
     const { report } = await fired('accounts');
-    expect(nodeNamed(report, 'made')?.in).toEqual({ value: REDACTED, type: ACCOUNTS });
+    expect(nodeNamed(report, 'made')?.in).toEqual({ value: REDACTED, type: ACCOUNTS, trim: true });
     expect(nodeNamed(report, 'made')?.out).toEqual(REDACTED);
   });
 
@@ -36,7 +36,7 @@ describe('a secret field, in the report of a run', () => {
     expect(report.status).toBe('done');
     // the binding hands the one field the operation marks under `in`, and the graph's node reads it whole
     expect(report.nodes.op.in).toEqual({ in: SECRET });
-    expect(nodeNamed(report, 'opened')?.in).toEqual({ value: SECRET, type: 'string' });
+    expect(nodeNamed(report, 'opened')?.in).toEqual({ value: SECRET, type: 'string', trim: true });
     expect(answer).toBe('k-1');
   });
 });

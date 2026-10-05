@@ -94,7 +94,7 @@ describe('a guard, in the report of a run', () => {
     expect(report.status).toBe('done');
     expect(answer).toEqual(ADA);
     const shown = { name: 'ada', password: SECRET };
-    expect(nodeNamed(report, 'login:made')?.in).toEqual({ value: shown, type: LOGIN });
+    expect(nodeNamed(report, 'login:made')?.in).toEqual({ value: shown, type: LOGIN, trim: true });
     expect(nodeNamed(report, 'login:check')?.in).toEqual({ name: 'ada', password: SECRET });
     expect(nodeNamed(report, 'login')?.in).toEqual({ value: shown });
     expect(nodeNamed(report, 'login')?.out).toEqual(shown);

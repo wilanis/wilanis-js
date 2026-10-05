@@ -6,11 +6,12 @@
  * is the author's own keys, and a misspelt one is refused rather than dropped.
  */
 import { rmSync } from 'node:fs';
-import { runGraph } from '@wilanis/compiler';
+import { Compiler, runGraph } from '@wilanis/compiler';
+import { loadTree, type PluginModule, Scope } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
 import { describe, expect, it } from 'vitest';
 import { embedderFor } from '../src/index.js';
-import { loadedEditing, sabotageSaying } from './example-harness.js';
+import { EXAMPLE, INCLUDES, loadedEditing, PLUGINS, sabotageSaying } from './example-harness.js';
 
 const CUSTOMER = '@features/customers/domain/Customer.shape.json';
 const ROW = '@features/customers/edge/CustomerRow.shape.json';
@@ -24,6 +25,13 @@ describe('sabotage: a closed shape handed what it does not declare', () => {
       delete value.registrar;
     });
     expect(said).toEqual([`G004 'value': field 'registar' is not declared in ${CUSTOMER}`]);
+  });
+
+  it("G004 make's trim written by hand: the compiler sets it where make reads its value whole", () => {
+    const said = sabotageSaying('features/customers/domain/register-customer.graph.json', graph => {
+      byId(graph, 'customer').in.trim = true;
+    });
+    expect(said).toEqual(["G004 'trim' is set by the compiler, where make reads its value whole, and never written"]);
   });
 
   it('G004 an open row handed whole to a store write that keeps Customers', () => {
@@ -97,5 +105,26 @@ describe('the run agrees: make narrows only a value it reads whole', () => {
     );
     expect(report.status).toBe('failed');
     expect(report.nodes['customer:made']?.error).toContain('$.registar: not a declared field');
+  });
+});
+
+describe('the lowering says where make narrows, in the spec', () => {
+  const modules = Object.values(PLUGINS) as PluginModule[];
+  const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);
+  const lowered = (graph: string) =>
+    new Compiler(new Scope(load.registry, load.resolve), modules, { profile: 'live' }).graph(graph).spec;
+
+  it("sets trim on a make that reads its value whole: get-row's row, moved aside as customer:made by its guard", () => {
+    expect(lowered('@features/customers/data/get-row.graph.json').nodes['customer:made']).toMatchObject({
+      kind: 'call',
+      handler: '@std/object.port.json#make',
+      in: { value: { ref: 'fetched', path: ['body'] }, trim: { value: true } },
+    });
+  });
+
+  it("sets none on a make written out in the node: register-customer's customer", () => {
+    const made = lowered('@features/customers/domain/register-customer.graph.json').nodes['customer:made'];
+    expect(made).toMatchObject({ kind: 'call', handler: '@std/object.port.json#make' });
+    expect(made && 'in' in made ? made.in : {}).not.toHaveProperty('trim');
   });
 });

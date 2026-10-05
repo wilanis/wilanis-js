@@ -63,7 +63,7 @@ describe('a secret read into a type that does not mark it', () => {
   it('is the marker in the answer of a make typed string, and in the text that reads it', async () => {
     const report = await badged();
     expect(report.status).toBe('done');
-    expect(nodeNamed(report, 'pass')?.in).toEqual({ value: SECRET, type: 'string' });
+    expect(nodeNamed(report, 'pass')?.in).toEqual({ value: SECRET, type: 'string', trim: true });
     expect(nodeNamed(report, 'pass')?.out).toBe(SECRET);
     expect(nodeNamed(report, 'basic')?.in).toEqual({ value: SECRET, type: 'string' });
     expect(nodeNamed(report, 'basic')?.out).toBe(SECRET);
