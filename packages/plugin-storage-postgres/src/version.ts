@@ -35,12 +35,18 @@ export function tooOld(connection: string, kind: string, answer: string): string
   return `connection '${connection}' reaches ${what}; ${kind} requires PostgreSQL ${REQUIRED} or later`;
 }
 
-/** What a server answers to `SELECT version()`, on a connection of its own closed after; nothing where none is reached. */
+/**
+ * What a server answers to `SELECT version()`, on a connection of its own closed after; nothing where none is
+ * reached. A URL pg cannot parse reaches nothing either: the client is made inside the `try`, since its
+ * constructor throws on one.
+ */
 export async function versionAt(url: string): Promise<string | undefined> {
-  const client = new pg.Client({ connectionString: url, connectionTimeoutMillis: CONNECT_TIMEOUT_MS });
+  let client: pg.Client | undefined;
   try {
+    client = new pg.Client({ connectionString: url, connectionTimeoutMillis: CONNECT_TIMEOUT_MS });
     await client.connect();
   } catch {
+    await client?.end().catch(() => undefined);
     return undefined;
   }
   try {
