@@ -152,6 +152,89 @@ function keyWord(node: object, found: string[]): void {
   if (key?.type === 'StringLiteral' && key.value) found.push(key.value);
 }
 
+/**
+ * One place a file's text calls, constructs or reads a member of a bare name, or reads a property by name, with
+ * the string it is handed where that string is written out in the source.
+ */
+export interface Reach {
+  name: string;
+  form: 'call' | 'new' | 'member' | 'property';
+  argument: string | null;
+  line: number;
+}
+
+/** A parsed node as `reachesOf` reads it: only the fields a call, a construction or a member read carries. */
+interface Loose {
+  type: string;
+  name?: string;
+  value?: unknown;
+  computed?: boolean;
+  callee?: Loose;
+  object?: Loose;
+  property?: Loose;
+  source?: Loose;
+  arguments?: Loose[];
+  expressions?: Loose[];
+  quasis?: { value: { cooked?: string | null } }[];
+  loc?: { start: { line: number } } | null;
+}
+
+/**
+ * Every call, construction and member read a file's text makes of a bare name, and every property it reads by
+ * name, comments and the contents of strings left out: `eval(x)` and `(0, eval)(x)` are calls of `eval`,
+ * `new Function(x)` a construction of `Function`, `vm.run` a member read of `vm`, `globalThis.eval` a property
+ * read of `eval`, `import(x)` a call of `import`, and a call of what `createRequire(...)` answers a call of
+ * `require`. `argument` is the first argument where it is a string written out whole, and null otherwise.
+ */
+export function reachesOf(text: string): Reach[] {
+  const found: Reach[] = [];
+  walk(parse(text, { sourceType: 'module', plugins: ['typescript'] }).program, node => {
+    found.push(...reachOf(node as Loose));
+  });
+  return found;
+}
+
+/** The reaches one node makes, or nothing where it is no call, construction or member read. */
+function reachOf(node: Loose): Reach[] {
+  const line = node.loc?.start.line ?? 0;
+  if (node.type === 'ImportExpression') return [{ name: 'import', form: 'call', argument: fixedOf(node.source), line }];
+  if (node.type === 'MemberExpression') return memberReaches(node, line);
+  const form = FORMS[node.type];
+  const name = bareName(node.callee);
+  return form && name ? [{ name, form, argument: fixedOf(node.arguments?.[0]), line }] : [];
+}
+
+const FORMS: Record<string, Reach['form']> = { CallExpression: 'call', NewExpression: 'new' };
+
+/** What a member read reaches: the bare name it reads a member of, and the property it reads by name. */
+function memberReaches(node: Loose, line: number): Reach[] {
+  const object = bareName(node.object);
+  const property = node.computed ? fixedOf(node.property) : (node.property?.name ?? null);
+  return [
+    ...(object ? [{ name: object, form: 'member' as const, argument: null, line }] : []),
+    ...(property ? [{ name: property, form: 'property' as const, argument: null, line }] : []),
+  ];
+}
+
+/**
+ * The name a callee or an object spells: an identifier, `import`, the last of a comma expression, or `require`
+ * for what `createRequire` answers.
+ */
+function bareName(node: Loose | undefined): string | null {
+  if (node?.type === 'Identifier') return node.name ?? null;
+  if (node?.type === 'Import') return 'import';
+  if (node?.type === 'SequenceExpression') return bareName(node.expressions?.at(-1));
+  const required = node?.type === 'CallExpression' && bareName(node.callee) === 'createRequire';
+  return required ? 'require' : null;
+}
+
+/** The string an argument is where it is written out whole, so what it names is fixed in the source; else null. */
+function fixedOf(node: Loose | undefined): string | null {
+  if (node?.type === 'StringLiteral' && typeof node.value === 'string') return node.value;
+  const plain = node?.type === 'TemplateLiteral' && node.expressions?.length === 0;
+  return plain ? (node?.quasis?.[0]?.value.cooked ?? null) : null;
+}
+
 /** Every node of a parsed tree, comments left out because the parser keeps them off the tree by default. */
 function walk(node: unknown, visit: (node: { type: string; name?: string; value?: string }) => void): void {
   if (!node || typeof node !== 'object') return;
