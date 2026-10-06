@@ -23,28 +23,19 @@ import type {
   Where,
   Written,
 } from '@wilanis/plugin-storage';
-import type { Kysely } from 'kysely';
+import type { Kysely, OnConflictBuilder } from 'kysely';
 import { typeOf } from './columns.js';
 import { ensureTables } from './ensure.js';
 import { conditionOf, orderingsOf } from './filter.js';
 import { type Handles, locked } from './handles.js';
 import { reserve, uuidv7 } from './keys.js';
 import { changedOf, columnsOf, keyIn, recordOf, rowOf } from './rows.js';
+import { keepScope, scopeColumns, scopeValues, within, withoutScope } from './scoping.js';
 import { isIdentity, type Settings } from './settings.js';
 import { Unrecorded } from './unrecorded.js';
 import { removeViolation, writeViolation } from './violations.js';
 
 type Row = Record<string, unknown>;
-
-/**
- * A collection asked about under a scope fails the node rather than answering every scope's rows: keeping a
- * scope (RFC 0015) is RFC 0022's sixth step for this engine, and an engine that ignored one would hand one
- * tenant another's records.
- */
-function unscoped(at: At, scope: Scope | undefined): void {
-  if (scope !== undefined)
-    throw new Error(`'${at.name}' is kept under a scope, and the sqlite engine keeps no scope yet (RFC 0022, step 6)`);
-}
 
 /** An @storage engine keeping records in the tables of one SQLite file. */
 export class SqliteEngine extends Unrecorded implements Engine {
@@ -66,27 +57,43 @@ export class SqliteEngine extends Unrecorded implements Engine {
     return this.on ?? this.handles.for(at);
   }
 
-  /** A select of every column of the collection, filtered as the caller asked. */
-  private selecting(at: At, where: Where | undefined) {
+  /**
+   * The handle, with the table made ready to be narrowed by this scope (`scoping.ts`): every statement below
+   * carries the predicate, so every one of them has to know the columns are there. A scope column is not part
+   * of what the store declares, so `ensure` never makes one and the first statement that names a scope does.
+   */
+  private async scoped(at: At, scope: Scope | undefined): Promise<Kysely<never>> {
+    const db = this.db(at);
+    await keepScope({ db, owner: this.handles, lasting: !this.on }, at, scope);
+    return db;
+  }
+
+  /**
+   * A select of every column of the collection, filtered as the caller asked and narrowed to the scope. No
+   * scope adds a predicate that holds of every row, which is how a view -- and an unscoped collection -- sees
+   * every row.
+   */
+  private selecting(at: At, where: Where | undefined, scope: Scope | undefined) {
     const query = this.db(at)
       .selectFrom(at.name as never)
-      .select(columnsOf(at) as never);
+      .select(columnsOf(at) as never)
+      .where(eb => within(eb as never, scope) as never);
     return where ? query.where(eb => conditionOf(eb as never, where, at.shape) as never) : query;
   }
 
-  /** The record under that key, or `record` absent where the collection holds none. */
+  /** The record under that key within the scope, or `record` absent where the collection holds none. */
   async get(at: At, key: unknown, scope?: Scope) {
-    unscoped(at, scope);
-    const found = await this.selecting(at, undefined)
+    await this.scoped(at, scope);
+    const found = await this.selecting(at, undefined, scope)
       .where(at.key as never, '=', keyIn(at, key) as never)
       .executeTakeFirst();
     return { record: recordOf(found as Row | undefined, at) };
   }
 
-  /** Every record the query matches, in the order asked for and cut to the page asked for. */
+  /** Every record of the scope the query matches, in the order asked for and cut to the page asked for. */
   async find(at: At, query: Query) {
-    unscoped(at, query.scope);
-    let select = this.selecting(at, query.where);
+    await this.scoped(at, query.scope);
+    let select = this.selecting(at, query.where, query.scope);
     for (const one of orderingsOf(query.order, at.shape)) select = select.orderBy(one as never) as never;
     if (query.limit !== undefined || query.offset !== undefined) select = select.limit(query.limit ?? -1) as never;
     if (query.offset !== undefined) select = select.offset(query.offset) as never;
@@ -94,12 +101,13 @@ export class SqliteEngine extends Unrecorded implements Engine {
     return rows.map(one => recordOf(one, at) as Record_);
   }
 
-  /** How many records the filter matches. */
+  /** How many records of the scope the filter matches. */
   async count(at: At, where: Where | undefined, scope?: Scope) {
-    unscoped(at, scope);
-    let query = this.db(at)
+    const db = await this.scoped(at, scope);
+    let query = db
       .selectFrom(at.name as never)
-      .select(eb => eb.fn.countAll().as('n'));
+      .select(eb => eb.fn.countAll().as('n'))
+      .where(eb => within(eb as never, scope) as never);
     if (where) query = query.where(eb => conditionOf(eb as never, where, at.shape) as never) as never;
     const answer = (await query.executeTakeFirst()) as { n: number } | undefined;
     return Number(answer?.n ?? 0);
@@ -109,16 +117,21 @@ export class SqliteEngine extends Unrecorded implements Engine {
    * Write the whole record under its own key; with `replace` false, write nothing where one is there. A
    * `unique` or a `refs` the file refuses is answered as the `violated` the port promises, read back from
    * what SQLite says it refused.
+   *
+   * The scope columns are written beside the record, whatever the record says -- it cannot say anything, since
+   * they are not its fields. A key already held under another scope is a `conflict` even with `replace`: the
+   * upsert's update is itself narrowed to the scope, so the row of another one is not touched and nothing is
+   * returned.
    */
   async put(at: At, given: Record_, { replace, scope }: Put) {
-    unscoped(at, scope);
-    const values = rowOf(given, at);
-    return this.answering(at, given, { conflict: false }, async db => {
+    await this.scoped(at, scope);
+    const values = { ...rowOf(given, at), ...scopeValues(scope) };
+    return this.answering(at, { given, scope }, { conflict: false }, async db => {
       const written = await db
         .insertInto(at.name as never)
         .values(values as never)
         .onConflict(oc =>
-          replace ? oc.column(at.key as never).doUpdateSet(values as never) : oc.column(at.key as never).doNothing(),
+          replace ? this.replacing(oc as never, at, values, scope) : oc.column(at.key as never).doNothing(),
         )
         .returning(columnsOf(at) as never)
         .executeTakeFirst();
@@ -128,14 +141,26 @@ export class SqliteEngine extends Unrecorded implements Engine {
   }
 
   /**
+   * The `do update` of a replacing put, narrowed to the scope it is written under. Without a scope it replaces
+   * whatever is under the key; with one it replaces only the row of that scope, so a key another scope holds
+   * falls through the conflict untouched and `put` answers it as the conflict it is.
+   */
+  private replacing(oc: OnConflictBuilder<never, never>, at: At, values: Row, scope?: Scope) {
+    const update = oc.column(at.key as never).doUpdateSet(values as never);
+    return scopeColumns(scope).length ? update.where(eb => within(eb as never, scope, at.name) as never) : update;
+  }
+
+  /**
    * Run one write, and answer a `unique` or a `refs` the file refused as the `violated` the port promises,
    * beside what the operation answers when nothing was written (`refused`). `given` is what the write named --
-   * the whole record of a put, the changes of a patch -- since a refused reference is found among its fields.
-   * Anything else the write throws passes up. `put` and `patch` share it, so the two name a violation alike.
+   * the whole record of a put, the changes of a patch -- since a refused reference is found among its fields;
+   * `scope` is what it was written under, which a scoped unique names beside the declared fields and the
+   * answer does not. Anything else the write throws passes up. `put` and `patch` share it, so the two name a
+   * violation alike.
    */
   private async answering<T>(
     at: At,
-    given: Record_,
+    { given, scope }: { given: Record_; scope?: Scope },
     refused: T,
     write: (db: Kysely<never>) => Promise<T>,
   ): Promise<T | (T & { violated: string })> {
@@ -143,26 +168,29 @@ export class SqliteEngine extends Unrecorded implements Engine {
     try {
       return await write(db);
     } catch (error) {
-      const violated = await writeViolation(error, db, at, given);
+      const violated = await writeViolation(withoutScope(error, scope), db, at, given);
       if (violated) return { ...refused, violated };
       throw error;
     }
   }
 
   /**
-   * The record after the change, or `record` absent where the collection holds none under that key. A change
-   * that repeats a declared `unique` or points a `refs` at no record writes nothing and answers `violated`,
-   * named as `put` names it.
+   * The record after the change, or `record` absent where the collection holds none under that key within the
+   * scope. A scope column is never among the changes -- it is not a field of the shape -- so the row stays
+   * under the scope it was written with. A change that repeats a declared `unique` or points a `refs` at no
+   * record writes nothing and answers `violated`, named as `put` names it.
    */
   async patch(at: At, key: unknown, changes: Record_, written?: Written): Promise<PatchAnswer> {
-    unscoped(at, written?.scope);
+    const scope = written?.scope;
+    await this.scoped(at, scope);
     const values = changedOf(changes, at);
-    if (!Object.keys(values).length) return this.get(at, key);
-    return this.answering<PatchAnswer>(at, changes, {}, async db => {
+    if (!Object.keys(values).length) return this.get(at, key, scope);
+    return this.answering<PatchAnswer>(at, { given: changes, scope }, {}, async db => {
       const after = await db
         .updateTable(at.name as never)
         .set(values as never)
         .where(at.key as never, '=', keyIn(at, key) as never)
+        .where(eb => within(eb as never, scope) as never)
         .returning(columnsOf(at) as never)
         .executeTakeFirst();
       return { record: recordOf(after as Row | undefined, at) };
@@ -170,16 +198,17 @@ export class SqliteEngine extends Unrecorded implements Engine {
   }
 
   /**
-   * Remove the record under that key and answer it. A record another table still references is kept by the
-   * file's own foreign key (`ON DELETE RESTRICT`), and the collection holding it is answered as `referencedBy`.
+   * Remove the record under that key within the scope and answer it. A record another table still references
+   * is kept by the file's own foreign key (`ON DELETE RESTRICT`), and the collection holding it is answered as
+   * `referencedBy`; a key of another scope matches nothing, so a remove of it removes nothing.
    */
   async remove(at: At, key: unknown, scope?: Scope) {
-    unscoped(at, scope);
-    const db = this.db(at);
+    const db = await this.scoped(at, scope);
     try {
       const gone = await db
         .deleteFrom(at.name as never)
         .where(at.key as never, '=', keyIn(at, key) as never)
+        .where(eb => within(eb as never, scope) as never)
         .returning(columnsOf(at) as never)
         .executeTakeFirst();
       const before = recordOf(gone as Row | undefined, at);
@@ -187,7 +216,7 @@ export class SqliteEngine extends Unrecorded implements Engine {
     } catch (error) {
       const referencedBy = await removeViolation(error, db, at, key);
       if (!referencedBy) throw error;
-      return { record: (await this.get(at, key)).record, removed: false, referencedBy };
+      return { record: (await this.get(at, key, scope)).record, removed: false, referencedBy };
     }
   }
 
