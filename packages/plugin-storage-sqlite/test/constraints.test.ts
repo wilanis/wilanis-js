@@ -156,15 +156,39 @@ describe('what ensure makes, and what it refuses to change', () => {
     await expect(engine.ensure([at('e_required')])).rejects.toThrow(/drift: e_required\.hits is required/);
   });
 
+  it('refuses a required column with no default on an empty table too, as SQLite does, and says so', async () => {
+    await engine.ensure([at('e_required_empty', { shape: BEFORE })]);
+    await expect(engine.ensure([at('e_required_empty')])).rejects.toThrow(
+      /drift: e_required_empty\.hits is required, and SQLite adds a required column only with a default, even to an empty table/,
+    );
+  });
+
   it('refuses a unique the rows already there would break, and leaves the table as it was', async () => {
     const plain = at('e_unique_bad');
     await engine.ensure([plain]);
     await engine.put(plain, row('1', 'https://x'), { replace: true });
     await engine.put(plain, row('2', 'https://x'), { replace: true });
-    // RFC 0003 says drift; ensure.ts lets SQLite's raw UNIQUE error through until #817.
-    await expect(engine.ensure([at('e_unique_bad', { unique: [['url']] })])).rejects.toThrow(/UNIQUE/);
+    await expect(engine.ensure([at('e_unique_bad', { unique: [['url']] })])).rejects.toThrow(
+      /^drift: e_unique_bad declares unique \[url\], and rows the table already holds repeat it;/,
+    );
     expect(await engine.count(plain, undefined)).toBe(2);
     expect((await engine.put(plain, row('3', 'https://x'), { replace: true })).violated).toBeUndefined();
+  });
+
+  it('on a scoped table, adds a unique the rows repeat only across scopes, and refuses one they repeat within one', async () => {
+    const plain = at('e_unique_scoped');
+    await engine.ensure([plain]);
+    await engine.put(plain, row('1', 'https://x'), { replace: true, scope: { tenant: 'acme' } });
+    await engine.put(plain, row('2', 'https://x'), { replace: true, scope: { tenant: 'beta' } });
+    await engine.put(plain, row('3', 'https://y'), { replace: true, scope: { tenant: 'acme' } });
+    await engine.put(plain, row('4', 'https://y'), { replace: true, scope: { tenant: 'acme' } });
+    const both = at('e_unique_scoped', { unique: [['url'], ['url', 'hits']] });
+    await expect(engine.ensure([both])).rejects.toThrow(
+      /^drift: e_unique_scoped declares unique \[url\], and rows the table already holds repeat it within one scope;/,
+    );
+    expect(await engine.count(plain, undefined)).toBe(4);
+    await engine.remove(plain, '4', { tenant: 'acme' });
+    expect((await engine.ensure([both])).constraints).toBe(2);
   });
 
   it('refuses a reference over a column the table already had, which SQLite adds only by a rebuild', async () => {
