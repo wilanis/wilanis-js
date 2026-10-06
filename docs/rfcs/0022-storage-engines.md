@@ -606,3 +606,23 @@ twelve steps, or the shorter `ALTER TABLE ... RENAME` dance, inside the one tran
 `busyTimeoutMs` default; and whether MySQL's `JSON` columns take `CHECK (JSON_VALID(x))` or rely on the type's own
 validation. None changes a document, a rule, a schema or the plan; each is judged by the shared suite, and one that
 turns out to need a rule gets it in that engine's band, the way any rule is added.
+
+## Decided during implementation
+
+- **MySQL: a string an index holds shares the index's 3072 bytes.** The flat `VARCHAR(768)` in the mapping table
+  and under *Drawbacks* holds only for a string alone in an index: the key, a `refs`, a `unique` of one field.
+  InnoDB caps the whole index at 3072 bytes, not each column, so a `unique` over two `VARCHAR(768)` columns is
+  refused by the server, and the shared suite declares one (`unique [url, method]`). The engine shares the
+  bytes among the columns of each index: a string takes four bytes a character, a number 8, a boolean 1, and
+  the strings divide what is left. A field in several indexes takes the narrowest width of its indexes. So
+  `[url, method]` makes each `VARCHAR(384)`, and `[url, hits]` makes `url` `VARCHAR(766)`. A longer string still
+  fails the node at the write, and the package README states the widths. `widthsOf` in
+  `packages/plugin-storage-mysql/src/columns.ts` is the one place the rule lives.
+- **MySQL: `put` with `replace: false` is a plain `INSERT`, and a duplicate primary key is its `conflict`.** It is
+  not `INSERT IGNORE`, as *Runtime behaviour* says. `IGNORE` turns more than a duplicate key into a warning, even
+  in strict mode: a string longer than its column is cut and stored, and a `NULL` in a `NOT NULL` column gets the
+  column's implicit default. `put` would then answer a record the table does not hold. Every other refusal of the
+  plain insert is answered as the `violated` it is, or fails the node.
+- **MySQL: a `JSON` column carries no `CHECK (JSON_VALID(x))`.** The `JSON` type already refuses a value that is
+  not JSON at the write, so the check would refuse nothing more. SQLite keeps its check, since its `TEXT` accepts
+  anything.
