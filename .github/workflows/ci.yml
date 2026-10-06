@@ -60,21 +60,9 @@ jobs:
     strategy:
       matrix:
         node: [22, 24]
-    # One vendor service: a MySQL 8.0 for the MySQL engine's suites (WILANIS_TEST_MYSQL_URL on `npm test`), the
-    # oldest series the engine admits, so its version check and its mapping are proved against a real server on
-    # every push. The other suites that need a database or an object store skip here, as they do anywhere their
-    # variable is unset, and are run locally (the Postgres engine's and the S3 plugin's READMEs).
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: wilanis
-          MYSQL_DATABASE: wilanis
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pwilanis"
-          --health-interval 5s --health-timeout 5s --health-retries 30
+    # CI starts no vendor service: the suites that need a database or an object store skip here, as they do
+    # anywhere their variable is unset, and are run locally (the Postgres and MySQL engines' and the S3 plugin's
+    # READMEs)
     steps:
       - uses: actions/checkout@v4
       # Whether a test reads anything the change touches. A pull request or a merge group whose every file is on
@@ -150,8 +138,6 @@ jobs:
         run: npm ci
       - if: steps.reads.outputs.skip != 'true'
         run: npm test
-        env:
-          WILANIS_TEST_MYSQL_URL: mysql://root:wilanis@127.0.0.1:3306/wilanis
       - name: the example checks and rehearses, under each of its profiles
         if: steps.reads.outputs.skip != 'true'
         run: |

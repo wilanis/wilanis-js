@@ -125,18 +125,24 @@ carrying a scope fails the node.
 
 ## Tests
 
-The suites that need a server are skipped without `WILANIS_TEST_MYSQL_URL`; CI's `test` job starts a MySQL
-service and sets it. By hand:
+The suites that need a server -- the shared engine suite, the version check against a real server, and the
+mapping -- run against a real MySQL, and are skipped without `WILANIS_TEST_MYSQL_URL`, since a suite that
+silently passed without a database would be worse than no suite. CI starts no database, so run them by hand
+before changing the engine, against a server at the floor version:
 
 ```
-docker run -d --rm --name wilanis-mysql -e MYSQL_ROOT_PASSWORD=wilanis -e MYSQL_DATABASE=wilanis \
-  -p 53306:3306 mysql:8.0
+docker run -d --rm --name wilanis-mysql --platform linux/amd64 -e MYSQL_ROOT_PASSWORD=wilanis \
+  -e MYSQL_DATABASE=wilanis -p 53306:3306 mysql:8.0.16
 WILANIS_TEST_MYSQL_URL=mysql://root:wilanis@127.0.0.1:53306/wilanis npx vitest run packages/plugin-storage-mysql
 ```
+
+`--platform linux/amd64` is there because the 8.0.16 image is published for amd64 alone; on an amd64 host it
+changes nothing. `npm test` with the variable set runs the same suites with the rest.
 
 `engine.test.ts` runs the shared engine suite. `version.test.ts` reads version answers without a server, and
 with one checks that a connection lying about `SELECT VERSION()` fails the start. `mapping.test.ts` checks the
 widths without a server, and with one checks the tables, what `put` without `replace` refuses, `wilanis_keys`
-and the session. `tree.test.ts` needs no server: a tree naming the kind checks, and a `unique` over a shape is refused naming it.
+and the session. `tree.test.ts` needs no server: a tree naming the kind checks, and a `unique` over a shape is
+refused naming the kind.
 
 Part of [wilanis](https://github.com/wilanis/wilanis-js). Apache-2.0.
