@@ -4,10 +4,10 @@
  * type, a column the shape no longer has, a reference SQLite could add only by rebuilding the table -- each is
  * `drift`, thrown rather than repaired, because what to do about it is a person's decision.
  *
- * A `unique` is a unique index (`wl_u_` and a hash of the declaration), so it can be added
- * to a table that is already there, which a table constraint cannot. A `refs` is a column's `REFERENCES ...
- * ON DELETE RESTRICT`, which SQLite takes only when the column is made -- in the `CREATE TABLE`, or in the
- * `ADD COLUMN` of a field the table did not have.
+ * A `unique` is a unique index (`wl_u_` and a hash of the declaration), so it can be added to a table that is
+ * already there, which a table constraint cannot; one the rows already there repeat is drift. A `refs` is a
+ * column's `REFERENCES ... ON DELETE RESTRICT`, which SQLite takes only when the column is made -- in the
+ * `CREATE TABLE`, or in the `ADD COLUMN` of a field the table did not have.
  *
  * Everything happens in one transaction, since SQLite's DDL is transactional: a drift half way through leaves
  * the file exactly as it was. The table `wilanis_keys` is made here too where the plugin's `keyType` is
@@ -19,7 +19,7 @@
  */
 import type { At, Made } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';
-import { columnsOf, foreignKeysOf, hasTable, rowCount, uniquesOf } from './catalog.js';
+import { columnsOf, foreignKeysOf, hasTable, uniquesOf } from './catalog.js';
 import { declaredOf, type Field, fieldsOf, isJson, quoted } from './columns.js';
 import { ensureKeys } from './keys.js';
 import { scopedUniqueName, uniqueName } from './names.js';
@@ -76,21 +76,19 @@ function literal(value: unknown, field: Field): string {
 }
 
 /**
- * Add a column the shape has and the table does not. SQLite adds a `NOT NULL` column only with a default, so a
- * required field is added with the one the store declares for the rows already there, and is drift without
- * one. The default stays on the column, since SQLite cannot drop one; nothing reads it, because a `put` always
- * writes the whole record.
+ * Add a column the shape has and the table does not. SQLite adds a `NOT NULL` column only with a default, even
+ * to an empty table, so a required field is added with the one the store declares for the rows already there,
+ * and is drift without one however many rows there are. The default stays on the column, since SQLite cannot
+ * drop one; nothing reads it, because a `put` always writes the whole record.
  */
 async function addColumn(db: Kysely<never>, at: At, field: Field): Promise<void> {
   const { column, check } = declaredOf(field.name, field.type);
   const has = Object.hasOwn(at.defaults ?? {}, field.name);
-  if (field.required && !has) {
-    const rows = await rowCount(db, at.name);
+  if (field.required && !has)
     throw new Error(
-      `drift: ${at.name}.${field.name} is required, the table holds ${rows} row(s), and SQLite adds a required ` +
-        "column only with a default; declare one under the collection's defaults",
+      `drift: ${at.name}.${field.name} is required, and SQLite adds a required column only with a default, even ` +
+        "to an empty table; declare one under the collection's defaults",
     );
-  }
   const fill = has ? ` DEFAULT ${literal(at.defaults[field.name], field)}` : '';
   const notNull = field.required ? ' NOT NULL' : '';
   const checked = check ? ` CHECK (${check})` : '';
@@ -153,6 +151,34 @@ function uniqueOf(at: At, scoped: string[], fields: string[]): { name: string; o
 }
 
 /**
+ * Create the index one `unique` is, or refuse it as drift where rows the table already holds repeat it. SQLite
+ * refuses such an index with `SQLITE_CONSTRAINT_UNIQUE` and makes nothing. The engine takes that refusal as the
+ * answer rather than asking with a query of its own, so a `NULL`, which a unique index never holds against
+ * another, counts exactly as SQLite counts it. The message names the fields the store declared, never the
+ * scope columns in front of them.
+ */
+async function createUnique(
+  db: Kysely<never>,
+  at: At,
+  fields: string[],
+  index: { name: string; over: string[] },
+): Promise<void> {
+  const { name, over } = index;
+  try {
+    await sql
+      .raw(`CREATE UNIQUE INDEX ${quoted(name)} ON ${quoted(at.name)} (${over.map(quoted).join(', ')})`)
+      .execute(db);
+  } catch (error) {
+    if ((error as { code?: unknown }).code !== 'SQLITE_CONSTRAINT_UNIQUE') throw error;
+    const within = over.length > fields.length ? ' within one scope' : '';
+    throw new Error(
+      `drift: ${at.name} declares unique [${fields.join(', ')}], and rows the table already holds repeat ` +
+        `it${within}; make them differ before ensure adds it`,
+    );
+  }
+}
+
+/**
  * Add the unique indexes a collection declares and its table does not hold yet; answer how many. A unique is
  * held when some unique index of the table covers exactly its columns, whatever that index is called -- on a
  * scoped table, its columns and the scope's, so the unscoped spelling is never put back beside the scoped one.
@@ -162,12 +188,10 @@ async function addUniques(db: Kysely<never>, at: At): Promise<number> {
   const scoped = await scopeColumnsOf(db, at);
   let made = 0;
   for (const fields of at.unique) {
-    const { name, over } = uniqueOf(at, scoped, fields);
-    if (held.some(columns => sameColumns(over, columns))) continue;
-    await sql
-      .raw(`CREATE UNIQUE INDEX ${quoted(name)} ON ${quoted(at.name)} (${over.map(quoted).join(', ')})`)
-      .execute(db);
-    held.push(over.map(one => one.toLowerCase()));
+    const index = uniqueOf(at, scoped, fields);
+    if (held.some(columns => sameColumns(index.over, columns))) continue;
+    await createUnique(db, at, fields, index);
+    held.push(index.over.map(one => one.toLowerCase()));
     made += 1;
   }
   return made;
