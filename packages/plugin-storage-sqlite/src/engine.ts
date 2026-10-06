@@ -245,8 +245,9 @@ export class SqliteEngine extends Unrecorded implements Engine {
 
   /**
    * `BEGIN IMMEDIATE` on a handle of the transaction's own, and the engine that runs on it. The write lock is
-   * taken at once, so a second writer waits on the file, up to `busyTimeoutMs`, rather than failing at commit;
-   * the handle is closed when the transaction ends either way.
+   * taken at once, so a second writer waits, up to `busyTimeoutMs`, rather than failing at commit: one of this
+   * process waits for its turn on the file (`turns.ts`), one of another process on SQLite's busy handler. The
+   * handle is closed when the transaction ends either way.
    */
   async begin(at: At): Promise<Transaction> {
     const trx = await this.handles.transaction(at);
