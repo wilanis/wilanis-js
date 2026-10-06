@@ -4,10 +4,11 @@
  * to what `put` writes), and `patch` and `remove` read the row inside the same short transaction as the
  * statement (`engine.ts`).
  *
- * A `put` that may not replace is `INSERT IGNORE`, and whether it wrote is read off the affected rows. `IGNORE`
- * turns every refusal into a warning, a broken `unique` or `refs` as much as the key already held, so where
- * nothing was written and the key is not held the row is inserted once more without it: that statement fails
- * with the refusal `IGNORE` swallowed, and the engine answers it as the violation it is.
+ * A `put` that may not replace is a plain `INSERT`, and a duplicate of the primary key is the `conflict` it
+ * answers. It is not `INSERT IGNORE`: `IGNORE` turns more than a duplicate key into a warning, even in strict
+ * mode. A string longer than its column would be cut and stored, and a `NULL` in a `NOT NULL` column given the
+ * column's implicit default, so `put` would answer a record the table does not hold. Any other refusal of the
+ * plain insert is thrown, and the engine answers a broken `unique` or `refs` as the violation it is.
  *
  * A `put` that may replace is an `INSERT`, and an `UPDATE` by key where the insert found the key held. It is not
  * `ON DUPLICATE KEY UPDATE`: that clause fires on any unique index, so a record repeating another's `unique`
@@ -41,15 +42,13 @@ const insert = (db: Kysely<never>, at: At, values: Row) =>
  * a `put` without `replace` answers; any other refusal is thrown, to be answered as the violation it is.
  */
 export async function insertNew(db: Kysely<never>, at: At, values: Row): Promise<boolean> {
-  const result = await db
-    .insertInto(at.name as never)
-    .ignore()
-    .values(values as never)
-    .executeTakeFirst();
-  if (Number(result.numInsertedOrUpdatedRows ?? 0n) > 0) return true;
-  if (await rowAt(db, at, values[at.key])) return false;
-  await insert(db, at, values);
-  return true;
+  try {
+    await insert(db, at, values);
+    return true;
+  } catch (error) {
+    if (indexNamed(error) === 'PRIMARY') return false;
+    throw error;
+  }
 }
 
 /**

@@ -1,7 +1,7 @@
 /**
  * What this engine does below the interface the shared suite judges: how wide a string an index holds may be,
- * what a table is created as, what a `put` without `replace` answers when `INSERT IGNORE` swallowed a refusal,
- * how `identity` reserves from `wilanis_keys`, and what every session of a pool is set up with.
+ * what a table is created as, what a `put` without `replace` refuses -- a broken `unique`, and a string wider
+ * than its column, which `INSERT IGNORE` would have cut and stored -- how `identity` reserves from `wilanis_keys`, and what every session of a pool is set up with.
  *
  * The widths are arithmetic and run everywhere. The rest needs a database and is skipped without
  * `WILANIS_TEST_MYSQL_URL` (`engine.test.ts` says how to run one).
@@ -93,6 +93,15 @@ describe.skipIf(!url)('what the database is asked to hold', () => {
     expect(repeat).toEqual({ conflict: false, violated: 'unique [url]' });
     expect((await made.engine.put(where, first, { replace: false })).conflict).toBe(true);
     expect(await made.engine.count(where, undefined)).toBe(1);
+  });
+
+  it('a put without replace of a string one character wider than its column fails the node and writes nothing', async () => {
+    const where = at('mapped_too_long');
+    await made.engine.ensure([where]);
+    const before = await made.engine.count(where, undefined);
+    const wide = { id: 'x'.repeat(769), url: 'https://one.example', method: 'GET', hits: 1, ok: true };
+    await expect(made.engine.put(where, wide, { replace: false })).rejects.toThrow(/too long/i);
+    expect(await made.engine.count(where, undefined)).toBe(before);
   });
 });
 
