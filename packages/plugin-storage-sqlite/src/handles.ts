@@ -118,8 +118,11 @@ export class Handles {
       this.held.set(db, handOn);
       return db;
     } catch (error) {
-      await db?.destroy();
-      handOn();
+      try {
+        await db?.destroy();
+      } finally {
+        handOn();
+      }
       throw error;
     }
   }

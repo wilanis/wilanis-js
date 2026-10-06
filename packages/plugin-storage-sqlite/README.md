@@ -42,10 +42,11 @@ opens sets `PRAGMA foreign_keys = ON`.
 
 The plugin's own settings are engine-wide: `keyType` -- `uuidv7` (the default), what `newKey` answers for a
 string key, or `identity`, a number reserved from the table `wilanis_keys` for a number key; and
-`busyTimeoutMs` (default 5000), how long a writer waits for the file's write lock before the node fails with
-`database is locked`. Five seconds is better-sqlite3's own default: long enough for a short transaction
-elsewhere to end, short enough that a lock nobody will release fails while someone is still looking. The wait
-holds the process, since the driver is synchronous.
+`busyTimeoutMs` (default 5000), how long a statement waits for the file before the node fails with
+`database is locked`. One of this process waits its turn on the file (`turns.ts`) without holding the event
+loop; one of another process waits on SQLite's busy handler, which holds the process, since the driver is
+synchronous. Five seconds is better-sqlite3's own default: long enough for a short transaction elsewhere to
+end, short enough that a lock nobody will release fails while someone is still looking.
 
 ## How a shape becomes a table
 
@@ -65,7 +66,8 @@ engine opens sets `PRAGMA foreign_keys = ON`. A violation comes back as the `vio
 
 ## Every handle
 
-Opened with `PRAGMA journal_mode = WAL` (a reader never waits on a writer), `foreign_keys = ON` and
+Opened with `PRAGMA journal_mode = WAL` (a reader in another process never waits on a writer; in this process
+every statement, a read included, waits for an open transaction to end), `foreign_keys = ON` and
 `busy_timeout = <busyTimeoutMs>`. One handle per connection carries every statement outside a transaction; a
 transaction (`begin`) opens a handle of its own, runs `BEGIN IMMEDIATE` on it -- taking the write lock at once,
 so a second writer waits rather than failing at commit -- and closes it when it commits or rolls back.
