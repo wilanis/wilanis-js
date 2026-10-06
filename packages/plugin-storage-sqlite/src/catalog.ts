@@ -55,14 +55,14 @@ export async function uniquesOf(db: Kysely<never>, table: string): Promise<strin
     sql<{ name: string }>`select name from pragma_index_list(${table}) where "unique" = 1`,
   );
   const covered: string[][] = [];
-  for (const index of listed) {
-    const columns = await rowsOf(
-      db,
-      sql<{ name: string }>`select name from pragma_index_info(${index.name}) order by seqno`,
-    );
-    covered.push(columns.map(one => String(one.name).toLowerCase()));
-  }
+  for (const index of listed) covered.push((await indexColumnsOf(db, index.name)).map(one => one.toLowerCase()));
   return covered;
+}
+
+/** The columns one index covers, in its order, as the index spells them; none where there is no such index. */
+export async function indexColumnsOf(db: Kysely<never>, index: string): Promise<string[]> {
+  const columns = await rowsOf(db, sql<{ name: string }>`select name from pragma_index_info(${index}) order by seqno`);
+  return columns.map(one => String(one.name));
 }
 
 /** How many rows a table holds. */

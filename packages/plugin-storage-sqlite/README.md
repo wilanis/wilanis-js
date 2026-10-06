@@ -88,21 +88,29 @@ error later:
 | X232 | a key it cannot key by, or one `newKey` cannot answer under the configured `keyType` |
 | X233 | a collection name SQLite will not create (one beginning `sqlite_`), or two of one connection that fold to one table |
 
+## Scopes
+
+A scoped collection (RFC 0015) keeps each scope column beside the record, as the postgres engine does: `TEXT`
+or `REAL` by the value, `NOT NULL`, added the first time a scope reaches the table. Every statement carries
+`<column> = ?` per scope column, a declared `unique` becomes a unique index with the scope columns in front, and
+an index over the scope and the key (`wl_i_<collection>_scope`) is what tells a later `ensure` which columns are
+the scope. A table that already holds rows and no scope column is `drift`: a row written before the store was
+scoped belongs to no scope.
+
 ## Not yet
 
-Keeping a scope (RFC 0015) and the migration planner's members (RFC 0017) are RFC 0022's sixth step
+The migration planner's members (RFC 0017) are RFC 0022's sixth step
 ([#260](https://github.com/wilanis/wilanis-js/issues/260)).
 
 **Until that step lands, a tree on this kind cannot prepare its tables.** A startup step's
 `@storage/storage.port.json#ensure` goes through the planner, and this engine's `apply` refuses: the start
 fails in the open, naming the step, rather than serving a store whose first write would meet a missing table.
-`wilanis migrate` skips a connection of this kind and says so, and an operation carrying a scope fails the
-node.
+`wilanis migrate` skips a connection of this kind and says so.
 
 ## Tests
 
 Every suite runs unconditionally, against a file in the test's temporary directory: the shared engine suite,
-a second load of a tree finding what the first kept, the rules (X231 to X233, which open no file), the pragmas,
-the keys, and the bundled SQLite's version (3.35 or later, for `RETURNING`).
+RFC 0015's scope cases, a second load of a tree finding what the first kept, the rules (X231 to X233, which open
+no file), the pragmas, the keys, and the bundled SQLite's version (3.35 or later, for `RETURNING`).
 
 Part of [wilanis](https://github.com/wilanis/wilanis-js). Apache-2.0.

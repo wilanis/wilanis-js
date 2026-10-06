@@ -12,26 +12,19 @@
  * Everything happens in one transaction, since SQLite's DDL is transactional: a drift half way through leaves
  * the file exactly as it was. The table `wilanis_keys` is made here too where the plugin's `keyType` is
  * `identity`, beside the collections, and never under `uuidv7`.
+ *
+ * A table that keeps a scope (RFC 0015, `scope-table.ts`) has columns no field of the shape has, `NOT NULL`.
+ * `ensure` reads which they are off the scope's index and holds them as the scope rather than as drift, and
+ * a `unique` declared after the table was scoped is made within the scope, as the ones before it were.
  */
-import { createHash } from 'node:crypto';
 import type { At, Made } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';
 import { columnsOf, foreignKeysOf, hasTable, rowCount, uniquesOf } from './catalog.js';
 import { declaredOf, type Field, fieldsOf, isJson, quoted } from './columns.js';
 import { ensureKeys } from './keys.js';
+import { scopedUniqueName, uniqueName } from './names.js';
+import { scopeColumnsOf } from './scope-table.js';
 import { isIdentity, type Settings } from './settings.js';
-
-/**
- * The name a unique index is created under: `wl_u_` and a short hash of the collection and the fields it
- * holds together. Joining the names with `_` would spell `["a_b"]` and `["a", "b"]` alike, and index names are
- * the file's, not the table's; the hash of the list keeps every declaration's name its own. Nothing reads the
- * name back -- whether a unique is held is read off what the index covers (`uniquesOf`).
- */
-export const uniqueName = (collection: string, fields: string[]) =>
-  `wl_u_${createHash('sha256')
-    .update(JSON.stringify([collection, fields]))
-    .digest('hex')
-    .slice(0, 16)}`;
 
 /** Whether two column lists are one constraint: the same columns, in any order, compared without case. */
 const sameColumns = (left: string[], right: string[]) =>
@@ -132,12 +125,15 @@ async function judgeReferences(db: Kysely<never>, at: At, existed: Set<string>):
 
 /**
  * One collection made ready: the table where there is none, the columns it has gained where there is one. A
- * reference made with its table or its column is a constraint made, and counted as one.
+ * reference made with its table or its column is a constraint made, and counted as one. The columns the table
+ * keeps as a scope are set aside before the rest is judged: no field of the shape has one, and that is what
+ * a scope column is, not a column the shape has lost.
  */
 async function ensureOne(db: Kysely<never>, at: At, settings: Settings): Promise<Made> {
   if (!(await hasTable(db, at.name)))
     return { collections: 1, columns: await createTable(db, at, settings), constraints: at.refs.length };
   const found = new Map((await columnsOf(db, at.name)).map(one => [one.name.toLowerCase(), one]));
+  for (const column of await scopeColumnsOf(db, at)) found.delete(column.toLowerCase());
   judgeDrift(at, found, settings);
   await judgeReferences(db, at, new Set(found.keys()));
   const added = fieldsOf(at.shape).filter(field => !found.has(field.name.toLowerCase()));
@@ -147,19 +143,31 @@ async function ensureOne(db: Kysely<never>, at: At, settings: Settings): Promise
 }
 
 /**
+ * The index one declared `unique` is created as: over its fields alone on an unscoped table, and with the
+ * scope columns in front of them on a scoped one, under the name `scope-table.ts` gives it. A unique declared
+ * after the table gained its scope is then held within one scope exactly as one declared before it is.
+ */
+function uniqueOf(at: At, scoped: string[], fields: string[]): { name: string; over: string[] } {
+  if (!scoped.length) return { name: uniqueName(at.name, fields), over: fields };
+  return { name: scopedUniqueName(at.name, scoped, fields), over: [...scoped, ...fields] };
+}
+
+/**
  * Add the unique indexes a collection declares and its table does not hold yet; answer how many. A unique is
- * held when some unique index of the table covers exactly its columns, whatever that index is called.
+ * held when some unique index of the table covers exactly its columns, whatever that index is called -- on a
+ * scoped table, its columns and the scope's, so the unscoped spelling is never put back beside the scoped one.
  */
 async function addUniques(db: Kysely<never>, at: At): Promise<number> {
   const held = await uniquesOf(db, at.name);
+  const scoped = await scopeColumnsOf(db, at);
   let made = 0;
   for (const fields of at.unique) {
-    if (held.some(columns => sameColumns(fields, columns))) continue;
-    const over = fields.map(quoted).join(', ');
+    const { name, over } = uniqueOf(at, scoped, fields);
+    if (held.some(columns => sameColumns(over, columns))) continue;
     await sql
-      .raw(`CREATE UNIQUE INDEX ${quoted(uniqueName(at.name, fields))} ON ${quoted(at.name)} (${over})`)
+      .raw(`CREATE UNIQUE INDEX ${quoted(name)} ON ${quoted(at.name)} (${over.map(quoted).join(', ')})`)
       .execute(db);
-    held.push(fields.map(one => one.toLowerCase()));
+    held.push(over.map(one => one.toLowerCase()));
     made += 1;
   }
   return made;
