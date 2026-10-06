@@ -156,10 +156,11 @@ describe('an atomic graph over a SQLite file', () => {
 });
 
 /**
- * What happens on the file, in order: each transaction begun and committed, each write landed, and each time a
- * statement outside a transaction asks for the connection's shared handle. A transaction is named by the order
- * `begin` was asked for it, and a write by the key it wrote. `firstWrite` parks the write of
- * that key, once it has landed, until the case opens `gate`, so its transaction stays open while the case looks.
+ * What happens on the file, in order: each transaction asked for, begun and told to commit, and each write
+ * asked of the engine and landed. A transaction is named by the order `begin` was asked for it, and a write by
+ * the key it wrote. `firstWrite` parks the write of that key, once it has landed, until the case opens `gate`,
+ * so its transaction stays open while the case looks. A commit is logged as it is asked for: the turn on the
+ * file is handed on only after it, so nothing that waited for the turn can be logged before it.
  */
 function watching(firstWrite: string) {
   const log: string[] = [];
@@ -180,26 +181,22 @@ function watching(firstWrite: string) {
     log.push(`${name} begun`);
     return {
       ...trx,
-      commit: async () => {
-        await trx.commit();
-        log.push(`${name} committed`);
+      commit: () => {
+        log.push(`${name} commits`);
+        return trx.commit();
       },
     };
   });
   vi.spyOn(SqliteEngine.prototype, 'put').mockImplementation(async function (this: SqliteEngine, ...args) {
-    const written = await put.apply(this, args);
     const id = (args[1] as { id: string }).id;
+    log.push(`write ${id}`);
+    const written = await put.apply(this, args);
     log.push(`put ${id}`);
     if (id === firstWrite) {
       parked();
       await gate;
     }
     return written;
-  });
-  const shared = Handles.prototype.for;
-  vi.spyOn(Handles.prototype, 'for').mockImplementation(function (this: Handles, on) {
-    log.push('shared asked');
-    return shared.call(this, on);
   });
   return { log, reached, open: opened };
 }
@@ -218,11 +215,21 @@ describe('two atomic graphs at once', () => {
     const second = tree.run('pair', { first: entry('c'), second: entry('d') });
     await until(() => watch.log.includes('trx2 asked'));
     // the first holds the file, parked after its first write; the second has asked and waits its turn
-    expect(watch.log).toEqual(['trx1 asked', 'trx1 begun', 'put a', 'trx2 asked']);
+    expect(watch.log).toEqual(['trx1 asked', 'trx1 begun', 'write a', 'put a', 'trx2 asked']);
     watch.open();
     const [one, other] = await Promise.all([first, second]);
     expect([one.status, other.status]).toEqual(['done', 'done']);
-    expect(watch.log.slice(4)).toEqual(['put b', 'trx1 committed', 'trx2 begun', 'put c', 'put d', 'trx2 committed']);
+    expect(watch.log.slice(5)).toEqual([
+      'write b',
+      'put b',
+      'trx1 commits',
+      'trx2 begun',
+      'write c',
+      'put c',
+      'write d',
+      'put d',
+      'trx2 commits',
+    ]);
     expect(kept(tree.file)).toEqual(['a', 'b', 'c', 'd']);
   });
 
@@ -243,14 +250,14 @@ describe('a write outside any transaction', () => {
     const atomic = tree.run('pair', { first: entry('a'), second: entry('b') });
     await watch.reached;
     const single = tree.run('keep', entry('s'));
-    await until(() => watch.log.includes('shared asked'));
+    await until(() => watch.log.includes('write s'));
     // the atomic graph holds the file, parked after its first write; the write outside it has reached the
-    // connection's shared handle and waits its turn
-    expect(watch.log).toEqual(['trx1 asked', 'trx1 begun', 'put a', 'shared asked']);
+    // engine and waits its turn
+    expect(watch.log).toEqual(['trx1 asked', 'trx1 begun', 'write a', 'put a', 'write s']);
     watch.open();
     const [one, other] = await Promise.all([atomic, single]);
     expect([one.status, other.status]).toEqual(['done', 'done']);
-    expect(watch.log.slice(4)).toEqual(['put b', 'trx1 committed', 'put s']);
+    expect(watch.log.slice(5)).toEqual(['write b', 'put b', 'trx1 commits', 'put s']);
     expect(kept(tree.file)).toEqual(['a', 'b', 's']);
   });
 });
