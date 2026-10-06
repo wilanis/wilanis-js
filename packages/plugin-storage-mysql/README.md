@@ -90,10 +90,11 @@ transaction (`begin`) holds one session from `START TRANSACTION` until it commit
 
 MySQL has no `RETURNING`.
 
-- `put` answers the record it wrote, which is the record as stored. With `replace` false it is `INSERT
-  IGNORE`, and whether it wrote is read off the affected rows. `IGNORE` turns every refusal into a warning, so
-  where nothing was written and the key is not held, the row is inserted once more without `IGNORE`, and the
-  refusal that statement raises is answered as the violation it is. With `replace` it is an `INSERT`, and an
+- `put` answers the record it wrote, which is the record as stored. With `replace` false it is a plain
+  `INSERT`, and a duplicate of the primary key is the `conflict` it answers. Any other refusal is answered as
+  the violation it is, or fails the node. It is not `INSERT IGNORE`: `IGNORE` turns more than a duplicate key
+  into a warning, even in strict mode, so a string longer than its column would be cut and stored, and `put`
+  would answer a record the table does not hold. With `replace` it is an `INSERT`, and an
   `UPDATE` by key where the key is held. It is never `ON DUPLICATE KEY UPDATE`, which fires on any unique index
   and would overwrite another record instead of refusing the write.
 - `patch` is the `UPDATE` and a `SELECT` by key, and `remove` is a `SELECT ... FOR UPDATE` by key and the
@@ -135,7 +136,7 @@ WILANIS_TEST_MYSQL_URL=mysql://root:wilanis@127.0.0.1:53306/wilanis npx vitest r
 
 `engine.test.ts` runs the shared engine suite. `version.test.ts` reads version answers without a server, and
 with one checks that a connection lying about `SELECT VERSION()` fails the start. `mapping.test.ts` checks the
-widths without a server, and with one checks the tables, `INSERT IGNORE`, `wilanis_keys` and the session.
-`tree.test.ts` needs no server: a tree naming the kind checks, and a `unique` over a shape is refused naming it.
+widths without a server, and with one checks the tables, what `put` without `replace` refuses, `wilanis_keys`
+and the session. `tree.test.ts` needs no server: a tree naming the kind checks, and a `unique` over a shape is refused naming it.
 
 Part of [wilanis](https://github.com/wilanis/wilanis-js). Apache-2.0.
