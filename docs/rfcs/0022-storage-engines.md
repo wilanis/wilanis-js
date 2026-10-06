@@ -626,3 +626,8 @@ turns out to need a rule gets it in that engine's band, the way any rule is adde
 - **MySQL: a `JSON` column carries no `CHECK (JSON_VALID(x))`.** The `JSON` type already refuses a value that is
   not JSON at the write, so the check would refuse nothing more. SQLite keeps its check, since its `TEXT` accepts
   anything.
+- **CI starts no MySQL service.** Step 7 and *Tests* gave the `test` job a MySQL service container. The workflow
+  starts no vendor service, for the same reason the Postgres engine's and the S3 plugin's suites skip there: a
+  suite that needs a database or an object store skips where its variable is unset and is run locally. The MySQL
+  suites follow the same rule. They skip in CI without `WILANIS_TEST_MYSQL_URL`, and the package README gives the
+  `docker run` line for a server at the 8.0.16 floor.

@@ -5,10 +5,10 @@
  * fails.
  *
  * It needs a database, so it is skipped without `WILANIS_TEST_MYSQL_URL` -- a suite that silently passed without
- * one would be worse than no suite. CI's `test` job starts a MySQL service and sets the variable; by hand:
+ * one would be worse than no suite. CI starts no database, so it runs by hand, against the floor version:
  *
- *   docker run -d --rm --name wilanis-mysql -e MYSQL_ROOT_PASSWORD=wilanis -e MYSQL_DATABASE=wilanis \
- *     -p 53306:3306 mysql:8.0
+ *   docker run -d --rm --name wilanis-mysql --platform linux/amd64 -e MYSQL_ROOT_PASSWORD=wilanis \
+ *     -e MYSQL_DATABASE=wilanis -p 53306:3306 mysql:8.0.16
  *   WILANIS_TEST_MYSQL_URL=mysql://root:wilanis@127.0.0.1:53306/wilanis \
  *     npx vitest run packages/plugin-storage-mysql
  *
