@@ -32,8 +32,8 @@ afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
 /**
  * The shared cases about a declared constraint: a `unique`, a reference, and the `ensure` that makes them. They
- * are picked by name, so the count is held too: a case renamed out of the pick, or a new one, fails here rather
- * than leaving the reopen proved over fewer cases than there are.
+ * are picked by name, so the count is held too: a case renamed out of the pick, or a new one the pick matches,
+ * fails here; a new constraint case is picked only if its name says unique or reference.
  */
 const CONSTRAINED = /unique|referenc|repeats nothing|^ensure /;
 const constraintCases = cases.filter(one => CONSTRAINED.test(one.name));
@@ -161,6 +161,7 @@ describe('what ensure makes, and what it refuses to change', () => {
     await engine.ensure([plain]);
     await engine.put(plain, row('1', 'https://x'), { replace: true });
     await engine.put(plain, row('2', 'https://x'), { replace: true });
+    // RFC 0003 says drift; ensure.ts lets SQLite's raw UNIQUE error through until #817.
     await expect(engine.ensure([at('e_unique_bad', { unique: [['url']] })])).rejects.toThrow(/UNIQUE/);
     expect(await engine.count(plain, undefined)).toBe(2);
     expect((await engine.put(plain, row('3', 'https://x'), { replace: true })).violated).toBeUndefined();
