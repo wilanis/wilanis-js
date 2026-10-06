@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/connection-kind.schema.json",
+  "label": "MySQL",
+  "description": "A store kept in one MySQL database, 8.0.16 or later, for the trees that already have a MySQL. The URL is a secret, since it carries the credentials, and it names the database: a MySQL database is the schema, so there is no schema setting. The pool is a fact about this one database, so it sits here rather than in the plugin's settings. MySQL commits around every DDL statement, so what ensure makes is made step by step.",
+  "settings": {
+    "fields": {
+      "url": {
+        "type": "string",
+        "secret": true,
+        "description": "the connection URL, read as {{secrets.*}} -- mysql://user:password@host:port/database"
+      },
+      "pool": {
+        "type": "@storage-mysql/Pool.shape.json",
+        "required": false,
+        "description": "how many sessions this tree may hold open at once. Absent: ten"
+      }
+    }
+  },
+  "storage": true,
+  "capabilities": {
+    "transactionalDdl": false,
+    "unique": ["string", "number", "boolean"],
+    "refs": true
+  }
+}

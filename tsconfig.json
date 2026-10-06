@@ -35,6 +35,9 @@
       "path": "packages/plugin-storage-sqlite"
     },
     {
+      "path": "packages/plugin-storage-mysql"
+    },
+    {
       "path": "packages/plugin-auth"
     },
     {

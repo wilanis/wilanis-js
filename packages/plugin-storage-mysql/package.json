@@ -1,0 +1,56 @@
+{
+  "name": "@wilanis/plugin-storage-mysql",
+  "version": "0.1.0",
+  "description": "The @storage-mysql engine for wilanis: an @storage store kept in MySQL 8.0.16 or later, through Kysely and mysql2, for the trees that already have a MySQL.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Rafael Fontes <rfontes1987@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wilanis/wilanis-js.git",
+    "directory": "packages/plugin-storage-mysql"
+  },
+  "homepage": "https://github.com/wilanis/wilanis-js/tree/main/packages/plugin-storage-mysql#readme",
+  "bugs": "https://github.com/wilanis/wilanis-js/issues",
+  "keywords": [
+    "wilanis",
+    "dataflow",
+    "json-schema",
+    "declarative",
+    "storage",
+    "mysql",
+    "plugin"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@wilanis/core": "0.1.0",
+    "@wilanis/engine": "0.1.0",
+    "@wilanis/plugin-storage": "0.1.0",
+    "kysely": "^0.28.17",
+    "mysql2": "^3.24.5"
+  },
+  "devDependencies": {
+    "@wilanis/compiler": "0.1.0",
+    "@wilanis/runtime": "0.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
