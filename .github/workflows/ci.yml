@@ -74,6 +74,9 @@ jobs:
       # and packages/runtime/templates/ are read, so they are not on it. A path goes on it only once no test and no
       # fitness function reads it, and comes off the day one does. A push to main, and a change whose files
       # cannot be listed, run in full; `fitness` always runs in full.
+      # It also hands on `base`, the revision a plugin's tests are chosen against (vitest.config.ts): the pull
+      # request's base or the queue's, fetched here so `git diff` reaches it. A push to main hands on none, nor
+      # does a base that cannot be fetched, and then every plugin's tests run.
       - id: reads
         name: whether a test reads what the change touches
         env:
@@ -81,6 +84,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           PULL: ${{ github.event.pull_request.number }}
           CHANGED: ${{ github.event.pull_request.changed_files }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
           BASE_SHA: ${{ github.event.merge_group.base_sha }}
           HEAD_SHA: ${{ github.event.merge_group.head_sha }}
           # one extended regular expression per line, matched against the whole repository-relative path; a
@@ -102,6 +106,11 @@ jobs:
             LICENSE
         run: |
           full() { echo "runs in full: $1"; echo "skip=false" >> "$GITHUB_OUTPUT"; exit 0; }
+          base=""; fetched=""
+          case "$EVENT" in pull_request) base="$PR_BASE" ;; merge_group) base="$BASE_SHA" ;; esac
+          if [ -n "$base" ] && git fetch --no-tags --depth=1 origin "$base"; then
+            fetched=yes; echo "base=$base" >> "$GITHUB_OUTPUT"
+          fi
           case "$EVENT" in
             pull_request)
               files=$(gh api --paginate "repos/${{ github.repository }}/pulls/$PULL/files" \
@@ -110,7 +119,7 @@ jobs:
               [ "$(printf '%s\n' "$files" | grep -c .)" -ge "$CHANGED" ] \
                 || full "the pull request changes $CHANGED files and only some were listed" ;;
             merge_group)
-              git fetch --no-tags --depth=1 origin "$BASE_SHA" || full "the merge group's base could not be fetched"
+              [ -n "$fetched" ] || full "the merge group's base could not be fetched"
               files=$(git diff --no-renames --name-only "$BASE_SHA" "$HEAD_SHA") \
                 || full "the merge group's files could not be listed" ;;
             *) full "a $EVENT is always tested whole" ;;
@@ -136,8 +145,15 @@ jobs:
           cache: npm
       - if: steps.reads.outputs.skip != 'true'
         run: npm ci
+      # npm test runs the tests under packages/plugin-*/test only for a plugin whose directory differs from the
+      # base `reads` handed on; vitest.config.ts chooses them and says on its first lines which ran and which did
+      # not. With no base, npm run test:all runs every plugin's tests.
       - if: steps.reads.outputs.skip != 'true'
-        run: npm test
+        name: npm test, with the tests of the plugins the change touches
+        env:
+          WILANIS_TEST_BASE: ${{ steps.reads.outputs.base }}
+        run: |
+          if [ -n "$WILANIS_TEST_BASE" ]; then npm test; else npm run test:all; fi
       - name: the example checks and rehearses, under each of its profiles
         if: steps.reads.outputs.skip != 'true'
         run: |
