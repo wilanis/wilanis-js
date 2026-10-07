@@ -3,16 +3,20 @@
  * is renewed, expires and is let go, and why a tick marked fired is granted to nobody however late a clock
  * asks. Two keepers are two holders, as two processes would be, over one table.
  *
+ * A connection whose schema the database does not hold yet finds it made on first contact, as `migrate` does
+ * (#868), so a tree that schedules before it stores needs no `create schema` by hand.
+ *
  * It needs a database, so the database cases are skipped without `WILANIS_TEST_POSTGRES_URL`, as the shared
  * suite is (`engine.test.ts` says how to run one). That the plugin registers its keeper needs none.
  */
 import { randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { leases } from '@wilanis/plugin-storage';
+import { sql } from 'kysely';
 import { afterAll, describe, expect, it } from 'vitest';
 import plugin from '../src/index.js';
 import { TableLeases } from '../src/leases.js';
-import { closePools } from '../src/pool.js';
+import { closePools, poolFor } from '../src/pool.js';
 
 const url = process.env.WILANIS_TEST_POSTGRES_URL;
 const KIND = '@storage-postgres/postgres.connection-kind.json';
@@ -27,6 +31,10 @@ const T2 = '2026-01-01T02:00:00.000Z';
 const fresh = () => `@features/t/${randomUUID()}.trigger.json`;
 /** Two keepers over one table: two holders, as two processes would be. */
 const pair = () => [new TableLeases(env, {}), new TableLeases(env, {})] as const;
+
+/** The database as its owner reaches it, to drop what a case made. */
+const admin = () =>
+  poolFor({ connection: '@connections/s868-admin.connection.json', kind: KIND, settings: { url } }, {}).db;
 
 afterAll(async () => {
   await closePools();
@@ -106,5 +114,25 @@ describe.skipIf(!url)('a lease kept in postgres', () => {
     expect(await one.lastFired(CONNECTION, name)).toBe(T3);
     await two.markFired(CONNECTION, name, T4);
     expect(await one.lastFired(CONNECTION, name)).toBe(T4);
+  });
+});
+
+describe.skipIf(!url)('a lease on a schema the database does not hold yet', () => {
+  it('makes the schema on first contact, and keeps the lease there', async () => {
+    const schema = `s868_${randomUUID().slice(0, 8)}`;
+    const connection = `@connections/${schema}.connection.json`;
+    const keeper = new TableLeases({ connections: { [connection]: { kind: KIND, settings: { url, schema } } } }, {});
+    const name = fresh();
+    try {
+      expect(await keeper.acquire(connection, name, T3, 30_000)).toBe(true);
+      await keeper.markFired(connection, name, T3);
+      const kept =
+        await sql`select 1 from ${sql.ref(schema)}.${sql.ref('wilanis_schedule')} where name = ${name}`.execute(
+          admin(),
+        );
+      expect((kept as { rows: unknown[] }).rows).toHaveLength(1);
+    } finally {
+      await sql`drop schema if exists ${sql.ref(schema)} cascade`.execute(admin());
+    }
   });
 });

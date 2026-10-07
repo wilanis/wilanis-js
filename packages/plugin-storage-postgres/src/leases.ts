@@ -14,7 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import type { Leases } from '@wilanis/plugin-storage';
 import { type Kysely, type RawBuilder, sql } from 'kysely';
-import { creating, poolFor, reachedOn, type Settings } from './pool.js';
+import { creating, ensureSchema, poolFor, reachedOn, type Settings } from './pool.js';
 
 /** Where one connection's leases are kept: its pool, and the lease table qualified by the connection's schema. */
 interface Kept {
@@ -26,10 +26,13 @@ interface Kept {
 const tableIn = (schema: string) => sql`${sql.ref(schema)}.${sql.ref('wilanis_schedule')}`;
 
 /**
- * Create the lease table where the schema has none, and leave it alone where it has one. Two first contacts at
- * once can both miss the table, and `creating` takes the second one's duplicate as the table being there.
+ * Create the lease table where the schema has none, and leave it alone where it has one. The schema itself is
+ * made first where the database has none, as `migrate` makes it, since a tree may schedule before it stores.
+ * Two first contacts at once can both miss the table, and `creating` takes the second one's duplicate as the
+ * table being there.
  */
 async function ensureLeases(db: Kysely<never>, schema: string): Promise<void> {
+  await ensureSchema(db, schema);
   await creating(
     sql`
       create table if not exists ${tableIn(schema)} (
