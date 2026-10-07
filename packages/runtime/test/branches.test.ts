@@ -84,6 +84,32 @@ describe('solving a switch to its branches', () => {
     expect(to(bs, 'diff').demands).toEqual({ a: { paired: 'equal', present: true }, b: { paired: 'unequal' } });
   });
 
+  it('meets two paths compared unequal either way round, so an earlier pair in the other order leaves it a case', () => {
+    const turned = branchesOf(
+      [
+        { when: 'b == a', to: 'same' },
+        { when: 'a != b', to: 'apart' },
+      ],
+      'never',
+    );
+    expect(to(turned, 'apart').unsolved).toBeUndefined();
+    // `b == a` false is met either way round; only the second, a at the generated value, also meets `a != b`
+    expect(to(turned, 'apart').demands).toEqual({
+      a: { paired: 'equal', present: true },
+      b: { paired: 'unequal' },
+    });
+    const chained = branchesOf(
+      [
+        { when: 'a == b', to: 'first' },
+        { when: 'c == a', to: 'second' },
+        { when: 'n == 1', to: 'third' },
+      ],
+      'rest',
+    );
+    expect(to(chained, 'third').unsolved).toBeUndefined();
+    expect(to(chained, 'third').demands.n).toEqual({ eq: 1, present: true });
+  });
+
   it('solves a presence and an equality of two paths together, which do not contradict (#845)', () => {
     const bs = branchesOf([{ when: 'has(previous) && previous == commit', to: 'same' }], 'moved');
     expect(to(bs, 'same').unsolved).toBeUndefined();
