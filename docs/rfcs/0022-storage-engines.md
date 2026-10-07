@@ -631,3 +631,10 @@ turns out to need a rule gets it in that engine's band, the way any rule is adde
   suite that needs a database or an object store skips where its variable is unset and is run locally. The MySQL
   suites follow the same rule. They skip in CI without `WILANIS_TEST_MYSQL_URL`, and the package README gives the
   `docker run` line for a server at the 8.0.16 floor.
+- **MySQL: a scope is one `ALTER TABLE` on the pool, at the first scoped operation.** MySQL commits before DDL, so
+  the `ALTER` runs outside any transaction under a server-wide `GET_LOCK`, and the scope stays if that transaction
+  rolls back. The scope index holds the scope columns alone, since InnoDB appends the key; RFC 0015 asks postgres
+  for `(tenant, id)`. A scope column shares the 3072 bytes by the rule above, so a `unique` declared later that
+  would narrow a string scope column is `drift`. The `ALTER` waits at most 10 seconds for a transaction holding
+  the table, then fails naming it. A transaction that read anything before a table's first scope is refused its
+  later reads of that table ("Table definition has changed"); a retry works.
