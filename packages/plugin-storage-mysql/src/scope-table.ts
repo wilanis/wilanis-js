@@ -19,10 +19,10 @@
  * scoped uniques that go with it.
  */
 import type { At, Scope } from '@wilanis/plugin-storage';
-import { type Kysely, sql } from 'kysely';
+import { type Kysely, type RawBuilder, sql } from 'kysely';
 import { type Column, columnsOf, indexColumnsOf, indexNamesOf, rowCount } from './catalog.js';
 import { columnTypeOf, declaredOf, type Field, fieldsOf, widthsOf } from './columns.js';
-import { folded, quoted, scopedIndexName, scopedUniqueName, uniqueName } from './names.js';
+import { folded, quoted, refIndexName, scopedIndexName, scopedUniqueName, uniqueName } from './names.js';
 
 /**
  * One scope column as the field the table keeps it in: a string or a number, required, named folded. The
@@ -103,6 +103,19 @@ function rescoped(at: At, before: string[], columns: string[], indexes: Set<stri
 }
 
 /**
+ * An index over each `refs` field that a declared `unique` leads with, where the table has none yet. `ensure`
+ * adds the uniques before the foreign keys, so MySQL takes such a unique as the foreign key's index and makes
+ * none of its own. Once the scope stands in front of the unique it no longer leads with the field, and MySQL
+ * refuses to drop it while the foreign key needs it. So the same `ALTER` gives the field an index first.
+ */
+function keptForRefs(at: At, indexes: Set<string>): string[] {
+  return at.refs
+    .filter(ref => at.unique.some(fields => fields[0] === ref.field))
+    .filter(ref => !indexes.has(refIndexName(at.name, ref.field)))
+    .map(ref => `ADD INDEX ${quoted(refIndexName(at.name, ref.field))} (${quoted(ref.field)})`);
+}
+
+/**
  * The index a scoped read is answered from, over every scope column. It is dropped and made again rather than
  * made only where it is missing, since a collection that gains a second scope column has to be indexed by
  * both, and one index by a fixed name is what tells `ensure` which columns are the scope.
@@ -133,8 +146,27 @@ export async function addScope(db: Kysely<never>, at: At, scope: Scope): Promise
   const clauses = [
     ...narrowed(at, has, fields, widths),
     ...missing.map(field => `ADD COLUMN ${definitionOf(at, field, widths)}`),
+    ...keptForRefs(at, indexes),
     ...rescoped(at, before, columns, indexes),
     ...reindexed(at, columns, indexes),
   ];
-  await sql.raw(`ALTER TABLE ${quoted(at.name)} ${clauses.join(', ')}`).execute(db);
+  await unchecked(db, sql.raw(`ALTER TABLE ${quoted(at.name)} ${clauses.join(', ')}`));
+}
+
+/**
+ * Run one statement with the session's foreign-key checks off, and give the session back to the pool with the
+ * checks it had. MySQL refuses to change a column a foreign key holds, even to narrow a `VARCHAR`, while the
+ * checks are on, and a `refs` field in a scoped `unique` has to narrow. The table is empty, so no row can break a
+ * reference, and the foreign key itself stays, with an index that leads with its column (`keptForRefs`). The
+ * value is read and set back rather than set to `default`, which leaves this variable off in MySQL 8.0.16.
+ */
+async function unchecked(db: Kysely<never>, statement: RawBuilder<unknown>): Promise<void> {
+  const { rows } = await sql<{ was: number }>`select @@session.foreign_key_checks as was`.execute(db);
+  const was = Number(rows[0]?.was) === 0 ? 0 : 1;
+  await sql`set session foreign_key_checks = 0`.execute(db);
+  try {
+    await statement.execute(db);
+  } finally {
+    await sql.raw(`set session foreign_key_checks = ${was}`).execute(db);
+  }
 }

@@ -28,26 +28,8 @@ describe.skipIf(!url)('what an engine that keeps scopes answers', () => {
   for (const one of scopeCases) it(one.name, () => one.run(subject));
 });
 
-/** The tables these cases inspect, dropped before they run so a second run starts from none. */
-const TABLES = [
-  'c_scope',
-  'c_scope_num',
-  'c_scope_rows',
-  'c_scope_again',
-  'c_scope_late',
-  'c_scope_late_num',
-  'c_scope_wider',
-  'c_scope_race',
-  'c_scope_txn',
-  'c_scope_txn_first',
-  'c_scope_held',
-  'c_scope_viewed',
-  'c_scope_rebuilt',
-  'c_scope_reload',
-];
-
-/** A collection of the suite's shape, with the uniques it declares. */
-const at = (name: string, unique: string[][] = []): At => ({
+/** A collection of the suite's shape, with the uniques and the references it declares. */
+const at = (name: string, unique: string[][] = [], refs: At['refs'] = []): At => ({
   connection: '@connections/costs.connection.json',
   kind: KIND,
   settings: { url },
@@ -55,7 +37,7 @@ const at = (name: string, unique: string[][] = []): At => ({
   shape: SHAPE,
   key: 'id',
   unique,
-  refs: [],
+  refs,
   referenced: [],
   defaults: {},
 });
@@ -75,8 +57,17 @@ describe.skipIf(!url)('what a scope costs the table', () => {
   const pools = new Pools({});
   const db = () => pools.for(at('any'));
 
+  // every table these cases inspect is a c_scope_ one, dropped before they run so a second run starts from none
   beforeAll(async () => {
-    for (const table of TABLES) await sql`drop table if exists ${sql.id(table)}`.execute(db());
+    const tables = await sql<{ name: string }>`select TABLE_NAME as name from information_schema.TABLES
+      where TABLE_SCHEMA = database() and TABLE_NAME like 'c\\_scope%'`.execute(db());
+    await db()
+      .connection()
+      .execute(async session => {
+        await sql`set foreign_key_checks = 0`.execute(session);
+        for (const { name } of tables.rows) await sql`drop table ${sql.id(name)}`.execute(session);
+        await sql`set foreign_key_checks = 1`.execute(session);
+      });
   });
   afterAll(async () => {
     await made.close();
@@ -195,6 +186,24 @@ describe.skipIf(!url)('what a scope costs the table', () => {
     const other = await engine.put(collection, one('2', 'https://same'), { replace: true, scope: grace });
     expect(other.violated).toBeUndefined();
     expect(await engine.ensure([collection])).toEqual({ collections: 0, columns: 0, constraints: 0 });
+  });
+
+  it('a unique that starts with a refs field is scoped, and the reference still holds', async () => {
+    const parent = at('c_scope_parent');
+    const refs = [{ from: 'c_scope_child', field: 'url', to: 'c_scope_parent' }];
+    const child = at('c_scope_child', [['url', 'method']], refs);
+    await engine.ensure([parent, child]);
+    await engine.put(parent, one('https://p'), { replace: true });
+    const acme = { tenant: 'acme' };
+    expect((await engine.put(child, one('1', 'https://p'), { replace: true, scope: acme })).violated).toBeUndefined();
+    expect((await engine.put(child, one('2', 'https://none'), { replace: true, scope: acme })).violated).toBe(
+      'refs c_scope_child.url -> c_scope_parent',
+    );
+    const { indexes } = await catalogOf('c_scope_child');
+    expect(indexes.filter(index => index.unique)).toEqual([{ unique: true, over: ['tenant', 'url', 'method'] }]);
+    // the foreign key led with url through the unscoped unique; the ALTER gave url an index of its own first
+    expect(indexes).toContainEqual({ unique: false, over: ['url'] });
+    expect(await engine.ensure([parent, child])).toEqual({ collections: 0, columns: 0, constraints: 0 });
   });
 
   it('first scoped writes at once all land, and the column is added once', async () => {
