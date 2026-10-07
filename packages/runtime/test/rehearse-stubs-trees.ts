@@ -2,30 +2,31 @@
  * The small trees `rehearse-stubs.test.ts` rehearses (#844), each built so that a stub holding only the fields a rule
  * reads breaks a sibling that reads another field of the same answer. One feature `rv`, with `@std` and `@cli`, fired
  * from a CLI trigger; every tree passes the checker, since a case about the walk must stand on a tree that does.
+ * `treeOf` and the document helpers are exported, so a test of another part of the walk builds its tree the same way.
  */
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { type Kind, schemaUrl } from '@wilanis/core';
 
-const HERE = '@features/rv';
+export const HERE = '@features/rv';
 const MAKE = '@std/object.port.json#make';
-const NUMBER = { type: 'number' };
-const STRING = { type: 'string' };
+export const NUMBER = { type: 'number' };
+export const STRING = { type: 'string' };
 const ITEM = { score: NUMBER, name: STRING };
-const shape = (name: string) => `${HERE}/domain/${name}.shape.json`;
-const edge = (name: string) => `${HERE}/edge/${name}.shape.json`;
+export const shape = (name: string) => `${HERE}/domain/${name}.shape.json`;
+export const edge = (name: string) => `${HERE}/edge/${name}.shape.json`;
 
-const run = (id: string, op: string, input: object) => ({
+export const run = (id: string, op: string, input: object) => ({
   type: '@wilanis/node/run.schema.json',
   id,
   run: op,
   in: input,
 });
-const make = (id: string, value: object, type: string) => run(id, MAKE, { value, type });
-const refuse = (id: string, reason: string, type: string) =>
+export const make = (id: string, value: object, type: string) => run(id, MAKE, { value, type });
+export const refuse = (id: string, reason: string, type: string) =>
   run(id, '@std/outcome.port.json#refuse', { reason, message: reason, type });
-const decide = (id: string, input: object, rules: { when: string; to: string }[], otherwise: string) => ({
+export const decide = (id: string, input: object, rules: { when: string; to: string }[], otherwise: string) => ({
   type: '@wilanis/node/switch.schema.json',
   id,
   in: input,
@@ -41,7 +42,7 @@ const map = (id: string, op: string, each: { over: string; bind: object; in: obj
 });
 
 /** A CLI trigger firing one operation. */
-const trigger = (command: string, types: { in: string; out: string }, op: string) => ({
+export const trigger = (command: string, types: { in: string; out: string }, op: string) => ({
   label: command,
   kind: '@cli/cli.trigger-kind.json',
   settings: { command },
@@ -50,7 +51,12 @@ const trigger = (command: string, types: { in: string; out: string }, op: string
 });
 
 /** A graph of the feature: its label, input, output and nodes. */
-const graph = (label: string, input: string, out: { type: string; from: string | string[] }, nodes: object[]) => ({
+export const graph = (
+  label: string,
+  input: string,
+  out: { type: string; from: string | string[] },
+  nodes: object[],
+) => ({
   label,
   in: input,
   out,
