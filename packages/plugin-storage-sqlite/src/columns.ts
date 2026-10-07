@@ -9,6 +9,10 @@
  * what its column holds on the way in (`bound`) and back into what the shape says on the way out (`unbound`).
  */
 import type { Type } from '@wilanis/core';
+import { fieldTypeOf } from '@wilanis/plugin-storage';
+import { checkFor, columnFor } from './ddl.js';
+
+export { quoted } from './ddl.js';
 
 /** One field of a record shape, as a column is made from it. */
 export interface Field {
@@ -36,16 +40,11 @@ export const typeOf = (shape: Type, field: string): Type | undefined =>
  * is a string with a list of values, so it is `TEXT` and the handler judges the value against the shape.
  */
 export function columnOf(type: Type): string | undefined {
-  if (type.kind === 'string') return 'TEXT';
-  if (type.kind === 'number') return 'REAL';
-  if (type.kind === 'boolean') return 'INTEGER';
-  if (type.kind === 'blob') return undefined;
-  return 'TEXT';
+  return type.kind === 'blob' ? undefined : columnFor(fieldTypeOf(type));
 }
 
 /** Is a value of this type kept as JSON text, rather than as a column SQLite can compare directly? */
-export const isJson = (type: Type): boolean =>
-  type.kind !== 'string' && type.kind !== 'number' && type.kind !== 'boolean' && type.kind !== 'blob';
+export const isJson = (type: Type): boolean => type.kind !== 'blob' && fieldTypeOf(type) === 'json';
 
 /** A value as its column holds it: 0 or 1 for a boolean, JSON text for a shape, the value itself otherwise. */
 export function bound(value: unknown, type: Type | undefined): unknown {
@@ -68,10 +67,6 @@ export function declaredOf(name: string, type: Type): { column: string; check?: 
   const column = columnOf(type);
   if (!column)
     throw new Error(`'${name}' is a blob, and this engine has no column for one: its bytes live in the blob registry`);
-  if (type.kind === 'boolean') return { column, check: `${quoted(name)} IN (0, 1)` };
-  if (isJson(type)) return { column, check: `json_valid(${quoted(name)})` };
-  return { column };
+  const check = checkFor(name, fieldTypeOf(type));
+  return check ? { column, check } : { column };
 }
-
-/** An identifier as SQLite reads it whatever it spells: double-quoted, with any quote inside doubled. */
-export const quoted = (name: string): string => `"${name.replace(/"/g, '""')}"`;
