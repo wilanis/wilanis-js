@@ -122,7 +122,7 @@ error later:
 |---|---|
 | X241 | a field this engine has no column for: a `blob`, whose bytes live in the blob registry |
 | X242 | a key it cannot key by, or one `newKey` cannot answer under the configured `keyType` |
-| X243 | a collection name longer than the 64 characters MySQL keeps, or two of one connection that fold to one table |
+| X243 | a collection name longer than the 64 characters MySQL keeps, or two of one connection that fold to one table; a field of a kept shape longer than 64 characters, or two fields of one shape that fold to one column, since MySQL compares column names without case |
 
 ## Not yet
 
