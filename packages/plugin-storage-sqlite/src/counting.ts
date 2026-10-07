@@ -11,7 +11,7 @@
 import type { Step } from '@wilanis/plugin-storage';
 import { type Kysely, type RawBuilder, sql } from 'kysely';
 import { attempts, carries } from './casts.js';
-import { columnsOf, keyOf } from './catalog.js';
+import { keyOf } from './catalog.js';
 import { quoted } from './columns.js';
 import { scopeOf } from './scope-table.js';
 
@@ -83,25 +83,12 @@ function ofColumn(step: Step, column: string): RawBuilder<{ n: number }> | undef
 }
 
 /**
- * Whether a constraint is over a column the table does not have yet: one an `add` of the same plan makes, before
- * it. Every row leaves such a column empty, and an empty value repeats nothing and points at nothing, so no row
- * stands in the way -- and a count over the column would ask SQLite about a column it has never heard of.
- */
-async function addedByThePlan(db: Kysely<never>, step: Step): Promise<boolean> {
-  if (step.do !== 'unique' && step.do !== 'ref') return false;
-  const over = step.do === 'unique' ? (step.over ?? []) : [step.at ?? ''];
-  const has = new Set((await columnsOf(db, step.target)).map(one => one.name.toLowerCase()));
-  return over.some(field => !has.has(field.toLowerCase()));
-}
-
-/**
  * How many rows stand in this step's way, as one count; zero for a step nothing can stand in the way of. A
  * `unique` reads the table's scope and a `ref` the key of the collection it points at off the catalog, so no
  * caller has to hand the engine the tree.
  */
 export async function countFor(db: Kysely<never>, step: Step): Promise<number> {
   if (step.do === 'drop') return counted(db, all(step.target));
-  if (await addedByThePlan(db, step)) return 0;
   if (step.do === 'unique' && step.over?.length) {
     const key = (await keyOf(db, step.target)) ?? '';
     return counted(db, repeating(step.target, step.over, await scopeOf(db, step.target, key)));

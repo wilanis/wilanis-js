@@ -76,35 +76,102 @@ export async function everKnown(engine: Engine, on: On, declared: string[]): Pro
 }
 
 /**
- * The collections this plan brings into existence itself. A `create` is the first step of its collection and
- * every later step of the same plan is against a table that does not exist yet, so asking a database to count
- * rows in one is asking about a relation it has never heard of -- which is not zero rows, it is an error.
+ * What the steps of a plan before this one have done to the names, read as the plan goes. Every count is asked
+ * of the database as it stands before the plan, since a plan is classed before it runs, so a step has to be
+ * asked about in the names the database has *now*: a column a `rename` gives a new name is still under its old
+ * one, a collection a `renameCollection` renames is still under its `from`, and a collection a `create` makes, or
+ * a column an `add` makes, is not there at all.
  */
-function beingCreated(steps: Step[]): Set<string> {
-  return new Set(steps.filter(step => step.do === 'create').map(step => step.target));
+class Before {
+  private readonly created = new Set<string>();
+  private readonly collections = new Map<string, string>();
+  private readonly fields = new Map<string, Map<string, string>>();
+  private readonly added = new Map<string, Set<string>>();
+
+  /** Take a step in, once it has been counted, so the steps after it are asked about in the right names. */
+  note(step: Step): void {
+    if (step.do === 'create') this.created.add(step.target);
+    else if (step.do === 'renameCollection' && step.from) this.collections.set(step.target, this.collection(step.from));
+    else if (step.do === 'rename' && step.at && step.from)
+      this.renamesOf(step.target).set(step.at, this.field(step.target, step.from));
+    else if (step.do === 'add' && step.at) this.addedTo(step.target).add(step.at);
+  }
+
+  /** Whether the plan makes this collection itself, so the database has no table for it yet. */
+  isCreated(collection: string): boolean {
+    return this.created.has(collection);
+  }
+
+  /** Whether the plan adds this column itself, so every row the database holds leaves it empty. */
+  isAdded(collection: string, field: string): boolean {
+    return this.added.get(collection)?.has(field) ?? false;
+  }
+
+  /** The step as the database names what it is about before the plan: its collection, its column, its target. */
+  asked(step: Step): Step {
+    const field = (name: string) => this.field(step.target, name);
+    const asked: Step = { ...step, target: this.collection(step.target) };
+    if (step.at !== undefined) asked.at = field(step.at);
+    if (step.over) asked.over = step.over.map(field);
+    if (step.to) asked.to = this.collection(step.to);
+    return asked;
+  }
+
+  private collection(name: string): string {
+    return this.collections.get(name) ?? name;
+  }
+
+  private field(collection: string, name: string): string {
+    return this.fields.get(collection)?.get(name) ?? name;
+  }
+
+  private renamesOf(collection: string): Map<string, string> {
+    const held = this.fields.get(collection) ?? new Map<string, string>();
+    this.fields.set(collection, held);
+    return held;
+  }
+
+  private addedTo(collection: string): Set<string> {
+    const held = this.added.get(collection) ?? new Set<string>();
+    this.added.set(collection, held);
+    return held;
+  }
+}
+
+/** Whether a guarantee is over a column the same plan adds: every row leaves it empty, and empty breaks no guarantee. */
+function overAdded(step: Step, before: Before): boolean {
+  if (step.do === 'unique') return (step.over ?? []).some(field => before.isAdded(step.target, field));
+  return step.do === 'ref' && before.isAdded(step.target, step.at ?? '');
 }
 
 /**
- * How many rows stand in this step's way. A step of a collection the same plan opens with `create` has none by
- * construction: the table is not there to hold a row, and the guarantees that follow the `create` are over
- * columns made empty a moment earlier. The engine is not asked, because there is nothing yet to ask it about.
+ * How many rows stand in this step's way, asked of the database in the names it has before the plan. A step of
+ * a collection the plan creates has none: the table is not there to hold a row. A guarantee over a column the
+ * plan adds has none either. A `ref` to a collection the plan creates is broken by every row that names a
+ * record, since the target will hold none; that is the rows holding a value, which is what a `remove` counts,
+ * so the engine is asked that and nothing new.
  */
-async function rowsFor(engine: Engine, on: On, step: Step, fresh: Set<string>): Promise<number> {
-  if (!counts(step) || fresh.has(step.target)) return 0;
-  return engine.rows(on, step);
+async function rowsFor(engine: Engine, on: On, step: Step, before: Before): Promise<number> {
+  if (!counts(step) || before.isCreated(step.target) || overAdded(step, before)) return 0;
+  const asked = before.asked(step);
+  if (step.do === 'ref' && step.to && before.isCreated(step.to))
+    return engine.rows(on, { do: 'remove', target: asked.target, at: asked.at, says: asked.says });
+  return engine.rows(on, asked);
 }
 
 /**
  * Every step classed, with the row count the engine answered where the count changes the answer. `attempts` is
  * handed to the classing because which casts an engine writes is that engine's table and no count answers it:
- * a pair it refuses is refused on an empty table exactly as on a full one.
+ * a pair it refuses is refused on an empty table exactly as on a full one. The steps are walked in plan order,
+ * each counted before it is noted, so each is asked about in the names the steps before it leave untouched.
  */
 export async function classedSteps(engine: Engine, on: On, steps: Step[]): Promise<Classed[]> {
-  const fresh = beingCreated(steps);
+  const before = new Before();
   const out: Classed[] = [];
   for (const step of steps) {
-    const rows = await rowsFor(engine, on, step, fresh);
+    const rows = await rowsFor(engine, on, step, before);
     out.push(classed(step, rows, { attempts: (was, becomes) => engine.attempts(was, becomes) }));
+    before.note(step);
   }
   return out;
 }
