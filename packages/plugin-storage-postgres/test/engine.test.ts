@@ -14,7 +14,7 @@
  * Every case keeps its records in a collection of its own and prepares it with `ensure` itself, so the whole
  * suite runs against one database without the cases reaching each other.
  */
-import { cases, scopeCases } from '@wilanis/plugin-storage/suite';
+import { cases, emptyWhereCases, scopeCases } from '@wilanis/plugin-storage/suite';
 import { afterAll, describe, it } from 'vitest';
 import { PostgresEngine } from '../src/engine.js';
 import { closePools } from '../src/pool.js';
@@ -34,6 +34,11 @@ afterAll(async () => {
 
 describe.skipIf(!url)('what every engine answers alike', () => {
   for (const one of cases) it(one.name, () => one.run(subject));
+});
+
+/** A filter of no test, which this engine answers as no filter; SQLite and MySQL join once #848 lands. */
+describe.skipIf(!url)('what a filter of no test answers', () => {
+  for (const one of emptyWhereCases) it(one.name, () => one.run(subject));
 });
 
 /**

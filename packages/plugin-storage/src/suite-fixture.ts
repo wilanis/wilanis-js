@@ -57,8 +57,8 @@ export const ids = (records: Record_[]) => records.map(record => String(record.i
 /** A filter parsed against the suite's shape, so a case writes what it means and the grammar judges it once. */
 export const where = (filter: unknown) => parseWhere(filter, SHAPE);
 
-/** What a case declares beyond the shape: the constraints the engine is to answer for. */
-export type Declared = Partial<Pick<At, 'unique' | 'refs' | 'referenced' | 'defaults'>>;
+/** What a case declares beyond the suite's shape: the constraints the engine is to answer for, or a shape of its own. */
+export type Declared = Partial<Pick<At, 'shape' | 'unique' | 'refs' | 'referenced' | 'defaults'>>;
 
 /** A collection of the subject's connection, named for the case that keeps its records there. */
 export function at(subject: Subject, name: string, declared: Declared = {}): At {
@@ -113,9 +113,9 @@ export async function scoped(subject: Subject, name: string, declared: Declared 
   return where_;
 }
 
-/** The keys a filter finds in one collection: the reading half of nearly every case, said once. */
+/** The keys a filter finds in one collection, parsed against its shape: the reading half of nearly every case. */
 export const found = async (subject: Subject, where_: At, filter: unknown) =>
-  ids(await subject.engine.find(where_, { where: where(filter) }));
+  ids(await subject.engine.find(where_, { where: parseWhere(filter, where_.shape) }));
 
 /** The keys one scope sees of a collection, which is the reading half of nearly every scope case. */
 export const foundIn = async (subject: Subject, where_: At, scope: Scope | undefined) =>

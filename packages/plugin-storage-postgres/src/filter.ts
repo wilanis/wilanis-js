@@ -13,11 +13,21 @@
  *   answered a different order for the same filter would make the suite a lie. The grammar already refuses an
  *   ordering on a shape or a list (`unfit` in @storage), so what is left here is `unknown`, and it is refused
  *   in the open rather than quietly ordered some other way.
+ *
+ * Where PostgreSQL's own reading of an operator disagrees with the memory engine's, the engine says it right
+ * rather than the suite bending, as the SQLite and MySQL engines do:
+ *
+ * - a field is named by its folded column, as `ensure` created it and the ordering names it; quoting the name
+ *   as written would ask for a `"traceId"` column the table does not have.
+ * - `ne` is `IS DISTINCT FROM`, and `notIn` keeps a row whose column is empty, because the memory engine's
+ *   `!==` and `!includes` are true of an absent value, where SQL's `!=` and `NOT IN` answer unknown and drop it.
+ * - `in` over no value is `false` and `notIn` over none is `true`; PostgreSQL refuses `IN ()`.
+ * - a filter of no test is `true`, so it means "every record" inside a `not` or an `any` as it does alone.
  */
 import type { Type } from '@wilanis/core';
 import type { Order, Test, Where } from '@wilanis/plugin-storage';
 import { type Expression, type ExpressionBuilder, sql } from 'kysely';
-import { isJson } from './columns.js';
+import { folded, isJson } from './columns.js';
 
 type Builder = ExpressionBuilder<never, never>;
 type Sql = Expression<unknown>;
@@ -34,23 +44,22 @@ const escaped = (value: unknown): string => String(value ?? '').replace(/([\\%_]
  * or a list means what the memory engine means by it; everything else is compared as the column it is.
  */
 function expression(eb: Builder, field: string, test: Test, type: Type | undefined): Sql {
-  const column = eb.ref(field as never);
+  const column = eb.ref(folded(field) as never);
   const json = type ? isJson(type) : false;
   const value = json ? sql`${JSON.stringify(test.value ?? null)}::jsonb` : sql`${test.value}`;
   switch (test.op) {
     case 'eq':
       return eb(column, '=', value as never);
     case 'ne':
-      return eb(column, '!=', value as never);
+      return eb(column, 'is distinct from', value as never);
     case 'lt':
     case 'lte':
     case 'gt':
     case 'gte':
       return ordering(eb, column as never, test, type);
     case 'in':
-      return eb(column, 'in', listed(test.value) as never);
     case 'notIn':
-      return eb(column, 'not in', listed(test.value) as never);
+      return membership(eb, column, test);
     case 'has':
       return test.value ? eb(column, 'is not', null) : eb(column, 'is', null);
     case 'contains':
@@ -73,23 +82,32 @@ function ordering(eb: Builder, column: Sql, test: Test, type: Type | undefined):
 /** What `in` and `notIn` are given: a list, or nothing at all, which matches no record and every record. */
 const listed = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
-/** A filter as one expression over the table's columns; no filter asks for every record. */
-export function conditionOf(eb: Builder, where: Where | undefined, shape: Type): Sql | undefined {
-  if (!where) return undefined;
-  if (where.kind === 'all') return every(eb, where.of, shape, 'and');
-  if (where.kind === 'any') return every(eb, where.of, shape, 'or');
-  if (where.kind === 'not') {
-    const inner = conditionOf(eb, where.of, shape);
-    return inner ? eb.not(inner as never) : undefined;
-  }
-  const tests = where.tests.map(test => expression(eb, where.field, test, typeOf(shape, where.field)));
-  return tests.length ? eb.and(tests as never) : undefined;
+/**
+ * An `in` or a `notIn` over its column. A list of no value is said as the constant it means, since PostgreSQL
+ * refuses `IN ()`; a `notIn` keeps a row whose column is empty, as the memory engine's `!includes` does.
+ */
+function membership(eb: Builder, column: Sql, test: Test): Sql {
+  const list = listed(test.value);
+  if (test.op === 'in') return list.length ? eb(column as never, 'in', list as never) : sql<boolean>`false`;
+  if (!list.length) return sql<boolean>`true`;
+  return eb.or([eb(column as never, 'is', null), eb(column as never, 'not in', list as never)]);
 }
 
-/** A list of filters joined: an empty `all` asks for every record, an empty `any` for none. */
-function every(eb: Builder, of: Where[], shape: Type, how: 'and' | 'or'): Sql | undefined {
-  const parts = of.map(one => conditionOf(eb, one, shape)).filter(Boolean);
-  if (!parts.length) return how === 'and' ? undefined : sql<boolean>`false`;
+/** A filter as one expression over the table's columns; a filter of no test asks for every record. */
+export function conditionOf(eb: Builder, where: Where, shape: Type): Sql {
+  if (where.kind === 'not') return eb.not(conditionOf(eb, where.of, shape) as never);
+  if (where.kind === 'field') {
+    const type = typeOf(shape, where.field);
+    const tests = where.tests.map(test => expression(eb, where.field, test, type));
+    return joined(eb, tests, 'and');
+  }
+  const parts = where.of.map(one => conditionOf(eb, one, shape));
+  return joined(eb, parts, where.kind === 'all' ? 'and' : 'or');
+}
+
+/** Expressions joined: none joined by `and` is `true`, as an empty `all` asks for every record, and by `or` `false`. */
+function joined(eb: Builder, parts: Sql[], how: 'and' | 'or'): Sql {
+  if (!parts.length) return how === 'and' ? sql<boolean>`true` : sql<boolean>`false`;
   return how === 'and' ? eb.and(parts as never) : eb.or(parts as never);
 }
 

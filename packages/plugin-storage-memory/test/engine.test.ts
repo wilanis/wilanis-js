@@ -10,7 +10,7 @@ import { checkTree } from '@wilanis/compiler';
 import { loadTree, type PluginModule, type Type, TypeResolver } from '@wilanis/core';
 import type { At } from '@wilanis/plugin-storage';
 import storage, { engines } from '@wilanis/plugin-storage';
-import { cases, scopeCases } from '@wilanis/plugin-storage/suite';
+import { cases, emptyWhereCases, scopeCases } from '@wilanis/plugin-storage/suite';
 import { BUILTIN_PLUGINS } from '@wilanis/runtime';
 import { afterAll, describe, expect, it } from 'vitest';
 import memory, { MemoryEngine } from '../src/index.js';
@@ -25,6 +25,12 @@ const subjectOf = () => ({
 describe('what every engine answers alike', () => {
   const subject = subjectOf();
   for (const one of cases) it(one.name, () => one.run(subject));
+});
+
+/** A filter of no test, which this engine answers as no filter; SQLite and MySQL join once #848 lands. */
+describe('what a filter of no test answers', () => {
+  const subject = subjectOf();
+  for (const one of emptyWhereCases) it(one.name, () => one.run(subject));
 });
 
 /**
