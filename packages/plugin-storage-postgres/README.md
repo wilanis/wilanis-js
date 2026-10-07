@@ -32,10 +32,14 @@ pool are facts about one database, so they sit on the connection rather than in 
 }
 ```
 
-`schema` (default `public`) and `pool` (`{ "max": 10 }`) are optional. The plugin's own settings are
-engine-wide: `statementTimeout`, in seconds; `keyType` -- `uuidv7` (the default), what `newKey` answers for a
-string key, or `identity`, one past the highest, for a number key; and `queueVisibility`, in seconds (default
-30), how long a queue delivery holds its message before another worker may take it.
+`schema` (default `public`) and `pool` (`{ "max": 10 }`) are optional. The schema need not exist yet: `migrate`,
+`ensure` and the queue's `ensure` create it before they write into it. They create it only where the catalog
+has no schema of that name, so a role that owns its schema and has no CREATE on the database still runs.
+
+The plugin's own settings are engine-wide: `statementTimeout`, in seconds; `keyType` -- `uuidv7` (the default),
+what `newKey` answers for a string key, or `identity`, one past the highest, for a number key; and
+`queueVisibility`, in seconds (default 30), how long a queue delivery holds its message before another worker
+may take it.
 
 ## The lease it keeps
 

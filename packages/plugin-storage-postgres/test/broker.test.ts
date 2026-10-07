@@ -174,12 +174,12 @@ describe.skipIf(!url)('a queue kept in a table several workers share', () => {
   });
 
   it('says which step is missing where ensure never made the table', async () => {
-    // a connection of its own, since a pool is one per connection and the schema is the pool's
+    // a connection of its own, since a pool is one per connection and the schema is the pool's; the database
+    // does not hold that schema yet, and ensure makes it with the table
     const schema = `s_${randomUUID().slice(0, 8)}`;
     const Bare = `@connections/${schema}.connection.json`;
     const bare = { connections: { [Bare]: { kind: KIND, settings: { url, schema } } } };
     const { db } = poolFor({ connection: CONNECTION, kind: KIND, settings: { url } }, {});
-    await sql`create schema ${sql.ref(schema)}`.execute(db);
     try {
       const broker = kept({}, bare);
       await expect(broker.publish(Bare, 'q', { body: {}, headers: {} })).rejects.toThrow(/queue\.port\.json#ensure/);
@@ -189,7 +189,7 @@ describe.skipIf(!url)('a queue kept in a table several workers share', () => {
       await broker.ensure(Bare);
       await expect(broker.publish(Bare, 'q', { body: {}, headers: {} })).resolves.toHaveProperty('id');
     } finally {
-      await sql`drop schema ${sql.ref(schema)} cascade`.execute(db);
+      await sql`drop schema if exists ${sql.ref(schema)} cascade`.execute(db);
     }
   });
 });

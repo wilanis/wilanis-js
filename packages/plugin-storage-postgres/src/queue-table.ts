@@ -12,6 +12,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Kysely, RawBuilder } from 'kysely';
 import { sql } from 'kysely';
+import { ensureSchema } from './pool.js';
 
 /** The channel every publish and retry notifies on; the payload says which schema and queue. */
 export const CHANNEL = 'wilanis_queue';
@@ -51,8 +52,12 @@ async function creating(statement: RawBuilder<unknown>, db: Kysely<never>): Prom
   }
 }
 
-/** Create the queue table and its index where the schema has neither, and leave both alone where it has them. */
+/**
+ * Create the queue table and its index where the schema has neither, and leave both alone where it has them.
+ * The schema is made first where the database has none, so `ensure` is the one step a fresh database needs.
+ */
 export async function ensureQueue({ db, schema }: Table): Promise<void> {
+  await ensureSchema(db, schema);
   await creating(
     sql`
       create table if not exists ${tableOf(schema)} (

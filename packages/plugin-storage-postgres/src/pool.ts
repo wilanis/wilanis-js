@@ -7,7 +7,7 @@
  * (a reload does exactly that) gets its own pools and the old ones are destroyed with the old tree.
  */
 import type { On } from '@wilanis/plugin-storage';
-import { Kysely, PostgresDialect } from 'kysely';
+import { Kysely, PostgresDialect, sql } from 'kysely';
 import pg from 'pg';
 import { forgetScopes } from './scoping.js';
 
@@ -77,6 +77,28 @@ export function poolFor(at: On, settings: Settings): { db: Kysely<never>; schema
   const opened = { db, schema };
   pools.set(key, opened);
   return opened;
+}
+
+/**
+ * Whether a failed `create schema if not exists` lost the race to another process creating the same schema:
+ * PostgreSQL checks before it takes the catalog lock, so two first contacts at once can both miss it.
+ */
+const lostTheRace = (error: unknown) => ['23505', '42P06'].includes(String((error as { code?: unknown }).code));
+
+/**
+ * Create the schema a connection names where the database has none, and leave it alone where it has one: what
+ * runs before the first statement that writes into it, so a fresh database needs no `create schema` by hand.
+ * The catalog is asked first, because `create schema if not exists` asks for CREATE on the database even where
+ * the schema is there, and a role an operator gave a schema of its own and nothing more must keep working.
+ */
+export async function ensureSchema(db: Kysely<never>, schema: string): Promise<void> {
+  const found = await sql`select 1 from pg_namespace where nspname = ${schema}`.execute(db);
+  if ((found as { rows: unknown[] }).rows.length) return;
+  try {
+    await sql`create schema if not exists ${sql.ref(schema)}`.execute(db);
+  } catch (error) {
+    if (!lostTheRace(error)) throw error;
+  }
 }
 
 /**
