@@ -21,6 +21,8 @@
  *   as written would ask for a `"traceId"` column the table does not have.
  * - `ne` is `IS DISTINCT FROM`, and `notIn` keeps a row whose column is empty, because the memory engine's
  *   `!==` and `!includes` are true of an absent value, where SQL's `!=` and `NOT IN` answer unknown and drop it.
+ * - `not` is `IS NOT TRUE`, not `NOT`, so a `not` over a test of an absent field keeps the record, as the memory
+ *   engine's `!` does; SQL's `NOT` keeps the test's unknown and drops it.
  * - `in` over no value is `false` and `notIn` over none is `true`; PostgreSQL refuses `IN ()`.
  * - a filter of no test is `true`, so it means "every record" inside a `not` or an `any` as it does alone.
  */
@@ -93,9 +95,16 @@ function membership(eb: Builder, column: Sql, test: Test): Sql {
   return eb.or([eb(column as never, 'is', null), eb(column as never, 'not in', list as never)]);
 }
 
+/**
+ * A `not` over a filter, true wherever the filter is not true. SQL answers unknown for a test of an empty column,
+ * and `NOT` keeps the unknown, so the row is dropped; `IS NOT TRUE` reads the unknown as false, as the memory
+ * engine reads a test of an absent field, and is `NOT COALESCE(x, FALSE)` said in one operator.
+ */
+const negated = (inner: Sql): Sql => sql<boolean>`((${inner}) is not true)`;
+
 /** A filter as one expression over the table's columns; a filter of no test asks for every record. */
 export function conditionOf(eb: Builder, where: Where, shape: Type): Sql {
-  if (where.kind === 'not') return eb.not(conditionOf(eb, where.of, shape) as never);
+  if (where.kind === 'not') return negated(conditionOf(eb, where.of, shape));
   if (where.kind === 'field') {
     const type = typeOf(shape, where.field);
     const tests = where.tests.map(test => expression(eb, where.field, test, type));
