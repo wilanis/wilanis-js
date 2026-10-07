@@ -84,7 +84,8 @@ export async function switchesReached(
 
 /**
  * Why no run can take a case, in the words the report prints after `NEVER RUN`: the solver found no input for its
- * rule, what it demands is something the rehearsal cannot set, or it leaves a required field no member of its enum.
+ * rule, what it demands is something the rehearsal cannot set, or it demands a value and leaves no member of the
+ * field's enum.
  * Nothing for a case a run can take.
  */
 export function uncoveredBy(one: Case): string | undefined {

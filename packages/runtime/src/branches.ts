@@ -62,7 +62,7 @@ export interface Case {
   input?: { path: string[]; value: unknown }[];
   /** Demands that could not be routed to anything the rehearsal can set. */
   unreachable?: string[];
-  /** Demands on a required enum field that exclude every member of its enum, so no value of its type meets them. */
+  /** Demands for a value that exclude every member of the field's enum, so no value of its type meets them. */
   exhausted?: string[];
   /** The dotted paths of the nodes made to break, for the branch a `catch` routes a fault to (RFC 0014). */
   broken?: string[];
@@ -294,22 +294,15 @@ function ofElement(list: FoundList, within: string[], domain: Domain, from: Pick
 type Missed = 'unreachable' | 'exhausted';
 
 /**
- * The value a demand writes at a path of a declared type. Where the demand leaves no member of the field's enum, the
- * field is left out if some field on the way may be absent, which a rule's `!=` accepts; otherwise `NO_MEMBER` says
- * that no value meets it.
+ * A demand on the trigger's own input at a path: the patch that meets it, or 'exhausted' where it leaves no member of
+ * the field's enum. An absent field is the solver's to demand, never this patch's to choose.
  */
-function valueFor(domain: Domain, base: unknown, at: { type?: Type; path: string[] }, seed: number): unknown {
-  const value = satisfy(domain, getPath(base, at.path), typeAtPath(at.type, at.path), seed);
-  return value === NO_MEMBER && omissible(at.type, at.path) ? undefined : value;
-}
-
-/** A demand on the trigger's own input at a path: the patch that meets it, or why none does. */
 function ofInput(
   path: string[],
   domain: Domain,
   from: Pick<Stubbing, 'inputSeed' | 'inType'> & { seed: number },
 ): { input: { path: string[]; value: unknown } } | Missed {
-  const value = valueFor(domain, from.inputSeed, { type: from.inType, path }, from.seed);
+  const value = satisfy(domain, getPath(from.inputSeed, path), typeAtPath(from.inType, path), from.seed);
   return value === NO_MEMBER ? 'exhausted' : { input: { path, value } };
 }
 
@@ -359,21 +352,39 @@ function standIn(target: string, from: Required<Pick<Stubbing, 'generated' | 'ty
 }
 
 /**
- * One demand written into the stub it steers, on top of what earlier demands already wrote there; false, and nothing
- * written, where no value of the type at that path meets it.
+ * One demand written into the stub it steers, on top of what earlier demands already wrote there; 'exhausted', and
+ * nothing written, where it leaves no member of the field's enum.
  */
 function write(
   stubs: Record<string, unknown>,
   stub: { target: string; path: string[]; value: unknown },
   from: Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>>,
-): boolean {
+): Missed | undefined {
   const { target, path } = stub;
   const type = from.typeOf(target);
   const base = target in stubs ? stubs[target] : standIn(target, from);
-  const want = valueFor(stub.value as Domain, base, { type, path }, from.seed);
-  if (want === NO_MEMBER) return false;
+  const want = satisfy(stub.value as Domain, getPath(base, path), typeAtPath(type, path), from.seed);
+  if (want === NO_MEMBER) return 'exhausted';
   stubs[target] = setPath(base, path, want, { type, seed: from.seed });
-  return true;
+  return undefined;
+}
+
+/** Where a case is steered: the stubs it writes, and the patches to the trigger's input. */
+interface Steered {
+  stubs: Record<string, unknown>;
+  input: { path: string[]; value: unknown }[];
+}
+
+/** One met demand laid into what a case steers: a patch to the input, or a stub written; why not, where it is not met. */
+function lay(
+  met: ReturnType<typeof meet>,
+  into: Steered,
+  from: Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>>,
+): Missed | undefined {
+  if (typeof met === 'string') return met;
+  if (!('input' in met)) return write(into.stubs, met.stub, from);
+  into.input.push(met.input);
+  return undefined;
 }
 
 /**
@@ -396,34 +407,17 @@ function steer(
   from: Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>> & Pick<Stubbing, 'inputSeed' | 'inType' | 'isMap'>,
   steerable: boolean,
 ): Case {
-  const stubs: Record<string, unknown> = {};
-  const input: { path: string[]; value: unknown }[] = [];
+  const steered: Steered = { stubs: {}, input: [] };
   const missed: Record<Missed, string[]> = { unreachable: [], exhausted: [] };
   const at: At = { node: found.node, prefix: found.prefix, steerable, element: elementOf(found) };
   const demands = branch.unsolved ? [] : Object.entries(branch.demands);
   for (const [dotted, domain] of demands) {
-    const met = meet(dotted, domain, at, from);
-    if (typeof met === 'string') missed[met].push(dotted);
-    else if ('input' in met) input.push(met.input);
-    else if (!write(stubs, met.stub, from)) missed.exhausted.push(dotted);
+    const why = lay(meet(dotted, domain, at, from), steered, from);
+    if (why) missed[why].push(dotted);
   }
+  const { stubs, input } = steered;
   const named = Object.entries(missed).filter(([, paths]) => paths.length);
   return { at: found.at, branch, stubs, ...(input.length ? { input } : {}), ...Object.fromEntries(named) };
-}
-
-/**
- * Whether a value may be left out at a path of a declared type: some field on the way is optional. A list's element is
- * not, since the walk holds the element a switch reads to one that is there.
- */
-function omissible(type: Type | undefined, path: string[]): boolean {
-  let here = type;
-  for (const step of path) {
-    const read = here && typeAt(here, [step]);
-    if (!read || typeof read === 'string') return false;
-    if (read.optional && !/^\d+$/.test(step)) return true;
-    here = read.type;
-  }
-  return false;
 }
 
 /** The declared type at a path within a node's output type, as far as the type system can follow it. */

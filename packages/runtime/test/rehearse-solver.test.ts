@@ -114,18 +114,36 @@ describe('rehearsing a tree whose switches read an enum and compare two fields',
 });
 
 /**
- * `sort` reads a scan and routes on its `status`, whose rules name every member of its enum, so only an absent status
- * reaches the else: a required one never does, and an optional one does when it is left out (#861).
+ * How `exhaustedTree` reads `status`: `required`; `optional`, under has(); `present`, optional and under has(), with a
+ * rule routing its absence elsewhere; `nested`, required inside an optional `info`, with a rule routing `info`'s absence.
  */
-function exhaustedTree(required: boolean): string {
+type Variant = 'required' | 'optional' | 'present' | 'nested';
+
+const MEMBERS = ['clean', 'findings', 'broke'];
+
+/**
+ * `sort` reads a scan and routes on its `status`, whose rules name every member of its enum (#861). Where `status` is
+ * required, or a rule before the else takes the case where it is absent, the else demands a value no member is.
+ */
+function exhaustedTree(variant: Variant): string {
   const port = `${HERE}/domain/scan.port.json`;
   const result = shape('Result');
-  const status = { type: 'string', enum: ['clean', 'findings', 'broke'], required };
+  const nested = variant === 'nested';
+  const status = { type: 'string', enum: MEMBERS, required: variant === 'required' || nested };
+  const held = nested ? 'info' : 'status';
   // an optional field is read under has(), which the checker asks for (G011)
-  const guard = required ? '' : 'has(status) && ';
-  const rules = ['clean', 'findings', 'broke'].map(member => ({ when: `${guard}status == '${member}'`, to: 'known' }));
+  const guard = variant === 'required' ? '' : `has(${held}) && `;
+  const rules = MEMBERS.map(member => ({
+    when: `${guard}${held}${nested ? '.status' : ''} == '${member}'`,
+    to: 'known',
+  }));
+  const routesAbsent = variant === 'present' || nested;
+  if (routesAbsent) rules.push({ when: `!has(${held})`, to: 'missing' });
+  const missing = routesAbsent ? [make('missing', { label: 'missing' }, result)] : [];
+  const read = nested ? { info: { type: shape('Info'), required: false } } : { status };
   return treeOf({
-    'domain/Read.shape.json': { layer: 'core', fields: { status, commit: STRING } },
+    'domain/Info.shape.json': { layer: 'core', fields: { status } },
+    'domain/Read.shape.json': { layer: 'core', fields: { ...read, commit: STRING } },
     'domain/Result.shape.json': { layer: 'core', fields: { label: STRING } },
     'domain/Ask.shape.json': { layer: 'core', fields: { target: STRING } },
     'edge/AskIn.shape.json': { layer: 'edge', fields: { target: STRING } },
@@ -144,21 +162,27 @@ function exhaustedTree(required: boolean): string {
       },
     },
     'data/read.graph.json': graph('Read', shape('Ask'), { type: shape('Read'), from: 'r' }, [
-      make('r', { status: 'broke', commit: '{{in.target}}' }, shape('Read')),
+      make('r', { ...(nested ? {} : { status: 'broke' }), commit: '{{in.target}}' }, shape('Read')),
     ]),
-    'domain/sort.graph.json': graph('Sort', shape('Ask'), { type: result, from: ['known', 'unknown'] }, [
-      run('got', `${port}#read`, { target: '{{in.target}}' }),
-      decide('status', { status: '{{got.status}}' }, rules, 'unknown'),
-      make('known', { label: '{{got.commit}}' }, result),
-      make('unknown', { label: 'unknown' }, result),
-    ]),
+    'domain/sort.graph.json': graph(
+      'Sort',
+      shape('Ask'),
+      { type: result, from: ['known', ...(routesAbsent ? ['missing'] : []), 'unknown'] },
+      [
+        run('got', `${port}#read`, { target: '{{in.target}}' }),
+        decide('status', { [held]: `{{got.${held}}}` }, rules, 'unknown'),
+        make('known', { label: '{{got.commit}}' }, result),
+        ...missing,
+        make('unknown', { label: 'unknown' }, result),
+      ],
+    ),
     'edge/sort.trigger.json': trigger('sort', { in: edge('AskIn'), out: edge('Out') }, `${port}#sort`),
   });
 }
 
 /** The rehearsal's lines for an `exhaustedTree` under every seed, and whether each rehearsal was ok. */
-async function rehearsedUnder(required: boolean): Promise<{ said: string; ok: boolean }[]> {
-  const dir = exhaustedTree(required);
+async function rehearsedUnder(variant: Variant): Promise<{ said: string; ok: boolean }[]> {
+  const dir = exhaustedTree(variant);
   const load = loadTree(dir, BUILTIN_PLUGINS);
   expect(checkTree(load).format()).toBe('');
   const runs = [];
@@ -170,16 +194,35 @@ async function rehearsedUnder(required: boolean): Promise<{ said: string; ok: bo
   return runs;
 }
 
+/** Every rehearsal of the variant reports the else `NEVER RUN`, naming the field whose enum the rules use up. */
+async function expectExhausted(variant: Variant, field: string): Promise<void> {
+  const reason = `every member of ${field}'s enum is named by a rule before it`;
+  for (const { said, ok } of await rehearsedUnder(variant)) {
+    expect(said).toContain(`NEVER RUN -- ${reason}`);
+    expect(said).toMatch(/anything else +NEVER RUN/);
+    expect(said).not.toMatch(/BROKE|WRONG ROUTE|cannot vary it/);
+    expect(ok, said).toBe(false);
+  }
+}
+
 describe('rehearsing a switch whose rules name every member of an enum (#861)', () => {
   it('reports the else unreachable when the field is required, and says why', { timeout: 60_000 }, async () => {
-    for (const { said, ok } of await rehearsedUnder(true)) {
-      expect(said).toMatch(/anything else +NEVER RUN -- every member of status's enum is named by a rule before it$/m);
-      expect(said).not.toMatch(/BROKE|cannot vary it/);
-      expect(ok, said).toBe(false);
-    }
+    await expectExhausted('required', 'status');
   });
-  it('reaches the else by leaving the field out when it is optional', { timeout: 60_000 }, async () => {
-    for (const { said, ok } of await rehearsedUnder(false)) {
+  it('reports it unreachable when the field is optional and a rule routes its absence', {
+    timeout: 60_000,
+  }, async () => {
+    await expectExhausted('present', 'status');
+  });
+  it('reports it unreachable when the field sits in an optional parent whose absence a rule routes', {
+    timeout: 60_000,
+  }, async () => {
+    await expectExhausted('nested', 'info.status');
+  });
+  it('pins the absent route: under has() alone, the solver leaves the optional field out', {
+    timeout: 60_000,
+  }, async () => {
+    for (const { said, ok } of await rehearsedUnder('optional')) {
       expect(said).toMatch(/ok {2}anything else +answered from 'unknown'/);
       expect(said).not.toMatch(/BROKE|NEVER RUN/);
       expect(ok, said).toBe(true);
