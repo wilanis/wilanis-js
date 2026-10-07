@@ -7,7 +7,7 @@
  * (a reload does exactly that) gets its own pools and the old ones are destroyed with the old tree.
  */
 import type { On } from '@wilanis/plugin-storage';
-import { Kysely, PostgresDialect, sql } from 'kysely';
+import { Kysely, PostgresDialect, type RawBuilder, sql } from 'kysely';
 import pg from 'pg';
 import { forgetScopes } from './scoping.js';
 
@@ -80,10 +80,22 @@ export function poolFor(at: On, settings: Settings): { db: Kysely<never>; schema
 }
 
 /**
- * Whether a failed `create schema if not exists` lost the race to another process creating the same schema:
- * PostgreSQL checks before it takes the catalog lock, so two first contacts at once can both miss it.
+ * Whether a failed `create ... if not exists` lost the race to another process creating the same thing.
+ * PostgreSQL checks before it takes the catalog lock, so two first contacts at once can both miss it, and the
+ * second answers a duplicate: in the catalog's own index (23505), of a schema (42P06), or of a table or an index
+ * (42P07).
  */
-const lostTheRace = (error: unknown) => ['23505', '42P06'].includes(String((error as { code?: unknown }).code));
+const lostTheRace = (error: unknown) =>
+  ['23505', '42P06', '42P07'].includes(String((error as { code?: unknown }).code));
+
+/** Run one DDL statement, where a process that made the same thing a moment earlier is not a failure. */
+export async function creating(statement: RawBuilder<unknown>, db: Kysely<never>): Promise<void> {
+  try {
+    await statement.execute(db);
+  } catch (error) {
+    if (!lostTheRace(error)) throw error;
+  }
+}
 
 /**
  * Create the schema a connection names where the database has none, and leave it alone where it has one: what
@@ -94,11 +106,7 @@ const lostTheRace = (error: unknown) => ['23505', '42P06'].includes(String((erro
 export async function ensureSchema(db: Kysely<never>, schema: string): Promise<void> {
   const found = await sql`select 1 from pg_namespace where nspname = ${schema}`.execute(db);
   if ((found as { rows: unknown[] }).rows.length) return;
-  try {
-    await sql`create schema if not exists ${sql.ref(schema)}`.execute(db);
-  } catch (error) {
-    if (!lostTheRace(error)) throw error;
-  }
+  await creating(sql`create schema if not exists ${sql.ref(schema)}`, db);
 }
 
 /**

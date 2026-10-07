@@ -14,7 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import type { Leases } from '@wilanis/plugin-storage';
 import { type Kysely, type RawBuilder, sql } from 'kysely';
-import { poolFor, reachedOn, type Settings } from './pool.js';
+import { creating, poolFor, reachedOn, type Settings } from './pool.js';
 
 /** Where one connection's leases are kept: its pool, and the lease table qualified by the connection's schema. */
 interface Kept {
@@ -26,26 +26,21 @@ interface Kept {
 const tableIn = (schema: string) => sql`${sql.ref(schema)}.${sql.ref('wilanis_schedule')}`;
 
 /**
- * Whether a failed `create table if not exists` lost the race to another process creating the same table:
- * PostgreSQL checks for the table before taking the catalog lock, so two first contacts at once can both miss
- * it and the second answers a duplicate in the catalog rather than finding the table there.
+ * Create the lease table where the schema has none, and leave it alone where it has one. Two first contacts at
+ * once can both miss the table, and `creating` takes the second one's duplicate as the table being there.
  */
-const lostTheRace = (error: unknown) => ['23505', '42P07'].includes(String((error as { code?: unknown }).code));
-
-/** Create the lease table where the schema has none, and leave it alone where it has one. */
 async function ensureLeases(db: Kysely<never>, schema: string): Promise<void> {
-  try {
-    await sql`
+  await creating(
+    sql`
       create table if not exists ${tableIn(schema)} (
         name text primary key,
         holder text,
         held_until timestamptz,
         last_fired timestamptz
       )
-    `.execute(db);
-  } catch (error) {
-    if (!lostTheRace(error)) throw error;
-  }
+    `,
+    db,
+  );
 }
 
 /** A timestamp as the driver hands it back, as the ISO 8601 the scheduler names its ticks in. */

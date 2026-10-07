@@ -12,7 +12,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Kysely, RawBuilder } from 'kysely';
 import { sql } from 'kysely';
-import { ensureSchema } from './pool.js';
+import { creating, ensureSchema } from './pool.js';
 
 /** The channel every publish and retry notifies on; the payload says which schema and queue. */
 export const CHANNEL = 'wilanis_queue';
@@ -36,21 +36,6 @@ const tableOf = (schema: string): RawBuilder<unknown> => sql`${sql.ref(schema)}.
 
 /** What a notification about one queue carries, so a listener can tell the schemas one database holds apart. */
 export const payloadOf = (schema: string, queue: string) => `${schema}.${queue}`;
-
-/**
- * Whether a failed `create ... if not exists` lost the race to another process creating the same thing:
- * PostgreSQL checks before it takes the catalog lock, so two first contacts at once can both miss it.
- */
-const lostTheRace = (error: unknown) => ['23505', '42P07'].includes(String((error as { code?: unknown }).code));
-
-/** Run one DDL statement, where a process that made the same thing a moment earlier is not a failure. */
-async function creating(statement: RawBuilder<unknown>, db: Kysely<never>): Promise<void> {
-  try {
-    await statement.execute(db);
-  } catch (error) {
-    if (!lostTheRace(error)) throw error;
-  }
-}
 
 /**
  * Create the queue table and its index where the schema has neither, and leave both alone where it has them.
