@@ -45,6 +45,26 @@ describe('how wide a string an index holds may be', () => {
     expect(widthsOf(at('w', { unique: [['id', 'url']] })).get('id')).toBe(384);
   });
 
+  it('a scope takes its share of its own index and of every unique it is put in front of', () => {
+    const tenant = { name: 'tenant', type: { kind: 'string' } as Type, required: true };
+    const owner = { name: 'owner', type: { kind: 'number' } as Type, required: true };
+    expect(widthsOf(at('w'), [tenant])).toEqual(
+      new Map([
+        ['id', 768],
+        ['tenant', 768],
+      ]),
+    );
+    // [tenant, url, method]: three strings share 3072 bytes; the key stays alone in the primary key
+    const scoped = widthsOf(at('w', { unique: [['url', 'method']] }), [tenant]);
+    expect([scoped.get('tenant'), scoped.get('url'), scoped.get('method'), scoped.get('id')]).toEqual([
+      256, 256, 256, 768,
+    ]);
+    // two string scope columns share their own index as well
+    expect(widthsOf(at('w'), [tenant, { ...tenant, name: 'team' }]).get('tenant')).toBe(384);
+    // a number scope takes the 8 bytes a number does
+    expect(widthsOf(at('w', { unique: [['url', 'method']] }), [owner]).get('url')).toBe(383);
+  });
+
   it('a string no index holds is TEXT, a shape is JSON with no CHECK, a boolean is held to 0 or 1', () => {
     expect(widthsOf(at('w')).has('url')).toBe(false);
     expect(declaredOf({ name: 'url', type: { kind: 'string' }, required: true })).toEqual({

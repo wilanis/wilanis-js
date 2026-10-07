@@ -6,11 +6,13 @@
  * MySQL names what it refused, and `ensure` names every constraint it makes after the declaration
  * (`names.ts`), so the round trip is a lookup. A duplicate names the index (`for key 'entries.wl_u_...'`, or
  * `PRIMARY` for the key); a foreign key names its constraint (`CONSTRAINT \`wl_r_...\``), whether the write named
- * a missing target or the remove would orphan a record. InnoDB undoes the one statement and keeps the
+ * a missing target or the remove would orphan a record. A scoped `unique` (RFC 0015) is named after the scope
+ * columns as well, and answered without them: the store declared `[url, method]`, and that is what `violated`
+ * says, whatever the scope in front of it. InnoDB undoes the one statement and keeps the
  * transaction, so a graph routing on the answer can go on writing in it.
  */
 import type { At } from '@wilanis/plugin-storage';
-import { refName, uniqueName } from './names.js';
+import { refName, scopedUniqueName, uniqueName } from './names.js';
 
 /** A row another table's key is not there for (`ER_NO_REFERENCED_ROW_2`), and a row still referenced (`ER_ROW_IS_REFERENCED_2`). */
 const MISSING_TARGET = 1452;
@@ -32,17 +34,24 @@ export function indexNamed(error: unknown): string | undefined {
 /** The foreign-key constraint an error names. */
 const constraintNamed = (error: unknown): string | undefined => /CONSTRAINT `([^`]*)`/.exec(messageOf(error))?.[1];
 
-/** The declared unique a duplicate names, as the store spells it; the key where it names the primary key. */
-function uniqueOf(error: unknown, at: At): string {
+/**
+ * The declared unique a duplicate names, as the store spells it, whether it is the unscoped index or the one
+ * within the scope the write was made under; the key where it names the primary key.
+ */
+function uniqueOf(error: unknown, at: At, scope: string[]): string {
   const index = indexNamed(error);
-  const fields = at.unique.find(one => uniqueName(at.name, one) === index);
+  const names = (fields: string[]) => [uniqueName(at.name, fields), scopedUniqueName(at.name, scope, fields)];
+  const fields = at.unique.find(one => names(one).includes(index ?? ''));
   return `unique [${(fields ?? [at.key]).join(', ')}]`;
 }
 
-/** What a refused `put` or `patch` answers as `violated`, or nothing where the error is not a constraint. */
-export function writeViolation(error: unknown, at: At): string | undefined {
+/**
+ * What a refused `put` or `patch` answers as `violated`, or nothing where the error is not a constraint. `scope`
+ * is the columns the write was made under, which a scoped unique's name holds.
+ */
+export function writeViolation(error: unknown, at: At, scope: string[] = []): string | undefined {
   const errno = errnoOf(error);
-  if (errno === DUPLICATE) return uniqueOf(error, at);
+  if (errno === DUPLICATE) return uniqueOf(error, at, scope);
   if (errno !== MISSING_TARGET) return undefined;
   const constraint = constraintNamed(error);
   const ref = at.refs.find(one => refName(one.from, one.field) === constraint);

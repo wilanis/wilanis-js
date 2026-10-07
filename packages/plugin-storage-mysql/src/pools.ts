@@ -86,6 +86,8 @@ export class Pools {
   private readonly held = new Map<Kysely<never>, () => void>();
   /** The collections whose `wilanis_keys` row this load has made, by connection and name (`keys.ts`). */
   readonly seeded = new Set<string>();
+  /** The tables this load has seen keep a scope, by connection and name, with the columns each has (`scoping.ts`). */
+  readonly scoped = new Map<string, Set<string>>();
 
   constructor(private readonly settings: Settings) {}
 
@@ -136,6 +138,7 @@ export class Pools {
     const open = [...this.open.values()];
     this.open.clear();
     this.seeded.clear();
+    this.scoped.clear();
     await Promise.all(open.map(db => db.destroy()));
   }
 }

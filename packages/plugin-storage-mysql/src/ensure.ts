@@ -12,13 +12,20 @@
  * Nothing here is one transaction. MySQL commits before and after every DDL statement, which is why the kind
  * says `transactionalDdl: false`: a drift found half way leaves what was made before it made. The statements
  * run on the pool, never on a transaction's session, which a `CREATE` would commit.
+ *
+ * A table that keeps a scope (RFC 0015, `scope-table.ts`) has columns no field of the shape has, `NOT NULL`.
+ * `ensure` reads which they are off the scope's index and holds them as the scope rather than as drift. They
+ * take their share of every index they are in, so the widths it expects are the ones `widthsOf` gives with
+ * the scope, and a `unique` declared after the table was scoped is made within the scope, as the ones before
+ * it were. A declaration that would change a scope column's width is drift, as it is for a field's.
  */
 import type { At, Made } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';
-import { columnsOf, hasTable, keyOf, referencingOf, rowCount, uniquesOf } from './catalog.js';
+import { type Column, columnsOf, hasTable, keyOf, referencingOf, rowCount, uniquesOf } from './catalog.js';
 import { columnTypeOf, declaredOf, type Field, fieldsOf, isJson, widthsOf } from './columns.js';
 import { ensureKeys } from './keys.js';
-import { quoted, refName, uniqueName } from './names.js';
+import { quoted, refName, scopedUniqueName, uniqueName } from './names.js';
+import { scopeFieldsOf } from './scope-table.js';
 import { isIdentity, type Settings } from './settings.js';
 
 /** What every table is created with: the storage engine `refs` and transactions need, and the binary collation. */
@@ -65,7 +72,7 @@ function literal(value: unknown, field: Field): string {
  * declares for the rows already there; without one it is drift where the table holds rows, since MySQL would
  * give each an empty value no document wrote.
  */
-async function addColumn(db: Kysely<never>, at: At, field: Field): Promise<void> {
+async function addColumn(db: Kysely<never>, at: At, field: Field, widths: Map<string, number>): Promise<void> {
   const has = Object.hasOwn(at.defaults ?? {}, field.name);
   if (field.required && !has) {
     const rows = await rowCount(db, at.name);
@@ -76,14 +83,33 @@ async function addColumn(db: Kysely<never>, at: At, field: Field): Promise<void>
       );
   }
   const fill = has ? ` DEFAULT (${literal(at.defaults[field.name], field)})` : '';
-  const { column, check } = declaredOf(field, widthsOf(at).get(field.name));
+  const { column, check } = declaredOf(field, widths.get(field.name));
   const clause = `${quoted(field.name)} ${column}${fill}${field.required ? ' NOT NULL' : ''}${check ? ` CHECK (${check})` : ''}`;
   await run(db, `ALTER TABLE ${quoted(at.name)} ADD COLUMN ${clause}`);
 }
 
-/** What the table already has, held against what the shape says: anything that would have to change is drift. */
-function judgeDrift(at: At, found: Map<string, { type: string; nullable: boolean }>): void {
-  const widths = widthsOf(at);
+/**
+ * The scope columns held against the width their share of the indexes gives them now. A `unique` declared after
+ * the table was scoped holds the scope too, and may leave a string scope less room than it was made with: that
+ * is drift, since narrowing a column the rows fill is a person's decision, as it is for a field.
+ */
+function judgeScope(at: At, columns: Column[], scope: Field[], widths: Map<string, number>): void {
+  const types = new Map(columns.map(one => [one.name.toLowerCase(), one.type]));
+  for (const field of scope) {
+    const want = columnTypeOf(field.type, widths.get(field.name));
+    if (types.get(field.name) !== want)
+      throw new Error(
+        `drift: ${at.name}.${field.name} is ${types.get(field.name)}, and the scope's share of the indexes that ` +
+          `hold it says ${want}`,
+      );
+  }
+}
+
+/**
+ * What the table already has, held against what the shape says: anything that would have to change is drift.
+ * `found` holds the table's columns without its scope's.
+ */
+function judgeDrift(at: At, found: Map<string, Column>, widths: Map<string, number>): void {
   for (const field of fieldsOf(at.shape)) {
     const column = found.get(field.name.toLowerCase());
     const want = columnTypeOf(field.type, widths.get(field.name));
@@ -96,25 +122,49 @@ function judgeDrift(at: At, found: Map<string, { type: string; nullable: boolean
       throw new Error(`drift: ${at.name}.${name} is a column no field of the shape has, and it is not null`);
 }
 
-/** One collection made ready: the table where there is none, the columns it has gained where there is one. */
+/**
+ * One collection made ready: the table where there is none, the columns it has gained where there is one. The
+ * columns the table keeps as a scope are set aside before the rest is judged: no field of the shape has one,
+ * and that is what a scope column is, not a column the shape has lost.
+ */
 async function ensureOne(db: Kysely<never>, at: At): Promise<Made> {
   if (!(await hasTable(db, at.name))) return { collections: 1, columns: await createTable(db, at), constraints: 0 };
-  const found = new Map((await columnsOf(db, at.name)).map(one => [one.name.toLowerCase(), one]));
-  judgeDrift(at, found);
+  const columns = await columnsOf(db, at.name);
+  const scope = await scopeFieldsOf(db, at);
+  const widths = widthsOf(at, scope);
+  judgeScope(at, columns, scope, widths);
+  const found = new Map(columns.map(one => [one.name.toLowerCase(), one]));
+  for (const field of scope) found.delete(field.name);
+  judgeDrift(at, found, widths);
   const added = fieldsOf(at.shape).filter(field => !found.has(field.name.toLowerCase()));
-  for (const field of added) await addColumn(db, at, field);
+  for (const field of added) await addColumn(db, at, field, widths);
   return { collections: 0, columns: added.length, constraints: 0 };
 }
 
-/** Add the unique indexes a collection declares and its table does not hold yet; answer how many. */
+/**
+ * The index one declared `unique` is created as: over its fields alone on an unscoped table, and with the scope
+ * columns in front of them on a scoped one, under the name `scope-table.ts` gives it. A unique declared after
+ * the table gained its scope is then held within one scope exactly as one declared before it is.
+ */
+function uniqueOf(at: At, scope: string[], fields: string[]): { name: string; over: string[] } {
+  if (!scope.length) return { name: uniqueName(at.name, fields), over: fields };
+  return { name: scopedUniqueName(at.name, scope, fields), over: [...scope, ...fields] };
+}
+
+/**
+ * Add the unique indexes a collection declares and its table does not hold yet; answer how many. A unique is
+ * held when some unique index of the table covers exactly its columns, whatever that index is called -- on a
+ * scoped table, its columns and the scope's, so the unscoped spelling is never put back beside the scoped one.
+ */
 async function addUniques(db: Kysely<never>, at: At): Promise<number> {
   const held = await uniquesOf(db, at.name);
+  const scope = (await scopeFieldsOf(db, at)).map(field => field.name);
   let made = 0;
   for (const fields of at.unique) {
-    if (held.some(columns => sameColumns(fields, columns))) continue;
-    const over = fields.map(quoted).join(', ');
-    await run(db, `CREATE UNIQUE INDEX ${quoted(uniqueName(at.name, fields))} ON ${quoted(at.name)} (${over})`);
-    held.push(fields.map(one => one.toLowerCase()));
+    const { name, over } = uniqueOf(at, scope, fields);
+    if (held.some(columns => sameColumns(over, columns))) continue;
+    await run(db, `CREATE UNIQUE INDEX ${quoted(name)} ON ${quoted(at.name)} (${over.map(quoted).join(', ')})`);
+    held.push(over.map(one => one.toLowerCase()));
     made += 1;
   }
   return made;

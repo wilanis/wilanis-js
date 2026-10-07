@@ -9,7 +9,9 @@
  * as wide as the index lets it be: InnoDB holds at most 3072 bytes in one index, `utf8mb4` takes four bytes a
  * character, so a string alone in an index is `VARCHAR(768)`, and strings that share one index share the 3072
  * bytes with each other and with the 8 a number takes and the 1 a boolean takes (`widthsOf`). A longer string
- * fails the node at the write, since the session is strict (`pools.ts`).
+ * fails the node at the write, since the session is strict (`pools.ts`). A scope column (RFC 0015) is held by an
+ * index too -- the scope's own, and every `unique` with the scope in front of it -- so a string scope shares
+ * those bytes by the same rule, and the fields of a scoped `unique` are narrower than an unscoped one's.
  *
  * Every string column is `COLLATE utf8mb4_bin`: the server's default collation compares without case, and
  * `"GET"` and `"get"` would then collide under a `unique` and match one `eq`. A boolean is `TINYINT(1)` held to
@@ -57,19 +59,32 @@ const fixedBytes = (type: Type | undefined): number => {
   return type?.kind === 'boolean' ? 1 : 0;
 };
 
-/** Every index the collection declares, as the fields each holds: the key, each `unique`, each `refs`. */
-const indexesOf = (at: At): string[][] => [[at.key], ...at.unique, ...at.refs.map(ref => [ref.field])];
+/**
+ * Every index the collection holds, as the fields each holds: the key, each `unique`, each `refs`, and, where
+ * it keeps a scope (RFC 0015), the scope's own index and every `unique` with the scope in front of it.
+ */
+const indexesOf = (at: At, scope: string[]): string[][] => [
+  [at.key],
+  ...at.unique.map(fields => [...scope, ...fields]),
+  ...at.refs.map(ref => [ref.field]),
+  ...(scope.length ? [scope] : []),
+];
 
 /**
- * The width of every string field an index holds, by field: the widest that lets every index it is in fit in
- * InnoDB's 3072 bytes. A string field that no index holds is not here, and is `TEXT`.
+ * The width of every string an index holds, by column: the widest that lets every index it is in fit in
+ * InnoDB's 3072 bytes. `scope` is the columns the table keeps as a scope, which no field of the shape names
+ * and which every scoped `unique` holds beside its fields. A string field that no index holds is not here,
+ * and is `TEXT`.
  */
-export function widthsOf(at: At): Map<string, number> {
+export function widthsOf(at: At, scope: Field[] = []): Map<string, number> {
+  const types = new Map<string, Type>(fieldsOf(at.shape).map(field => [field.name, field.type]));
+  for (const column of scope) types.set(column.name, column.type);
   const widths = new Map<string, number>();
-  for (const fields of indexesOf(at)) {
-    const strings = fields.filter(field => typeOf(at.shape, field)?.kind === 'string');
+  const scoped = scope.map(column => column.name);
+  for (const fields of indexesOf(at, scoped)) {
+    const strings = fields.filter(field => types.get(field)?.kind === 'string');
     if (!strings.length) continue;
-    const fixed = fields.reduce((sum, field) => sum + fixedBytes(typeOf(at.shape, field)), 0);
+    const fixed = fields.reduce((sum, field) => sum + fixedBytes(types.get(field)), 0);
     const width = Math.min(WIDEST, Math.floor((INDEX_BYTES - fixed) / (CHAR_BYTES * strings.length)));
     for (const field of strings) widths.set(field, Math.min(widths.get(field) ?? WIDEST, width));
   }
