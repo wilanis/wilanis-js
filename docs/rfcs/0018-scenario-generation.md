@@ -671,6 +671,16 @@ Decided during implementation:
   branch answers first, and a guarded list's map through the branch into the list moved aside there; and a switch's
   outermost list made to hold an element where the frames on the way hand it the trigger's own input under another
   name.
+- **What a steered stub holds (#844).** A case writes into a node's answer only the fields its rule reads, and it
+  writes them over what the run's steering already holds at that node. Each other decision's answering case is
+  written over the ones before it, `reach` is written over those, and the branch's own case over both, so a node that
+  two switches read keeps the field each of them was steered on. A stub starts from the node's whole answer: what the
+  seed recorded, else a value of the type the node declares, also where a list is made to hold an element. A parent
+  the seed left out is made whole from the type at that path (`setPath` given `Parents` in
+  `packages/runtime/src/stubs.ts`), not left a bare object that holds only the steered field. A demand on an element
+  of a list that a `map` made is written at the map's first element, `<map>.0`, typed from what the map's operation
+  answers, since the kernel reads a map's stubs per element and never at the map. Two switches whose demands on one
+  field conflict are still not met at once: the later case wins.
 - **A policy's decision is not its trigger's (#222).** The `scenarios` line of `wilanis describe <trigger>` counts
   the scenarios whose `trigger` names it and that name no `policy` (`scenariosOf` in
   `packages/runtime/src/scenario-said.ts`), and the viewer's trigger page groups the same list. A policy scenario
