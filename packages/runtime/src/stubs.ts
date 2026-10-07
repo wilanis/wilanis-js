@@ -2,7 +2,7 @@
  * From a solved demand to a value a rehearsal can run with: the smallest change to a generated stub that puts it
  * inside the domain a branch asks for, and the paths that change is written at.
  */
-import { generate, rng, type Type } from '@wilanis/core';
+import { generate, rng, type Type, typeAt } from '@wilanis/core';
 import { type Domain, fits } from './domains.js';
 
 // ---- from demands to stubs --------------------------------------------------------------------------
@@ -192,36 +192,52 @@ function elementOf(type: Type | undefined, seed: number): unknown {
 /** Stands in where a domain demands a value the type says nothing about. */
 export const PLACEHOLDER = 'x';
 
+/** What a parent `setPath` must create is made from: the type declared where the path starts, and the seed it is generated under. */
+export interface Parents {
+  type?: Type;
+  seed: number;
+}
+
 /**
- * A copy of `root` with `path` set to `value`; undefined deletes the key. Objects along the way are created.
+ * A copy of `root` with `path` set to `value`; undefined deletes the key, and leaves alone a parent that is not there.
  * A step whose name is an index makes a list rather than an object, keeping what was already there when it was
  * one: what reads such a value next is a `map`, and an object of numbered keys is not a list to run over. That
  * is how a demand on an element of a list -- the element a guarded list's guard judges -- is written.
+ *
+ * A parent `root` lacks is created. Given `parents`, it is a whole value of the type declared there, so the fields
+ * beside the one written are present as the type requires; without, it is a bare object or an empty element.
  */
-export function setPath(root: unknown, path: string[], value: unknown): unknown {
+export function setPath(root: unknown, path: string[], value: unknown, parents?: Parents): unknown {
   if (!path.length) return value;
   const [head, ...rest] = path;
-  if (/^\d+$/.test(head)) return inList(Array.isArray(root) ? (root as unknown[]) : [], Number(head), rest, value);
+  const held = getPath(root, [head]);
+  // an absent field under a parent that is not there is absent already
+  if (value === undefined && rest.length && held === undefined) return root;
+  const below = parents && { ...parents, type: typeBelow(parents.type, head) };
+  const start = held === undefined && below?.type ? fresh(below.type, below.seed) : held;
+  return withChild(root, head, rest.length ? setPath(start, rest, value, below) : value);
+}
+
+/** A copy of `root` with one step set to `child`: a list's element at an index, the list grown with empty objects where it is short, or a field. */
+function withChild(root: unknown, head: string, child: unknown): unknown {
+  if (/^\d+$/.test(head)) {
+    const out = Array.isArray(root) ? [...(root as unknown[])] : [];
+    while (out.length <= Number(head)) out.push({});
+    out[Number(head)] = child;
+    return out;
+  }
   const base: Record<string, unknown> =
     root && typeof root === 'object' && !Array.isArray(root) ? { ...(root as Record<string, unknown>) } : {};
-  if (!rest.length) {
-    if (value === undefined) {
-      delete base[head];
-      return base;
-    }
-    base[head] = value;
-    return base;
-  }
-  base[head] = setPath(base[head], rest, value);
+  if (child === undefined) delete base[head];
+  else base[head] = child;
   return base;
 }
 
-/** A copy of a list with one element written at an index, the list grown with empty objects where it is short. */
-function inList(list: unknown[], at: number, rest: string[], value: unknown): unknown[] {
-  const out = [...list];
-  while (out.length <= at) out.push({});
-  out[at] = rest.length ? setPath(out[at], rest, value) : value;
-  return out;
+/** The type one step below a declared type: a field's, or a list's element; nothing where the type says nothing there. */
+function typeBelow(type: Type | undefined, step: string): Type | undefined {
+  if (!type) return undefined;
+  const read = typeAt(type, [step]);
+  return typeof read === 'string' ? undefined : read.type;
 }
 
 /** The value `path` names inside `root`, walking objects and list indices; undefined where the way runs out. */

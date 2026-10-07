@@ -7,14 +7,22 @@ import type { Loaded, LoadResult, TriggerDoc } from '@wilanis/core';
 import { Scope } from '@wilanis/core';
 import type { Outcome, Report } from '@wilanis/engine';
 import { outcomeOf } from '@wilanis/engine';
-import { type Case, casesFor, type FoundSwitch, setPath } from './branches.js';
+import { type Case, casesFor, type FoundSwitch, over } from './branches.js';
 import type { Embedder } from './embed.js';
 import { activeProfile, recordedProfile, skippedLines } from './profile.js';
 import { type Recorded, type Recording, recordRuns } from './record.js';
 import { recordedDir } from './recorded-dir.js';
 import { type Decision, format, gather, type PlainRun, short, statedOf, stateName } from './rehearsal-report.js';
 import { heldUpstream } from './rehearse-held.js';
-import { answering, type Reached, reach, type Steering, switchesReached, uncoveredBy } from './rehearse-reached.js';
+import {
+  answering,
+  patched,
+  type Reached,
+  reach,
+  type Steering,
+  switchesReached,
+  uncoveredBy,
+} from './rehearse-reached.js';
 import { namedBy, type Ran, recordedOf, recordsInto, secretOut } from './rehearse-recorded.js';
 import { atomicAt, rootGraph, type Where, whereOf } from './rehearse-where.js';
 import { embedderFor, failedBelow, generatedFire, policyRoots, unbroken } from './stubbing.js';
@@ -261,9 +269,9 @@ const guardSaid = (guard: Guard, at: Where): Decision['guard'] => ({
 
 /** One switch as a decision: every branch, and what each settled to. */
 async function decisionFor(walk: Walk, sw: FoundSwitch): Promise<Decision> {
-  const pre = reach(walk, sw);
   // a branch of this switch is about where it routes: every other decision on the run answers, before it and after it
   const others = answering(walk, sw);
+  const pre = reach(walk, sw, others.stubs);
   const at = whereOf(walk.probe, walk.trigger, sw.prefix);
   const node = sw.at.split('.').pop() ?? '';
   const guard = guardAt(walk.probe, at, node);
@@ -278,7 +286,8 @@ async function decisionFor(walk: Walk, sw: FoundSwitch): Promise<Decision> {
   // a guard whose value an enclosing graph already judged on this path is held there: neither branch is steered,
   // since what reaches it is what the caller handed down, and the one that refuses cannot be reached on this path
   const held = guard && heldUpstream(walk.probe, walk.trigger, sw, guard);
-  const cases = casesFor(sw, walk.stubbing);
+  // each case writes its demands over what steers the run to the switch, so a node both read keeps every field
+  const cases = casesFor(sw, over(walk.stubbing, { ...others.stubs, ...pre.stubs }));
   for (const one of cases) {
     if (held) {
       decision.branches.push({ when: one.branch.when, to: one.branch.to, held });
@@ -310,7 +319,8 @@ async function branchOf(
   // a demand on the graph's own input is met by firing with a patched input, not by a stub
   let fired = walk.input;
   const patches = [...steer.others.input, ...steer.pre.input, ...(one.input ?? [])];
-  for (const patch of patches) fired = setPath(fired, patch.path, patch.value);
+  for (const patch of patches) fired = patched(walk, fired, patch);
+  // each layer was written over the ones before it, so a later stub of a node already holds what an earlier one steered
   const given = unbroken({ ...steer.others.stubs, ...steer.pre.stubs, ...one.stubs }, broken);
   const report = await emb.fire(walk.trigger.doc, fired, walk.context, { stubs: given });
   // a run that never got to the switch proves nothing of the branch, and is not recorded as though it did

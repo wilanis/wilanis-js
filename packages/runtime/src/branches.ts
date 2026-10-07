@@ -26,6 +26,16 @@ export interface Stubbing {
   seed?: number;
   inputSeed?: unknown;
   inType?: Type;
+  /** Whether the node at a dotted path is a map: the kernel reads its stubs per element, at `<path>.<index>`. */
+  isMap?: (nodePath: string) => boolean;
+}
+
+/**
+ * A stubbing whose seed values are what `stubs` already steered, where it steered them: a case built over it writes
+ * its demands on top of those, so laying it over them keeps every field they set that it does not demand itself.
+ */
+export function over(from: Stubbing, stubs: Record<string, unknown>): Stubbing {
+  return { ...from, generated: path => (path in stubs ? stubs[path] : from.generated(path)) };
 }
 
 /** Where a walk over a spec has reached: the path so far, the handlers already walked, and the lists it passed through. */
@@ -203,13 +213,11 @@ export function nonEmpty(
   const held = listHolder(list);
   if (!held) return { stubs: {}, input: [] };
   const { target, path } = held;
-  const base = generated(target);
-  return {
-    stubs: {
-      [target]: setPath(base, path, satisfy(want, getPath(base, path), typeAtPath(typeOf(target), path), seed)),
-    },
-    input: [],
-  };
+  // the answer that holds the list keeps every other field it has: a sibling may read one
+  const base = standIn(target, { generated, typeOf, seed });
+  const type = typeOf(target);
+  const filled = satisfy(want, getPath(base, path), typeAtPath(type, path), seed);
+  return { stubs: { [target]: setPath(base, path, filled, { type, seed }) }, input: [] };
 }
 
 /** Does this call hand its callee the caller's `in` untouched, field for field? Then the trigger's input still reaches inside. */
@@ -228,14 +236,16 @@ function forwardsIn(node: Record<string, unknown>): boolean {
  * what the seed produced for a node path, so a case only overrides the fields its rule reads.
  */
 export function casesFor(found: FoundSwitch, from: Stubbing): Case[] {
-  const { generated, typeOf = () => undefined, seed = 1, inputSeed, inType } = from;
+  const { generated, typeOf = () => undefined, seed = 1, inputSeed, inType, isMap } = from;
   const { node, prefix } = found;
   const steerable = found.fromTriggerIn ?? !prefix.length;
   const branches = branchesOf(
     node.rules.map(rule => ({ when: rule.label, to: rule.to })),
     node.else,
   );
-  const ruled = branches.map(branch => steer(branch, found, { generated, typeOf, seed, inputSeed, inType }, steerable));
+  const ruled = branches.map(branch =>
+    steer(branch, found, { generated, typeOf, seed, inputSeed, inType, isMap }, steerable),
+  );
   return [...ruled, ...caughtCases(found)];
 }
 
@@ -269,9 +279,12 @@ interface At {
  * runs over. The first element stands for all of them, as it does everywhere else in the walk, so the demand
  * lands at index 0.
  */
-function ofElement(list: FoundList, within: string[], domain: Domain) {
+function ofElement(list: FoundList, within: string[], domain: Domain, from: Pick<Stubbing, 'isMap'>) {
   const held = listHolder(list);
   if (!held) return 'unreachable' as const;
+  // a list a map makes is answered element by element: the kernel reads a stub at `<map>.<index>`, never at the map
+  if (!held.path.length && from.isMap?.(held.target))
+    return { stub: { target: `${held.target}.0`, path: within, value: domain } };
   return { stub: { target: held.target, path: [...held.path, '0', ...within], value: domain } };
 }
 
@@ -280,7 +293,7 @@ function meet(
   dotted: string,
   domain: Domain,
   at: At,
-  from: Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>> & Pick<Stubbing, 'inputSeed' | 'inType'>,
+  from: Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>> & Pick<Stubbing, 'inputSeed' | 'inType' | 'isMap'>,
 ):
   | { input: { path: string[]; value: unknown } }
   | { stub: { target: string; path: string[]; value: unknown } }
@@ -299,7 +312,7 @@ function meet(
     };
   }
   // inside a map, `in` is the element: what steers it is the list the map runs over
-  if (src.ref === 'in' && at.element) return ofElement(at.element, [...src.path, ...within], domain);
+  if (src.ref === 'in' && at.element) return ofElement(at.element, [...src.path, ...within], domain, from);
   if (src.ref === 'in' || src.ref === 'context' || src.ref === 'const') return 'unreachable';
   return { stub: { target: stubTarget(at.prefix, src.ref, from), path: [...src.path, ...within], value: domain } };
 }
@@ -337,7 +350,7 @@ function write(
   const { target, path } = stub;
   const base = target in stubs ? stubs[target] : standIn(target, from);
   const want = satisfy(stub.value as Domain, getPath(base, path), typeAtPath(from.typeOf(target), path), from.seed);
-  stubs[target] = setPath(base, path, want);
+  stubs[target] = setPath(base, path, want, { type: from.typeOf(target), seed: from.seed });
 }
 
 /**
@@ -357,7 +370,7 @@ function elementOf(found: FoundSwitch): FoundList | undefined {
 function steer(
   branch: Branch,
   found: FoundSwitch,
-  from: Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>> & Pick<Stubbing, 'inputSeed' | 'inType'>,
+  from: Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>> & Pick<Stubbing, 'inputSeed' | 'inType' | 'isMap'>,
   steerable: boolean,
 ): Case {
   const stubs: Record<string, unknown> = {};

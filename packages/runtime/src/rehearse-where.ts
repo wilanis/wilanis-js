@@ -119,13 +119,23 @@ function literalsOf(node: SpecNode): Values {
 /**
  * The type the node at a dotted path declares it answers, read off the spec rather than off a run: what a
  * rehearsal needs to build a value for a node no stub recorded -- a call into a graph, whose answer the kernel
- * never generates. A map's element index is a segment of the path and no node of the spec. Nothing for a map
- * itself, a switch, or a node whose operation leaves its type to the call site.
+ * never generates. A map's element index is a segment of the path and no node of the spec: a path that ends at one
+ * names an element, which is what the map's operation answers. Nothing for a map itself, a switch, or a node whose
+ * operation leaves its type to the call site.
  */
 export function declaredAt(emb: Embedder, root: Spec, nodePath: string): Type | undefined {
-  const node = nodeAt(emb, root, nodePath.split('.'));
-  if (!node || node.kind === 'map' || typeof node.handler !== 'string') return undefined;
+  const segments = nodePath.split('.');
+  const mapped = /^\d+$/.test(segments[segments.length - 1] ?? '')
+    ? nodeAt(emb, root, segments.slice(0, -1))
+    : undefined;
+  const node = mapped?.kind === 'map' ? mapped : nodeAt(emb, root, segments);
+  if (!node || (node.kind === 'map' && node !== mapped) || typeof node.handler !== 'string') return undefined;
   return answeredBy(emb, { ...node, handler: node.handler });
+}
+
+/** Whether the node at a dotted path is a map, whose answer the kernel stubs element by element and never whole. */
+export function mapAt(emb: Embedder, root: Spec, nodePath: string): boolean {
+  return nodeAt(emb, root, nodePath.split('.'))?.kind === 'map';
 }
 
 /** A node of a lowered spec, as far as a walk down a path reads one. */

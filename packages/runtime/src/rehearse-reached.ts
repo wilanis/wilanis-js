@@ -16,12 +16,13 @@ import {
   casesFor,
   type FoundSwitch,
   nonEmpty,
+  over,
   type Stubbing,
   setPath,
   switchesOf,
 } from './branches.js';
 import type { Embedder } from './embed.js';
-import { declaredAt, type Spec, specBehind } from './rehearse-where.js';
+import { declaredAt, mapAt, type Spec, specBehind } from './rehearse-where.js';
 import { embedderFor, generatedFire, unbroken } from './stubbing.js';
 
 /** What a trigger's run reaches: the tree, the trigger, the switches found, and what each case fires and stubs with. */
@@ -70,6 +71,7 @@ export async function switchesReached(
     seed,
     inputSeed: input,
     inType,
+    isMap: (path: string) => mapAt(probe, spec, path),
   };
   const reached: Reached = { load, trigger, seed, profile, found, stubbing, input, context, probe };
 
@@ -87,7 +89,15 @@ export async function switchesReached(
 export function uncoveredBy(one: Case): string | undefined {
   if (one.branch.unsolved) return one.branch.unsolved;
   if (!one.unreachable?.length) return undefined;
-  return `${one.unreachable.join(', ')} is the trigger's own input and the rehearsal cannot vary it`;
+  return `${one.unreachable.join(', ')} comes from nothing the rehearsal sets, so the rehearsal cannot vary it`;
+}
+
+/**
+ * The trigger's input with one patch written in: a parent the input lacks is made whole from the input type, so the
+ * fields beside the one patched are there as the type requires.
+ */
+export function patched(walk: Reached, input: unknown, patch: { path: string[]; value: unknown }): unknown {
+  return setPath(input, patch.path, patch.value, { type: walk.stubbing.inType, seed: walk.seed });
 }
 
 /** What steers a run: the stubs it is given, the patches to the trigger's input, and the nodes made to break. */
@@ -101,17 +111,23 @@ export interface Steering {
  * The stubs and input that route a run to `sw` -- and the nodes to break, where only a catch routes there. Its lists
  * each hold an element, and in its own spec and the spec of every call enclosing it, each switch that routes a node
  * `sw` or that call waits for is steered to that node. A switch is otherwise cancelled before it runs, and its own case
- * would land on a dead path.
+ * would land on a dead path. Each stub is written over `under`, and over what was steered before it, so a node two
+ * switches read keeps the field each of them was steered on.
  */
-export function reach(walk: Reached, sw: FoundSwitch): Steering {
+export function reach(walk: Reached, sw: FoundSwitch, under: Record<string, unknown> = {}): Steering {
   const steering: Steering = { stubs: {}, input: [], broken: [] };
+  const laid = () => over(walk.stubbing, { ...under, ...steering.stubs });
   // a switch inside a mapped operation runs only when the list it maps over has an element to run for
   for (const list of sw.lists) {
-    const need = nonEmpty(list, walk.stubbing, list === sw.lists[0]);
+    const need = nonEmpty(list, laid(), list === sw.lists[0]);
     Object.assign(steering.stubs, need.stubs);
     steering.input.push(...need.input);
   }
-  for (const at of [...sw.via, sw.at]) for (const want of routingTo(walk, at)) steerBy(steering, want);
+  for (const at of [...sw.via, sw.at])
+    for (const { governing, id } of routingTo(walk, at)) {
+      const want = casesFor(governing, laid()).find(one => routesTo(one, id));
+      if (want) steerBy(steering, want);
+    }
   return steering;
 }
 
@@ -123,27 +139,26 @@ function steerBy(steering: Steering, want: Case): void {
 }
 
 /**
- * The cases that route a run to the node at a dotted path: one for each switch in its spec that routes a node it waits
- * for, towards that node. The kernel cancels the branches a switch did not take and every node waiting on them, so a
- * guard's `<id>:check`, which reads the `<id>:made` its graph's own switch routes to, runs only where that switch is
- * steered there -- not wherever the first of its branches that answers goes -- and a guarded list's map, which runs
- * over the list moved aside to `<id>:made`, only the same way (RFC 0007).
+ * The switches that route a run to the node at a dotted path, each with the node it must route to: one for each switch
+ * in its spec that routes a node it waits for. The kernel cancels the branches a switch did not take and every node
+ * waiting on them, so a guard's `<id>:check`, which reads the `<id>:made` its graph's own switch routes to, runs only
+ * where that switch is steered there -- not wherever the first of its branches that answers goes -- and a guarded
+ * list's map, which runs over the list moved aside to `<id>:made`, only the same way (RFC 0007).
  */
-function routingTo(walk: Reached, at: string): Case[] {
+function routingTo(walk: Reached, at: string): { governing: FoundSwitch; id: string }[] {
   const segments = at.split('.');
   const prefix = segments.slice(0, -1);
   const spec = specAt(walk, prefix);
   if (!spec) return [];
   const routers = routersOf(spec);
   const node = segments[segments.length - 1] ?? '';
-  const cases: Case[] = [];
+  const routes: { governing: FoundSwitch; id: string }[] = [];
   for (const id of [node, ...waitedOn(spec, node, routers)]) {
     const router = routers.get(id);
     const governing = router && walk.found.find(one => one.at === [...prefix, router].join('.'));
-    const want = governing && casesFor(governing, walk.stubbing).find(one => routesTo(one, id));
-    if (want) cases.push(want);
+    if (governing) routes.push({ governing, id });
   }
-  return cases;
+  return routes;
 }
 
 /** Whether a run can take a case, and it routes to the node named. */
@@ -190,13 +205,14 @@ function waitsFor(spec: Spec, id: string, routers: Map<string, string>): string[
  * the value it is handed -- and what those decide is their own decision's business, reported there. So each of them
  * answers here, and one that routes into `sw`'s own call is still steered there by `reach`, which is laid over this.
  * A stub at a call `sw` stands inside is left out: the call would answer it, and the graph it runs would never run.
+ * Each case is written over the ones before it, so two switches reading one node's answer each keep their field.
  */
 export function answering(walk: Reached, sw: FoundSwitch): Pick<Steering, 'stubs' | 'input'> {
   const stubs: Record<string, unknown> = {};
   const input: { path: string[]; value: unknown }[] = [];
   const encloses = (path: string) => sw.at.startsWith(`${path}.`);
   for (const other of walk.found) {
-    const answers = other === sw ? undefined : answeringCase(walk, other);
+    const answers = other === sw ? undefined : answeringCase(walk, other, over(walk.stubbing, stubs));
     for (const [path, value] of Object.entries(answers?.stubs ?? {})) if (!encloses(path)) stubs[path] = value;
     input.push(...(answers?.input ?? []));
   }
@@ -208,10 +224,10 @@ export function answering(walk: Reached, sw: FoundSwitch): Pick<Steering, 'stubs
  * refusal -- a node that runs `REFUSE`, the native operation a guard refuses with too. Nothing where every branch
  * refuses, or none can be taken.
  */
-function answeringCase(walk: Reached, other: FoundSwitch): Case | undefined {
+function answeringCase(walk: Reached, other: FoundSwitch, from: Stubbing): Case | undefined {
   const spec = specAt(walk, other.prefix);
   const refuses = (id: string) => (spec?.nodes[id] as { handler?: unknown } | undefined)?.handler === REFUSE;
-  return casesFor(other, walk.stubbing).find(
+  return casesFor(other, from).find(
     one => one.branch.rule !== CAUGHT && uncoveredBy(one) === undefined && !refuses(one.branch.to),
   );
 }
@@ -231,9 +247,9 @@ function specAt(walk: Reached, prefix: string[]): Spec | undefined {
 /** One run steered to reach a switch, so what it records is there before any case is built from it. */
 async function warmUp(walk: Reached, sw: FoundSwitch, record: Record<string, unknown>, types: Record<string, Type>) {
   const others = answering(walk, sw);
-  const pre = reach(walk, sw);
+  const pre = reach(walk, sw, others.stubs);
   let warm = walk.input;
-  for (const patch of [...others.input, ...pre.input]) warm = setPath(warm, patch.path, patch.value);
+  for (const patch of [...others.input, ...pre.input]) warm = patched(walk, warm, patch);
   const broken = new Set(pre.broken);
   const emb = embedderFor(walk.load, { seed: walk.seed, record, types, profile: walk.profile, broken });
   await emb.fire(walk.trigger.doc, warm, walk.context, { stubs: unbroken({ ...others.stubs, ...pre.stubs }, broken) });
