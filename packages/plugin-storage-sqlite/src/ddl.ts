@@ -3,13 +3,18 @@
  * is kept in, its `CHECK`, `NOT NULL`, the key and the references. A `create` step writes a new table with it,
  * and a rebuild (`rebuild.ts`) writes the table a step leaves behind. Both spell a column exactly as `ensure`
  * does, so a table made one way reads back the same as a table made the other.
+ *
+ * The map from a field type to its column and the text of each `CHECK` live here and nowhere else: `columns.ts`
+ * maps a shape's field through them for `ensure`, and `inspect.ts` reads this same `CHECK` text back.
  */
 import type { Declared, FieldType } from '@wilanis/plugin-storage';
-import { quoted } from './columns.js';
 import { folded } from './names.js';
 
-/** The column type each field type is kept in, as `columns.ts` maps a shape's field. */
+/** The column type each field type is kept in. */
 const COLUMN: Record<FieldType, string> = { string: 'TEXT', number: 'REAL', boolean: 'INTEGER', json: 'TEXT' };
+
+/** An identifier as SQLite reads it whatever it spells: double-quoted, with any quote inside doubled. */
+export const quoted = (name: string): string => `"${name.replace(/"/g, '""')}"`;
 
 /** The column type a field of this type is kept in. */
 export const columnFor = (type: FieldType): string => COLUMN[type];
