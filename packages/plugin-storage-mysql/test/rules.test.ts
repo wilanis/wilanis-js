@@ -142,4 +142,15 @@ describe('what this engine refuses before anything runs', () => {
       }),
     ).toEqual([['X243', 'collections/entrieskept']]);
   });
+
+  it('X243 a field name longer than MySQL keeps a column name', () => {
+    expect(shape(doc => (doc.fields[`hits${'X'.repeat(61)}`] = { type: 'number' }))).toEqual([
+      ['X243', 'collections/entries/of'],
+    ]);
+    expect(shape(doc => (doc.fields[`hits${'X'.repeat(60)}`] = { type: 'number' }))).toEqual([]);
+  });
+
+  it('X243 two fields of one shape that fold to one column name', () => {
+    expect(shape(doc => (doc.fields.hitS = { type: 'number' }))).toEqual([['X243', 'collections/entries/of']]);
+  });
 });

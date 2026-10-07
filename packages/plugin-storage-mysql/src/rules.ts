@@ -105,10 +105,41 @@ function illegalBecause(name: string): string | undefined {
 }
 
 /**
- * X243: a collection name MySQL will not keep, or two of one connection it will not keep apart. Whether MySQL
- * compares table names with case is the host's `lower_case_table_names`, so the engine assumes the strict case
- * and `Entries` and `entries` are one table; two collections of one connection that fold together are refused
- * here, by the fold the engine names tables by, where X206 and X207 refuse what @storage can see.
+ * X243, for the columns: a field of a kept shape whose name MySQL will not keep as a column, or two it will not
+ * keep apart. The store's schema covers table names only, and the shape's schema caps a field name at no
+ * length, so a field over 64 characters passes until `CREATE TABLE`. MySQL compares column names without case
+ * on every host, so `userId` and `userid` are one column. A blob field has no column, and X241 refuses it.
+ */
+function checkFields(kept: Kept, refuse: Refuse): void {
+  if (kept.shape.kind !== 'object') return;
+  const at = `collections/${kept.name}/of`;
+  const say = (message: string, hint: string) => refuse({ code: 'X243', file: kept.file, message, at, hint });
+  const seen = new Map<string, string>();
+  for (const [field, declared] of Object.entries(kept.shape.fields)) {
+    if (!columnTypeOf(declared.type)) continue;
+    if (field.length > LONGEST) {
+      say(
+        `'${field}' is ${field.length} characters, and MySQL keeps a column name of ${LONGEST} at most`,
+        `rename the field in the shape to ${LONGEST} characters or fewer`,
+      );
+      continue;
+    }
+    const first = seen.get(folded(field));
+    if (first)
+      say(
+        `'${field}' and '${first}' are one column once folded to lower case, and MySQL compares column names without case`,
+        'rename one of the two fields in the shape',
+      );
+    else seen.set(folded(field), field);
+  }
+}
+
+/**
+ * X243: a collection name MySQL will not keep, or two of one connection it will not keep apart. The store's
+ * schema covers table names only; field names are `checkFields`'s. Whether MySQL compares table names with case
+ * is the host's `lower_case_table_names`, so the engine assumes the strict case and `Entries` and `entries` are
+ * one table; two collections of one connection that fold together are refused here, by the fold the engine
+ * names tables by, where X206 and X207 refuse what @storage can see.
  */
 function checkNames(kept: Kept[], refuse: Refuse): void {
   const seen = new Map<string, Kept>();
@@ -138,6 +169,7 @@ export function check(ctx: PluginCheckContext): void {
   for (const one of kept) {
     checkColumns(one, ctx.refuse);
     checkKey(one, identity, ctx.refuse);
+    checkFields(one, ctx.refuse);
   }
   checkNames(kept, ctx.refuse);
 }
