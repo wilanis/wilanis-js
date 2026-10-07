@@ -94,8 +94,11 @@ function holding(db: Kysely<never>, at: At, work: (held: Kysely<never>) => Promi
     } catch (error) {
       throw waited(error, at);
     } finally {
-      await sql`set session lock_wait_timeout = default`.execute(held);
-      await sql`select release_lock(${name})`.execute(held);
+      try {
+        await sql`set session lock_wait_timeout = default`.execute(held);
+      } finally {
+        await sql`select release_lock(${name})`.execute(held);
+      }
     }
   });
 }
