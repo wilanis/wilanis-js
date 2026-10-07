@@ -27,34 +27,25 @@ import type { Kysely, OnConflictBuilder } from 'kysely';
 import { typeOf } from './columns.js';
 import { ensureTables } from './ensure.js';
 import { conditionOf, orderingsOf } from './filter.js';
-import { type Handles, locked } from './handles.js';
+import { locked } from './handles.js';
 import { reserve, uuidv7 } from './keys.js';
+import { SqliteRecorder } from './recorder.js';
 import { changedOf, columnsOf, keyIn, recordOf, rowOf } from './rows.js';
 import { keepScope, scopeColumns, scopeValues, within, withoutScope } from './scoping.js';
-import { isIdentity, type Settings } from './settings.js';
-import { Unrecorded } from './unrecorded.js';
+import { isIdentity } from './settings.js';
 import { removeViolation, writeViolation } from './violations.js';
 
 type Row = Record<string, unknown>;
 
 /** An @storage engine keeping records in the tables of one SQLite file. */
-export class SqliteEngine extends Unrecorded implements Engine {
+export class SqliteEngine extends SqliteRecorder implements Engine {
   /**
-   * `on` is the handle a transaction runs on, absent everywhere else. An engine made with one is the same
-   * engine in every respect but where its statements go: to that handle, so every call is inside the
+   * The handle this collection's statements run on. An engine made with a transaction's handle (`trx`) is the
+   * same engine in every respect but where its statements go: to that handle, so every call is inside the
    * transaction it began.
    */
-  constructor(
-    private readonly handles: Handles,
-    private readonly settings: Settings,
-    private readonly on?: Kysely<never>,
-  ) {
-    super();
-  }
-
-  /** The handle this collection's statements run on. */
   private db(at: At): Kysely<never> {
-    return this.on ?? this.handles.for(at);
+    return this.trx ?? this.handles.for(at);
   }
 
   /**
@@ -64,7 +55,7 @@ export class SqliteEngine extends Unrecorded implements Engine {
    */
   private async scoped(at: At, scope: Scope | undefined): Promise<Kysely<never>> {
     const db = this.db(at);
-    await keepScope({ db, owner: this.handles, lasting: !this.on }, at, scope);
+    await keepScope({ db, owner: this.handles, lasting: !this.trx }, at, scope);
     return db;
   }
 
@@ -230,7 +221,7 @@ export class SqliteEngine extends Unrecorded implements Engine {
     const identity = isIdentity(this.settings);
     if (type === 'string' && !identity) return uuidv7();
     if (type === 'number' && identity)
-      return this.on ? reserve(this.on, at) : locked(this.db(at), held => reserve(held, at));
+      return this.trx ? reserve(this.trx, at) : locked(this.db(at), held => reserve(held, at));
     throw new Error(
       `newKey: keyType '${this.settings.keyType ?? 'uuidv7'}' answers no key for '${at.key}', which is ${type ?? 'of no known type'}`,
     );
@@ -239,7 +230,7 @@ export class SqliteEngine extends Unrecorded implements Engine {
   /** Create every table, column and constraint the store declares that is not there yet, and count each. */
   async ensure(collections: At[]) {
     if (!collections.length) return { collections: 0, columns: 0, constraints: 0 };
-    if (this.on) return ensureTables(this.on, collections, this.settings);
+    if (this.trx) return ensureTables(this.trx, collections, this.settings);
     return locked(this.db(collections[0]), held => ensureTables(held, collections, this.settings));
   }
 

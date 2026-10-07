@@ -45,9 +45,12 @@ export const lacking = (scope: Scope, has: Set<string>): Missing[] =>
  * columns those are, and `ensure` would otherwise read one as a `NOT NULL` column the shape has lost. The key
  * is in the index too and is taken out again here. They come back in the index's order, which is the scope's.
  */
-export async function scopeColumnsOf(db: Kysely<never>, at: At): Promise<string[]> {
-  const key = at.key.toLowerCase();
-  return (await indexColumnsOf(db, scopedIndexName(at.name))).filter(one => one.toLowerCase() !== key);
+export const scopeColumnsOf = (db: Kysely<never>, at: At): Promise<string[]> => scopeOf(db, at.name, at.key);
+
+/** The columns a table keeps as a scope, by the table's name and its key, for a caller that holds no `At`. */
+export async function scopeOf(db: Kysely<never>, table: string, key: string): Promise<string[]> {
+  const folded = key.toLowerCase();
+  return (await indexColumnsOf(db, scopedIndexName(table))).filter(one => one.toLowerCase() !== folded);
 }
 
 /** One scope column added to a table, `NOT NULL`; a table with rows is refused as `drift` rather than guessed at. */

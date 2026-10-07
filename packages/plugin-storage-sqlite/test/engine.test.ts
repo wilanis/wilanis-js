@@ -133,7 +133,12 @@ async function loaded(profile?: string) {
       in: { store: '@features/customers/data/customers.store.json', collection: 'entries', record },
       ctx: { env: emb.env } as never,
     });
-  return { engine, at, close, put, resolve: tree.resolve };
+  const ensure = () =>
+    storage.handlers['@storage/storage.port.json#ensure']({
+      in: { store: '@features/customers/data/customers.store.json' },
+      ctx: { env: emb.env } as never,
+    });
+  return { engine, at, close, put, ensure, resolve: tree.resolve };
 }
 
 describe('a tree that names this engine', () => {
@@ -158,6 +163,17 @@ describe('a tree that names this engine', () => {
       });
     } finally {
       if (emb.blobs instanceof FileBlobStore) emb.blobs.destroy();
+    }
+  });
+
+  it('prepares its store through @storage ensure, over the planner, and records the plan it applied', async () => {
+    const tree = await loaded();
+    try {
+      expect(await tree.ensure()).toMatchObject({ collections: 1 });
+      expect(await tree.ensure()).toEqual({ collections: 0, columns: 0, constraints: 0 });
+      expect((await tree.engine.history(tree.at)).map(one => one.targets)).toEqual([['entries']]);
+    } finally {
+      await tree.close();
     }
   });
 

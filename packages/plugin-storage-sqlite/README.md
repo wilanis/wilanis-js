@@ -99,20 +99,41 @@ an index over the scope and the key (`wl_i_<collection>_scope`) is what tells a 
 the scope. A table that already holds rows and no scope column is `drift`: a row written before the store was
 scoped belongs to no scope.
 
-## Not yet
+## Migrations
 
-The migration planner's members (RFC 0017) are RFC 0022's sixth step
-([#260](https://github.com/wilanis/wilanis-js/issues/260)).
+The engine answers RFC 0017's planner. `wilanis migrate` plans a connection of this kind against the file, and a
+startup step's `@storage/storage.port.json#ensure` applies a plan whose every step is additive and refuses
+`drift` otherwise -- a column of another type, a required column with no default over rows, a `unique` the rows
+already repeat, a column the shape no longer has. A table an earlier `ensure` built and nothing recorded is
+adopted on first contact.
 
-**Until that step lands, a tree on this kind cannot prepare its tables.** A startup step's
-`@storage/storage.port.json#ensure` goes through the planner, and this engine's `apply` refuses: the start
-fails in the open, naming the step, rather than serving a store whose first write would meet a missing table.
-`wilanis migrate` skips a connection of this kind and says so.
+**The record** is the table `wilanis_migrations` in the file itself: one row per collection a plan touched, with
+what the collection is afterwards, the steps, the tree and who ran it, and `plan`, the migration's number. It is
+made on first contact; no plan drops it. `rm` of the file is still the whole of a reset.
+
+**One plan, one transaction.** The kind says `transactionalDdl: true`, and a plan runs on a handle of its own:
+`PRAGMA foreign_keys = OFF`, `BEGIN IMMEDIATE`, the steps, the record's rows, `PRAGMA foreign_key_check`,
+`COMMIT`. A step that fails, or a reference the rows break, rolls the whole plan back, and the file and its
+record are as they were.
+
+**What a step is.** `create`, `rename`, `renameCollection`, an `add` the table can take in place, `unique`,
+`ununique` and `drop` are one statement each. SQLite has no `ALTER COLUMN` and adds a reference only with its
+column, so `retype`, `require`, `relax`, `ref`, `unref`, `remove`, and an `add` of a required field with no
+default remake the table, inside the plan's transaction. The sequence is the one SQLite documents for other
+schema changes (the twelve steps): make `wl_rebuild_<name>`, copy the rows, drop the table, give the new one its
+name, make its indexes again. It never renames the old table out of the way first: since SQLite 3.26 that
+rewrites every reference other tables make to it, and they would point at a table about to be dropped.
+
+**Which casts a `retype` attempts** are the postgres engine's pairs: anything to a string; a string to a number,
+a boolean or JSON; a number or a boolean to JSON. SQLite's own cast never fails (`CAST('two' AS REAL)` is 0), so
+each pair that can lose a value has a test: the plan counts the values that fail it before it runs, and the
+rebuild counts them again inside the transaction and fails the plan where any is left.
 
 ## Tests
 
 Every suite runs unconditionally, against a file in the test's temporary directory: the shared engine suite,
-RFC 0015's scope cases, a second load of a tree finding what the first kept, the rules (X231 to X233, which open
+RFC 0015's scope cases, RFC 0017's planner (a plan that fails half way, a table rebuild included, leaves the file
+and its record as they were), a second load of a tree finding what the first kept, the rules (X231 to X233, which open
 no file), the pragmas, the keys, and the bundled SQLite's version (3.35 or later, for `RETURNING`).
 
 Part of [wilanis](https://github.com/wilanis/wilanis-js). Apache-2.0.
