@@ -21,6 +21,11 @@ export interface Domain {
   lacks?: unknown[];
   /** The path must be truthy / falsy, used when a bare path is the whole predicate. */
   truthy?: boolean;
+  /**
+   * The path is compared with another path (`a == b`, `a != b`): `equal` holds the one value its type generates
+   * under the seed, which every path paired `equal` of that type holds too; `unequal` holds a value unlike it.
+   */
+  paired?: 'equal' | 'unequal';
 }
 
 /** Constraints for one branch, keyed by dotted input path. */
@@ -111,6 +116,10 @@ function narrowBounds(domain: Domain, by: Domain): Maybe<Domain> {
 
 /** The exact value and the membership the two constraints ask for, together. */
 function narrowValues(domain: Domain, by: Domain): Maybe<Domain> {
+  if (by.paired) {
+    if (domain.paired && domain.paired !== by.paired) return UNSAT;
+    domain.paired = by.paired;
+  }
   if (by.eq !== undefined) {
     if (domain.absent || (domain.eq !== undefined && JSON.stringify(domain.eq) !== JSON.stringify(by.eq))) return UNSAT;
     domain.eq = by.eq;
