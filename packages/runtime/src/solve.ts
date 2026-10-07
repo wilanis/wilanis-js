@@ -75,15 +75,43 @@ function demandOf(target: expr.Expr, truth: Cmp, lit: unknown): Demands[] {
   return [{ [key(target.path)]: valueDomain(truth, lit) }];
 }
 
+/** The two paths a comparison has on its sides, each a path or the length of one; undefined when a side is neither. */
+function pathSides(
+  node: expr.Expr & { kind: 'bin' },
+): { left: string[]; right: string[]; lengths: boolean } | undefined {
+  const pathOf = (side: expr.Expr) => {
+    if (side.kind === 'path') return side.path;
+    return side.kind === 'len' && side.arg.kind === 'path' ? side.arg.path : undefined;
+  };
+  const left = pathOf(node.left);
+  const right = pathOf(node.right);
+  if (!left || !right) return undefined;
+  return { left, right, lengths: node.left.kind === 'len' || node.right.kind === 'len' };
+}
+
+const EQUAL: Domain = { paired: 'equal', present: true };
+const UNEQUAL: Domain = { paired: 'unequal' };
+
 /**
- * Two paths compared: `==` holds both at the one value their type generates, `!=` the left at that value and the right
- * at another. An ordering between two paths has no such value, and no alternatives.
+ * Two paths compared: `==` holds both at the one value their type generates; `!=` holds one of them at that value and
+ * the other at another, either way round, the left at it first. An ordering between two paths has no such value, and
+ * no alternatives.
  */
 function paired(left: string[], right: string[], op: Cmp): Demands[] {
   if (op !== '==' && op !== '!=') return [];
-  const other = op === '==' ? { paired: 'equal' as const, present: true } : { paired: 'unequal' as const };
-  const both = merge({ [key(left)]: { paired: 'equal', present: true } }, { [key(right)]: other });
-  return both === UNSAT ? [] : [both];
+  const ways: [Domain, Domain][] =
+    op === '=='
+      ? [[EQUAL, EQUAL]]
+      : [
+          [EQUAL, UNEQUAL],
+          [UNEQUAL, EQUAL],
+        ];
+  const out: Demands[] = [];
+  for (const [one, other] of ways) {
+    const both = merge({ [key(left)]: { ...one } }, { [key(right)]: { ...other } });
+    if (both !== UNSAT) out.push(both);
+  }
+  return out;
 }
 
 /** Solve one comparison: a literal against a path or its length, or two paths for equality. */
@@ -91,10 +119,10 @@ function compare(node: expr.Expr & { kind: 'bin' }, want: boolean): Demands[] {
   // `lit in path`: the list must hold the literal, or must not
   if (node.op === 'in') return membership(node, want);
   const sides: [expr.Expr, expr.Expr] = [node.left, node.right];
-  if (node.left.kind === 'path' && node.right.kind === 'path')
-    return paired(node.left.path, node.right.path, want ? (node.op as Cmp) : NEGATE[node.op as Cmp]);
+  const pair = pathSides(node);
+  if (pair) return pair.lengths ? [] : paired(pair.left, pair.right, want ? (node.op as Cmp) : NEGATE[node.op as Cmp]);
   const at = sides.findIndex(side => side.kind === 'lit');
-  if (at < 0) return []; // len() against a path, or two lengths: no alternatives
+  if (at < 0) return [];
   const lit = (sides[at] as expr.Expr & { kind: 'lit' }).value;
   // the operator is written against the left operand; with the literal on the left it mirrors
   const op: Cmp = at === 0 ? MIRROR[node.op as Cmp] : (node.op as Cmp);
@@ -141,7 +169,7 @@ function nameableBin(node: expr.Expr & { kind: 'bin' }): boolean {
   // first comparison names something when one side is first literal and the other first path or len(path)
   const sides = [node.left, node.right];
   const at = sides.findIndex(side => side.kind === 'lit');
-  if (at < 0) return node.left.kind === 'path' && node.right.kind === 'path';
+  if (at < 0) return pathSides(node)?.lengths === false;
   const target = sides[at === 0 ? 1 : 0];
   return target.kind === 'path' || (target.kind === 'len' && target.arg.kind === 'path');
 }
@@ -167,7 +195,7 @@ function comparesPaths(node: expr.Expr): boolean {
   if (node.kind === 'not') return comparesPaths(node.arg);
   if (node.kind !== 'bin') return false;
   if (node.op === '&&' || node.op === '||') return comparesPaths(node.left) || comparesPaths(node.right);
-  return node.left.kind !== 'lit' && node.right.kind !== 'lit';
+  return pathSides(node) !== undefined;
 }
 
 /**
