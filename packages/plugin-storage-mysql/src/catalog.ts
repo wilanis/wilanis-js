@@ -1,6 +1,6 @@
 /**
  * What the database already holds, read from `information_schema` for the database the URL names: whether a
- * table is there, its columns, its unique indexes, its foreign keys and its key. `ensure` reads it to add only
+ * table is there, its columns, its indexes, its foreign keys and its key. `ensure` reads it to add only
  * what is missing. Table names are compared as written, since whether MySQL folds them is the host's setting.
  */
 import { type Kysely, sql } from 'kysely';
@@ -82,4 +82,24 @@ export async function keyOf(db: Kysely<never>, table: string): Promise<string | 
 export async function rowCount(db: Kysely<never>, table: string): Promise<number> {
   const rows = await rowsOf(db, sql<{ n: number }>`select count(*) as n from ${sql.id(table)}`);
   return Number(rows[0]?.n ?? 0);
+}
+
+/** The names of a table's indexes, the primary key's among them; none where there is no such table. */
+export async function indexNamesOf(db: Kysely<never>, table: string): Promise<Set<string>> {
+  const rows = await rowsOf(
+    db,
+    sql<{ index: string }>`select distinct INDEX_NAME as \`index\` from information_schema.STATISTICS
+      where TABLE_SCHEMA = database() and TABLE_NAME = ${table}`,
+  );
+  return new Set(rows.map(one => one.index));
+}
+
+/** The columns one index of a table covers, in its order; none where the table has no such index. */
+export async function indexColumnsOf(db: Kysely<never>, table: string, index: string): Promise<string[]> {
+  const rows = await rowsOf(
+    db,
+    sql<{ name: string }>`select COLUMN_NAME as name from information_schema.STATISTICS
+      where TABLE_SCHEMA = database() and TABLE_NAME = ${table} and INDEX_NAME = ${index} order by SEQ_IN_INDEX`,
+  );
+  return rows.map(one => one.name);
 }

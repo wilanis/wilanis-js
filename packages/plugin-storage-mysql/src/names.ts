@@ -16,6 +16,21 @@ const hashOf = (parts: unknown): string =>
 /** The name a declared `unique` is created under: `wl_u_` and a hash of the collection and its fields. */
 export const uniqueName = (collection: string, fields: string[]): string => `wl_u_${hashOf([collection, fields])}`;
 
+/**
+ * The name the same `unique` is created under once the collection keeps a scope (RFC 0015): `wl_us_` and a hash
+ * of the collection, the scope columns and the fields. It is a name of its own rather than the unscoped one
+ * made again, so the engine drops exactly the index a scope replaces, and the one a wider scope replaces.
+ */
+export const scopedUniqueName = (collection: string, scope: string[], fields: string[]): string =>
+  `wl_us_${hashOf([collection, scope, fields])}`;
+
+/**
+ * The name of the index over a collection's scope columns. It names the collection and not the columns: a fixed
+ * name is what lets the engine read back from the catalog which columns a table keeps as a scope, since no
+ * field of the shape says so.
+ */
+export const scopedIndexName = (collection: string): string => `wl_s_${hashOf([collection])}`;
+
 /** The name a declared `refs` is created under: `wl_r_` and a hash of the collection and the field. */
 export const refName = (collection: string, field: string): string => `wl_r_${hashOf([collection, field])}`;
 

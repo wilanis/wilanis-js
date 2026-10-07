@@ -124,20 +124,47 @@ error later:
 | X242 | a key it cannot key by, or one `newKey` cannot answer under the configured `keyType` |
 | X243 | a collection name longer than the 64 characters MySQL keeps, or two of one connection that fold to one table; a field of a kept shape longer than 64 characters, or two fields of one shape that fold to one column, since MySQL compares column names without case |
 
+## A scope
+
+A collection the store declares `scoped` (RFC 0015) keeps each scope column beside the record: `VARCHAR` for a
+string and `DOUBLE` for a number, `NOT NULL`. Every statement carries `AND <column> = ?` per scope column, so a
+row of another scope is not there for a `get`, a `find`, a `count`, a `patch` or a `remove`, in a transaction
+too. The key stays global: a replacing `put` of a key another scope holds answers `conflict` and writes nothing.
+
+The table gains the columns at the first operation that names a scope. One `ALTER TABLE` adds them, makes every
+`unique` again with the scope columns in front (`wl_us_` and a hash), and indexes the scope columns (`wl_s_`
+and a hash; InnoDB puts the key behind them already). That index is how a later `ensure` knows which columns
+are the scope. A table that holds rows and lacks a scope column is `drift`: no declaration can say which scope
+those rows belong to.
+
+A scope column shares the 3072 bytes of every index it is in, by the rule above. So a `unique [url, method]`
+under a string `tenant` makes all three `VARCHAR(256)`. The table is empty when the scope arrives, so the
+`ALTER` narrows the fields without cutting a value. A `unique` declared later that would leave a string scope
+less room is `drift`, as it is for a field. A violated scoped `unique` is answered in the store's words,
+`unique [url, method]`, without the scope.
+
+MySQL commits before DDL, so the `ALTER` runs on the pool, never in a transaction. The scope stays even when
+the transaction that asked for it rolls back. That costs a transaction two things, both only at a table's
+first scoped operation. A transaction that has already read or written the table holds it, and the operation
+fails after 10 seconds, saying so. A transaction that has already read anything holds an older snapshot than
+the rebuilt table, and MySQL refuses its later reads of that table with "Table definition has changed, please
+retry transaction". A retried run finds the scope made.
+
 ## Not yet
 
-Keeping a scope (RFC 0015), the planner's members applied step by step (RFC 0017), and
-the constraint suites are RFC 0022's eighth step ([#262](https://github.com/wilanis/wilanis-js/issues/262)).
+Two things are still missing: the planner's members applied step by step (RFC 0017,
+[#835](https://github.com/wilanis/wilanis-js/issues/835)), and the runs of RFC 0003's constraint suite and RFC
+0004's atomic suite ([#833](https://github.com/wilanis/wilanis-js/issues/833),
+[#832](https://github.com/wilanis/wilanis-js/issues/832)).
 
-**Until that step lands, a tree on this kind cannot prepare its tables from a startup step.** A startup step's
-`@storage/storage.port.json#ensure` goes through the planner, and this engine's `apply` refuses: the start fails
-in the open, naming the step. `wilanis migrate` skips a connection of this kind and says so, and an operation
-carrying a scope fails the node.
+**Until the planner's step lands, a tree on this kind cannot prepare its tables from a startup step.** A startup
+step's `@storage/storage.port.json#ensure` goes through the planner, and this engine's `apply` refuses: the start
+fails in the open, naming the step. `wilanis migrate` skips a connection of this kind and says so.
 
 ## Tests
 
-The suites that need a server -- the shared engine suite, the version check against a real server, and the
-mapping -- run against a real MySQL, and are skipped without `WILANIS_TEST_MYSQL_URL`, since a suite that
+The suites that need a server -- the shared engine suite, the shared scope cases, the version check against a
+real server, and the mapping -- run against a real MySQL, and are skipped without `WILANIS_TEST_MYSQL_URL`, since a suite that
 silently passed without a database would be worse than no suite. CI starts no database, so run them by hand
 before changing the engine, against a server at the floor version:
 
