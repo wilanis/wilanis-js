@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type Branch, branchesOf, satisfy } from '../src/branches.js';
+import { NO_MEMBER } from '../src/stubs.js';
 
 /** The demands of one case, by the node it routes to. */
 const to = (branches: Branch[], target: string) => branches.find(one => one.to === target)!;
@@ -167,6 +168,12 @@ describe('turning a demand into a value', () => {
     expect(satisfy({ ne: ['clean', 'findings'] }, '', status)).toBe('broke');
     expect(satisfy({ ne: ['clean', 'findings'] }, 'clean', status)).toBe('broke');
     expect(satisfy({ ne: ['clean'] }, 'findings', status)).toBe('findings');
+  });
+  it('answers NO_MEMBER where the domain excludes every member of an enum, never a value outside it (#861)', () => {
+    const status = { kind: 'string', enum: ['clean', 'findings', 'broke'] } as const;
+    expect(satisfy({ ne: ['clean', 'findings', 'broke'] }, 'broke', status)).toBe(NO_MEMBER);
+    // a string with no enum still takes a value the rules leave
+    expect(satisfy({ ne: ['clean', 'findings', 'broke'] }, 'clean', { kind: 'string' })).toBe('');
   });
   it('makes two paths paired equal the same value of their type, and a path paired unequal another', () => {
     const text = { kind: 'string' } as const;

@@ -84,12 +84,19 @@ export async function switchesReached(
 
 /**
  * Why no run can take a case, in the words the report prints after `NEVER RUN`: the solver found no input for its
- * rule, or what it demands is something the rehearsal cannot set. Nothing for a case a run can take.
+ * rule, what it demands is something the rehearsal cannot set, or it leaves a required field no member of its enum.
+ * Nothing for a case a run can take.
  */
 export function uncoveredBy(one: Case): string | undefined {
   if (one.branch.unsolved) return one.branch.unsolved;
-  if (!one.unreachable?.length) return undefined;
-  return `${one.unreachable.join(', ')} comes from nothing the rehearsal sets, so the rehearsal cannot vary it`;
+  if (one.unreachable?.length)
+    return `${one.unreachable.join(', ')} comes from nothing the rehearsal sets, so the rehearsal cannot vary it`;
+  if (!one.exhausted?.length) return undefined;
+  const fields = one.exhausted.map(field => `${field}'s`).join(' and ');
+  // the else is reached only when every rule is false; a rule's own case may exclude members with a `!=` of its own
+  const by =
+    one.branch.rule === -1 ? 'named by a rule before it' : `excluded by '${one.branch.when}' or a rule before it`;
+  return `every member of ${fields} enum is ${by}`;
 }
 
 /**

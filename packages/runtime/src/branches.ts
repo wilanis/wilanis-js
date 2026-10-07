@@ -10,7 +10,7 @@ import { type Type, typeAt } from '@wilanis/core';
 import type { Branch, Domain } from './domains.js';
 import { listHolder, ownInputAt, sourceOf } from './frames.js';
 import { branchesOf } from './solve.js';
-import { getPath, satisfy, setPath } from './stubs.js';
+import { getPath, NO_MEMBER, satisfy, setPath } from './stubs.js';
 
 export type { Branch, Demands, Domain } from './domains.js';
 export { branchesOf } from './solve.js';
@@ -62,6 +62,8 @@ export interface Case {
   input?: { path: string[]; value: unknown }[];
   /** Demands that could not be routed to anything the rehearsal can set. */
   unreachable?: string[];
+  /** Demands on a required enum field that exclude every member of its enum, so no value of its type meets them. */
+  exhausted?: string[];
   /** The dotted paths of the nodes made to break, for the branch a `catch` routes a fault to (RFC 0014). */
   broken?: string[];
 }
@@ -288,6 +290,29 @@ function ofElement(list: FoundList, within: string[], domain: Domain, from: Pick
   return { stub: { target: held.target, path: [...held.path, '0', ...within], value: domain } };
 }
 
+/** Why a demand is not met: nothing the rehearsal sets reaches it, or no value of its field's type meets it. */
+type Missed = 'unreachable' | 'exhausted';
+
+/**
+ * The value a demand writes at a path of a declared type. Where the demand leaves no member of the field's enum, the
+ * field is left out if some field on the way may be absent, which a rule's `!=` accepts; otherwise `NO_MEMBER` says
+ * that no value meets it.
+ */
+function valueFor(domain: Domain, base: unknown, at: { type?: Type; path: string[] }, seed: number): unknown {
+  const value = satisfy(domain, getPath(base, at.path), typeAtPath(at.type, at.path), seed);
+  return value === NO_MEMBER && omissible(at.type, at.path) ? undefined : value;
+}
+
+/** A demand on the trigger's own input at a path: the patch that meets it, or why none does. */
+function ofInput(
+  path: string[],
+  domain: Domain,
+  from: Pick<Stubbing, 'inputSeed' | 'inType'> & { seed: number },
+): { input: { path: string[]; value: unknown } } | Missed {
+  const value = valueFor(domain, from.inputSeed, { type: from.inType, path }, from.seed);
+  return value === NO_MEMBER ? 'exhausted' : { input: { path, value } };
+}
+
 /** Where one demand is met: the trigger's input, an element of a mapped list, a node's stub, or nowhere. */
 function meet(
   dotted: string,
@@ -297,20 +322,12 @@ function meet(
 ):
   | { input: { path: string[]; value: unknown } }
   | { stub: { target: string; path: string[]; value: unknown } }
-  | 'unreachable' {
+  | Missed {
   const [inputName, ...within] = dotted.split('.');
   const src = sourceOf(at.node.in[inputName]);
   if (!src) return 'unreachable';
   // a switch in the top-level graph reading `in` is steered by the trigger's input, not a stub
-  if (src.ref === 'in' && at.steerable) {
-    const full = [...src.path, ...within];
-    return {
-      input: {
-        path: full,
-        value: satisfy(domain, getPath(from.inputSeed, full), typeAtPath(from.inType, full), from.seed),
-      },
-    };
-  }
+  if (src.ref === 'in' && at.steerable) return ofInput([...src.path, ...within], domain, from);
   // inside a map, `in` is the element: what steers it is the list the map runs over
   if (src.ref === 'in' && at.element) return ofElement(at.element, [...src.path, ...within], domain, from);
   if (src.ref === 'in' || src.ref === 'context' || src.ref === 'const') return 'unreachable';
@@ -341,16 +358,22 @@ function standIn(target: string, from: Required<Pick<Stubbing, 'generated' | 'ty
   return type ? satisfy({ present: true }, undefined, type, from.seed) : undefined;
 }
 
-/** One demand written into the stub it steers, on top of what earlier demands already wrote there. */
+/**
+ * One demand written into the stub it steers, on top of what earlier demands already wrote there; false, and nothing
+ * written, where no value of the type at that path meets it.
+ */
 function write(
   stubs: Record<string, unknown>,
   stub: { target: string; path: string[]; value: unknown },
   from: Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>>,
-) {
+): boolean {
   const { target, path } = stub;
+  const type = from.typeOf(target);
   const base = target in stubs ? stubs[target] : standIn(target, from);
-  const want = satisfy(stub.value as Domain, getPath(base, path), typeAtPath(from.typeOf(target), path), from.seed);
-  stubs[target] = setPath(base, path, want, { type: from.typeOf(target), seed: from.seed });
+  const want = valueFor(stub.value as Domain, base, { type, path }, from.seed);
+  if (want === NO_MEMBER) return false;
+  stubs[target] = setPath(base, path, want, { type, seed: from.seed });
+  return true;
 }
 
 /**
@@ -375,22 +398,32 @@ function steer(
 ): Case {
   const stubs: Record<string, unknown> = {};
   const input: { path: string[]; value: unknown }[] = [];
-  const unreachable: string[] = [];
+  const missed: Record<Missed, string[]> = { unreachable: [], exhausted: [] };
   const at: At = { node: found.node, prefix: found.prefix, steerable, element: elementOf(found) };
   const demands = branch.unsolved ? [] : Object.entries(branch.demands);
   for (const [dotted, domain] of demands) {
     const met = meet(dotted, domain, at, from);
-    if (met === 'unreachable') unreachable.push(dotted);
+    if (typeof met === 'string') missed[met].push(dotted);
     else if ('input' in met) input.push(met.input);
-    else write(stubs, met.stub, from);
+    else if (!write(stubs, met.stub, from)) missed.exhausted.push(dotted);
   }
-  return {
-    at: found.at,
-    branch,
-    stubs,
-    ...(input.length ? { input } : {}),
-    ...(unreachable.length ? { unreachable } : {}),
-  };
+  const named = Object.entries(missed).filter(([, paths]) => paths.length);
+  return { at: found.at, branch, stubs, ...(input.length ? { input } : {}), ...Object.fromEntries(named) };
+}
+
+/**
+ * Whether a value may be left out at a path of a declared type: some field on the way is optional. A list's element is
+ * not, since the walk holds the element a switch reads to one that is there.
+ */
+function omissible(type: Type | undefined, path: string[]): boolean {
+  let here = type;
+  for (const step of path) {
+    const read = here && typeAt(here, [step]);
+    if (!read || typeof read === 'string') return false;
+    if (read.optional && !/^\d+$/.test(step)) return true;
+    here = read.type;
+  }
+  return false;
 }
 
 /** The declared type at a path within a node's output type, as far as the type system can follow it. */
