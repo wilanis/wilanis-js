@@ -108,26 +108,36 @@ function plausible(domain: Domain, value: unknown): boolean {
 }
 
 /**
+ * What `satisfy` answers when the domain excludes every member of a string enum: no value of the type meets the
+ * demand, and only the caller, which knows whether the field may be absent, can say whether anything else does.
+ */
+export const NO_MEMBER: unique symbol = Symbol('no member of the enum is left');
+
+/**
  * A value the domain does not exclude, of the same family as what it excludes where that can be told. A string with an
- * enum takes a member the domain leaves, so the value stays one of its type; where it leaves none, no member will do.
+ * enum takes a member the domain leaves, so the value stays one of its type; where it leaves none, the answer is
+ * `NO_MEMBER`.
  */
 function excluding(domain: Domain, generated: unknown, type: Type | undefined): unknown {
   const kept = generated !== undefined && fits(generated, domain) && plausible(domain, generated);
-  if (kept && (type?.kind !== 'string' || !type.enum?.length || type.enum.includes(generated as string)))
-    return generated;
-  const member = memberLeft(domain, type);
-  if (member !== undefined) return member;
+  const members = membersOf(type);
+  if (kept && (!members || members.includes(generated as string))) return generated;
+  if (members) return members.find(member => fits(member, domain)) ?? NO_MEMBER;
+  return unlikeExcluded(domain);
+}
+
+/** The members of a string enum; undefined for any other type. */
+function membersOf(type: Type | undefined): string[] | undefined {
+  return type?.kind === 'string' && type.enum?.length ? type.enum : undefined;
+}
+
+/** A value unlike the first one the domain excludes, for a type that does not say which values it holds. */
+function unlikeExcluded(domain: Domain): unknown {
   const bad = domain.ne?.[0];
   if (typeof bad === 'number') return unlike(bad, domain);
   if (typeof bad === 'string') return bad === '' ? 'x' : '';
   if (typeof bad === 'boolean') return !bad;
   return null;
-}
-
-/** The first member of a string enum the domain does not exclude; undefined for any other type, or when none is left. */
-function memberLeft(domain: Domain, type: Type | undefined): string | undefined {
-  if (type?.kind !== 'string' || !type.enum) return undefined;
-  return type.enum.find(member => fits(member, domain));
 }
 
 /**

@@ -112,3 +112,77 @@ describe('rehearsing a tree whose switches read an enum and compare two fields',
     }
   });
 });
+
+/**
+ * `sort` reads a scan and routes on its `status`, whose rules name every member of its enum, so only an absent status
+ * reaches the else: a required one never does, and an optional one does when it is left out (#861).
+ */
+function exhaustedTree(required: boolean): string {
+  const port = `${HERE}/domain/scan.port.json`;
+  const result = shape('Result');
+  const status = { type: 'string', enum: ['clean', 'findings', 'broke'], required };
+  // an optional field is read under has(), which the checker asks for (G011)
+  const guard = required ? '' : 'has(status) && ';
+  const rules = ['clean', 'findings', 'broke'].map(member => ({ when: `${guard}status == '${member}'`, to: 'known' }));
+  return treeOf({
+    'domain/Read.shape.json': { layer: 'core', fields: { status, commit: STRING } },
+    'domain/Result.shape.json': { layer: 'core', fields: { label: STRING } },
+    'domain/Ask.shape.json': { layer: 'core', fields: { target: STRING } },
+    'edge/AskIn.shape.json': { layer: 'edge', fields: { target: STRING } },
+    'edge/Out.shape.json': { layer: 'edge', fields: { label: STRING } },
+    'domain/scan.port.json': {
+      operations: {
+        sort: { description: 'd', accepts: { target: STRING }, returns: result },
+        read: { description: 'd', accepts: { target: STRING }, returns: shape('Read') },
+      },
+    },
+    'data/scan.binding.json': {
+      port,
+      operations: {
+        sort: { graph: `${HERE}/domain/sort.graph.json` },
+        read: { graph: `${HERE}/data/read.graph.json` },
+      },
+    },
+    'data/read.graph.json': graph('Read', shape('Ask'), { type: shape('Read'), from: 'r' }, [
+      make('r', { status: 'broke', commit: '{{in.target}}' }, shape('Read')),
+    ]),
+    'domain/sort.graph.json': graph('Sort', shape('Ask'), { type: result, from: ['known', 'unknown'] }, [
+      run('got', `${port}#read`, { target: '{{in.target}}' }),
+      decide('status', { status: '{{got.status}}' }, rules, 'unknown'),
+      make('known', { label: '{{got.commit}}' }, result),
+      make('unknown', { label: 'unknown' }, result),
+    ]),
+    'edge/sort.trigger.json': trigger('sort', { in: edge('AskIn'), out: edge('Out') }, `${port}#sort`),
+  });
+}
+
+/** The rehearsal's lines for an `exhaustedTree` under every seed, and whether each rehearsal was ok. */
+async function rehearsedUnder(required: boolean): Promise<{ said: string; ok: boolean }[]> {
+  const dir = exhaustedTree(required);
+  const load = loadTree(dir, BUILTIN_PLUGINS);
+  expect(checkTree(load).format()).toBe('');
+  const runs = [];
+  for (const seed of SEEDS) {
+    const one = await rehearse(load, { seed });
+    runs.push({ said: `seed ${seed}\n${one.lines.join('\n')}`, ok: one.ok });
+  }
+  rmSync(dir, { recursive: true, force: true });
+  return runs;
+}
+
+describe('rehearsing a switch whose rules name every member of an enum (#861)', () => {
+  it('reports the else unreachable when the field is required, and says why', { timeout: 60_000 }, async () => {
+    for (const { said, ok } of await rehearsedUnder(true)) {
+      expect(said).toMatch(/anything else +NEVER RUN -- every member of status's enum is named by a rule before it$/m);
+      expect(said).not.toMatch(/BROKE|cannot vary it/);
+      expect(ok, said).toBe(false);
+    }
+  });
+  it('reaches the else by leaving the field out when it is optional', { timeout: 60_000 }, async () => {
+    for (const { said, ok } of await rehearsedUnder(false)) {
+      expect(said).toMatch(/ok {2}anything else +answered from 'unknown'/);
+      expect(said).not.toMatch(/BROKE|NEVER RUN/);
+      expect(ok, said).toBe(true);
+    }
+  });
+});
