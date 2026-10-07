@@ -16,6 +16,11 @@
  * A table that keeps a scope (RFC 0015, `scope-table.ts`) has columns no field of the shape has, `NOT NULL`.
  * `ensure` reads which they are off the scope's index and holds them as the scope rather than as drift, and
  * a `unique` declared after the table was scoped is made within the scope, as the ones before it were.
+ *
+ * This is not what `@storage/storage.port.json#ensure` reaches. That operation goes over RFC 0017's planner --
+ * `recorded` and `inspect` against what the tree declares, classed by the *Guide* table, applied by `apply.ts`
+ * -- as it does on postgres. What is left here serves the callers of `Engine.ensure` that remain: the shared
+ * suite, which makes the tables its cases write into.
  */
 import type { At, Made } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';
