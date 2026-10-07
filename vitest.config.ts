@@ -8,11 +8,12 @@
  *
  * Which plugins' tests run is decided here, and only here (issue #828). With `WILANIS_TEST_PLUGINS=touched`,
  * which `npm test` sets, the tests under `packages/plugin-<name>/test` run only for a plugin with a file that
- * differs from the base: `WILANIS_TEST_BASE` when it is set (CI sets the pull request's or the merge queue's
- * base), and otherwise the merge base of HEAD with `origin/main`. Every other package, `libraries/` and
- * `fitness/` always run; a change to core or engine alone runs no plugin's tests, by decision. Without the
- * variable (`npm run test:all`, or `vitest` run by hand) every plugin runs, and so does a run whose changed
- * files cannot be listed. The run says on its first lines which plugins it tests and which it skips.
+ * differs from the base: `WILANIS_TEST_BASE` when it is set (CI sets the pull request's base, the merge queue's,
+ * or a push's previous tip of main), and otherwise the merge base of HEAD with `origin/main`. Every other
+ * package, `libraries/` and `fitness/` always run; a change to core or engine alone runs no plugin's tests, by
+ * decision. Without the variable (`npm run test:all`, or `vitest` run by hand) every plugin runs, and so does a
+ * run whose changed files cannot be listed. The run says on its first lines which plugins it tests and which it
+ * skips. `WILANIS_TEST_PLUGINS=none`, which `npm run fitness` sets, runs no plugin and says nothing.
  */
 import { execFileSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
@@ -67,11 +68,16 @@ function choosePlugins(plugins: string[]): { tested: string[]; skipped: string[]
 /** The plugin packages under packages/, by directory name. */
 const PLUGINS = readdirSync(`${ROOT}packages`).filter(name => name.startsWith('plugin-'));
 
-/** What this run decided about the plugins' tests. */
-const CHOSEN = choosePlugins(PLUGINS);
+/** Whether this run asked for no plugin's tests (`npm run fitness`), and so has nothing to choose or say. */
+const NONE = process.env.WILANIS_TEST_PLUGINS === 'none';
 
-console.log(`plugins tested (${CHOSEN.why}): ${CHOSEN.tested.join(', ') || 'none'}`);
-console.log(`plugins skipped (unchanged): ${CHOSEN.skipped.join(', ') || 'none'}`);
+/** What this run decided about the plugins' tests. */
+const CHOSEN = NONE ? { tested: [], skipped: PLUGINS, why: '' } : choosePlugins(PLUGINS);
+
+if (!NONE) {
+  console.log(`plugins tested (${CHOSEN.why}): ${CHOSEN.tested.join(', ') || 'none'}`);
+  console.log(`plugins skipped (unchanged): ${CHOSEN.skipped.join(', ') || 'none'}`);
+}
 
 export default defineConfig({
   test: {

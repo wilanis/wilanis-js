@@ -51,11 +51,11 @@ npm run release             # npm run test:all, then publishes every package in 
 
 `npm test` must pass before a commit. It always runs the tests of every package that is not a plugin, of
 `libraries/` and of `fitness/`. It runs the tests under `packages/plugin-<name>/test` only for a plugin with a
-file that differs from the base: the merge base with `origin/main` locally, the pull request's or the merge
-queue's base in CI (`WILANIS_TEST_BASE`). A change to core or engine alone runs no plugin's tests; that is a
+file that differs from the base: the merge base with `origin/main` locally; in CI (`WILANIS_TEST_BASE`) the
+pull request's base, the merge queue's base, or for a push to `main` the previous tip of `main`. A change to core or engine alone runs no plugin's tests; that is a
 decision (issue #828), and the runtime's and the viewer's tests still load every plugin as fixtures. The first
 lines of the run say which plugins it tested and which it skipped; `vitest.config.ts` is the one place that
-chooses. `npm run test:all` runs every plugin's tests, and so does a push to `main`. Tests import the built
+chooses. `npm run test:all` runs every plugin's tests, and so does a CI run with no base to compare with. Tests import the built
 `dist` of sibling packages, so a change in core needs a build before its effect shows in a runtime test;
 `npm test` does that.
 

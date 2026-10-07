@@ -19,7 +19,7 @@
     "build": "tsc -b",
     "prepare": "git config core.hooksPath .githooks",
     "lint": "biome check .",
-    "fitness": "tsc -p fitness && vitest run --project fitness",
+    "fitness": "tsc -p fitness && WILANIS_TEST_PLUGINS=none vitest run --project fitness",
     "lint:fix": "biome check --write .",
     "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo",
     "test": "npm run lint && npm run build && tsc -p fitness && WILANIS_TEST_PLUGINS=touched vitest run",
