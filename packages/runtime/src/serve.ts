@@ -4,6 +4,7 @@ import { basename, extname } from 'node:path';
 import type { Readable } from 'node:stream';
 import {
   type BlobHandle,
+  type BlobStore,
   isBlobHandle,
   type Loaded,
   type LoadResult,
@@ -106,13 +107,14 @@ export async function start(
   if (opts.observe) served.observe(opts.observe);
   emb.serve(served);
   // what was held, in reverse, then the plugins' own teardowns (which say for themselves what would not stop),
-  // then the blob store: each runs whatever the one before it threw
+  // then every blob store the server answered from -- the ones a reload replaced and the one serving now:
+  // each runs whatever the one before it threw
   const bye = () =>
     stopEach(
       [
         ...[...served.emb.held].reverse(),
         { stop: () => served.stopPlugins() },
-        { label: 'the blob store', stop: async () => destroyed(emb) },
+        ...served.blobStores().map(store => ({ label: 'the blob store', stop: async () => destroyed(store) })),
       ],
       log,
     );
@@ -127,9 +129,9 @@ export async function start(
   return { stop: bye, held: emb.held.length };
 }
 
-/** Remove what the embedder's blob store wrote, where that store is one on disk. */
-function destroyed(emb: Embedder): void {
-  if (emb.blobs instanceof FileBlobStore) emb.blobs.destroy();
+/** Remove what a blob store wrote, where that store is one on disk. */
+function destroyed(store: BlobStore): void {
+  if (store instanceof FileBlobStore) store.destroy();
 }
 
 /** The content type a file on disk is taken to have, by its extension; anything else is a stream of bytes. */
@@ -262,6 +264,6 @@ export async function runTrigger(
   } finally {
     await blobs.release();
     await down();
-    destroyed(emb);
+    destroyed(emb.blobs);
   }
 }
