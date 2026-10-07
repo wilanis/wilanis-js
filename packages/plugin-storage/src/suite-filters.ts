@@ -27,7 +27,11 @@ const TRACED: Type =
 /** The suite's seeds, two of them holding the camelCase field and one not. */
 const TRACES = [{ ...SEEDS[0], traceId: 't-1' }, { ...SEEDS[1], traceId: 't-2' }, SEEDS[2]];
 
-/** What a filter answers over a camelCase field, an empty list and an absent field, in every engine. */
+/**
+ * What a filter answers over a camelCase field, an empty list and an absent field, in every engine. Where a test
+ * of an absent field is false in memory, a `not` over it is true, however deep the `not` sits; SQL answers
+ * unknown for that test, and an engine whose `not` kept the unknown would drop the record.
+ */
 export const filterCases: Case[] = [
   {
     name: 'a field named in camelCase is read, filtered, counted and ordered by as any other field is',
@@ -64,6 +68,35 @@ export const filterCases: Case[] = [
       assert.deepEqual(await found(subject, where_, { ua: { ne: 'curl' } }), ['b', 'c']);
       assert.deepEqual(await found(subject, where_, { ua: { notIn: ['curl'] } }), ['b', 'c']);
       assert.equal(await subject.engine.count(where_, where({ ua: { ne: 'curl' } })), 2);
+    },
+  },
+  {
+    name: 'not over a test of a field a record does not hold keeps that record',
+    async run(subject) {
+      const where_ = await seeded(subject, 'find_not_absent');
+      assert.deepEqual(await found(subject, where_, { not: { ua: 'curl' } }), ['b', 'c']);
+      assert.deepEqual(await found(subject, where_, { not: { ua: { in: ['curl', 'wget'] } } }), ['b']);
+      assert.deepEqual(await found(subject, where_, { not: { ua: { contains: 'url' } } }), ['b', 'c']);
+      assert.deepEqual(await found(subject, where_, { not: { ua: { startsWith: 'cu' } } }), ['b', 'c']);
+      assert.deepEqual(await found(subject, where_, { not: { ua: { gt: 'a' } } }), ['b']);
+      assert.equal(await subject.engine.count(where_, where({ not: { ua: 'curl' } })), 2);
+    },
+  },
+  {
+    name: 'not nested, and not over all and any, keep a record that does not hold the field',
+    async run(subject) {
+      const where_ = await seeded(subject, 'find_not_nested');
+      assert.deepEqual(await found(subject, where_, { not: { not: { ua: 'curl' } } }), ['a']);
+      assert.deepEqual(await found(subject, where_, { not: { any: [{ ua: 'wget' }, { method: 'PUT' }] } }), ['a', 'b']);
+      assert.deepEqual(await found(subject, where_, { not: { all: [{ ua: 'curl' }, { method: 'GET' }] } }), ['b', 'c']);
+      const inside = { not: { all: [{ not: { ua: 'curl' } }, { method: 'GET' }] } };
+      assert.deepEqual(await found(subject, where_, inside), ['a', 'b']);
+      assert.deepEqual(await found(subject, where_, { any: [{ not: { ua: 'curl' } }, { method: 'GET' }] }), [
+        'a',
+        'b',
+        'c',
+      ]);
+      assert.deepEqual(await found(subject, where_, { all: [{ not: { ua: 'curl' } }, { method: 'POST' }] }), ['b']);
     },
   },
 ];

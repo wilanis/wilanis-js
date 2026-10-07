@@ -10,6 +10,8 @@
  *   two are `INSTR()` and `LOCATE()`, which read no pattern, so nothing in the value needs escaping.
  * - `ne` is `NOT (x <=> v)` and `notIn` keeps a row whose column is empty, because the memory engine's `!==`
  *   and `!includes` are true of an absent value, where SQL's `!=` and `NOT IN` answer unknown and drop the row.
+ * - `not` is `IS NOT TRUE`, not `NOT`, so a `not` over a test of an absent field keeps the record, as the memory
+ *   engine's `!` does; SQL's `NOT` keeps the test's unknown and drops it.
  * - `in` over no value matches nothing and `notIn` over none matches everything; MySQL refuses `IN ()`.
  * - a `JSON` column is compared as JSON, cast from the value's text, and `in` over one is a list of equalities,
  *   since MySQL does not compare JSON inside `IN`. It is never ordered: MySQL's order of JSON values is not the
@@ -79,6 +81,13 @@ function expression(field: string, test: Test, type: Type | undefined): Sql {
   }
 }
 
+/**
+ * A `not` over a filter, true wherever the filter is not true. SQL answers unknown for a test of an empty column,
+ * and `NOT` keeps the unknown, so the row is dropped; `IS NOT TRUE` reads the unknown as false, as the memory
+ * engine reads a test of an absent field, and is `NOT COALESCE(x, FALSE)` said in one operator.
+ */
+const negated = (inner: Sql): Sql => sql<boolean>`((${inner}) is not true)`;
+
 /** A filter as one expression over the table's columns; no filter asks for every record. */
 export function conditionOf(eb: Builder, where: Where | undefined, shape: Type): Sql | undefined {
   if (!where) return undefined;
@@ -86,7 +95,7 @@ export function conditionOf(eb: Builder, where: Where | undefined, shape: Type):
   if (where.kind === 'any') return every(eb, where.of, shape, 'or');
   if (where.kind === 'not') {
     const inner = conditionOf(eb, where.of, shape);
-    return inner ? eb.not(inner as never) : undefined;
+    return inner ? negated(inner) : undefined;
   }
   const tests = where.tests.map(test => expression(where.field, test, typeOf(shape, where.field)));
   return tests.length ? eb.and(tests as never) : undefined;
