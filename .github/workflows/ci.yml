@@ -130,7 +130,8 @@ jobs:
               [ -n "$fetched" ] || full "the merge group's base could not be fetched"
               files=$(git diff --no-renames --name-only "$BASE_SHA" "$HEAD_SHA") \
                 || full "the merge group's files could not be listed" ;;
-            *) full "a $EVENT is always tested whole" ;;
+            *) echo "is never skipped: a $EVENT is always tested, its plugins chosen against its base"
+               echo "skip=false" >> "$GITHUB_OUTPUT"; exit 0 ;;
           esac
           [ -n "$files" ] || full "no changed file was listed"
           printf '%s\n' "$UNREAD" | sed '/^[[:space:]]*$/d' > "$RUNNER_TEMP/unread"
