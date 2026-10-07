@@ -86,10 +86,14 @@ export const filterCases: Case[] = [
     name: 'not nested, and not over all and any, keep a record that does not hold the field',
     async run(subject) {
       const where_ = await seeded(subject, 'find_not_nested');
-      assert.deepEqual(await found(subject, where_, { not: { not: { ua: 'curl' } } }), ['a']);
+      assert.deepEqual(await found(subject, where_, { not: { not: { not: { ua: 'curl' } } } }), ['b', 'c']);
       assert.deepEqual(await found(subject, where_, { not: { any: [{ ua: 'wget' }, { method: 'PUT' }] } }), ['a', 'b']);
-      assert.deepEqual(await found(subject, where_, { not: { all: [{ ua: 'curl' }, { method: 'GET' }] } }), ['b', 'c']);
-      const inside = { not: { all: [{ not: { ua: 'curl' } }, { method: 'GET' }] } };
+      assert.deepEqual(await found(subject, where_, { not: { all: [{ ua: 'curl' }, { method: 'POST' }] } }), [
+        'a',
+        'b',
+        'c',
+      ]);
+      const inside = { not: { all: [{ not: { ua: 'curl' } }, { ua: 'wget' }] } };
       assert.deepEqual(await found(subject, where_, inside), ['a', 'b']);
       assert.deepEqual(await found(subject, where_, { any: [{ not: { ua: 'curl' } }, { method: 'GET' }] }), [
         'a',
