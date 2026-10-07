@@ -31,6 +31,12 @@ export const scopedUniqueName = (collection: string, scope: string[], fields: st
  */
 export const scopedIndexName = (collection: string): string => `wl_s_${hashOf([collection])}`;
 
+/**
+ * The name of the index a `refs` field keeps once a scope takes the `unique` that led with it: `wl_f_` and a hash
+ * of the collection and the field. A foreign key needs an index that leads with its column (`scope-table.ts`).
+ */
+export const refIndexName = (collection: string, field: string): string => `wl_f_${hashOf([collection, field])}`;
+
 /** The name a declared `refs` is created under: `wl_r_` and a hash of the collection and the field. */
 export const refName = (collection: string, field: string): string => `wl_r_${hashOf([collection, field])}`;
 
