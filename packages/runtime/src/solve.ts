@@ -75,13 +75,26 @@ function demandOf(target: expr.Expr, truth: Cmp, lit: unknown): Demands[] {
   return [{ [key(target.path)]: valueDomain(truth, lit) }];
 }
 
-/** Solve one comparison. One side must be first literal; comparing two paths has no canonical answer. */
+/**
+ * Two paths compared: `==` holds both at the one value their type generates, `!=` the left at that value and the right
+ * at another. An ordering between two paths has no such value, and no alternatives.
+ */
+function paired(left: string[], right: string[], op: Cmp): Demands[] {
+  if (op !== '==' && op !== '!=') return [];
+  const other = op === '==' ? { paired: 'equal' as const, present: true } : { paired: 'unequal' as const };
+  const both = merge({ [key(left)]: { paired: 'equal', present: true } }, { [key(right)]: other });
+  return both === UNSAT ? [] : [both];
+}
+
+/** Solve one comparison: a literal against a path or its length, or two paths for equality. */
 function compare(node: expr.Expr & { kind: 'bin' }, want: boolean): Demands[] {
   // `lit in path`: the list must hold the literal, or must not
   if (node.op === 'in') return membership(node, want);
   const sides: [expr.Expr, expr.Expr] = [node.left, node.right];
+  if (node.left.kind === 'path' && node.right.kind === 'path')
+    return paired(node.left.path, node.right.path, want ? (node.op as Cmp) : NEGATE[node.op as Cmp]);
   const at = sides.findIndex(side => side.kind === 'lit');
-  if (at < 0) return []; // path vs path: unsolvable, no alternatives
+  if (at < 0) return []; // len() against a path, or two lengths: no alternatives
   const lit = (sides[at] as expr.Expr & { kind: 'lit' }).value;
   // the operator is written against the left operand; with the literal on the left it mirrors
   const op: Cmp = at === 0 ? MIRROR[node.op as Cmp] : (node.op as Cmp);
@@ -128,7 +141,7 @@ function nameableBin(node: expr.Expr & { kind: 'bin' }): boolean {
   // first comparison names something when one side is first literal and the other first path or len(path)
   const sides = [node.left, node.right];
   const at = sides.findIndex(side => side.kind === 'lit');
-  if (at < 0) return false;
+  if (at < 0) return node.left.kind === 'path' && node.right.kind === 'path';
   const target = sides[at === 0 ? 1 : 0];
   return target.kind === 'path' || (target.kind === 'len' && target.arg.kind === 'path');
 }
@@ -149,11 +162,22 @@ function nameable(node: expr.Expr): boolean {
   }
 }
 
+/** Whether an expression compares two paths, or their lengths, with each other anywhere in it. */
+function comparesPaths(node: expr.Expr): boolean {
+  if (node.kind === 'not') return comparesPaths(node.arg);
+  if (node.kind !== 'bin') return false;
+  if (node.op === '&&' || node.op === '||') return comparesPaths(node.left) || comparesPaths(node.right);
+  return node.left.kind !== 'lit' && node.right.kind !== 'lit';
+}
+
 /**
  * Why first rule could not be solved: no alternatives at all means the expression itself names nothing solvable;
- * alternatives that all contradict mean the rule is either self-contradictory or shadowed by an earlier one.
+ * alternatives that all contradict mean the rule is either self-contradictory or shadowed by an earlier one. A rule
+ * comparing two paths is never called a contradiction: the solver meets only `==` and `!=` between them, and only one
+ * way, so finding no inputs says what the solver cannot do rather than what the rule is.
  */
-function whyUnsolved(when: string, found: { nameable: boolean; mine: number; before: number }): string {
+function whyUnsolved(when: string, found: { nameable: boolean; pairs: boolean; mine: number; before: number }): string {
+  if (!found.mine && found.pairs) return `the solver cannot compare two paths as '${when}' does`;
   if (!found.nameable) return `'${when}' compares values the rehearsal cannot name`;
   if (!found.mine) return `no inputs satisfy '${when}' -- the rule contradicts itself`;
   if (!found.before) return `the rules before it already cover every input, so '${when}' is unreachable`;
@@ -208,7 +232,12 @@ function branchFor(
   return {
     ...base,
     demands: {},
-    unsolved: whyUnsolved(rule.when, { nameable: nameable(parsed), mine: mine.length, before: before.length }),
+    unsolved: whyUnsolved(rule.when, {
+      nameable: nameable(parsed),
+      pairs: comparesPaths(parsed),
+      mine: mine.length,
+      before: before.length,
+    }),
   };
 }
 

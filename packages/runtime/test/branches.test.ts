@@ -75,9 +75,32 @@ describe('solving a switch to its branches', () => {
     expect(to(bs, 'never').unsolved).toMatch(/contradicts itself/);
   });
 
-  it('reports a comparison of two paths as unnameable', () => {
+  it('solves two paths compared equal by demanding one value of both, and unequal by two (#845)', () => {
     const bs = branchesOf([{ when: 'a == b', to: 'same' }], 'diff');
-    expect(to(bs, 'same').unsolved).toMatch(/cannot name/);
+    expect(to(bs, 'same').demands).toEqual({
+      a: { paired: 'equal', present: true },
+      b: { paired: 'equal', present: true },
+    });
+    expect(to(bs, 'diff').demands).toEqual({ a: { paired: 'equal', present: true }, b: { paired: 'unequal' } });
+  });
+
+  it('solves a presence and an equality of two paths together, which do not contradict (#845)', () => {
+    const bs = branchesOf([{ when: 'has(previous) && previous == commit', to: 'same' }], 'moved');
+    expect(to(bs, 'same').unsolved).toBeUndefined();
+    expect(to(bs, 'same').demands).toEqual({
+      previous: { paired: 'equal', present: true },
+      commit: { paired: 'equal', present: true },
+    });
+  });
+
+  it('says it cannot compare two paths it cannot solve, not that the rule contradicts itself (#845)', () => {
+    const bs = branchesOf([{ when: 'has(a) && a < b', to: 'less' }], 'more');
+    expect(to(bs, 'less').unsolved).toBe("the solver cannot compare two paths as 'has(a) && a < b' does");
+  });
+
+  it('says the same of two paths it pairs one way only, rather than judge the rule', () => {
+    const bs = branchesOf([{ when: 'a == b && a != b', to: 'never' }], 'always');
+    expect(to(bs, 'never').unsolved).toBe("the solver cannot compare two paths as 'a == b && a != b' does");
   });
 });
 
@@ -112,6 +135,21 @@ describe('turning a demand into a value', () => {
   it('generates a value of the declared type for a bare presence', () => {
     const list = satisfy({ present: true }, undefined, { kind: 'list', of: { kind: 'string' } });
     expect(Array.isArray(list)).toBe(true);
+  });
+  it('excludes an enum member with another member, never a value outside the enum (#845)', () => {
+    const status = { kind: 'string', enum: ['clean', 'findings', 'broke'] } as const;
+    expect(satisfy({ ne: ['clean', 'findings'] }, '', status)).toBe('broke');
+    expect(satisfy({ ne: ['clean', 'findings'] }, 'clean', status)).toBe('broke');
+    expect(satisfy({ ne: ['clean'] }, 'findings', status)).toBe('findings');
+  });
+  it('makes two paths paired equal the same value of their type, and a path paired unequal another', () => {
+    const text = { kind: 'string' } as const;
+    const one = satisfy({ paired: 'equal', present: true }, 'a', text, 3);
+    expect(satisfy({ paired: 'equal', present: true }, 'b', text, 3)).toBe(one);
+    expect(typeof one).toBe('string');
+    expect(satisfy({ paired: 'unequal' }, one, text, 3)).not.toBe(one);
+    const flag = { kind: 'boolean' } as const;
+    expect(satisfy({ paired: 'unequal' }, undefined, flag, 1)).toBe(!satisfy({ paired: 'equal' }, undefined, flag, 1));
   });
   it('replaces an empty list for a presence, which reads as present but breaks its readers', () => {
     const list = satisfy({ present: true }, [], { kind: 'list', of: { kind: 'string' } }) as unknown[];

@@ -40,7 +40,7 @@
   },
   "stubs": {
     "op.checked": {
-      "status": "",
+      "status": "unavailable",
       "identity": {
         "subject": "hotel",
         "name": "Zulu-9612",
@@ -65,7 +65,7 @@
         "status": "done",
         "handler": "@features/access-dev/data/identity.binding.json#verifyEmployee",
         "out": {
-          "status": "",
+          "status": "unavailable",
           "identity": {
             "subject": "hotel",
             "name": "Zulu-9612",

@@ -107,15 +107,50 @@ function plausible(domain: Domain, value: unknown): boolean {
   return !sameThing && (!statusLike || (value >= 200 && value < 600));
 }
 
-/** A value the domain does not exclude, of the same family as what it excludes where that can be told. */
-function excluding(domain: Domain, generated: unknown): unknown {
-  if (generated !== undefined && fits(generated, domain) && plausible(domain, generated)) return generated;
+/**
+ * A value the domain does not exclude, of the same family as what it excludes where that can be told. A string with an
+ * enum takes a member the domain leaves, so the value stays one of its type; where it leaves none, no member will do.
+ */
+function excluding(domain: Domain, generated: unknown, type: Type | undefined): unknown {
+  const kept = generated !== undefined && fits(generated, domain) && plausible(domain, generated);
+  if (kept && (type?.kind !== 'string' || !type.enum?.length || type.enum.includes(generated as string)))
+    return generated;
+  const member = memberLeft(domain, type);
+  if (member !== undefined) return member;
   const bad = domain.ne?.[0];
   if (typeof bad === 'number') return unlike(bad, domain);
   if (typeof bad === 'string') return bad === '' ? 'x' : '';
   if (typeof bad === 'boolean') return !bad;
   return null;
 }
+
+/** The first member of a string enum the domain does not exclude; undefined for any other type, or when none is left. */
+function memberLeft(domain: Domain, type: Type | undefined): string | undefined {
+  if (type?.kind !== 'string' || !type.enum) return undefined;
+  return type.enum.find(member => fits(member, domain));
+}
+
+/**
+ * A path compared with another (`a == b`, `a != b`): `equal` is the value its type generates under the seed, which is
+ * the same value for every path of that type, so two paths paired `equal` hold one value; `unequal` is another.
+ */
+function inPair(domain: Domain, type: Type | undefined, seed: number): unknown {
+  const one = fresh(type, seed);
+  return domain.paired === 'equal' ? one : unlikeFresh(one, type, seed);
+}
+
+/** A value of the type unlike `one`: the next seed's where it differs, else `one` changed by the least that tells. */
+function unlikeFresh(one: unknown, type: Type | undefined, seed: number): unknown {
+  if (typeof one === 'boolean') return !one;
+  for (let step = 1; step <= TRIES; step++) {
+    const other = fresh(type, seed + step);
+    if (JSON.stringify(other) !== JSON.stringify(one)) return other;
+  }
+  return typeof one === 'number' ? one + 1 : `${String(one)}${PLACEHOLDER}`;
+}
+
+/** How many further seeds a path paired `unequal` tries before it changes the value by hand. */
+const TRIES = 8;
 
 /**
  * A bare has(path): any value of the declared type will do, so generate one rather than invent a shape. An empty list
@@ -141,6 +176,7 @@ const DEMANDS: {
 }[] = [
   { asks: domain => Boolean(domain.absent), met: () => undefined },
   { asks: domain => domain.eq !== undefined, met: domain => domain.eq },
+  { asks: domain => domain.paired !== undefined, met: (domain, _generated, type, seed) => inPair(domain, type, seed) },
   { asks: domain => Boolean(domain.has?.length || domain.lacks?.length), met: withMembers },
   { asks: domain => domain.minLen !== undefined || domain.maxLen !== undefined, met: withLength },
   {
@@ -149,7 +185,7 @@ const DEMANDS: {
     met: (domain, generated) => withinRange(domain, generated),
   },
   { asks: domain => domain.truthy !== undefined, met: (domain, generated) => asTruthy(domain, generated) },
-  { asks: domain => Boolean(domain.ne?.length), met: (domain, generated) => excluding(domain, generated) },
+  { asks: domain => Boolean(domain.ne?.length), met: (domain, generated, type) => excluding(domain, generated, type) },
   { asks: domain => Boolean(domain.present), met: (_domain, generated, type, seed) => anyValue(generated, type, seed) },
 ];
 
