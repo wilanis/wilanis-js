@@ -352,7 +352,7 @@ https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/
 
 Until 1.0 is published they are a working draft and `main` is their address. A schema changes in place, and
 the documents this repository holds (`example/`, `libraries/`, every plugin's `docs/`) change in the same
-commit, so `npm test` is the compatibility check. At 1.0 the tag `schemas-v1` marks the first supported version
+commit, so `npm run test:all` is the compatibility check. At 1.0 the tag `schemas-v1` marks the first supported version
 and becomes the address, and from then on every change to a schema is compatible or breaking.
 [RFC 0008](rfcs/0008-ir-versioning.md) states the rules. Node types are documents of their own under `node/`,
 listed in `graph.schema.json`.

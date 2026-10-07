@@ -75,8 +75,9 @@ jobs:
       # fitness function reads it, and comes off the day one does. A push to main, and a change whose files
       # cannot be listed, run in full; `fitness` always runs in full.
       # It also hands on `base`, the revision a plugin's tests are chosen against (vitest.config.ts): the pull
-      # request's base or the queue's, fetched here so `git diff` reaches it. A push to main hands on none, nor
-      # does a base that cannot be fetched, and then every plugin's tests run.
+      # request's base, the queue's, or for a push the previous tip of main (`github.event.before`), fetched here
+      # so `git diff` reaches it. A push whose `before` is all zeros hands on none, nor does a base that cannot
+      # be fetched; the step says why, and then every plugin's tests run.
       - id: reads
         name: whether a test reads what the change touches
         env:
@@ -85,6 +86,7 @@ jobs:
           PULL: ${{ github.event.pull_request.number }}
           CHANGED: ${{ github.event.pull_request.changed_files }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
           BASE_SHA: ${{ github.event.merge_group.base_sha }}
           HEAD_SHA: ${{ github.event.merge_group.head_sha }}
           # one extended regular expression per line, matched against the whole repository-relative path; a
@@ -107,9 +109,15 @@ jobs:
         run: |
           full() { echo "runs in full: $1"; echo "skip=false" >> "$GITHUB_OUTPUT"; exit 0; }
           base=""; fetched=""
-          case "$EVENT" in pull_request) base="$PR_BASE" ;; merge_group) base="$BASE_SHA" ;; esac
-          if [ -n "$base" ] && git fetch --no-tags --depth=1 origin "$base"; then
-            fetched=yes; echo "base=$base" >> "$GITHUB_OUTPUT"
+          case "$EVENT" in pull_request) base="$PR_BASE" ;; merge_group) base="$BASE_SHA" ;; push) base="$PUSH_BEFORE" ;; esac
+          if [ -z "$base" ]; then
+            echo "hands on no base: a $EVENT names none, so every plugin's tests run"
+          elif [ "$base" = 0000000000000000000000000000000000000000 ]; then
+            echo "hands on no base: the $EVENT names no previous tip (all zeros), so every plugin's tests run"
+          elif git fetch --no-tags --depth=1 origin "$base"; then
+            fetched=yes; echo "base=$base" >> "$GITHUB_OUTPUT"; echo "hands on the base $base"
+          else
+            echo "hands on no base: $base could not be fetched, so every plugin's tests run"
           fi
           case "$EVENT" in
             pull_request)
@@ -147,7 +155,7 @@ jobs:
         run: npm ci
       # npm test runs the tests under packages/plugin-*/test only for a plugin whose directory differs from the
       # base `reads` handed on; vitest.config.ts chooses them and says on its first lines which ran and which did
-      # not. With no base, npm run test:all runs every plugin's tests.
+      # not. With no base (the `reads` step says why), npm run test:all runs every plugin's tests.
       - if: steps.reads.outputs.skip != 'true'
         name: npm test, with the tests of the plugins the change touches
         env:
