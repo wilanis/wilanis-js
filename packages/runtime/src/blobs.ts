@@ -1,11 +1,12 @@
 /**
  * The runtime's blob registry: one directory, one file per blob, streamed in and streamed out, so a file's
  * bytes are held once, on disk, and never as a value. A handle names a file only while this store holds it:
- * a handle written into a request by hand opens nothing.
+ * a handle written into a request by hand opens nothing. A tree that names no `blobs.dir` gets one folder per
+ * process, shared by every store, and removed when the process exits; a store only ever removes its own files.
  */
 
 import { randomUUID } from 'node:crypto';
-import { createReadStream, createWriteStream, mkdirSync, rmSync } from 'node:fs';
+import { createReadStream, createWriteStream, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
@@ -18,15 +19,27 @@ const ID = /^[0-9a-f-]{36}$/;
 /** A directory named against a root, unless it is already absolute. */
 const absoluteOr = (root: string, dir: string) => (isAbsolute(dir) ? dir : resolve(root, dir));
 
+/** The folder every store of this process shares when the tree names none, once one store has needed it. */
+let shared: string | undefined;
+
+/** This process's folder under the system temp dir: made by the first store that needs it, removed at exit. */
+function sharedDir(): string {
+  if (shared) return shared;
+  const made = mkdtempSync(join(tmpdir(), `wilanis-blobs-${process.pid}-`));
+  process.once('exit', () => rmSync(made, { recursive: true, force: true }));
+  shared = made;
+  return made;
+}
+
 /** The tree's blob registry on disk: the one place a blob's bytes live, held once and streamed, never as a value. */
 export class FileBlobStore implements BlobStore {
   /** Every handle this store holds, by id: the size counted as it was written. */
   private held = new Map<string, BlobHandle>();
   readonly dir: string;
 
-  /** `dir` relative to `root` or absolute; absent, a fresh directory under the system temp dir. */
+  /** `dir` relative to `root` or absolute; absent, the one folder this process keeps under the system temp dir. */
   constructor(root: string, dir?: string) {
-    this.dir = dir ? absoluteOr(root, dir) : join(tmpdir(), `wilanis-blobs-${process.pid}-${randomUUID().slice(0, 8)}`);
+    this.dir = dir ? absoluteOr(root, dir) : sharedDir();
     mkdirSync(this.dir, { recursive: true });
   }
 
@@ -87,10 +100,10 @@ export class FileBlobStore implements BlobStore {
     };
   }
 
-  /** Remove the directory and everything in it. */
+  /** Delete every file this store holds and forget it; the folder stays, since the tree or another store may use it. */
   destroy(): void {
+    for (const id of this.held.keys()) rmSync(join(this.dir, id), { force: true });
     this.held.clear();
-    rmSync(this.dir, { recursive: true, force: true });
   }
 }
 
