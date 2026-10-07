@@ -1,6 +1,6 @@
 /** The tree behind a listener: what every request is answered from, and what a reload puts there instead. */
 import { checkTree } from '@wilanis/compiler';
-import { type LoadResult, Scope, type Serving, type Trace } from '@wilanis/core';
+import { type BlobStore, type LoadResult, Scope, type Serving, type Trace } from '@wilanis/core';
 import type { Embedder } from './embed.js';
 import type { Ran } from './fired.js';
 import { postLoad } from './post-load.js';
@@ -33,6 +33,9 @@ export class Served {
    * one: an exporter holds the server, never the tree it came from, exactly as a listener does.
    */
   private readonly listeners = new Set<(trace: Trace) => void>();
+
+  /** The blob stores of the trees a reload replaced, oldest first: kept until stop, which destroys them. */
+  private readonly replaced: BlobStore[] = [];
 
   /**
    * `under` is the profile this process started with and the environment it read: a reload never changes
@@ -149,9 +152,19 @@ export class Served {
     }
   }
 
-  /** Put a newly loaded tree behind whatever is already listening. The old embedder's held things are not stopped: the listener is the same one. */
+  /**
+   * Put a newly loaded tree behind whatever is already listening. The old embedder's held things are not
+   * stopped: the listener is the same one. Its blob store is kept, not destroyed: a held thing may still read
+   * a blob it put there, and nothing here can say it no longer does, so stopping destroys it with the rest.
+   */
   swap(load: LoadResult, emb: Embedder) {
+    if (emb.blobs !== this.emb.blobs) this.replaced.push(this.emb.blobs);
     this.current = { load, emb };
+  }
+
+  /** Every blob store this server answered from, the ones a reload replaced first and the current one last. */
+  blobStores(): BlobStore[] {
+    return [...this.replaced, this.emb.blobs];
   }
   /** What a `holds` operation reads as env.serving: every member goes through `current`, so a swap is seen at once. */
   serving(): Serving {
