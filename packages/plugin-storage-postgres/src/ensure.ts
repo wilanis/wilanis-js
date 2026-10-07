@@ -21,7 +21,7 @@ import { type Kysely, sql } from 'kysely';
 import { columnOf, fieldsOf, folded, isJson as isJsonType } from './columns.js';
 import { type Column, columnsOf } from './inspect.js';
 import { refName, scopedUniqueName, uniqueName } from './names.js';
-import type { Settings } from './pool.js';
+import { ensureSchema, type Settings } from './pool.js';
 import { scopeColumnsOf } from './scoping.js';
 
 /** How much `ensure` made: what was created, never what was already there. */
@@ -214,12 +214,15 @@ async function ensureOne(
 /**
  * Prepare every collection the store declares: the tables and columns first, then the constraints over them --
  * in that order, since a foreign key names a table that has to exist. Everything happens in one transaction,
- * so a `drift` half way through leaves the database exactly as it was.
+ * so a `drift` half way through leaves the database exactly as it was. Before the transaction, it makes the
+ * schema the tables sit in, where the database has none. A drift rolls back the tables but not the schema: the
+ * schema stays, empty, and a second run would make it again anyway.
  */
 export async function ensureTables(db: Kysely<never>, collections: At[], _settings: Settings): Promise<Made> {
   const schema = schemaOf(collections[0]);
   const made: Made = { collections: 0, columns: 0, constraints: 0 };
   const scoped = new Map<string, string[]>();
+  await ensureSchema(db, schema);
   await db.transaction().execute(async trx => {
     for (const at of collections) {
       const one = await ensureOne(trx as never, schema, at);

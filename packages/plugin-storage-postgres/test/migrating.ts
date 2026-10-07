@@ -74,9 +74,9 @@ export interface Driving {
 }
 
 /**
- * A suite's own schema and the helpers over it. The schema is dropped and remade rather than the tables
- * dropped one by one, so a case starts from a database that has never seen any of them -- including the
- * `wilanis_migrations` the engine makes on first contact.
+ * A suite's own schema and the helpers over it. The schema is dropped rather than the tables dropped one by
+ * one, and left for the engine to make again, so a case starts from a database that has never seen any of them
+ * -- the schema itself included, and the `wilanis_migrations` the engine makes in it on first contact.
  */
 export function driving(schema: string): Driving {
   const on = connectionIn(schema);
@@ -87,7 +87,6 @@ export function driving(schema: string): Driving {
     db,
     clean: async () => {
       await sql`drop schema if exists ${sql.ref(schema)} cascade`.execute(db());
-      await sql`create schema ${sql.ref(schema)}`.execute(db());
     },
     apply: (steps, record) => engine.apply(on, steps, record, by),
   };

@@ -9,6 +9,7 @@
 
 import type { Applied, Declared } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';
+import { ensureSchema } from './pool.js';
 
 /** One row of the record, as the database reports it. */
 interface Row {
@@ -26,9 +27,11 @@ const table = (schema: string) => sql`${sql.ref(schema)}.${sql.ref('wilanis_migr
 
 /**
  * Create the record's table where the schema has none, and leave it alone where it has one. Called before
- * anything reads or writes the record, so no caller has to know whether this is a database's first contact.
+ * anything reads or writes the record, so no caller has to know whether this is a database's first contact --
+ * and on a first contact the schema itself may not be there yet, so it is made first.
  */
 export async function ensureRecord(db: Kysely<never>, schema: string): Promise<void> {
+  await ensureSchema(db, schema);
   await sql`
     create table if not exists ${table(schema)} (
       id bigint generated always as identity primary key,
