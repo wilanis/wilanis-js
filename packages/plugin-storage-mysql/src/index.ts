@@ -13,6 +13,7 @@ import type { PluginModule, PostLoadContext } from '@wilanis/core';
 import { engines } from '@wilanis/plugin-storage';
 import { MysqlEngine } from './engine.js';
 import { Pools } from './pools.js';
+import { check } from './rules.js';
 import type { Settings } from './settings.js';
 import { holdVersions } from './version.js';
 
@@ -38,6 +39,7 @@ const plugin: PluginModule = {
   root: ROOT,
   docs: fileURLToPath(new URL('../docs', import.meta.url)),
   handlers: {},
+  check,
   async postLoad(ctx) {
     const kind = ctx.scope.canon(KIND);
     await holdVersions(ctx.env, kind, KIND);
