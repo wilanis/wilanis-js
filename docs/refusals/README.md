@@ -214,6 +214,9 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [X231](X231.md) | X | live | a field of a collection kept in sqlite that is a blob, which this engine has no column for |
 | [X232](X232.md) | X | live | a sqlite collection's key that is neither string nor number, or that the plugin's keyType cannot generate |
 | [X233](X233.md) | X | live | a sqlite collection name that is no legal table name, or folds to the same table as another's |
+| [X241](X241.md) | X | live | a field of a collection kept in mysql that is a blob, which this engine has no column for |
+| [X242](X242.md) | X | live | a mysql collection's key that is neither string nor number, or that the plugin's keyType cannot generate |
+| [X243](X243.md) | X | live | a mysql collection or field name over 64 characters, or one that folds to the same table or column as another's |
 | [X251](X251.md) | X | live | a schedule that is not one: cron and everyMs both or neither, a bad cron, interval or zone, or a bad setting |
 | [X252](X252.md) | X | live | a scheduled trigger declares `in` with no `fire.in`, and nothing arrives on a tick |
 | [X253](X253.md) | X | live | `catchUp` is set while no scheduler run step names a lease |
