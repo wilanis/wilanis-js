@@ -109,7 +109,7 @@ function plausible(domain: Domain, value: unknown): boolean {
 
 /**
  * What `satisfy` answers when the domain excludes every member of a string enum: no value of the type meets the
- * demand, and only the caller, which knows whether the field may be absent, can say whether anything else does.
+ * demand. An absent field is the solver's to demand, as `absent`, so a case given this answer is one no run can take.
  */
 export const NO_MEMBER: unique symbol = Symbol('no member of the enum is left');
 
