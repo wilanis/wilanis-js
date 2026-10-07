@@ -7,6 +7,7 @@ import { pipeline } from 'node:stream/promises';
 import { checkTree } from '@wilanis/compiler';
 import type { BlobHandle, Trace } from '@wilanis/core';
 import { KINDS, type Kind, type LoadResult, RefusalList } from '@wilanis/core';
+import { describes } from './discovery.js';
 import { irSaid } from './doc-said.js';
 import { loadProject, type ProjectLoad } from './project.js';
 import { runSaid } from './run-said.js';
@@ -192,6 +193,12 @@ function orRefused<T>(answer: Asked<T>): T {
   return answer.asked;
 }
 
+/** Exit 2 on a command missing a word it cannot run without: say which, then how the command is asked. */
+function missing(command: string, what: string): never {
+  console.error(`wilanis ${command}: ${what}\n\n${USAGE}`);
+  process.exit(2);
+}
+
 /** What the command line gave: the flags, the words, and the root each command reads from. */
 interface Given {
   flags: Record<string, string>;
@@ -267,6 +274,7 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     process.on('SIGTERM', bye);
   },
   run: async ({ flags, positional, rootArg, rest }) => {
+    const trigger = positional[0] ?? missing('run', 'name the trigger to fire');
     const loaded = await check(rootArg(1));
     const { flags: f2 } = parse(rest.slice(1));
     let delivered = false;
@@ -279,7 +287,7 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     };
     const { report, answer } = await runTrigger(
       loaded,
-      positional[0],
+      trigger,
       { flags: f2, args: positional.slice(2) },
       {
         profile: flags.profile,
@@ -321,8 +329,13 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     const root = positional.find(word => !(KINDS as string[]).includes(word)) ?? '.';
     console.log(ls(await load(root), kind).join('\n'));
   },
+  // a path that names no document is said on stderr and exits 1, so a script reading stdout never takes it for one
   describe: async ({ positional, rootArg }) => {
-    console.log(describe(await load(rootArg(1)), positional[0]));
+    const ref = positional[0] ?? missing('describe', 'name the document to describe');
+    const loaded = await load(rootArg(1));
+    if (describes(loaded, ref)) return console.log(describe(loaded, ref));
+    console.error(describe(loaded, ref));
+    process.exit(1);
   },
   map: async ({ flags, rootArg }) => {
     console.log(map(await load(rootArg(0)), flags.profile).join('\n'));
@@ -334,10 +347,7 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
   },
   new: async ({ flags, positional, rootArg }) => {
     const [kind, target] = positional;
-    if (!kind || !target) {
-      console.error(USAGE);
-      process.exit(2);
-    }
+    if (!kind || !target) missing('new', 'name the kind and the name or path to write');
     console.log(
       scaffold(resolve(rootArg(2)), kind, target, flags)
         .map(file => `wrote ${file}`)

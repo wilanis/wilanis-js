@@ -286,15 +286,25 @@ function grantLine(doc: { native?: string; included?: string }, from: string | u
   return doc.included ? [`included from  ${doc.included}`] : [];
 }
 
+/** The document a path names, the part after any `#` set aside; nothing where it names none. */
+function documentAt(scope: Scope, load: LoadResult, ref: string) {
+  const { path } = splitRef(ref.includes('#') ? ref : `${ref}#`);
+  // the project is `@project.json` in the registry and `project.json` on disk and in every sentence about it
+  return scope.any(path || ref) ?? (ref === 'project.json' ? load.registry.project : undefined);
+}
+
+/** Whether a path names a document `describe` can say, so the command line can exit 1 where it names none. */
+export function describes(load: LoadResult, ref: string): boolean {
+  return documentAt(new Scope(load.registry, load.resolve), load, ref) !== undefined;
+}
+
 /**
  * One document said in full: where it lives, who granted it and, for a native port, which profiles permit it
  * (RFC 0016), what it describes, and what its kind adds.
  */
 export function describe(load: LoadResult, ref: string): string {
   const scope = new Scope(load.registry, load.resolve);
-  const { path } = splitRef(ref.includes('#') ? ref : `${ref}#`);
-  // the project is `@project.json` in the registry and `project.json` on disk and in every sentence about it
-  const doc = scope.any(path || ref) ?? (ref === 'project.json' ? load.registry.project : undefined);
+  const doc = documentAt(scope, load, ref);
   if (!doc) return `no document at '${ref}'`;
   // one native or required document is one plugin's: say which, and the package it came from, so who implements it is not one code detail
   const owner = doc.native ?? doc.requiredBy;
