@@ -113,9 +113,20 @@ One difference stays: `utf8mb4_bin` is a `PAD SPACE` collation, so two strings t
 spaces compare equal, under `eq` and under a `unique`. `utf8mb4_0900_bin` does not pad, and it needs MySQL
 8.0.17.
 
+## Its rules
+
+`wilanis check` refuses these before anything runs, so they are read as output rather than met as a driver
+error later:
+
+| Code | Refuses |
+|---|---|
+| X241 | a field this engine has no column for: a `blob`, whose bytes live in the blob registry |
+| X242 | a key it cannot key by, or one `newKey` cannot answer under the configured `keyType` |
+| X243 | a collection name longer than the 64 characters MySQL keeps, or two of one connection that fold to one table |
+
 ## Not yet
 
-The rules X241 to X243, keeping a scope (RFC 0015), the planner's members applied step by step (RFC 0017), and
+Keeping a scope (RFC 0015), the planner's members applied step by step (RFC 0017), and
 the constraint suites are RFC 0022's eighth step ([#262](https://github.com/wilanis/wilanis-js/issues/262)).
 
 **Until that step lands, a tree on this kind cannot prepare its tables from a startup step.** A startup step's
@@ -143,6 +154,7 @@ changes nothing. `npm test` with the variable set runs the same suites with the 
 with one checks that a connection lying about `SELECT VERSION()` fails the start. `mapping.test.ts` checks the
 widths without a server, and with one checks the tables, what `put` without `replace` refuses, `wilanis_keys`
 and the session. `tree.test.ts` needs no server: a tree naming the kind checks, and a `unique` over a shape is
-refused naming the kind.
+refused naming the kind. `rules.test.ts` needs no server either: it breaks one document of a small tree for each
+of X241 to X243 and reads the code back.
 
 Part of [wilanis](https://github.com/wilanis/wilanis-js). Apache-2.0.
