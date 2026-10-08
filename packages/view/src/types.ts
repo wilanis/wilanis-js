@@ -2,7 +2,7 @@
  * What a page reads: the shapes of the view model. Nothing here computes; these are the types every other module of
  * the view fills in, and the labels a reader sees. The tree index is `tree-index.ts`.
  */
-import type { Kind, Layer, Loaded, Outcome, Refusal } from '@wilanis/core';
+import type { Kind, Layer, Loaded, Outcome, Refusal, ScenarioNode } from '@wilanis/core';
 import type { Endpoint, ProfileReach, ScenarioAuthor, TriggerLimits } from '@wilanis/runtime';
 import type { VAttempts, VPromised } from './attempts.js';
 import type { VCatches, VCaught } from './catches.js';
@@ -315,6 +315,11 @@ export interface DocView {
    * naming the command that rewrites it.
    */
   generated?: string;
+  /**
+   * On a scenario: what each node is expected to do, a row per node in the order it was recorded, read through
+   * `nodesOf`, so an answer shared in the answers document shows as one written inline does.
+   */
+  expectedNodes?: VExpectedNode[];
   /** On a policy: the port operation it decides through, and where that leads. */
   decides?: VTarget;
   /** On a policy: what each reason its decision can refuse with means. */
@@ -461,6 +466,11 @@ export interface VScenarioGroup {
   /** The command that writes them, where one does: `wilanis rehearse --record`. */
   writtenBy?: string;
   scenarios: VScenarioRow[];
+}
+
+/** One node of a scenario's run as its page tables it: the node's dotted path, and the answer it is expected to give. */
+export interface VExpectedNode extends ScenarioNode {
+  node: string;
 }
 
 /**

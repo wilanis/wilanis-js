@@ -6,7 +6,17 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { walkedUnder } from '@wilanis/compiler';
 import type { Loaded, LoadResult } from '@wilanis/core';
-import { type ScenarioDoc, Scope, schemaUrl, secretPaths, type TriggerDoc } from '@wilanis/core';
+import {
+  answersFor,
+  nodesOf,
+  type ScenarioDoc,
+  type ScenarioNode,
+  Scope,
+  schemaUrl,
+  secretPaths,
+  stubsOf,
+  type TriggerDoc,
+} from '@wilanis/core';
 import { outcomeOf, type Report, refusalOf, shownOutput } from '@wilanis/engine';
 import type { Embedder } from './embed.js';
 import { type Fuzzing, fuzzEdges } from './fuzz-edges.js';
@@ -27,7 +37,7 @@ export { HOME_DIR, SCENARIOS } from './recorded-dir.js';
  *
  * Durations are deliberately absent: they are not reproducible, so a scenario would diff against itself.
  */
-function did(node: Report['nodes'][string]): ScenarioDoc['expect']['nodes'][string] {
+function did(node: Report['nodes'][string]): ScenarioNode {
   return {
     status: node.status,
     ...(node.status === 'failed' && node.reason !== undefined ? { reason: node.reason } : {}),
@@ -38,8 +48,8 @@ function did(node: Report['nodes'][string]): ScenarioDoc['expect']['nodes'][stri
 }
 
 /** What every node of a run did, by its dotted path, a nested graph's nodes under the node that called it. */
-function pick(report: Report, prefix = ''): ScenarioDoc['expect']['nodes'] {
-  const out: ScenarioDoc['expect']['nodes'] = {};
+function pick(report: Report, prefix = ''): Record<string, ScenarioNode> {
+  const out: Record<string, ScenarioNode> = {};
   for (const [id, node] of Object.entries(report.nodes)) {
     const key = prefix ? `${prefix}.${id}` : id;
     out[key] = did(node);
@@ -167,12 +177,7 @@ function refusalDiffs(report: Report, sc: ScenarioDoc): string[] {
  * How one node differs from what the scenario recorded. A reason is diffed only where the scenario pins reasons at
  * all: one written before fuzz recorded them has none on any node, and replays as it did.
  */
-function nodeDiffs(
-  id: string,
-  was: ScenarioDoc['expect']['nodes'][string],
-  now: ScenarioDoc['expect']['nodes'][string] | undefined,
-  pinsReasons: boolean,
-): string[] {
+function nodeDiffs(id: string, was: ScenarioNode, now: ScenarioNode | undefined, pinsReasons: boolean): string[] {
   if (!now) return [`${id}: gone`];
   const out: string[] = [];
   if (now.status !== was.status) out.push(`${id}: ${was.status} → ${now.status}`);
@@ -183,29 +188,36 @@ function nodeDiffs(
   return out;
 }
 
-/** How this run differs from what the scenario recorded: its status, its output, every node, and its declared refusal. */
-function diffOf(report: Report, sc: ScenarioDoc, secret: string[][]): string[] {
+/**
+ * How this run differs from what the scenario recorded: its status, its output, every node -- as `nodesOf` resolved
+ * them -- and its declared refusal.
+ */
+function diffOf(report: Report, sc: ScenarioDoc, nodes: Record<string, ScenarioNode>, secret: string[][]): string[] {
   const { expect } = sc;
   const diffs: string[] = [];
   if (report.status !== expect.status) diffs.push(`status ${expect.status} → ${report.status}`);
   if (expect.status === 'done' && !same(shownOutput(report, secret), expect.output)) diffs.push('output changed');
   const got = pick(report);
-  const pinsReasons = Object.values(expect.nodes).some(node => node.reason !== undefined);
-  for (const [id, was] of Object.entries(expect.nodes)) diffs.push(...nodeDiffs(id, was, got[id], pinsReasons));
-  for (const id of Object.keys(got)) if (!(id in expect.nodes)) diffs.push(`${id}: new`);
+  const pinsReasons = Object.values(nodes).some(node => node.reason !== undefined);
+  for (const [id, was] of Object.entries(nodes)) diffs.push(...nodeDiffs(id, was, got[id], pinsReasons));
+  for (const id of Object.keys(got)) if (!(id in nodes)) diffs.push(`${id}: new`);
   diffs.push(...refusalDiffs(report, sc));
-  return branchFirst(sc, got, diffs);
+  return branchFirst(sc, { was: nodes, got }, diffs);
 }
 
 /**
  * The diffs with the decision named first, where the scenario proves a branch and its switch no longer routes where
  * the recording did, so a decision is named before the nodes that moved with it.
  */
-function branchFirst(sc: ScenarioDoc, got: ScenarioDoc['expect']['nodes'], diffs: string[]): string[] {
+function branchFirst(
+  sc: ScenarioDoc,
+  nodes: { was: Record<string, ScenarioNode>; got: Record<string, ScenarioNode> },
+  diffs: string[],
+): string[] {
   const branch = sc.branch;
-  const at = branch && switchPath(sc.expect.nodes, branch);
+  const at = branch && switchPath(nodes.was, branch);
   if (!branch || at === undefined || !diffs.length) return diffs;
-  if (got[at]?.selected === sc.expect.nodes[at].selected) return diffs;
+  if (nodes.got[at]?.selected === nodes.was[at].selected) return diffs;
   const [first, ...rest] = diffs;
   return [`branch '${branch.when}' → ${branch.to} no longer routes there: ${first}`, ...rest];
 }
@@ -214,10 +226,7 @@ function branchFirst(sc: ScenarioDoc, got: ScenarioDoc['expect']['nodes'], diffs
  * Where a scenario's recording has the switch its branch names: under the node that ran the branch's graph, the
  * switch that routed. The graph is matched first, since two graphs of one run may each have a switch of that id.
  */
-function switchPath(
-  nodes: ScenarioDoc['expect']['nodes'],
-  branch: { graph: string; node: string },
-): string | undefined {
+function switchPath(nodes: Record<string, ScenarioNode>, branch: { graph: string; node: string }): string | undefined {
   const ran = `graph:${branch.graph}`;
   for (const [id, node] of Object.entries(nodes))
     if (node.handler === ran && nodes[`${id}.${branch.node}`]?.selected !== undefined) return `${id}.${branch.node}`;
@@ -264,7 +273,7 @@ export async function regress(load: LoadResult, opts: { profile?: string } = {})
       unserved.push(trigger);
       continue;
     }
-    const diffs = await replayedDiffs(load, { emb, stubbed }, sc.doc, trigger);
+    const diffs = await replayedDiffs(load, { emb, stubbed }, sc, trigger);
     results.push({ scenario: sc.path, same: diffs.length === 0, diffs });
     lines.push(`${sc.path}: ${diffs.length ? `DIFF ${diffs.join('; ')}` : 'same'}`);
   }
@@ -273,38 +282,60 @@ export async function regress(load: LoadResult, opts: { profile?: string } = {})
 }
 
 /**
- * How one served scenario replays: fired again with its recorded stubs and diffed, or -- where it recorded its branch
- * unreachable, and so has nothing to run -- solved again (`solvedAgain`, RFC 0018).
+ * How one served scenario replays: its pointers resolved once (`nodesOf`, `stubsOf`), fired again with its recorded
+ * stubs and diffed, or -- where it recorded its branch unreachable, and so has nothing to run -- solved again
+ * (`solvedAgain`, RFC 0018). A pointer its answers document does not hold is a difference, and nothing is fired.
  */
 async function replayedDiffs(
   load: LoadResult,
   how: { emb: Embedder; stubbed: { seed: number; profile?: string; env: NodeJS.ProcessEnv } },
-  sc: ScenarioDoc,
+  loaded: Loaded<ScenarioDoc>,
   trigger: Loaded<TriggerDoc>,
 ): Promise<string[]> {
+  const sc = loaded.doc;
   if (sc.expect.status === 'unreachable') return solvedAgain(load, sc, trigger, how.stubbed.profile);
+  const answers = answersFor(load.registry, loaded.path);
+  const { nodes, unresolved } = nodesOf(sc, answers?.doc);
+  const { stubs, unresolved: unstubbed } = stubsOf(sc, answers?.doc);
+  if (unresolved.length || unstubbed.length) return unheldDiffs(sc, answers?.path, { unresolved, unstubbed });
   const fired = replayedDoc(load, sc, trigger);
   const report = sc.cancelAt
-    ? await cancelledReplay(load, how.stubbed, fired, sc)
-    : await how.emb.fire(fired, sc.in, sc.context ?? {}, { stubs: sc.stubs });
-  return diffOf(report, sc, secretPaths(how.emb.types(fired).out));
+    ? await cancelledReplay(load, how.stubbed, fired, { sc, stubs })
+    : await how.emb.fire(fired, sc.in, sc.context ?? {}, { stubs });
+  return diffOf(report, sc, nodes, secretPaths(how.emb.types(fired).out));
 }
 
 /**
- * A scenario that pins a cancellation, replayed: its `cancelAt` is taken out of the recorded stubs so the run reaches
- * that effect's stub, which aborts the run's signal there. A node, never a duration, so the replay is the same on
- * every machine; an embedder of its own, since the stub that aborts is this run's alone.
+ * The pointers of a scenario its answers document does not hold, one difference each: `op.x: points at <digest>,
+ * which scenarios/rehearsed/answers.json does not hold`, or `stub op.x: ...` for a stub.
+ */
+function unheldDiffs(
+  sc: ScenarioDoc,
+  answers: string | undefined,
+  paths: { unresolved: string[]; unstubbed: string[] },
+): string[] {
+  const holder = answers ? `which ${answers.replace(/^@/, '')} does not hold` : 'and no answers.json is above it';
+  const nodes = paths.unresolved.map(path => `${path}: points at ${sc.expect.nodes[path]}, ${holder}`);
+  const stubs = paths.unstubbed.map(path => `stub ${path}: points at ${sc.sharedStubs?.[path]}, ${holder}`);
+  return [...nodes, ...stubs];
+}
+
+/**
+ * A scenario that pins a cancellation, replayed: its `cancelAt` is taken out of the stubs `stubsOf` resolved, so the
+ * run reaches that effect's stub, which aborts the run's signal there. A node, never a duration, so the replay is the
+ * same on every machine; an embedder of its own, since the stub that aborts is this run's alone.
  */
 function cancelledReplay(
   load: LoadResult,
   stubbed: { seed: number; profile?: string; env: NodeJS.ProcessEnv },
   trigger: TriggerDoc,
-  sc: ScenarioDoc,
+  replayed: { sc: ScenarioDoc; stubs: Record<string, unknown> },
 ): Promise<Report> {
+  const { sc } = replayed;
   const path = sc.cancelAt ?? '';
   const control = new AbortController();
   const emb = embedderFor(load, { ...stubbed, cancelAt: { path, abort: () => control.abort() } });
-  const { [path]: _, ...stubs } = sc.stubs ?? {};
+  const { [path]: _, ...stubs } = replayed.stubs;
   return emb.fire(trigger, sc.in, sc.context ?? {}, { stubs, signal: control.signal });
 }
 

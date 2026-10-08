@@ -2,7 +2,16 @@
  * Which documents reference which: the index built once over the tree, and the callers of one document, so a reader can
  * walk the tree in both directions.
  */
-import type { Kind, Loaded, LoadResult, Scope } from '@wilanis/core';
+import {
+  answersFor,
+  type Kind,
+  type Loaded,
+  type LoadResult,
+  nodesOf,
+  type ScenarioDoc,
+  type Scope,
+  stubsOf,
+} from '@wilanis/core';
 import type { VRef } from './types.js';
 import { labelOf } from './types.js';
 
@@ -34,6 +43,19 @@ function below(value: unknown): [string, unknown][] {
   return Object.entries(value as Record<string, unknown>).filter(([key]) => key !== '$schema');
 }
 
+/**
+ * A document as the walk reads it. A scenario is read with every pointer resolved (`nodesOf`, `stubsOf`, RFC 0036), so
+ * it names, at the same pointers, what its inline form names: the operation each node ran, under `expect/nodes`.
+ */
+function walkedDoc(scope: Scope, file: Loaded): unknown {
+  if (file.kind !== 'scenario') return file.doc;
+  const scenario = file.doc as ScenarioDoc;
+  const answers = answersFor(scope.registry, file.path)?.doc;
+  const { sharedStubs, ...inline } = scenario;
+  const stubs = scenario.stubs || sharedStubs ? { stubs: stubsOf(scenario, answers).stubs } : {};
+  return { ...inline, ...stubs, expect: { ...scenario.expect, nodes: nodesOf(scenario, answers).nodes } };
+}
+
 /** Every string in every document that names another document, with the JSON pointer it sits at. */
 export function referenceIndex(load: LoadResult, scope: Scope): IndexedRef[] {
   const out: IndexedRef[] = [];
@@ -45,7 +67,7 @@ export function referenceIndex(load: LoadResult, scope: Scope): IndexedRef[] {
     }
     for (const [segment, each] of below(value)) walk(from, each, `${at}/${segment}`);
   };
-  for (const file of load.registry.files) walk(file, file.doc, '');
+  for (const file of load.registry.files) walk(file, walkedDoc(scope, file), '');
   return out;
 }
 

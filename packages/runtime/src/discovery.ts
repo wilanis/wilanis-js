@@ -252,7 +252,7 @@ function plainBody(doc: Loaded, load: LoadResult, scope: Scope): string[] {
   if (doc.kind === 'feature') return featureLines(doc);
   if (doc.kind === 'connection') return connectionLines(doc, scope, capabilityLines(kindOf(doc, scope)));
   if (doc.kind === 'codec') return codecLines(doc);
-  if (doc.kind === 'scenario') return scenarioLines(doc);
+  if (doc.kind === 'scenario') return scenarioLines(doc, scope);
   if (doc.kind === 'project') return projectLines(doc, scope);
   return [];
 }

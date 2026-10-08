@@ -13,7 +13,17 @@
  */
 
 import { checkTree } from '@wilanis/compiler';
-import type { GraphDoc, Kind, Loaded, LoadResult, PolicyDoc, PortDoc, Refusal, TriggerDoc } from '@wilanis/core';
+import type {
+  GraphDoc,
+  Kind,
+  Loaded,
+  LoadResult,
+  PolicyDoc,
+  PortDoc,
+  Refusal,
+  ScenarioDoc,
+  TriggerDoc,
+} from '@wilanis/core';
 import { pageUrl, policyPath, SCHEMA_BASE, Scope, WILANIS } from '@wilanis/core';
 import { endpointSaid, limitsOf, listensParts, profilesOf, settingsSaid, triggersGatedBy } from '@wilanis/runtime';
 import { attemptsOf } from './attempts.js';
@@ -23,7 +33,7 @@ import { invariantView } from './invariants.js';
 import { stemOf, targetOf } from './ports.js';
 import { callersOf, type IndexedRef, referenceIndex } from './references.js';
 import { answersOf } from './refusals.js';
-import { generatedOf, scenarioGroupsOf } from './scenarios.js';
+import { expectedNodesOf, generatedOf, scenarioGroupsOf } from './scenarios.js';
 import { viewsRequiredBy } from './scopes.js';
 import { storeView } from './stores.js';
 import type { DocView, VAttachedPolicy } from './types.js';
@@ -162,10 +172,19 @@ function triggerView(scope: Scope, doc: Loaded, view: DocView) {
 /** The kinds a recording command writes, whose page says which command, where one did. */
 const RECORDED = new Set<Kind>(['scenario', 'answers']);
 
-/** What a scenario or an answers document adds to its view: the sentence it is marked with, where a command wrote it. */
-function recordedView(doc: Loaded, view: DocView) {
+/**
+ * What a scenario or an answers document adds to its view: the sentence it is marked with, where a command wrote it;
+ * and on a scenario, what each node is expected to do (`scenarioView`).
+ */
+function recordedView(scope: Scope, doc: Loaded, view: DocView) {
   const generated = generatedOf(doc);
   if (generated) view.generated = generated;
+  if (doc.kind === 'scenario') scenarioView(scope, doc, view);
+}
+
+/** What a scenario adds to its view: what each node is expected to do, every answer resolved, as the page tables it. */
+function scenarioView(scope: Scope, doc: Loaded, view: DocView) {
+  view.expectedNodes = expectedNodesOf(scope, doc as Loaded<ScenarioDoc>);
 }
 
 /**
@@ -259,6 +278,6 @@ export function viewOf(load: LoadResult, ref: string, reads: TreeReads = treeRea
   if (doc.kind === 'invariant') view.invariant = invariantView(scope, doc);
   if (doc.kind === 'project') view.profiles = profilesOf(scope);
   if (doc.kind === 'connection') connectionView(scope, doc, view);
-  if (RECORDED.has(doc.kind)) recordedView(doc, view);
+  if (RECORDED.has(doc.kind)) recordedView(scope, doc, view);
   return view;
 }
