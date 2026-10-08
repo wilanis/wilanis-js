@@ -8,8 +8,8 @@
   file). Nothing in the engine, nothing in a plugin.
 - **Tracking issue:** #877
 - **Depends on:** RFC 0018 (implemented: the recorded directories, `Owner`, `--check`). RFC 0008 (accepted: the
-  freeze of `schemas-v1`, issue #91). Issue #875, which writes each scenario on one line and keeps `--check`'s byte
-  comparison; this RFC builds on that rendering and lands after it.
+  freeze of `schemas-v1`, issue #91). Issue #875 (merged), which writes each scenario on one line and keeps
+  `--check`'s byte comparison; this RFC builds on that rendering.
 
 ## Summary
 
@@ -20,7 +20,7 @@ value is written once, in an `answers` document at the top of the directory (`sc
 `scenarios/edges/answers.json`), under a 16-character digest of its canonical JSON. A recorded scenario's
 `expect.nodes` maps each node path to a digest instead of writing the answer again, and a new map, `sharedStubs`,
 maps each stubbed path to a digest instead of writing the value in `stubs`. On a tree with 738 recorded scenarios,
-the scenarios without indentation go from 318 MB to about 27 MB. The command that owns the directory (`Owner` in
+the scenarios without indentation go from 318 MB to about 28 MB. The command that owns the directory (`Owner` in
 `packages/runtime/src/recorded-dir.ts`) writes, removes and checks the shared file as one more file it owns. A
 hand-written scenario still writes its answers and stubs inline, and `wilanis scenarios --pin` copies a recorded
 scenario out with everything inline. Every reader of `expect.nodes` and `stubs` (the S rules, `regress`, `describe`,
@@ -36,8 +36,8 @@ Recorded scenarios cost far more than what they hold.
 
 | Form | Size |
 |---|---|
-| On disk, indented as `--record` writes today | 723 MB |
-| On one line (issue #875) | 318.2 MB |
+| Indented, as `--record` wrote before #875 | 723 MB |
+| On one line, as #875 (merged) writes it | 318.2 MB |
 | Gzipped, file by file | 41 MB |
 | In git (packed) | 6.7 MB |
 
@@ -75,39 +75,40 @@ writes each node's `status`, `reason`, `handler`, `selected` and `out`. Two scen
 with the same stub write the same answers and the same stub twice. The answer `{"status":"cancelled"}` alone is
 written 480 times in the example. Nothing in the format lets two scenarios share an answer or a stub.
 
-**What #875 does, and what it leaves.** Issue #875 writes each scenario on one line: `rendered` in `recorded-dir.ts`
-becomes `JSON.stringify(doc) + '\n'`. That halves the bytes for a one-line change, and keeps the byte comparison
-`checkRecorded` makes. It does not change the schema, and it leaves every repeat in place: 317.7 of the 318.2 MB are
-`expect.nodes` and `stubs`. This RFC removes the repeats.
+**What #875 did, and what it leaves.** Issue #875 (merged) writes each scenario on one line: `rendered` in
+`recorded-dir.ts` is `JSON.stringify(doc) + '\n'`. That halves the bytes for a one-line change, and keeps the byte
+comparison `checkRecorded` makes. It does not change the schema, and it leaves every repeat in place: 317.7 of the
+318.2 MB are `expect.nodes` and `stubs`. This RFC removes the repeats.
 
-**What this gives.** On one line, after #875:
+**What this gives.** On one line, as #875 writes them:
 
 | | Example `rehearsed/` | Example `edges/` | Tree with 738 scenarios |
 |---|---|---|---|
 | Today | 138,356 | 130,395 | 318.2 MB |
-| Nodes shared (scenarios + `answers.json`) | 98,110 + 27,698 = 125,808 | 88,007 + 13,682 = 101,689 | about 70 MB |
-| Nodes and stubs shared (scenarios + `answers.json`) | 81,603 + 34,498 = 116,101 | 82,908 + 15,210 = 98,118 | about 27 MB |
+| Nodes shared (scenarios + `answers.json`) | 95,442 + 27,698 = 123,140 | 85,361 + 13,682 = 99,043 | about 70 MB |
+| Nodes and stubs shared (scenarios + `answers.json`) | 78,935 + 34,498 = 113,433 | 80,262 + 15,210 = 95,472 | about 28 MB |
 
 The example's figures are bytes, measured: a script rewrote each scenario as this RFC writes it and wrote each
-directory's `answers.json` as the Guide shows it. The example goes from 268,751 to 227,497 bytes with nodes shared,
-and to 214,219 with nodes and stubs shared. It gains less than the large tree because its scenarios are small, and
+directory's `answers.json` as the Guide shows it. The example goes from 268,751 to 222,183 bytes with nodes shared,
+and to 208,905 with nodes and stubs shared. It gains less than the large tree because its scenarios are small, and
 their `in`, `context` and `description` are a larger share.
 
 The large tree's figures are computed from parts measured on it. Paths stay: the node paths are 11.7 MB and the stub
-paths 5.1 MB, both measured as the sum of the keys' lengths. A pointer costs about 20 bytes (16 characters, two quotes,
-a colon and a comma), and the answers file holds the distinct values with their digests:
+paths 5.1 MB, both measured as the sum of the keys' lengths. A pointer costs about 22 bytes: 16 characters, the two
+quotes around the digest, the two quotes around its path (the measured lengths count no quotes), a colon and a comma.
+The answers file holds the distinct values with their digests:
 
-- nodes shared: 0.5 + 50.3 + 11.7 + 268,055 × 20 B (5.4) + 2.1 ≈ 70 MB;
-- nodes and stubs shared: 0.5 + 11.7 + 5.1 + (268,055 + 106,767) × 20 B (7.5) + 2.3 ≈ 27 MB.
+- nodes shared: 0.5 + 50.3 + 11.7 + 268,055 × 22 B (5.9) + 2.1 ≈ 70 MB;
+- nodes and stubs shared: 0.5 + 11.7 + 5.1 + (268,055 + 106,767) × 22 B (8.2) + 2.3 ≈ 28 MB.
 
-The pointers' 20 bytes and the answers file's size are close approximations; every other term is measured. I have
+The pointers' 22 bytes and the answers file's size are close approximations; every other term is measured. I have
 not measured the result gzipped or in git.
 
-**What this does not try to solve.** It does not change what a run records (`did` and `pick` are unchanged), what
-`regress` compares, or what it prints. It does not share `in` or `context`. It does not change plain `wilanis fuzz`,
-which writes to `scenarios/fuzz/`, is ignored by git, and keeps everything inline. It does not compress anything. It
-does not share values between two directories, or between a tree and the trees it includes. It does not make a replay
-faster.
+**What this does not try to solve.** It does not change what a run records (`did` and `pick` record what they
+record today), what `regress` compares, or what it prints. It does not share `in` or `context`. It does not change
+plain `wilanis fuzz`, which writes to `scenarios/fuzz/`, is ignored by git, and keeps everything inline. It does not
+compress anything. It does not share values between two directories, or between a tree and the trees it includes. It
+does not make a replay faster.
 
 ## Guide-level explanation
 
@@ -119,7 +120,7 @@ directory, that holds each distinct node answer and each distinct stub value of 
 its digest. A *pointer* is a digest written in place of the value.
 
 **A recorded scenario.** `wilanis rehearse example --record` writes the `noCustomer` branch of `get-row`, reached from
-`GET /customers/{id}`, as below. The file is shown indented here; #875 writes it on one line.
+`GET /customers/{id}`, as below. The file is shown indented here; since #875 (merged) it is written on one line.
 
 ```json
 {
@@ -308,7 +309,12 @@ distinct values of the large tree take 2.3 MB together, so the cost is below tha
 
 **Placement.** `HOME` in `packages/core/src/placement.ts` gains `answers: { dir: 'scenarios', why: 'answers are what
 the recorded scenarios beside them share' }`. `misplacedDir` reads only the first segment, so `scenarios/rehearsed/`
-is home. The name `answers.json` is fixed, as `feature.json` is.
+is home. The name `answers.json` is fixed, as `feature.json` is, and a rule holds it. `misplacedKind` in
+`packages/core/src/documents.ts` gains a D003 branch beside the feature's: an `answers` document whose file name is
+not `answers.json` is refused, with the message `an answers document is answers.json at the top of a recorded
+directory` and the hint `move it to <its directory>/answers.json, or change its $schema to the kind this file is`.
+`answersFor` reads only files of that name, so without the rule a misnamed answers file would load and be read by
+no one.
 
 **`packages/runtime/templates/CLAUDE.md`**: a row for `answers` ("the node answers and stub values the recorded
 scenarios of one directory share, each once, under its digest; written by `wilanis rehearse --record` and `wilanis
@@ -431,13 +437,13 @@ validates and means the same thing, *breaking* otherwise.
 | the `answers` document kind | compatible: RFC 0008 names a new document kind as compatible |
 | `nodeAnswer` and `answerDigest` in `common.schema.json` | compatible: a definition moved, with the same content |
 | S0n1, S0n2 | compatible: each refuses only a document that uses the new form, so no document written before is refused |
-| what `--record` and `fuzz --edges` write | not a schema change. Every committed recorded directory is stale once, and `--check` asks for `--record`, as #875 does |
+| what `--record` and `fuzz --edges` write | not a schema change. Every committed recorded directory is stale once, and `--check` asks for `--record`, as #875 did |
 
 So the change is compatible, and RFC 0008 would let it land after #91 in place, without `schemas-v2`. The schema step
 lands before #91 all the same (decided in review, below). A 1.0 runtime is what trees pin. A 1.0 runtime that does
 not read an answers file cannot read a tree that a later runtime recorded, and a tree like the large one that starts
-at 1.0 would carry its scenarios at more than ten times the size. Landing before #91 also lets every tree pay the one
-re-record of #875 and the one of this RFC in the same release.
+at 1.0 would carry its scenarios at more than ten times the size. Landing before #91 also keeps the re-record this
+RFC asks for before 1.0, as the one #875 (merged) asked for is.
 
 Recording fewer nodes (proposal 2, below) would be *breaking* unless it were opt-in. Today a node in the run that is
 absent from `expect.nodes` is a diff (`x: new`). If an absent node meant "not judged", a hand-written scenario that
@@ -455,6 +461,9 @@ Sabotage tests through `planted` in `packages/runtime/test/sabotage-scenarios.te
 | S002 | a shared answer with `reason` and status `done`, refused at `nodes/<digest>/reason` of the answers document; an inline one, as today |
 | S003 | a hand-written scenario with `cancelAt` naming a path under `stubs` passes, as today; one naming no path refuses |
 | none | a hand-written scenario with inline answers and stubs; a recorded one whose every digest resolves |
+
+D003, in `packages/runtime/test/sabotage-unproved.test.ts` beside the project document's D003 case: an answers
+document named `scenarios/rehearsed/shared.json` is refused; one named `scenarios/rehearsed/answers.json` is not.
 
 Core, in `packages/core/test/validate.test.ts`: the baseline gains an answers document and a scenario with digests and
 `sharedStubs`; a digest of 15 characters, an upper-case digest, an answers document with `generated: "fuzz"`, and a
@@ -486,41 +495,50 @@ one with inline answers; the answers page lists each node answer and each stub v
 
 ## Implementation plan
 
-Each step is one pull request and one sub-issue, and each leaves `npm test` passing. Readers land before the writer,
-so no commit writes a form that a reader cannot read.
+Each step is one pull request and one sub-issue, and each leaves `tsc -b` and `npm test` passing.
+Readers land before the writer, so no commit writes a form that a reader cannot read.
 
 1. **Core: the schemas.** `nodeAnswer` and `answerDigest` in `common.schema.json`; `expect.nodes` and `sharedStubs` in
    `scenario.schema.json`; `answers.schema.json`; `AnswersDoc`, the `Kind` entry and `HOME.answers`; the validate
-   baseline; the template's row. `ScenarioDoc`'s types do not change in this step, so no reader breaks. Lands before
-   #91.
+   baseline; the D003 branch for `answers.json` in `misplacedKind` (`documents.ts`) and its sabotage case; the
+   template's row. `ScenarioDoc`'s types do not change in this step, so no reader breaks. Lands before #91.
 2. **Core and every reader: one way to read a pointer.** `packages/core/src/answers.ts` with `canonicalJson`,
    `answerDigest`, `answersFor`, `nodesOf`, `stubsOf`, and its test. In the same pull request, `ScenarioNode` is named,
    `expect.nodes` becomes `ScenarioNode | string` and `ScenarioDoc` gains `sharedStubs`, and every reader the type
-   change would break goes through the new functions: `checkPinnedReasons` and `checkCancelAt` in
-   `check/scenarios.ts`, `replayedDiffs`, `diffOf` and `cancelledReplay` in `fuzz.ts`, `routedLines` in
-   `scenario-said.ts`, `scenarioView` in the viewer's model. Tested with a planted scenario that points, since nothing
-   writes one yet.
+   change would break goes through the new functions, so `tsc -b` passes:
+   - `check/scenarios.ts`: `checkPinnedReasons` and `checkCancelAt` read through `nodesOf` and `stubsOf`;
+   - `fuzz.ts`: `did`, `pick` and `nodeDiffs` take and answer `ScenarioNode` (`Record<string, ScenarioNode>` for
+     `pick`) where they are typed `ScenarioDoc['expect']['nodes']` today; `branchFirst` and `switchPath` take the
+     resolved nodes `nodesOf` answers; `replayedDiffs` resolves once and hands them on to `diffOf`; `cancelledReplay`
+     takes the stubs `stubsOf` answers;
+   - `scenario-said.ts`: `routedLines` reads the resolved nodes;
+   - the viewer: `scenarioView` in `model.ts` hands the page the resolved rows, and `scenarioEl` in
+     `client/index.html` stops reading `d.expect.nodes`.
+
+   Tested with a planted scenario that points, since nothing writes one yet.
 3. **Compiler: the rules.** S0n1, S0n2; S002 judged in answers documents; `judgeTree` judges answers documents; the
    sabotage tests; the rule list in the template's `CLAUDE.md`.
 4. **Runtime and viewer: the answers document shown.** `answersLines`, `ls answers`, the answers line of a scenario's
    `describe`; the answers page in the viewer. (`good first issue`)
-5. **Runtime: the writer.** `recorded-answers.ts` (`sharedOf`); `writeRecorded` and `checkRecorded` write and compare
-   `answers.json`; `onDisk` lists it; the ownership, determinism, orphan, no-file, collision and edges tests.
+5. **Runtime and the trees: the writer.** `recorded-answers.ts` (`sharedOf`); `writeRecorded` and `checkRecorded` write
+   and compare `answers.json`; `onDisk` lists it; the ownership, determinism, orphan, no-file, collision and edges
+   tests. This step changes the bytes `--record` and `fuzz --edges` write, so in the same pull request:
+   `example/scenarios/rehearsed`, `example/scenarios/edges` and `libraries/access/scenarios/rehearsed` are
+   re-recorded, `manifest.golden.json` is regenerated, and the README or changelog line that tells hosts how to
+   regenerate says that every recorded directory goes stale once. Otherwise `committed-scenarios.test.ts`,
+   `libraries/access/test/access.test.ts` and CI's `wilanis scenarios example --check` would fail until a later step.
 6. **Runtime: `wilanis scenarios --pin`.** In `tools.ts`, the flag in `scenario-flags.ts`, the template's step 3 and
    `scenario` row, and fuzz's description sentence. Test.
-7. **The trees.** Re-record `example/scenarios/rehearsed`, `example/scenarios/edges` and
-   `libraries/access/scenarios/rehearsed`; regenerate `manifest.golden.json`; say in the README or changelog line that
-   tells hosts how to regenerate that every recorded directory goes stale once. After #875 has landed.
 
 ## Drawbacks and alternatives
 
 **A scenario no longer reads alone.** A reviewer who opens one recorded file sees digests, not values. That is the
-cost of the gain. Three things pay it back: `regress` says what changed in words, as today; `describe` and the viewer
-show the answers resolved; and a pull request's diff of `answers.json` lists, one line each, the values that are new
+cost of the gain. Three things reduce that cost: `regress` says what changed in words, as today; `describe` and the
+viewer show the answers resolved; and a pull request's diff of `answers.json` lists, one line each, the values that are new
 or gone. For the one file a person wants to read whole and keep, `--pin` writes it inline.
 
 **Gzip (`.scenario.json.gz`).** Not taken. File by file it gives 41 MB on the large tree, more than this RFC's
-27 MB. And a gzipped file is binary in git: a pull request shows no diff, a reviewer cannot read it, and an agent
+28 MB. And a gzipped file is binary in git: a pull request shows no diff, a reviewer cannot read it, and an agent
 cannot read it with the tools it reads the rest of the tree with. The loader would also have to learn a second file
 format for one kind. Git already compresses what it stores (6.7 MB packed), so gzip saves disk in a checkout and
 nothing in the repository. This RFC removes the repeats instead, and the files stay text, reviewable and readable.
@@ -548,8 +566,8 @@ which node first differs on the path the scenario pins? Those are:
 - the top-level node of each call into a graph the path enters, with its `handler`.
 
 On the example, that keeps about 415 of the 1,220 nodes. On top of nodes and stubs shared, it takes the example from
-214,219 to about 183,000 bytes. On the large tree, assuming the example's proportions, it saves about two thirds of
-the 17.1 MB of node paths and pointers: about 27 MB to about 15 MB, estimated. I have not measured it there. With
+208,905 to about 177,000 bytes. On the large tree, assuming the example's proportions, it saves about two thirds of
+the 17.6 MB of node paths and pointers: about 28 MB to about 16 MB, estimated. I have not measured it there. With
 stubs shared, that is the largest gain left, and this RFC does not take it: it keeps `regress`'s report of a changed
 node off the path instead, for the reason below.
 
@@ -570,8 +588,8 @@ records, which is RFC 0006's and not this RFC's.
 
 **The narrow cut: an absent node is expected `cancelled`.** Not taken. It loses no guarantee about a node that ran:
 `regress` would still say `new` for a node that runs and is not recorded, and stop saying `new` and `gone` only for
-nodes that did not run. On top of nodes and stubs shared it takes the example from 214,219 to about 195,000 bytes
-(9%), and the large tree, assuming the example's proportions, from about 27 MB to about 20 MB. It changes the meaning
+nodes that did not run. On top of nodes and stubs shared it takes the example from 208,905 to about 189,000 bytes
+(9%), and the large tree, assuming the example's proportions, from about 28 MB to about 21 MB. It changes the meaning
 of an absent node, so it would be breaking unless opt-in, and every reader would have to know the rule. The gain does
 not pay for a second meaning of an absent key.
 
