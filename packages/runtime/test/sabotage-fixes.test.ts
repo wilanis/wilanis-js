@@ -182,6 +182,15 @@ const SCENARIO = {
   expect: { status: 'done', nodes: { op: { status: 'failed', reason: 'upstream' } } },
 };
 
+/** An answers document that checks clean where it belongs, as answers.json in a recorded directory below scenarios/. */
+const ANSWERS = {
+  $schema: 'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/answers.schema.json',
+  description: 'The answers the recorded scenarios beside it share.',
+  generated: 'rehearse',
+  nodes: { a0af58eabbdc1659: { status: 'cancelled' } },
+  stubs: {},
+};
+
 /** The D008 refusals a broken copy answers. */
 const d008After = (change: (dir: string) => void) => refusalsAfter(change).filter(one => one.code === 'D008');
 
@@ -214,6 +223,12 @@ const MOVES: [string, (dir: string) => void, string, string][] = [
     planting({ 'features/customers/data/pinned.scenario.json': SCENARIO }),
     'features/customers/data/pinned.scenario.json',
     'scenarios/pinned.scenario.json',
+  ],
+  [
+    'an answers document under a feature, moved to the one name D003 accepts',
+    planting({ 'features/customers/data/answers.json': ANSWERS }),
+    'features/customers/data/answers.json',
+    'scenarios/rehearsed/answers.json',
   ],
   [
     'a shape in the data layer',

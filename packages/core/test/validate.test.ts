@@ -66,6 +66,34 @@ describe('the baseline', () => {
   });
 });
 
+describe('shared answers (RFC 0036)', () => {
+  const digest = 'a0af58eabbdc1659';
+  const pointing = (pointer: unknown) => doc('scenario', { expect: { status: 'done', nodes: { op: pointer } } });
+
+  it('an answers document holding a node answer and a stub value, and a scenario pointing into it, conform', () => {
+    const held = { nodes: { [digest]: { status: 'cancelled' } }, stubs: { fe434f59137f740d: 'any value' } };
+    expect(refused(doc('answers', { generated: 'edges', ...held }))).toEqual([]);
+    const nodes = { op: digest, 'op.asked': { status: 'done', out: 1 } };
+    const shared = { sharedStubs: { 'op.asked': 'fe434f59137f740d' }, expect: { status: 'done', nodes } };
+    expect(refused(doc('scenario', shared))).toEqual([]);
+  });
+  it('a digest is 16 lower-case hexadecimal characters, in a scenario and as a key of an answers document', () => {
+    expect(refused(pointing(digest.slice(1)))).toEqual([at('expect/nodes/op', 'must match')]);
+    expect(refused(pointing(digest.toUpperCase()))).toEqual([at('expect/nodes/op', 'must match')]);
+    expect(refused(doc('scenario', { sharedStubs: { op: 'x' } }))).toEqual([at('sharedStubs/op', 'must match')]);
+    expect(refused(doc('answers', { stubs: { [digest.toUpperCase()]: 1 } }))).toEqual([at('stubs', 'must match')]);
+  });
+  it('an answers document is written by rehearse or edges, never by plain fuzz', () => {
+    expect(refused(doc('answers', { generated: 'fuzz' }))).toEqual([at('generated', '"rehearse", "edges"')]);
+  });
+  it('an inline answer without status gets one refusal, not one per form a node may take', () => {
+    expect(refused(pointing({ out: 1 }))).toEqual([at('expect/nodes/op', "missing 'status'")]);
+    expect(refused(doc('answers', { nodes: { [digest]: { out: 1 } } }))).toEqual([
+      at(`nodes/${digest}`, "missing 'status'"),
+    ]);
+  });
+});
+
 describe('the envelope', () => {
   it('a document is a JSON object', () => {
     expect(refused([])).toEqual([at(undefined, 'a document is a JSON object')]);

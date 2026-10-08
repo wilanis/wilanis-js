@@ -24,5 +24,5 @@ export function scenarioGroupsOf(scope: Scope, trigger: Loaded): VScenarioGroup[
   }));
 }
 
-/** The sentence a scenario's page marks it with, where a command wrote it. */
+/** The sentence a scenario's or an answers document's page marks it with, where a command wrote it. */
 export const generatedOf = (doc: Loaded): string | undefined => generatedSaid(doc.doc as ScenarioDoc);

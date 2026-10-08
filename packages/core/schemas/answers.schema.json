@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/answers.schema.json",
+  "title": "answers",
+  "description": "The node answers and stub values the recorded scenarios of one directory share, each once, under its digest. A recorded scenario's `expect.nodes` and `sharedStubs` name a value here by its digest instead of writing it again. It is answers.json at the top of a recorded directory (scenarios/rehearsed/, scenarios/edges/), written by the command that records there; regenerate it, never edit it.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "description": "The kind of this document: its published schema URL, or the alias @wilanis/answers.schema.json.",
+      "enum": [
+        "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/answers.schema.json",
+        "@wilanis/answers.schema.json"
+      ]
+    },
+    "description": {
+      "description": "What this file is, written by the command that wrote it.",
+      "type": "string",
+      "minLength": 1
+    },
+    "label": {
+      "description": "A short human name for this document, shown wherever a reader sees it instead of its path. Absent: the file name stands in.",
+      "type": "string",
+      "minLength": 1
+    },
+    "generated": {
+      "description": "The command that wrote this file and owns the directory it sits in. It writes the file whole each time it records, so a value no scenario points to is never kept.",
+      "enum": [
+        "rehearse",
+        "edges"
+      ]
+    },
+    "nodes": {
+      "description": "Each distinct node answer of the scenarios in this directory, once, under its digest.",
+      "type": "object",
+      "propertyNames": {
+        "$ref": "common.schema.json#/$defs/answerDigest"
+      },
+      "additionalProperties": {
+        "$ref": "common.schema.json#/$defs/nodeAnswer"
+      }
+    },
+    "stubs": {
+      "description": "Each distinct stub value of the scenarios in this directory, once, under its digest.",
+      "type": "object",
+      "propertyNames": {
+        "$ref": "common.schema.json#/$defs/answerDigest"
+      },
+      "additionalProperties": {}
+    }
+  },
+  "required": [
+    "$schema",
+    "description",
+    "generated",
+    "nodes",
+    "stubs"
+  ],
+  "additionalProperties": false
+}

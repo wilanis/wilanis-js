@@ -310,7 +310,10 @@ export interface DocView {
    * groups that hold one; empty where no scenario replays it.
    */
   scenarios?: VScenarioGroup[];
-  /** On a scenario a command wrote: the sentence `wilanis describe` marks it with, naming the command that rewrites it. */
+  /**
+   * On a scenario a command wrote, and on an answers document: the sentence `wilanis describe` marks a scenario with,
+   * naming the command that rewrites it.
+   */
   generated?: string;
   /** On a policy: the port operation it decides through, and where that leads. */
   decides?: VTarget;

@@ -150,8 +150,8 @@
   const heldSaid = (h) => h.by === 'narrowed' ? "narrowed by '" + h.switch + "'" : h.by === 'through' ? "from '" + h.node + "'" : 'literal';
   /** How a whole rule was established: the ways its conjuncts were, each said once, in the order it writes them. */
   const heldWays = (held) => [...new Set(held.map(heldSaid))].join(', ');
-  const KIND_NAMES = { project: 'Project', feature: 'Features', trigger: 'Triggers', policy: 'Policies', resolvers: 'Context reads', graph: 'Graphs', port: 'Ports', binding: 'Bindings', shape: 'Shapes', store: 'Stores', connection: 'Connections', scenario: 'Scenarios', plugin: 'Plugins', 'trigger-kind': 'Trigger kinds', 'connection-kind': 'Connection kinds', codec: 'Codecs' };
-  const KIND_ONE = { project: 'project', feature: 'feature', trigger: 'trigger', policy: 'policy', resolvers: 'context reads', graph: 'graph', port: 'port', binding: 'binding', shape: 'shape', store: 'store', connection: 'connection', scenario: 'scenario', plugin: 'plugin', 'trigger-kind': 'trigger kind', 'connection-kind': 'connection kind', codec: 'codec' };
+  const KIND_NAMES = { project: 'Project', feature: 'Features', trigger: 'Triggers', policy: 'Policies', resolvers: 'Context reads', graph: 'Graphs', port: 'Ports', binding: 'Bindings', shape: 'Shapes', store: 'Stores', connection: 'Connections', scenario: 'Scenarios', answers: 'Shared answers', plugin: 'Plugins', 'trigger-kind': 'Trigger kinds', 'connection-kind': 'Connection kinds', codec: 'Codecs' };
+  const KIND_ONE = { project: 'project', feature: 'feature', trigger: 'trigger', policy: 'policy', resolvers: 'context reads', graph: 'graph', port: 'port', binding: 'binding', shape: 'shape', store: 'store', connection: 'connection', scenario: 'scenario', answers: 'answers', plugin: 'plugin', 'trigger-kind': 'trigger kind', 'connection-kind': 'connection kind', codec: 'codec' };
   /** A read path shown: context.headers['user-agent'] → context › headers › user-agent. */
   const showRead = (read) => String(read).split(/\.|\[['"]|['"]\]/).filter(Boolean).join(SEP);
   /** One scoped column said as a reader meets it: the column, and the read of the context that fills it. */
@@ -277,7 +277,7 @@
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(d);
     }
-    const order = ['project', 'feature', 'trigger', 'policy', 'resolvers', 'graph', 'port', 'binding', 'shape', 'store', 'connection', 'scenario'];
+    const order = ['project', 'feature', 'trigger', 'policy', 'resolvers', 'graph', 'port', 'binding', 'shape', 'store', 'connection', 'scenario', 'answers'];
     const rank = (k) => { const i = order.findIndex(o => k.startsWith(KIND_NAMES[o])); return (i < 0 ? 99 : i) + (k.includes(' / ') ? 50 : 0); };
     const keys = [...groups.keys()].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
     for (const k of keys) {
@@ -678,6 +678,38 @@
     page.appendChild(t);
   }
 
+  /** The operation a recorded node ran, linked: the graph a `graph:` handler names, or the port of an operation. */
+  function handlerEl(handler) {
+    if (handler.startsWith('graph:')) return link(handler.slice('graph:'.length));
+    return link(handler.split('#')[0], showOp(handler));
+  }
+
+  /**
+   * An answers document's page (RFC 0036): what the file is and the command that writes it, then each node answer
+   * and each stub value it holds, under its digest, as a table each. A scenario's page shows the values it points to.
+   */
+  function answersEl(page, v) {
+    const d = v.doc;
+    const lead = el('p', null, 'What the recorded scenarios in this directory share: each distinct node answer and stub value, once, under its digest, which a scenario writes in place of the value.');
+    if (v.generated) lead.appendChild(frag(' ' + v.generated[0].toUpperCase() + v.generated.slice(1) + '.'));
+    page.appendChild(lead);
+    const nodes = Object.entries(d.nodes);
+    page.appendChild(el('h2', null, 'Node answers (' + nodes.length + ')'));
+    const t = el('table'); const hd = el('tr'); for (const h of ['digest', 'status', 'routes to', 'ran', 'answers']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
+    for (const [digest, n] of nodes) {
+      const tr = el('tr'); tr.appendChild(el('td', 'mono', digest));
+      tr.appendChild(el('td', null, n.reason === undefined ? n.status : n.status + ', refusing as ' + n.reason));
+      tr.appendChild(el('td', 'name', n.selected || '')); const ran = el('td'); if (n.handler) ran.appendChild(handlerEl(n.handler)); tr.appendChild(ran);
+      tr.appendChild(el('td', 'val', n.out === undefined ? '' : JSON.stringify(n.out))); t.appendChild(tr);
+    }
+    page.appendChild(t);
+    const stubs = Object.entries(d.stubs);
+    page.appendChild(el('h2', null, 'Stub values (' + stubs.length + ')'));
+    const s = el('table'); const sh = el('tr'); for (const h of ['digest', 'value']) sh.appendChild(el('th', null, h)); s.appendChild(sh);
+    for (const [digest, value] of stubs) { const tr = el('tr'); tr.appendChild(el('td', 'mono', digest)); tr.appendChild(el('td', 'val', JSON.stringify(value))); s.appendChild(tr); }
+    page.appendChild(s);
+  }
+
   /**
    * The scenarios that replay a trigger, grouped by who wrote them as `wilanis ls` marks them, each opening its page
    * and saying the branch it proves and how it expects the run to end.
@@ -899,6 +931,10 @@
       }
       case 'scenario': {
         scenarioEl(page, v);
+        break;
+      }
+      case 'answers': {
+        answersEl(page, v);
         break;
       }
       case 'plugin': {

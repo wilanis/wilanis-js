@@ -197,6 +197,39 @@
       "description": "The most this call may take, in milliseconds, counted from the moment it starts (a map: each element). When it strikes, the call fails as a fault and the handler is told through its signal. Absent: the call waits as long as its handler does.",
       "type": "number",
       "exclusiveMinimum": 0
+    },
+    "nodeAnswer": {
+      "description": "What one node did in a recorded run: how it ended, the operation that ran, where a switch routed, the reason it refused with, and what it answered.",
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "How this node ended.",
+          "type": "string"
+        },
+        "handler": {
+          "description": "For a call or a map, the operation that ran, so a replay says when a node was rebound rather than only that its answer changed.",
+          "type": "string"
+        },
+        "out": {
+          "description": "What this node answered, recorded as it was."
+        },
+        "selected": {
+          "description": "For a switch, the rule it took, so a replay says when routing changed.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "For a node that refused on purpose, the reason it gave; absent for a node that answered or broke. A replay whose reason differs, or whose refusal became a fault, is a diff.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "answerDigest": {
+      "description": "The digest of a node answer or a stub value: the first 16 hexadecimal characters of the SHA-256 of its canonical JSON (RFC 8785). It names the value in the answers document of the directory the scenario sits in.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
     }
   }
 }

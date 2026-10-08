@@ -29,7 +29,21 @@ export const HOME: Partial<Record<Kind, Home>> = {
   },
   connection: { dir: 'connections', why: 'a connection is a channel to an external system, shared across features' },
   scenario: { dir: 'scenarios', why: 'a scenario is a recorded run' },
+  answers: { dir: 'scenarios', why: 'answers are what the recorded scenarios beside them share' },
 };
+
+/** The one name an answers document has: the recorded scenarios of the directory it sits in share what it holds. */
+export const ANSWERS_FILE = 'answers.json';
+
+/**
+ * Where an answers document belongs: `answers.json` in the recorded directory below `scenarios/` it sits in, the one
+ * place a scenario of that directory finds it; `scenarios/rehearsed/answers.json` for one in no such directory.
+ */
+export function answersHome(file: string): string {
+  const segments = file.split('/');
+  if (segments[0] === 'scenarios' && segments.length > 2) return `${segments.slice(0, -1).join('/')}/${ANSWERS_FILE}`;
+  return `scenarios/rehearsed/${ANSWERS_FILE}`;
+}
 
 /** A document as it is about to be placed: its kind, its tree path, the feature it sits in, and its content. */
 export interface Placement {
@@ -57,7 +71,8 @@ export function misplaced(placement: Placement): Refusal | null {
 function misplacedDir(placement: Placement, dir: string, why: string): Refusal | null {
   const { kind, file } = placement;
   if (file.split('/')[0] === dir) return null;
-  const to = `${dir}/${stem(file)}.${kind}.json`;
+  // an answers document has one name, so the move goes where D003 takes it rather than to a name of the file's stem
+  const to = kind === 'answers' ? answersHome(file) : `${dir}/${stem(file)}.${kind}.json`;
   return {
     code: 'D008',
     file,

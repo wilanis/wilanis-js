@@ -159,8 +159,11 @@ function triggerView(scope: Scope, doc: Loaded, view: DocView) {
   view.scenarios = scenarioGroupsOf(scope, doc);
 }
 
-/** What a scenario adds to its view: the sentence it is marked with, where a command wrote it. */
-function scenarioView(doc: Loaded, view: DocView) {
+/** The kinds a recording command writes, whose page says which command, where one did. */
+const RECORDED = new Set<Kind>(['scenario', 'answers']);
+
+/** What a scenario or an answers document adds to its view: the sentence it is marked with, where a command wrote it. */
+function recordedView(doc: Loaded, view: DocView) {
   const generated = generatedOf(doc);
   if (generated) view.generated = generated;
 }
@@ -256,6 +259,6 @@ export function viewOf(load: LoadResult, ref: string, reads: TreeReads = treeRea
   if (doc.kind === 'invariant') view.invariant = invariantView(scope, doc);
   if (doc.kind === 'project') view.profiles = profilesOf(scope);
   if (doc.kind === 'connection') connectionView(scope, doc, view);
-  if (doc.kind === 'scenario') scenarioView(doc, view);
+  if (RECORDED.has(doc.kind)) recordedView(doc, view);
   return view;
 }
