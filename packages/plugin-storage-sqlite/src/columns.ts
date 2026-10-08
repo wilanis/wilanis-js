@@ -9,8 +9,8 @@
  * what its column holds on the way in (`bound`) and back into what the shape says on the way out (`unbound`).
  */
 import type { Type } from '@wilanis/core';
-import { fieldTypeOf } from '@wilanis/plugin-storage';
-import { checkFor, columnFor } from './ddl.js';
+import { type FieldType, fieldTypeOf } from '@wilanis/plugin-storage';
+import { columnFor } from './ddl.js';
 
 export { quoted } from './ddl.js';
 
@@ -62,11 +62,9 @@ export function unbound(value: unknown, type: Type): unknown {
   return value;
 }
 
-/** The column type a field is declared with, its `CHECK` included where its column holds less than its type. */
-export function declaredOf(name: string, type: Type): { column: string; check?: string } {
-  const column = columnOf(type);
-  if (!column)
+/** The field type a field is kept as, which `ddl.ts` writes the column for; a blob has none, and is refused. */
+export function storedOf(name: string, type: Type): FieldType {
+  if (type.kind === 'blob')
     throw new Error(`'${name}' is a blob, and this engine has no column for one: its bytes live in the blob registry`);
-  const check = checkFor(name, fieldTypeOf(type));
-  return check ? { column, check } : { column };
+  return fieldTypeOf(type);
 }
