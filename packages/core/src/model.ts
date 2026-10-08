@@ -2,15 +2,17 @@
  * The document model: one TypeScript type per document kind, mirroring schemas/*.schema.json.
  * A document's kind is its $schema (the published URL, or the alias @wilanis/<kind>.schema.json); its identity is its path (@...).
  * Where those URLs point, and how a $schema is read back to a kind, is `published.ts`.
- * The vocabulary every kind is written in -- the envelope, types, fields and values -- is `vocabulary.ts`, and
- * the nodes a graph is made of are `nodes.ts`; both are re-exported here so model.js stays the one import for
- * the document model.
+ * The vocabulary every kind is written in -- the envelope, types, fields and values -- is `vocabulary.ts`,
+ * the nodes a graph is made of are `nodes.ts`, and the documents a recording command writes are `recorded.ts`; all
+ * three are re-exported here so model.js stays the one import for the document model.
  */
 
 import type { Node } from './nodes.js';
+import type { AnswersDoc, ScenarioDoc } from './recorded.js';
 import type { Envelope, Fields, InlineObject, Retry, TypeRef, TypeSpec, Values } from './vocabulary.js';
 
 export * from './nodes.js';
+export * from './recorded.js';
 export * from './vocabulary.js';
 
 export type Kind =
@@ -30,7 +32,8 @@ export type Kind =
   | 'scenario'
   | 'resolvers'
   | 'store'
-  | 'invariant';
+  | 'invariant'
+  | 'answers';
 
 export const KINDS: Kind[] = [
   'project',
@@ -50,6 +53,7 @@ export const KINDS: Kind[] = [
   'resolvers',
   'store',
   'invariant',
+  'answers',
 ];
 
 /**
@@ -400,40 +404,6 @@ export interface InvariantDoc extends Envelope {
   holds?: HoldsInvariant;
 }
 
-/** The decision a scenario proves: a switch of a graph, one of its rules (`else` for the else), and where it routes. */
-export interface ScenarioBranch {
-  graph: string;
-  node: string;
-  when: string;
-  to: string;
-}
-
-export interface ScenarioDoc extends Envelope {
-  /** The command that wrote this scenario, which regenerates it; absent for one written by hand. */
-  generated?: 'rehearse' | 'edges' | 'fuzz';
-  trigger: string;
-  /** A policy of the trigger whose decision this scenario replays instead of the trigger's fire. */
-  policy?: string;
-  branch?: ScenarioBranch;
-  seed: number;
-  in?: unknown;
-  /** The context the run read, for a trigger whose kind hands one: what `fire.in` and any policy read from. */
-  context?: Record<string, unknown>;
-  stubs?: Record<string, unknown>;
-  /** The stubbed node at which a replay aborts the run's signal: one of the keys of `stubs`. */
-  cancelAt?: string;
-  expect: {
-    status: 'done' | 'failed' | 'blocked' | 'cancelled' | 'unreachable';
-    output?: unknown;
-    /** The reason the refuse node the run failed at declared. */
-    reason?: string;
-    /** Why no input reaches the branch; present exactly when `status` is `unreachable`. */
-    unreachable?: string;
-    /** What each node did; `reason` is the one a node that refused on purpose gave, absent where it answered or broke. */
-    nodes: Record<string, { status: string; handler?: string; out?: unknown; selected?: string; reason?: string }>;
-  };
-}
-
 export interface DocByKind {
   project: ProjectDoc;
   plugin: PluginDoc;
@@ -452,5 +422,6 @@ export interface DocByKind {
   resolvers: ResolversDoc;
   store: StoreDoc;
   invariant: InvariantDoc;
+  answers: AnswersDoc;
 }
 export type AnyDoc = DocByKind[Kind];

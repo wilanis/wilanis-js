@@ -84,6 +84,13 @@
       "type": "object",
       "additionalProperties": {}
     },
+    "sharedStubs": {
+      "description": "dotted node path -> the digest of the value its operation returned, held under `stubs` in the directory's answers document. A command that records writes this in place of `stubs`; a person writes `stubs`. A path is in one of the two, never both.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "common.schema.json#/$defs/answerDigest"
+      }
+    },
     "cancelAt": {
       "description": "The dotted node path of one stubbed effect at which the replay cancels the run: wilanis regress aborts the run's signal when that node is reached, and the node rejects the way an aborted call does. Must be a key of stubs. wilanis fuzz never writes it; an author does, to pin a deadline.",
       "type": "string",
@@ -119,31 +126,17 @@
           "description": "What each node did, by its dotted path, so a replay says which node first differs.",
           "type": "object",
           "additionalProperties": {
-            "type": "object",
-            "properties": {
-              "status": {
-                "description": "How this node ended.",
-                "type": "string"
-              },
-              "handler": {
-                "description": "For a call or a map, the operation that ran, so a replay says when a node was rebound rather than only that its answer changed.",
-                "type": "string"
-              },
-              "out": {
-                "description": "What this node answered, recorded as it was."
-              },
-              "selected": {
-                "description": "For a switch, the rule it took, so a replay says when routing changed.",
-                "type": "string"
-              },
-              "reason": {
-                "description": "For a node that refused on purpose, the reason it gave; absent for a node that answered or broke. A replay whose reason differs, or whose refusal became a fault, is a diff.",
-                "type": "string"
-              }
+            "description": "What each node did, by its dotted path: the answer itself, or the digest of an answer the directory's answers document holds. A command that records writes digests; a person writes answers.",
+            "if": {
+              "description": "A string is a digest: no answer is a string, since every answer is an object with a `status`.",
+              "type": "string"
             },
-            "required": [
-              "status"
-            ]
+            "then": {
+              "$ref": "common.schema.json#/$defs/answerDigest"
+            },
+            "else": {
+              "$ref": "common.schema.json#/$defs/nodeAnswer"
+            }
           }
         }
       },

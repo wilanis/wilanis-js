@@ -499,11 +499,12 @@ Each step is one pull request and one sub-issue, and each leaves `tsc -b` and `n
 Readers land before the writer, so no commit writes a form that a reader cannot read.
 
 1. **Core: the schemas.** `nodeAnswer` and `answerDigest` in `common.schema.json`; `expect.nodes` and `sharedStubs` in
-   `scenario.schema.json`; `answers.schema.json`; `AnswersDoc`, the `Kind` entry and `HOME.answers`; the validate
-   baseline; the D003 branch for `answers.json` in `misplacedKind` (`documents.ts`) and its sabotage case; the
-   template's row. `ScenarioDoc`'s types do not change in this step, so no reader breaks. Lands before #91.
+   `scenario.schema.json`; `answers.schema.json`; `AnswersDoc` (in `recorded.ts`), the `Kind` entry and
+   `HOME.answers`; the validate baseline; the D003 branch for `answers.json` in `misplacedKind` (`documents.ts`) and
+   its sabotage cases; D008's move for an answers document; the template's row; the answers page in the viewer and its
+   test. `ScenarioDoc`'s types do not change in this step, so no reader breaks. Lands before #91.
 2. **Core and every reader: one way to read a pointer.** `packages/core/src/answers.ts` with `canonicalJson`,
-   `answerDigest`, `answersFor`, `nodesOf`, `stubsOf`, and its test. In the same pull request, `ScenarioNode` is named,
+   `answerDigest`, `answersFor`, `nodesOf`, `stubsOf`, and its test. In the same pull request, `ScenarioNode` is named (in `recorded.ts`),
    `expect.nodes` becomes `ScenarioNode | string` and `ScenarioDoc` gains `sharedStubs`, and every reader the type
    change would break goes through the new functions, so `tsc -b` passes:
    - `check/scenarios.ts`: `checkPinnedReasons` and `checkCancelAt` read through `nodesOf` and `stubsOf`;
@@ -518,8 +519,8 @@ Readers land before the writer, so no commit writes a form that a reader cannot 
    Tested with a planted scenario that points, since nothing writes one yet.
 3. **Compiler: the rules.** S0n1, S0n2; S002 judged in answers documents; `judgeTree` judges answers documents; the
    sabotage tests; the rule list in the template's `CLAUDE.md`.
-4. **Runtime and viewer: the answers document shown.** `answersLines`, `ls answers`, the answers line of a scenario's
-   `describe`; the answers page in the viewer. (`good first issue`)
+4. **Runtime: the answers document shown.** `answersLines`, `ls answers`, the answers line of a scenario's
+   `describe`. The viewer's answers page landed in step 1. (`good first issue`)
 5. **Runtime and the trees: the writer.** `recorded-answers.ts` (`sharedOf`); `writeRecorded` and `checkRecorded` write
    and compare `answers.json`; `onDisk` lists it; the ownership, determinism, orphan, no-file, collision and edges
    tests. This step changes the bytes `--record` and `fuzz --edges` write, so in the same pull request:
@@ -606,3 +607,15 @@ None. Decided in review:
 5. **Order.** The schema step (step 1) lands before #91, the `schemas-v1` freeze.
 6. **`answers.json`'s layout.** One value per line, each map sorted by digest, so a pull request's diff lists the
    values added and removed.
+
+## Decided during implementation
+
+- The answers page in the viewer moved from step 4 to step 1. The fitness function
+  `a-kind-is-declared-once-and-mirrored` requires a page for every kind, and step 1 adds the kind. Its test is in
+  `packages/view/test/scenarios.test.ts`, beside the scenario page's.
+- `ScenarioDoc`, `AnswersDoc` and, from step 2, `ScenarioNode` live in `packages/core/src/recorded.ts`, which `model.ts`
+  re-exports. With them in `model.ts`, the file would exceed the house rule's 300 lines.
+- An answers document sits at least one directory below `scenarios/`, since `answersFor` finds none at `scenarios/`
+  itself: D003 also refuses `scenarios/answers.json`. D008 moves an answers document outside `scenarios/` to
+  `scenarios/rehearsed/answers.json`, a place D003 accepts, so the fix removes the refusal (RFC 0019). `answersHome`
+  in `placement.ts` says that place for both rules.

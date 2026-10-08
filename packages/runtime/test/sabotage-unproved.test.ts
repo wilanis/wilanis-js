@@ -8,7 +8,7 @@
  * not a second decision.
  */
 import { describe, expect, it } from 'vitest';
-import { corrupt, planted, sabotage, without } from './example-harness.js';
+import { corrupt, planted, plantedEditingHinting, sabotage, without } from './example-harness.js';
 
 const SCHEMAS = 'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas';
 
@@ -20,6 +20,15 @@ const scenario = (trigger: string) => ({
   seed: 1,
   expect: { status: 'done', nodes: {} },
 });
+
+/** An answers document, valid but for where a case puts it. */
+const answers = {
+  $schema: `${SCHEMAS}/answers.schema.json`,
+  description: 'The answers the recorded scenarios beside it share.',
+  generated: 'rehearse',
+  nodes: { a0af58eabbdc1659: { status: 'cancelled' } },
+  stubs: {},
+};
 
 describe('sabotage: the documents a tree may not have', () => {
   it('D000 a file that is not JSON', () => {
@@ -35,6 +44,17 @@ describe('sabotage: the documents a tree may not have', () => {
         plugins: [],
       }),
     ).toEqual(['D003']);
+  });
+  it('D003 an answers document under any name but answers.json', () => {
+    expect(planted('scenarios/rehearsed/shared.json', answers)).toEqual(['D003']);
+    expect(planted('scenarios/rehearsed/answers.json', answers)).toEqual([]);
+  });
+  it('D003 an answers document at the top of scenarios/, where no scenario finds it', () => {
+    expect(planted('scenarios/answers.json', answers)).toEqual(['D003']);
+    // the hint names a recorded directory, never the top it was refused at; the edit is the identity, the plant is the claim
+    expect(plantedEditingHinting({ 'scenarios/answers.json': answers }, 'scenarios/answers.json', doc => doc)).toEqual([
+      'D003 move it to scenarios/rehearsed/answers.json, or change its $schema to the kind this file is',
+    ]);
   });
   it('D004 a trigger kind authored in a tree instead of shipped by a plugin', () => {
     expect(

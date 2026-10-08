@@ -5,11 +5,11 @@
  * the host's to bind (D012) -- and its ports are held to what a contract may say for itself (D011).
  */
 import { readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { basename, join, relative } from 'node:path';
 import { badResolves } from './contracts.js';
 import { type AnyDoc, type Kind, layerOf, type PluginDoc, type PortDoc, type ProjectDoc } from './model.js';
 import { featureOf, stem, treePath, walk } from './paths.js';
-import { misplaced } from './placement.js';
+import { ANSWERS_FILE, answersHome, misplaced } from './placement.js';
 import type { PluginModule } from './plugin.js';
 import type { Loaded, Refusal, RefusalList, Registry } from './registry.js';
 import { validateDocument } from './validate.js';
@@ -101,7 +101,10 @@ export class Documents {
     });
   }
 
-  /** D003, D004: the project and a feature manifest have one place each; a plugin's kinds are never authored in a tree. */
+  /**
+   * D003, D004: the project and a feature manifest have one place each, and an answers document one name in a recorded
+   * directory; a plugin's kinds are never authored in a tree.
+   */
   private misplacedKind(kind: Kind, file: string, feature: string | undefined): Refusal | null {
     if (kind === 'project')
       return {
@@ -118,6 +121,7 @@ export class Documents {
         hint: `move it to features/${feature ?? '<name>'}/feature.json`,
       };
     }
+    if (kind === 'answers') return misnamedAnswers(file);
     if (NATIVE_KINDS.has(kind))
       return {
         code: 'D004',
@@ -185,6 +189,23 @@ export class Documents {
       file: abs,
     } as Loaded);
   }
+}
+
+/**
+ * D003: an answers document is `answers.json` in a recorded directory below `scenarios/`, the one place a scenario of
+ * that directory finds it. One under another name, or at the top of `scenarios/`, would load and be read by no one.
+ */
+function misnamedAnswers(file: string): Refusal | null {
+  const atTop = file === `scenarios/${ANSWERS_FILE}`;
+  if (basename(file) === ANSWERS_FILE && !atTop) return null;
+  return {
+    code: 'D003',
+    file,
+    message: atTop
+      ? 'an answers document sits in a recorded directory below scenarios/, never at its top'
+      : 'an answers document is answers.json at the top of a recorded directory',
+    hint: `move it to ${answersHome(file)}, or change its $schema to the kind this file is`,
+  };
 }
 
 /** Whose a plugin's document is: the plugin's own (native), or, for a port it requires, the host's to bind. */

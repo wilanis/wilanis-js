@@ -39,6 +39,7 @@ export const minimal: Record<Kind, Record<string, unknown>> = {
     collections: { customers: { of: '@features/f/domain/Customer.shape.json', key: 'id' } },
   },
   invariant: { holds: { on: '@features/f/domain/Customer.shape.json', when: 'true' } },
+  answers: { generated: 'rehearse', nodes: {}, stubs: {} },
 };
 export const doc = (kind: Kind, body: Record<string, unknown> = {}, schema = schemaRef(kind)) => ({
   $schema: schema,

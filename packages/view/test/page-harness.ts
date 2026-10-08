@@ -45,6 +45,7 @@ const HELPERS = {
   step: (heading: string, content: Drawn) =>
     drawn({ tag: 'div', cls: 'step', children: [drawn({ tag: 'div', cls: 'k', text: heading }), content] }),
   arrow: () => drawn({ tag: 'span', cls: 'arrow', text: '→' }),
+  showOp: (op: string) => op,
   SEP: ' › ',
 };
 
