@@ -23,7 +23,7 @@ import { fieldLine, portLines, shower, storeLines } from './lines.js';
 import { triggersGatedBy } from './policy-gates.js';
 import { permittedLines } from './profiles-said.js';
 import { requiredByLines, requiresLines } from './required-said.js';
-import { scenarioLines, triggerScenarioLines, writtenMark } from './scenario-said.js';
+import { answersLines, scenarioLines, triggerScenarioLines, writtenMark } from './scenario-said.js';
 import { viewsOfTrigger } from './scope-said.js';
 import { shapeLines } from './shape-said.js';
 
@@ -253,6 +253,7 @@ function plainBody(doc: Loaded, load: LoadResult, scope: Scope): string[] {
   if (doc.kind === 'connection') return connectionLines(doc, scope, capabilityLines(kindOf(doc, scope)));
   if (doc.kind === 'codec') return codecLines(doc);
   if (doc.kind === 'scenario') return scenarioLines(doc, scope);
+  if (doc.kind === 'answers') return answersLines(doc);
   if (doc.kind === 'project') return projectLines(doc, scope);
   return [];
 }
