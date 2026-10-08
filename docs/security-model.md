@@ -104,6 +104,9 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
 - A scenario expects only what a run can produce: a reason on a node that failed, a cancel where it stubs, a branch
   the tree has, and a policy its trigger attaches. [[S002](refusals/S002.md), [S003](refusals/S003.md),
   [S004](refusals/S004.md), [S005](refusals/S005.md)] (RFC 0012, RFC 0014, RFC 0018)
+- A scenario reads every answer it points at: one written by hand holds its answers and stubs itself, and every
+  pointer of a recorded one resolves in the answers document its own command wrote above it.
+  [[S006](refusals/S006.md), [S007](refusals/S007.md)] (RFC 0036)
 - The http plugin's codec table names codecs, every content type in use has one, and a throttle lets something
   through. [[X001](refusals/X001.md), [X002](refusals/X002.md), [X003](refusals/X003.md)] (before the RFCs)
 - The guard's session is a shape, a session is read and written within it, and a challenge names a method the
