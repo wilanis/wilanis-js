@@ -1,9 +1,12 @@
 /**
  * S scenarios. A scenario names a trigger the tree has (S001), pins a reason only on a node that refused (S002),
  * cancels its replay only at an effect it stubbed (S003), proves a branch the graph still has (S004), and
- * replays a policy only under a trigger that attaches it (S005).
+ * replays a policy only under a trigger that attaches it (S005). A scenario written by hand holds its answers and
+ * stubs itself (S006), and every pointer of a recorded one resolves in its directory's answers document (S007), whose
+ * shared answers S002 judges once (RFC 0036).
  */
 import {
+  type AnswersDoc,
   answersFor,
   type GraphDoc,
   isSwitch,
@@ -22,7 +25,8 @@ import type { Judge, Refuser } from './judge.js';
 /**
  * The refusals a scenario earns: naming a trigger the tree does not have (S001), pinning a reason on a node
  * that did not refuse (S002), cancelling at a node it did not stub (S003), naming a branch the graph does not
- * have (S004), and naming a policy its trigger does not attach (S005).
+ * have (S004), naming a policy its trigger does not attach (S005), pointing though written by hand (S006), and
+ * pointing at what its answers document does not hold (S007).
  */
 export function checkScenario(judge: Judge, scenario: Loaded<ScenarioDoc>): void {
   const refuse = judge.refuser(scenario.path);
@@ -31,26 +35,119 @@ export function checkScenario(judge: Judge, scenario: Loaded<ScenarioDoc>): void
     refuse('S001', `scenario names unknown trigger '${scenario.doc.trigger}'`, 'trigger', 'wilanis ls trigger');
   }
   // a shared answer is judged once, in the answers document that holds it, so only the inline ones are judged here
-  checkPinnedReasons(nodesOf(scenario.doc, undefined).nodes, 'expect/nodes', refuse);
+  checkPinnedReasons(nodesOf(scenario.doc, undefined).nodes, INLINE, refuse);
   checkCancelAt(judge, scenario, refuse);
+  if (scenario.doc.generated === undefined) checkWrittenByHand(scenario.doc, refuse);
+  else checkResolved(judge, scenario, refuse);
   if (scenario.doc.branch) checkBranch(judge, scenario.doc.branch, refuse);
   if (scenario.doc.policy !== undefined) checkReplayedPolicy(judge, scenario.doc, trigger, refuse);
 }
 
 /**
- * S002: a reason belongs to a node that refused, and a node that refused ended `failed`. Judged over a map of answers
- * at `at`: a scenario's inline ones at `expect/nodes`, by node path.
+ * The refusals an answers document earns: a shared answer that pins a reason though it did not end `failed` (S002),
+ * judged once here rather than in each scenario that points at it.
  */
-function checkPinnedReasons(answers: Record<string, ScenarioNode>, at: string, refuse: Refuser): void {
+export function checkAnswers(judge: Judge, answers: Loaded<AnswersDoc>): void {
+  checkPinnedReasons(answers.doc.nodes, SHARED, judge.refuser(answers.path));
+}
+
+/** Where a map of answers sits in its document, what one of its keys names, and how its document is written again. */
+interface AnswersAt {
+  at: string;
+  named: string;
+  hint: string;
+}
+
+/** A scenario's inline answers, by node path. */
+const INLINE: AnswersAt = {
+  at: 'expect/nodes',
+  named: 'node',
+  hint: 'a reason belongs to a node that refused; drop it, or let wilanis fuzz write the scenario again',
+};
+
+/** The answers an answers document shares, by digest. */
+const SHARED: AnswersAt = {
+  at: 'nodes',
+  named: 'shared answer',
+  hint: 'a reason belongs to a node that refused; wilanis rehearse --record (or wilanis fuzz --edges) writes the answers file again: run it and review the diff',
+};
+
+/**
+ * S002: a reason belongs to a node that refused, and a node that refused ended `failed`. Judged over a map of answers:
+ * a scenario's inline ones at `expect/nodes`, by node path, or an answers document's at `nodes`, by digest.
+ */
+function checkPinnedReasons(answers: Record<string, ScenarioNode>, where: AnswersAt, refuse: Refuser): void {
   for (const [id, node] of Object.entries(answers)) {
     if (node.reason === undefined || node.status === 'failed') continue;
     refuse(
       'S002',
-      `node '${id}' pins reason '${node.reason}' but ended '${node.status}': only a node that refused gives a reason`,
-      `${at}/${id}/reason`,
-      'a reason belongs to a node that refused; drop it, or let wilanis fuzz write the scenario again',
+      `${where.named} '${id}' pins reason '${node.reason}' but ended '${node.status}': only a node that refused gives a reason`,
+      `${where.at}/${id}/reason`,
+      where.hint,
     );
   }
+}
+
+const PIN = 'wilanis scenarios --pin <the recorded file> writes the copy with every answer and stub inline';
+
+/**
+ * S006: a scenario written by hand holds its answers and its stubs itself. An answers document is rewritten whole by
+ * a command that does not know the scenario, so a value it points at could disappear on the next record.
+ */
+function checkWrittenByHand(scenario: ScenarioDoc, refuse: Refuser): void {
+  for (const [id, node] of Object.entries(scenario.expect.nodes ?? {})) {
+    if (typeof node !== 'string') continue;
+    refuse(
+      'S006',
+      `node '${id}' points at the shared answer ${node}, and a scenario written by hand holds its answers itself: no command keeps an answers file for it`,
+      `expect/nodes/${id}`,
+      `${PIN}; or write this node's answer in place of the digest`,
+    );
+  }
+  if (scenario.sharedStubs === undefined) return;
+  refuse(
+    'S006',
+    'the scenario shares its stubs under sharedStubs, and a scenario written by hand holds its stubs itself: no command keeps an answers file for it',
+    'sharedStubs',
+    `${PIN}; or write each value under stubs in place of sharedStubs`,
+  );
+}
+
+const RECORD_AGAIN =
+  'wilanis rehearse --record (or wilanis fuzz --edges) writes the scenarios and their answers file together: run it and review the diff';
+
+/**
+ * S007: every pointer of a recorded scenario resolves in the answers document `answersFor` finds for it, written by
+ * the command that wrote the scenario; and a stub is written inline or shared, never both. What `nodesOf` and
+ * `stubsOf` cannot resolve is what is refused, so no pointer is resolved a second way here.
+ */
+function checkResolved(judge: Judge, scenario: Loaded<ScenarioDoc>, refuse: Refuser): void {
+  const { doc } = scenario;
+  const found = answersFor(judge.scope.registry, scenario.path);
+  const answers = found?.doc.generated === doc.generated ? found?.doc : undefined;
+  for (const id of nodesOf(doc, answers).unresolved) {
+    const why = unheld(found, doc.generated, 'nodes');
+    refuse('S007', `node '${id}' points at ${doc.expect.nodes[id]}${why}`, `expect/nodes/${id}`, RECORD_AGAIN);
+  }
+  for (const path of stubsOf(doc, answers).unresolved) {
+    const why = unheld(found, doc.generated, 'stubs');
+    refuse('S007', `stub '${path}' points at ${doc.sharedStubs?.[path]}${why}`, `sharedStubs/${path}`, RECORD_AGAIN);
+  }
+  for (const path of Object.keys(doc.sharedStubs ?? {}).filter(one => Object.hasOwn(doc.stubs ?? {}, one))) {
+    const both = `stub '${path}' is under both stubs and sharedStubs: a stub is written inline or shared, never both`;
+    refuse('S007', both, `sharedStubs/${path}`, RECORD_AGAIN);
+  }
+}
+
+/**
+ * Why a pointer does not resolve, said after its digest: no answers document above the scenario, one another command
+ * wrote, or one whose map does not hold the digest.
+ */
+function unheld(found: Loaded<AnswersDoc> | undefined, mark: string | undefined, map: 'nodes' | 'stubs'): string {
+  if (!found) return ', and no answers.json is above this scenario';
+  const written = found.doc.generated;
+  if (written !== mark) return `, and ${found.path} above it is marked '${written}' where this scenario is '${mark}'`;
+  return `, which ${found.path} does not hold under ${map}`;
 }
 
 /**

@@ -12,7 +12,7 @@
  *   L016, a data graph making a guarded value an effect reads (graph-making.ts)
  *   L017, a `listens` setting the granting plugin does not declare (listen-settings.ts, beside contracts.ts)
  *   L018, a port the tree writes where a `listens` reads it that no socket can bind (listen-settings.ts)
- *   S scenarios (scenarios.ts)   X plugin-specific (each plugin's own `check`)
+ *   S scenarios and the answers documents they share (scenarios.ts)   X plugin-specific (each plugin's own `check`)
  */
 import { type LoadResult, type PluginModule, RefusalList, Scope } from '@wilanis/core';
 import { checkPolicy } from './check/access.js';
@@ -27,7 +27,7 @@ import { Judge } from './check/judge.js';
 import { checkBlobStore, checkProject, checkStartup } from './check/project.js';
 import { checkRequired } from './check/required.js';
 import { checkResolversDoc } from './check/resolvers.js';
-import { checkScenario } from './check/scenarios.js';
+import { checkAnswers, checkScenario } from './check/scenarios.js';
 import { checkStoreScoping } from './check/scopes.js';
 import { checkStore } from './check/stores.js';
 import { checkTrigger, checkTriggerKind } from './check/triggers.js';
@@ -72,10 +72,11 @@ function judgeContracts(judge: Judge): void {
 }
 
 /**
- * What names a contract: the resolvers, graphs, bindings, policies, triggers and scenarios. A store's scoping
- * is judged here rather than beside the rest of the store, because what a scope claims is about the resolver
- * it names, and a resolver is judged the line above. Where a data graph makes a guarded value is judged once
- * over the tree, after every graph, since it walks each guarded shape's sites rather than one document.
+ * What names a contract: the resolvers, graphs, bindings, policies, triggers, scenarios and the answers documents
+ * recorded scenarios share. A store's scoping is judged here rather than beside the rest of the store, because what
+ * a scope claims is about the resolver it names, and a resolver is judged the line above. Where a data graph makes a
+ * guarded value is judged once over the tree, after every graph, since it walks each guarded shape's sites rather
+ * than one document.
  */
 function judgeUses(judge: Judge): void {
   const { registry } = judge.scope;
@@ -88,6 +89,7 @@ function judgeUses(judge: Judge): void {
   for (const trigger of registry.all('trigger')) checkTrigger(judge, trigger);
   judgeInvariants(judge);
   for (const scenario of registry.all('scenario')) checkScenario(judge, scenario);
+  for (const answers of registry.all('answers')) checkAnswers(judge, answers);
 }
 
 /**

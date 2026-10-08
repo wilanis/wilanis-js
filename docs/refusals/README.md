@@ -183,10 +183,12 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [C022](C022.md) | C | live | a `permits` entry that permits nothing the profile reaches |
 | [C023](C023.md) | C | live | a `permits` entry naming a domain port or its operation, a pure operation, a port with nothing effectful, or a connection the profile replaces |
 | [S001](S001.md) | S | live | a scenario naming a trigger the tree does not have |
-| [S002](S002.md) | S | live | a scenario pinning a reason on a node whose status is not failed |
+| [S002](S002.md) | S | live | a scenario, or a shared answer of an answers document, pinning a reason on a node whose status is not failed |
 | [S003](S003.md) | S | live | a `cancelAt` that is not a key of the scenario's `stubs` |
 | [S004](S004.md) | S | live | a scenario's `branch` naming a graph, a switch of it or a node the switch routes to that the tree does not have |
 | [S005](S005.md) | S | live | a scenario's `policy` naming no policy, or one its trigger does not attach |
+| [S006](S006.md) | S | live | a scenario written by hand that points at a shared answer or has `sharedStubs` |
+| [S007](S007.md) | S | live | a recorded scenario's pointer its answers document does not hold, or a stub both inline and shared |
 | [X001](X001.md) | X | live | the @http codec table names something that is not a codec |
 | [X002](X002.md) | X | live | a content type a route, graph or binding uses has no codec in the @http codec table |
 | [X003](X003.md) | X | live | an http connection's throttle could never let a request through |

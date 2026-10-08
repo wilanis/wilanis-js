@@ -208,7 +208,7 @@ wrote scenarios/customers.get-row.outcome.noCustomer.scenario.json with every an
 **The refusal an author meets.** Copy the recorded file by hand and drop `generated`:
 
 ```
-S0n1  @scenarios/customers.get-row.outcome.noCustomer.scenario.json#expect/nodes/op.outcome
+S006  @scenarios/customers.get-row.outcome.noCustomer.scenario.json#expect/nodes/op.outcome
     node 'op.outcome' points at the shared answer 57a449dbd5d11643, and a scenario written by hand holds its answers itself: no command keeps an answers file for it
     → wilanis scenarios --pin <the recorded file> writes the copy with every answer and stub inline; or write this node's answer in place of the digest
 ```
@@ -320,7 +320,7 @@ no one.
 scenarios of one directory share, each once, under its digest; written by `wilanis rehearse --record` and `wilanis
 fuzz --edges` beside what they record; regenerate it, never edit it"; home `scenarios/`, at the top of a recorded
 directory). The `scenario` row and step 3 say to keep a run with `wilanis scenarios --pin <file>`, where today they
-say to copy the file. The rule list's `S scenarios` gains S0n1 and S0n2.
+say to copy the file. The rule list's `S scenarios` gains S006 and S007.
 
 **`wilanis new answers`**: not added. An answers file is written only by a command, as RFC 0018 decided for a
 scenario.
@@ -331,14 +331,14 @@ None.
 
 ### Checker rules
 
-Codes are placeholders. The implementing pull request takes the next free codes of the S family. The rules live in
+The codes are the next free ones of the S family, S006 and S007, taken in step 3. The rules live in
 `packages/compiler/src/check/scenarios.ts`, beside S001 to S005, or in a `check/answers.ts` beside it if the file would
 pass the house rule's 300 lines. `judgeTree` in `checker.ts` judges answers documents where it judges scenarios.
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
-| S0n1 | `check/scenarios.ts`, at `expect/nodes/<id>` or `sharedStubs` | a scenario with no `generated` writes a digest for a node, or has `sharedStubs`. Its answers file is rewritten by a command that does not know the scenario, so a value it needs may disappear | `wilanis scenarios --pin <the recorded file> writes the copy with every answer and stub inline; or write the value in place of the digest` |
-| S0n2 | `check/scenarios.ts`, at `expect/nodes/<id>` or `sharedStubs/<path>` | a node or a stub is a digest, and the scenario's answers file (`answersFor`) does not exist, carries another `generated` than the scenario, or holds no value under that digest in the map it reads (`nodes` for a node, `stubs` for a stub). Also a path that is in both `stubs` and `sharedStubs` | `wilanis rehearse --record (or wilanis fuzz --edges) writes the scenarios and their answers file together: run it and review the diff` |
+| S006 | `check/scenarios.ts`, at `expect/nodes/<id>` or `sharedStubs` | a scenario with no `generated` writes a digest for a node, or has `sharedStubs`. Its answers file is rewritten by a command that does not know the scenario, so a value it needs may disappear | `wilanis scenarios --pin <the recorded file> writes the copy with every answer and stub inline; or write the value in place of the digest` |
+| S007 | `check/scenarios.ts`, at `expect/nodes/<id>` or `sharedStubs/<path>` | a node or a stub is a digest, and the scenario's answers file (`answersFor`) does not exist, carries another `generated` than the scenario, or holds no value under that digest in the map it reads (`nodes` for a node, `stubs` for a stub). Also a path that is in both `stubs` and `sharedStubs` | `wilanis rehearse --record (or wilanis fuzz --edges) writes the scenarios and their answers file together: run it and review the diff` |
 
 **S002 and S003 read through core.** S002 refuses a reason on a node that did not end `failed`. For an inline answer
 it is judged as today, at `expect/nodes/<id>/reason`. A shared answer is judged once, in the answers document, at
@@ -385,7 +385,7 @@ are pure functions of the documents, so `--check` keeps comparing bytes.
 | S003, `checkCancelAt` in `check/scenarios.ts` | reads the keys of `stubs` | reads the keys `stubsOf` answers |
 | `regress` in `fuzz.ts`: `replayedDiffs`, `diffOf`, `branchFirst`, `switchPath` | reads `expect.nodes` as answers and fires with `sc.stubs` | `replayedDiffs` calls `answersFor`, `nodesOf` and `stubsOf` once per scenario, fires with the resolved stubs, and hands `diffOf` the resolved nodes; the diff and its lines are unchanged |
 | `regress`: `cancelledReplay` in `fuzz.ts` | removes `cancelAt` from `sc.stubs` | removes it from the resolved stubs |
-| `regress`, a digest that does not resolve | | a `DIFF` naming it (`op.x: points at 57a4… which scenarios/rehearsed/answers.json does not hold`), never a throw; `wilanis regress` runs `check` first, which refuses it as S0n2 |
+| `regress`, a digest that does not resolve | | a `DIFF` naming it (`op.x: points at 57a4… which scenarios/rehearsed/answers.json does not hold`), never a throw; `wilanis regress` runs `check` first, which refuses it as S007 |
 | `routedLines` and `scenarioLines` in `scenario-said.ts` (`wilanis describe`) | reads `selected` of each node; prints no stub (RFC 0018) | `scenarioLines` takes the scope and reads the nodes `nodesOf` answers; still prints no stub, and adds `answers  <the file answersFor found>` where a node or a stub is shared |
 | the viewer, `scenarioView` in `packages/view/src/model.ts` and `scenarioEl` in `client/index.html` | the page reads `d.expect.nodes` raw; shows no stub | the view model hands the page the nodes `nodesOf` answers, and the page no longer reads `expect.nodes` itself; it still shows no stub |
 | `fuzz --edges` | writes through `writeRecorded` | shares through `sharedOf` there, with no change of its own |
@@ -436,7 +436,7 @@ validates and means the same thing, *breaking* otherwise.
 | `sharedStubs` on a scenario | compatible: a new optional field |
 | the `answers` document kind | compatible: RFC 0008 names a new document kind as compatible |
 | `nodeAnswer` and `answerDigest` in `common.schema.json` | compatible: a definition moved, with the same content |
-| S0n1, S0n2 | compatible: each refuses only a document that uses the new form, so no document written before is refused |
+| S006, S007 | compatible: each refuses only a document that uses the new form, so no document written before is refused |
 | what `--record` and `fuzz --edges` write | not a schema change. Every committed recorded directory is stale once, and `--check` asks for `--record`, as #875 did |
 
 So the change is compatible, and RFC 0008 would let it land after #91 in place, without `schemas-v2`. The schema step
@@ -456,8 +456,8 @@ Sabotage tests through `planted` in `packages/runtime/test/sabotage-scenarios.te
 
 | Code | The edit |
 |---|---|
-| S0n1 | a recorded scenario copied into `scenarios/` with `generated` dropped and its digests kept; the same with only `sharedStubs` kept |
-| S0n2 | a node digest the directory's `answers.json` does not hold; a stub digest it does not hold under `stubs`, though it holds it under `nodes`; a recorded scenario moved under a second `--record` directory whose `answers.json` lacks its digests; a recorded scenario in a directory with no `answers.json`; an `answers.json` marked `edges` above a `rehearse` scenario; a path in both `stubs` and `sharedStubs` |
+| S006 | a recorded scenario copied into `scenarios/` with `generated` dropped and its digests kept; the same with only `sharedStubs` kept |
+| S007 | a node digest the directory's `answers.json` does not hold; a stub digest it does not hold under `stubs`, though it holds it under `nodes`; a recorded scenario moved under a second `--record` directory whose `answers.json` lacks its digests; a recorded scenario in a directory with no `answers.json`; an `answers.json` marked `edges` above a `rehearse` scenario; a path in both `stubs` and `sharedStubs` |
 | S002 | a shared answer with `reason` and status `done`, refused at `nodes/<digest>/reason` of the answers document; an inline one, as today |
 | S003 | a hand-written scenario with `cancelAt` naming a path under `stubs` passes, as today; one naming no path refuses |
 | none | a hand-written scenario with inline answers and stubs; a recorded one whose every digest resolves |
@@ -517,7 +517,7 @@ Readers land before the writer, so no commit writes a form that a reader cannot 
      `client/index.html` stops reading `d.expect.nodes`.
 
    Tested with a planted scenario that points, since nothing writes one yet.
-3. **Compiler: the rules.** S0n1, S0n2; S002 judged in answers documents; `judgeTree` judges answers documents; the
+3. **Compiler: the rules.** S006, S007; S002 judged in answers documents; `judgeTree` judges answers documents; the
    sabotage tests; the rule list in the template's `CLAUDE.md`.
 4. **Runtime: the answers document shown.** `answersLines`, `ls answers`, the answers line of a scenario's
    `describe`. The viewer's answers page landed in step 1. (`good first issue`)
@@ -622,11 +622,11 @@ None. Decided in review:
 - `answersFor` walks up from the scenario's directory and stops at the first `answers.json` the registry holds. It asks
   `answersHome` whether each candidate is a place an answers document may sit, so the rule D003 and D008 follow is
   written once. `nodesOf` and `stubsOf` list the node paths and the stub paths they cannot resolve, not the digests:
-  S0n2 refuses at a path, and a reader finds the digest under that path.
+  S007 refuses at a path, and a reader finds the digest under that path.
 - In step 2, S002 judges a scenario's inline answers only (`nodesOf` with no answers document). A shared answer waits
   for step 3, which judges it once, in its answers document. `checkPinnedReasons` takes a map of answers and the
   pointer they sit under, so step 3 calls the same function at `nodes`. S003 counts a path under `sharedStubs` even
-  when its digest does not resolve: that fault is S0n2's, and one fault gets one refusal.
+  when its digest does not resolve: that fault is S007's, and one fault gets one refusal.
 - `regress` fires nothing for a scenario with a pointer that does not resolve. It answers one `DIFF` per pointer:
   `op.x: points at <digest>, which scenarios/rehearsed/answers.json does not hold`, `stub op.x: points at ...` for a
   stub, and `..., and no answers.json is above it` where `answersFor` finds no file.
@@ -639,3 +639,20 @@ None. Decided in review:
   every document, and a scenario's `expect.nodes/<id>/handler` names the operation a node ran. It now reads a scenario
   through `nodesOf` and `stubsOf`, so a pointing scenario references, at the same pointers, what its inline form does.
   The answers document is walked as it is written, so it references those operations too.
+- Step 3 took S006 for the rule this RFC called S0n1, and S007 for S0n2. The rules stay in `check/scenarios.ts`, which
+  stays under the house rule's 300 lines, so there is no `check/answers.ts`. `judgeTree` judges each answers document
+  in `judgeUses`, after the scenarios, through `checkAnswers`.
+- S007 judges only a recorded scenario. A scenario written by hand that points is S006's alone, so one fault gets one
+  refusal, and that includes a hand-written scenario with a path under both `stubs` and `sharedStubs`. S006 refuses each
+  node written as a digest at `expect/nodes/<id>`, and `sharedStubs` once, at `sharedStubs`, whatever it holds.
+- Where the answers document above a recorded scenario carries another `generated` mark, S007 reads the scenario's
+  pointers as if no document were there (`nodesOf` and `stubsOf` with none), so each pointer is refused once, at its
+  own path, and the message names both marks. Nothing is refused at the answers document for it.
+- S002 in an answers document names the answer by its digest (`shared answer '<digest>' pins reason ...`), and its hint
+  says to record the directory again, since a person does not edit the file. `checkPinnedReasons` takes where the map
+  sits, what its keys name and that hint together, so one function judges both forms.
+- The sabotage tests live in `packages/runtime/test/sabotage-shared-answers.test.ts`, one file for the three rules this
+  RFC adds or widens. `example.test.ts` has no room under the house rule's 300 lines, and the S004 and S005 cases in
+  `sabotage-scenarios.test.ts` plant a scenario of their own form.
+- S006's hint names `wilanis scenarios --pin`, which step 6 (#884) adds. Until it lands, the second half of the hint,
+  writing the value in place of the digest, is the fix.
