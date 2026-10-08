@@ -8,8 +8,9 @@
  * The counts are `planner-counts.test.ts`, and the port's `ensure` over the planner is `planner-ensure.test.ts`.
  */
 import { type Declared, driftOf, type Step } from '@wilanis/plugin-storage';
+import type Database from 'better-sqlite3';
 import { afterAll, describe, expect, it } from 'vitest';
-import { ENTRIES, NOTES, planFor, planning } from './planning.js';
+import { ENTRIES, NOTES, planFor, planning, rowsOf } from './planning.js';
 
 const { engine, fresh, raw, snapshot, apply, close } = planning('planner');
 afterAll(close);
@@ -95,29 +96,44 @@ describe('the record a file keeps of the plans that applied', () => {
   });
 });
 
+/**
+ * Two rows of `entries` with every column filled, answered as the file then holds them, so a case compares the
+ * whole table after a rebuild rather than one value of its first row.
+ */
+function filled(db: Database.Database): Record<string, unknown>[] {
+  db.prepare(
+    `insert into entries (id, url, method, code, hits, vip, tags) values
+      ('1', '/a', 'GET', '42', 3, 1, '["x"]'), ('2', '/b', 'POST', '7', 0.5, 0, '{"a":1}')`,
+  ).run();
+  const rows = rowsOf(db, 'entries');
+  expect(rows).toHaveLength(2);
+  return rows;
+}
+
+/** A row without one column, as the table holds it once that column is removed. */
+const without = (row: Record<string, unknown>, column: string) =>
+  Object.fromEntries(Object.entries(row).filter(([name]) => name !== column));
+
 describe('a step SQLite takes only by remaking the table', () => {
   it('a retype carries every value, and keeps the other columns, the unique and the references to the table', async () => {
     const on = await made();
     const db = raw(on);
-    db.prepare(`insert into entries (id, url, method, code, vip) values ('1', '/a', 'GET', '42', 1)`).run();
+    const before = filled(db);
     db.prepare(`insert into notes (id, entryId) values ('n', '1')`).run();
     const now = withField('code', { type: 'number', required: false });
     await apply(on, [retype('code', 'string', 'number')], { entries: now });
-    expect(db.prepare('select code, typeof(code) as t, vip from entries').get()).toEqual({
-      code: 42,
-      t: 'real',
-      vip: 1,
-    });
+    expect(rowsOf(db, 'entries')).toEqual(before.map(row => ({ ...row, code: Number(row.code) })));
+    expect(db.prepare('select distinct typeof(code) as t from entries').all()).toEqual([{ t: 'real' }]);
     expect(await engine.inspect(on, 'entries')).toEqual(now);
     expect(await engine.recorded(on, 'entries')).toEqual(now);
-    expect(() => db.prepare(`insert into entries (id, url, method) values ('2', '/a', 'GET')`).run()).toThrow(/UNIQUE/);
+    expect(() => db.prepare(`insert into entries (id, url, method) values ('3', '/a', 'GET')`).run()).toThrow(/UNIQUE/);
     expect(() => db.prepare(`delete from entries where id = '1'`).run()).toThrow(/FOREIGN KEY/);
   });
 
   it('a number becomes text as JavaScript writes it, and a text that reads as JSON becomes JSON', async () => {
     const on = await made();
     const db = raw(on);
-    db.prepare(`insert into entries (id, url, method, code, hits) values ('1', '/a', 'GET', '{"a":1}', 3)`).run();
+    const before = filled(db);
     const now: Declared = withField('hits', { type: 'string', required: false });
     now.fields.code = { type: 'json', required: false };
     const steps: Step[] = [
@@ -125,44 +141,53 @@ describe('a step SQLite takes only by remaking the table', () => {
       { ...retype('code', 'string', 'string'), becomes: 'json' },
     ];
     await apply(on, steps, { entries: now });
-    expect(db.prepare('select hits, code from entries').get()).toEqual({ hits: '3', code: '{"a":1}' });
+    expect(rowsOf(db, 'entries')).toEqual(before.map(row => ({ ...row, hits: String(row.hits) })));
     expect(await engine.inspect(on, 'entries')).toEqual(now);
   });
 
   it('require fills what is empty with the default, relax lets it be empty again, remove takes the column', async () => {
     const on = await made();
     const db = raw(on);
-    db.prepare(`insert into entries (id, url, method) values ('1', '/a', 'GET')`).run();
+    filled(db);
+    db.prepare(`insert into entries (id, url, method, hits, vip, tags) values ('3', '/c', 'GET', 1, 1, '[]')`).run();
+    const before = rowsOf(db, 'entries');
     const required = withField('code', { type: 'string', required: true });
     await apply(on, [{ do: 'require', target: 'entries', at: 'code', default: 'none', says: 'require code' }], {
       entries: required,
     });
-    expect(db.prepare('select code from entries').get()).toEqual({ code: 'none' });
+    const filledIn = before.map(row => ({ ...row, code: row.code ?? 'none' }));
+    expect(rowsOf(db, 'entries')).toEqual(filledIn);
     expect(await engine.inspect(on, 'entries')).toEqual(required);
     await apply(on, [{ do: 'relax', target: 'entries', at: 'code', says: 'relax code' }], { entries: ENTRIES });
+    expect(rowsOf(db, 'entries')).toEqual(filledIn);
     expect(await engine.inspect(on, 'entries')).toEqual(ENTRIES);
-    const without: Declared = { ...ENTRIES, fields: { ...ENTRIES.fields } };
-    delete without.fields.code;
-    await apply(on, [{ do: 'remove', target: 'entries', at: 'code', says: 'remove code' }], { entries: without });
-    expect(await engine.inspect(on, 'entries')).toEqual(without);
+    const removed: Declared = { ...ENTRIES, fields: { ...ENTRIES.fields } };
+    delete removed.fields.code;
+    await apply(on, [{ do: 'remove', target: 'entries', at: 'code', says: 'remove code' }], { entries: removed });
+    expect(rowsOf(db, 'entries')).toEqual(filledIn.map(row => without(row, 'code')));
+    expect(await engine.inspect(on, 'entries')).toEqual(removed);
   });
 
   it('a reference is added over a column the table already has, and dropped again', async () => {
     const on = await made();
+    const db = raw(on);
+    filled(db);
+    db.prepare(`insert into notes (id, entryId) values ('n1', '1'), ('n2', '2'), ('n3', null)`).run();
+    const notes = rowsOf(db, 'notes');
     const loose: Declared = { ...NOTES, refs: {} };
     await apply(on, [{ do: 'unref', target: 'notes', at: 'entryId', to: 'entries', says: 'unref entryId' }], {
       notes: loose,
     });
-    raw(on).prepare(`insert into notes (id, entryId) values ('n', 'nobody')`).run();
+    expect(rowsOf(db, 'notes')).toEqual(notes);
+    db.prepare(`insert into notes (id, entryId) values ('n4', 'nobody')`).run();
     expect(await engine.inspect(on, 'notes')).toEqual(loose);
-    raw(on).prepare(`delete from notes`).run();
+    db.prepare(`delete from notes where id = 'n4'`).run();
     await apply(on, [{ do: 'ref', target: 'notes', at: 'entryId', to: 'entries', says: 'ref entryId' }], {
       notes: NOTES,
     });
+    expect(rowsOf(db, 'notes')).toEqual(notes);
     expect(await engine.inspect(on, 'notes')).toEqual(NOTES);
-    expect(() => raw(on).prepare(`insert into notes (id, entryId) values ('m', 'nobody')`).run()).toThrow(
-      /FOREIGN KEY/,
-    );
+    expect(() => db.prepare(`insert into notes (id, entryId) values ('m', 'nobody')`).run()).toThrow(/FOREIGN KEY/);
   });
 });
 

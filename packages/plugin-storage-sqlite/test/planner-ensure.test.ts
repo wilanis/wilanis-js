@@ -13,7 +13,7 @@
 import { type Type, TypeResolver } from '@wilanis/core';
 import { type At, type Declares, driftOf, ensureStore, type On } from '@wilanis/plugin-storage';
 import { afterAll, describe, expect, it } from 'vitest';
-import { planning } from './planning.js';
+import { planning, rowsOf } from './planning.js';
 
 const { engine, fresh, raw, snapshot, close } = planning('ensure');
 afterAll(close);
@@ -130,7 +130,12 @@ describe('ensure over the planner', () => {
   it('adds a reference over a column the table already has, by remaking it, and the reference holds', async () => {
     const on = fresh();
     await ensure(store(on, { entries: ENTRIES, notes: { of: 'Note', key: 'id' } }, SHAPES));
+    raw(on).prepare(`insert into entries (id, url, hits, vip, tags) values ('1', '/a', 1, 1, '["x"]')`).run();
+    raw(on).prepare(`insert into entries (id, url, hits, vip, tags) values ('2', '/b', 2, 0, '[]')`).run();
+    raw(on).prepare(`insert into notes (id, entryId) values ('n1', '1'), ('n2', '2'), ('n3', null)`).run();
+    const notes = rowsOf(raw(on), 'notes');
     expect((await ensure(store(on, { entries: ENTRIES, notes: NOTES }, SHAPES))).constraints).toBe(1);
+    expect(rowsOf(raw(on), 'notes')).toEqual(notes);
     expect(() => raw(on).prepare(`insert into notes (id, entryId) values ('n', 'nobody')`).run()).toThrow(
       /FOREIGN KEY/,
     );

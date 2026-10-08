@@ -46,6 +46,10 @@ export const NOTES: Declared = {
 /** The steps the planner writes for collections a file has never recorded, so a case applies what a plan does. */
 export const planFor = (declared: Record<string, Declared>): Step[] => plan({}, declared, {}).steps;
 
+/** Every row of one table, every column, in key order: what a rebuild must carry whole. */
+export const rowsOf = (db: Database.Database, table: string): Record<string, unknown>[] =>
+  db.prepare(`select * from "${table}" order by id`).all() as Record<string, unknown>[];
+
 /** What a file holds, read as any SQLite tool reads it: every table, index and row, in a stable order. */
 export interface Snapshot {
   schema: unknown[];
