@@ -83,17 +83,25 @@ function shares(doc: ScenarioDoc): boolean {
 }
 
 /**
- * The line naming the answers document a scenario's pointers read, the one `answersAbove` found as its own; where the
- * nearest one is another command's, that command and why the scenario reads nothing from it; that none is above it
- * where it found none; nothing for a scenario that shares nothing.
+ * The line naming the answers document a scenario's pointers read, the one `answersAbove` found as its own; where it
+ * found none of its own, why its pointers read nothing (`unreadSaid`); nothing for a scenario that shares nothing.
  */
 function sharedLines(doc: ScenarioDoc, above: ReturnType<typeof answersAbove>): string[] {
   if (!shares(doc)) return [];
   if (above.own) return [`answers ${above.own.path}`];
-  if (!above.other) return ['answers none -- no answers.json is above it, so its pointers read nothing'];
+  return [`answers none -- ${unreadSaid(above, doc)}, so its pointers read nothing`];
+}
+
+/**
+ * Why a scenario with no answers document of its own reads nothing through its pointers: no answers.json is above it,
+ * or the nearest one was written by another command than the scenario's, or the scenario was written by hand.
+ */
+export function unreadSaid(above: { other?: Loaded<AnswersDoc> }, doc: ScenarioDoc): string {
+  if (!above.other) return 'no answers.json is above it';
   const other = `${above.other.path} was written by ${WRITTEN_BY[above.other.doc.generated]}`;
-  const why = doc.generated ? `not by ${WRITTEN_BY[doc.generated]}` : 'and a hand-written scenario cannot point';
-  return [`answers none -- ${other}, ${why}, so its pointers read nothing`];
+  return doc.generated
+    ? `${other}, not by ${WRITTEN_BY[doc.generated]}`
+    : `${other}, and a hand-written scenario cannot point`;
 }
 
 /** What a policy scenario fires, said beside the policy. */

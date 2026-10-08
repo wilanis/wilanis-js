@@ -161,6 +161,18 @@ describe('a pointing scenario diffs as its inline form', () => {
     const none = (await replayed(unheld)).find(one => one.startsWith(`@${MISSING}`));
     expect(none).toMatch(new RegExp(`^@${MISSING}: DIFF op: points at [0-9a-f]{16}, and no answers.json is above it;`));
   });
+
+  it('names the answers file another command wrote, and both commands, where it reads nothing from it', {
+    timeout: 120_000,
+  }, async () => {
+    const edges = pointingCopy();
+    copies.push(edges);
+    editing(edges, ANSWERS, doc => (doc.generated = 'edges'));
+    const line = (await replayed(edges)).find(one => one.startsWith(`@${MISSING}`));
+    const why = `and @${ANSWERS} was written by wilanis fuzz --edges, not by wilanis rehearse --record`;
+    expect(line).toMatch(new RegExp(`^@${MISSING}: DIFF op: points at [0-9a-f]{16}, ${why};`));
+    expect(line).not.toContain('no answers.json is above it');
+  });
 });
 
 /** The body `describe` prints for one document: what follows the blank line after its description. */

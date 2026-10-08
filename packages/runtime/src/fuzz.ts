@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { walkedUnder } from '@wilanis/compiler';
 import type { Loaded, LoadResult } from '@wilanis/core';
 import {
-  answersFor,
+  answersAbove,
   nodesOf,
   type ScenarioDoc,
   type ScenarioNode,
@@ -23,6 +23,7 @@ import { type Fuzzing, fuzzEdges } from './fuzz-edges.js';
 import { activeProfile, skippedLines } from './profile.js';
 import { HOME_DIR, SCENARIOS } from './recorded-dir.js';
 import { replayedDoc, solvedAgain } from './rehearse-recorded.js';
+import { unreadSaid } from './scenario-said.js';
 import { embedderFor, generatedFire } from './stubbing.js';
 
 export { HOME_DIR, SCENARIOS } from './recorded-dir.js';
@@ -294,10 +295,10 @@ async function replayedDiffs(
 ): Promise<string[]> {
   const sc = loaded.doc;
   if (sc.expect.status === 'unreachable') return solvedAgain(load, sc, trigger, how.stubbed.profile);
-  const answers = answersFor(load.registry, loaded.path);
-  const { nodes, unresolved } = nodesOf(sc, answers?.doc);
-  const { stubs, unresolved: unstubbed } = stubsOf(sc, answers?.doc);
-  if (unresolved.length || unstubbed.length) return unheldDiffs(sc, answers?.path, { unresolved, unstubbed });
+  const above = answersAbove(load.registry, loaded.path);
+  const { nodes, unresolved } = nodesOf(sc, above.own?.doc);
+  const { stubs, unresolved: unstubbed } = stubsOf(sc, above.own?.doc);
+  if (unresolved.length || unstubbed.length) return unheldDiffs(sc, above, { unresolved, unstubbed });
   const fired = replayedDoc(load, sc, trigger);
   const report = sc.cancelAt
     ? await cancelledReplay(load, how.stubbed, fired, { sc, stubs })
@@ -306,15 +307,15 @@ async function replayedDiffs(
 }
 
 /**
- * The pointers of a scenario its answers document does not hold, one difference each: `op.x: points at <digest>,
- * which scenarios/rehearsed/answers.json does not hold`, or `stub op.x: ...` for a stub.
+ * The pointers of a scenario that do not resolve, one difference each: `op.x: points at <digest>, which <file> does not
+ * hold`, `stub op.x: ...` for a stub, or, with no answers document of its own, why (`unreadSaid`, as `describe` says).
  */
 function unheldDiffs(
   sc: ScenarioDoc,
-  answers: string | undefined,
+  above: ReturnType<typeof answersAbove>,
   paths: { unresolved: string[]; unstubbed: string[] },
 ): string[] {
-  const holder = answers ? `which ${answers.replace(/^@/, '')} does not hold` : 'and no answers.json is above it';
+  const holder = above.own ? `which ${above.own.path.slice(1)} does not hold` : `and ${unreadSaid(above, sc)}`;
   const nodes = paths.unresolved.map(path => `${path}: points at ${sc.expect.nodes[path]}, ${holder}`);
   const stubs = paths.unstubbed.map(path => `stub ${path}: points at ${sc.sharedStubs?.[path]}, ${holder}`);
   return [...nodes, ...stubs];
