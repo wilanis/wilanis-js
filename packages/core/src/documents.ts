@@ -196,12 +196,13 @@ export class Documents {
  * that directory finds it. One under another name, or at the top of `scenarios/`, would load and be read by no one.
  */
 function misnamedAnswers(file: string): Refusal | null {
-  const atTop = file === `scenarios/${ANSWERS_FILE}`;
-  if (basename(file) === ANSWERS_FILE && !atTop) return null;
+  const named = basename(file) === ANSWERS_FILE;
+  if (file.startsWith('scenarios/') ? answersHome(file) === file : named) return null;
   return {
     code: 'D003',
     file,
-    message: atTop
+    // refused under its one name, it can only be at the top of scenarios/
+    message: named
       ? 'an answers document sits in a recorded directory below scenarios/, never at its top'
       : 'an answers document is answers.json at the top of a recorded directory',
     hint: `move it to ${answersHome(file)}, or change its $schema to the kind this file is`,
