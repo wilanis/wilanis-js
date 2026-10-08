@@ -140,6 +140,18 @@ describe('what ensure makes, and what it refuses to change', () => {
     });
   });
 
+  it('fills a column kept as JSON with its default as JSON text, so a true reads back as true and not as 1', async () => {
+    const older = at('e_json', { shape: BEFORE });
+    await engine.ensure([older]);
+    await engine.put(older, { id: '1', url: 'https://x' }, { replace: true });
+    const shape = types.inline({
+      fields: { id: { type: 'string' }, url: { type: 'string' }, flag: { type: 'unknown', required: false } },
+    });
+    const now = at('e_json', { shape, defaults: { flag: true } });
+    await engine.ensure([now]);
+    expect((await engine.get(now, '1')).record).toEqual({ id: '1', url: 'https://x', flag: true });
+  });
+
   it('refuses drift where a column is of another type, and changes nothing', async () => {
     const before = at('e_typed', {
       shape: types.inline({ fields: { id: { type: 'string' }, hits: { type: 'string' } } }),

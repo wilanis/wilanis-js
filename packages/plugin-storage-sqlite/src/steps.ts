@@ -14,7 +14,7 @@ import { attempts, carries } from './casts.js';
 import { indexColumnsOf } from './catalog.js';
 import { changeOf } from './changes.js';
 import { quoted } from './columns.js';
-import { checkFor, columnFor, createTableSql, layoutOf, literal, same } from './ddl.js';
+import { addColumnSql, columnFor, createTableSql, layoutOf, same } from './ddl.js';
 import { readTable } from './inspect.js';
 import { scopedIndexName, scopedUniqueName, uniqueName } from './names.js';
 import { rebuild } from './rebuild.js';
@@ -44,19 +44,15 @@ async function create(db: Kysely<never>, step: Step, to: Declared | null | undef
 /**
  * Add a column the table can take in place: an optional one, or a required one with the default the store
  * declares for the rows already there. The default stays on the column, since SQLite cannot drop one; nothing
- * reads it, because a `put` always writes the whole record.
+ * reads it, because a `put` always writes the whole record. A reference the field holds is the plan's own `ref`
+ * step, so the column is added without one.
  */
-async function add(db: Kysely<never>, step: Step, field: DeclaredField | undefined) {
-  if (!field) throw new Error(`add ${step.target}.${step.at}: the tree declares no such field`);
-  const name = step.at ?? '';
-  const fill = step.default === undefined ? '' : ` DEFAULT ${literal(step.default, field.type)}`;
-  const notNull = field.required ? ' NOT NULL' : '';
-  const check = checkFor(name, field.type);
-  const checked = check ? ` CHECK (${check})` : '';
-  await run(
-    db,
-    `ALTER TABLE ${quoted(step.target)} ADD COLUMN ${quoted(name)} ${columnFor(field.type)}${fill}${notNull}${checked}`,
-  );
+async function add(db: Kysely<never>, step: Step, to: Declared | null | undefined) {
+  const field = fieldOf(step, to);
+  if (!to || !field) throw new Error(`add ${step.target}.${step.at}: the tree declares no such field`);
+  const column = { name: step.at ?? '', type: field.type, column: columnFor(field.type), required: field.required };
+  const layout = { columns: [column], key: to.key, integerKey: false, refs: {} };
+  await run(db, addColumnSql(step.target, column, layout, step.default));
 }
 
 /**
@@ -107,7 +103,7 @@ async function inPlace(db: Kysely<never>, step: Step, ctx: Against): Promise<boo
       db,
       `ALTER TABLE ${quoted(step.target)} RENAME COLUMN ${quoted(step.from ?? '')} TO ${quoted(step.at ?? '')}`,
     );
-  else if (step.do === 'add') await add(db, step, fieldOf(step, to));
+  else if (step.do === 'add') await add(db, step, to);
   else if (step.do === 'unique') await unique(db, step);
   else if (step.do === 'ununique') await ununique(db, step);
   else return false;

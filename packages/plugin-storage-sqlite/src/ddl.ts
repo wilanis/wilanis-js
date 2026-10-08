@@ -1,11 +1,12 @@
 /**
  * A table as DDL spells it, from what the planner says a collection is (RFC 0017): the column each field type
  * is kept in, its `CHECK`, `NOT NULL`, the key and the references. A `create` step writes a new table with it,
- * and a rebuild (`rebuild.ts`) writes the table a step leaves behind. Both spell a column exactly as `ensure`
- * does, so a table made one way reads back the same as a table made the other.
+ * and a rebuild (`rebuild.ts`) writes the table a step leaves behind. `ensure` writes its tables with it too,
+ * so a table made one way reads back the same as a table made the other.
  *
- * The map from a field type to its column and the text of each `CHECK` live here and nowhere else: `columns.ts`
- * maps a shape's field through them for `ensure`, and `inspect.ts` reads this same `CHECK` text back.
+ * The map from a field type to its column, the text of each `CHECK` and the clause a column is written with live
+ * here and nowhere else: `ensure.ts` makes its tables and adds its columns through them, `steps.ts` its creates
+ * and adds, `rebuild.ts` its remade tables, and `inspect.ts` reads this same `CHECK` text back.
  */
 import type { Declared, FieldType } from '@wilanis/plugin-storage';
 import { folded } from './names.js';
@@ -53,16 +54,20 @@ function referenceOf(refs: Declared['refs'], column: string): string | undefined
   return field ? refs[field]?.collection : undefined;
 }
 
-/** One column of a `CREATE TABLE`: its type, `NOT NULL`, the integer key, its `CHECK` and its reference. */
-function clauseOf(column: Kept, layout: Layout): string {
+/**
+ * One column as DDL spells it: its type, the default the rows already there receive where it is added with
+ * one, `NOT NULL`, the integer key, its `CHECK` and its reference.
+ */
+function clauseOf(column: Kept, layout: Layout, fill?: string): string {
   const isKey = same(column.name, layout.key);
+  const filled = fill ? ` DEFAULT ${fill}` : '';
   const notNull = column.required || isKey ? ' NOT NULL' : '';
   const key = layout.integerKey && isKey ? ' PRIMARY KEY' : '';
   const check = checkFor(column.name, column.type);
   const checked = check ? ` CHECK (${check})` : '';
   const to = referenceOf(layout.refs, column.name);
   const references = to ? ` REFERENCES ${quoted(to)} ON DELETE RESTRICT` : '';
-  return `${quoted(column.name)} ${column.column}${notNull}${key}${checked}${references}`;
+  return `${quoted(column.name)} ${column.column}${filled}${notNull}${key}${checked}${references}`;
 }
 
 /** The `CREATE TABLE` a layout is, under a name. */
@@ -70,6 +75,15 @@ export function createTableSql(name: string, layout: Layout): string {
   const clauses = layout.columns.map(column => clauseOf(column, layout));
   if (!layout.integerKey) clauses.push(`PRIMARY KEY (${quoted(layout.key)})`);
   return `CREATE TABLE ${quoted(name)} (${clauses.join(', ')})`;
+}
+
+/**
+ * The `ALTER TABLE ... ADD COLUMN` that adds one column of a layout to the table in place, with the default
+ * the rows already there receive where `fill` is one; `undefined` adds the column with none.
+ */
+export function addColumnSql(name: string, column: Kept, layout: Layout, fill: unknown): string {
+  const filled = fill === undefined ? undefined : literal(fill, column.type);
+  return `ALTER TABLE ${quoted(name)} ADD COLUMN ${clauseOf(column, layout, filled)}`;
 }
 
 /**

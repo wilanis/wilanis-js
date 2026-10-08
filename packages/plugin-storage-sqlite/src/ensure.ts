@@ -2,7 +2,8 @@
  * What `Engine.ensure` does to the file: adds what the store declares and is not there, and refuses to change
  * anything that is. Additive everywhere, destructive nowhere, as the postgres engine's: a column of another
  * type, a column the shape no longer has, a reference SQLite could add only by rebuilding the table -- each is
- * `drift`, thrown rather than repaired, because what to do about it is a person's decision.
+ * `drift`, thrown rather than repaired, because what to do about it is a person's decision. A table and a column
+ * are written by `ddl.ts`, the same text the planner writes, so a table `ensure` made reads back as its record.
  *
  * A `unique` is a unique index (`wl_u_` and a hash of the declaration), so it can be added to a table that is
  * already there, which a table constraint cannot; one the rows already there repeat is drift. A `refs` is a
@@ -22,10 +23,11 @@
  * -- as it does on postgres. What is left here serves the callers of `Engine.ensure` that remain: the shared
  * suite, which makes the tables its cases write into.
  */
-import type { At, Made } from '@wilanis/plugin-storage';
+import type { At, Declared, Made } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';
 import { columnsOf, foreignKeysOf, hasTable, uniquesOf } from './catalog.js';
-import { declaredOf, type Field, fieldsOf, isJson, quoted } from './columns.js';
+import { fieldsOf, quoted, storedOf } from './columns.js';
+import { addColumnSql, createTableSql, type Kept, type Layout, layoutOf } from './ddl.js';
 import { ensureKeys } from './keys.js';
 import { scopedUniqueName, uniqueName } from './names.js';
 import { scopeColumnsOf } from './scope-table.js';
@@ -35,49 +37,23 @@ import { isIdentity, type Settings } from './settings.js';
 const sameColumns = (left: string[], right: string[]) =>
   left.length === right.length && left.every(one => right.includes(one.toLowerCase()));
 
-/** Whether a field is the key and kept as SQLite's own integer key: a number key under `identity`. */
-const integerKey = (at: At, field: Field, settings: Settings) =>
-  field.name === at.key && field.type.kind === 'number' && isIdentity(settings);
-
-/** The column type a field is created with: `INTEGER` for an integer key, its declared column otherwise. */
-const typeIn = (at: At, field: Field, settings: Settings) =>
-  integerKey(at, field, settings) ? 'INTEGER' : declaredOf(field.name, field.type).column;
-
-/** The `REFERENCES` clause a field carries where the collection declares it holds another's key. */
-function referenceOf(at: At, field: Field): string {
-  const ref = at.refs.find(one => one.field === field.name);
-  return ref ? ` REFERENCES ${quoted(ref.to)} ON DELETE RESTRICT` : '';
+/** A collection as `ddl.ts` reads one: its fields in the order the shape declares them, its key and its references. */
+function declaredFrom(at: At): Declared {
+  const fields: Declared['fields'] = {};
+  for (const field of fieldsOf(at.shape))
+    fields[field.name] = { type: storedOf(field.name, field.type), required: field.required };
+  const refs: Declared['refs'] = {};
+  for (const ref of at.refs) refs[ref.field] = { collection: ref.to, onRemove: 'refuse' };
+  return { key: at.key, fields, unique: at.unique, refs };
 }
 
-/** One column of a `CREATE TABLE`: its type, `NOT NULL`, the key, its `CHECK` and its reference. */
-function columnClause(at: At, field: Field, settings: Settings): string {
-  const { check } = declaredOf(field.name, field.type);
-  const notNull = field.required || field.name === at.key ? ' NOT NULL' : '';
-  const key = integerKey(at, field, settings) ? ' PRIMARY KEY' : '';
-  const checked = check ? ` CHECK (${check})` : '';
-  return `${quoted(field.name)} ${typeIn(at, field, settings)}${notNull}${key}${checked}${referenceOf(at, field)}`;
-}
+/** The table a collection is made as: SQLite's own integer key where the key is a number under `identity`. */
+const layoutFor = (at: At, settings: Settings): Layout => layoutOf(declaredFrom(at), isIdentity(settings));
 
 /** Create the table a collection is, with every column, the key and the references; answer how many columns. */
-async function createTable(db: Kysely<never>, at: At, settings: Settings): Promise<number> {
-  const fields = fieldsOf(at.shape);
-  const clauses = fields.map(field => columnClause(at, field, settings));
-  const keyField = fields.find(field => field.name === at.key);
-  if (!keyField || !integerKey(at, keyField, settings)) clauses.push(`PRIMARY KEY (${quoted(at.key)})`);
-  await sql.raw(`CREATE TABLE ${quoted(at.name)} (${clauses.join(', ')})`).execute(db);
-  return fields.length;
-}
-
-/**
- * A default as DDL spells it. A `DEFAULT` is part of the statement rather than a value bound to it, so the
- * literal is written out: a boolean as 0 or 1, JSON as its text, a string with its quotes doubled.
- */
-function literal(value: unknown, field: Field): string {
-  if (value === null || value === undefined) return 'NULL';
-  if (typeof value === 'boolean') return value ? '1' : '0';
-  if (typeof value === 'number' && !isJson(field.type)) return String(value);
-  const text = isJson(field.type) ? JSON.stringify(value) : String(value);
-  return `'${text.replace(/'/g, "''")}'`;
+async function createTable(db: Kysely<never>, at: At, layout: Layout): Promise<number> {
+  await sql.raw(createTableSql(at.name, layout)).execute(db);
+  return layout.columns.length;
 }
 
 /**
@@ -86,30 +62,25 @@ function literal(value: unknown, field: Field): string {
  * and is drift without one however many rows there are. The default stays on the column, since SQLite cannot
  * drop one; nothing reads it, because a `put` always writes the whole record.
  */
-async function addColumn(db: Kysely<never>, at: At, field: Field): Promise<void> {
-  const { column, check } = declaredOf(field.name, field.type);
-  const has = Object.hasOwn(at.defaults ?? {}, field.name);
-  if (field.required && !has)
+async function addColumn(db: Kysely<never>, at: At, column: Kept, layout: Layout): Promise<void> {
+  const has = Object.hasOwn(at.defaults ?? {}, column.name);
+  if (column.required && !has)
     throw new Error(
-      `drift: ${at.name}.${field.name} is required, and SQLite adds a required column only with a default, even ` +
+      `drift: ${at.name}.${column.name} is required, and SQLite adds a required column only with a default, even ` +
         "to an empty table; declare one under the collection's defaults",
     );
-  const fill = has ? ` DEFAULT ${literal(at.defaults[field.name], field)}` : '';
-  const notNull = field.required ? ' NOT NULL' : '';
-  const checked = check ? ` CHECK (${check})` : '';
-  const clause = `${quoted(field.name)} ${column}${fill}${notNull}${checked}${referenceOf(at, field)}`;
-  await sql.raw(`ALTER TABLE ${quoted(at.name)} ADD COLUMN ${clause}`).execute(db);
+  const fill = has ? at.defaults[column.name] : undefined;
+  await sql.raw(addColumnSql(at.name, column, layout, fill)).execute(db);
 }
 
 /** What the table already has, held against what the shape says: anything that would have to change is drift. */
-function judgeDrift(at: At, found: Map<string, { type: string; notnull: number }>, settings: Settings): void {
-  for (const field of fieldsOf(at.shape)) {
-    const column = found.get(field.name.toLowerCase());
-    const want = typeIn(at, field, settings);
-    if (column && column.type.toUpperCase() !== want)
-      throw new Error(`drift: ${at.name}.${field.name} is ${column.type}, and the shape says ${want}`);
+function judgeDrift(at: At, found: Map<string, { type: string; notnull: number }>, layout: Layout): void {
+  for (const column of layout.columns) {
+    const held = found.get(column.name.toLowerCase());
+    if (held && held.type.toUpperCase() !== column.column)
+      throw new Error(`drift: ${at.name}.${column.name} is ${held.type}, and the shape says ${column.column}`);
   }
-  const declared = new Set(fieldsOf(at.shape).map(field => field.name.toLowerCase()));
+  const declared = new Set(layout.columns.map(column => column.name.toLowerCase()));
   for (const [name, column] of found)
     if (!declared.has(name) && column.notnull)
       throw new Error(`drift: ${at.name}.${name} is a column no field of the shape has, and it is not null`);
@@ -133,15 +104,16 @@ async function judgeReferences(db: Kysely<never>, at: At, existed: Set<string>):
  * a scope column is, not a column the shape has lost.
  */
 async function ensureOne(db: Kysely<never>, at: At, settings: Settings): Promise<Made> {
+  const layout = layoutFor(at, settings);
   if (!(await hasTable(db, at.name)))
-    return { collections: 1, columns: await createTable(db, at, settings), constraints: at.refs.length };
+    return { collections: 1, columns: await createTable(db, at, layout), constraints: at.refs.length };
   const found = new Map((await columnsOf(db, at.name)).map(one => [one.name.toLowerCase(), one]));
   for (const column of await scopeColumnsOf(db, at)) found.delete(column.toLowerCase());
-  judgeDrift(at, found, settings);
+  judgeDrift(at, found, layout);
   await judgeReferences(db, at, new Set(found.keys()));
-  const added = fieldsOf(at.shape).filter(field => !found.has(field.name.toLowerCase()));
-  for (const field of added) await addColumn(db, at, field);
-  const referenced = added.filter(field => at.refs.some(ref => ref.field === field.name));
+  const added = layout.columns.filter(column => !found.has(column.name.toLowerCase()));
+  for (const column of added) await addColumn(db, at, column, layout);
+  const referenced = added.filter(column => at.refs.some(ref => ref.field === column.name));
   return { collections: 0, columns: added.length, constraints: referenced.length };
 }
 
