@@ -151,7 +151,7 @@ RFC 0020, and on RFC 0034, the one word for what a kind hands, which must land b
 RFC 0035, the whole record before the write, whose one schema change lets a port operation's `accepts` name a shape;
 its rules correct the write graphs M06 demonstrated. RFC 0036, recorded scenarios that share their answers, changes
 `scenario.schema.json` compatibly and should land before the freeze too, so a tree like the one it measures starts
-1.0 with its recorded scenarios a quarter of their size.
+1.0 with its recorded scenarios about a tenth of their size.
 
 ## Unscheduled
 
