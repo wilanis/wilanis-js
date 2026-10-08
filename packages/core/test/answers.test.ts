@@ -3,7 +3,7 @@
  * which answers document a scenario reads, and `nodesOf` and `stubsOf`, which every reader goes through.
  */
 import { describe, expect, it } from 'vitest';
-import { answerDigest, answersFor, canonicalJson, nodesOf, stubsOf } from '../src/answers.js';
+import { answerDigest, answersAbove, answersFor, canonicalJson, nodesOf, stubsOf } from '../src/answers.js';
 import type { AnswersDoc, ScenarioDoc } from '../src/recorded.js';
 import { type Loaded, Registry } from '../src/registry.js';
 
@@ -29,9 +29,22 @@ const ANSWERS: AnswersDoc = {
   stubs: { [FETCHED]: { status: 404 } },
 };
 
-/** A registry holding an answers document at each path given, below the tree's root. */
+/** The recorded scenario the answersFor cases look for answers above. */
+const SCENARIO = '@scenarios/rehearsed/customers.get-customer/customers.get-row.outcome.noCustomer.scenario.json';
+
+/**
+ * A registry holding an answers document at each path given, below the tree's root, and the scenario at `SCENARIO`,
+ * marked as `wilanis rehearse --record` marks it, as the answers documents are.
+ */
 function holding(...files: string[]): Registry {
+  return marked('rehearse', ...files);
+}
+
+/** The same registry, the scenario at `SCENARIO` carrying the mark given, or none, as one written by hand. */
+function marked(mark: ScenarioDoc['generated'], ...files: string[]): Registry {
   const registry = new Registry();
+  const recorded = scenario(mark ? { generated: mark } : {});
+  registry.add({ doc: recorded, kind: 'scenario', path: SCENARIO, name: 'customers.get-row.outcome.noCustomer' });
   for (const file of files) {
     const entry: Loaded<AnswersDoc> = { doc: ANSWERS, kind: 'answers', path: `@${file}`, name: 'answers' };
     registry.add(entry);
@@ -87,7 +100,7 @@ describe('answerDigest', () => {
 });
 
 describe('answersFor', () => {
-  const Scenario = '@scenarios/rehearsed/customers.get-customer/customers.get-row.outcome.noCustomer.scenario.json';
+  const Scenario = SCENARIO;
 
   it("finds the nearest answers.json above the scenario, the recorded directory's", () => {
     expect(answersFor(holding('scenarios/rehearsed/answers.json'), Scenario)?.path).toBe(
@@ -102,6 +115,20 @@ describe('answersFor', () => {
     expect(answersFor(holding('scenarios/edges/answers.json'), Scenario)).toBeUndefined();
     expect(answersFor(holding(), Scenario)).toBeUndefined();
     expect(answersFor(holding('scenarios/answers.json'), '@scenarios/kept.scenario.json')).toBeUndefined();
+  });
+
+  it("finds none where the nearest answers.json carries another mark than the scenario's, and says it is there", () => {
+    const edges = marked('edges', 'scenarios/rehearsed/answers.json');
+    expect(answersFor(edges, Scenario)).toBeUndefined();
+    expect(answersAbove(edges, Scenario).other?.path).toBe('@scenarios/rehearsed/answers.json');
+    // a scenario written by hand has no answers file of its own: every answers document carries a mark
+    const byHand = marked(undefined, 'scenarios/rehearsed/answers.json');
+    expect(answersFor(byHand, Scenario)).toBeUndefined();
+    expect(answersAbove(byHand, Scenario).other?.path).toBe('@scenarios/rehearsed/answers.json');
+    expect(answersAbove(holding('scenarios/rehearsed/answers.json'), Scenario)).toEqual({
+      own: expect.objectContaining({ path: '@scenarios/rehearsed/answers.json' }),
+    });
+    expect(answersAbove(holding(), Scenario)).toEqual({});
   });
 });
 

@@ -7,6 +7,7 @@
  */
 import {
   type AnswersDoc,
+  answersAbove,
   answersFor,
   type GraphDoc,
   isSwitch,
@@ -88,8 +89,6 @@ function checkPinnedReasons(answers: Record<string, ScenarioNode>, where: Answer
   }
 }
 
-const PIN = 'wilanis scenarios --pin <the recorded file> writes the copy with every answer and stub inline';
-
 /**
  * S006: a scenario written by hand holds its answers and its stubs itself. An answers document is rewritten whole by
  * a command that does not know the scenario, so a value it points at could disappear on the next record.
@@ -101,7 +100,7 @@ function checkWrittenByHand(scenario: ScenarioDoc, refuse: Refuser): void {
       'S006',
       `node '${id}' points at the shared answer ${node}, and a scenario written by hand holds its answers itself: no command keeps an answers file for it`,
       `expect/nodes/${id}`,
-      `${PIN}; or write this node's answer in place of the digest`,
+      `write the answer answers.json holds under nodes/${node} in place of the digest`,
     );
   }
   if (scenario.sharedStubs === undefined) return;
@@ -109,7 +108,7 @@ function checkWrittenByHand(scenario: ScenarioDoc, refuse: Refuser): void {
     'S006',
     'the scenario shares its stubs under sharedStubs, and a scenario written by hand holds its stubs itself: no command keeps an answers file for it',
     'sharedStubs',
-    `${PIN}; or write each value under stubs in place of sharedStubs`,
+    'move each entry of sharedStubs under stubs, with the value answers.json holds under stubs/<digest>',
   );
 }
 
@@ -117,20 +116,19 @@ const RECORD_AGAIN =
   'wilanis rehearse --record (or wilanis fuzz --edges) writes the scenarios and their answers file together: run it and review the diff';
 
 /**
- * S007: every pointer of a recorded scenario resolves in the answers document `answersFor` finds for it, written by
- * the command that wrote the scenario; and a stub is written inline or shared, never both. What `nodesOf` and
- * `stubsOf` cannot resolve is what is refused, so no pointer is resolved a second way here.
+ * S007: every pointer of a recorded scenario resolves in its own answers document, the one `answersAbove` finds with
+ * the scenario's mark; and a stub is written inline or shared, never both. What `nodesOf` and `stubsOf` cannot resolve
+ * is what is refused, so no pointer is resolved a second way here.
  */
 function checkResolved(judge: Judge, scenario: Loaded<ScenarioDoc>, refuse: Refuser): void {
   const { doc } = scenario;
-  const found = answersFor(judge.scope.registry, scenario.path);
-  const answers = found?.doc.generated === doc.generated ? found?.doc : undefined;
-  for (const id of nodesOf(doc, answers).unresolved) {
-    const why = unheld(found, doc.generated, 'nodes');
+  const above = answersAbove(judge.scope.registry, scenario.path);
+  for (const id of nodesOf(doc, above.own?.doc).unresolved) {
+    const why = unheld(above, doc.generated, 'nodes');
     refuse('S007', `node '${id}' points at ${doc.expect.nodes[id]}${why}`, `expect/nodes/${id}`, RECORD_AGAIN);
   }
-  for (const path of stubsOf(doc, answers).unresolved) {
-    const why = unheld(found, doc.generated, 'stubs');
+  for (const path of stubsOf(doc, above.own?.doc).unresolved) {
+    const why = unheld(above, doc.generated, 'stubs');
     refuse('S007', `stub '${path}' points at ${doc.sharedStubs?.[path]}${why}`, `sharedStubs/${path}`, RECORD_AGAIN);
   }
   for (const path of Object.keys(doc.sharedStubs ?? {}).filter(one => Object.hasOwn(doc.stubs ?? {}, one))) {
@@ -141,13 +139,13 @@ function checkResolved(judge: Judge, scenario: Loaded<ScenarioDoc>, refuse: Refu
 
 /**
  * Why a pointer does not resolve, said after its digest: no answers document above the scenario, one another command
- * wrote, or one whose map does not hold the digest.
+ * wrote, or its own, whose map does not hold the digest.
  */
-function unheld(found: Loaded<AnswersDoc> | undefined, mark: string | undefined, map: 'nodes' | 'stubs'): string {
-  if (!found) return ', and no answers.json is above this scenario';
-  const written = found.doc.generated;
-  if (written !== mark) return `, and ${found.path} above it is marked '${written}' where this scenario is '${mark}'`;
-  return `, which ${found.path} does not hold under ${map}`;
+function unheld(above: ReturnType<typeof answersAbove>, mark: string | undefined, map: 'nodes' | 'stubs'): string {
+  const { own, other } = above;
+  if (other) return `, and ${other.path} above it is marked '${other.doc.generated}' where this scenario is '${mark}'`;
+  if (!own) return ', and no answers.json is above this scenario';
+  return `, which ${own.path} does not hold under ${map}`;
 }
 
 /**

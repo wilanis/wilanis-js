@@ -193,6 +193,21 @@ describe('wilanis describe and ls show the answers document', () => {
     );
   });
 
+  it('reads no answers document another command wrote: describe names none, and check refuses each pointer', () => {
+    const edges = pointingCopy();
+    copies.push(edges);
+    editing(edges, ANSWERS, doc => (doc.generated = 'edges'));
+    const load = loadTree(edges, PLUGINS, INCLUDES);
+    const said = body(load, `@${MISSING}`);
+    expect(said).toContain('answers none -- no answers.json is above it, so its pointers read nothing');
+    expect(said).not.toContain('    op.outcome → noCustomer');
+    expect(
+      checkTree(load)
+        .items.filter(one => one.file === `@${MISSING}`)
+        .map(one => one.code),
+    ).toContain('S007');
+  });
+
   it('describes answers.json by how many node answers and stub values it holds, and who writes it', () => {
     const held = read(join(shared, ANSWERS));
     expect(body(loadTree(shared, PLUGINS, INCLUDES), `@${ANSWERS}`)).toEqual([

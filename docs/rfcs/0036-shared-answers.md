@@ -285,8 +285,8 @@ The compiler, the runtime and the viewer read `expect.nodes` only through `nodes
 through `stubsOf`, so no reader resolves a pointer its own way.
 
 **Which answers file.** A scenario's answers file is the `answers.json` of the nearest directory that holds the
-scenario, strictly below `scenarios/` (`answersFor`). For `scenarios/rehearsed/customers.get-customer/x.scenario.json`,
-that is `scenarios/rehearsed/answers.json`. Two `--record <dir>` directories are both `rehearse`, so a mark alone
+scenario, strictly below `scenarios/` (`answersFor`), when it carries the scenario's `generated` mark. For
+`scenarios/rehearsed/customers.get-customer/x.scenario.json`, that is `scenarios/rehearsed/answers.json`. Two `--record <dir>` directories are both `rehearse`, so a mark alone
 could not tell their files apart; the place can. The scenario does not name the file: a field that must equal what
 the place already says would only be one more thing to get wrong. The viewer and `describe` show the file found.
 
@@ -529,7 +529,7 @@ Readers land before the writer, so no commit writes a form that a reader cannot 
    regenerate says that every recorded directory goes stale once. Otherwise `committed-scenarios.test.ts`,
    `libraries/access/test/access.test.ts` and CI's `wilanis scenarios example --check` would fail until a later step.
 6. **Runtime: `wilanis scenarios --pin`.** In `tools.ts`, the flag in `scenario-flags.ts`, the template's step 3 and
-   `scenario` row, and fuzz's description sentence. Test.
+   `scenario` row, and fuzz's description sentence. Test. S006's hint, its page and its test gain `--pin`.
 
 ## Drawbacks and alternatives
 
@@ -645,14 +645,33 @@ None. Decided in review:
 - S007 judges only a recorded scenario. A scenario written by hand that points is S006's alone, so one fault gets one
   refusal, and that includes a hand-written scenario with a path under both `stubs` and `sharedStubs`. S006 refuses each
   node written as a digest at `expect/nodes/<id>`, and `sharedStubs` once, at `sharedStubs`, whatever it holds.
-- Where the answers document above a recorded scenario carries another `generated` mark, S007 reads the scenario's
-  pointers as if no document were there (`nodesOf` and `stubsOf` with none), so each pointer is refused once, at its
-  own path, and the message names both marks. Nothing is refused at the answers document for it.
+- `answersFor` finds no answers document where the nearest `answers.json` carries another `generated` mark than the
+  scenario, or the scenario has none: a file with another mark is not this scenario's answers file. The rule lives in
+  core, so `check`, `regress`, `describe` and the viewer all read the same file. `answersAbove` answers the file it
+  found as `own` or `other`, so S007's message names both marks without a second walk. Each pointer is refused once,
+  at its own path, and nothing is refused at the answers document.
 - S002 in an answers document names the answer by its digest (`shared answer '<digest>' pins reason ...`), and its hint
   says to record the directory again, since a person does not edit the file. `checkPinnedReasons` takes where the map
   sits, what its keys name and that hint together, so one function judges both forms.
 - The sabotage tests live in `packages/runtime/test/sabotage-shared-answers.test.ts`, one file for the three rules this
   RFC adds or widens. `example.test.ts` has no room under the house rule's 300 lines, and the S004 and S005 cases in
   `sabotage-scenarios.test.ts` plant a scenario of their own form.
-- S006's hint names `wilanis scenarios --pin`, which step 6 (#884) adds. Until it lands, the second half of the hint,
-  writing the value in place of the digest, is the fix.
+- Step 3's hint names the edit only; step 6 adds `--pin` to it. A hint names a fix that works at its own commit,
+  and 1.0 may be cut before step 6. S006's hint is `write the answer answers.json holds under nodes/<digest> in place
+  of the digest` at a node, and `move each entry of sharedStubs under stubs, with the value answers.json holds under
+  stubs/<digest>` at `sharedStubs`.
+- Step 4 (#887) prints the answers line as `answers @scenarios/rehearsed/answers.json`, with one space after `answers`
+  and the path's `@` kept. `answers` has seven letters, like `expects`, so the path sits in the same column as the other
+  lines, and a reader can pass it to `describe` as it stands.
+- Step 4 (#887): a scenario that points, with no answers document of its own above it, prints `answers none -- no
+  answers.json is above it, so its pointers read nothing`. Since step 3, that includes a nearest `answers.json` with
+  another mark, which `answersFor` does not read.
+- Step 4 (#887): a pointer the answers document does not hold adds nothing to `describe`. The routed lines leave that
+  node out, as `nodesOf` does; `check` and `regress` name each such pointer.
+- Step 4 (#887) tests `describe` and `ls` in `packages/runtime/test/shared-answers.test.ts`, not in
+  `describe-scenario.test.ts` as the test table says. Nothing writes a pointer before step 5, and that file already
+  plants a pointing copy of the example. Once step 5 records pointers, the exact-body cases of
+  `describe-scenario.test.ts` gain the answers line.
+- Step 4 (#887) did not edit the template's `CLAUDE.md`, which step 3 was editing at the same time. It could say, where
+  it describes the recorded directories, that `wilanis ls answers` lists their answers documents and `wilanis describe
+  <dir>/answers.json` counts what each holds.
