@@ -199,13 +199,20 @@ describe('wilanis describe and ls show the answers document', () => {
     editing(edges, ANSWERS, doc => (doc.generated = 'edges'));
     const load = loadTree(edges, PLUGINS, INCLUDES);
     const said = body(load, `@${MISSING}`);
-    expect(said).toContain('answers none -- no answers.json is above it, so its pointers read nothing');
+    expect(said).toContain(
+      `answers none -- @${ANSWERS} was written by wilanis fuzz --edges, not by wilanis rehearse --record, so its pointers read nothing`,
+    );
     expect(said).not.toContain('    op.outcome → noCustomer');
     expect(
       checkTree(load)
         .items.filter(one => one.file === `@${MISSING}`)
         .map(one => one.code),
     ).toContain('S007');
+    // a scenario written by hand has no command of its own, so no answers document is ever its own
+    editing(edges, MISSING, doc => delete doc.generated);
+    expect(body(loadTree(edges, PLUGINS, INCLUDES), `@${MISSING}`)).toContain(
+      `answers none -- @${ANSWERS} was written by wilanis fuzz --edges, and a hand-written scenario cannot point, so its pointers read nothing`,
+    );
   });
 
   it('describes answers.json by how many node answers and stub values it holds, and who writes it', () => {

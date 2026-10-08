@@ -6,7 +6,7 @@
  */
 import {
   type AnswersDoc,
-  answersFor,
+  answersAbove,
   type Loaded,
   nodesOf,
   type ScenarioBranch,
@@ -83,14 +83,17 @@ function shares(doc: ScenarioDoc): boolean {
 }
 
 /**
- * The line naming the answers document a scenario's pointers read, the one `answersFor` found; that none is above it
+ * The line naming the answers document a scenario's pointers read, the one `answersAbove` found as its own; where the
+ * nearest one is another command's, that command and why the scenario reads nothing from it; that none is above it
  * where it found none; nothing for a scenario that shares nothing.
  */
-function sharedLines(doc: ScenarioDoc, answers: Loaded<AnswersDoc> | undefined): string[] {
+function sharedLines(doc: ScenarioDoc, above: ReturnType<typeof answersAbove>): string[] {
   if (!shares(doc)) return [];
-  return [
-    answers ? `answers ${answers.path}` : 'answers none -- no answers.json is above it, so its pointers read nothing',
-  ];
+  if (above.own) return [`answers ${above.own.path}`];
+  if (!above.other) return ['answers none -- no answers.json is above it, so its pointers read nothing'];
+  const other = `${above.other.path} was written by ${WRITTEN_BY[above.other.doc.generated]}`;
+  const why = doc.generated ? `not by ${WRITTEN_BY[doc.generated]}` : 'and a hand-written scenario cannot point';
+  return [`answers none -- ${other}, ${why}, so its pointers read nothing`];
 }
 
 /** What a policy scenario fires, said beside the policy. */
@@ -105,8 +108,8 @@ const IN_PLACE = "its decide, fired under the trigger's kind in place of the tri
 export function scenarioLines(doc: Loaded, scope: Scope): string[] {
   const declared = doc.doc as ScenarioDoc;
   const generated = generatedSaid(declared);
-  const answers = answersFor(scope.registry, doc.path);
-  const { nodes } = nodesOf(declared, answers?.doc);
+  const above = answersAbove(scope.registry, doc.path);
+  const { nodes } = nodesOf(declared, above.own?.doc);
   return [
     `drives  ${declared.trigger}`,
     ...(declared.policy ? [`policy  ${declared.policy}  (${IN_PLACE})`] : []),
@@ -114,7 +117,7 @@ export function scenarioLines(doc: Loaded, scope: Scope): string[] {
     `seed    ${declared.seed}`,
     `expects ${expectsSaid(declared.expect)}`,
     ...routedLines(nodes),
-    ...sharedLines(declared, answers),
+    ...sharedLines(declared, above),
     ...(generated ? [generated] : []),
   ];
 }
