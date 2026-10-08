@@ -93,14 +93,15 @@ directory's `answers.json` as the Guide shows it. The example goes from 268,751 
 and to 214,219 with nodes and stubs shared. It gains less than the large tree because its scenarios are small, and
 their `in`, `context` and `description` are a larger share.
 
-The large tree's figures are estimates from the measured parts. Paths stay, a pointer costs about 20 bytes (16
-characters, two quotes, a colon and a comma), and the answers file holds the distinct values with their digests:
+The large tree's figures are computed from parts measured on it. Paths stay: the node paths are 11.7 MB and the stub
+paths 5.1 MB, both measured as the sum of the keys' lengths. A pointer costs about 20 bytes (16 characters, two quotes,
+a colon and a comma), and the answers file holds the distinct values with their digests:
 
 - nodes shared: 0.5 + 50.3 + 11.7 + 268,055 × 20 B (5.4) + 2.1 ≈ 70 MB;
-- nodes and stubs shared: 0.5 + 11.7 + 4.7 (stub paths) + (268,055 + 106,767) × 20 B (7.5) + 2.3 ≈ 27 MB.
+- nodes and stubs shared: 0.5 + 11.7 + 5.1 + (268,055 + 106,767) × 20 B (7.5) + 2.3 ≈ 27 MB.
 
-The stub paths' 4.7 MB are not measured: they assume a stub path as long as the average node path (11.7 MB / 268,055
-≈ 44 bytes). I have not measured the result gzipped or in git.
+The pointers' 20 bytes and the answers file's size are close approximations; every other term is measured. I have
+not measured the result gzipped or in git.
 
 **What this does not try to solve.** It does not change what a run records (`did` and `pick` are unchanged), what
 `regress` compares, or what it prints. It does not share `in` or `context`. It does not change plain `wilanis fuzz`,
@@ -548,7 +549,9 @@ which node first differs on the path the scenario pins? Those are:
 
 On the example, that keeps about 415 of the 1,220 nodes. On top of nodes and stubs shared, it takes the example from
 214,219 to about 183,000 bytes. On the large tree, assuming the example's proportions, it saves about two thirds of
-the 17.1 MB of node paths and pointers: about 27 MB to about 15 MB. I have not measured it there.
+the 17.1 MB of node paths and pointers: about 27 MB to about 15 MB, estimated. I have not measured it there. With
+stubs shared, that is the largest gain left, and this RFC does not take it: it keeps `regress`'s report of a changed
+node off the path instead, for the reason below.
 
 What `regress` could no longer say, that it says today:
 
