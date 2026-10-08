@@ -1,6 +1,6 @@
 # RFC 0036: Recorded scenarios share their answers: each distinct node answer kept once per directory
 
-- **Status:** draft
+- **Status:** accepted
 - **Areas:** `area:core` (`scenario.schema.json`, a new `answers.schema.json`, `ScenarioDoc`, `AnswersDoc`, `HOME`,
   one module that reads a pointer), `area:compiler` (two `S` rules; S002 and S003 read through that module),
   `area:runtime` (`writeRecorded` and `checkRecorded` write and compare the shared file; `regress`, `describe` and `ls`
