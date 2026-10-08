@@ -46,8 +46,8 @@ export interface Owner {
   refused: (root: string, dir: string) => string | undefined;
 }
 
-/** The bytes a scenario is written as. */
-const rendered = (doc: ScenarioDoc) => `${JSON.stringify(doc, null, 2)}\n`;
+/** The bytes a scenario is written as: one line, without indentation, and a newline. */
+const rendered = (doc: ScenarioDoc) => `${JSON.stringify(doc)}\n`;
 
 /** A path below the root, with `/` between segments and without case, as a filesystem that ignores case reads it. */
 const caseless = (root: string, abs: string) => relative(root, abs).split(sep).join('/').toLowerCase();

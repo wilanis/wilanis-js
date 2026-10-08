@@ -66,6 +66,9 @@ describe('fuzz --edges: the edges directory', () => {
     expect(written).toHaveLength(expectedFiles(dir));
     expect(Object.keys(bytesUnder(join(dir, EDGES))).map(file => `${EDGES}/${file}`)).toEqual(written);
     expect(first.written).toEqual(written.map(file => join(dir, file)));
+    // each written on one line, without indentation, and a newline: the bytes --check compares with
+    for (const bytes of Object.values(bytesUnder(join(dir, EDGES))))
+      expect(bytes).toBe(`${JSON.stringify(JSON.parse(bytes))}\n`);
     // a string field: empty, one character, long
     expect(filesOf(first, 'customers.get-customer')).toEqual([
       'id.empty.scenario.json',

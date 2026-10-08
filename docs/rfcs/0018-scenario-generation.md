@@ -106,7 +106,9 @@ scenarios/
 path segment, so the subdirectories are home; the loader reads every `*.json` under the root, so they load.
 
 **Recording.** `wilanis rehearse example --record` runs the rehearsal it runs today and, beside the lines, writes one
-file per trigger and branch. The `missing` branch of `get-row`, reached from `GET /customers/{id}`:
+file per trigger and branch. Each file is written on one line, without indentation, and ends with a newline; the
+files below are indented here only so a reader can follow them. The `missing` branch of `get-row`, reached from
+`GET /customers/{id}`:
 
 ```json
 {
@@ -337,8 +339,8 @@ The writing lives in a new module, `packages/runtime/src/record.ts`, so `rehears
 exports `scenarioOf(run: RecordedRun): ScenarioDoc` (pure, from one run's inputs and report to the document),
 `fileOf(run): string` (pure, the path below), `writeRecorded(root, dir, docs)` (writes every file, removes every
 scenario under `dir` an earlier run wrote and this one did not, answers the paths written) and `checkRecorded(root, dir, docs)`
-(renders each document as `writeRecorded` would and compares bytes to what is on disk; answers `{ stale, missing,
-extra }` and never writes).
+(renders each document as `writeRecorded` would, on one line, and compares bytes to what is on disk; answers
+`{ stale, missing, extra }` and never writes).
 
 What `branchOf` runs is what is recorded. It fires with an embedder that records
 (`embedderFor(load, { seed, record, profile })` -- `record` is the map `stubEffects` fills with every generated
@@ -719,3 +721,9 @@ Decided during implementation:
   too, so `wilanis check .` in the demo still counts 221 documents and the script does not move each time a branch
   is recorded. The manifest of the example lists the scenarios among its documents, as it lists
   every loaded document (RFC 0026), and `manifest.golden.json` is regenerated.
+- **One line (#875).** `writeRecorded` writes a scenario as `JSON.stringify(doc)` and a newline (`rendered` in
+  `packages/runtime/src/recorded-dir.ts`), not indented with two spaces as it first did. The indentation was about a
+  third of the bytes: the example's directories went from 407 KB to 269 KB. `--check` still compares bytes with that
+  same text, so it stays exact. A diff of a recorded file is now one long line; the files are generated and never
+  edited, and `regress`, `describe` and the viewer say what a scenario proves. Every tree's committed directories go
+  stale once, and `--record` and `fuzz --edges` rewrite them.

@@ -103,7 +103,10 @@ describe('rehearse --record: the recorded directory', () => {
     expect(Object.keys(bytesUnder(join(dir, RECORDED))).map(file => `${RECORDED}/${file}`)).toEqual(written);
     expect(written).toContain(`${RECORDED}/customers.get-customer/customers.get-row.outcome.noCustomer.scenario.json`);
     expect(written).toContain(`${RECORDED}/hello.hello-gated/whole.scenario.json`);
-    const sc = read(join(dir, RECORDED, 'customers.get-customer/customers.get-row.outcome.noCustomer.scenario.json'));
+    const noCustomer = join(dir, RECORDED, 'customers.get-customer/customers.get-row.outcome.noCustomer.scenario.json');
+    const sc = read(noCustomer);
+    // written on one line, without indentation, and a newline: the bytes --check compares with
+    expect(readFileSync(noCustomer, 'utf8')).toBe(`${JSON.stringify(sc)}\n`);
     expect(sc).toMatchObject({
       description:
         "get-customer: get-row 'outcome' when status == 404 routes to noCustomer, which refuses as missing. Written by wilanis rehearse --record; regenerate it, do not edit it.",
