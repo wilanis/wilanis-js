@@ -83,14 +83,14 @@ describe('S006: a scenario written by hand holds its answers and stubs itself', 
     expect(plantedPointing({ [ANSWERS]: answers(), [MINE]: doc })).toEqual(at(MINE, 'S006', 'sharedStubs'));
   });
 
-  it('says which answer it points at, and that --pin writes the copy inline', () => {
+  it('says which answer it points at, and that the edit is to write that answer in its place', () => {
     const doc = byHand({ sharedStubs: undefined, stubs: { 'op.fetched': FETCHED } });
     const placed = { [ANSWERS]: answers(), [MINE]: doc };
     expect(plantedEditingAllSaying(placed, {})).toContain(
       `S006 node 'op.outcome' points at the shared answer ${routed}, and a scenario written by hand holds its answers itself: no command keeps an answers file for it`,
     );
     expect(plantedEditingAllHinting(placed, {})).toContain(
-      "S006 wilanis scenarios --pin <the recorded file> writes the copy with every answer and stub inline; or write this node's answer in place of the digest",
+      `S006 write the answer answers.json holds under nodes/${routed} in place of the digest`,
     );
   });
 

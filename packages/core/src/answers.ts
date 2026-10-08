@@ -32,11 +32,31 @@ export function answerDigest(value: unknown): string {
 }
 
 /**
- * The answers document a scenario's pointers read: the `answers.json` of the nearest directory above the scenario
- * that holds one, strictly below `scenarios/` -- where `answersHome` says an answers document belongs. Nothing where
- * no such directory holds one.
+ * The answers document a scenario's pointers read: the one `answersAbove` finds, where the command that wrote the
+ * scenario wrote it too. Nothing where no directory above holds one, or where the nearest one is another command's.
  */
 export function answersFor(registry: Registry, scenarioPath: string): Loaded<AnswersDoc> | undefined {
+  return answersAbove(registry, scenarioPath).own;
+}
+
+/**
+ * The `answers.json` of the nearest directory above a scenario that holds one, strictly below `scenarios/` -- where
+ * `answersHome` says an answers document belongs. It is `own` where it carries the scenario's `generated` mark, and
+ * `other` where it carries another, or the scenario was written by hand: a file with another mark is not this
+ * scenario's answers file. Neither where no such directory holds one.
+ */
+export function answersAbove(
+  registry: Registry,
+  scenarioPath: string,
+): { own?: Loaded<AnswersDoc>; other?: Loaded<AnswersDoc> } {
+  const nearest = nearestAnswers(registry, scenarioPath);
+  if (!nearest) return {};
+  const mark = registry.get('scenario', scenarioPath)?.doc.generated;
+  return nearest.doc.generated === mark ? { own: nearest } : { other: nearest };
+}
+
+/** The answers document of the nearest directory above a path that holds one, below `scenarios/`, whatever its mark. */
+function nearestAnswers(registry: Registry, scenarioPath: string): Loaded<AnswersDoc> | undefined {
   const dirs = scenarioPath.replace(/^@/, '').split('/').slice(0, -1);
   for (let depth = dirs.length; depth > 0; depth--) {
     const candidate = `${dirs.slice(0, depth).join('/')}/${ANSWERS_FILE}`;
