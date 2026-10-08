@@ -13,6 +13,18 @@ export interface ScenarioBranch {
   to: string;
 }
 
+/**
+ * What one node did in a recorded run: how it ended, the operation it ran, what it answered, where a switch routed,
+ * and the reason a node that refused on purpose gave, absent where it answered or broke.
+ */
+export interface ScenarioNode {
+  status: string;
+  handler?: string;
+  out?: unknown;
+  selected?: string;
+  reason?: string;
+}
+
 export interface ScenarioDoc extends Envelope {
   /** The command that wrote this scenario, which regenerates it; absent for one written by hand. */
   generated?: 'rehearse' | 'edges' | 'fuzz';
@@ -25,7 +37,12 @@ export interface ScenarioDoc extends Envelope {
   /** The context the run read, for a trigger whose kind hands one: what `fire.in` and any policy read from. */
   context?: Record<string, unknown>;
   stubs?: Record<string, unknown>;
-  /** The stubbed node at which a replay aborts the run's signal: one of the keys of `stubs`. */
+  /**
+   * Dotted node path -> the digest of the value its operation returned, held under `stubs` in the answers document of
+   * the directory the scenario sits in. A command that records writes this in place of `stubs`; `stubsOf` reads both.
+   */
+  sharedStubs?: Record<string, string>;
+  /** The stubbed node at which a replay aborts the run's signal: one of the paths `stubsOf` answers. */
   cancelAt?: string;
   expect: {
     status: 'done' | 'failed' | 'blocked' | 'cancelled' | 'unreachable';
@@ -34,8 +51,11 @@ export interface ScenarioDoc extends Envelope {
     reason?: string;
     /** Why no input reaches the branch; present exactly when `status` is `unreachable`. */
     unreachable?: string;
-    /** What each node did; `reason` is the one a node that refused on purpose gave, absent where it answered or broke. */
-    nodes: Record<string, { status: string; handler?: string; out?: unknown; selected?: string; reason?: string }>;
+    /**
+     * What each node did, by its dotted path: the answer itself, or the digest of one the directory's answers document
+     * holds. Read through `nodesOf`, which answers every node resolved.
+     */
+    nodes: Record<string, ScenarioNode | string>;
   };
 }
 
@@ -45,6 +65,6 @@ export interface ScenarioDoc extends Envelope {
  */
 export interface AnswersDoc extends Envelope {
   generated: 'rehearse' | 'edges';
-  nodes: Record<string, ScenarioDoc['expect']['nodes'][string]>;
+  nodes: Record<string, ScenarioNode>;
   stubs: Record<string, unknown>;
 }

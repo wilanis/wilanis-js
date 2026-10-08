@@ -660,7 +660,8 @@
 
   /**
    * A scenario's page: who wrote it, what it replays and expects, the branch it proves, why no input reaches that
-   * branch where none does, the seed and input it runs with, and what each node is expected to do.
+   * branch where none does, the seed and input it runs with, and what each node is expected to do -- the rows the
+   * view model resolved, since a recorded scenario may point at answers its directory's answers document holds.
    */
   function scenarioEl(page, v) {
     const d = v.doc;
@@ -670,11 +671,11 @@
     if (d.expect.unreachable !== undefined) page.appendChild(el('p', 'miss', 'No input reaches this branch: ' + d.expect.unreachable));
     page.appendChild(el('h2', null, 'Seed ' + d.seed));
     if (d.in !== undefined) { page.appendChild(el('h2', null, 'Input')); page.appendChild(el('pre', 'mono', JSON.stringify(d.in, null, 2))); }
-    const nodes = Object.entries(d.expect.nodes || {});
+    const nodes = v.expectedNodes || [];
     if (!nodes.length) return;
     page.appendChild(el('h2', null, 'Expected per node'));
     const t = el('table'); const hd = el('tr'); for (const h of ['node', 'status', 'routes to', 'answers']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
-    for (const [id, n] of nodes) { const tr = el('tr'); tr.appendChild(el('td', 'name', id)); tr.appendChild(el('td', null, n.status)); tr.appendChild(el('td', 'name', n.selected || '')); tr.appendChild(el('td', 'val', n.out === undefined ? '' : JSON.stringify(n.out))); t.appendChild(tr); }
+    for (const n of nodes) { const tr = el('tr'); tr.appendChild(el('td', 'name', n.node)); tr.appendChild(el('td', null, n.status)); tr.appendChild(el('td', 'name', n.selected || '')); tr.appendChild(el('td', 'val', n.out === undefined ? '' : JSON.stringify(n.out))); t.appendChild(tr); }
     page.appendChild(t);
   }
 

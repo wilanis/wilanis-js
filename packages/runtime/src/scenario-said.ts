@@ -4,7 +4,16 @@
  * scenarios replay it and who wrote them. The viewer reads the same words from here, so a page and the command
  * cannot say a scenario two ways.
  */
-import { type Loaded, type ScenarioBranch, type ScenarioDoc, type Scope, stem } from '@wilanis/core';
+import {
+  answersFor,
+  type Loaded,
+  nodesOf,
+  type ScenarioBranch,
+  type ScenarioDoc,
+  type ScenarioNode,
+  type Scope,
+  stem,
+} from '@wilanis/core';
 
 /** A command that writes scenarios, by the `generated` mark it leaves on what it wrote. */
 export type ScenarioWriter = NonNullable<ScenarioDoc['generated']>;
@@ -49,9 +58,12 @@ export function expectsSaid(expect: ScenarioDoc['expect']): string {
   return expect.reason === undefined ? expect.status : `${expect.status} as ${expect.reason}`;
 }
 
-/** How the recorded run routed: a line per node with a `selected`, `op.route → missing`, in the order it was recorded. */
-function routedLines(expect: ScenarioDoc['expect']): string[] {
-  return Object.entries(expect.nodes ?? {}).flatMap(([id, node]) =>
+/**
+ * How the recorded run routed: a line per node with a `selected`, `op.route → missing`, in the order it was recorded,
+ * read off the nodes `nodesOf` resolved.
+ */
+function routedLines(nodes: Record<string, ScenarioNode>): string[] {
+  return Object.entries(nodes).flatMap(([id, node]) =>
     node.selected === undefined ? [] : [`    ${id} → ${node.selected}`],
   );
 }
@@ -62,18 +74,20 @@ const IN_PLACE = "its decide, fired under the trigger's kind in place of the tri
 /**
  * A scenario: the trigger it drives, and the policy whose decision it fires in the trigger's place; the branch it
  * proves; the seed; how it expects the run to end, and under that how each switch routed, since the routing is what
- * a reader came for; and, for one a command wrote, that command, which rewrites it.
+ * a reader came for, an answer shared in the answers document read as one written inline; and, for one a command
+ * wrote, that command, which rewrites it.
  */
-export function scenarioLines(doc: Loaded): string[] {
+export function scenarioLines(doc: Loaded, scope: Scope): string[] {
   const declared = doc.doc as ScenarioDoc;
   const generated = generatedSaid(declared);
+  const { nodes } = nodesOf(declared, answersFor(scope.registry, doc.path)?.doc);
   return [
     `drives  ${declared.trigger}`,
     ...(declared.policy ? [`policy  ${declared.policy}  (${IN_PLACE})`] : []),
     ...(declared.branch ? [`proves  ${provesSaid(declared.branch)}`] : []),
     `seed    ${declared.seed}`,
     `expects ${expectsSaid(declared.expect)}`,
-    ...routedLines(declared.expect),
+    ...routedLines(nodes),
     ...(generated ? [generated] : []),
   ];
 }

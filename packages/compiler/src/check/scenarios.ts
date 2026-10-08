@@ -4,13 +4,17 @@
  * replays a policy only under a trigger that attaches it (S005).
  */
 import {
+  answersFor,
   type GraphDoc,
   isSwitch,
   type Loaded,
+  nodesOf,
   policyPath,
   type ScenarioBranch,
   type ScenarioDoc,
+  type ScenarioNode,
   type SwitchNode,
+  stubsOf,
   type TriggerDoc,
 } from '@wilanis/core';
 import type { Judge, Refuser } from './judge.js';
@@ -26,20 +30,24 @@ export function checkScenario(judge: Judge, scenario: Loaded<ScenarioDoc>): void
   if (!trigger) {
     refuse('S001', `scenario names unknown trigger '${scenario.doc.trigger}'`, 'trigger', 'wilanis ls trigger');
   }
-  checkPinnedReasons(scenario.doc, refuse);
-  checkCancelAt(scenario.doc, refuse);
+  // a shared answer is judged once, in the answers document that holds it, so only the inline ones are judged here
+  checkPinnedReasons(nodesOf(scenario.doc, undefined).nodes, 'expect/nodes', refuse);
+  checkCancelAt(judge, scenario, refuse);
   if (scenario.doc.branch) checkBranch(judge, scenario.doc.branch, refuse);
   if (scenario.doc.policy !== undefined) checkReplayedPolicy(judge, scenario.doc, trigger, refuse);
 }
 
-/** S002: a reason belongs to a node that refused, and a node that refused ended `failed`. */
-function checkPinnedReasons(scenario: ScenarioDoc, refuse: Refuser): void {
-  for (const [id, node] of Object.entries(scenario.expect.nodes ?? {})) {
+/**
+ * S002: a reason belongs to a node that refused, and a node that refused ended `failed`. Judged over a map of answers
+ * at `at`: a scenario's inline ones at `expect/nodes`, by node path.
+ */
+function checkPinnedReasons(answers: Record<string, ScenarioNode>, at: string, refuse: Refuser): void {
+  for (const [id, node] of Object.entries(answers)) {
     if (node.reason === undefined || node.status === 'failed') continue;
     refuse(
       'S002',
       `node '${id}' pins reason '${node.reason}' but ended '${node.status}': only a node that refused gives a reason`,
-      `expect/nodes/${id}/reason`,
+      `${at}/${id}/reason`,
       'a reason belongs to a node that refused; drop it, or let wilanis fuzz write the scenario again',
     );
   }
@@ -47,11 +55,14 @@ function checkPinnedReasons(scenario: ScenarioDoc, refuse: Refuser): void {
 
 /**
  * S003: `cancelAt` names a stubbed effect. The replay aborts the run's signal where that stub would have
- * answered, so a path the recording never stubbed is one the replay never reaches, and nothing is cancelled.
+ * answered, so a path the recording never stubbed is one the replay never reaches, and nothing is cancelled. A path
+ * under `sharedStubs` is stubbed too, whether or not its digest resolves.
  */
-function checkCancelAt(scenario: ScenarioDoc, refuse: Refuser): void {
-  const at = scenario.cancelAt;
-  if (at === undefined || Object.hasOwn(scenario.stubs ?? {}, at)) return;
+function checkCancelAt(judge: Judge, scenario: Loaded<ScenarioDoc>, refuse: Refuser): void {
+  const at = scenario.doc.cancelAt;
+  if (at === undefined) return;
+  const { stubs, unresolved } = stubsOf(scenario.doc, answersFor(judge.scope.registry, scenario.path)?.doc);
+  if (Object.hasOwn(stubs, at) || unresolved.includes(at)) return;
   refuse(
     'S003',
     `cancelAt names '${at}', which is not a stubbed effect of this scenario`,

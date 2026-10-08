@@ -4,6 +4,7 @@
  * contract a plugin package fulfils. Nothing here executes anything.
  */
 
+export * from './answers.js';
 export * from './assign.js';
 export * from './contracts.js';
 export { listedIn } from './documents.js';

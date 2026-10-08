@@ -619,3 +619,23 @@ None. Decided in review:
   itself: D003 also refuses `scenarios/answers.json`. D008 moves an answers document outside `scenarios/` to
   `scenarios/rehearsed/answers.json`, a place D003 accepts, so the fix removes the refusal (RFC 0019). `answersHome`
   in `placement.ts` says that place for both rules.
+- `answersFor` walks up from the scenario's directory and stops at the first `answers.json` the registry holds. It asks
+  `answersHome` whether each candidate is a place an answers document may sit, so the rule D003 and D008 follow is
+  written once. `nodesOf` and `stubsOf` list the node paths and the stub paths they cannot resolve, not the digests:
+  S0n2 refuses at a path, and a reader finds the digest under that path.
+- In step 2, S002 judges a scenario's inline answers only (`nodesOf` with no answers document). A shared answer waits
+  for step 3, which judges it once, in its answers document. `checkPinnedReasons` takes a map of answers and the
+  pointer they sit under, so step 3 calls the same function at `nodes`. S003 counts a path under `sharedStubs` even
+  when its digest does not resolve: that fault is S0n2's, and one fault gets one refusal.
+- `regress` fires nothing for a scenario with a pointer that does not resolve. It answers one `DIFF` per pointer:
+  `op.x: points at <digest>, which scenarios/rehearsed/answers.json does not hold`, `stub op.x: points at ...` for a
+  stub, and `..., and no answers.json is above it` where `answersFor` finds no file.
+- `scenarioLines` takes the scope and reads the routed lines through `nodesOf`. The line naming the answers file is
+  step 4's (#882), as the Implementation plan says.
+- The view model had no `scenarioView`. It is new in `model.ts`, called from `recordedView` so that `viewOf` stays
+  within the house rule's complexity. It sets `expectedNodes` on the view, a row per node that `expectedNodesOf` in
+  `packages/view/src/scenarios.ts` resolves through `nodesOf`.
+- One reader the reader table did not list: `referenceIndex` in `packages/view/src/references.ts` walks every string of
+  every document, and a scenario's `expect.nodes/<id>/handler` names the operation a node ran. It now reads a scenario
+  through `nodesOf` and `stubsOf`, so a pointing scenario references, at the same pointers, what its inline form does.
+  The answers document is walked as it is written, so it references those operations too.
