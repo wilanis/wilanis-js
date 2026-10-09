@@ -27,7 +27,7 @@ export interface Shared {
  * absent item of a list as `null`. The digest is taken over this, so it names exactly the text the file holds.
  * Nothing where `JSON.stringify` writes nothing, as for an absent value.
  */
-function asWritten(value: unknown): unknown {
+export function asWritten(value: unknown): unknown {
   const text = JSON.stringify(value);
   return text === undefined ? undefined : JSON.parse(text);
 }
