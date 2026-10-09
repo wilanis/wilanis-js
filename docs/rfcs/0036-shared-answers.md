@@ -721,7 +721,8 @@ None. Decided in review:
   already; the case no longer depends on that. With the recorded directory in the copy, the move lands over the
   example's answers file and every scenario's pointers are refused as S007.
 - Step 5: until step 6 adds `--pin`, the template's step 3 says to keep a run by hand by copying it, dropping
-  `generated`, and writing in place of each digest the value `answers.json` holds under it, as S006's hint says.
+  `generated`, writing in place of each digest the value `answers.json` holds under it, and moving `sharedStubs` to
+  `stubs`, as S006's hints say.
 - Step 5, measured on the re-recorded directories (bytes on one line; `du -sk`): the example's `rehearsed/` goes from
   138,356 to 113,246 bytes (276K to 268K), its `edges/` from 130,395 to 95,404 (272K to 268K). The access tree's
   `rehearsed/` grows, from 23,267 to 25,341 bytes (60K to 72K): its 15 scenarios hold 72 node answers, of which 48 are

@@ -22,6 +22,7 @@ import { outcomeOf, type Report, refusalOf, shownOutput } from '@wilanis/engine'
 import type { Embedder } from './embed.js';
 import { type Fuzzing, fuzzEdges } from './fuzz-edges.js';
 import { activeProfile, skippedLines } from './profile.js';
+import { asWritten } from './recorded-answers.js';
 import { HOME_DIR, SCENARIOS } from './recorded-owner.js';
 import { replayedDoc, solvedAgain } from './rehearse-recorded.js';
 import { unreadSaid } from './scenario-said.js';
@@ -157,8 +158,8 @@ async function fuzzSeeds(load: LoadResult, opts: { runs?: number; profile?: stri
 
 /** A value as the JSON written for it reads back, in canonical form; nothing where JSON writes nothing. */
 function canonical(value: unknown): string | undefined {
-  const text = JSON.stringify(value);
-  return text === undefined ? undefined : canonicalJson(JSON.parse(text));
+  const written = asWritten(value);
+  return written === undefined ? undefined : canonicalJson(written);
 }
 
 /**
