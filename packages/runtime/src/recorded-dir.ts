@@ -1,8 +1,9 @@
 /**
- * The directories the scenario commands own (RFC 0018): where `wilanis rehearse --record` and `wilanis fuzz --edges`
- * may write, and how the scenarios in such a directory are written, removed and compared with what the tree writes
- * today. What a command owns is what it wrote, a scenario carrying its `generated` mark, and nothing else: not a
- * scenario a person or another command wrote, even one in the directory, and not what a link inside it leads to.
+ * What is on disk under a directory a scenario command owns (RFC 0018), and how it is written, removed and compared
+ * with what the tree writes today. What a command owns is what it wrote, a file carrying its `generated` mark, and
+ * nothing else: not a scenario a person or another command wrote, even one in the directory, and not what a link
+ * inside it leads to. Its files are the scenarios and, where they share anything, the answers file at the top of the
+ * directory (RFC 0036). Where the directory may be, and who owns it, is `recorded-owner.ts`'s.
  */
 import {
   existsSync,
@@ -10,149 +11,58 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
-  realpathSync,
   rmdirSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { HOME, type ScenarioDoc } from '@wilanis/core';
-
-/** The one directory placement says a scenario lives in (HOME, D008). */
-export const HOME_DIR = HOME.scenario?.dir ?? 'scenarios';
-
-/**
- * Where plain fuzz writes, under the root: a directory of its own inside the scenarios' home, so what fuzz owns sits
- * apart from what a person wrote and from what the other commands record (RFC 0018).
- */
-export const SCENARIOS = `${HOME_DIR}/fuzz`;
-
-/** Where `fuzz --edges` writes, under the root: the one directory it owns. */
-export const EDGES = `${HOME_DIR}/edges`;
-
-/** Where `--record` writes, under the root, when the flag names no directory. */
-export const RECORDED = `${HOME_DIR}/rehearsed`;
-
-/** The directories fuzz writes, plain and `--edges`, which `--record` may not own. */
-const FUZZED = [SCENARIOS, EDGES];
-
-/**
- * A command that owns a directory of scenarios: the `generated` mark on what it wrote, the words a refusal names it
- * by, and why a directory may not be its own.
- */
-export interface Owner {
-  generated: 'rehearse' | 'edges';
-  by: string;
-  refused: (root: string, dir: string) => string | undefined;
-}
+import { dirname, join } from 'node:path';
+import { ANSWERS_FILE, type ScenarioDoc } from '@wilanis/core';
+import { renderedAnswers, sharedOf } from './recorded-answers.js';
+import { type Owner, ownedDir, REHEARSED, realOf, strictlyInside } from './recorded-owner.js';
 
 /** The bytes a scenario is written as: one line, without indentation, and a newline. */
 const rendered = (doc: ScenarioDoc) => `${JSON.stringify(doc)}\n`;
 
-/** A path below the root, with `/` between segments and without case, as a filesystem that ignores case reads it. */
-const caseless = (root: string, abs: string) => relative(root, abs).split(sep).join('/').toLowerCase();
-
-/** Whether `abs` is strictly inside `root`. */
-function strictlyInside(root: string, abs: string): boolean {
-  const inside = relative(root, abs);
-  return Boolean(inside) && !inside.startsWith('..') && !isAbsolute(inside);
-}
-
 /**
- * The real path of a path that may not exist yet: its nearest existing ancestor's, followed by the rest as written.
- * The operating system's own answer (`realpathSync.native`), so a case-insensitive filesystem answers the case on
- * disk and `scenarios/FUZZ` is read as the `scenarios/fuzz` it is.
+ * Every file a command writes under `dir` for these scenarios, by its path inside it, with its bytes: each scenario as
+ * `sharedOf` points it, and the answers file where they share anything.
  */
-function realOf(abs: string): string {
-  const rest: string[] = [];
-  let at = abs;
-  for (; !existsSync(at) && dirname(at) !== at; at = dirname(at)) rest.unshift(basename(at));
-  return join(realpathSync.native(at), ...rest);
+function filesOf(dir: string, docs: Record<string, ScenarioDoc>, owner: Owner): Record<string, string> {
+  const shared = sharedOf(docs, dir, owner);
+  const files = Object.fromEntries(Object.entries(shared.docs).map(([file, doc]) => [file, rendered(doc)]));
+  if (shared.answers) files[ANSWERS_FILE] = renderedAnswers(shared.answers);
+  return files;
 }
 
 /**
- * Whether a path below the root may hold the recorded directory: strictly below the scenarios' home, where no
- * hand-written scenario sits in it, and outside what fuzz writes, plain or `--edges`. Compared without case, since
- * on a filesystem that ignores it `Scenarios/fuzz` is fuzz's directory, and one not made yet has no case on disk.
+ * An answers file below the top of the directory: no command writes one there, and the scenarios beside it would
+ * read it in place of the one at the top (`answersFor` stops at the nearest).
  */
-function ownable(root: string, abs: string): boolean {
-  const inside = caseless(root, abs);
-  const fuzzed = FUZZED.map(dir => dir.toLowerCase()).some(dir => inside === dir || inside.startsWith(`${dir}/`));
-  return inside.startsWith(`${HOME_DIR.toLowerCase()}/`) && !fuzzed;
-}
+const stray = (file: string) => file !== ANSWERS_FILE && file.endsWith(`/${ANSWERS_FILE}`);
 
 /**
- * Why `dir` may not be the recorded directory, or nothing: it sits apart from the scenarios a person keeps at the
- * home and from what fuzz owns. It is judged on the real paths too, so a link on the way cannot carry the directory
- * anywhere else.
- */
-export function refusedDir(root: string, dir: string): string | undefined {
-  const abs = resolve(root, dir);
-  const outside = FUZZED.map(one => `${one}/`).join(' and ');
-  const where = `it may be any directory below ${HOME_DIR}/ outside ${outside}, as ${RECORDED}/ is`;
-  if (!ownable(resolve(root), abs))
-    return `--record may not own ${dir}, beside the scenarios a person or fuzz wrote: ${where}`;
-  const real = realOf(abs);
-  if (!ownable(realOf(resolve(root)), real))
-    return `the recorded directory ${dir} leads through a link to ${real}: ${where}`;
-  return undefined;
-}
-
-/**
- * Why `dir` may not be what `fuzz --edges` owns, or nothing: it is `scenarios/edges/` and no other, on the path as
- * written and on its real path, so a link on the way cannot carry what it writes and removes anywhere else.
- */
-function refusedEdges(root: string, dir: string): string | undefined {
-  const abs = resolve(root, dir);
-  if (caseless(resolve(root), abs) !== EDGES.toLowerCase()) return `fuzz --edges owns ${EDGES}/ alone, not ${dir}`;
-  const real = realOf(abs);
-  if (caseless(realOf(resolve(root)), real) !== EDGES.toLowerCase())
-    return `${dir} leads through a link to ${real}: fuzz --edges writes to ${EDGES}/ in the tree and nowhere else`;
-  return undefined;
-}
-
-/** What `wilanis rehearse --record` owns: the scenarios marked `rehearse`, in a directory `refusedDir` accepts. */
-export const REHEARSED: Owner = { generated: 'rehearse', by: '--record', refused: refusedDir };
-
-/** What `wilanis fuzz --edges` owns: the scenarios marked `edges`, in `scenarios/edges/`. */
-export const EDGED: Owner = { generated: 'edges', by: 'fuzz --edges', refused: refusedEdges };
-
-/** The recorded directory `record` names, `scenarios/rehearsed` where it names none; throws where `refusedDir` refuses it. */
-export function recordedDir(root: string, record?: string): string {
-  const dir = record ?? RECORDED;
-  const refused = refusedDir(root, dir);
-  if (refused) throw new Error(refused);
-  return dir;
-}
-
-/** An owned directory on disk, where its owner accepts it; throws where the owner refuses it. */
-function ownedDir(root: string, dir: string, owner: Owner): string {
-  const refused = owner.refused(root, dir);
-  if (refused) throw new Error(refused);
-  return resolve(root, dir);
-}
-
-/**
- * Every scenario file under the directory, by its path inside it with `/` between segments: only regular files, and
- * only below real directories, since a link inside it may lead anywhere and what it leads to is not owned.
+ * Every scenario file and every answers file under the directory, by its path inside it with `/` between segments:
+ * only regular files, and only below real directories, since a link inside it may lead anywhere and what it leads to
+ * is not owned.
  */
 function onDisk(abs: string): string[] {
   if (!existsSync(abs)) return [];
   const found: string[] = [];
-  scenarioFiles(abs, [], found);
+  ownableFiles(abs, [], found);
   return found.sort();
 }
 
-/** The scenario files under one directory, walked through its real subdirectories and never through a link. */
-function scenarioFiles(at: string, prefix: string[], into: string[]): void {
+/** The scenario and answers files under one directory, walked through its real subdirectories and never through a link. */
+function ownableFiles(at: string, prefix: string[], into: string[]): void {
   for (const entry of readdirSync(at, { withFileTypes: true })) {
     const path = [...prefix, entry.name];
-    if (entry.isDirectory()) scenarioFiles(join(at, entry.name), path, into);
-    else if (entry.isFile() && entry.name.endsWith('.scenario.json')) into.push(path.join('/'));
+    if (entry.isDirectory()) ownableFiles(join(at, entry.name), path, into);
+    else if (entry.isFile() && (entry.name.endsWith('.scenario.json') || entry.name === ANSWERS_FILE))
+      into.push(path.join('/'));
   }
 }
 
-/** Whether a scenario on disk is one the owner wrote, which carries its `generated` mark; an unreadable one is not. */
+/** Whether a file on disk is one the owner wrote, which carries its `generated` mark; an unreadable one is not. */
 function wroteIt(abs: string, file: string, owner: Owner): boolean {
   try {
     const doc = JSON.parse(readFileSync(join(abs, file), 'utf8')) as { generated?: unknown };
@@ -162,17 +72,19 @@ function wroteIt(abs: string, file: string, owner: Owner): boolean {
   }
 }
 
-/** The scenarios under the directory, parted into those the owner wrote and the rest, which it never touches. */
+/** The files under the directory, parted into those the owner wrote and the rest, which it never touches. */
 function held(abs: string, owner: Owner): { owned: string[]; others: string[] } {
   const files = onDisk(abs);
   const owned = files.filter(file => wroteIt(abs, file, owner));
   return { owned, others: files.filter(file => !owned.includes(file)) };
 }
 
-/** The scenarios under `dir` that its owner did not write and would not write over, root-relative: left as they are. */
+/** The files under `dir` that its owner did not write and would not write over, root-relative: left as they are. */
 export function keptIn(root: string, dir: string, docs: Record<string, ScenarioDoc>, owner = REHEARSED): string[] {
-  return held(ownedDir(root, dir, owner), owner)
-    .others.filter(file => !(file in docs))
+  const abs = ownedDir(root, dir, owner);
+  const files = filesOf(dir, docs, owner);
+  return held(abs, owner)
+    .others.filter(file => !(file in files) && !stray(file))
     .map(file => `${dir}/${file}`);
 }
 
@@ -188,10 +100,26 @@ function throughLinks(abs: string, files: string[]): string[] {
 }
 
 /**
- * Write every scenario under `dir` for its owner, `--record` unless another is named, and remove every scenario
- * under it that an earlier run of the owner wrote and this one does not, with any directory that leaves empty. A
- * scenario the owner did not write is left, and one in the way of a file it writes refuses the write; nothing
- * outside `dir` is touched, and nothing is reached through a link in it. Answers the files written, root-relative.
+ * Refuse a write that would touch what the owner did not write: a file in the way of one it writes, or an answers
+ * file below the top of the directory, which the scenarios beside it would read in place of the one it writes.
+ */
+function refuseOthers(dir: string, others: string[], files: Record<string, string>, owner: Owner): void {
+  const notMine = `${owner.by} did not write it (no "generated": "${owner.generated}"): move it out of ${dir}/, where ${owner.by} writes`;
+  const inTheWay = others.filter(file => file in files).map(file => `${dir}/${file}`);
+  if (inTheWay.length) throw new Error(`${inTheWay.join(', ')} would be written over, and ${notMine}`);
+  const hiding = others.filter(stray).map(file => `${dir}/${file}`);
+  if (hiding.length)
+    throw new Error(
+      `${hiding.join(', ')} would be read in place of ${dir}/${ANSWERS_FILE} by the scenarios beside it, and ${notMine}`,
+    );
+}
+
+/**
+ * Write every scenario under `dir` for its owner, `--record` unless another is named, with the answers file they
+ * share, and remove every file under it that an earlier run of the owner wrote and this one does not, with any
+ * directory that leaves empty. A file the owner did not write is left, and one in the way of a file it writes refuses
+ * the write; nothing outside `dir` is touched, and nothing is reached through a link in it. Answers the files
+ * written, root-relative.
  */
 export function writeRecorded(
   root: string,
@@ -200,24 +128,20 @@ export function writeRecorded(
   owner = REHEARSED,
 ): string[] {
   const abs = ownedDir(root, dir, owner);
-  const linked = throughLinks(abs, Object.keys(docs));
+  const files = filesOf(dir, docs, owner);
+  const linked = throughLinks(abs, Object.keys(files));
   if (linked.length)
     throw new Error(
       `${linked.map(file => `${dir}/${file}`).join(', ')} would be written through a link, which may lead out of ` +
         `the tree; ${dir}/ holds only what ${owner.by} writes: remove the link`,
     );
   const { owned, others } = held(abs, owner);
-  const inTheWay = others.filter(file => file in docs).map(file => `${dir}/${file}`);
-  if (inTheWay.length)
-    throw new Error(
-      `${inTheWay.join(', ')} would be written over, and ${owner.by} did not write it ` +
-        `(no "generated": "${owner.generated}"): move it out of ${dir}/, where ${owner.by} writes`,
-    );
-  for (const file of owned) if (!(file in docs)) removeOwned(abs, file);
+  refuseOthers(dir, others, files, owner);
+  for (const file of owned) if (!(file in files)) removeOwned(abs, file);
   const written: string[] = [];
-  for (const [file, doc] of Object.entries(docs).sort(([one], [other]) => (one < other ? -1 : 1))) {
+  for (const [file, bytes] of Object.entries(files).sort(([one], [other]) => (one < other ? -1 : 1))) {
     mkdirSync(dirname(join(abs, file)), { recursive: true });
-    writeFileSync(join(abs, file), rendered(doc));
+    writeFileSync(join(abs, file), bytes);
     written.push(`${dir}/${file}`);
   }
   return written;
@@ -235,11 +159,17 @@ export interface RecordCheck {
   stale: string[];
   /** Would be written, and is not on disk. */
   missing: string[];
-  /** On disk under the directory, written by its owner, and would not be written now. */
+  /**
+   * On disk under the directory, written by its owner, and would not be written now; and any answers file below the
+   * top of the directory, whoever wrote it, since the scenarios beside it would read it in place of the one at the top.
+   */
   extra: string[];
 }
 
-/** Render every scenario as `writeRecorded` would for the owner and compare the bytes with what is on disk; never writes. */
+/**
+ * Render every scenario and the answers file as `writeRecorded` would for the owner and compare the bytes with what is
+ * on disk; never writes.
+ */
 export function checkRecorded(
   root: string,
   dir: string,
@@ -247,14 +177,16 @@ export function checkRecorded(
   owner = REHEARSED,
 ): RecordCheck {
   const abs = ownedDir(root, dir, owner);
+  const files = filesOf(dir, docs, owner);
   const { owned, others } = held(abs, owner);
   const present = new Set([...owned, ...others]);
   const out: RecordCheck = { stale: [], missing: [], extra: [] };
-  for (const [file, doc] of Object.entries(docs)) {
+  for (const [file, bytes] of Object.entries(files)) {
     if (!present.has(file)) out.missing.push(`${dir}/${file}`);
-    else if (readFileSync(join(abs, file), 'utf8') !== rendered(doc)) out.stale.push(`${dir}/${file}`);
+    else if (readFileSync(join(abs, file), 'utf8') !== bytes) out.stale.push(`${dir}/${file}`);
   }
-  for (const file of owned) if (!(file in docs)) out.extra.push(`${dir}/${file}`);
+  for (const file of [...owned.filter(one => !(one in files)), ...others.filter(stray)])
+    out.extra.push(`${dir}/${file}`);
   for (const list of Object.values(out)) list.sort();
   return out;
 }

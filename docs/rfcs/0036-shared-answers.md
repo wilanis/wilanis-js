@@ -682,3 +682,47 @@ None. Decided in review:
 - Step 4 (#887) did not edit the template's `CLAUDE.md`, which step 3 was editing at the same time. It could say, where
   it describes the recorded directories, that `wilanis ls answers` lists their answers documents and `wilanis describe
   <dir>/answers.json` counts what each holds.
+- Step 5 (#883) splits `recorded-dir.ts` along what it does. `recorded-owner.ts` says where a recorded directory may be
+  and which command owns it (`Owner`, `REHEARSED`, `EDGED`, `refusedDir`). `recorded-dir.ts` keeps what is on disk and
+  how it is written, removed and compared. `recorded-answers.ts` holds `sharedOf` and `renderedAnswers`.
+- Step 5: the digest is taken over the value as JSON reads it back, `JSON.parse(JSON.stringify(x))`, and the answers file
+  writes that same value. So a `Date` is shared as its text, a key whose value is absent is left out, and an absent item
+  of a list is `null`, as the inline form wrote them. A stub whose value JSON leaves out is left out of `sharedStubs`, as
+  the inline form left it out of `stubs`. The writer does not refuse such a value: `--record` wrote it without complaint
+  before this step, and the shared form now means exactly what the inline form meant.
+- Step 5: `regress` compares a node's `out` and the run's output as canonical JSON, so the order of an object's keys
+  does not count. The answers file holds each value in canonical form, with its keys sorted. A replay fed a stub from it
+  builds its objects in another order than the recorded run did. Compared as `JSON.stringify` compares, 32 of the
+  example's 121 recorded scenarios (20 rehearsed, 12 edges) said `out changed` or `output changed` for equal values.
+- Step 5: a scenario gets `sharedStubs` only where its `stubs` held at least one value; an empty `stubs` is dropped. Each
+  other field keeps its place, and `sharedStubs` takes the place of `stubs`. `written` lists `answers.json` with the
+  scenarios; `files` still counts the scenarios alone.
+- Step 5: `onDisk` lists every `answers.json` under the owned directory. One below the top is *stray*: no command writes
+  one there, and the scenarios beside it would read it in place of the one at the top. `checkRecorded` calls a stray
+  file `extra`, whoever wrote it. `writeRecorded` removes a stray file its owner wrote, and refuses to write while a
+  stray file it did not write is there (`... would be read in place of <dir>/answers.json by the scenarios beside it`),
+  since it never removes what it did not write. `keptIn` does not list a stray file: it is refused, not kept.
+- Step 5: an `answers.json` at the top that the owner did not write is in the way only when the owner would write one.
+  Where nothing is shared, it is left, and `keptIn` lists it as it lists a scenario a person wrote.
+- Step 5: a collision refuses with `two different values share the digest <d>, and an answers file holds one value under
+  a digest: <one> and <other> -- report it, since a digest of 64 bits should not collide`. `sharedOf` takes the digest
+  function as a fourth argument, `answerDigest` but in a test.
+- Step 5: the answers file's description is `The node answers and stub values the scenarios under <dir>/ share, each
+  once, under its digest. Written by <command>; regenerate it, do not edit it.`, the command in the words of
+  `WRITTEN_BY`.
+- Step 5: the writer's tests are in two new files, since `record.test.ts` and `fuzz-edges.test.ts` are at the house
+  rule's 300 lines. `recorded-answers.test.ts` writes scenarios into an empty tree: each value once, one per line and
+  sorted, the same bytes in any order, a `Date` and an absent value, a collision, no file, ownership and a stray file.
+  `record-answers.test.ts` records copies of the example: both directories share, `fuzz --edges --check` judges the
+  file, a routing change diffs as the inline form diffs, and no orphan is kept. The no-file case is not in
+  `record-unreachable.test.ts`: the example has no tree whose every branch is unreachable, so the case writes one.
+- Step 5: the D008 case in `sabotage-fixes.test.ts` that moves an answers document to `scenarios/rehearsed/answers.json`
+  runs on a copy with no `scenarios/rehearsed/` (`withoutRecorded`). A copy of the example leaves its scenarios behind
+  already; the case no longer depends on that. With the recorded directory in the copy, the move lands over the
+  example's answers file and every scenario's pointers are refused as S007.
+- Step 5: until step 6 adds `--pin`, the template's step 3 says to keep a run by hand by copying it, dropping
+  `generated`, and writing in place of each digest the value `answers.json` holds under it, as S006's hint says.
+- Step 5, measured on the re-recorded directories (bytes on one line; `du -sk`): the example's `rehearsed/` goes from
+  138,356 to 113,246 bytes (276K to 268K), its `edges/` from 130,395 to 95,404 (272K to 268K). The access tree's
+  `rehearsed/` grows, from 23,267 to 25,341 bytes (60K to 72K): its 15 scenarios hold 72 node answers, of which 48 are
+  distinct, so a pointer saves less than it costs there. `du` moves little, since most files are smaller than a block.

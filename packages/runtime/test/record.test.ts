@@ -7,7 +7,15 @@ import { readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'n
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkTree } from '@wilanis/compiler';
-import { type GraphDoc, isSwitch, type LoadResult, loadTree, type ProjectDoc, policyPath } from '@wilanis/core';
+import {
+  type GraphDoc,
+  isSwitch,
+  type LoadResult,
+  loadTree,
+  type ProjectDoc,
+  policyPath,
+  stubsOf,
+} from '@wilanis/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PROFILE_VARIABLE, RECORDED, type Rehearsal, regress, rehearse } from '../src/index.js';
 import { recordedProfile } from '../src/profile.js';
@@ -99,7 +107,9 @@ describe('rehearse --record: the recorded directory', () => {
   it('is complete: one file per trigger and branch, and one per trigger with no switch', () => {
     expect(first.ok, first.lines.join('\n')).toBe(true);
     const written = first.recorded?.written ?? [];
-    expect(written).toHaveLength(expectedFiles(load(dir), first));
+    // a file per scenario, and the answers file they share
+    expect(written).toHaveLength(expectedFiles(load(dir), first) + 1);
+    expect(written).toContain(`${RECORDED}/answers.json`);
     expect(Object.keys(bytesUnder(join(dir, RECORDED))).map(file => `${RECORDED}/${file}`)).toEqual(written);
     expect(written).toContain(`${RECORDED}/customers.get-customer/customers.get-row.outcome.noCustomer.scenario.json`);
     expect(written).toContain(`${RECORDED}/hello.hello-gated/whole.scenario.json`);
@@ -114,9 +124,11 @@ describe('rehearse --record: the recorded directory', () => {
       trigger: '@features/customers/edge/get-customer.trigger.json',
       branch: { graph: `@${GET_ROW}`, node: 'outcome', when: 'status == 404', to: 'noCustomer' },
       seed: 1,
-      stubs: { 'op.fetched': { status: 404 } },
       expect: { status: 'failed', reason: 'missing' },
     });
+    // the stub is shared: the scenario names its digest, and the answers file holds the value
+    const answers = read(join(dir, RECORDED, 'answers.json'));
+    expect(stubsOf(sc, answers)).toMatchObject({ stubs: { 'op.fetched': { status: 404 } }, unresolved: [] });
     // a branch is named by the node the document routes to, not by where a guard moved the made node aside
     expect(written).toContain(
       `${RECORDED}/customers.list-customers/customers.list-rows-by-tier.outcome.none.scenario.json`,
@@ -156,8 +168,9 @@ describe('rehearse --check: a recorded directory the tree has moved away from', 
     for (const line of moved)
       expect(line).toContain(": DIFF branch 'status == 404' → noCustomer no longer routes there: ");
     const checked = await rehearse(load(dir), { check: true });
+    // the answers file holds the answers the moved branch no longer gives, so it is stale with them
     expect(checked.recorded?.check).toEqual({
-      stale: filesOf(recorded, 'noCustomer'),
+      stale: [`${RECORDED}/answers.json`, ...filesOf(recorded, 'noCustomer')].sort(),
       missing: [],
       extra: [],
     });
@@ -177,8 +190,9 @@ describe('rehearse --check: a recorded directory the tree has moved away from', 
     const checked = await rehearse(load(dir), { check: true });
     const extra = filesOf(recorded, 'noCustomer');
     expect(checked.recorded?.check).toMatchObject({ missing: filesOf(recorded, 'gone'), extra });
-    // every other run through get-row recorded the node under its old name, so those files are stale and no others
-    const through = reaching(recorded, GET_ROW).map(under => `${under}/`);
+    // every other run through get-row recorded the node under its old name, so those files are stale, with the
+    // answers file they share, and no others
+    const through = [`${RECORDED}/answers.json`, ...reaching(recorded, GET_ROW).map(under => `${under}/`)];
     expect(checked.recorded?.check?.stale.length).toBeGreaterThan(0);
     for (const file of checked.recorded?.check?.stale ?? []) expect(through.some(at => file.startsWith(at))).toBe(true);
     const refused = checkTree(load(dir)).items.map(one => `${one.code} ${one.file}#${one.at}`);

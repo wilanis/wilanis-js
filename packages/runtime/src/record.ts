@@ -7,7 +7,8 @@
 import { featureOf, type ScenarioBranch, type ScenarioDoc, schemaUrl, stem } from '@wilanis/core';
 import { type Report, refusalOf } from '@wilanis/engine';
 import { expectOf } from './fuzz.js';
-import { checkRecorded, keptIn, RECORDED, REHEARSED, type RecordCheck, writeRecorded } from './recorded-dir.js';
+import { checkRecorded, keptIn, type RecordCheck, writeRecorded } from './recorded-dir.js';
+import { RECORDED, REHEARSED } from './recorded-owner.js';
 
 /** What `--check` says after the files it lists: the one command that brings the directory back. */
 export const RECORD_HINT = 'run wilanis rehearse --record and review the diff';

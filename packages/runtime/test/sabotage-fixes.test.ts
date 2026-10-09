@@ -5,8 +5,8 @@
  * checker wrapped, so every refusal any of them earns that carries `fixes` has each fix applied to a copy
  * of its tree and re-checked.
  */
-import { readdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { readdirSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { LoadResult, Refusal } from '@wilanis/core';
 import { describe, expect, it, vi } from 'vitest';
@@ -191,6 +191,16 @@ const ANSWERS = {
   stubs: {},
 };
 
+/**
+ * A change made to a copy that holds no recorded directory: the example keeps `scenarios/rehearsed/answers.json`, the
+ * place D008 moves a stray answers document to, so a move there would land over the file the example's recorded
+ * scenarios read, and they would no longer resolve. The copy leaves the example's scenarios behind; this says so.
+ */
+const withoutRecorded = (change: (dir: string) => void) => (dir: string) => {
+  rmSync(join(dir, 'scenarios/rehearsed'), { recursive: true, force: true });
+  change(dir);
+};
+
 /** The D008 refusals a broken copy answers. */
 const d008After = (change: (dir: string) => void) => refusalsAfter(change).filter(one => one.code === 'D008');
 
@@ -226,7 +236,7 @@ const MOVES: [string, (dir: string) => void, string, string][] = [
   ],
   [
     'an answers document under a feature, moved to the one name D003 accepts',
-    planting({ 'features/customers/data/answers.json': ANSWERS }),
+    withoutRecorded(planting({ 'features/customers/data/answers.json': ANSWERS })),
     'features/customers/data/answers.json',
     'scenarios/rehearsed/answers.json',
   ],

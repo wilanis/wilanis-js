@@ -6,7 +6,7 @@
  */
 import { resolve } from 'node:path';
 import { BESIDE_EDGES } from './fuzz-edges.js';
-import { RECORDED, refusedDir } from './recorded-dir.js';
+import { RECORDED, refusedDir } from './recorded-owner.js';
 
 /** What the command line asked of a command, or why it may not be asked. */
 export type Asked<T> = { asked: T } | { refused: string };

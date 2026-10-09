@@ -11,7 +11,7 @@ import { type Case, casesFor, type FoundSwitch, over } from './branches.js';
 import type { Embedder } from './embed.js';
 import { activeProfile, recordedProfile, skippedLines } from './profile.js';
 import { type Recorded, type Recording, recordRuns } from './record.js';
-import { recordedDir } from './recorded-dir.js';
+import { recordedDir } from './recorded-owner.js';
 import { type Decision, format, gather, type PlainRun, short, statedOf, stateName } from './rehearsal-report.js';
 import { heldUpstream } from './rehearse-held.js';
 import {
