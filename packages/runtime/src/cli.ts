@@ -27,6 +27,8 @@ import {
   manifestText,
   map,
   migrate,
+  type Pinned,
+  pinScenario,
   printed,
   regress,
   rehearsalFailed,
@@ -69,6 +71,9 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
                    and --json
   wilanis scenarios [root] --check                 rehearse --check and fuzz --edges --check in one step, for CI:
                    exit 1 when either fails
+  wilanis scenarios [root] --pin <file>            keep one scenario by hand: copy the file (its path below the root)
+                   to scenarios/<its name> with every answer and stub inline and no generated mark; exit 1, writing
+                   nothing, where that file is there already
   wilanis regress  [root] [--json]                 replay every scenario and diff node by node
   wilanis start    [root] [--profile word] [--trace[=text|json]] [--level summary|full]
                    refuse a variable the profile reads that is unset, then run postLoad and the profile's
@@ -193,6 +198,15 @@ function orRefused<T>(answer: Asked<T>): T {
   return answer.asked;
 }
 
+/** Say what `scenarios --pin` wrote on stdout, or why it wrote nothing on stderr, and exit 1. */
+function pinned(answer: Pinned): void {
+  if (!answer.ok) {
+    console.error(answer.line);
+    process.exit(1);
+  }
+  console.log(answer.line);
+}
+
 /** Exit 2 on a command missing a word it cannot run without: say which, then how the command is asked. */
 function missing(command: string, what: string): never {
   console.error(`wilanis ${command}: ${what}\n\n${USAGE}`);
@@ -254,8 +268,10 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     if (!answer.ok) process.exit(1);
   },
   scenarios: async ({ flags, rootArg }) => {
-    orRefused(scenariosOf(flags));
-    const answer = await checkScenarios(await check(rootArg(0)));
+    const asked = orRefused(scenariosOf(flags));
+    const loaded = await check(rootArg(0));
+    if ('pin' in asked) return pinned(pinScenario(loaded, asked.pin));
+    const answer = await checkScenarios(loaded);
     console.log(answer.lines.join('\n'));
     if (!answer.ok) process.exit(1);
   },

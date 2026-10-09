@@ -130,6 +130,8 @@ export {
   manifestText,
   map,
   migrate,
+  type Pinned,
+  pinScenario,
   policyRoots,
   printed,
   RECORDED,

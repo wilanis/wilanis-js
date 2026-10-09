@@ -52,7 +52,9 @@ describe('fuzz owns scenarios/fuzz and marks what it writes', () => {
     const { description } = read(join(dir, FUZZED));
     expect(description).toContain('regenerate it, do not edit it');
     // a pinned copy says why it is kept, so it never reads as a leftover of an older fuzz
-    expect(description).toContain('give it a description of its own, and drop generated');
+    expect(description).toContain(
+      'to pin a case, run wilanis scenarios --pin <this file>, which copies it into scenarios/.',
+    );
     rmSync(dir, { recursive: true, force: true });
   });
 

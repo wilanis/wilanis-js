@@ -41,7 +41,7 @@ accepted. Statuses: draft, accepted, implemented, withdrawn.
 | 0033 | A guard before the write: three ways to compensate a guard lowered behind a store write; superseded by RFC 0035 and removed, so the number stays taken | withdrawn |
 | [0034](0034-context-is-the-root.md) | `context` is the root: one word for what a kind hands, where it is declared and where it is read | implemented |
 | [0035](0035-the-whole-record-before-the-write.md) | The whole record before the write: a guarded shape is made upstream of the effect, never from it | implemented |
-| [0036](0036-shared-answers.md) | Recorded scenarios share their answers: each distinct node answer kept once per directory | accepted |
+| [0036](0036-shared-answers.md) | Recorded scenarios share their answers: each distinct node answer kept once per directory | implemented |
 
 Which milestone first shows an RFC is said once, in [`../roadmap.md`](../roadmap.md); the tracking issue
 carries it as GitHub's milestone. Where this list and the outside assessment that seeded it differ, the

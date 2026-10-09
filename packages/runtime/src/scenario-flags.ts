@@ -1,8 +1,9 @@
 /**
  * What the scenario commands are asked on the command line (RFC 0018): `rehearse --record [dir]` and `--check`,
- * `fuzz --edges` and its `--check`, and `scenarios --check`, each answered, before any run, as the options to run
- * with or the reason the flags are refused. Each refuses what would make a directory a command owns depend on more
- * than the tree: a seed, a profile, an envelope whose `ok` would not say whether the directory is current.
+ * `fuzz --edges` and its `--check`, `scenarios --check`, and `scenarios --pin` (RFC 0036), each answered, before any
+ * run, as the options to run with or the reason the flags are refused. Each refuses what would make a directory a
+ * command owns depend on more than the tree: a seed, a profile, an envelope whose `ok` would not say whether the
+ * directory is current.
  */
 import { resolve } from 'node:path';
 import { BESIDE_EDGES } from './fuzz-edges.js';
@@ -58,13 +59,35 @@ export function edgingOf(flags: Flags): Asked<{ edges?: boolean; check?: boolean
 }
 
 /**
- * What `scenarios` is asked: `--check`, its one form, and nothing beside it, since it runs `rehearse --check` and
- * `fuzz --edges --check` as they are, under seed 1 and the default profile, and prints no envelope.
+ * What `scenarios --pin <file>` is asked: the scenario to copy, and nothing beside it, since it writes one file and
+ * runs nothing. `--check` beside it is refused apart, since the two are different steps.
  */
-export function scenariosOf(flags: Flags): Asked<{ check: true }> {
+function pinningOf(flags: Flags): Asked<{ pin: string }> {
+  if (flags.check !== undefined)
+    return {
+      refused: '--check judges the recorded directories and --pin copies one scenario out of them: run them apart',
+    };
+  if (flags.pin === 'true')
+    return {
+      refused: '--pin names the scenario to keep, by its path below the root: wilanis scenarios [root] --pin <file>',
+    };
+  const other = Object.keys(flags).find(flag => flag !== 'pin');
+  if (other) return { refused: `wilanis scenarios --pin copies one scenario and runs nothing: drop --${other}` };
+  return { asked: { pin: flags.pin } };
+}
+
+/**
+ * What `scenarios` is asked: `--check`, and nothing beside it, since it runs `rehearse --check` and
+ * `fuzz --edges --check` as they are, under seed 1 and the default profile, and prints no envelope; or `--pin <file>`,
+ * and nothing beside it (`pinningOf`).
+ */
+export function scenariosOf(flags: Flags): Asked<{ check: true } | { pin: string }> {
+  if (flags.pin !== undefined) return pinningOf(flags);
   if (flags.check === undefined)
     return {
-      refused: 'wilanis scenarios checks the directories rehearse --record and fuzz --edges write: add --check',
+      refused:
+        'wilanis scenarios checks the directories rehearse --record and fuzz --edges write: add --check, or ' +
+        '--pin <file> to keep one scenario of them by hand',
     };
   const other = Object.keys(flags).find(flag => flag !== 'check');
   if (other === 'json')
