@@ -26,7 +26,8 @@ import { outcomeOf, type Report } from '@wilanis/engine';
 import { expectOf } from './fuzz.js';
 import { recordedProfile, skippedLines } from './profile.js';
 import { claimDir, dirOf, type Recorded, recordedLines, type Writer } from './record.js';
-import { checkRecorded, EDGED, EDGES, keptIn, writeRecorded } from './recorded-dir.js';
+import { checkRecorded, keptIn, writeRecorded } from './recorded-dir.js';
+import { EDGED, EDGES } from './recorded-owner.js';
 import { embedderFor, generatedFire } from './stubbing.js';
 import { getPath, setPath } from './stubs.js';
 

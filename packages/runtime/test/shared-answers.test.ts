@@ -1,15 +1,15 @@
 /**
- * A recorded scenario that points into its directory's answers document is read as its inline form (RFC 0036, step 2).
- * Nothing writes a pointer yet, so each case plants one: the example's committed `scenarios/rehearsed/` is copied into
- * two copies of the example, and in one of them every scenario is rewritten as `--record` will write it -- a digest per
- * node, `sharedStubs` in place of `stubs` -- beside the `answers.json` they point into. The checker, `regress` and
- * `describe` must say of the pointing copy exactly what they say of the inline one, and name the answers document it
- * reads (step 4); `describe` and `ls` show the answers document itself.
+ * A recorded scenario that points into its directory's answers document is read as its inline form (RFC 0036). The
+ * example's committed `scenarios/rehearsed/`, which `--record` writes with a digest per node and `sharedStubs` in place
+ * of `stubs` beside the `answers.json` they point into, is copied into two copies of the example, and in one of them
+ * every scenario is written inline again and the answers file removed. The checker, `regress` and `describe` must say
+ * of the pointing copy exactly what they say of the inline one, and name the answers document it reads (step 4);
+ * `describe` and `ls` show the answers document itself.
  */
 import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkTree } from '@wilanis/compiler';
-import { answerDigest, type LoadResult, loadTree, type ScenarioDoc, schemaUrl } from '@wilanis/core';
+import { type LoadResult, loadTree, nodesOf, type ScenarioDoc, schemaUrl, stubsOf } from '@wilanis/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { describe as describeDoc, ls, RECORDED, regress } from '../src/index.js';
 import { copyOfExample, EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
@@ -29,37 +29,28 @@ function scenariosUnder(root: string, dir: string): string[] {
   });
 }
 
-/** A copy of the example holding the scenarios it keeps under `scenarios/rehearsed/`, inline as committed. */
-function inlineCopy(): string {
+/** A copy of the example holding the scenarios it keeps under `scenarios/rehearsed/`, as `--record` writes them. */
+function pointingCopy(): string {
   const dir = copyOfExample();
   cpSync(join(EXAMPLE, RECORDED), join(dir, RECORDED), { recursive: true });
   return dir;
 }
 
-/** One scenario as `--record` will write it: each node and each stub a digest, the value held in `held`. */
-function pointing(sc: ScenarioDoc, held: { nodes: Record<string, unknown>; stubs: Record<string, unknown> }) {
-  const nodes: Record<string, string> = {};
-  for (const [path, answer] of Object.entries(sc.expect.nodes)) {
-    nodes[path] = answerDigest(answer);
-    held.nodes[nodes[path]] = answer;
+/** The same copy with every scenario written inline, each answer and stub in place of its digest, and no answers file. */
+function inlineCopy(): string {
+  const dir = pointingCopy();
+  const answers = read(join(dir, ANSWERS));
+  for (const file of scenariosUnder(dir, RECORDED)) {
+    const sc: ScenarioDoc = read(join(dir, file));
+    const { sharedStubs, ...rest } = sc;
+    const inline = {
+      ...rest,
+      ...(sharedStubs ? { stubs: stubsOf(sc, answers).stubs } : {}),
+      expect: { ...sc.expect, nodes: nodesOf(sc, answers).nodes },
+    };
+    writeFileSync(join(dir, file), JSON.stringify(inline));
   }
-  const shared: Record<string, string> = {};
-  for (const [path, value] of Object.entries(sc.stubs ?? {})) {
-    shared[path] = answerDigest(value);
-    held.stubs[shared[path]] = value;
-  }
-  const { stubs: _, ...rest } = sc;
-  return { ...rest, ...(sc.stubs ? { sharedStubs: shared } : {}), expect: { ...sc.expect, nodes } };
-}
-
-/** A copy whose recorded scenarios all point into `scenarios/rehearsed/answers.json`. */
-function pointingCopy(): string {
-  const dir = inlineCopy();
-  const held = { nodes: {}, stubs: {} };
-  for (const file of scenariosUnder(dir, RECORDED))
-    writeFileSync(join(dir, file), JSON.stringify(pointing(read(join(dir, file)), held)));
-  const answers = { $schema: schemaUrl('answers'), description: 'Planted.', generated: 'rehearse', ...held };
-  writeFileSync(join(dir, ANSWERS), JSON.stringify(answers));
+  rmSync(join(dir, ANSWERS));
   return dir;
 }
 

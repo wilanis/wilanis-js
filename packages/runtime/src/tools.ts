@@ -35,18 +35,8 @@ export {
   recordedLines,
   scenarioOf,
 } from './record.js';
-export {
-  checkRecorded,
-  EDGED,
-  EDGES,
-  type Owner,
-  RECORDED,
-  REHEARSED,
-  type RecordCheck,
-  refusedDir,
-  SCENARIOS,
-  writeRecorded,
-} from './recorded-dir.js';
+export { checkRecorded, type RecordCheck, writeRecorded } from './recorded-dir.js';
+export { EDGED, EDGES, type Owner, RECORDED, REHEARSED, refusedDir, SCENARIOS } from './recorded-owner.js';
 export { type Rehearsal, rehearse } from './rehearse.js';
 export { init, scaffold } from './scaffolds.js';
 export {

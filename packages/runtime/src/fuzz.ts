@@ -8,6 +8,7 @@ import { walkedUnder } from '@wilanis/compiler';
 import type { Loaded, LoadResult } from '@wilanis/core';
 import {
   answersAbove,
+  canonicalJson,
   nodesOf,
   type ScenarioDoc,
   type ScenarioNode,
@@ -21,12 +22,12 @@ import { outcomeOf, type Report, refusalOf, shownOutput } from '@wilanis/engine'
 import type { Embedder } from './embed.js';
 import { type Fuzzing, fuzzEdges } from './fuzz-edges.js';
 import { activeProfile, skippedLines } from './profile.js';
-import { HOME_DIR, SCENARIOS } from './recorded-dir.js';
+import { HOME_DIR, SCENARIOS } from './recorded-owner.js';
 import { replayedDoc, solvedAgain } from './rehearse-recorded.js';
 import { unreadSaid } from './scenario-said.js';
 import { embedderFor, generatedFire } from './stubbing.js';
 
-export { HOME_DIR, SCENARIOS } from './recorded-dir.js';
+export { HOME_DIR, SCENARIOS } from './recorded-owner.js';
 
 // ---- fuzz / regress ----------------------------------------------------------------------------------
 
@@ -154,7 +155,18 @@ async function fuzzSeeds(load: LoadResult, opts: { runs?: number; profile?: stri
   return { ok: lines.length === 0, written, lines, skipped };
 }
 
-const same = (one: unknown, other: unknown) => JSON.stringify(one) === JSON.stringify(other);
+/** A value as the JSON written for it reads back, in canonical form; nothing where JSON writes nothing. */
+function canonical(value: unknown): string | undefined {
+  const text = JSON.stringify(value);
+  return text === undefined ? undefined : canonicalJson(JSON.parse(text));
+}
+
+/**
+ * Whether two values write the same JSON, whatever the order of their keys: an answers file holds each value in
+ * canonical form, its keys sorted, so a replay fed a stub from it builds its objects in another order than the run
+ * that was recorded, and means the same.
+ */
+const same = (one: unknown, other: unknown) => canonical(one) === canonical(other);
 
 /**
  * How a reason differs, a node's (`id`) or the run's: `none` for one that answered or broke, so a refusal become a
