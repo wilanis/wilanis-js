@@ -88,7 +88,8 @@ describe('S006: a scenario written by hand holds its answers and stubs itself', 
     expect(plantedEditingAllSaying(placed, {})).toContain(
       `S006 node 'op.outcome' points at the shared answer ${routed}, and a scenario written by hand holds its answers itself: no command keeps an answers file for it`,
     );
-    const pin = 'wilanis scenarios --pin <the recorded file> writes the copy with every answer and stub inline; or ';
+    const pin =
+      'delete this file, then wilanis scenarios --pin <the recorded file> writes it again with every answer and stub inline; or ';
     expect(plantedEditingAllHinting(placed, {})).toEqual(
       expect.arrayContaining([
         `S006 ${pin}write the answer answers.json holds under nodes/${routed} in place of the digest`,

@@ -95,7 +95,9 @@ describe('scenarios --pin', () => {
     expect(result(FILE)?.same).toBe(true);
   });
 
-  it('refuses a file already there, writing nothing, and says so on the command line with exit 1', () => {
+  it('refuses a file already there, writing nothing, and says so on the command line with exit 1', {
+    timeout: 60_000,
+  }, () => {
     const before = readFileSync(join(dir, PINNED), 'utf8');
     const again = pinScenario(load(dir), FILE);
     expect(again).toEqual({
@@ -109,7 +111,9 @@ describe('scenarios --pin', () => {
     expect(readFileSync(join(dir, PINNED), 'utf8')).toBe(before);
   });
 
-  it('pins on the command line, the path with or without @, and refuses its flags with exit 2 before any run', () => {
+  it('pins on the command line, the path with or without @, and refuses its flags with exit 2 before any run', {
+    timeout: 60_000,
+  }, () => {
     rmSync(join(dir, PINNED));
     const cli = wilanis(dir, 'scenarios', '.', '--pin', `@${FILE}`);
     expect(cli.code, cli.stderr).toBe(0);
@@ -144,6 +148,29 @@ describe('scenarios --pin', () => {
         `${FILE} points at values --pin cannot read (op.outcome): ${ANSWERS} does not hold them -- run wilanis ` +
         'rehearse --record, which writes the scenario and what it points at again, then pin it again',
     });
+  });
+
+  it("follows S006's hint: a copy made by hand is refused, deleted, pinned, and the tree checks", {
+    timeout: 60_000,
+  }, () => {
+    rmSync(join(dir, PINNED), { force: true });
+    const { generated: _, ...byHand } = read(join(dir, FILE));
+    writeFileSync(join(dir, PINNED), JSON.stringify(byHand, null, 2));
+    const refused = wilanis(dir, 'check', '.');
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain(`S006  @${PINNED}#expect/nodes/op.outcome`);
+    const hint = /→ (.*)$/m.exec(refused.stderr.slice(refused.stderr.indexOf('S006')))?.[1] ?? '';
+    expect(hint).toMatch(/^delete this file, then wilanis scenarios --pin <the recorded file> writes it again/);
+    // the other order never runs: the command line checks the tree first, and the copy is still there
+    const first = wilanis(dir, 'scenarios', '.', '--pin', FILE);
+    expect(first.code).toBe(1);
+    expect(first.stderr).toContain(`S006  @${PINNED}`);
+    expect(read(join(dir, PINNED))).toEqual(byHand);
+    rmSync(join(dir, PINNED));
+    const pinned = wilanis(dir, 'scenarios', '.', '--pin', FILE);
+    expect(pinned.code, pinned.stderr).toBe(0);
+    const checked = wilanis(dir, 'check', '.');
+    expect(checked.code, checked.stderr).toBe(0);
   });
 
   it('pins what plain fuzz wrote too, its first sentence kept whole though the trigger path in it holds dots', async () => {

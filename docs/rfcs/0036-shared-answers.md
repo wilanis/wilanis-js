@@ -210,7 +210,7 @@ wrote scenarios/customers.get-row.outcome.noCustomer.scenario.json with every an
 ```
 S006  @scenarios/customers.get-row.outcome.noCustomer.scenario.json#expect/nodes/op.outcome
     node 'op.outcome' points at the shared answer 57a449dbd5d11643, and a scenario written by hand holds its answers itself: no command keeps an answers file for it
-    → wilanis scenarios --pin <the recorded file> writes the copy with every answer and stub inline; or write this node's answer in place of the digest
+    → delete this file, then wilanis scenarios --pin <the recorded file> writes it again with every answer and stub inline; or write this node's answer in place of the digest
 ```
 
 ## Reference
@@ -337,7 +337,7 @@ pass the house rule's 300 lines. `judgeTree` in `checker.ts` judges answers docu
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
-| S006 | `check/scenarios.ts`, at `expect/nodes/<id>` or `sharedStubs` | a scenario with no `generated` writes a digest for a node, or has `sharedStubs`. Its answers file is rewritten by a command that does not know the scenario, so a value it needs may disappear | `wilanis scenarios --pin <the recorded file> writes the copy with every answer and stub inline; or write the value in place of the digest` |
+| S006 | `check/scenarios.ts`, at `expect/nodes/<id>` or `sharedStubs` | a scenario with no `generated` writes a digest for a node, or has `sharedStubs`. Its answers file is rewritten by a command that does not know the scenario, so a value it needs may disappear | `delete this file, then wilanis scenarios --pin <the recorded file> writes it again with every answer and stub inline; or write the value in place of the digest` |
 | S007 | `check/scenarios.ts`, at `expect/nodes/<id>` or `sharedStubs/<path>` | a node or a stub is a digest, and the scenario's answers file (`answersAbove`) does not exist, carries another `generated` than the scenario, or holds no value under that digest in the map it reads (`nodes` for a node, `stubs` for a stub). Also a path that is in both `stubs` and `sharedStubs` | `wilanis rehearse --record (or wilanis fuzz --edges) writes the scenarios and their answers file together: run it and review the diff` |
 
 **S002 and S003 read through core.** S002 refuses a reason on a node that did not end `failed`. For an inline answer
@@ -742,10 +742,13 @@ None. Decided in review:
   scenario, or, for a scenario written by hand, `wilanis check`, whose S006 names each value. The command line checks
   the tree first, and S006 and S007 refuse every such pointer, so only a caller without the command line meets this
   refusal.
-- Step 6: S006's hint begins `wilanis scenarios --pin <the recorded file> writes the copy with every answer and stub
-  inline; or ` and goes on with the edit step 3 named, at a node and at `sharedStubs`. The template's step 3 and its
+- Step 6: S006's hint begins `delete this file, then wilanis scenarios --pin <the recorded file> writes it again with
+  every answer and stub inline; or ` and goes on with the edit step 3 named, at a node and at `sharedStubs`. The template's step 3 and its
   `scenario` row name `--pin` alone: the manual edit stays only in S006's hint and its page, as the fallback.
 - Step 6: fuzz's description ends `-- to pin a case, run wilanis scenarios --pin <this file>, which copies it into
   scenarios/.`
 - Step 6: the tests are in a new file, `packages/runtime/test/scenarios-pin.test.ts`, not in `scenarios-check.test.ts`
   as the test table says. That file would reach the house rule's 300 lines.
+- Step 6: S006's hint says to delete the hand-made copy first, before `--pin`. The command line checks the tree before
+  `--pin` runs, and while the copy is there `check` refuses it as S006, so `--pin` alone would never run and the same
+  hint would come back. A test follows the hint's own steps: the copy refused, deleted, pinned, and the tree checks.
