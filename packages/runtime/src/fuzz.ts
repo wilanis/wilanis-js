@@ -101,7 +101,7 @@ async function fuzzed(load: LoadResult, trigger: Loaded<TriggerDoc>, seed: numbe
 function scenarioOf({ trigger, seed, input, context, record, report, secret }: Fuzzed): ScenarioDoc {
   return {
     $schema: schemaUrl('scenario'),
-    description: `${trigger.path} under seed ${seed}: ${report.status}. Written by wilanis fuzz; regenerate it, do not edit it -- to pin a case, copy it up into ${HOME_DIR}/, give it a description of its own, and drop generated.`,
+    description: `${trigger.path} under seed ${seed}: ${report.status}. Written by wilanis fuzz; regenerate it, do not edit it -- to pin a case, run wilanis scenarios --pin <this file>, which copies it into ${HOME_DIR}/.`,
     generated: 'fuzz',
     trigger: trigger.path,
     seed,

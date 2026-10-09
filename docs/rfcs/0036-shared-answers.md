@@ -1,6 +1,6 @@
 # RFC 0036: Recorded scenarios share their answers: each distinct node answer kept once per directory
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:core` (`scenario.schema.json`, a new `answers.schema.json`, `ScenarioDoc`, `AnswersDoc`, `HOME`,
   one module that reads a pointer), `area:compiler` (two `S` rules; S002 and S003 read through that module),
   `area:runtime` (`writeRecorded` and `checkRecorded` write and compare the shared file; `regress`, `describe` and `ls`
@@ -727,3 +727,25 @@ None. Decided in review:
   138,356 to 113,246 bytes (276K to 268K), its `edges/` from 130,395 to 95,404 (272K to 268K). The access tree's
   `rehearsed/` grows, from 23,267 to 25,341 bytes (60K to 72K): its 15 scenarios hold 72 node answers, of which 48 are
   distinct, so a pointer saves less than it costs there. `du` moves little, since most files are smaller than a block.
+- Step 6 (#884): the work is in `scenario-pin.ts` (`pinScenario`), and `tools.ts` exports it, as it exports every other
+  command's work from the module that does it. `pinScenario` answers `{ ok, line, wrote? }`; the command line prints
+  the line on stdout and exits 0, or prints it on stderr and exits 1, writing nothing. A flag refused before any run
+  exits 2, as `--check`'s do.
+- Step 6: `--pin` names the scenario by its path below the root, with or without the `@`, as `wilanis ls scenario`
+  lists it. It pins any scenario of the tree, a plain `fuzz` one included, since fuzz's description now names `--pin`
+  as the way to pin a case. Like every command but `ls` and `describe`, it checks the tree first.
+- Step 6: the pinned file is indented, two spaces, as plain `fuzz` writes, since a person reads and keeps it. Its
+  fields keep their places, and `stubs` takes the place of `sharedStubs`. Its description's first sentence ends at the
+  first period followed by a space or the end, so a trigger path with dots in it stays whole.
+- Step 6: where a pointer does not resolve, `--pin` names each path (`stub <path>` for a stub), says why in the words
+  `regress` uses (`<file> does not hold them`, or `unreadSaid`), and says what to run: the command that wrote the
+  scenario, or, for a scenario written by hand, `wilanis check`, whose S006 names each value. The command line checks
+  the tree first, and S006 and S007 refuse every such pointer, so only a caller without the command line meets this
+  refusal.
+- Step 6: S006's hint begins `wilanis scenarios --pin <the recorded file> writes the copy with every answer and stub
+  inline; or ` and goes on with the edit step 3 named, at a node and at `sharedStubs`. The template's step 3 and its
+  `scenario` row name `--pin` alone: the manual edit stays only in S006's hint and its page, as the fallback.
+- Step 6: fuzz's description ends `-- to pin a case, run wilanis scenarios --pin <this file>, which copies it into
+  scenarios/.`
+- Step 6: the tests are in a new file, `packages/runtime/test/scenarios-pin.test.ts`, not in `scenarios-check.test.ts`
+  as the test table says. That file would reach the house rule's 300 lines.

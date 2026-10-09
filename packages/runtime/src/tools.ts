@@ -39,6 +39,7 @@ export { checkRecorded, type RecordCheck, writeRecorded } from './recorded-dir.j
 export { EDGED, EDGES, type Owner, RECORDED, REHEARSED, refusedDir, SCENARIOS } from './recorded-owner.js';
 export { type Rehearsal, rehearse } from './rehearse.js';
 export { init, scaffold } from './scaffolds.js';
+export { type Pinned, pinScenario } from './scenario-pin.js';
 export {
   checkScenarios,
   edgesFailed,

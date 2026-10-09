@@ -89,6 +89,9 @@ function checkPinnedReasons(answers: Record<string, ScenarioNode>, where: Answer
   }
 }
 
+/** What S006's hint names first: the command that writes a hand-kept copy of a recorded scenario with nothing shared. */
+const PIN = 'wilanis scenarios --pin <the recorded file> writes the copy with every answer and stub inline; or ';
+
 /**
  * S006: a scenario written by hand holds its answers and its stubs itself. An answers document is rewritten whole by
  * a command that does not know the scenario, so a value it points at could disappear on the next record.
@@ -100,7 +103,7 @@ function checkWrittenByHand(scenario: ScenarioDoc, refuse: Refuser): void {
       'S006',
       `node '${id}' points at the shared answer ${node}, and a scenario written by hand holds its answers itself: no command keeps an answers file for it`,
       `expect/nodes/${id}`,
-      `write the answer answers.json holds under nodes/${node} in place of the digest`,
+      `${PIN}write the answer answers.json holds under nodes/${node} in place of the digest`,
     );
   }
   if (scenario.sharedStubs === undefined) return;
@@ -108,7 +111,7 @@ function checkWrittenByHand(scenario: ScenarioDoc, refuse: Refuser): void {
     'S006',
     'the scenario shares its stubs under sharedStubs, and a scenario written by hand holds its stubs itself: no command keeps an answers file for it',
     'sharedStubs',
-    'move each entry of sharedStubs under stubs, with the value answers.json holds under stubs/<digest>',
+    `${PIN}move each entry of sharedStubs under stubs, with the value answers.json holds under stubs/<digest>`,
   );
 }
 
