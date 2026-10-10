@@ -127,8 +127,11 @@ describe.skipIf(!url)('what ensure makes, and what it refuses to change', () => 
     await engine.ensure([collection]);
     await engine.put(collection, { id: '1', url: 'https://x', hits: 1, tags: [] }, true);
     await engine.put(collection, { id: '2', url: 'https://x', hits: 1, tags: [] }, true);
-    await expect(engine.ensure([at('e_uniq_bad', { unique: [['url']] })])).rejects.toThrow();
+    await expect(engine.ensure([at('e_uniq_bad', { unique: [['url']] })])).rejects.toThrow(
+      /^drift: e_uniq_bad declares unique \[url\], and rows the table already holds repeat it; make them differ/,
+    );
     expect(await engine.count(collection, undefined)).toBe(2);
+    expect((await catalogOf('e_uniq_bad')).constraints).toEqual([]);
   });
 });
 
@@ -241,6 +244,19 @@ describe.skipIf(!url)('what a scope costs the table', () => {
     expect(await engine.ensure([collection])).toEqual({ collections: 0, columns: 0, constraints: 0 });
     // the unique is still the scoped one: a second ensure must not put the unscoped spelling back beside it
     expect((await catalogOf('e_scope_again')).constraints).toEqual(['wl_us_e_scope_again_tenant_url']);
+  });
+
+  it('refuses a scoped unique the rows of one tenant would break, saying so, and leaves the table as it was', async () => {
+    const before = at('e_scope_bad');
+    await engine.ensure([before]);
+    const same = { url: 'https://same', hits: 1, tags: [] };
+    await engine.put(before, { id: '1', ...same }, { replace: true, scope: { tenant: 'acme' } });
+    await engine.put(before, { id: '2', ...same }, { replace: true, scope: { tenant: 'acme' } });
+    await expect(engine.ensure([at('e_scope_bad', { unique: [['url']] })])).rejects.toThrow(
+      /^drift: e_scope_bad declares unique \[url\], and rows the table already holds repeat it within one scope;/,
+    );
+    expect(await engine.count(before, undefined, { tenant: 'acme' })).toBe(2);
+    expect((await catalogOf('e_scope_bad')).constraints).toEqual([]);
   });
 
   it('a unique declared after the table is scoped holds within one tenant, and not across them', async () => {
