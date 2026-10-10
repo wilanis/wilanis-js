@@ -4,7 +4,8 @@
  * variables they name (P001) -- a type field from its own literal, a static field through its `resolves`.
  * Every other value is typed by the site's reader in the caller's context (G003), must be an input (G006),
  * present when required (G005), and assignable (G004). Where the operation refuses, its `message` is said to
- * the caller, and reads no field marked secret (G016).
+ * the caller, and reads no field marked secret (G016). A field the contract marks `provided` is the compiler's:
+ * it is never given (G026) and never missing (G005 passes it over).
  */
 import {
   assignable,
@@ -83,6 +84,13 @@ export function trimsAt(op: string | undefined, name: string, given: unknown): b
 /** `make`'s `trim`, which the compiler sets where `trimsAt` says and no document writes. */
 const TRIM = 'trim';
 
+/** The names of the fields an operation's contract marks `provided`, which the compiler writes and no site gives. */
+export function providedNames(accepted: Fields): string[] {
+  return Object.entries(accepted)
+    .filter(([, field]) => field.provided !== undefined)
+    .map(([name]) => name);
+}
+
 const BRACES = /^\{\{(.*)\}\}$/s;
 const INDEX = /^[0-9]+$/;
 
@@ -125,9 +133,25 @@ class InputCheck {
     for (const [name, field] of Object.entries(this.accepts))
       if (this.isTypeField(field)) this.checkTypeField(name, field);
     this.bindResolved();
-    for (const [name, field] of Object.entries(this.accepts))
-      if (!this.isTypeField(field)) this.checkValueField(name, field);
+    for (const [name, field] of Object.entries(this.accepts)) {
+      if (field.provided) this.checkProvided(name);
+      else if (!this.isTypeField(field)) this.checkValueField(name, field);
+    }
     return this.subst;
+  }
+
+  /**
+   * G026: a field the contract marks `provided` is written by the compiler where the operation is called, so a call
+   * site that gives it is refused, and one that leaves it out is not asked for it.
+   */
+  private checkProvided(name: string): void {
+    if (!(name in this.site.given)) return;
+    this.refuse(
+      'G026',
+      `'${name}' is provided by the compiler where ${this.site.what} is called`,
+      `${this.site.at}/${name}`,
+      'drop it; the operation is told where it was called without being asked',
+    );
   }
 
   /**
