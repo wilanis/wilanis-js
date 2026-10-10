@@ -31,9 +31,9 @@ import { BUILTIN_PLUGINS } from '@wilanis/runtime';
 import { type DocView, viewOf } from '../src/index.js';
 import { treeReadsOf } from '../src/model.js';
 
-const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
+export const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 /** The tree the example includes, as the runtime would resolve it from the example's node_modules. */
-const INCLUDES: ResolvedInclude[] = [
+export const INCLUDES: ResolvedInclude[] = [
   {
     from: '@wilanis/access',
     dir: fileURLToPath(new URL('../../../libraries/access', import.meta.url)),
@@ -45,7 +45,7 @@ const INCLUDES: ResolvedInclude[] = [
  * What a copy of the example takes: all but its node_modules and the scenarios it keeps, so a case sees the scenarios
  * it plants and no others.
  */
-const copied = (from: string) => !from.includes('node_modules') && from !== join(EXAMPLE, 'scenarios');
+export const copied = (from: string) => !from.includes('node_modules') && from !== join(EXAMPLE, 'scenarios');
 
 /** The store the local profile keeps its customers in. */
 export const STORE_FILE = 'features/customers/data/customers.store.json';
@@ -54,7 +54,7 @@ export const STORE_FILE = 'features/customers/data/customers.store.json';
 export type Edits = Record<string, (doc: any) => void>;
 
 /** The plugins the example names, handed in: a copy of the tree has no node_modules and resolves none of them. */
-const PLUGINS: Record<string, PluginModule> = {
+export const PLUGINS: Record<string, PluginModule> = {
   ...BUILTIN_PLUGINS,
   '@http': http,
   '@blob': blob,
