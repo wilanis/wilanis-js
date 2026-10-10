@@ -1,6 +1,6 @@
 # RFC 0032: The site as a declared input: what the compiler tells an operation about where it was called
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:core` (one key on a contract field in `common.schema.json`; `ObjField.provided`; one shape the
   `@std` plugin grants), `area:compiler` (the literal written at lowering; two rules), `area:runtime` (`describe`, the
   `@std` document, one method on the handler environment), `area:view` (the node panel marks the field). Nothing in the engine.

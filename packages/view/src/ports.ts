@@ -2,7 +2,7 @@
  * The ports of a node and where its operation leads: each field an operation accepts and answers, how one input value
  * was written, and the attribute ports a deep read opens under the field it reads.
  */
-import { bindings } from '@wilanis/compiler';
+import { bindings, type SiteLiteral } from '@wilanis/compiler';
 import type { Operation, Type, Values } from '@wilanis/core';
 import { hasVars, type Scope, show, splitPath, substitute, TEMPLATE, WHOLE_TEMPLATE } from '@wilanis/core';
 import { attemptsOf, promisedOf } from './attempts.js';
@@ -141,6 +141,11 @@ function fieldType(scope: Scope, field: { type: unknown; enum?: string[] }, subs
   }
 }
 
+/** A provided field: the compiler's, shown with the literal it writes at this site, which an author never gives. */
+function provided(site: SiteLiteral | undefined): Pick<VPort, 'provided' | 'literal'> {
+  return site ? { provided: true, literal: JSON.stringify(site) } : { provided: true };
+}
+
 /** How one input is given: written at the call, bound from each element of a map, or not given at all. */
 function howGiven(scope: Scope, value: unknown, bind: Record<string, string> | undefined, name: string) {
   if (value !== undefined) return written(scope, value);
@@ -148,19 +153,26 @@ function howGiven(scope: Scope, value: unknown, bind: Record<string, string> | u
   return { missing: true };
 }
 
-/** The input ports of a call: each field the operation accepts, typed with the variables this call binds, and how it is given -- written, bound from each element of a map, or not at all. */
+/** Where a call's inputs come from beside what is written at it: a map's bound element, and the site the compiler writes for a field marked `provided`. */
+export interface GivenAt {
+  bind?: Record<string, string>;
+  /** the call's site, which a provided field shows as the literal the compiler writes; absent where no site is known */
+  site?: SiteLiteral;
+}
+
+/** The input ports of a call: each field the operation accepts, typed with the variables this call binds, and how it is given -- written, bound from each element of a map, provided by the compiler, or not at all. */
 export function inputPorts(
   scope: Scope,
   op: Operation | undefined,
   given: Values | undefined,
-  bind?: Record<string, string>,
+  at: GivenAt = {},
 ): VPort[] {
   const ports: VPort[] = [];
   const subst = op ? bindings(scope, op, given) : {};
   const typeOf = (field: { type: unknown; enum?: string[] }) => fieldType(scope, field, subst);
   const accepted = scope.types.accepted(op?.accepts);
   for (const [name, field] of Object.entries(accepted)) {
-    const how = howGiven(scope, given?.[name], bind, name);
+    const how = field.provided ? provided(at.site) : howGiven(scope, given?.[name], at.bind, name);
     ports.push({
       name,
       type: typeOf(field),

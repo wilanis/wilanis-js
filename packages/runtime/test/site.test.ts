@@ -8,7 +8,7 @@
 import { checkTree, runGraph } from '@wilanis/compiler';
 import type { Report } from '@wilanis/engine';
 import { afterEach, describe, expect, it } from 'vitest';
-import { embedderFor, fuzz, regress } from '../src/index.js';
+import { describe as describeDoc, embedderFor, fuzz, regress } from '../src/index.js';
 import { forget, notes } from './fixtures/plugin-note/index.js';
 import {
   CREATE_ROW,
@@ -135,6 +135,18 @@ describe('the site a provided field receives', () => {
       });
       const again = await regress(loadSite(dir), { profile: 'live' });
       expect(again.ok, again.lines.join('\n')).toBe(true);
+    });
+  });
+});
+
+describe('what a reader is told', () => {
+  it('describe prints (provided) after the type of a provided field, as it prints (static)', async () => {
+    await withSite(dir => {
+      const lines = describeDoc(loadSite(dir), NOTE_PORT).split('\n');
+      expect(lines).toContain(
+        '    in  site: @std/Site.shape.json  (provided)  -- where this call was written; the compiler fills it and the note carries it',
+      );
+      expect(lines).toContain('    in  text: string  -- what to note');
     });
   });
 });

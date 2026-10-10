@@ -44,7 +44,10 @@ function bindsOf(field: { binds?: string; resolves?: Record<string, string> }): 
   return both.length ? ` ${both.join(', ')}` : '';
 }
 
-/** One input one port's operation accepts: one type parameter is shown as `type`, and one static one says so. */
+/**
+ * One input one port's operation accepts: one type parameter is shown as `type`, one static one says so, and one
+ * the compiler provides says `(provided)`, so a reader knows the call site never gives it.
+ */
 function acceptsLine(
   name: string,
   field: {
@@ -53,6 +56,7 @@ function acceptsLine(
     enum?: string[];
     binds?: string;
     static?: boolean;
+    provided?: string;
     resolves?: Record<string, string>;
     maxItems?: number;
     description?: string;
@@ -62,9 +66,10 @@ function acceptsLine(
   const optional = field.required === false ? '?' : '';
   const type = field.type === 'type' ? 'type' : showType(field.type);
   const isStatic = field.static || field.type === 'type' ? '  (static)' : '';
+  const isProvided = field.provided ? '  (provided)' : '';
   const allowed = field.enum ? ` ∈ ${field.enum.join('|')}` : '';
   const says = field.description ? `  -- ${field.description}` : '';
-  return `    in  ${name}${optional}: ${type}${boundSaid(field)}${isStatic}${bindsOf(field)}${allowed}${says}`;
+  return `    in  ${name}${optional}: ${type}${boundSaid(field)}${isStatic}${isProvided}${bindsOf(field)}${allowed}${says}`;
 }
 
 /** What one operation takes: the shape it names, said once, or each field it writes. */
