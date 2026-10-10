@@ -3,7 +3,8 @@
  * C002), and every declared secret is read by something (C019). The profiles are judged in `profiles.ts`
  * (C017, C018, R001, B002, B003, B004, B011), and what each permits against what it reaches in `permits.ts`
  * (C021, C022, C023). Startup: each step fires a domain port operation (or a native one
- * that holds) before anything is received, under profiles the project declares (B006, B007, B008, B012). Blobs:
+ * that holds) before anything is received, under profiles the project declares (B006, B007, B008, B012), and
+ * gives no field the compiler provides (G026). Blobs:
  * the connection the blob registry keeps bytes behind opens a store some plugin offers (C014).
  */
 import {
@@ -13,7 +14,9 @@ import {
   runsUnder,
   type StartupStep,
   secretKeysRead,
+  type Type,
 } from '@wilanis/core';
+import { providedNames } from './inputs.js';
 import { type Judge, underProfile } from './judge.js';
 import { checkPermits } from './permits.js';
 import { checkProfiles } from './profiles.js';
@@ -114,13 +117,22 @@ function checkStepProfiles(judge: Judge, step: StartupStep, index: number): void
   }
 }
 
-/** B007: a step's inputs are literals and secrets that meet the operation's contract. */
+/**
+ * B007: a step's inputs are literals and secrets that meet the operation's contract -- less the fields the compiler
+ * provides, which the step is not asked for and is refused for giving (G026, as any call site is).
+ */
 function checkStepInputs(judge: Judge, step: StartupStep, index: number, op: Operation): void {
   const refuse = judge.refuser(judge.project.path);
   const at = `startup/${index}/in`;
-  const takes = judge.acceptsType(op);
+  const provided = providedNames(judge.accepted(op));
+  for (const name of provided.filter(name => name in (step.in ?? {}))) {
+    const message = `'${name}' is provided by the compiler where '${step.run}' is called`;
+    refuse('G026', message, `${at}/${name}`, 'drop it; the operation is told where it was called without being asked');
+  }
+  const takes = withoutFields(judge.acceptsType(op), provided);
+  const given = Object.fromEntries(Object.entries(step.in ?? {}).filter(([name]) => !provided.includes(name)));
   const why = 'a startup step runs before anything is received; only {{secrets.<key>}} may appear';
-  const read = judge.secretsRead(step.in ?? {}, why);
+  const read = judge.secretsRead(given, why);
   if (typeof read === 'string') {
     refuse(
       'B007',
@@ -133,8 +145,15 @@ function checkStepInputs(judge: Judge, step: StartupStep, index: number, op: Ope
   const bad = mismatch(read?.type, takes);
   if (bad)
     refuse('B007', `startup step ${index} → ${step.run}: ${bad}`, at, `wilanis describe ${step.run.split('#')[0]}`);
-  if (!takes && Object.keys(step.in ?? {}).length)
+  if (!takes && Object.keys(given).length)
     refuse('B007', `startup step ${index}: '${step.run}' takes no input`, at, 'remove in');
+}
+
+/** An object type less the named fields; any other type, or none, as it is. */
+function withoutFields(type: Type | undefined, names: string[]): Type | undefined {
+  if (type?.kind !== 'object' || !names.length) return type;
+  const fields = Object.fromEntries(Object.entries(type.fields).filter(([name]) => !names.includes(name)));
+  return { ...type, fields };
 }
 
 /** B008: nothing has been received when a step runs, so no read of context.* can be met, under any profile it runs under. */

@@ -91,6 +91,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [L016](L016.md) | L | live | a data graph composing a value a field invariant guards that an effect of the graph reads |
 | [L017](L017.md) | L | live | a `listens` setting the granting plugin does not declare, or not a number for the port or a string for the host |
 | [L018](L018.md) | L | live | a port the tree writes where a `listens` reads it, a step's input or the plugin's setting, that is not a whole number from 0 to 65535 |
+| [L019](L019.md) | L | live | a `provided` field of a shape or a domain operation, or of a native operation where it is not `@std/Site.shape.json`, or is secret or optional |
 | [G001](G001.md) | G | live | a node id another node of the graph has, or one of the reserved roots in, const, context, secrets |
 | [G003](G003.md) | G | live | a read that cannot be typed: no such field, constant, earlier node, or name under reads |
 | [G004](G004.md) | G | live | a value that does not fit its input: optional where the contract requires it, or of the wrong type |
@@ -115,6 +116,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [G023](G023.md) | G | live | a read of the node that broke, where its fault is routed or behind it |
 | [G024](G024.md) | G | live | a catch of a switch, a pure operation or one that refuses on purpose, which break only by a bug |
 | [G025](G025.md) | G | live | a catch of a node where an invariant is guarded, which the guard moves aside |
+| [G026](G026.md) | G | live | a value given for a field the contract marks `provided`, which the compiler writes where the operation is called |
 | [P001](P001.md) | P | live | a static field, or a type reference, given a read where the checker must see a literal |
 | [P002](P002.md) | P | live | a resolver reading a context.* path no trigger kind hands and the guard does not add |
 | [P003](P003.md) | P | live | a resolver named in, const, context or secrets |
