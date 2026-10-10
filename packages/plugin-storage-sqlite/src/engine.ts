@@ -33,7 +33,7 @@ import { locked } from './handles.js';
 import { reserve, uuidv7 } from './keys.js';
 import { SqliteRecorder } from './recorder.js';
 import { changedOf, columnsOf, keyIn, recordOf, rowOf } from './rows.js';
-import { keepScope, scopeColumns, scopeValues, within, withoutScope } from './scoping.js';
+import { keepScope, scopeColumns, scopeValues, within } from './scoping.js';
 import { isIdentity } from './settings.js';
 import { removeViolation, writeViolation } from './violations.js';
 
@@ -163,7 +163,7 @@ export class SqliteEngine extends SqliteRecorder implements Engine {
       return await write(db);
     } catch (error) {
       betweenStatements(run);
-      const violated = await writeViolation(withoutScope(error, scope), db, at, given);
+      const violated = await writeViolation(error, db, at, { record: given, scope });
       if (violated) return { ...refused, violated };
       throw error;
     }
