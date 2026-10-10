@@ -138,8 +138,14 @@ export function mapAt(emb: Embedder, root: Spec, nodePath: string): boolean {
   return nodeAt(emb, root, nodePath.split('.'))?.kind === 'map';
 }
 
+/** The lowered `over` of the map at a dotted path, the list it runs over; nothing where the path names no map. */
+export function overAt(emb: Embedder, root: Spec, nodePath: string): unknown {
+  const node = nodeAt(emb, root, nodePath.split('.'));
+  return node?.kind === 'map' ? node.over : undefined;
+}
+
 /** A node of a lowered spec, as far as a walk down a path reads one. */
-type SpecNode = { kind?: string; handler?: unknown; in?: Record<string, unknown> };
+type SpecNode = { kind?: string; handler?: unknown; in?: Record<string, unknown>; over?: unknown };
 
 /** The node a dotted path ends at: the spec behind each call stepped into, and a map's element index stepped over. */
 function nodeAt(emb: Embedder, root: Spec, segments: string[]): SpecNode | undefined {
