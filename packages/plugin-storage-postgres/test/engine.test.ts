@@ -15,9 +15,11 @@
  * suite runs against one database without the cases reaching each other.
  */
 import { cases, emptyWhereCases, scopeCases } from '@wilanis/plugin-storage/suite';
-import { afterAll, describe, it } from 'vitest';
+import { sql } from 'kysely';
+import { afterAll, beforeAll, describe, it } from 'vitest';
 import { PostgresEngine } from '../src/engine.js';
-import { closePools } from '../src/pool.js';
+import { closePools, poolFor } from '../src/pool.js';
+import { forgetScopes } from '../src/scoping.js';
 
 const url = process.env.WILANIS_TEST_POSTGRES_URL;
 const KIND = '@storage-postgres/postgres.connection-kind.json';
@@ -49,5 +51,14 @@ describe.skipIf(!url)('what a filter of no test answers', () => {
  * predicate at once, and a scoped read of a table nothing has written yet, before its scope column exists.
  */
 describe.skipIf(!url)('what an engine that keeps scopes answers', () => {
+  // a scope case's table is a scope_ one, dropped before they run so a second run starts from none: a case that
+  // widens a scope needs a table that does not keep the wider one already
+  beforeAll(async () => {
+    const { db } = poolFor({ ...subject.connection, name: 'any' }, {});
+    const tables = (await sql<{ name: string }>`select tablename as name from pg_tables
+      where schemaname = 'public' and tablename like 'scope\_%'`.execute(db)) as { rows: { name: string }[] };
+    for (const { name } of tables.rows) await sql`drop table if exists public.${sql.ref(name)} cascade`.execute(db);
+    forgetScopes();
+  });
   for (const one of scopeCases) it(one.name, () => one.run(subject));
 });

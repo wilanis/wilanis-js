@@ -69,6 +69,25 @@ export const scopeCases: Case[] = [
     },
   },
   {
+    name: 'a unique follows a scope that widens: taken under one owner of a tenant, it is free under another',
+    async run(subject) {
+      // the table keeps `tenant` first; emptied, it then gains `owner`, and the unique over [url, method] is held
+      // within (tenant, owner) from then on -- never still within tenant alone, as a constraint left behind would
+      const where_ = await scoped(subject, 'scope_widened', { unique: [['url', 'method']] });
+      await subject.engine.put(where_, entry('a', 'https://one.example/a', 'GET'), { replace: true, scope: ACME });
+      await subject.engine.remove(where_, 'a', ACME);
+      const ada = { tenant: 'acme', owner: 'ada' };
+      const grace = { tenant: 'acme', owner: 'grace' };
+      const same = (id: string) => entry(id, 'https://one.example/a', 'GET');
+      assert.equal((await subject.engine.put(where_, same('b'), { replace: true, scope: ada })).violated, undefined);
+      assert.equal((await subject.engine.put(where_, same('c'), { replace: true, scope: grace })).violated, undefined);
+      const repeat = await subject.engine.put(where_, same('d'), { replace: true, scope: ada });
+      assert.equal(repeat.violated, 'unique [url, method]');
+      assert.deepEqual(await foundIn(subject, where_, ada), ['b']);
+      assert.deepEqual(await foundIn(subject, where_, grace), ['c']);
+    },
+  },
+  {
     name: 'a view sees every row: a read with no scope answers both scopes',
     async run(subject) {
       const where_ = await scoped(subject, 'scope_view');
