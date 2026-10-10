@@ -24,6 +24,16 @@ const CONNECTION = '@connections/records.connection.json';
 describe.skipIf(!url)('what an engine that keeps scopes answers', () => {
   const made = makeMysqlEngine({ settings: {} });
   const subject = { engine: made.engine, connection: { connection: CONNECTION, kind: KIND, settings: { url } } };
+  // a shared case's table is a scope_ one, dropped before they run so a second run starts from none: a case that
+  // widens a scope needs a table that does not keep the wider one already
+  beforeAll(async () => {
+    const pools = new Pools({});
+    const db = pools.for(at('any'));
+    const tables = await sql<{ name: string }>`select TABLE_NAME as name from information_schema.TABLES
+      where TABLE_SCHEMA = database() and TABLE_NAME like 'scope\\_%'`.execute(db);
+    for (const { name } of tables.rows) await sql`drop table ${sql.id(name)}`.execute(db);
+    await pools.close();
+  });
   afterAll(() => made.close());
   for (const one of scopeCases) it(one.name, () => one.run(subject));
 });
