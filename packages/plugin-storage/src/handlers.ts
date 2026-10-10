@@ -5,13 +5,14 @@
  */
 import type { Atomic } from '@wilanis/core';
 import type { Handler } from '@wilanis/engine';
-import type { At, Engine, Order, Query, Scope, Transaction } from './engine.js';
+import type { At, Engine, Order, Query, Run, Scope, Transaction } from './engine.js';
 import { ensureStore } from './ensure.js';
 import { collectionAt, engineFor, scopedAt, storeFor, viewed } from './store.js';
 import { whereOf } from './where.js';
 
 type Input = Record<string, unknown>;
-type Ctx = { env: Record<string, unknown> };
+/** What a handler reads of where it runs: the environment, and the signal that fires when the run is cancelled. */
+type Ctx = { env: Record<string, unknown>; signal?: AbortSignal };
 
 export type { Scope } from './engine.js';
 
@@ -56,6 +57,8 @@ interface Reached {
   at: At;
   engine: Engine;
   scope: Scope | undefined;
+  /** The run the call is part of, handed to the engine so it stops between statements once the run is cancelled. */
+  run: Run;
 }
 
 /**
@@ -72,19 +75,20 @@ async function at(input: Input, ctx: Ctx, unscoped?: 'takes no scope'): Promise<
   const columns = unscoped ? [] : scopedAt(ctx.env, input.store, input.collection);
   const scope = scopeOf(input.scope, columns, collection.name);
   const engine = engineFor(ctx.env, collection);
+  const run: Run = { signal: ctx.signal };
   const atomic = ctx.env.atomic as Atomic | undefined;
-  if (!atomic) return { at: collection, engine, scope };
+  if (!atomic) return { at: collection, engine, scope, run };
   if (!engine.begin)
     throw new Error(
       `the engine keeping '${collection.connection}' cannot take part in a transaction, so an atomic graph cannot write through it`,
     );
   const joined = await atomic.join<Transaction>(collection.connection, async () => {
-    const opened = await engine.begin?.(collection);
+    const opened = await engine.begin?.(collection, run);
     if (!opened)
       throw new Error(`the engine keeping '${collection.connection}' opened no transaction for an atomic graph`);
     return opened;
   });
-  return { at: collection, engine: joined.engine, scope };
+  return { at: collection, engine: joined.engine, scope, run };
 }
 
 /**
@@ -127,46 +131,47 @@ function objectOf(given: unknown, name: string): Record<string, unknown> {
 }
 
 const get: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine, scope } = await at(input, ctx);
-  return engine.get(where, input.key, scope);
+  const { at: where, engine, scope, run } = await at(input, ctx);
+  return engine.get(where, input.key, scope, run);
 };
 
 const find: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine, scope } = await at(input, ctx);
+  const { at: where, engine, scope, run } = await at(input, ctx);
   const query: Query = {
     where: whereOf(input.where, where.shape),
     order: orderOf(input.order),
     limit: countOf(input.limit, 'limit'),
     offset: countOf(input.offset, 'offset'),
     scope,
+    ...run,
   };
   return engine.find(where, query);
 };
 
 const count: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine, scope } = await at(input, ctx);
-  return engine.count(where, whereOf(input.where, where.shape), scope);
+  const { at: where, engine, scope, run } = await at(input, ctx);
+  return engine.count(where, whereOf(input.where, where.shape), scope, run);
 };
 
 const put: Handler = async ({ in: input, ctx }) => {
   writable(input, ctx);
-  const { at: where, engine, scope } = await at(input, ctx);
-  return engine.put(where, objectOf(input.record, 'record'), { replace: input.replace !== false, scope });
+  const { at: where, engine, scope, run } = await at(input, ctx);
+  return engine.put(where, objectOf(input.record, 'record'), { replace: input.replace !== false, scope, ...run });
 };
 
 const patch: Handler = async ({ in: input, ctx }) => {
   writable(input, ctx);
-  const { at: where, engine, scope } = await at(input, ctx);
+  const { at: where, engine, scope, run } = await at(input, ctx);
   const changes = objectOf(input.changes, 'changes');
   if (where.key in changes)
     throw new Error(`patch: '${where.key}' is the key of this collection, and a key is never patched`);
-  return engine.patch(where, input.key, changes, { scope });
+  return engine.patch(where, input.key, changes, { scope, ...run });
 };
 
 const remove: Handler = async ({ in: input, ctx }) => {
   writable(input, ctx);
-  const { at: where, engine, scope } = await at(input, ctx);
-  return engine.remove(where, input.key, scope);
+  const { at: where, engine, scope, run } = await at(input, ctx);
+  return engine.remove(where, input.key, scope, run);
 };
 
 /**
@@ -174,8 +179,8 @@ const remove: Handler = async ({ in: input, ctx }) => {
  * across every scope of the collection, so one tenant can never be handed a key another already holds.
  */
 const newKey: Handler = async ({ in: input, ctx }) => {
-  const { at: where, engine } = await at(input, ctx, 'takes no scope');
-  return engine.newKey(where);
+  const { at: where, engine, run } = await at(input, ctx, 'takes no scope');
+  return engine.newKey(where, run);
 };
 
 /**

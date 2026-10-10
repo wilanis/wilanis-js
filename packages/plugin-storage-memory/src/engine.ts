@@ -8,7 +8,20 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { Type } from '@wilanis/core';
-import type { At, Engine, Put, Query, Record_, Ref, Scope, Transaction, Where, Written } from '@wilanis/plugin-storage';
+import {
+  type At,
+  betweenStatements,
+  type Engine,
+  type Put,
+  type Query,
+  type Record_,
+  type Ref,
+  type Run,
+  type Scope,
+  type Transaction,
+  type Where,
+  type Written,
+} from '@wilanis/plugin-storage';
 import { matches, ordered, paged, sameValue } from './match.js';
 
 /** The type of the field that identifies a record, so a new key can be one the collection would accept. */
@@ -233,9 +246,16 @@ export class MemoryEngine implements Engine {
     );
   }
 
-  /** Every collection exists as soon as it is asked for, so there is nothing to create and nothing to alter. */
-  async ensure(collections: At[]) {
-    for (const at of collections) this.records(at);
+  /**
+   * Every collection exists as soon as it is asked for, so there is nothing to create and nothing to alter. A run
+   * cancelled on the way is still stopped between two of them, where an engine sending statements would stop, so
+   * every engine answers a cancelled `ensure` alike.
+   */
+  async ensure(collections: At[], run?: Run) {
+    collections.forEach((at, index) => {
+      if (index) betweenStatements(run);
+      this.records(at);
+    });
     return undefined;
   }
 

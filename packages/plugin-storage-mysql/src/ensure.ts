@@ -19,7 +19,7 @@
  * the scope, and a `unique` declared after the table was scoped is made within the scope, as the ones before
  * it were. A declaration that would change a scope column's width is drift, as it is for a field's.
  */
-import type { At, Made } from '@wilanis/plugin-storage';
+import { type At, betweenStatements, type Made, type Run } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';
 import { type Column, columnsOf, hasTable, keyOf, referencingOf, rowCount, uniquesOf } from './catalog.js';
 import { columnTypeOf, declaredOf, type Field, fieldsOf, isJson, widthsOf } from './columns.js';
@@ -189,16 +189,28 @@ async function addRefs(db: Kysely<never>, at: At): Promise<number> {
   return made;
 }
 
-/** Prepare every collection: the tables and columns, then the unique indexes, then the foreign keys. */
-export async function ensureTables(db: Kysely<never>, collections: At[], settings: Settings): Promise<Made> {
+/**
+ * Prepare every collection: the tables and columns, then the unique indexes, then the foreign keys. A run
+ * cancelled between two collections is stopped before the next one's statements (RFC 0012); what was made
+ * before it stays, as it does after a drift, since nothing here is one transaction.
+ */
+export async function ensureTables(db: Kysely<never>, collections: At[], settings: Settings, run?: Run): Promise<Made> {
   const made: Made = { collections: 0, columns: 0, constraints: 0 };
   for (const at of collections) {
+    betweenStatements(run);
     const one = await ensureOne(db, at);
     made.collections += one.collections;
     made.columns += one.columns;
   }
-  for (const at of collections) made.constraints += await addUniques(db, at);
-  for (const at of collections) made.constraints += await addRefs(db, at);
+  for (const at of collections) {
+    betweenStatements(run);
+    made.constraints += await addUniques(db, at);
+  }
+  for (const at of collections) {
+    betweenStatements(run);
+    made.constraints += await addRefs(db, at);
+  }
+  betweenStatements(run);
   if (isIdentity(settings)) await ensureKeys(db);
   return made;
 }

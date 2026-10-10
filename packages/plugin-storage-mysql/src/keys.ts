@@ -14,7 +14,7 @@
  * `CREATE TABLE` commits whatever transaction its session holds, so it is never run inside one.
  */
 import { randomBytes } from 'node:crypto';
-import type { At } from '@wilanis/plugin-storage';
+import { type At, betweenStatements, type Run } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';
 
 /** The table the reserved keys are kept in, one row per collection. */
@@ -46,12 +46,15 @@ async function pastHighest(db: Kysely<never>, at: At): Promise<number> {
 /**
  * Reserve the next key of a collection on `db`, which the caller has put inside a transaction, the row seeded
  * already: lock the row, take the higher of what it keeps and one past the highest held, and keep the one after.
+ * Three statements, and a run cancelled between two of them is stopped there (RFC 0012).
  */
-export async function reserve(db: Kysely<never>, at: At): Promise<number> {
+export async function reserve(db: Kysely<never>, at: At, run?: Run): Promise<number> {
   const rows = (
     await sql<{ next: number }>`select next from ${sql.id(KEYS)} where collection = ${at.name} for update`.execute(db)
   ).rows;
+  betweenStatements(run);
   const next = Math.max(Number(rows[0]?.next ?? 1), await pastHighest(db, at));
+  betweenStatements(run);
   await sql`update ${sql.id(KEYS)} set next = ${next + 1} where collection = ${at.name}`.execute(db);
   return next;
 }

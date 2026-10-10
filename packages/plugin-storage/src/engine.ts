@@ -46,13 +46,32 @@ export interface Order {
 export type Scope = Record<string, string | number>;
 
 /**
+ * The run a call is part of: the signal that fires when the run is cancelled (RFC 0012). An engine reads it between
+ * the statements of one operation and sends no more once it fired -- a statement already in flight finishes, and
+ * interrupting one is the driver's -- so a cancelled run stops at its next statement rather than at the operation's
+ * end. Every options object a call takes carries it, and a call that takes none takes this last.
+ */
+export interface Run {
+  signal?: AbortSignal;
+}
+
+/**
+ * What an engine asks between two statements of one operation: whether the run was cancelled, and if so it stops
+ * here, with the signal's reason, before the next statement is sent. It is never asked before the first: a run
+ * cancelled before it reached the engine is the kernel's to have stopped.
+ */
+export function betweenStatements(run: Run | undefined): void {
+  run?.signal?.throwIfAborted();
+}
+
+/**
  * What a find asks for beyond the collection: which records, in what order, and how much of the answer.
  *
  * `scope` sits here rather than beside `query` because it narrows which records a find is over exactly as
  * `where` does -- the difference being that the store wrote it and no document could -- and because the two
  * are read together wherever a statement is built.
  */
-export interface Query {
+export interface Query extends Run {
   where?: Where;
   order?: Order[];
   limit?: number;
@@ -65,7 +84,7 @@ export interface Query {
  * than a fourth parameter because `put` and `patch` already take three, and a boolean followed by a scope is
  * exactly the call site the parameter rule exists to prevent -- `{ scope }` at the call site names what it is.
  */
-export interface Written {
+export interface Written extends Run {
   scope?: Scope;
 }
 
@@ -136,7 +155,8 @@ export interface RemoveAnswer {
 }
 
 /**
- * What @storage asks of whoever keeps the records. No SQL, no dialect, no driver: values in, values out.
+ * What @storage asks of whoever keeps the records. No SQL, no dialect, no driver: values in, values out. Every
+ * call is told the run it is part of (`Run`), so an engine stops between two statements once the run is cancelled.
  *
  * The five members of `Recorder` are the migration half (RFC 0017): what this connection has recorded, what
  * its catalog holds, how many rows stand in a step's way, the application of a plan, and the history of the
@@ -149,11 +169,11 @@ export interface Engine extends Recorder {
    * the key *and* every scope column, so another scope's row is absent rather than refused: a `get` that
    * found it would be the hole this whole rule exists to close, and the graph already routes absence.
    */
-  get(at: At, key: unknown, scope?: Scope): Promise<{ record?: Record_ }>;
+  get(at: At, key: unknown, scope?: Scope, run?: Run): Promise<{ record?: Record_ }>;
   /** Every record the query matches, in the order it asks for, within the query's scope. */
   find(at: At, query: Query): Promise<Record_[]>;
   /** How many records the filter matches within the scope. */
-  count(at: At, where: Where | undefined, scope?: Scope): Promise<number>;
+  count(at: At, where: Where | undefined, scope?: Scope, run?: Run): Promise<number>;
   /**
    * Write the whole record under its own key; with `replace` false, write nothing where one is already there.
    * A declared `unique` another record already holds, or a `refs` naming a record that is not there, is
@@ -177,20 +197,20 @@ export interface Engine extends Recorder {
    * still references by a declared `refs` is kept, and the collection that references it is answered. A key
    * of another scope is absent and nothing is removed.
    */
-  remove(at: At, key: unknown, scope?: Scope): Promise<RemoveAnswer>;
+  remove(at: At, key: unknown, scope?: Scope, run?: Run): Promise<RemoveAnswer>;
   /**
    * A key no record of the collection has, of the type the collection's key field declares. It takes no
    * scope: a key is global to the collection across every scope, so one is minted free of all of them and no
    * scope can ever be handed a key another already holds.
    */
-  newKey(at: At): Promise<unknown>;
+  newKey(at: At, run?: Run): Promise<unknown>;
   /**
    * Create every collection that is not there yet and leave alone every one that is, and say how much was
    * made. The counts are the engine's own account of what it did -- zero on a second run, and zero everywhere
    * for an engine with nothing to create. What `@storage/storage.port.json#ensure` answers a graph is still
    * `collections`, the number the store declares; widening that is RFC 0003 step 6's.
    */
-  ensure(collections: At[]): Promise<Made | undefined>;
+  ensure(collections: At[], run?: Run): Promise<Made | undefined>;
   /**
    * Begin a transaction on one connection and answer what runs inside it: an engine of the same shape whose
    * every call is part of the transaction, and the way to end it. An engine that cannot do this answers
@@ -199,7 +219,7 @@ export interface Engine extends Recorder {
    * @storage calls this at most once per atomic run, through `env.atomic`: the scope memoises it, so an
    * engine is never asked to nest one transaction inside another.
    */
-  begin?(at: At): Promise<Transaction | undefined>;
+  begin?(at: At, run?: Run): Promise<Transaction | undefined>;
 }
 
 /** A transaction an engine opened: the engine that runs inside it, and the two ways it can end. */

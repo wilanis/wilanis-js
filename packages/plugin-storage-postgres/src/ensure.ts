@@ -16,7 +16,7 @@
  * so the comparison a port's `ensure` makes is the planner's now, and `judgeDrift` below judges only for the
  * callers of `Engine.ensure` that remain: the shared suite, which makes the tables its cases write into.
  */
-import type { At } from '@wilanis/plugin-storage';
+import { type At, betweenStatements, type Run } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';
 import { columnOf, fieldsOf, folded, isJson as isJsonType } from './columns.js';
 import { type Column, columnsOf } from './inspect.js';
@@ -214,25 +214,35 @@ async function ensureOne(
 /**
  * Prepare every collection the store declares: the tables and columns first, then the constraints over them --
  * in that order, since a foreign key names a table that has to exist. Everything happens in one transaction,
- * so a `drift` half way through leaves the database exactly as it was. Before the transaction, it makes the
- * schema the tables sit in, where the database has none. A drift rolls back the tables but not the schema: the
- * schema stays, empty, and a second run would make it again anyway.
+ * so a `drift` half way through leaves the database exactly as it was, and so does a run cancelled between two
+ * collections, which is stopped before the next one's statements (RFC 0012). Before the transaction, it makes
+ * the schema the tables sit in, where the database has none. A drift rolls back the tables but not the schema:
+ * the schema stays, empty, and a second run would make it again anyway.
  */
-export async function ensureTables(db: Kysely<never>, collections: At[], _settings: Settings): Promise<Made> {
+export async function ensureTables(
+  db: Kysely<never>,
+  collections: At[],
+  _settings: Settings,
+  run?: Run,
+): Promise<Made> {
   const schema = schemaOf(collections[0]);
   const made: Made = { collections: 0, columns: 0, constraints: 0 };
   const scoped = new Map<string, string[]>();
   await ensureSchema(db, schema);
   await db.transaction().execute(async trx => {
     for (const at of collections) {
+      betweenStatements(run);
       const one = await ensureOne(trx as never, schema, at);
       made.collections += one.collections;
       made.columns += one.columns;
       scoped.set(at.name, one.scoped);
     }
+    betweenStatements(run);
     const held = await constraints(trx as never, schema);
-    for (const at of collections)
+    for (const at of collections) {
+      betweenStatements(run);
       made.constraints += await addConstraints(trx as never, { schema, at, scoped: scoped.get(at.name) ?? [] }, held);
+    }
   });
   return made;
 }
