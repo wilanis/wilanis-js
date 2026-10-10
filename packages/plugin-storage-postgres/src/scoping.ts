@@ -138,17 +138,25 @@ async function addScopeColumn(db: Kysely<never>, where: Where, column: string, t
 }
 
 /**
- * Every `unique` the store declares, created again with the scope columns in front of it and the unscoped one
- * dropped. `[url, method]` taken under one tenant is then free under every other, which is what "judged within
+ * Every `unique` the store declares, created again with the scope columns in front of it, and the one it replaces
+ * dropped: the unscoped one, or the one over a narrower scope where the collection gains a second column
+ * (#822). `[url, method]` taken under one tenant is then free under every other, which is what "judged within
  * the scope" means -- said once here rather than spelled into every constraint the store writes.
  */
-async function rescopeUniques(db: Kysely<never>, where: Where, at: At, columns: string[]): Promise<void> {
+async function rescopeUniques(
+  db: Kysely<never>,
+  where: Where,
+  at: At,
+  scope: { before: string[]; columns: string[] },
+): Promise<void> {
   const { schema, table } = where;
+  const { before, columns } = scope;
   const on = sql`${sql.ref(schema)}.${sql.ref(table)}`;
   for (const fields of at.unique) {
+    const replaced = before.length ? scopedUniqueName(at.name, before, fields) : uniqueName(at.name, fields);
     const scoped = scopedUniqueName(at.name, columns, fields);
     const held = sql.join([...columns, ...fields.map(folded)].map(one => sql.ref(one)));
-    await sql`alter table ${on} drop constraint if exists ${sql.ref(uniqueName(at.name, fields))}`.execute(db);
+    await sql`alter table ${on} drop constraint if exists ${sql.ref(replaced)}`.execute(db);
     await sql`alter table ${on} add constraint ${sql.ref(scoped)} unique (${held})`.execute(db);
   }
 }
@@ -283,8 +291,10 @@ async function addScope(
   at: At,
   by: { missing: [string, string | number][]; columns: string[] },
 ): Promise<void> {
+  // the scope the table kept before this one, read off its index before that index is made again
+  const before = [...(await scopeColumnsOf(db, at, where))];
   for (const [column, value] of by.missing) await addScopeColumn(db, where, folded(column), scopeTypeOf(column, value));
-  await rescopeUniques(db, where, at, by.columns);
+  await rescopeUniques(db, where, at, { before, columns: by.columns });
   await indexScope(db, where, at, by.columns);
 }
 
