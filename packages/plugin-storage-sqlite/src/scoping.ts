@@ -41,24 +41,6 @@ export function within(eb: Builder, scope: Scope | undefined, of?: string): Expr
 /** The scope columns as a row is written with them: what `put` adds beside the record's own columns. */
 export const scopeValues = (scope: Scope | undefined): Record<string, unknown> => ({ ...scope });
 
-/** The words SQLite starts a refused unique with, before the columns it names. */
-const UNIQUE = 'UNIQUE constraint failed:';
-
-/**
- * A refused write's error with the scope columns taken out of the unique it names. A scoped unique is the
- * declared one with the scope in front (`tenant, url, method`), and the store declared `[url, method]`: the
- * error is handed on naming what the store declared, so the violation is answered in the store's words.
- * Anything that is not a unique refused under a scope is handed on as it came.
- */
-export function withoutScope(error: unknown, scope: Scope | undefined): unknown {
-  const columns = new Set(scopeColumns(scope));
-  const message = String((error as { message?: unknown })?.message ?? '');
-  if (!columns.size || !message.startsWith(UNIQUE)) return error;
-  const named = message.slice(UNIQUE.length).split(',');
-  const kept = named.filter(one => !columns.has(folded(one.trim().slice(one.trim().indexOf('.') + 1))));
-  return { code: (error as { code?: unknown }).code, message: `${UNIQUE}${kept.join(',')}` };
-}
-
 /**
  * Where a scope is being kept. `db` is the handle the statements run on; `owner` is what this process's
  * memory of scoped tables is kept by, the handles of one load of the tree, so a reload never reads another's;
