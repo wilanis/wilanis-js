@@ -4,6 +4,9 @@
  * takes one from its caller. `sitesOf` finds both, and the checker (I005) and the compiler (the guard it
  * lowers) read the same list, so neither can judge a site the other does not see. Whether the rule already
  * holds at one is `heldAt` in `check/prove.ts`, which reads a site the way the proof rules need it.
+ *
+ * Also where a native operation is called (RFC 0032): `siteOf` writes the two strings a field marked `provided: site`
+ * carries, the calling document and the position within it, as a refusal against that place would write them.
  */
 import {
   type GraphDoc,
@@ -36,6 +39,34 @@ export interface Site {
 
 /** How a site is written in a refusal or a report: `in` where the graph takes the value, else the node's id. */
 export const siteId = (site: Site): string => site.node?.id ?? 'in';
+
+/**
+ * Where a native operation is called, as the compiler writes it for a field marked `provided: site`: the calling
+ * document, canonical, and the position within it in the grammar a refusal's `at` has. Two strings and nothing of
+ * what they point at, so a handler that wants the words opens the document (`env.document`) and the literal
+ * changes only when the site itself moves. Its fields are `@std/Site.shape.json`'s, which the checker types the
+ * field against; the first test of a provided field holds the two together.
+ */
+export interface SiteLiteral {
+  file: string;
+  at: string;
+}
+
+/**
+ * A place a native operation is called from: a graph's node, a binding's operation, or a step of the project's
+ * startup list, each by the canonical path of the document it is written in.
+ */
+export type Called =
+  | { graph: string; node: string }
+  | { binding: string; operation: string }
+  | { project: string; startup: number };
+
+/** The site of a call, as the field marked `provided: site` receives it: `nodes/<id>`, `operations/<name>` or `startup/<index>`. */
+export function siteOf(called: Called): SiteLiteral {
+  if ('graph' in called) return { file: called.graph, at: `nodes/${called.node}` };
+  if ('binding' in called) return { file: called.binding, at: `operations/${called.operation}` };
+  return { file: called.project, at: `startup/${called.startup}` };
+}
 
 /**
  * Every site of a shape in the tree: a node whose native operation answers the shape (a `type` field bound to

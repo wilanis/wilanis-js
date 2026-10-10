@@ -163,12 +163,16 @@ export class Embedder {
     return this.compiler.guardSpec(name);
   }
 
-  /** The compiled binding behind a trigger's port operation. Compiled once per operation, like a graph. */
-  operation(opRef: string): Compiled {
-    const key = `op:${this.scope.canon(opRef.split('#')[0])}#${opRef.split('#')[1] ?? ''}`;
+  /**
+   * The compiled binding behind a trigger's port operation. Compiled once per operation, like a graph -- and once
+   * per startup step for a native `holds` operation, since the step is the site such an operation is called from.
+   */
+  operation(opRef: string, called?: { startup: number }): Compiled {
+    const step = called ? `@startup/${called.startup}` : '';
+    const key = `op:${this.scope.canon(opRef.split('#')[0])}#${opRef.split('#')[1] ?? ''}${step}`;
     let found = this.compiled.get(key);
     if (!found) {
-      found = this.compiler.operation(opRef);
+      found = this.compiler.operation(opRef, called);
       this.compiled.set(key, found);
     }
     return found;
@@ -184,7 +188,7 @@ export class Embedder {
    * the record exports as `wilanis.startup.at`, so a caller that does not know it must not be given a false one.
    */
   async startup(step: StartupStep, opts: FireOptions & { at: number }): Promise<Report> {
-    const compiled = this.operation(step.run);
+    const compiled = this.operation(step.run, { startup: opts.at });
     const input = fillTemplates(step.in ?? {}, { secrets: this.secrets }) as Record<string, unknown>;
     const startedAt = this.clock();
     const answer = await runGraph(compiled, {

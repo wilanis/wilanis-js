@@ -5,6 +5,7 @@
  * type, which a call's report redacts.
  */
 import {
+  type Fields,
   hasVars,
   type Loaded,
   type Operation,
@@ -21,6 +22,7 @@ import {
 } from '@wilanis/core';
 import { type KSource, type Redact, readPath } from '@wilanis/engine';
 import { bindings, type CallSite, collectionOf } from './documents.js';
+import type { SiteLiteral } from './sites.js';
 
 /** The roots a value may read where it is written, and how each lowers. */
 export interface Roots {
@@ -89,6 +91,21 @@ export function lowerValues(values: Values | undefined, roots: Roots): Record<st
 /** Inputs passed on from the caller's by name. */
 export function inputsByName(names: string[]): Record<string, KSource> {
   return Object.fromEntries(names.map(name => [name, { ref: 'in', path: [name] }]));
+}
+
+/**
+ * The inputs the compiler provides at a call site, laid over what the author gave: every field of the operation
+ * marked `provided: site` as the literal site (RFC 0032). An operation that marks none gets nothing, so a tree
+ * whose operations ask for no site lowers exactly as it did. The checker refused the author who wrote one (G026).
+ */
+export function withProvided(
+  inputs: Record<string, KSource>,
+  accepted: Fields,
+  site: SiteLiteral,
+): Record<string, KSource> {
+  const provided = Object.entries(accepted).filter(([, field]) => field.provided === 'site');
+  if (!provided.length) return inputs;
+  return { ...inputs, ...Object.fromEntries(provided.map(([name]) => [name, { value: site }])) };
 }
 
 /** A map's bind, each dotted path split; nothing when the element arrives whole as `item`. */

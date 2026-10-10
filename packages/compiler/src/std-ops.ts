@@ -8,3 +8,6 @@ export const MAKE = '@std/object.port.json#make';
 
 /** Ends the run with a reason and a message. */
 export const REFUSE = '@std/outcome.port.json#refuse';
+
+/** The shape of a field marked `provided: site`: the calling document and the position within it (RFC 0032). */
+export const SITE_SHAPE = '@std/Site.shape.json';
