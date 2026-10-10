@@ -129,6 +129,33 @@ function uniqueOf(at: At, scoped: string[], fields: string[]): { name: string; o
 }
 
 /**
+ * Create the constraint one `unique` is, or refuse it as drift where rows the table already holds repeat it. The
+ * server refuses such a constraint with a unique violation (23505) and makes nothing, and the engine takes that
+ * refusal as the answer rather than asking with a query of its own, so a `NULL`, which a unique never holds
+ * against another, counts exactly as the server counts it. The message names the fields the store declared,
+ * never the scope columns in front of them; the transaction around `ensure` leaves the table as it was.
+ */
+async function createUnique(
+  db: Kysely<never>,
+  where: { table: ReturnType<typeof sql>; at: At },
+  fields: string[],
+  constraint: { name: string; over: string[] },
+): Promise<void> {
+  const { name, over } = constraint;
+  const columns = sql.join(over.map(column => sql.ref(column)));
+  try {
+    await sql`alter table ${where.table} add constraint ${sql.ref(name)} unique (${columns})`.execute(db);
+  } catch (error) {
+    if ((error as { code?: unknown }).code !== '23505') throw error;
+    const within = over.length > fields.length ? ' within one scope' : '';
+    throw new Error(
+      `drift: ${where.at.name} declares unique [${fields.join(', ')}], and rows the table already holds repeat ` +
+        `it${within}; make them differ before ensure adds it`,
+    );
+  }
+}
+
+/**
  * Add the uniques and the foreign keys a collection declares and the schema does not hold yet.
  *
  * `scoped` is the columns this table keeps as a scope. Where there are any, the collection's uniques are held
@@ -146,10 +173,9 @@ async function addConstraints(
   let made = 0;
   for (const fields of at.unique) {
     if (held.has(uniqueName(at.name, fields)) || held.has(scopedUniqueName(at.name, scoped, fields))) continue;
-    const { name, over } = uniqueOf(at, scoped, fields);
-    const columns = sql.join(over.map(column => sql.ref(column)));
-    await sql`alter table ${table} add constraint ${sql.ref(name)} unique (${columns})`.execute(db);
-    held.add(name);
+    const constraint = uniqueOf(at, scoped, fields);
+    await createUnique(db, { table, at }, fields, constraint);
+    held.add(constraint.name);
     made += 1;
   }
   for (const ref of at.refs) {
