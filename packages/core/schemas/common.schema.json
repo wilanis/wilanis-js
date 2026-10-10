@@ -137,6 +137,13 @@
             "pattern": "^[a-z][A-Za-z0-9_]*(\\[[a-z][A-Za-z0-9_]*(\\|[a-z][A-Za-z0-9_]*)?\\]|\\{[a-z][A-Za-z0-9_]*\\})?(\\.[a-z][A-Za-z0-9_]*(\\[[a-z][A-Za-z0-9_]*(\\|[a-z][A-Za-z0-9_]*)?\\]|\\{[a-z][A-Za-z0-9_]*\\})?)*$"
           },
           "minProperties": 1
+        },
+        "provided": {
+          "description": "Native contracts only. The compiler writes this field's value where the operation is called; an author never does. `site`: the calling document and node, of type `@std/Site.shape.json`.",
+          "type": "string",
+          "enum": [
+            "site"
+          ]
         }
       },
       "required": [

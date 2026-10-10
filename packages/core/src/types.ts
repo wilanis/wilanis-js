@@ -2,7 +2,7 @@
  * The type system the checker reasons with. A TypeRef string or an InlineObject becomes a Type; every edge,
  * param and contract is judged by `assignable` (assign.ts), and every dotted read by `typeAt` (values.ts).
  */
-import type { Field, FieldClass, Fields, InlineObject, ShapeDoc, TypeRef, TypeSpec } from './model.js';
+import type { Field, FieldClass, Fields, InlineObject, Provided, ShapeDoc, TypeRef, TypeSpec } from './model.js';
 
 export type Type =
   | { kind: 'string'; enum?: string[] }
@@ -27,6 +27,8 @@ export interface ObjField {
   type: Type;
   required: boolean;
   secret?: boolean;
+  /** Written by the compiler where the operation is called, never by an author: `site`, the calling document and position. */
+  provided?: Provided;
 }
 
 /** A read of a type at a path: what is there, and whether it may be missing. */
@@ -133,13 +135,14 @@ export class TypeResolver {
 
   /**
    * One declared field as a typed field: its type, its enum narrowing a string, its maxItems bounding a list,
-   * and whether it must be there -- a field is required unless it says otherwise.
+   * whether it must be there -- a field is required unless it says otherwise -- and whether the compiler provides it.
    */
   field(field: Field): ObjField {
     let type = this.spec(field.type);
     if (field.enum && type.kind === 'string') type = { kind: 'string', enum: field.enum };
     if (field.maxItems && type.kind === 'list') type = { ...type, max: field.maxItems };
-    return { type, required: field.required !== false, secret: field.secret };
+    const typed: ObjField = { type, required: field.required !== false, secret: field.secret };
+    return field.provided ? { ...typed, provided: field.provided } : typed;
   }
 
   /** The type a spec names, written either way: a reference string, or an object spelled out inline. */

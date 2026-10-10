@@ -8,6 +8,9 @@
       "@std/text.port.json",
       "@std/list.port.json",
       "@std/outcome.port.json"
+    ],
+    "shapes": [
+      "@std/Site.shape.json"
     ]
   }
 }

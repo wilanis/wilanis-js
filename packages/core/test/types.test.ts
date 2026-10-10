@@ -46,6 +46,18 @@ describe('the blob type', () => {
   });
 });
 
+describe('a field the compiler provides', () => {
+  it('types as its declared type, required, and carries provided; a field that says nothing carries nothing', () => {
+    const site = types.field({ type: 'string', provided: 'site' });
+    expect(site).toEqual({ type: { kind: 'string' }, required: true, secret: undefined, provided: 'site' });
+    expect(types.field({ type: 'string' })).not.toHaveProperty('provided');
+    expect(types.inline({ fields: { site: { type: 'string', provided: 'site' } } })).toMatchObject({
+      kind: 'object',
+      fields: { site: { provided: 'site' } },
+    });
+  });
+});
+
 describe('the class of a field, as a storage engine names it', () => {
   it('is one of six words: a shape is a shape and a list a list, whatever they hold', () => {
     const classOf = (ref: string) => fieldClass(types.ref(ref));

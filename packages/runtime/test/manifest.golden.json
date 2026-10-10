@@ -2475,6 +2475,13 @@
       "included": null
     },
     {
+      "path": "@std/Site.shape.json",
+      "kind": "shape",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
       "path": "@std/list.port.json",
       "kind": "port",
       "feature": null,
