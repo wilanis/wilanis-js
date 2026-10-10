@@ -9,10 +9,12 @@
  * a write, which declared reference names a record that is not there; for a remove, which collection still
  * holds the key. Both are asked on the handle the write ran on, so a transaction sees its own rows.
  */
-import type { At, Record_ } from '@wilanis/plugin-storage';
+import type { At, Record_, Scope } from '@wilanis/plugin-storage';
 import type { Kysely } from 'kysely';
 import { holds, keyOf } from './catalog.js';
 import { bound, typeOf } from './columns.js';
+import { folded } from './names.js';
+import { scopeColumns } from './scoping.js';
 
 /** The code a driver error carries, or nothing where it is not one. */
 const codeOf = (error: unknown): string | undefined => (error as { code?: unknown }).code as string | undefined;
@@ -30,24 +32,28 @@ function isForeignKey(error: unknown): boolean {
   );
 }
 
-/** The columns a unique violation names, without the table each is prefixed with. */
+/**
+ * The columns a unique violation names, without the table each is prefixed with, folded as SQLite compares them.
+ * The one place the message is read: whatever else is asked of a refused unique is asked of this list.
+ */
 function columnsNamed(error: unknown): string[] {
   const message = String((error as { message?: unknown }).message ?? '');
   const listed = message.slice(message.indexOf(':') + 1).trim();
-  return listed.split(',').map(one =>
-    one
-      .trim()
-      .slice(one.trim().indexOf('.') + 1)
-      .toLowerCase(),
-  );
+  return listed.split(',').map(one => folded(one.trim().slice(one.trim().indexOf('.') + 1)));
 }
 
-/** The declared unique a violation names, as the store spells it; the key where it names the key alone. */
-function uniqueOf(error: unknown, at: At): string {
+/**
+ * The declared unique a violation names, as the store spells it; the key where it names no declared one. A
+ * scoped table holds each `unique` with the scope columns in front of the declared fields (`scope-table.ts`), so
+ * a declaration is read in both spellings, bare and with the scope in front, as the postgres engine reads its
+ * two constraint names -- never by stripping columns from the message by name. The answer names what the store
+ * declared and nothing the engine put beside it.
+ */
+function uniqueOf(error: unknown, at: At, scope: Scope | undefined): string {
   const named = columnsNamed(error);
-  const same = (fields: string[]) =>
-    fields.length === named.length && fields.every(field => named.includes(field.toLowerCase()));
-  const fields = at.unique.find(same);
+  const scoped = scopeColumns(scope);
+  const names = (columns: string[]) => columns.length === named.length && columns.every(one => named.includes(one));
+  const fields = at.unique.find(one => names(one.map(folded)) || names([...scoped, ...one.map(folded)]));
   return `unique [${(fields ?? [at.key]).join(', ')}]`;
 }
 
@@ -64,12 +70,22 @@ async function missingTarget(db: Kysely<never>, at: At, record: Record_): Promis
   return undefined;
 }
 
-/** What a refused `put` or `patch` answers as `violated`, or nothing where the error is not a constraint. */
-export async function writeViolation(error: unknown, db: Kysely<never>, at: At, record: Record_) {
+/** What a write named: the record it gave -- whole for a put, the changes for a patch -- and the scope it ran under. */
+export interface Wrote {
+  record: Record_;
+  scope?: Scope;
+}
+
+/**
+ * What a refused `put` or `patch` answers as `violated`, or nothing where the error is not a constraint. The scope
+ * the write ran under is what a scoped unique names beside the declared fields, and the answer does not.
+ */
+export async function writeViolation(error: unknown, db: Kysely<never>, at: At, wrote: Wrote) {
   const code = codeOf(error);
-  if (code === 'SQLITE_CONSTRAINT_UNIQUE' || code === 'SQLITE_CONSTRAINT_PRIMARYKEY') return uniqueOf(error, at);
+  if (code === 'SQLITE_CONSTRAINT_UNIQUE' || code === 'SQLITE_CONSTRAINT_PRIMARYKEY')
+    return uniqueOf(error, at, wrote.scope);
   if (!isForeignKey(error)) return undefined;
-  return (await missingTarget(db, at, record)) ?? `refs ${at.name}`;
+  return (await missingTarget(db, at, wrote.record)) ?? `refs ${at.name}`;
 }
 
 /** What a refused `remove` answers as `referencedBy`, or nothing where the error is not a reference. */
