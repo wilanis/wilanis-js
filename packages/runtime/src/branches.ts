@@ -28,6 +28,8 @@ export interface Stubbing {
   inType?: Type;
   /** Whether the node at a dotted path is a map: the kernel reads its stubs per element, at `<path>.<index>`. */
   isMap?: (nodePath: string) => boolean;
+  /** The lowered `over` of the map at a dotted path: the list it runs over, which is what makes its answer non-empty. */
+  overOf?: (nodePath: string) => unknown;
 }
 
 /**
@@ -194,32 +196,67 @@ function atNode(
  * trigger's input when the list is read from it -- field for field, or, for the `outermost` list of a switch,
  * handed down under another name by the frames on the way (`ownInputAt`) -- a stub of the node that holds it
  * otherwise -- a sibling of the map, or, where the map runs over what its frame was handed, the node one hop out
- * that fed the call. Nothing when the list is composed or literal, since a literal list is already what it is.
+ * that fed the call. Nothing when the list is composed or literal, since a literal list is already what it is. A
+ * holder that is itself a map answers element by element, at `<map>.<index>`, so a stub at the map is one the kernel
+ * never reads: its answer holds an element when the list it runs over does, which is the same question one map
+ * further out (#869).
  */
-export function nonEmpty(
-  list: FoundList,
-  from: Stubbing,
-  outermost = false,
-): { stubs: Record<string, unknown>; input: { path: string[]; value: unknown }[] } {
-  const { generated, typeOf = () => undefined, seed = 1, inputSeed, inType } = from;
+export function nonEmpty(list: FoundList, from: Stubbing, outermost = false): NonEmpty {
   const src = sourceOf(list.over);
-  const want: Domain = { minLen: 1, present: true };
-  if (!src) return { stubs: {}, input: [] };
-  const own = src.ref === 'in' && list.fromTriggerIn ? src.path : undefined;
-  const handed = own ?? (outermost ? ownInputAt(list) : undefined);
-  if (handed)
-    return {
-      stubs: {},
-      input: [{ path: handed, value: satisfy(want, getPath(inputSeed, handed), typeAtPath(inType, handed), seed) }],
-    };
+  if (!src) return NOTHING;
+  const handed = handedFrom(src, list, outermost);
+  if (handed) return { stubs: {}, input: [patchOf(handed, from)] };
   const held = listHolder(list);
-  if (!held) return { stubs: {}, input: [] };
+  if (!held) return NOTHING;
+  if (!held.path.length && from.isMap?.(held.target)) {
+    const holder = ownListOf(held.target, list, from);
+    return holder ? nonEmpty(holder, from, outermost) : NOTHING;
+  }
+  return { stubs: stubHolding(held, from), input: [] };
+}
+
+/** What a list must be to run a mapped operation at all: there, with an element. */
+const AN_ELEMENT: Domain = { minLen: 1, present: true };
+
+/**
+ * Where in the trigger's own input a list is read from, when it is: field for field where the map reads `in` and
+ * `in` is still the trigger's, or, for the outermost list of a switch, handed down under another name by the frames
+ * on the way (`ownInputAt`).
+ */
+function handedFrom(src: { ref: string; path: string[] }, list: FoundList, outermost: boolean): string[] | undefined {
+  if (src.ref === 'in' && list.fromTriggerIn) return src.path;
+  return outermost ? ownInputAt(list) : undefined;
+}
+
+/** The patch to the trigger's input that puts an element in the list at a path. */
+function patchOf(path: string[], from: Stubbing): { path: string[]; value: unknown } {
+  const value = satisfy(AN_ELEMENT, getPath(from.inputSeed, path), typeAtPath(from.inType, path), from.seed ?? 1);
+  return { path, value };
+}
+
+/** The stub of the node that holds the list, with an element in it; the answer keeps every other field it has, since a sibling may read one. */
+function stubHolding(held: { target: string; path: string[] }, from: Stubbing): Record<string, unknown> {
+  const { generated, typeOf = () => undefined, seed = 1 } = from;
   const { target, path } = held;
-  // the answer that holds the list keeps every other field it has: a sibling may read one
   const base = standIn(target, { generated, typeOf, seed });
   const type = typeOf(target);
-  const filled = satisfy(want, getPath(base, path), typeAtPath(type, path), seed);
-  return { stubs: { [target]: setPath(base, path, filled, { type, seed }) }, input: [] };
+  const filled = satisfy(AN_ELEMENT, getPath(base, path), typeAtPath(type, path), seed);
+  return { [target]: setPath(base, path, filled, { type, seed }) };
+}
+
+/** What makes a list hold an element: the stubs to write, and the patches to the trigger's input. */
+type NonEmpty = { stubs: Record<string, unknown>; input: { path: string[]; value: unknown }[] };
+
+const NOTHING: NonEmpty = { stubs: {}, input: [] };
+
+/**
+ * The list a map at a dotted path runs over, as a list of its own to make non-empty. The map stands in the same frame
+ * as the list it holds -- it is that list's sibling -- so what steered the one steers the other.
+ */
+function ownListOf(at: string, holding: FoundList, from: Pick<Stubbing, 'overOf'>): FoundList | undefined {
+  const over = from.overOf?.(at);
+  if (over === undefined) return undefined;
+  return { at, over, fromTriggerIn: holding.fromTriggerIn, from: holding.from };
 }
 
 /** Does this call hand its callee the caller's `in` untouched, field for field? Then the trigger's input still reaches inside. */
