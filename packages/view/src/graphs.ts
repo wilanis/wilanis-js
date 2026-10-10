@@ -5,7 +5,7 @@
  * so the edge leaves the attribute. What a graph reads from the context, and the node that stands for it, are
  * `reads.ts`.
  */
-import { atomicOf } from '@wilanis/compiler';
+import { atomicOf, siteOf } from '@wilanis/compiler';
 import type { GraphDoc, Loaded, Scope, Type, Values } from '@wilanis/core';
 import { isMap, isRun, isSwitch, show, typeAt } from '@wilanis/core';
 import { attemptsOf } from './attempts.js';
@@ -221,7 +221,7 @@ class GraphBuilder {
       label: node.label ?? readable(node.id),
       op: node.run,
       description: node.description,
-      inputs: inputPorts(this.scope, target.op, node.in),
+      inputs: inputPorts(this.scope, target.op, node.in, { site: siteOf({ graph: this.graph.path, node: node.id }) }),
       outputs: outputPorts(result, target.op),
       target: target.target,
       ...(target.target.refuses ? { answeredBy: answeredBy(this.scope, this.graph.path, node.id) } : {}),
@@ -246,7 +246,10 @@ class GraphBuilder {
       description: node.description,
       inputs: [
         { name: 'over', ...written(this.scope, node.over), description: 'the list mapped over' },
-        ...inputPorts(this.scope, target.op, node.in, node.bind),
+        ...inputPorts(this.scope, target.op, node.in, {
+          bind: node.bind,
+          site: siteOf({ graph: this.graph.path, node: node.id }),
+        }),
       ],
       outputs: list ? [{ name: WHOLE, type: show(list) }] : [],
       target: target.target,

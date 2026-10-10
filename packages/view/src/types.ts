@@ -27,6 +27,8 @@ export interface VPort {
   required?: boolean;
   /** A static field: a literal, never a read. */
   static?: boolean;
+  /** A field the compiler provides: the site, written where the operation is called and never given; `literal` holds what it writes. */
+  provided?: boolean;
   /** The literal value written for this input, when it is one (JSON). */
   literal?: string;
   /** The document a literal names, canonical, when it is a document path (a type, a connection). */
