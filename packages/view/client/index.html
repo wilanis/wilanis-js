@@ -66,6 +66,8 @@
   .req::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); margin-right: 7px; vertical-align: 1px; }
   .opt::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--dim); box-sizing: border-box; margin-right: 7px; vertical-align: 1px; }
   .opt { color: var(--muted); } .opt::after { content: ' optional'; font-family: var(--sans); font-size: 10px; color: var(--dim); }
+  .provided { color: var(--dim); } .provided::after { content: ' provided'; font-family: var(--sans); font-size: 10px; color: var(--dim); }
+  .details .row .val.provided { color: var(--dim); }
   .tag { display: inline-block; font-size: 10px; padding: 0 5px; border-radius: 4px; background: var(--panel-3); color: var(--muted); margin-left: 6px; vertical-align: 1px; } .tag.secret { color: var(--bad); }
   .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
   .card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; } .card .k { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .05em; } .card .v { font-size: 14px; margin-top: 2px; } .card .v small { display: block; color: var(--dim); font-family: var(--mono); font-size: 10px; margin-top: 3px; }
@@ -94,7 +96,7 @@
   .node .title { font: 600 12px var(--sans); fill: var(--text); }
   .node .sub { font: 11px var(--sans); fill: var(--muted); }
   .node .port { font: 11px var(--mono); fill: var(--text); } .node .port.opt { fill: var(--muted); } .node .port.type { fill: var(--dim); }
-  .node .port.lit { fill: var(--lit); } .node .port.miss { fill: var(--dim); font-style: italic; }
+  .node .port.lit { fill: var(--lit); } .node .port.miss { fill: var(--dim); font-style: italic; } .node .port.provided { fill: var(--dim); }
   .node .pin { fill: var(--panel-2); stroke: var(--muted); stroke-width: 1.4; } .node .pin.req { fill: var(--muted); }
   .node .go { font: 14px var(--sans); fill: var(--accent); cursor: pointer; } .node .go:hover { fill: #fff; }
   .node .link { cursor: pointer; } .node .link:hover { fill: var(--accent); text-decoration: underline; }
@@ -394,6 +396,7 @@
       if (f.enum) tags.appendChild(el('span', 'tag', 'one of ' + f.enum.join(', ')));
       if (f.maxItems !== undefined) { const b = el('span', 'tag', 'at most ' + f.maxItems); b.title = 'the most items a list may hold; a longer one is refused wherever the type is judged, a body at the edge among them'; tags.appendChild(b); }
       if (f.static || f.type === 'type') tags.appendChild(el('span', 'tag', 'static: written, never read'));
+      if (f.provided) { const b = el('span', 'tag', 'provided: the compiler writes it, never a call site'); b.title = 'the site: the calling document and the position within it, written where the operation is called; a call site that gives it is refused (G026)'; tags.appendChild(b); }
       if (f.secret) tags.appendChild(el('span', 'tag secret', 'secret'));
       tr.appendChild(tags);
       tr.appendChild(el('td', 'desc', f.description || ''));
@@ -1268,9 +1271,10 @@
     if (n.inputs.length) {
       box.appendChild(el('h4', null, n.kind === 'rule' ? 'decides on' : 'inputs'));
       for (const p of n.inputs) {
-        const r = el('div', 'row'); r.appendChild(el('span', 'name ' + (p.required === false ? 'opt' : 'req'), p.name));
+        const r = el('div', 'row'); r.appendChild(el('span', 'name ' + (p.provided ? 'provided' : p.required === false ? 'opt' : 'req'), p.name));
         const cell = el('span');
-        if (p.literal != null) { if (p.ref) cell.appendChild(link(p.ref, showLit(p), 'val')); else cell.appendChild(el('span', 'val', showLit(p))); }
+        if (p.provided) { const v = el('span', 'val provided', p.literal != null ? showLit(p) : 'the site'); v.title = 'written by the compiler where the operation is called: the calling document and the position within it; never given'; cell.appendChild(v); }
+        else if (p.literal != null) { if (p.ref) cell.appendChild(link(p.ref, showLit(p), 'val')); else cell.appendChild(el('span', 'val', showLit(p))); }
         else if (p.text != null) cell.appendChild(el('span', 'val', p.text));
         else if (p.bound != null) cell.appendChild(el('span', 'from', FROM + 'each item' + (p.bound ? '.' + p.bound : '')));
         else if (p.missing) cell.appendChild(el('span', 'miss', 'not given'));
@@ -1554,9 +1558,9 @@
         const val = p.literal != null ? ' = ' + showLit(p) : p.text != null ? ' = ' + p.text : p.bound != null ? ' ' + FROM + 'item' + (p.bound ? '.' + p.bound : '') : '';
         const nameLen = Math.min(14, p.name.length);
         const room = n.outputs.length ? 22 : 36; // characters the left column may use when the right one is in use
-        const hint = p.name + (req ? '' : ' (optional)') + (p.type ? ': ' + showType(p.type) : '') + (p.description ? '\n' + p.description : '');
-        const name = withTitle(txt(12, y + 4, trunc(p.name, 14), 'port' + (p.missing ? ' miss' : req ? '' : ' opt')), hint); name.dataset.in = p.name; gn.appendChild(name);
-        if (val) gn.appendChild(opens(withTitle(txt(12 + (nameLen + 1) * CH, y + 4, trunc(val, room - nameLen), 'port lit'), p.name + val), p.ref));
+        const hint = p.name + (p.provided ? ' (provided by the compiler)' : req ? '' : ' (optional)') + (p.type ? ': ' + showType(p.type) : '') + (p.description ? '\n' + p.description : '');
+        const name = withTitle(txt(12, y + 4, trunc(p.name, 14), 'port' + (p.missing ? ' miss' : p.provided ? ' provided' : req ? '' : ' opt')), hint); name.dataset.in = p.name; gn.appendChild(name);
+        if (val) gn.appendChild(opens(withTitle(txt(12 + (nameLen + 1) * CH, y + 4, trunc(val, room - nameLen), 'port lit' + (p.provided ? ' provided' : '')), p.name + val), p.ref));
         else if (p.missing) gn.appendChild(txt(12 + (nameLen + 1) * CH, y + 4, 'not given', 'port miss'));
         else if (p.type && n.outputs.length === 0) gn.appendChild(opens(withTitle(txt(12 + (nameLen + 1) * CH, y + 4, trunc(showType(p.type), room - 1 - nameLen), 'port type'), p.name + ': ' + showType(p.type)), shapeOf(p.type)));
       });
