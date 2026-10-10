@@ -1,0 +1,10 @@
+{
+  "$schema": "@wilanis/plugin.schema.json",
+  "label": "Note",
+  "description": "A test fixture, the shape every plugin has: a note beside a run, kept with the site that wrote it (RFC 0032).",
+  "grants": {
+    "ports": [
+      "@note/note.port.json"
+    ]
+  }
+}

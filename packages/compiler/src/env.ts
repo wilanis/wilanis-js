@@ -72,8 +72,9 @@ function connectionsOf(scope: Scope, secrets: Secrets, profile: string | undefin
 
 /**
  * The environment handlers see under a profile: connections with secrets substituted (a stand-in's under the
- * name it stands in for), plugin settings, a type resolver, and the `resolves` view of the tree a stubbed
- * effect binds its variables through.
+ * name it stands in for), plugin settings, a type resolver, the `resolves` view of the tree a stubbed
+ * effect binds its variables through, and `document`, the loaded document at a path as the tree now stands --
+ * what a handler handed its site (RFC 0032) opens when it wants the words behind the two strings.
  */
 export function buildEnv(
   scope: Scope,
@@ -87,8 +88,9 @@ export function buildEnv(
   for (const use of project?.plugins ?? []) plugins[use.use] = secrets.substitute(use.settings ?? {}) as Settings;
   const resolveType = (ref: string) => scope.types.spec(ref);
   const resolving = scope.resolving();
+  const document = (path: string) => scope.any(path)?.doc;
   return {
-    env: { connections, plugins, canon: scope.canon, resolveType, resolving },
+    env: { connections, plugins, canon: scope.canon, resolveType, resolving, document },
     missing: [...secrets.missing],
   };
 }

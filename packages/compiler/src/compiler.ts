@@ -52,7 +52,9 @@ import {
   type Roots,
   redactOf,
   SCOPE,
+  withProvided,
 } from './lower.js';
+import { siteOf } from './sites.js';
 
 /**
  * Lowers a checked tree to what the kernel runs: the spec of a graph, or of the binding that meets a domain
@@ -82,12 +84,13 @@ export class Compiler {
 
   /**
    * Compile a domain port operation by path#operation: the spec of the binding that meets it under the
-   * chosen profile. This is what a trigger fires -- it names what it wants done, never how.
+   * chosen profile. This is what a trigger fires -- it names what it wants done, never how. A startup step naming
+   * a native `holds` operation says which step it is, since that step is the site the operation is called from.
    */
-  operation(opRef: string): Compiled {
+  operation(opRef: string, called?: { startup: number }): Compiled {
     const hit = this.scope.op(opRef);
     if (typeof hit === 'string') throw new Error(hit);
-    if (hit.port.native && hit.op.holds) return { spec: this.holdsSpec(hit), handlers: this.handlers };
+    if (hit.port.native && hit.op.holds) return { spec: this.holdsSpec(hit, called), handlers: this.handlers };
     if (hit.port.native) throw new Error(`'${opRef}' is a native operation; a trigger fires a domain port`);
     const binding = this.scope.bindingFor(hit.path, this.opts.profile);
     if (typeof binding === 'string') throw new Error(binding);
@@ -96,13 +99,18 @@ export class Compiler {
 
   /**
    * A `holds` operation starts something that outlives the run: it is a plugin's own, has no binding to choose
-   * between, and only a project's startup list names it. It compiles to the one call it is.
+   * between, and only a project's startup list names it. It compiles to the one call it is, the step it is named
+   * at written in where a field asks for the site.
    */
-  private holdsSpec(hit: OpHit): KernelSpec {
+  private holdsSpec(hit: OpHit, called: { startup: number } | undefined): KernelSpec {
+    const accepted = this.scope.types.accepted(hit.op.accepts);
+    const byName = inputsByName(Object.keys(accepted));
+    const project = this.scope.registry.project?.path;
+    const site = called && project ? siteOf({ project, startup: called.startup }) : undefined;
     const op: KCall = {
       kind: 'call',
       handler: this.nativeHandler(hit),
-      in: inputsByName(Object.keys(this.scope.types.accepted(hit.op.accepts))),
+      in: site ? withProvided(byName, accepted, site) : byName,
       redact: redactOf(this.scope, hit.op, undefined),
     };
     return { name: `${hit.path}#${hit.opName}`, nodes: { op }, output: hit.op.returns ? ['op'] : undefined };
@@ -239,15 +247,13 @@ export class Compiler {
       return { kind: 'switch', in: lowerValues(node.in, roots), rules, else: node.else, ...caught };
     }
     const { handler, op } = this.handlerFor(node.run);
-    const inputs = trimming(
-      handler,
-      node,
-      this.withScope(lowerValues(node.in, roots), { key: node.run, given: node.in }),
-    );
+    const authored = this.withScope(lowerValues(node.in, roots), { key: node.run, given: node.in });
+    const site = siteOf({ graph: graphPath, node: node.id });
+    const inputs = trimming(handler, node, withProvided(authored, this.scope.types.accepted(op.accepts), site));
     const redact = redactOf(this.scope, op, node.in);
-    const site = tagSite(this.sites, `${graphPath}#${node.id}`, node);
+    const tagged = tagSite(this.sites, `${graphPath}#${node.id}`, node);
     const pure = pureOf(op);
-    if (isRun(node)) return { kind: 'call', handler, in: inputs, redact, ...pure, ...site };
+    if (isRun(node)) return { kind: 'call', handler, in: inputs, redact, ...pure, ...tagged };
     const over = lowerValue(node.over, roots);
     return {
       kind: 'map',
@@ -260,7 +266,7 @@ export class Compiler {
       bind: bindPaths(node.bind),
       ...(node.limit === undefined ? {} : { limit: node.limit }),
       ...(node.concurrency === undefined ? {} : { concurrency: node.concurrency }),
-      ...site,
+      ...tagged,
     };
   }
 
@@ -270,7 +276,9 @@ export class Compiler {
     const cached = this.bindingSpecs.get(key);
     if (cached) return cached;
     const bound = binding.doc.operations[hit.opName];
-    const call = bound.graph ? this.graphCall(bound.graph, hit.op) : this.delegateCall(binding, bound, hit.op);
+    const call = bound.graph
+      ? this.graphCall(bound.graph, hit.op)
+      : this.delegateCall(binding, bound, { op: hit.op, name: hit.opName });
     const op: KCall = { ...call, ...tagSite(this.sites, key, bound) };
     const spec: KernelSpec = { name: key, nodes: { op }, output: hit.op.returns ? ['op'] : undefined };
     this.bindingSpecs.set(key, spec);
@@ -301,18 +309,23 @@ export class Compiler {
     };
   }
 
-  /** A delegation as one call: the statement's own values, the caller's by name for the rest, reads taken below context. */
-  private delegateCall(binding: Loaded<BindingDoc>, bound: BindingOp, op: Operation): KCall {
+  /**
+   * A delegation as one call: the statement's own values, the caller's by name for the rest, reads taken below
+   * context, and the binding's operation as the site where the target asks for one.
+   */
+  private delegateCall(binding: Loaded<BindingDoc>, bound: BindingOp, met: { op: Operation; name: string }): KCall {
     if (!bound.run) throw new Error(`${binding.path}: an operation binds a graph or a run`);
     const { handler, op: target } = this.handlerFor(bound.run);
-    const given = passedInputs(this.scope, target, op, bound.in);
+    const given = passedInputs(this.scope, target, met.op, bound.in);
     const roots: Roots = { resolvers: this.resolverRoots(binding.doc.reads) };
-    const inputs = this.withScope(lowerValues(given, roots), { key: bound.run, given: bound.in });
+    const authored = this.withScope(lowerValues(given, roots), { key: bound.run, given: bound.in });
+    const site = siteOf({ binding: binding.path, operation: met.name });
+    const inputs = withProvided(authored, this.scope.types.accepted(target.accepts), site);
     return {
       kind: 'call',
       handler,
       in: inputs,
-      redact: alsoAnswering(redactOf(this.scope, target, given), op, this.scope),
+      redact: alsoAnswering(redactOf(this.scope, target, given), met.op, this.scope),
       ...pureOf(target),
     };
   }

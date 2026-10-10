@@ -1,6 +1,8 @@
 /**
  * Shapes, ports and connections. A shape's fields resolve and speak their own layer (R001, L001, L005). A
- * port's operations resolve; a domain operation speaks core shapes and fixes no value itself (L001, L006);
+ * port's operations resolve; a domain operation speaks core shapes and fixes no value itself (L001, L006), and asks
+ * for no site: a field the compiler provides is a native operation's, of the site's shape, never secret and always
+ * given (L019, in `provided.ts`);
  * what an operation says about repeating it names its own fields and types as boolean (C015). A field of
  * either bounds its length with maxItems only where it is a list (C016).
  * An operation that says it `listens` holds (L014), and the inputs and settings its address reads are ones it
@@ -23,6 +25,7 @@ import {
 } from '@wilanis/core';
 import type { Judge } from './judge.js';
 import { checkListenPorts, checkListenSetting, fieldsOf, listed, misfit, PARTS, type Part } from './listen-settings.js';
+import { checkProvidedAt, checkProvidedFields } from './provided.js';
 import { mismatch } from './typing.js';
 
 /**
@@ -34,6 +37,7 @@ export function checkShape(judge: Judge, shape: Loaded<ShapeDoc>): void {
   const spec = { fields: shape.doc.fields, open: shape.doc.open };
   judge.type(spec, shape.path, 'fields');
   checkMaxItems(judge, shape.path, shape.doc.fields, 'fields');
+  checkProvidedAt(judge, { file: shape.path, fields: shape.doc.fields, at: 'fields', what: `shape '${shape.path}'` });
   if (!shape.native)
     judge.checkLayer({ spec, from: shape, at: 'fields', layer: shape.doc.layer, what: `shape '${shape.path}'` });
 }
@@ -60,6 +64,7 @@ function checkOperationWords(judge: Judge, port: Loaded<PortDoc>, name: string, 
   if (op.listens) checkListens(judge, port, name, op);
   if (!port.native) checkDomainOperation(judge, port, name, op);
   else checkRepeatable(judge, port, name, op);
+  checkProvidedFields(judge, port, name, op);
 }
 
 /**
