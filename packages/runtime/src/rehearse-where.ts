@@ -14,6 +14,7 @@
 import { bindings, guardSpecAt } from '@wilanis/compiler';
 import {
   type BindingDoc,
+  type BindingOp,
   hasVars,
   type Loaded,
   type Operation,
@@ -49,17 +50,20 @@ export function graphSpec(emb: Embedder, ref: string): Spec | undefined {
   }
 }
 
-/** The graph a binding operation runs, when its handler names one. */
-export function bindingGraph(emb: Embedder, handler: string): string | undefined {
+/** The binding operation a handler names, when it names one: how the port operation behind it is met. */
+function boundOpOf(emb: Embedder, handler: string): BindingOp | undefined {
   const hash = handler.lastIndexOf('#');
   if (hash < 0) return undefined;
   const [path, opName] = [handler.slice(0, hash), handler.slice(hash + 1)];
   try {
-    return (emb.scope.get('binding', path)?.doc as BindingDoc | undefined)?.operations?.[opName]?.graph;
+    return (emb.scope.get('binding', path)?.doc as BindingDoc | undefined)?.operations?.[opName];
   } catch {
     return undefined;
   }
 }
+
+/** The graph a binding operation runs, when its handler names one. */
+export const bindingGraph = (emb: Embedder, handler: string): string | undefined => boundOpOf(emb, handler)?.graph;
 
 /**
  * The spec behind one node's handler, whatever kind of thing the compiler put there: a graph it names, the
@@ -136,6 +140,19 @@ export function declaredAt(emb: Embedder, root: Spec, nodePath: string): Type | 
 /** Whether the node at a dotted path is a map, whose answer the kernel stubs element by element and never whole. */
 export function mapAt(emb: Embedder, root: Spec, nodePath: string): boolean {
   return nodeAt(emb, root, nodePath.split('.'))?.kind === 'map';
+}
+
+/**
+ * The one effect the node at a dotted path delegates to, where it is a call a binding meets by a `run` and no graph:
+ * `<path>.op`, the single node of the wrapper the binding operation lowers to. That node is the effect the kernel
+ * stubs and a seed records, so a demand on the call's answer is written there, the one place every stubbed run reads
+ * (#788). Nothing for a call a graph meets, a native operation called directly, or a path that names no node.
+ */
+export function effectAt(emb: Embedder, root: Spec, nodePath: string): string | undefined {
+  const node = nodeAt(emb, root, nodePath.split('.'));
+  if (typeof node?.handler !== 'string') return undefined;
+  const bound = boundOpOf(emb, node.handler);
+  return bound?.run && !bound.graph ? `${nodePath}.op` : undefined;
 }
 
 /** A node of a lowered spec, as far as a walk down a path reads one. */

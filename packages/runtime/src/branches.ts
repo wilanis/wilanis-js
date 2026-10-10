@@ -28,6 +28,11 @@ export interface Stubbing {
   inType?: Type;
   /** Whether the node at a dotted path is a map: the kernel reads its stubs per element, at `<path>.<index>`. */
   isMap?: (nodePath: string) => boolean;
+  /**
+   * The one effect the node at a dotted path delegates to, where it is a call a binding meets by a `run`: a demand on
+   * its answer is written there, `<path>.op`, where the kernel stubs it and a seed records it, never at the call.
+   */
+  effectOf?: (nodePath: string) => string | undefined;
 }
 
 /**
@@ -238,18 +243,20 @@ function forwardsIn(node: Record<string, unknown>): boolean {
  * what the seed produced for a node path, so a case only overrides the fields its rule reads.
  */
 export function casesFor(found: FoundSwitch, from: Stubbing): Case[] {
-  const { generated, typeOf = () => undefined, seed = 1, inputSeed, inType, isMap } = from;
+  const settled: Settled = { ...from, typeOf: from.typeOf ?? (() => undefined), seed: from.seed ?? 1 };
   const { node, prefix } = found;
   const steerable = found.fromTriggerIn ?? !prefix.length;
   const branches = branchesOf(
     node.rules.map(rule => ({ when: rule.label, to: rule.to })),
     node.else,
   );
-  const ruled = branches.map(branch =>
-    steer(branch, found, { generated, typeOf, seed, inputSeed, inType, isMap }, steerable),
-  );
+  const ruled = branches.map(branch => steer(branch, found, settled, steerable));
   return [...ruled, ...caughtCases(found)];
 }
+
+/** A stubbing with what a case needs settled: a type lookup that may answer nothing, and a seed. */
+type Settled = Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>> &
+  Omit<Stubbing, 'generated' | 'typeOf' | 'seed'>;
 
 /** The rule index a catch branch carries: neither a rule nor the else, since no rule is tried when a node broke. */
 export const CAUGHT = -2;
@@ -311,7 +318,7 @@ function meet(
   dotted: string,
   domain: Domain,
   at: At,
-  from: Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>> & Pick<Stubbing, 'inputSeed' | 'inType' | 'isMap'>,
+  from: Settled,
 ):
   | { input: { path: string[]; value: unknown } }
   | { stub: { target: string; path: string[]; value: unknown } }
@@ -328,14 +335,14 @@ function meet(
 }
 
 /**
- * Which stub a demand writes into. An operation met by a delegation lowers to a wrapper spec holding one node `op`,
- * so what the seed recorded for it sits one level deeper.
+ * Which stub a demand on a node's answer writes into: the node's own, or, where the node is a call a binding meets by
+ * delegation, the one effect under it. A binding operation lowers to a wrapper spec holding one node `op`, and that
+ * effect is what the kernel stubs and what a seed records; a stub at the call would answer only where every node is
+ * answered from a stub, as in the rehearsal, and never where effects alone are, as in an edge's run (#788).
  */
-function stubTarget(prefix: string[], ref: string, from: Pick<Required<Stubbing>, 'generated' | 'typeOf'>): string {
+function stubTarget(prefix: string[], ref: string, from: Pick<Stubbing, 'effectOf'>): string {
   const direct = [...prefix, ref].join('.');
-  const deeper = `${direct}.op`;
-  const bare = from.generated(direct) === undefined && !from.typeOf(direct);
-  return bare && (from.generated(deeper) !== undefined || from.typeOf(deeper)) ? deeper : direct;
+  return from.effectOf?.(direct) ?? direct;
 }
 
 /**
@@ -401,12 +408,7 @@ function elementOf(found: FoundSwitch): FoundList | undefined {
 }
 
 /** One branch as a case: the stubs and the input that steer a run into it. */
-function steer(
-  branch: Branch,
-  found: FoundSwitch,
-  from: Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>> & Pick<Stubbing, 'inputSeed' | 'inType' | 'isMap'>,
-  steerable: boolean,
-): Case {
+function steer(branch: Branch, found: FoundSwitch, from: Settled, steerable: boolean): Case {
   const steered: Steered = { stubs: {}, input: [] };
   const missed: Record<Missed, string[]> = { unreachable: [], exhausted: [] };
   const at: At = { node: found.node, prefix: found.prefix, steerable, element: elementOf(found) };
