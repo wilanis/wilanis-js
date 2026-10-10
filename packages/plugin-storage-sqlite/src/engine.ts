@@ -11,17 +11,19 @@
  * The driver is synchronous: a statement runs to its end on the event loop. That is the price of SQLite, and
  * the reason this kind is the development database rather than the production one.
  */
-import type {
-  At,
-  Engine,
-  PatchAnswer,
-  Put,
-  Query,
-  Record_,
-  Scope,
-  Transaction,
-  Where,
-  Written,
+import {
+  type At,
+  betweenStatements,
+  type Engine,
+  type PatchAnswer,
+  type Put,
+  type Query,
+  type Record_,
+  type Run,
+  type Scope,
+  type Transaction,
+  type Where,
+  type Written,
 } from '@wilanis/plugin-storage';
 import type { Kysely, OnConflictBuilder } from 'kysely';
 import { typeOf } from './columns.js';
@@ -114,10 +116,10 @@ export class SqliteEngine extends SqliteRecorder implements Engine {
    * upsert's update is itself narrowed to the scope, so the row of another one is not touched and nothing is
    * returned.
    */
-  async put(at: At, given: Record_, { replace, scope }: Put) {
+  async put(at: At, given: Record_, { replace, scope, signal }: Put) {
     await this.scoped(at, scope);
     const values = { ...rowOf(given, at), ...scopeValues(scope) };
-    return this.answering(at, { given, scope }, { conflict: false }, async db => {
+    return this.answering(at, { given, scope, run: { signal } }, { conflict: false }, async db => {
       const written = await db
         .insertInto(at.name as never)
         .values(values as never)
@@ -146,12 +148,13 @@ export class SqliteEngine extends SqliteRecorder implements Engine {
    * beside what the operation answers when nothing was written (`refused`). `given` is what the write named --
    * the whole record of a put, the changes of a patch -- since a refused reference is found among its fields;
    * `scope` is what it was written under, which a scoped unique names beside the declared fields and the
-   * answer does not. Anything else the write throws passes up. `put` and `patch` share it, so the two name a
+   * answer does not; `run` is what the write is part of, which a refused write's read-back is stopped by once
+   * it was cancelled. Anything else the write throws passes up. `put` and `patch` share it, so the two name a
    * violation alike.
    */
   private async answering<T>(
     at: At,
-    { given, scope }: { given: Record_; scope?: Scope },
+    { given, scope, run }: { given: Record_; scope?: Scope; run?: Run },
     refused: T,
     write: (db: Kysely<never>) => Promise<T>,
   ): Promise<T | (T & { violated: string })> {
@@ -159,6 +162,7 @@ export class SqliteEngine extends SqliteRecorder implements Engine {
     try {
       return await write(db);
     } catch (error) {
+      betweenStatements(run);
       const violated = await writeViolation(withoutScope(error, scope), db, at, given);
       if (violated) return { ...refused, violated };
       throw error;
@@ -176,7 +180,7 @@ export class SqliteEngine extends SqliteRecorder implements Engine {
     await this.scoped(at, scope);
     const values = changedOf(changes, at);
     if (!Object.keys(values).length) return this.get(at, key, scope);
-    return this.answering<PatchAnswer>(at, { given: changes, scope }, {}, async db => {
+    return this.answering<PatchAnswer>(at, { given: changes, scope, run: written }, {}, async db => {
       const after = await db
         .updateTable(at.name as never)
         .set(values as never)
@@ -193,7 +197,7 @@ export class SqliteEngine extends SqliteRecorder implements Engine {
    * is kept by the file's own foreign key (`ON DELETE RESTRICT`), and the collection holding it is answered as
    * `referencedBy`; a key of another scope matches nothing, so a remove of it removes nothing.
    */
-  async remove(at: At, key: unknown, scope?: Scope) {
+  async remove(at: At, key: unknown, scope?: Scope, run?: Run) {
     const db = await this.scoped(at, scope);
     try {
       const gone = await db
@@ -205,6 +209,7 @@ export class SqliteEngine extends SqliteRecorder implements Engine {
       const before = recordOf(gone as Row | undefined, at);
       return before ? { record: before, removed: true } : { removed: false };
     } catch (error) {
+      betweenStatements(run);
       const referencedBy = await removeViolation(error, db, at, key);
       if (!referencedBy) throw error;
       return { record: (await this.get(at, key, scope)).record, removed: false, referencedBy };
@@ -216,22 +221,22 @@ export class SqliteEngine extends SqliteRecorder implements Engine {
    * a number under `identity`. Any other pairing is what X232 refuses at check time, so what is left here is
    * the honest run-time message for a plugin loaded without its rules.
    */
-  async newKey(at: At) {
+  async newKey(at: At, run?: Run) {
     const type = typeOf(at.shape, at.key)?.kind;
     const identity = isIdentity(this.settings);
     if (type === 'string' && !identity) return uuidv7();
     if (type === 'number' && identity)
-      return this.trx ? reserve(this.trx, at) : locked(this.db(at), held => reserve(held, at));
+      return this.trx ? reserve(this.trx, at, run) : locked(this.db(at), held => reserve(held, at, run));
     throw new Error(
       `newKey: keyType '${this.settings.keyType ?? 'uuidv7'}' answers no key for '${at.key}', which is ${type ?? 'of no known type'}`,
     );
   }
 
   /** Create every table, column and constraint the store declares that is not there yet, and count each. */
-  async ensure(collections: At[]) {
+  async ensure(collections: At[], run?: Run) {
     if (!collections.length) return { collections: 0, columns: 0, constraints: 0 };
-    if (this.trx) return ensureTables(this.trx, collections, this.settings);
-    return locked(this.db(collections[0]), held => ensureTables(held, collections, this.settings));
+    if (this.trx) return ensureTables(this.trx, collections, this.settings, run);
+    return locked(this.db(collections[0]), held => ensureTables(held, collections, this.settings, run));
   }
 
   /**

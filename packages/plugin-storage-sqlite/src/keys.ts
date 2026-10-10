@@ -8,7 +8,7 @@
  * higher, so a record written with a key of its own moves the next reservation past it.
  */
 import { randomBytes } from 'node:crypto';
-import type { At } from '@wilanis/plugin-storage';
+import { type At, betweenStatements, type Run } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';
 
 /** The table the reserved keys are kept in, one row per collection. */
@@ -40,10 +40,15 @@ async function pastHighest(db: Kysely<never>, at: At): Promise<number> {
 /**
  * Reserve the next key of a collection on `db`, which the caller has put inside a transaction holding the
  * write lock: read what is kept, take the higher of it and one past the highest held, and keep the one after.
+ * Four statements, and a run cancelled between two of them is stopped there (RFC 0012).
  */
-export async function reserve(db: Kysely<never>, at: At): Promise<number> {
+export async function reserve(db: Kysely<never>, at: At, run?: Run): Promise<number> {
   await ensureKeys(db);
-  const next = Math.max((await keptFor(db, at.name)) ?? 1, await pastHighest(db, at));
+  betweenStatements(run);
+  const kept = await keptFor(db, at.name);
+  betweenStatements(run);
+  const next = Math.max(kept ?? 1, await pastHighest(db, at));
+  betweenStatements(run);
   await sql`
     insert into ${sql.id(KEYS)} (collection, next) values (${at.name}, ${next + 1})
     on conflict (collection) do update set next = excluded.next

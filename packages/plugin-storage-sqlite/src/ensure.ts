@@ -23,7 +23,7 @@
  * -- as it does on postgres. What is left here serves the callers of `Engine.ensure` that remain: the shared
  * suite, which makes the tables its cases write into.
  */
-import type { At, Declared, Made } from '@wilanis/plugin-storage';
+import { type At, betweenStatements, type Declared, type Made, type Run } from '@wilanis/plugin-storage';
 import { type Kysely, sql } from 'kysely';
 import { columnsOf, foreignKeysOf, hasTable, uniquesOf } from './catalog.js';
 import { fieldsOf, quoted, storedOf } from './columns.js';
@@ -176,17 +176,23 @@ async function addUniques(db: Kysely<never>, at: At): Promise<number> {
 
 /**
  * Prepare every collection: the tables and columns first, then the unique indexes over them, all on `db` --
- * which the caller has put inside one transaction, so a drift leaves the file as it was.
+ * which the caller has put inside one transaction, so a drift leaves the file as it was, and so does a run
+ * cancelled between two collections, which is stopped before the next one's statements (RFC 0012).
  */
-export async function ensureTables(db: Kysely<never>, collections: At[], settings: Settings): Promise<Made> {
+export async function ensureTables(db: Kysely<never>, collections: At[], settings: Settings, run?: Run): Promise<Made> {
   const made: Made = { collections: 0, columns: 0, constraints: 0 };
   for (const at of collections) {
+    betweenStatements(run);
     const one = await ensureOne(db, at, settings);
     made.collections += one.collections;
     made.columns += one.columns;
     made.constraints += one.constraints;
   }
-  for (const at of collections) made.constraints += await addUniques(db, at);
+  for (const at of collections) {
+    betweenStatements(run);
+    made.constraints += await addUniques(db, at);
+  }
+  betweenStatements(run);
   if (isIdentity(settings)) await ensureKeys(db);
   return made;
 }

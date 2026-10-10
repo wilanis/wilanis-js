@@ -289,6 +289,22 @@ const recordCases: Case[] = [
       assert.equal(await subject.engine.count(where_, undefined), 3);
     },
   },
+  {
+    name: 'a cancelled run is stopped between the two collections ensure makes: it rejects with the reason, and the second is never made',
+    async run(subject) {
+      const first = at(subject, 'cancel_first');
+      const second = at(subject, 'cancel_second');
+      await subject.engine.ensure([first]);
+      const control = new AbortController();
+      control.abort(new Error('the deadline passed'));
+      // the first collection's statements are the run's last; the second's are never sent (RFC 0012)
+      await assert.rejects(subject.engine.ensure([first, second], { signal: control.signal }), /the deadline passed/);
+      assert.equal(await subject.engine.inspect(subject.connection, 'cancel_second'), undefined);
+      // and the engine is whole: the first collection is there and takes a record as before
+      await subject.engine.put(first, SEEDS[0], { replace: true });
+      assert.deepEqual((await subject.engine.get(first, 'a')).record, SEEDS[0]);
+    },
+  },
 ];
 
 /** Everything every engine must answer: what it does with records and filters, with a transaction, and what a plan counts. */

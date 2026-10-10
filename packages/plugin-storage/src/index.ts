@@ -25,11 +25,12 @@ export type {
   Record_,
   Ref,
   RemoveAnswer,
+  Run,
   Scope,
   Transaction,
   Written,
 } from './engine.js';
-export { engines } from './engine.js';
+export { betweenStatements, engines } from './engine.js';
 export { ensureStore } from './ensure.js';
 export type { Leases } from './leases.js';
 export { Keepers, leases } from './leases.js';

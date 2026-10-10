@@ -9,23 +9,25 @@
  */
 import { randomUUID } from 'node:crypto';
 import { conforms } from '@wilanis/core';
-import type {
-  Applied,
-  Applying,
-  At,
-  Declared,
-  Engine,
-  FieldType,
-  On,
-  Put,
-  Query,
-  Record_,
-  Recording,
-  Scope,
-  Step,
-  Transaction,
-  Where,
-  Written,
+import {
+  type Applied,
+  type Applying,
+  type At,
+  betweenStatements,
+  type Declared,
+  type Engine,
+  type FieldType,
+  type On,
+  type Put,
+  type Query,
+  type Record_,
+  type Recording,
+  type Run,
+  type Scope,
+  type Step,
+  type Transaction,
+  type Where,
+  type Written,
 } from '@wilanis/plugin-storage';
 import type { Kysely, OnConflictBuilder } from 'kysely';
 import { applyPlan } from './apply.js';
@@ -252,7 +254,7 @@ export class PostgresEngine implements Engine {
    * is kept by the database's own foreign key, and the refusal comes back as the `referencedBy` the port
    * promises; a key of another scope matches nothing, so a remove of it removes nothing.
    */
-  async remove(at: At, key: unknown, scope?: Scope) {
+  async remove(at: At, key: unknown, scope?: Scope, run?: Run) {
     const { db, table } = await this.scoped(at, scope);
     try {
       const [gone] = await writing(
@@ -269,6 +271,8 @@ export class PostgresEngine implements Engine {
     } catch (error) {
       const referencedBy = violation(error, at);
       if (!referencedBy) throw error;
+      // the record read back is a second statement, which a cancelled run is stopped before
+      betweenStatements(run);
       return { record: (await this.get(at, key, scope)).record, removed: false, referencedBy };
     }
   }
@@ -295,10 +299,10 @@ export class PostgresEngine implements Engine {
   }
 
   /** Create every table, column and constraint the store declares that is not there yet, and count each. */
-  async ensure(collections: At[]) {
+  async ensure(collections: At[], run?: Run) {
     if (!collections.length) return { collections: 0, columns: 0, constraints: 0 };
     const { db } = this.db(collections[0]);
-    return ensureTables(db, collections, this.settings);
+    return ensureTables(db, collections, this.settings, run);
   }
 
   /** The connection's pool and the schema its tables sit in, for the five members that name no collection. */

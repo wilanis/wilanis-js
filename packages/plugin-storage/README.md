@@ -87,6 +87,12 @@ shape they have, the field that identifies one, and what the store declared abou
 | `newKey(at)` | a key no record of the collection has, of the key field's type |
 | `ensure(collections)` | every collection prepared; what that means is the engine's, and may be nothing |
 
+Every call also takes the run it is part of: as the `signal` of the options object it already has (`Query`,
+`Put`, `Written`), or as a trailing `Run` where it has none (`get`, `count`, `remove`, `newKey`, `ensure`,
+`begin`). An engine reads it between the statements of one operation -- `betweenStatements(run)`, exported
+here, stops with the signal's reason once the run was cancelled -- and never inside one: a statement in flight
+finishes, and interrupting it is the driver's (RFC 0012). The suite's cancelled `ensure` holds every engine to it.
+
 **A condition the author could expect is answered, never thrown.** An absent record, a taken key, a violated
 `unique`, a record another still references: each comes back as a field a graph routes on with a `switch`.
 Failure is for the unforeseen.

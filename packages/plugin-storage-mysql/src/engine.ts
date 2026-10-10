@@ -14,19 +14,21 @@
  * Every statement over a collection carries its scope (RFC 0015, `scoping.ts`): a row belongs to the scope it
  * was written under, and a read, a change or a removal under another scope does not find it.
  */
-import type {
-  At,
-  Engine,
-  On,
-  PatchAnswer,
-  Put,
-  Query,
-  Record_,
-  RemoveAnswer,
-  Scope,
-  Transaction,
-  Where,
-  Written,
+import {
+  type At,
+  betweenStatements,
+  type Engine,
+  type On,
+  type PatchAnswer,
+  type Put,
+  type Query,
+  type Record_,
+  type RemoveAnswer,
+  type Run,
+  type Scope,
+  type Transaction,
+  type Where,
+  type Written,
 } from '@wilanis/plugin-storage';
 import type { Kysely } from 'kysely';
 import { typeOf } from './columns.js';
@@ -182,6 +184,7 @@ export class MysqlEngine extends Unrecorded implements Engine {
           .where(at.key as never, '=', keyIn(at, key) as never)
           .where(eb => within(eb as never, scope) as never)
           .execute();
+        betweenStatements(written);
         return { record: recordOf(await rowAt(db, at, key, { scope }), at) };
       }),
     );
@@ -193,12 +196,13 @@ export class MysqlEngine extends Unrecorded implements Engine {
    * (`ON DELETE RESTRICT`), and the collection holding it is answered as `referencedBy`; a key of another scope
    * matches nothing, so a remove of it removes nothing.
    */
-  async remove(at: At, key: unknown, scope?: Scope): Promise<RemoveAnswer> {
+  async remove(at: At, key: unknown, scope?: Scope, run?: Run): Promise<RemoveAnswer> {
     await this.scoped(at, scope);
     try {
       return await this.together(at, async db => {
         const before = recordOf(await rowAt(db, at, key, { scope, lock: true }), at);
         if (!before) return { removed: false };
+        betweenStatements(run);
         await db
           .deleteFrom(at.name as never)
           .where(at.key as never, '=', keyIn(at, key) as never)
@@ -209,6 +213,8 @@ export class MysqlEngine extends Unrecorded implements Engine {
     } catch (error) {
       const referencedBy = removeViolation(error, at);
       if (!referencedBy) throw error;
+      // the record read back is one more statement, which a cancelled run is stopped before
+      betweenStatements(run);
       return { record: (await this.get(at, key, scope)).record, removed: false, referencedBy };
     }
   }
@@ -218,15 +224,18 @@ export class MysqlEngine extends Unrecorded implements Engine {
    * a number under `identity`. Any other pairing is what X242 refuses at check time, so what is left here is
    * the honest run-time message for a plugin loaded without its rules.
    */
-  async newKey(at: At) {
+  async newKey(at: At, run?: Run) {
     const type = typeOf(at.shape, at.key)?.kind;
     const identity = isIdentity(this.settings);
     if (type === 'string' && !identity) return uuidv7();
     if (type === 'number' && identity) {
       const seed = `${at.connection} ${at.name}`;
-      if (!this.pools.seeded.has(seed)) await seedKeys(this.pools.for(at), at.name);
+      if (!this.pools.seeded.has(seed)) {
+        await seedKeys(this.pools.for(at), at.name);
+        betweenStatements(run);
+      }
       this.pools.seeded.add(seed);
-      return this.together(at, db => reserve(db, at));
+      return this.together(at, db => reserve(db, at, run));
     }
     throw new Error(
       `newKey: keyType '${this.settings.keyType ?? 'uuidv7'}' answers no key for '${at.key}', which is ${type ?? 'of no known type'}`,
@@ -238,9 +247,9 @@ export class MysqlEngine extends Unrecorded implements Engine {
    * on the pool even for an engine `begin` made, since MySQL commits whatever transaction a session holds
    * before a `CREATE` or an `ALTER`.
    */
-  async ensure(collections: At[]) {
+  async ensure(collections: At[], run?: Run) {
     if (!collections.length) return { collections: 0, columns: 0, constraints: 0 };
-    return ensureTables(this.pools.for(collections[0]), collections, this.settings);
+    return ensureTables(this.pools.for(collections[0]), collections, this.settings, run);
   }
 
   /** `START TRANSACTION` on a session of the connection's pool, and the engine that runs on it. */
