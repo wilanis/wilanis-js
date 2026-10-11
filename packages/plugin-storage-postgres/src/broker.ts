@@ -22,7 +22,7 @@ import { Listeners } from './listener.js';
 import { poolFor, reachedOn, type Settings } from './pool.js';
 import { ensureQueue, parkedOn, payloadOf, putMessage, type Table } from './queue-table.js';
 
-/** How long a delivery holds its message before another worker may take it, where the plugin's settings say nothing. */
+/** How long a worker that died holds its message before another may take it, where the plugin's settings say nothing. */
 const VISIBILITY_SECONDS = 30;
 
 /**
@@ -45,11 +45,15 @@ async function prepared<T>(connection: string, work: () => Promise<T>): Promise<
 export class TableBroker implements Broker {
   private readonly listeners = new Listeners();
 
-  /** `env` is read at each call for the connection's settings; `engine` is the one this plugin registered. */
+  /**
+   * `env` is read at each call for the connection's settings; `engine` is the one this plugin registered; `log`
+   * is where a consumer says that a delivery's lock could not be extended.
+   */
   constructor(
     private readonly env: object,
     private readonly settings: Settings,
     private readonly engine: PostgresEngine,
+    private readonly log: (line: string) => void = () => {},
   ) {}
 
   /** Create the queue table and its index on the connection, where they are not there; alter nothing that is. */
@@ -73,7 +77,7 @@ export class TableBroker implements Broker {
   ): Promise<() => Promise<void>> {
     const table = this.tableOn(connection);
     const visibilityMs = (this.settings.queueVisibility ?? VISIBILITY_SECONDS) * 1000;
-    const consumer = new TableConsumer({ table, queue, visibilityMs }, handle, opts.concurrency);
+    const consumer = new TableConsumer({ table, queue, visibilityMs, log: this.log }, handle, opts.concurrency);
     const url = String(this.connectionOf(connection).settings.url);
     await prepared(connection, () =>
       consumer.start(wake => this.listeners.listen(connection, url, payloadOf(table.schema, queue), wake)),

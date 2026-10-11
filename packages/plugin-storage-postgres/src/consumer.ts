@@ -4,10 +4,14 @@
  *
  * It looks at the table only when something could have become deliverable: when it starts, when a notification
  * says the queue changed (a publish, a retry), when a delivery of its own is answered, and when the soonest
- * waiting message falls due by the database's clock. There is no fixed beat. While every slot is busy it arms no
- * timer at all -- a message falling due then has nowhere to go, and the delivery that ends next looks again --
- * and over a queue with nothing waiting it arms none either, since the next publish notifies. What keeps a
- * process whose only work is its queues alive meanwhile is the listening session, not a timer.
+ * waiting message falls due by the database's clock. There is no fixed beat for looking. While every slot is busy
+ * it arms no timer to look -- a message falling due then has nowhere to go, and the delivery that ends next looks
+ * again -- and over a queue with nothing waiting it arms none either, since the next publish notifies. What keeps
+ * a process whose only work is its queues alive meanwhile is the listening session, not a timer.
+ *
+ * The one beat it keeps is per delivery: while a run goes on, its lock is extended every half window
+ * (`renewal.ts`), so a healthy run longer than the window is never handed to a second worker. The beat stops
+ * when the delivery is answered, whatever the answer, before the answer is kept.
  *
  * A look that fails -- the database went away -- is tried again after a pause that doubles to a bound, so a
  * consumer outlives an outage without hammering the server; the first look is not, so a table `ensure` never
@@ -15,6 +19,7 @@
  */
 import type { Answer, Handle } from '@wilanis/plugin-queue';
 import { forget, park, release, type Table, type Taken, takeDue, untake } from './queue-table.js';
+import { Renewal } from './renewal.js';
 
 /** The first pause after a look failed; each further failure doubles it, up to `FAILED_MAX_MS`. */
 const FAILED_MS = 1000;
@@ -22,11 +27,15 @@ const FAILED_MAX_MS = 30_000;
 /** The longest a timer can be armed for; a message due later is looked at again then, and waited for again. */
 const TIMER_MAX_MS = 2 ** 31 - 1;
 
-/** The queue a consumer works: the table it is kept in, its name, and how long a delivery holds its lock. */
+/**
+ * The queue a consumer works: the table it is kept in, its name, how long a delivery holds its lock before it is
+ * extended, and where a failed extension is said.
+ */
 export interface Worked {
   table: Table;
   queue: string;
   visibilityMs: number;
+  log?: (line: string) => void;
 }
 
 /** What a consumer listens through: `wake` is called on every notification about its queue; answers the way to stop. */
@@ -132,14 +141,19 @@ export class TableConsumer {
     this.inFlight.add(running);
   }
 
-  /** Hand one message to the handle and keep what its answer says; a handle that throws is a retry with no wait. */
+  /**
+   * Hand one message to the handle, holding its lock while the handle runs, and keep what its answer says; a
+   * handle that throws is a retry with no wait. The lock stops being extended before the answer is kept.
+   */
   private async deliver(taken: Taken): Promise<void> {
+    const renewal = new Renewal(this.worked, taken);
     let answer: Answer;
     try {
       answer = await this.handle({ ...taken, headers: { ...taken.headers } });
     } catch {
       answer = { outcome: 'retry' };
     }
+    await renewal.stop();
     try {
       await this.settle(taken, answer);
     } catch {

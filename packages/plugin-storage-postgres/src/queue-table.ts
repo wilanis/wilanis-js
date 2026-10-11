@@ -162,6 +162,20 @@ async function nextDue(
   return wait === null || wait === undefined ? undefined : Math.max(0, Number(wait));
 }
 
+/**
+ * Hold one delivery's lock for `visibilityMs` more from now, while its run goes on; answers whether the row was
+ * still this delivery's. A row already answered -- forgotten, released, parked or given back, each of which
+ * clears the lock -- or taken since by another worker matches nothing, so a late extension never relocks it.
+ */
+export async function extend({ db, schema }: Table, taken: Taken, visibilityMs: number): Promise<boolean> {
+  const answer = (await sql`
+    update ${tableOf(schema)} set locked_until = now() + ${visibilityMs} * interval '1 millisecond'
+    where id = ${taken.id} and attempts = ${taken.attempt} and locked_until is not null and dead_at is null
+    returning id
+  `.execute(db)) as { rows: unknown[] };
+  return answer.rows.length > 0;
+}
+
 /** Forget one delivered message: the acknowledgement, where the delivery is still this one. */
 export async function forget({ db, schema }: Table, taken: Taken): Promise<void> {
   await sql`delete from ${tableOf(schema)} where id = ${taken.id} and attempts = ${taken.attempt}`.execute(db);

@@ -2,8 +2,9 @@
  * The table broker, against a real database. What every broker must answer is not restated here: it is
  * @queue's shared suite, run against this broker, the same list the memory broker runs. What is here is what
  * only a broker kept in a shared table has: two workers over one table never take one message, a lock a worker
- * never gave back expires into a redelivery, and a publish inside a transaction is kept exactly when the
- * transaction commits -- the one a store call on the same connection opened, or one it opened itself.
+ * that died never gave back expires into a redelivery, a run longer than the window keeps its lock and is
+ * delivered once, and a publish inside a transaction is kept exactly when the transaction commits -- the one a
+ * store call on the same connection opened, or one it opened itself.
  *
  * It needs a database, so the database cases are skipped without `WILANIS_TEST_POSTGRES_URL`, as the engine's
  * suite is (`engine.test.ts` says how to run one). That the plugin registers its broker needs none, and nor does
@@ -21,6 +22,7 @@ import { TableBroker } from '../src/broker.js';
 import { PostgresEngine } from '../src/engine.js';
 import plugin from '../src/index.js';
 import { closePools, poolFor } from '../src/pool.js';
+import { takeDue } from '../src/queue-table.js';
 
 const url = process.env.WILANIS_TEST_POSTGRES_URL;
 const KIND = '@storage-postgres/postgres.connection-kind.json';
@@ -36,6 +38,10 @@ function kept(settings = {}, over: object = env): TableBroker {
   made.push(broker);
   return broker;
 }
+
+/** A worker that takes one message of the queue, locks it for 200 ms and is never heard from again. */
+const takenOnce = (queue: string) =>
+  takeDue(poolFor({ connection: CONNECTION, kind: KIND, settings: { url } }, {}), queue, 1, 200);
 
 /** A queue no other case names. */
 const fresh = () => `q_${randomUUID().slice(0, 8)}`;
@@ -150,27 +156,37 @@ describe.skipIf(!url)('a queue kept in a table several workers share', () => {
     }
   });
 
-  it('delivers again, one attempt higher, a message whose worker never answered once its lock expires', async () => {
+  it('delivers again, one attempt higher, a message whose worker died holding it once its lock expires', async () => {
+    // the worker that died is a take with no consumer behind it: it locked the row and will never extend the lock
     const queue = fresh();
     const { id } = await kept().publish(CONNECTION, queue, { body: {}, headers: {} });
-    let letGo: () => void = () => {};
-    const stuck = await consuming(
-      kept({ queueVisibility: 0.2 }),
-      queue,
-      () =>
-        new Promise(done => {
-          letGo = () => done('ack');
-        }),
-    );
-    await until(() => stuck.seen.length === 1, 'the first delivery');
+    expect((await takenOnce(queue)).taken.map(one => one.id)).toEqual([id]);
     const taker = await consuming(kept({ queueVisibility: 0.2 }), queue, async () => 'ack');
     try {
       await until(() => taker.seen.length === 1, 'the delivery after the lock expired');
       expect(taker.seen.map(one => [one.id, one.attempt])).toEqual([[id, 2]]);
     } finally {
-      letGo();
-      await Promise.all([stuck.stop(), taker.stop()]);
+      await taker.stop();
     }
+  });
+
+  it('delivers once a run two and a half windows long, since its worker extends the lock while it runs (#907)', async () => {
+    const queue = fresh();
+    const { id } = await kept().publish(CONNECTION, queue, { body: {}, headers: {} });
+    const slow = await consuming(kept({ queueVisibility: 0.2 }), queue, async () => {
+      await pause(500);
+      return 'ack';
+    });
+    await until(() => slow.seen.length === 1, 'the first delivery');
+    const other = await consuming(kept({ queueVisibility: 0.2 }), queue, async () => 'ack');
+    try {
+      await pause(800);
+      expect([...slow.seen, ...other.seen].map(one => [one.id, one.attempt])).toEqual([[id, 1]]);
+      expect(await kept().parked(CONNECTION, queue)).toEqual([]);
+    } finally {
+      await Promise.all([slow.stop(), other.stop()]);
+    }
+    expect((await takenOnce(queue)).taken).toEqual([]); // the one run's ack matched: the row is gone
   });
 
   it('says which step is missing where ensure never made the table', async () => {

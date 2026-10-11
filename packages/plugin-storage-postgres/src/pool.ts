@@ -15,7 +15,7 @@ import { forgetScopes } from './scoping.js';
 export interface Settings {
   statementTimeout?: number;
   keyType?: 'uuidv7' | 'identity';
-  /** Seconds a queue delivery holds its message before another worker may take it. */
+  /** Seconds a worker that died holds a queue message before another may take it; a live run extends its lock. */
   queueVisibility?: number;
 }
 

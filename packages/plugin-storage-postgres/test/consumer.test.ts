@@ -16,6 +16,7 @@ const table = vi.hoisted(() => ({
   park: vi.fn(async () => {}),
   release: vi.fn(async () => {}),
   untake: vi.fn(async () => {}),
+  extend: vi.fn(async () => true),
 }));
 vi.mock('../src/queue-table.js', () => table);
 
@@ -67,7 +68,8 @@ describe('a saturated consumer', () => {
     await consumer.start(listening().listen);
     try {
       expect(seen).toEqual(['first']);
-      expect(vi.getTimerCount()).toBe(0);
+      expect(vi.getTimerCount()).toBe(1); // the delivery's lock renewal, and no timer to look
+      expect(table.extend).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(5000);
       expect(table.takeDue).toHaveBeenCalledTimes(1);
       answer({ outcome: 'ack' });

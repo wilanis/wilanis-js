@@ -26,7 +26,7 @@
       "queueVisibility": {
         "type": "number",
         "required": false,
-        "description": "how many seconds a queue delivery holds its message before another worker may take it: a worker that dies mid-run gives the message up this long after taking it, and a run longer than this may be handed to a second worker while it is still going. Absent: 30."
+        "description": "how many seconds a worker that died keeps its queue message before another worker may take it. While a run goes on, its worker extends the lock every half of this, so a run longer than this is not handed to a second worker; a shorter value only makes a message a dead worker held come back sooner. Absent: 30."
       }
     }
   }
