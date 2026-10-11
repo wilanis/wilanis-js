@@ -34,11 +34,14 @@ export function atOrBelow(path: string, prefix: string): boolean {
 /**
  * Assignability at the edge: wire text (query, route placeholders, headers, form fields, flags) may feed any scalar,
  * and a value that may be missing may feed a required field -- the trigger coerces and judges the input when it
- * arrives, and a request missing it is refused there rather than run.
+ * arrives, and a request missing it is refused there rather than run. A literal `[]` feeds any list, as it does
+ * everywhere.
  */
 export function assignableWire(from: Type, to: Type): string | null {
   if (from.kind === 'string' && !from.enum && isScalar(to)) return null;
-  if (from.kind === 'list' && to.kind === 'list') return assignableWire(from.of, to.of);
+  if (from.kind === 'list' && to.kind === 'list') {
+    return from.empty || to.empty ? assignable(from, to) : assignableWire(from.of, to.of);
+  }
   if (from.kind === 'object' && to.kind === 'object') return objectWire(from, to);
   return assignable(from, to);
 }
