@@ -4,32 +4,29 @@
  * settle as they settle (`packages/engine/src/run.ts`). An effect a stub answers settles in fewer steps than one a
  * handler answers, so a run whose effects were generated as it went and the replay of its stubs can end with other
  * nodes cancelled. Recording what the replay answers, fired by the one function `regress` fires with, keeps the two
- * the same.
+ * the same. Where the replay ends another way than the run (another node ended it first), the run is not recorded at
+ * all (`endedOtherwise`, #935).
  */
 import type { Loaded, LoadResult, ScenarioDoc, TriggerDoc } from '@wilanis/core';
-import type { Report } from '@wilanis/engine';
+import { type NodeReport, type Outcome, outcomeOf, type Report } from '@wilanis/engine';
 import type { Embedder } from './embed.js';
 import { asWritten } from './recorded-answers.js';
 import { replayedDoc } from './rehearse-recorded.js';
 import { embedderFor } from './stubbing.js';
 
-/** What every replay of one tree fires through: stubbed effects under seed 0, a fake secret for each one declared. */
+/**
+ * What every replay of one tree fires through: stubbed effects under seed 0, and so (`embedderFor`) a fake value for
+ * every secret the project declares, so a replay reads no real one.
+ */
 export interface Replayer {
   emb: Embedder;
-  stubbed: { seed: number; profile?: string; env: NodeJS.ProcessEnv };
+  stubbed: { seed: number; profile?: string };
 }
 
 /** The replayer of a tree under a profile: what `regress` replays with, and what a recorder fires a recording with. */
 export function replayerFor(load: LoadResult, profile?: string): Replayer {
-  const stubbed = { seed: 0, profile, env: fakeEnvFor(load) };
+  const stubbed = { seed: 0, profile };
   return { emb: embedderFor(load, stubbed), stubbed };
-}
-
-/** An environment that holds every secret the project declares, as `stub-<name>`, so a replay reads no real one. */
-function fakeEnvFor(load: LoadResult): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {};
-  for (const name of Object.values(load.registry.project?.doc.secrets ?? {})) env[name] = `stub-${name.toLowerCase()}`;
-  return env;
 }
 
 /** The trigger a scenario names, as the tree has it; nothing where it has none, which `wilanis check` refuses (S001). */
@@ -87,4 +84,71 @@ function cancelledReplay(
   const emb = embedderFor(load, { ...stubbed, cancelAt: { path, abort: () => control.abort() } });
   const { [path]: _, ...stubs } = replayed.stubs;
   return emb.fire(trigger, sc.in, sc.context ?? {}, { stubs, signal: control.signal });
+}
+
+/** How a run ended: how, a refusal's reason, and the node that ended it, by its dotted path. */
+interface Ending {
+  /** What two runs must share to have ended the same: the kind of ending, a refusal's reason, and the node. */
+  same: string;
+  /** The ending as the tail of a sentence about the run: `refuses as missing at 'op.noCustomer'`. */
+  said: string;
+}
+
+/**
+ * The node that ended a run that refused or broke, by its dotted path down through every call that failed with it (an
+ * element of a map by its index), and the outcome there; nothing for a run that ended another way.
+ */
+function endedAt(report: Report, prefix: string[] = []): { path: string; outcome: Outcome } | undefined {
+  const outcome = outcomeOf(report);
+  if (outcome.kind !== 'refused' && outcome.kind !== 'faulted') return undefined;
+  const path = [...prefix, outcome.at];
+  const below = belowOf(report.nodes[outcome.at]);
+  return (below && endedAt(below.report, [...path, ...below.step])) ?? { path: path.join('.'), outcome };
+}
+
+/** The run a failed node failed with: its call's, or the first failed element's of a map, with that element's index. */
+function belowOf(node: NodeReport | undefined): { report: Report; step: string[] } | undefined {
+  if (node?.sub) return { report: node.sub, step: [] };
+  const index = node?.items?.findIndex(item => item.status === 'failed') ?? -1;
+  const sub = index >= 0 ? node?.items?.[index]?.sub : undefined;
+  return sub && { report: sub, step: [String(index)] };
+}
+
+/** How a run ended, as `Ending` says it. A fault's message is said and not compared: the node names the fault. */
+function endingOf(report: Report): Ending {
+  const ended = endedAt(report);
+  if (ended?.outcome.kind === 'refused') {
+    const said = `refuses as ${ended.outcome.reason} at '${ended.path}'`;
+    return { same: said, said };
+  }
+  if (ended?.outcome.kind === 'faulted') {
+    const same = `breaks at '${ended.path}'`;
+    return { same, said: `${same}: ${ended.outcome.error}` };
+  }
+  return { same: ENDED[report.status], said: ENDED[report.status] };
+}
+
+/** How a run that neither refused nor broke ended, as the tail of a sentence about it. */
+const ENDED: Record<Report['status'], string> = {
+  done: 'answers',
+  failed: 'fails',
+  blocked: 'blocks',
+  cancelled: 'is cancelled',
+};
+
+/**
+ * Why a recorder does not write a run (#935): the run that chose the stubs and the replay of those stubs ended in
+ * another way, with another reason, or at another node. A refusal ends a run while the nodes in flight settle as they
+ * settle, so another node can end the replay first. The file would then pin the replay's ending under a name and a
+ * line that say the first run's. Said as the tail of the recorder's line, with both endings and `again`, the command
+ * that records again once the tree is fixed; nothing where both runs ended the same.
+ */
+export function endedOtherwise(first: Report, replayed: Report, again: string): string | undefined {
+  const [was, now] = [endingOf(first), endingOf(replayed)];
+  if (was.same === now.same) return undefined;
+  return (
+    `NOT RECORDED: the run that chose the stubs ${was.said}, and the replay of those stubs ${now.said}. ` +
+    'Which node ends the run depends on which settles first: make one of the two run only after the other is ' +
+    `decided, or make it stop refusing or breaking, then run ${again} again`
+  );
 }

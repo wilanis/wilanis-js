@@ -9,7 +9,7 @@ import { type Report, refusalOf } from '@wilanis/engine';
 import { expectOf } from './fuzz.js';
 import { checkRecorded, keptIn, type RecordCheck, writeRecorded } from './recorded-dir.js';
 import { RECORDED, REHEARSED } from './recorded-owner.js';
-import { recordedReport, replayerFor } from './replay.js';
+import { endedOtherwise, type Replayer, recordedReport, replayerFor } from './replay.js';
 
 /** What `--check` says after the files it lists: the one command that brings the directory back. */
 export const RECORD_HINT = 'run wilanis rehearse --record and review the diff';
@@ -79,9 +79,12 @@ function provenAs({ graph, node, when, to }: ScenarioBranch): string {
   return `${partsOf(graph).stem} '${node}' ${rule} routes to ${to}`;
 }
 
+/** The way a recorded run went in: its trigger, or a policy as the trigger that attaches it lent it a kind. */
+const wayOf = (run: Named) => (run.policy ? `${run.policy.name} as attached by ${run.trigger.name}` : run.trigger.name);
+
 /** What a recorded scenario says it proves, in its first line: how its run ended, or why no input reaches it. */
 function descriptionOf(run: Recording): string {
-  const way = run.policy ? `${run.policy.name} as attached by ${run.trigger.name}` : run.trigger.name;
+  const way = wayOf(run);
   if ('unreachable' in run)
     return `${way}: ${provenAs(run.branch)}, and no input reaches it: ${run.unreachable}. ${WRITTEN}`;
   const ended = endedAs(run.report);
@@ -244,13 +247,31 @@ function sameDir(under: string, paths: string[], what: keyof typeof MANY): strin
  * rehearsal fires a branch with the case's stubs alone and lets the seed answer every other effect as it runs;
  * `regress` answers every effect from a stub, in fewer steps, so where a refusal ends a run while other nodes still
  * run, the two can cancel different nodes. The expectation is read off the replay, so the file replays the same (#908).
+ * A run whose replay ended otherwise -- another node ended it first -- is not recorded, and `unwritten` says why in a
+ * line naming its branch (#935). As `docsOf` keeps a trigger's first run of a file, its later runs of it are not replayed.
  */
 export async function replayedRuns(load: LoadResult, profile: string | undefined, runs: Recording[]) {
   const replayer = replayerFor(load, profile);
-  const out: Recording[] = [];
-  for (const run of runs)
-    out.push('unreachable' in run ? run : { ...run, report: await recordedReport(load, replayer, replayableOf(run)) });
+  const out = { runs: [] as Recording[], unwritten: [] as string[] };
+  const files = new Set<string>();
+  for (const run of runs) {
+    // keyed by its owner too, so `docsOf` still sees two triggers or policies that would share a directory
+    const file = `${(run.policy ?? run.trigger).path} ${fileOf(run)}`;
+    if (files.has(file)) continue;
+    files.add(file);
+    const replayed = 'unreachable' in run ? run : await replayedRun(load, replayer, run);
+    if (typeof replayed === 'string') out.unwritten.push(replayed);
+    else out.runs.push(replayed);
+  }
   return out;
+}
+
+/** One run with its replay's report, or -- where the replay ended otherwise -- the line that says it is not written. */
+async function replayedRun(load: LoadResult, replayer: Replayer, run: RecordedRun): Promise<RecordedRun | string> {
+  const report = await recordedReport(load, replayer, replayableOf(run));
+  const otherwise = endedOtherwise(run.report, report, 'wilanis rehearse --record');
+  if (!otherwise) return { ...run, report };
+  return `${wayOf(run)}${run.branch ? `: ${provenAs(run.branch)}` : ''}: ${otherwise}`;
 }
 
 /** What a recorded run is written to fire: its way in, and its input, context and stubs. */
