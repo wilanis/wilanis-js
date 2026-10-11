@@ -207,10 +207,12 @@ The right side is a non-empty string literal, and the checker refuses anything e
 
 1. **The solver.** `solve` in `packages/runtime/src/solve.ts` turns each comparison into a demand on one path
    (a `Domain`). A literal word gives one demand: this path holds `'@'`, or lacks it. A path on the right would
-   relate two values, as `a == b` does, and the solver meets that only for `==` and `!=`, through `paired`;
-   `whyUnsolved` already says "the solver cannot compare two paths" for every other operator. `a contains b`
-   would need a new paired relation (make `b` a part of `a`, or make `a` avoid `b`), and its negation over
-   generated values.
+   relate two values, as `a == b` does. The solver meets two values only in `pairDemands`
+   (`packages/runtime/src/solve-pairs.ts`): `==` and `!=` between two values, one way, and a length only at 1 or
+   2. For anything else `whyUnsolved` says "the solver cannot compare two paths". `a contains b` would need a new
+   relation there (make `b` a part of `a`, or make `a` avoid `b`), and its negation over generated values.
+   `containment` is tried before `pairOf`, so a rule that reached the solver with a path on the right would
+   still answer no alternative rather than a wrong one.
 2. **The proof.** `prove.ts` proves a conjunct from literals (`literalTrue`) or from the same words a switch
    tested (`narrowedBy`, through `same` and `spell`). A literal word keeps both of those exact. A path on the
    right would be proved only where both sides are literals at the site, which is where a rule is least needed.
