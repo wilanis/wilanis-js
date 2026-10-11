@@ -131,6 +131,54 @@ describe('solving a switch to its branches', () => {
   });
 });
 
+/** A demand for a list or string of exactly this many elements. */
+const long = (count: number) => ({ minLen: count, maxLen: count, present: true });
+
+describe('solving a rule that compares a length with another side (#905)', () => {
+  // each operator, the lengths its rule is met by, and the lengths its else is met by
+  const cases: [string, [number, number], [number, number]][] = [
+    ['==', [1, 1], [1, 2]],
+    ['!=', [1, 2], [1, 1]],
+    ['<', [1, 2], [1, 1]],
+    ['<=', [1, 1], [2, 1]],
+    ['>', [2, 1], [1, 1]],
+    ['>=', [1, 1], [1, 2]],
+  ];
+  it.each(cases)('solves len(a) %s len(b) and its else to concrete lengths', (op, rule, otherwise) => {
+    const bs = branchesOf([{ when: `len(a) ${op} len(b)`, to: 'yes' }], 'no');
+    expect(to(bs, 'yes').unsolved).toBeUndefined();
+    expect(to(bs, 'yes').demands).toEqual({ a: long(rule[0]), b: long(rule[1]) });
+    expect(to(bs, 'no').unsolved).toBeUndefined();
+    expect(to(bs, 'no').demands).toEqual({ a: long(otherwise[0]), b: long(otherwise[1]) });
+  });
+
+  it('solves a length against a path to a length and a number, either side first', () => {
+    const bs = branchesOf([{ when: 'len(rows) < limit', to: 'room' }], 'full');
+    expect(to(bs, 'room').demands).toEqual({ rows: long(1), limit: { eq: 2, present: true } });
+    expect(to(bs, 'full').demands).toEqual({ rows: long(1), limit: { eq: 1, present: true } });
+    const turned = branchesOf([{ when: 'limit > len(rows)', to: 'room' }], 'full');
+    expect(to(turned, 'room').demands).toEqual({ rows: long(1), limit: { eq: 2, present: true } });
+  });
+
+  it('takes the next pair where an earlier rule rules the first out', () => {
+    const bs = branchesOf(
+      [
+        { when: 'len(a) < 2', to: 'short' },
+        { when: 'len(a) == len(b)', to: 'even' },
+      ],
+      'odd',
+    );
+    expect(to(bs, 'even').demands).toEqual({ a: long(2), b: long(2) });
+    expect(to(bs, 'odd').demands).toEqual({ a: long(2), b: long(1) });
+  });
+
+  it('says it cannot compare a length with itself unequal, rather than judge the rule', () => {
+    const bs = branchesOf([{ when: 'len(a) != len(a)', to: 'never' }], 'always');
+    expect(to(bs, 'never').unsolved).toBe("the solver cannot compare two paths as 'len(a) != len(a)' does");
+    expect(to(bs, 'always').demands).toEqual({ a: long(1) });
+  });
+});
+
 describe('turning a demand into a value', () => {
   it('keeps what the seed generated when it already satisfies the demand', () => {
     expect(satisfy({ gt: 100, present: true }, 200)).toBe(200);

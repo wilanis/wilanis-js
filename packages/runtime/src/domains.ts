@@ -190,3 +190,12 @@ export function emptyRange(domain: Domain): boolean {
 }
 
 /** Two demand sets, narrowed path by path. UNSAT when any path contradicts. */
+export function merge(first: Demands, second: Demands): Maybe<Demands> {
+  const out: Demands = { ...first };
+  for (const [path, domain] of Object.entries(second)) {
+    const got = out[path] ? narrow(out[path], domain) : domain;
+    if (got === UNSAT) return UNSAT;
+    out[path] = got;
+  }
+  return out;
+}

@@ -3,17 +3,8 @@
  * cases that reach each target -- the rule true and every earlier rule false, plus one case where all are false.
  */
 import { expr } from '@wilanis/core';
-import { type Branch, type Demands, type Domain, key, type Maybe, narrow, UNSAT } from './domains.js';
-
-function merge(first: Demands, second: Demands): Maybe<Demands> {
-  const out: Demands = { ...first };
-  for (const [path, domain] of Object.entries(second)) {
-    const got = out[path] ? narrow(out[path], domain) : domain;
-    if (got === UNSAT) return UNSAT;
-    out[path] = got;
-  }
-  return out;
-}
+import { type Branch, type Demands, type Domain, key, merge, UNSAT } from './domains.js';
+import { type Cmp, pairDemands, pairOf } from './solve-pairs.js';
 
 /** Every assignment satisfying `node === want`, as alternatives; first disjunction yields more than one. */
 function solve(node: expr.Expr, want: boolean): Demands[] {
@@ -54,8 +45,7 @@ function group(node: expr.Expr & { kind: 'bin' }, want: boolean): Demands[] {
 }
 
 const MIRROR = { '<': '>', '<=': '>=', '>': '<', '>=': '<=', '==': '==', '!=': '!=' } as const;
-const NEGATE = { '==': '!=', '!=': '==', '<': '>=', '<=': '>', '>': '<=', '>=': '<' } as const;
-type Cmp = keyof typeof NEGATE;
+const NEGATE: Record<Cmp, Cmp> = { '==': '!=', '!=': '==', '<': '>=', '<=': '>', '>': '<=', '>=': '<' };
 
 /** `lit in path`: the list must hold the literal, or must not. */
 function membership(node: expr.Expr & { kind: 'bin' }, want: boolean): Demands[] {
@@ -75,52 +65,13 @@ function demandOf(target: expr.Expr, truth: Cmp, lit: unknown): Demands[] {
   return [{ [key(target.path)]: valueDomain(truth, lit) }];
 }
 
-/** The two paths a comparison has on its sides, each a path or the length of one; undefined when a side is neither. */
-function pathSides(
-  node: expr.Expr & { kind: 'bin' },
-): { left: string[]; right: string[]; lengths: boolean } | undefined {
-  const pathOf = (side: expr.Expr) => {
-    if (side.kind === 'path') return side.path;
-    return side.kind === 'len' && side.arg.kind === 'path' ? side.arg.path : undefined;
-  };
-  const left = pathOf(node.left);
-  const right = pathOf(node.right);
-  if (!left || !right) return undefined;
-  return { left, right, lengths: node.left.kind === 'len' || node.right.kind === 'len' };
-}
-
-const EQUAL: Domain = { paired: 'equal', present: true };
-const UNEQUAL: Domain = { paired: 'unequal' };
-
-/**
- * Two paths compared: `==` holds both at the one value their type generates; `!=` holds one of them at that value and
- * the other at another, either way round, the left at it first. An ordering between two paths has no such value, and
- * no alternatives.
- */
-function paired(left: string[], right: string[], op: Cmp): Demands[] {
-  if (op !== '==' && op !== '!=') return [];
-  const ways: [Domain, Domain][] =
-    op === '=='
-      ? [[EQUAL, EQUAL]]
-      : [
-          [EQUAL, UNEQUAL],
-          [UNEQUAL, EQUAL],
-        ];
-  const out: Demands[] = [];
-  for (const [one, other] of ways) {
-    const both = merge({ [key(left)]: { ...one } }, { [key(right)]: { ...other } });
-    if (both !== UNSAT) out.push(both);
-  }
-  return out;
-}
-
-/** Solve one comparison: a literal against a path or its length, or two paths for equality. */
+/** Solve one comparison: a literal against a path or its length, two paths for equality, or a length against a side. */
 function compare(node: expr.Expr & { kind: 'bin' }, want: boolean): Demands[] {
   // `lit in path`: the list must hold the literal, or must not
   if (node.op === 'in') return membership(node, want);
   const sides: [expr.Expr, expr.Expr] = [node.left, node.right];
-  const pair = pathSides(node);
-  if (pair) return pair.lengths ? [] : paired(pair.left, pair.right, want ? (node.op as Cmp) : NEGATE[node.op as Cmp]);
+  const pair = pairOf(node);
+  if (pair) return pairDemands(pair, want ? (node.op as Cmp) : NEGATE[node.op as Cmp]);
   const at = sides.findIndex(side => side.kind === 'lit');
   if (at < 0) return [];
   const lit = (sides[at] as expr.Expr & { kind: 'lit' }).value;
@@ -169,7 +120,7 @@ function nameableBin(node: expr.Expr & { kind: 'bin' }): boolean {
   // first comparison names something when one side is first literal and the other first path or len(path)
   const sides = [node.left, node.right];
   const at = sides.findIndex(side => side.kind === 'lit');
-  if (at < 0) return pathSides(node)?.lengths === false;
+  if (at < 0) return pairOf(node) !== undefined;
   const target = sides[at === 0 ? 1 : 0];
   return target.kind === 'path' || (target.kind === 'len' && target.arg.kind === 'path');
 }
@@ -195,14 +146,14 @@ function comparesPaths(node: expr.Expr): boolean {
   if (node.kind === 'not') return comparesPaths(node.arg);
   if (node.kind !== 'bin') return false;
   if (node.op === '&&' || node.op === '||') return comparesPaths(node.left) || comparesPaths(node.right);
-  return pathSides(node) !== undefined;
+  return pairOf(node) !== undefined;
 }
 
 /**
  * Why first rule could not be solved: no alternatives at all means the expression itself names nothing solvable;
  * alternatives that all contradict mean the rule is either self-contradictory or shadowed by an earlier one. A rule
- * comparing two paths is never called a contradiction: the solver meets only `==` and `!=` between them, and only one
- * way, so finding no inputs says what the solver cannot do rather than what the rule is.
+ * comparing two paths is never called a contradiction: the solver meets only `==` and `!=` between two values, one way,
+ * and a length only at 1 or 2, so finding no inputs says what the solver cannot do rather than what the rule is.
  */
 function whyUnsolved(when: string, found: { nameable: boolean; pairs: boolean; mine: number; before: number }): string {
   if (!found.mine && found.pairs) return `the solver cannot compare two paths as '${when}' does`;
