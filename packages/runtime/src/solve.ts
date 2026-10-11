@@ -6,15 +6,18 @@ import { expr } from '@wilanis/core';
 import { type Branch, type Demands, type Domain, key, merge, UNSAT } from './domains.js';
 import { type Cmp, pairDemands, pairOf } from './solve-pairs.js';
 
-/** Every assignment satisfying `node === want`, as alternatives; first disjunction yields more than one. */
-function solve(node: expr.Expr, want: boolean): Demands[] {
+/**
+ * Every assignment satisfying `node === want`, as alternatives; first disjunction yields more than one. `within` is what
+ * the case already demands, which a comparison between two lengths picks its numbers inside.
+ */
+function solve(node: expr.Expr, want: boolean, within: Demands): Demands[] {
   switch (node.kind) {
     case 'lit':
       return Boolean(node.value) === want ? [{}] : [];
     case 'has':
       return [want ? { [key(node.path)]: { present: true } } : { [key(node.path)]: { absent: true } }];
     case 'not':
-      return solve(node.arg, !want);
+      return solve(node.arg, !want, within);
     case 'path':
       return [{ [key(node.path)]: { truthy: want } }];
     case 'len': {
@@ -22,26 +25,35 @@ function solve(node: expr.Expr, want: boolean): Demands[] {
       return [];
     }
     case 'bin':
-      return node.op === '&&' || node.op === '||' ? group(node, want) : compare(node, want);
+      return node.op === '&&' || node.op === '||' ? group(node, want, within) : compare(node, want, within);
   }
+}
+
+/** Two expressions held at once: each alternative of the first, with the second solved inside it, merged. */
+function inTurn(first: expr.Expr, second: expr.Expr, want: boolean, within: Demands): Demands[] {
+  const out: Demands[] = [];
+  for (const one of solve(first, want, within)) {
+    const inside = merge(within, one);
+    if (inside === UNSAT) continue;
+    for (const other of solve(second, want, inside)) {
+      const merged = merge(one, other);
+      if (merged !== UNSAT) out.push(merged);
+    }
+  }
+  return out;
 }
 
 /**
  * A group: under the operator it reads as, either side alone satisfies it, or both must hold at once -- and where both
- * must hold, every pair of their demands that can be merged is one alternative.
+ * must hold, every pair of their demands that can be merged is one alternative. The right side is solved inside each
+ * alternative of the left, so a length it compares is picked within the bounds the left sets; where that finds none,
+ * the left is solved inside the right instead, since a bound the right sets reaches a length the left compares.
  */
-function group(node: expr.Expr & { kind: 'bin' }, want: boolean): Demands[] {
+function group(node: expr.Expr & { kind: 'bin' }, want: boolean, within: Demands): Demands[] {
   const together = (node.op === '&&') === want;
-  const left = solve(node.left, want);
-  const right = solve(node.right, want);
-  if (!together) return [...left, ...right];
-  const out: Demands[] = [];
-  for (const one of left)
-    for (const other of right) {
-      const merged = merge(one, other);
-      if (merged !== UNSAT) out.push(merged);
-    }
-  return out;
+  if (!together) return [...solve(node.left, want, within), ...solve(node.right, want, within)];
+  const ways = inTurn(node.left, node.right, want, within);
+  return ways.length ? ways : inTurn(node.right, node.left, want, within);
 }
 
 const MIRROR = { '<': '>', '<=': '>=', '>': '<', '>=': '<=', '==': '==', '!=': '!=' } as const;
@@ -66,12 +78,12 @@ function demandOf(target: expr.Expr, truth: Cmp, lit: unknown): Demands[] {
 }
 
 /** Solve one comparison: a literal against a path or its length, two paths for equality, or a length against a side. */
-function compare(node: expr.Expr & { kind: 'bin' }, want: boolean): Demands[] {
+function compare(node: expr.Expr & { kind: 'bin' }, want: boolean, within: Demands): Demands[] {
   // `lit in path`: the list must hold the literal, or must not
   if (node.op === 'in') return membership(node, want);
   const sides: [expr.Expr, expr.Expr] = [node.left, node.right];
   const pair = pairOf(node);
-  if (pair) return pairDemands(pair, want ? (node.op as Cmp) : NEGATE[node.op as Cmp]);
+  if (pair) return pairDemands(pair, want ? (node.op as Cmp) : NEGATE[node.op as Cmp], within);
   const at = sides.findIndex(side => side.kind === 'lit');
   if (at < 0) return [];
   const lit = (sides[at] as expr.Expr & { kind: 'lit' }).value;
@@ -152,14 +164,18 @@ function comparesPaths(node: expr.Expr): boolean {
 /**
  * Why first rule could not be solved: no alternatives at all means the expression itself names nothing solvable;
  * alternatives that all contradict mean the rule is either self-contradictory or shadowed by an earlier one. A rule
- * comparing two paths is never called a contradiction: the solver meets only `==` and `!=` between two values, one way,
- * and a length only at 1 or 2, so finding no inputs says what the solver cannot do rather than what the rule is.
+ * comparing two paths is never called self-contradictory: the solver meets only `==` and `!=` between two values, one
+ * way, so finding none says what the solver cannot do rather than what the rule is. Where such a rule has inputs alone
+ * and none once the rules before it are false, it is the rules together that contradict: `pairDemands` finds a pair
+ * wherever one exists inside the bounds those rules leave each side, so finding none there means there is none.
  */
 function whyUnsolved(when: string, found: { nameable: boolean; pairs: boolean; mine: number; before: number }): string {
   if (!found.mine && found.pairs) return `the solver cannot compare two paths as '${when}' does`;
   if (!found.nameable) return `'${when}' compares values the rehearsal cannot name`;
   if (!found.mine) return `no inputs satisfy '${when}' -- the rule contradicts itself`;
   if (!found.before) return `the rules before it already cover every input, so '${when}' is unreachable`;
+  if (found.pairs)
+    return `no inputs satisfy '${when}' inside the bounds the rules before it leave -- the rules contradict`;
   return `no inputs satisfy '${when}'`;
 }
 
@@ -167,7 +183,7 @@ function whyUnsolved(when: string, found: { nameable: boolean; pairs: boolean; m
 function alsoFalse(alternatives: Demands[], rule: expr.Expr): Demands[] {
   const next: Demands[] = [];
   for (const soFar of alternatives)
-    for (const negated of solve(rule, false)) {
+    for (const negated of solve(rule, false, soFar)) {
       const merged = merge(soFar, negated);
       if (merged !== UNSAT) next.push(merged);
     }
@@ -186,14 +202,25 @@ function negatedThrough(parsed: (expr.Expr | undefined)[], upto: number): Demand
   return alternatives;
 }
 
-/** The first pairing of one rule's demand with first case where the earlier rules are false that can hold at once. */
-function firstBoth(mine: Demands[], before: Demands[]): Demands | undefined {
-  for (const demand of mine)
-    for (const earlier of before) {
-      const merged = merge(demand, earlier);
-      if (merged !== UNSAT) return merged;
-    }
+/** The first of the pairings of a rule's demand with a case where the earlier rules are false that can hold at once. */
+function firstMerged(pairings: [Demands, Demands][]): Demands | undefined {
+  for (const [demand, earlier] of pairings) {
+    const merged = merge(demand, earlier);
+    if (merged !== UNSAT) return merged;
+  }
   return undefined;
+}
+
+/**
+ * The first case where a rule holds and every earlier rule is false: the rule's demands solved alone first, so a rule
+ * the earlier ones leave alone keeps the case it always had, then solved inside each earlier case, so a length the
+ * earlier rules push past 2 is met at the numbers they leave.
+ */
+function firstBoth(mine: Demands[], parsed: expr.Expr, before: Demands[]): Demands | undefined {
+  const alone = mine.flatMap(demand => before.map((earlier): [Demands, Demands] => [demand, earlier]));
+  const inside = () =>
+    before.flatMap(earlier => solve(parsed, true, earlier).map((demand): [Demands, Demands] => [demand, earlier]));
+  return firstMerged(alone) ?? firstMerged(inside());
 }
 
 /** One rule's branch: the case that reaches its target, or why none could be solved. */
@@ -205,8 +232,8 @@ function branchFor(
 ): Branch {
   const base = { rule: at, when: rule.when, to: rule.to };
   if (!parsed) return { ...base, demands: {}, unsolved: 'the expression does not parse' };
-  const mine = solve(parsed, true);
-  const hit = firstBoth(mine, before);
+  const mine = solve(parsed, true, {});
+  const hit = firstBoth(mine, parsed, before);
   if (hit) return { ...base, demands: hit };
   return {
     ...base,
