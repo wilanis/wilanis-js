@@ -110,6 +110,13 @@ describe('sabotage: a schedule that is not one -- X251', () => {
       }),
     ).toEqual([`X251 ${AT}#settings/timezone`]);
   });
+  it('a deadline of 30 days, longer than a Node timer can wait, which would cancel every run after 1 ms', () => {
+    expect(
+      pointing(trigger => {
+        trigger.settings.deadlineMs = 30 * 24 * 60 * 60 * 1000;
+      }),
+    ).toEqual([`X251 ${AT}#settings/deadlineMs`]);
+  });
   it("the plugin's own leaseTtlMs, judged where the project sets it", () => {
     expect(
       sabotagePointing('project.json', project => {

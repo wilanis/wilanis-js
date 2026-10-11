@@ -137,7 +137,7 @@ at run time.
 
 | Code | When |
 |---|---|
-| X251 | a schedule that is not one: both `cron` and `everyMs` or neither, an expression that does not parse, an `everyMs` below 1000, a `timezone` beside an interval or one no runtime knows, a `deadlineMs` that is not a whole number of 1 or more; and the same for the plugin's own settings |
+| X251 | a schedule that is not one: both `cron` and `everyMs` or neither, an expression that does not parse, an `everyMs` below 1000, a `timezone` beside an interval or one no runtime knows, a `deadlineMs` that is not a whole number of 1 or more, or is above 2147483647, which a Node timer fires after 1 ms; and the same for the plugin's own settings, where a `leaseTtlMs` is at most 4294967294, since a run renews its hold every half of it |
 | X252 | an `in` with no `fire.in`: nothing arrives on a tick, so nothing would fill it |
 | X253 | `catchUp` while no `run` step names a `lease`: nothing can remember the last tick |
 | X254 | a `run` step's `lease` naming no connection, or one whose kind does not declare `leases` |

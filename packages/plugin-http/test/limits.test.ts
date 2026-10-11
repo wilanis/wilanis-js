@@ -8,7 +8,7 @@ import { readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { checkTree } from '@wilanis/compiler';
-import { type BlobStore, loadTree } from '@wilanis/core';
+import { type BlobStore, loadTree, TIMER_MAX_MS } from '@wilanis/core';
 import { FileBlobStore, start } from '@wilanis/runtime';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { multipart } from '../src/codecs.js';
@@ -326,5 +326,22 @@ describe('X004', () => {
     );
     expect(refused).toHaveLength(3);
     expect(refused[0].hint).toBe('set it to 1 or more, or drop it for no limit');
+  });
+
+  it('refuses a deadline longer than a Node timer can wait, and takes one at the bound', () => {
+    const load = loaded(edit => {
+      edit(`${EDGE}/get-customer.trigger.json`, trigger => {
+        trigger.settings.deadlineMs = 30 * 24 * 60 * 60 * 1000; // 30 days: Node would fire it after 1 ms
+      });
+      edit('project.json', project => {
+        httpSettings(project).deadlineMs = TIMER_MAX_MS;
+      });
+    });
+    const refused = checkTree(load).items.filter(item => item.code === 'X004');
+    expect(refused.map(item => [item.file, item.at])).toEqual([
+      ['@features/customers/edge/get-customer.trigger.json', 'settings/deadlineMs'],
+    ]);
+    expect(refused[0].message).toMatch(/a Node timer waits at most 2147483647 ms/);
+    expect(refused[0].hint).toBe('set it to 2147483647 or less, or drop it for no limit');
   });
 });

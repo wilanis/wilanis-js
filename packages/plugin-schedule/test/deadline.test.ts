@@ -2,8 +2,12 @@
  * A tick's deadline (RFC 0010 step 5, RFC 0012), over the fake clock: the scheduler arms it when the tick fires,
  * hands the run its signal, and logs a run the deadline cut as cancelled. A trigger with no deadline hands no
  * signal, so its run is never cut, and a run that answers in time is not touched by a deadline that never came.
+ * The last block is on the system's clock, since what it shows is Node's own: a deadline above `TIMER_MAX_MS` strikes
+ * after 1 ms, which is why X251 refuses one.
  */
+import { TIMER_MAX_MS } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
+import { deadlineOf, systemClock } from '../src/clock.js';
 import { Scheduler } from '../src/scheduler.js';
 import { type Answering, FakeClock, serving, settle, trigger } from './harness.js';
 
@@ -62,5 +66,25 @@ describe('a tick with no deadline', () => {
     one.release();
     await settle();
     await one.scheduler.stop();
+  });
+});
+
+describe("a deadline past what a Node timer can wait, on the system's clock", () => {
+  /** Whether a deadline of `ms` on the real clock has struck 30 ms after it was armed; then it is let go. */
+  async function struckSoon(ms: number): Promise<boolean> {
+    const answered = new AbortController();
+    const deadline = deadlineOf(systemClock, ms, answered.signal);
+    await new Promise(done => setTimeout(done, 30));
+    const struck = deadline.struck();
+    answered.abort(); // the run answered: the wait ends and its timer is cleared
+    return struck;
+  }
+
+  it('strikes after 1 ms, which is why X251 holds deadlineMs to TIMER_MAX_MS', async () => {
+    expect(await struckSoon(TIMER_MAX_MS + 1)).toBe(true);
+  });
+
+  it('a deadline of TIMER_MAX_MS is armed as written', async () => {
+    expect(await struckSoon(TIMER_MAX_MS)).toBe(false);
   });
 });

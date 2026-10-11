@@ -40,7 +40,7 @@
       "deadlineMs": {
         "type": "number",
         "required": false,
-        "description": "the most this route's run may take, in milliseconds, from firing to answer; past it the run is cancelled and answered 504. Absent: the plugin's setting, else none"
+        "description": "the most this route's run may take, in milliseconds, from firing to answer; past it the run is cancelled and answered 504; at most 2147483647, the longest a Node timer waits. Absent: the plugin's setting, else none"
       },
       "maxBodyBytes": {
         "type": "number",

@@ -1,9 +1,10 @@
 /**
  * What only @http can judge. X001: the codec table names something that is not a codec. X002: a content type used
  * anywhere has no codec in the table. X003: a connection's throttle could never let a request through. X004: a
- * deadline or a body bound, on a route, in the plugin's settings or on a connection, is not a whole number of 1 or more.
+ * deadline or a body bound, on a route, in the plugin's settings or on a connection, is not a whole number of 1 or more,
+ * or a deadline is longer than a Node timer can wait.
  */
-import type { PluginCheckContext } from '@wilanis/core';
+import { type PluginCheckContext, TIMER_MAX_MS } from '@wilanis/core';
 import { doc, ROOT } from './paths.js';
 
 type Scope = PluginCheckContext['scope'];
@@ -44,22 +45,33 @@ const LIMITS: Record<string, string> = {
   maxBodyBytes: 'the most a body may weigh, in bytes',
 };
 
-/** X004: the limits one document declares, each a whole number of 1 or more; `at` is where its settings are. */
+/** The limits a timer waits on, so the ones a Node timer bounds: past `TIMER_MAX_MS` it fires after 1 ms. */
+const TIMED = new Set(['deadlineMs']);
+
+/** Why one limit's value cannot be met, as the message and hint X004 says, or undefined where it can be. */
+function unmet(name: string, value: unknown): { message: string; hint: string } | undefined {
+  const said = `${name} is ${JSON.stringify(value)}; it is ${LIMITS[name]}`;
+  if (!(Number.isInteger(value) && (value as number) >= 1))
+    return { message: `${said}, a whole number of 1 or more`, hint: 'set it to 1 or more, or drop it for no limit' };
+  if (TIMED.has(name) && (value as number) > TIMER_MAX_MS)
+    return {
+      message: `${said}, and a Node timer waits at most ${TIMER_MAX_MS} ms (about 24.8 days): a longer one fires after 1 ms, so every run would be cancelled at once`,
+      hint: `set it to ${TIMER_MAX_MS} or less, or drop it for no limit`,
+    };
+  return undefined;
+}
+
+/** X004: the limits one document declares, each one that can be met; `at` is where its settings are. */
 function judgeLimits(
   settings: Record<string, unknown>,
   names: string[],
   where: { file: string; at: string },
   refuse: Refuse,
 ) {
-  for (const name of names)
-    if (name in settings && !(Number.isInteger(settings[name]) && (settings[name] as number) >= 1))
-      refuse({
-        code: 'X004',
-        file: where.file,
-        message: `${name} is ${JSON.stringify(settings[name])}; it is ${LIMITS[name]}, a whole number of 1 or more`,
-        at: `${where.at}/${name}`,
-        hint: 'set it to 1 or more, or drop it for no limit',
-      });
+  for (const name of names) {
+    const why = name in settings ? unmet(name, settings[name]) : undefined;
+    if (why) refuse({ code: 'X004', file: where.file, at: `${where.at}/${name}`, ...why });
+  }
 }
 
 /** X004: the limits of the plugin's settings, of every http trigger, and the answer bound of every http connection. */
