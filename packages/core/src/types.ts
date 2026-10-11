@@ -11,8 +11,11 @@ export type Type =
   /** A stored file. The value is a handle -- id, contentType, size, filename -- never the bytes; the blob registry holds those. */
   | { kind: 'blob' }
   | { kind: 'unknown' }
-  /** `max`: the most items a value may hold, judged at run time; assignability ignores it. */
-  | { kind: 'list'; of: Type; max?: number }
+  /**
+   * `max`: the most items a value may hold, judged at run time; assignability ignores it. `empty`: the list a
+   * literal `[]` writes, whose one value has no items, so it feeds a list of any type and only it feeds it.
+   */
+  | { kind: 'list'; of: Type; max?: number; empty?: true }
   | { kind: 'object'; name?: string; fields: Record<string, ObjField>; open: false | Type }
   /** A type variable of a native contract ($T), bound per call site by unification or a `type` param. */
   | { kind: 'var'; name: string }
@@ -43,6 +46,10 @@ export const NUMBER: Type = { kind: 'number' };
 export const BOOLEAN: Type = { kind: 'boolean' };
 export const BLOB: Type = { kind: 'blob' };
 export const EMPTY_OBJECT: Type = { kind: 'object', fields: {}, open: false };
+/** The type of a literal `[]`: a list with no items, so nothing is known of them and none is ever read. */
+export const EMPTY_LIST: Type = { kind: 'list', of: UNKNOWN, empty: true };
+/** Is the type the one a literal `[]` has? */
+export const isEmptyList = (type: Type): boolean => type.kind === 'list' && type.empty === true;
 /** What a blob value is on the wire and in a report: the handle. Reads into a blob (`{{in.file.filename}}`) see these fields. */
 export const BLOB_HANDLE: Type = {
   kind: 'object',

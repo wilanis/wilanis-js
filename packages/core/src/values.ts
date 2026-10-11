@@ -5,7 +5,9 @@
 import {
   BLOB_HANDLE,
   BOOLEAN,
+  EMPTY_LIST,
   isBlobHandle,
+  isEmptyList,
   isTypeRef,
   type ListType,
   NUMBER,
@@ -52,18 +54,19 @@ export function typeOfValue(value: unknown): Type {
   if (typeof value === 'string') return { kind: 'string', enum: [value] };
   if (typeof value === 'number') return NUMBER;
   if (typeof value === 'boolean') return BOOLEAN;
-  if (Array.isArray(value)) {
-    return { kind: 'list', of: value.length ? widen(value.map(typeOfValue)) : UNKNOWN };
-  }
+  if (Array.isArray(value)) return value.length ? { kind: 'list', of: widen(value.map(typeOfValue)) } : EMPTY_LIST;
   const fields: Record<string, ObjField> = {};
   for (const [name, item] of Object.entries(value as object))
     fields[name] = { type: typeOfValue(item), required: true };
   return { kind: 'object', fields, open: false };
 }
 
-/** The one type a list of literals has: strings widen to string; a mixed list is unknown. */
+/**
+ * The one type a list of literals has: strings widen to string; a mixed list is unknown. An empty list among
+ * lists says nothing of their items, so the first member that is not one sets the type.
+ */
 function widen(types: Type[]): Type {
-  const first = types[0];
+  const first = types.find(type => !isEmptyList(type)) ?? types[0];
   if (!types.every(type => type.kind === first.kind)) return UNKNOWN;
   return first.kind === 'string' ? STRING : first;
 }
