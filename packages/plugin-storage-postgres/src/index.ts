@@ -42,7 +42,7 @@ const plugin: PluginModule = {
     await holdVersions(ctx.env, kind, KIND);
     const settings = ctx.settings as Settings;
     const engine = new PostgresEngine(settings);
-    const broker = new TableBroker(ctx.env, settings, engine);
+    const broker = new TableBroker(ctx.env, settings, engine, ctx.log);
     engines(ctx.env).register(kind, engine);
     leases(ctx.env).register(kind, new TableLeases(ctx.env, settings));
     brokers(ctx.env).register(kind, broker);

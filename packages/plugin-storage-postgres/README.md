@@ -38,8 +38,8 @@ has no schema of that name, so a role that owns its schema and has no CREATE on 
 
 The plugin's own settings are engine-wide: `statementTimeout`, in seconds; `keyType` -- `uuidv7` (the default),
 what `newKey` answers for a string key, or `identity`, one past the highest, for a number key; and
-`queueVisibility`, in seconds (default 30), how long a queue delivery holds its message before another worker
-may take it.
+`queueVisibility`, in seconds (default 30), how long a worker that died keeps its queue message before another
+worker may take it. A live run never loses its message to the window: its worker extends the lock while it runs.
 
 ## The lease it keeps
 
@@ -70,14 +70,17 @@ missing. It alters nothing that is there, and asking twice changes nothing.
   publish runs first opens the transaction, and the other joins it.
 - **A worker takes a message by locking it.** One short transaction takes what is due and nobody holds
   (`for update skip locked`), counts the attempt and locks each row for `queueVisibility` seconds, so two workers
-  over one table never take one message. A worker that dies holding one gives it up when the lock expires, and
-  the next worker is handed it one attempt higher. An acknowledgement deletes the row, a retry sets when it is
-  due again, a dead letter stamps `dead_at` and leaves the row for an operator; each names the attempt it
-  answers, so a worker whose lock expired cannot answer for the delivery another worker has since taken.
+  over one table never take one message. While the run goes on, the worker extends the lock every half window,
+  so a run longer than the window keeps its message; the extension stops when the run is answered. A worker that
+  dies holding one stops extending it and gives it up when the lock expires, and the next worker is handed it one
+  attempt higher. An extension that fails is logged and tried again half a window later; the run goes on. An
+  acknowledgement deletes the row, a retry sets when it is due again, a dead letter stamps `dead_at` and leaves
+  the row for an operator; each names the attempt it answers, so a worker whose lock expired cannot answer for
+  the delivery another worker has since taken.
 - **Nothing polls.** A publish or a retry raises a notification when its transaction commits (`LISTEN`/`NOTIFY`
   on one session per connection, outside the pool), and a worker looks at the table when it is notified, when
   a delivery of its own is answered, and when the soonest waiting message falls due by the database's clock.
-  While every slot is busy it arms no timer at all; the delivery that ends next looks again. A look that fails
+  While every slot is busy it arms no timer to look; the delivery that ends next looks again. A look that fails
   is tried again after a pause that doubles to thirty seconds, and a listening session that drops is reopened
   after a second, after which every worker looks once, since a notification is a hint and never the only way a
   message is found. The session probes with TCP keepalive after ten seconds idle, so one left half-open by a
