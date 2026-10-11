@@ -2,7 +2,7 @@
  * Assignability and type variables. `assignable` says whether every value of one type satisfies another;
  * `unify` binds the variables of a native contract so an actual type fits it; `substitute` writes the bindings in.
  */
-import { type ObjectType, type ObjField, type StringType, show, type Type, UNKNOWN } from './types.js';
+import { type ListType, type ObjectType, type ObjField, type StringType, show, type Type, UNKNOWN } from './types.js';
 
 /** Does the type mention a variable anywhere? */
 export function hasVars(type: Type): boolean {
@@ -18,12 +18,16 @@ export function hasVars(type: Type): boolean {
   }
 }
 
-/** Bind the variables of `pattern` so that `actual` fits it. Answers an error, or null with `subst` extended. */
+/**
+ * Bind the variables of `pattern` so that `actual` fits it. Answers an error, or null with `subst` extended. An
+ * empty list fits a list of anything and binds nothing: its items say nothing of a variable.
+ */
 export function unify(pattern: Type, actual: Type, subst: Record<string, Type>): string | null {
   if (pattern.kind === 'var') return unifyVar(pattern.name, actual, subst);
   if (!hasVars(pattern)) return assignable(actual, pattern);
   if (pattern.kind === 'list') {
-    return actual.kind === 'list' ? unify(pattern.of, actual.of, subst) : `${show(actual)} is not a list`;
+    if (actual.kind !== 'list') return `${show(actual)} is not a list`;
+    return actual.empty ? null : unify(pattern.of, actual.of, subst);
   }
   if (pattern.kind === 'object' && actual.kind === 'object') return unifyObject(pattern, actual, subst);
   return assignable(actual, pattern);
@@ -103,9 +107,16 @@ function fits(from: Type, to: Type, trims: boolean): string | null {
   if (from.kind === 'unknown') return `unknown cannot feed ${show(to)}`;
   if (from.kind !== to.kind) return `${show(from)} is not ${show(to)}`;
   if (to.kind === 'string') return assignableString(from as StringType, to);
-  if (to.kind === 'list') return fits((from as { kind: 'list'; of: Type }).of, to.of, trims);
+  if (to.kind === 'list') return fitsList(from as ListType, to, trims);
   if (to.kind === 'object') return assignableObject(from as ObjectType, to, trims);
   return null;
+}
+
+/** A list feeds a list of what it holds; an empty list feeds any list, and only an empty list feeds one. */
+function fitsList(from: ListType, to: ListType, trims: boolean): string | null {
+  if (from.empty) return null;
+  if (to.empty) return `${show(from)} is not an empty list`;
+  return fits(from.of, to.of, trims);
 }
 
 /** An enum feeds an enum that holds every one of its values; only an enum feeds an enum. */

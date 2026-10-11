@@ -4,7 +4,7 @@
  * root reads is the caller's to answer, which is why `Scope` delegates here rather than holding it.
  */
 import { splitPath, TEMPLATE, WHOLE_TEMPLATE } from './templates.js';
-import { type Read, STRING, type Type, UNKNOWN } from './types.js';
+import { EMPTY_LIST, isEmptyList, type Read, STRING, type Type } from './types.js';
 import { typeOfValue } from './values.js';
 
 /**
@@ -44,16 +44,19 @@ function stringRead(value: string, resolve: ResolveRoot): Read | string | undefi
   return { type: value.includes('{{') ? STRING : typeOfValue(value), optional };
 }
 
-/** A list types as a list of its first member; every member must type. */
+/**
+ * A list types as a list of its first member that is not an empty list, which says nothing of the items; every
+ * member must type. An empty list is the one a literal `[]` writes, which feeds a list of any type.
+ */
 function listRead(value: unknown[], resolve: ResolveRoot): Read | string | undefined {
-  if (!value.length) return { type: { kind: 'list', of: UNKNOWN }, optional: false };
-  const first = valueRead(value[0], resolve);
-  if (typeof first !== 'object') return first;
-  for (const item of value.slice(1)) {
+  if (!value.length) return { type: EMPTY_LIST, optional: false };
+  const types: Type[] = [];
+  for (const item of value) {
     const read = valueRead(item, resolve);
     if (typeof read !== 'object') return read;
+    types.push(read.type);
   }
-  return { type: { kind: 'list', of: first.type }, optional: false };
+  return { type: { kind: 'list', of: types.find(type => !isEmptyList(type)) ?? types[0] }, optional: false };
 }
 
 /** An object types field by field; a member that may be missing is an optional field. */

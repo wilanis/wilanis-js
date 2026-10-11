@@ -2,7 +2,7 @@
  * Values of a type, for fuzzing: generated under a seed by a deterministic generator, so a seed reproduces a run,
  * and the fixed edge cases of a type, the same on every machine.
  */
-import { BOOLEAN, NUMBER, type ObjectType, STRING, type Type } from './types.js';
+import { BOOLEAN, type ListType, NUMBER, type ObjectType, STRING, type Type } from './types.js';
 
 /** Deterministic PRNG (mulberry32) so a seed reproduces a run. */
 export function rng(seed: number) {
@@ -52,8 +52,8 @@ const LEAF_DEPTH = 2;
 const LIST_DEPTH = 3;
 
 /**
- * Generate a value of a type under a seed: every required field, optional ones half the time, lists of 0..3
- * and never past their bound.
+ * Generate a value of a type under a seed: every required field, optional ones half the time, lists of 0..3 (none in
+ * the empty list a literal `[]` writes) and never past their bound.
  */
 export function generate(type: Type, random: Rng, depth = 0): unknown {
   switch (type.kind) {
@@ -71,12 +71,15 @@ export function generate(type: Type, random: Rng, depth = 0): unknown {
     case 'unknown':
       return depth > LEAF_DEPTH ? random.pick([null, 0, 'x', true]) : generate(random.pick(ANY_OF), random, depth + 1);
     case 'list':
-      return Array.from({ length: depth > LIST_DEPTH ? 0 : random.int(0, Math.min(3, type.max ?? 3)) }, () =>
-        generate(type.of, random, depth + 1),
-      );
+      return Array.from({ length: listLength(type, random, depth) }, () => generate(type.of, random, depth + 1));
     case 'object':
       return generateObject(type, random, depth);
   }
+}
+
+/** How many items a generated list holds: none in the empty list or past the depth, else 0..3 within its bound. */
+function listLength(type: ListType, random: Rng, depth: number): number {
+  return depth > LIST_DEPTH || type.empty ? 0 : random.int(0, Math.min(3, type.max ?? 3));
 }
 
 function generateWord(random: Rng): string {
@@ -170,7 +173,10 @@ function valueEdges(type: Type): [string, unknown][] {
         ['false', false],
       ];
     case 'list':
-      return [['empty', []], ...(type.max === 0 ? [] : [['one', [generate(type.of, rng(1))]] as [string, unknown]])];
+      return [
+        ['empty', []],
+        ...(type.max === 0 || type.empty ? [] : [['one', [generate(type.of, rng(1))]] as [string, unknown]]),
+      ];
     default:
       return [];
   }
