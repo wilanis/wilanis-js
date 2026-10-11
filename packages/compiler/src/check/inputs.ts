@@ -142,14 +142,17 @@ class InputCheck {
 
   /**
    * G026: a field the contract marks `provided` is written by the compiler where the operation is called, so a call
-   * site that gives it is refused, and one that leaves it out is not asked for it.
+   * site that gives it is refused, and one that leaves it out is not asked for it. A map's `bind` gives it too: the
+   * engine lays each bound name over the broadcast, so a bound value would replace the site the compiler wrote.
    */
   private checkProvided(name: string): void {
-    if (!(name in this.site.given)) return;
+    const bound = name in this.extra;
+    if (!(name in this.site.given) && !bound) return;
+    const at = bound ? `${this.site.at.replace(/\/in$/, '/bind')}/${name}` : `${this.site.at}/${name}`;
     this.refuse(
       'G026',
       `'${name}' is provided by the compiler where ${this.site.what} is called`,
-      `${this.site.at}/${name}`,
+      at,
       'drop it; the operation is told where it was called without being asked',
     );
   }

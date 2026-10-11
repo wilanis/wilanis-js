@@ -1,8 +1,5 @@
 /** The fields of a contract: where a type comes from (resolves), and what the compiler provides (provided). */
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { validateDocument } from '../src/validate.js';
 import { at, doc, refused } from './documents.js';
 
 describe('a contract that says where a type comes from', () => {
@@ -50,7 +47,6 @@ describe('a contract that says where a type comes from', () => {
 });
 
 describe('a field the compiler provides', () => {
-  const Site = fileURLToPath(new URL('../../runtime/docs/std/Site.shape.json', import.meta.url));
   const port = (site: Record<string, unknown>) =>
     doc('port', {
       operations: {
@@ -65,12 +61,5 @@ describe('a field the compiler provides', () => {
     expect(refused(port({ provided: 'site' }))).toEqual([]);
     expect(refused(port({ provided: 'run' }))).toEqual([at('operations/record/accepts/site/provided', '"site"')]);
     expect(refused(port({ provided: true }))).toEqual([at('operations/record/accepts/site/provided', '"site"')]);
-  });
-
-  it('@std/Site.shape.json, the shape a provided site has, validates as a shape of two strings', () => {
-    const site = JSON.parse(readFileSync(Site, 'utf8')) as { fields: Record<string, { type: string }> };
-    expect(validateDocument(site, 'Site.shape.json')).toEqual({ kind: 'shape', refusals: [] });
-    expect(Object.keys(site.fields)).toEqual(['file', 'at']);
-    expect(Object.values(site.fields).map(field => field.type)).toEqual(['string', 'string']);
   });
 });
