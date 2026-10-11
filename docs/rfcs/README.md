@@ -47,6 +47,7 @@ accepted. Statuses: draft, accepted, implemented, withdrawn.
 | [0039](0039-keep-and-group-a-list.md) | Keep and group a list: a `where` on `map`, and `@std/list#totals` | accepted |
 | [0040](0040-text-contains.md) | `contains`: a rule asks whether a text holds a word written in the rule | accepted |
 | [0041](0041-wait-for-a-node.md) | `after`: a node waits for another whose answer it does not read | accepted |
+| [0042](0042-collections-another-tree-keeps.md) | `keptBy`: a store says another tree keeps its collections | draft |
 
 Which milestone first shows an RFC is said once, in [`../roadmap.md`](../roadmap.md); the tracking issue
 carries it as GitHub's milestone. Where this list and the outside assessment that seeded it differ, the
