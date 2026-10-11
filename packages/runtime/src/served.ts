@@ -131,7 +131,8 @@ export class Served {
     // the modules this tree was started with, so a reload serves the same plugins rather than whatever the
     // directory resolves to now: one started with a module of its own could not otherwise reload at all
     const plugins = Object.fromEntries(this.load.plugins.map(plugin => [plugin.root, plugin]));
-    const load = await loadProject(this.load.root, { plugins });
+    // a served tree never replays a scenario, so the reload reads none, as `wilanis start` does
+    const load = await loadProject(this.load.root, { plugins, scenarios: false });
     const refusals = checkTree(load);
     if (!refusals.ok) return { refusals: refusals.format() };
     const { profile, env = process.env } = this.under;

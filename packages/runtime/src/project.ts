@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
+  type LoadOptions,
   type LoadResult,
   listedIn,
   loadTree,
@@ -216,16 +217,17 @@ function includeFrom(
 /**
  * Load the tree at root with its plugins and includes resolved: builtins, `extra`, and the packages project.json
  * names; the load carries the versions they were resolved at and the Node the tree asks for, which the manifest
- * prints.
+ * prints. `scenarios: false` leaves the top-level scenarios/ directory unread, for a command that never judges or
+ * replays a scenario (`LoadOptions`).
  */
 export async function loadProject(
   root: string,
-  opts: { plugins?: Record<string, PluginModule>; includes?: ResolvedInclude[] } = {},
+  opts: { plugins?: Record<string, PluginModule>; includes?: ResolvedInclude[] } & LoadOptions = {},
 ): Promise<ProjectLoad> {
   const { available, refusals, versions } = await resolvePlugins(root, opts.plugins);
   const resolved = resolveIncludes(root);
   const includes = [...(opts.includes ?? []), ...resolved.includes];
-  const load = loadTree(root, available, includes);
+  const load = loadTree(root, available, includes, { scenarios: opts.scenarios });
   refusals.push(...resolved.refusals);
   // a plugin whose package failed to load is reported once, with the install hint, not also as unknown
   const failed = new Set(refusals.map(refusal => refusal.at?.replace(/\/from$/, '')));

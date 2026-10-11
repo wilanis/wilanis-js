@@ -138,7 +138,8 @@ function targetsOf(asked: Asked): string[] {
 async function checked(root: string): Promise<ProjectLoad> {
   const abs = resolve(root);
   if (!existsSync(join(abs, 'project.json'))) throw new Error(`no project.json in ${abs}`);
-  const loaded = await loadProject(abs);
+  // the plan reads no document row of the manifest, so the scenarios, which only those rows would list, stay unread
+  const loaded = await loadProject(abs, { scenarios: false });
   const answer = checkTree(loaded);
   if (!answer.ok) throw new Error(`${answer.format()}\n\n${answer.items.length} refusal(s)`);
   return loaded;
