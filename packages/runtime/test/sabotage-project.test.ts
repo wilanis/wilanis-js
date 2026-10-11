@@ -1,6 +1,27 @@
-import { schemaUrl } from '@wilanis/core';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { checkTree } from '@wilanis/compiler';
+import { loadTree, schemaUrl } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
-import { plantedAll, plantedEditing, sabotage, sabotagePointing, without } from './example-harness.js';
+import {
+  copyOfExample,
+  INCLUDES,
+  PLUGINS,
+  plantedAll,
+  plantedEditing,
+  sabotage,
+  sabotagePointing,
+  without,
+} from './example-harness.js';
+
+/** Edit one JSON document under a directory, in place. */
+function editJson(dir: string, file: string, edit: (doc: any) => void): void {
+  const path = join(dir, file);
+  const doc = JSON.parse(readFileSync(path, 'utf8'));
+  edit(doc);
+  writeFileSync(path, JSON.stringify(doc));
+}
 
 describe('sabotage: the project, its plugins and its startup', () => {
   it('X003 a throttle that lets nothing through', () => {
@@ -238,5 +259,23 @@ describe('sabotage: a store names a connection and the shapes it keeps', () => {
         project.blobs = { connection: '@connections/customers-api.connection.json' };
       }),
     ).toContain('C014');
+  });
+  it('R001 a startup step whose static connection names no connection document', () => {
+    // no startup operation takes a connection today, so the listener is given one in a copy of @http's docs
+    const docs = mkdtempSync(join(tmpdir(), 'wilanis-docs-'));
+    cpSync(PLUGINS['@http'].docs, docs, { recursive: true });
+    editJson(docs, 'server.port.json', port => {
+      port.operations.listen.accepts.connection = { type: 'string', static: true, required: false };
+    });
+    const tree = copyOfExample();
+    editJson(tree, 'project.json', project => {
+      const listen = project.startup.find((step: any) => step.run === '@http/server.port.json#listen');
+      listen.in = { connection: '@connections/nowhere.connection.json' };
+    });
+    const plugins = { ...PLUGINS, '@http': { ...PLUGINS['@http'], docs } };
+    const refused = checkTree(loadTree(tree, plugins, INCLUDES)).items.map(one => `${one.code} ${one.at}`);
+    rmSync(docs, { recursive: true, force: true });
+    rmSync(tree, { recursive: true, force: true });
+    expect(refused).toEqual([expect.stringMatching(/^R001 startup\/[0-9]+\/in\/connection$/)]);
   });
 });

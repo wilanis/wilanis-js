@@ -136,8 +136,9 @@ export function collectionOf(scope: Scope, site: CallSite): CollectionSite | und
  * falls, and the reach of a profile for which connections it needs.
  *
  * It stays quiet throughout. A field that is absent, or names a document that is not there, is the business
- * of the rules that judge the call site and the store itself (R001 from `checkStore`), so a tree with one
- * fault answers one refusal rather than the same fault told twice.
+ * of the rules that judge the call site and the store itself -- R001 from `checkConnectionNamed` for a
+ * `connection`, R001 from `checkStore` for a store's -- so a tree with one fault answers one refusal rather
+ * than the same fault told twice.
  */
 export function connectionOf(scope: Scope, op: Operation, given: Values | undefined): string | undefined {
   const accepted = scope.types.accepted(op.accepts);

@@ -5,7 +5,7 @@ import { checkTree } from '@wilanis/compiler';
 import { loadTree, type PluginModule } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_PLUGINS, loadProject, rehearse } from '../src/index.js';
-import { codes, EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
+import { codes, EXAMPLE, INCLUDES, PLUGINS, without } from './example-harness.js';
 
 describe('the example tree', () => {
   it('passes check', () => {
@@ -289,5 +289,17 @@ describe('sabotage: what a refusal says to the caller', () => {
   });
   it('lets the same message read what is not secret', () => {
     expect(withBrokenInclude(signIn, rejected('no account {{in.username}} with that password'))).toEqual([]);
+  });
+  it('R001 a connection an included graph names and the host does not have', () => {
+    const ping = { id: 'pinged', run: '@http/http.port.json#request' };
+    const nowhere = { connection: '@connections/nowhere.connection.json', method: 'GET', path: '/' };
+    const edit = (graph: any) => graph.nodes.push({ type: '@wilanis/node/run.schema.json', ...ping, in: nowhere });
+    expect(withBrokenInclude('features/access/data/end-session.graph.json', edit)).toContainEqual([
+      'R001',
+      'nodes/pinged/in/connection',
+    ]);
+  });
+  it('R001 at each of the eight graph nodes and the binding delegation naming a connection that was deleted', () => {
+    expect(without('connections/customers-api.connection.json')).toEqual(Array(9).fill('R001'));
   });
 });
