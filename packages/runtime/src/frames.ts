@@ -21,12 +21,14 @@ export function sourceOf(spec_: unknown): { ref: string; path: string[] } | unde
  * whose `over` reads `in` iterates what the frame was handed, so the answer is one hop out -- the call that
  * entered the frame, and the source it was given under that name. Nothing when the list is composed, literal,
  * the context's or the trigger's own: a composed list is no single node's output to stub, and the trigger's
- * input the rehearsal steers is met before this is asked.
+ * input the rehearsal steers is met before this is asked. `from` is the frames the holder stands in: the list's own
+ * for a sibling, and fewer for a node one or more calls out, since those calls are inside the frame that holds it.
  */
-export function listHolder(list: FoundList): { target: string; path: string[] } | undefined {
+export function listHolder(list: FoundList): { target: string; path: string[]; from: Frame[] } | undefined {
   const held = heldOutwards(list);
   if (!held || ['in', 'context', 'const'].includes(held.src.ref)) return undefined;
-  return { target: [...held.at.split('.').slice(0, -1), held.src.ref].join('.'), path: held.src.path };
+  const target = [...held.at.split('.').slice(0, -1), held.src.ref].join('.');
+  return { target, path: held.src.path, from: list.from.slice(0, held.outside) };
 }
 
 /**
@@ -40,21 +42,28 @@ export function ownInputAt(list: FoundList): string[] | undefined {
   return held?.src.ref === 'in' ? held.src.path : undefined;
 }
 
-/** A list's source followed out through the frames that handed it down, and the call it was last handed through. */
-function heldOutwards(list: FoundList): { at: string; src: { ref: string; path: string[] } } | undefined {
+/**
+ * A list's source followed out through the frames that handed it down, the call it was last handed through, and how
+ * many of the list's frames stand outside that call: the frames of the spec the source is a node of.
+ */
+function heldOutwards(
+  list: FoundList,
+): { at: string; src: { ref: string; path: string[] }; outside: number } | undefined {
   let src = sourceOf(list.over);
   let at = list.at;
+  let outside = list.from.length;
   // `in` is whatever the frame was handed, so a frame that declares where it got it is a hop outwards; one that
   // declares nothing -- the wrapper a binding lowers to, which hands its caller's value straight on -- is a hop
   // that changes nothing, and the search carries on with the same source one frame further out.
   for (let frame = list.from.length - 1; src?.ref === 'in' && frame >= 0; frame--) {
     const outer = list.from[frame];
     at = outer.at;
+    outside = frame;
     const given = passedAs(outer.in, src.path);
     if (given === 'opaque') return undefined;
     if (given) src = given;
   }
-  return src ? { at, src } : undefined;
+  return src ? { at, src, outside } : undefined;
 }
 
 /**

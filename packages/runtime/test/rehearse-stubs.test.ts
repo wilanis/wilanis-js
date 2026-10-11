@@ -8,14 +8,17 @@
  * - a rule reads a field inside an optional object the seed left out, so the object is made whole from its type;
  * - a guard judges a list a `map` of `#make` made, and the kernel reads a map's stubs per element, never at the map;
  * - a map runs over another map's answer, so the list it needs an element of is made non-empty where that map
- *   reads its own, since a stub at the map is one the kernel never reads (#869).
+ *   reads its own, since a stub at the map is one the kernel never reads (#869); the trees are in
+ *   `rehearse-stubs-chained.ts`, one with the second map beside the first, one with it in a graph the first's answer
+ *   is handed to.
  */
 import { rmSync } from 'node:fs';
 import { checkTree } from '@wilanis/compiler';
 import { loadTree } from '@wilanis/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { BUILTIN_PLUGINS, type Rehearsal, rehearse } from '../src/index.js';
-import { chainedTree, layersTree, mappedTree, nonemptyTree, parentTree } from './rehearse-stubs-trees.js';
+import { calledTree, chainedTree } from './rehearse-stubs-chained.js';
+import { layersTree, mappedTree, nonemptyTree, parentTree } from './rehearse-stubs-trees.js';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -106,20 +109,33 @@ describe('a guard over a list a map made', () => {
   });
 });
 
+/**
+ * Rehearse a tree of #869 under seeds 1 to 8, and expect `judge`'s switch reached on both branches under each. The
+ * generated batch holds no item under seeds 3 and 8, found by running the probe: the switch inside `judged` then runs
+ * only because the rehearsal patched `in.items`, where `made` reads its list.
+ */
+async function reachedUnderEverySeed(tree: () => string): Promise<void> {
+  const dir = tree();
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    const done = await rehearsed(dir, seed);
+    expect(branchesOf(done, 'domain/judge.graph.json', 'decide'), `seed ${seed}`).toEqual([
+      ['high', 'done'],
+      ['low', 'done'],
+    ]);
+    expect(done.ok, `seed ${seed}:\n${done.lines.join('\n')}`).toBe(true);
+  }
+}
+
 describe('a map over the list another map made', () => {
   it('is reached by making the list the first map runs over non-empty, under a seed whose input holds none', {
     timeout: 30_000,
   }, async () => {
-    const dir = chainedTree();
-    // the seeds under which the generated batch holds no item, found by running the probe: the switch inside
-    // `judged` then runs only because the rehearsal patched `in.items`, where `made` reads its list
-    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
-      const done = await rehearsed(dir, seed);
-      expect(branchesOf(done, 'domain/judge.graph.json', 'decide'), `seed ${seed}`).toEqual([
-        ['high', 'done'],
-        ['low', 'done'],
-      ]);
-      expect(done.ok, `seed ${seed}:\n${done.lines.join('\n')}`).toBe(true);
-    }
+    await reachedUnderEverySeed(chainedTree);
+  });
+
+  it('is reached the same way when the list is handed to the graph the second map stands in', {
+    timeout: 30_000,
+  }, async () => {
+    await reachedUnderEverySeed(calledTree);
   });
 });
