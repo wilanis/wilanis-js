@@ -10,6 +10,7 @@ import { Documents, PROJECT_FILE, parseJson, readProject, takes } from './docume
 import { versionsRefused } from './ir-version.js';
 import type { ProjectDoc } from './model.js';
 import { makeResolver, RESERVED_ROOTS, subdirectories, treePath, walk } from './paths.js';
+import { HOME } from './placement.js';
 import type { PluginModule } from './plugin.js';
 import { type Refusal, RefusalList, Registry } from './registry.js';
 import { validateDocument } from './validate.js';
@@ -35,6 +36,15 @@ export interface ResolvedInclude {
   version?: string;
 }
 
+/** How much of the tree a load reads. */
+export interface LoadOptions {
+  /**
+   * Whether the top-level `scenarios/` directory is read, where every scenario and answers document lives: true by
+   * default. A command that never judges or replays a scenario passes false, and the tree it loads holds none.
+   */
+  scenarios?: boolean;
+}
+
 /**
  * Load the tree at `root`. `available` maps plugin alias (@http) to its module; `includes` are the trees the
  * project includes, resolved to their directories. An include's features load as if they sat here -- the same
@@ -44,9 +54,14 @@ export function loadTree(
   root: string,
   available: Record<string, PluginModule>,
   includes: ResolvedInclude[] = [],
+  options: LoadOptions = {},
 ): LoadResult {
-  return new Loader(root, available, includes).load();
+  return new Loader(root, available, includes, options).load();
 }
+
+/** The directories directly under the root a load leaves unread. */
+const leftOut = (options: LoadOptions): string[] =>
+  options.scenarios === false ? [HOME.scenario?.dir ?? 'scenarios'] : [];
 
 class Loader {
   private readonly registry = new Registry();
@@ -62,8 +77,9 @@ class Loader {
     private readonly root: string,
     private readonly available: Record<string, PluginModule>,
     private readonly includes: ResolvedInclude[],
+    options: LoadOptions,
   ) {
-    this.files = walk(root);
+    this.files = walk(root, leftOut(options));
   }
 
   load(): LoadResult {

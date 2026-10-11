@@ -7,15 +7,22 @@ const NOT_DOCUMENTS = new Set(['package.json', 'package-lock.json', 'tsconfig.js
 export const RESERVED_ROOTS = ['@wilanis', '@features', '@connections', '@scenarios'];
 const ALIAS_REF = /^(@[a-z][a-z0-9-]*)(\/.*)?$/;
 
-/** Every document under a directory: *.json files, tooling files and hidden directories left out. */
-export function walk(dir: string, out: string[] = []): string[] {
-  for (const name of readdirSync(dir)) {
-    if (name.startsWith('.') || name === 'node_modules') continue;
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) walk(path, out);
-    else if (name.endsWith('.json') && !NOT_DOCUMENTS.has(name)) out.push(path);
-  }
-  return out;
+/**
+ * Every document under a directory: *.json files, tooling files and hidden directories left out, and so is every
+ * directory directly under it that `leaveOut` names (a nested one of the same name is still walked).
+ */
+export function walk(dir: string, leaveOut: readonly string[] = []): string[] {
+  return readdirSync(dir)
+    .filter(name => !leaveOut.includes(name))
+    .flatMap(name => documentsAt(dir, name));
+}
+
+/** The documents one entry of a directory holds: itself where it is one, everything under it where it is a directory. */
+function documentsAt(dir: string, name: string): string[] {
+  if (name.startsWith('.') || name === 'node_modules') return [];
+  const path = join(dir, name);
+  if (statSync(path).isDirectory()) return walk(path);
+  return name.endsWith('.json') && !NOT_DOCUMENTS.has(name) ? [path] : [];
 }
 
 /** The directories directly under one. */

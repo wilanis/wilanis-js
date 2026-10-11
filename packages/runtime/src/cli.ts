@@ -6,7 +6,7 @@ import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { checkTree } from '@wilanis/compiler';
 import type { BlobHandle, Trace } from '@wilanis/core';
-import { KINDS, type Kind, type LoadResult, RefusalList } from '@wilanis/core';
+import { KINDS, type Kind, type LoadOptions, type LoadResult, RefusalList } from '@wilanis/core';
 import { describes } from './discovery.js';
 import { irSaid } from './doc-said.js';
 import { loadProject, type ProjectLoad } from './project.js';
@@ -158,21 +158,27 @@ function tracing(flags: Record<string, string>): ((trace: Trace) => void) | unde
   return trace => console.error(write(atLevel(trace, level)));
 }
 
-async function load(root: string): Promise<ProjectLoad> {
+/**
+ * What a command that never judges or replays a scenario loads: the tree without its scenarios/ directory, which
+ * on a tree with many recorded runs is most of what a load parses (issue #906). Its check judges no scenario.
+ */
+const WITHOUT_SCENARIOS: LoadOptions = { scenarios: false };
+
+async function load(root: string, options: LoadOptions = {}): Promise<ProjectLoad> {
   const abs = resolve(root);
   if (!existsSync(join(abs, 'project.json'))) {
     console.error(`no project.json in ${abs}`);
     process.exit(2);
   }
-  return loadProject(abs);
+  return loadProject(abs, options);
 }
 
 /**
  * Load and judge the tree, and stop at a refusal: in words on stderr, or, under `--json`, as the envelope on stdout
  * with `command` set to what was asked, so a refused tree reads the same whichever command met it.
  */
-async function check(root: string, json?: string): Promise<ProjectLoad> {
-  const loaded = await load(root);
+async function check(root: string, json?: string, options: LoadOptions = {}): Promise<ProjectLoad> {
+  const loaded = await load(root, options);
   const answer = checkTree(loaded);
   if (!answer.ok) {
     if (json) console.log(printed(diagnosticsOf(loaded, answer, { command: json, root })));
@@ -276,7 +282,7 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     if (!answer.ok) process.exit(1);
   },
   start: async ({ flags, rootArg }) => {
-    const loaded = await check(rootArg(0));
+    const loaded = await check(rootArg(0), undefined, WITHOUT_SCENARIOS);
     const { stop, held } = await start(loaded, { profile: flags.profile, observe: tracing(flags) });
     if (!held) {
       console.log('nothing is held: project.json declares no startup step that listens, so there is nothing to serve');
@@ -291,7 +297,7 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
   },
   run: async ({ flags, positional, rootArg, rest }) => {
     const trigger = positional[0] ?? missing('run', 'name the trigger to fire');
-    const loaded = await check(rootArg(1));
+    const loaded = await check(rootArg(1), undefined, WITHOUT_SCENARIOS);
     const { flags: f2 } = parse(rest.slice(1));
     let delivered = false;
     const deliver = async (body: Readable, handle: BlobHandle) => {
@@ -324,7 +330,7 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
       process.exit(2);
     }
     // migrate judges the tree itself, so that a caller without the command line gets the same guarantee
-    const loaded = await load(rootArg(0));
+    const loaded = await load(rootArg(0), WITHOUT_SCENARIOS);
     const answer = await migrate(loaded, {
       profile: flags.profile,
       apply: Boolean(flags.apply),
@@ -354,9 +360,10 @@ const COMMANDS: Record<string, (given: Given) => Promise<void> | void> = {
     process.exit(1);
   },
   map: async ({ flags, rootArg }) => {
-    console.log(map(await load(rootArg(0)), flags.profile).join('\n'));
+    console.log(map(await load(rootArg(0), WITHOUT_SCENARIOS), flags.profile).join('\n'));
   },
-  // judged first, as start is: the manifest of a tree with an unresolved reference would describe nothing real
+  // judged first, as start is: the manifest of a tree with an unresolved reference would describe nothing real. It
+  // loads the scenarios, since its documents list every document the tree holds, as ls does
   manifest: async ({ flags, rootArg }) => {
     const loaded = await check(rootArg(0));
     process.stdout.write(manifestText(manifestOf(loaded, { root: rootArg(0), profile: flags.profile })));
