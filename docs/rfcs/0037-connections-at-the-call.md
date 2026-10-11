@@ -83,8 +83,9 @@ cannot choose a host's connection by a value a message carries") stays out; *Dra
 profile still cannot stand a connection of one kind in for another (RFC 0013). A store still names one connection: the
 consumer's store copies stay (*Drawbacks and alternatives*). This RFC adds no map that the compiler unrolls; the per-member
 port operation and domain nodes stay (*Drawbacks and alternatives*). It does not decide whether a tree may read
-collections another tree owns (#851), and it does not change `wilanis migrate`. It does not make every command skip
-`scenarios/` (Item 37's loader fix is separate).
+collections another tree owns (#851), and it does not change `wilanis migrate`. It does not change which commands read
+`scenarios/`: since f97493db, `run`, `start`, `migrate` and `map` load a tree without it, and `check`, `rehearse`,
+`regress` and the viewer still read every file this RFC removes.
 
 ## Guide-level explanation
 
