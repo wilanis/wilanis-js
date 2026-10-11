@@ -199,6 +199,7 @@ describe.skipIf(!url)('what a scope costs the table', () => {
       'e_scope_late',
       'e_scope_race',
       'e_scope_txn',
+      'e_scope_bad',
     ])
       await drop(name);
   });
