@@ -16,7 +16,7 @@ import {
   secretKeysRead,
   type Type,
 } from '@wilanis/core';
-import { providedNames } from './inputs.js';
+import { checkConnectionNamed, providedNames } from './inputs.js';
 import { type Judge, underProfile } from './judge.js';
 import { checkPermits } from './permits.js';
 import { checkProfiles } from './profiles.js';
@@ -119,12 +119,15 @@ function checkStepProfiles(judge: Judge, step: StartupStep, index: number): void
 
 /**
  * B007: a step's inputs are literals and secrets that meet the operation's contract -- less the fields the compiler
- * provides, which the step is not asked for and is refused for giving (G026, as any call site is).
+ * provides, which the step is not asked for and is refused for giving (G026, as any call site is). A static
+ * `connection` names a connection document the tree has (R001, as at any call site).
  */
 function checkStepInputs(judge: Judge, step: StartupStep, index: number, op: Operation): void {
   const refuse = judge.refuser(judge.project.path);
   const at = `startup/${index}/in`;
-  const provided = providedNames(judge.accepted(op));
+  const accepted = judge.accepted(op);
+  checkConnectionNamed(judge, judge.project.path, accepted, { given: step.in, at });
+  const provided = providedNames(accepted);
   for (const name of provided.filter(name => name in (step.in ?? {}))) {
     const message = `'${name}' is provided by the compiler where '${step.run}' is called`;
     refuse('G026', message, `${at}/${name}`, 'drop it; the operation is told where it was called without being asked');
