@@ -21,7 +21,7 @@ import { keyOf } from './engine.js';
 import { type Gathered, gathered } from './migrate-stores.js';
 import { type Declared, declaredOfStore, marksOfStore, plan as planOf, type Stale, type Step } from './plan.js';
 import type { Classed } from './plan-class.js';
-import type { Applying, Recording } from './record.js';
+import { type Applying, type Recording, treeOf } from './record.js';
 import { classedSteps, everKnown, type Standing, standing } from './standing.js';
 import { engineFor } from './store.js';
 
@@ -160,9 +160,9 @@ export async function planStores(ctx: MigrateContext): Promise<Plan> {
   return { targets };
 }
 
-/** Who a migration this command applied is recorded as having been run by, and from which tree. */
+/** Who a migration this command applied is recorded as having been run by, and from which tree (`treeOf`). */
 function applying(ctx: MigrateContext): Applying {
-  return { by: `${userInfo().username}@${hostname()}`, tree: ctx.registry.project?.doc.name ?? 'unknown' };
+  return { by: `${userInfo().username}@${hostname()}`, tree: treeOf(ctx.env, ctx.root) };
 }
 
 /**
