@@ -12,12 +12,11 @@
  */
 
 import { hostname, userInfo } from 'node:os';
-import { basename } from 'node:path';
 import type { Type } from '@wilanis/core';
 import type { Engine, Made } from './engine.js';
 import { type Declared, type Declaring, declaredOfStore, marksOfStore, plan, type Step } from './plan.js';
 import type { Classed } from './plan-class.js';
-import type { Applying, On, Recording } from './record.js';
+import { type Applying, type On, type Recording, treeOf } from './record.js';
 import { classedSteps, standing } from './standing.js';
 
 /**
@@ -62,11 +61,11 @@ function madeBy(steps: Step[]): Made {
 /**
  * Who a migration this `ensure` applied is recorded as having been run by, and from which tree. A startup
  * step is nobody's hand on a keyboard, so it says so: the operator reading the history sees that the tree
- * prepared itself rather than that a person ran `wilanis migrate`. The tree is named by the directory it is
- * rooted at, which is what `env.serving` knows about it; a run outside a served tree names none.
+ * prepared itself rather than that a person ran `wilanis migrate`. The tree is named the way that command
+ * names it (`treeOf`), so the two callers of the planner write one name into one history.
  */
-function applying(root: string | undefined): Applying {
-  return { by: `${userInfo().username}@${hostname()} (startup)`, tree: root ? basename(root) : 'unknown' };
+function applying(env: Record<string, unknown>, root: string | undefined): Applying {
+  return { by: `${userInfo().username}@${hostname()} (startup)`, tree: treeOf(env, root) };
 }
 
 /**
@@ -136,7 +135,7 @@ export async function ensureStore(engine: Engine, store: Lowering, env: Record<s
   if (judged.some(one => one.class !== 'additive')) throw drift(judged, root);
   const steps = judged.map(one => one.step);
   if (!steps.length) return { ...NOTHING_MADE };
-  const applied = await engine.apply(store.on, steps, recording(declared, steps), applying(root));
+  const applied = await engine.apply(store.on, steps, recording(declared, steps), applying(env, root));
   if (!applied) return { ...NOTHING_MADE };
   logAdoptions(steps, store.on.connection, log);
   return madeBy(steps);

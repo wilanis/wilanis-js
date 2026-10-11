@@ -7,6 +7,7 @@
  * house limit splits along the families it holds. Nothing here mentions SQL, a table or a column: an engine
  * answers a `Declared` and takes a `Step`, and what either is on that engine is that engine's alone.
  */
+import { basename } from 'node:path';
 import type { Declared, FieldType, Step } from './plan.js';
 
 /**
@@ -111,4 +112,16 @@ export interface Recorder {
 /** The connection half of anything that names one, so a caller holding an `At` has an `On` already. */
 export function onOf(at: On): On {
   return { connection: at.connection, kind: at.kind, settings: at.settings };
+}
+
+/**
+ * The tree a migration is recorded from: `project.json -> name`, read through the environment handlers see,
+ * and the directory the tree is rooted at only where no project is loaded. `ensure` at startup and `wilanis
+ * migrate` both name the tree here, so one tree's history never names it two ways.
+ */
+export function treeOf(env: Record<string, unknown>, root: string | undefined): string {
+  const document = env.document;
+  const project = typeof document === 'function' ? (document('@project.json') as { name?: unknown }) : undefined;
+  if (typeof project?.name === 'string') return project.name;
+  return root ? basename(root) : 'unknown';
 }
