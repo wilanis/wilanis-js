@@ -5,16 +5,20 @@
  * and only as the site's shape (L019); the report shows it under the node's `in`; a stubbed run sees the same
  * literal; and a handler that wants the words behind it opens the document through `env.document`.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { checkTree, runGraph } from '@wilanis/compiler';
+import { validateDocument } from '@wilanis/core';
 import type { Report } from '@wilanis/engine';
 import { afterEach, describe, expect, it } from 'vitest';
-import { embedderFor, fuzz, regress } from '../src/index.js';
+import { embedderFor, fuzz, regress, std } from '../src/index.js';
 import { forget, notes } from './fixtures/plugin-note/index.js';
 import {
   CREATE_ROW,
   type Edit,
   editing,
   loadSite,
+  NOTE_IT,
   NOTE_PORT,
   NOTES_BINDING,
   NOTES_PORT,
@@ -54,6 +58,17 @@ function flatten(report: Report, prefix = ''): Record<string, Report['nodes'][st
 }
 
 afterEach(forget);
+
+describe('the shape of a site', () => {
+  it('@std/Site.shape.json, the shape a provided site has, validates as a shape of two strings', () => {
+    const site = JSON.parse(readFileSync(join(std.docs, 'Site.shape.json'), 'utf8')) as {
+      fields: Record<string, { type: string }>;
+    };
+    expect(validateDocument(site, 'Site.shape.json')).toEqual({ kind: 'shape', refusals: [] });
+    expect(Object.keys(site.fields)).toEqual(['file', 'at']);
+    expect(Object.values(site.fields).map(field => field.type)).toEqual(['string', 'string']);
+  });
+});
 
 describe('the site a provided field receives', () => {
   it('the planted tree passes check: a node that gives every other field and not the site is whole', async () => {
@@ -160,6 +175,25 @@ describe('G026: an author never writes a provided field', () => {
       });
       expect(codesOf(dir)).toEqual(['G026']);
       expect(refusalsAt(dir)).toEqual([`G026 @features/notes/data/notes.binding.json#operations/delegate/in/site`]);
+    });
+  });
+
+  it('G026 a map binding it', async () => {
+    // the engine lays a bound name over what every element is handed, so a bound site would replace the compiler's
+    await withSite(dir => {
+      editing(dir, NOTE_IT, graph => {
+        graph.constants = { texts: { type: 'string[]', value: ['one', 'two'] } };
+        graph.nodes.push({
+          type: '@wilanis/node/map.schema.json',
+          id: 'each',
+          label: 'Each text',
+          run: `${NOTE_PORT}#record`,
+          over: '{{const.texts}}',
+          bind: { text: '', site: '' },
+        });
+      });
+      // the map answers nothing the graph reads, so G008 says so beside it; G026 is the case
+      expect(refusalsAt(dir).filter(one => one.startsWith('G026'))).toEqual([`G026 @${NOTE_IT}#nodes/each/bind/site`]);
     });
   });
 
