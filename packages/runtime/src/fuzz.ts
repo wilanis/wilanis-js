@@ -10,6 +10,7 @@ import {
   answersAbove,
   canonicalJson,
   nodesOf,
+  SCENARIOS_DIR,
   type ScenarioDoc,
   type ScenarioNode,
   Scope,
@@ -22,13 +23,13 @@ import { outcomeOf, type Report, refusalOf, shownOutput } from '@wilanis/engine'
 import { type Fuzzing, fuzzEdges } from './fuzz-edges.js';
 import { activeProfile, skippedLines } from './profile.js';
 import { asWritten } from './recorded-answers.js';
-import { HOME_DIR, SCENARIOS } from './recorded-owner.js';
+import { SCENARIOS } from './recorded-owner.js';
 import { replayedDoc, solvedAgain } from './rehearse-recorded.js';
 import { type Replayer, recordedReport, replayedReport, replayerFor, triggerOf } from './replay.js';
 import { unreadSaid } from './scenario-said.js';
 import { embedderFor, generatedFire } from './stubbing.js';
 
-export { HOME_DIR, SCENARIOS } from './recorded-owner.js';
+export { SCENARIOS } from './recorded-owner.js';
 
 // ---- fuzz / regress ----------------------------------------------------------------------------------
 
@@ -110,7 +111,7 @@ async function fuzzed(
 function scenarioOf({ trigger, seed, input, context, record, report, secret }: Fuzzed): ScenarioDoc {
   return {
     $schema: schemaUrl('scenario'),
-    description: `${trigger.path} under seed ${seed}: ${report.status}. Written by wilanis fuzz; regenerate it, do not edit it -- to pin a case, run wilanis scenarios --pin <this file>, which copies it into ${HOME_DIR}/.`,
+    description: `${trigger.path} under seed ${seed}: ${report.status}. Written by wilanis fuzz; regenerate it, do not edit it -- to pin a case, run wilanis scenarios --pin <this file>, which copies it into ${SCENARIOS_DIR}/.`,
     generated: 'fuzz',
     trigger: trigger.path,
     seed,

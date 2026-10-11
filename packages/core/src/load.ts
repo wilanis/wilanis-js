@@ -7,10 +7,11 @@
  */
 import { join, relative } from 'node:path';
 import { Documents, PROJECT_FILE, parseJson, readProject, takes } from './documents.js';
+import { rootsReferenced, unnamedPlugins } from './include-plugins.js';
 import { versionsRefused } from './ir-version.js';
 import type { ProjectDoc } from './model.js';
 import { makeResolver, RESERVED_ROOTS, subdirectories, treePath, walk } from './paths.js';
-import { HOME } from './placement.js';
+import { SCENARIOS_DIR } from './placement.js';
 import type { PluginModule } from './plugin.js';
 import { type Refusal, RefusalList, Registry } from './registry.js';
 import { validateDocument } from './validate.js';
@@ -60,8 +61,7 @@ export function loadTree(
 }
 
 /** The directories directly under the root a load leaves unread. */
-const leftOut = (options: LoadOptions): string[] =>
-  options.scenarios === false ? [HOME.scenario?.dir ?? 'scenarios'] : [];
+const leftOut = (options: LoadOptions): string[] => (options.scenarios === false ? [SCENARIOS_DIR] : []);
 
 class Loader {
   private readonly registry = new Registry();
@@ -92,9 +92,12 @@ class Loader {
     this.resolvePlugins();
     Object.assign(this.aliases, this.project?.aliases ?? {});
     for (const alias of Object.keys(this.aliases)) this.checkAlias(alias, `aliases/${alias}`);
-    const included = this.includes.filter((include, index) => this.readInclude(include, index));
+    const read = this.includes.map((include, index) => this.readInclude(include, index));
+    const included = this.includes.filter((_, index) => read[index]);
     this.registerTree();
     this.registerIncludes(included);
+    for (const [index, theirs] of read.entries())
+      if (theirs) this.requireUsedPlugins(this.includes[index], index, theirs);
     for (const plugin of this.plugins) this.documents.registerPlugin(plugin);
     return this.result();
   }
@@ -205,11 +208,11 @@ class Loader {
   // ---- includes -----------------------------------------------------------------------------------
 
   /**
-   * An include is a wilanis tree of its own. Its aliases come along, so its documents keep naming themselves;
-   * its plugins must be ones this project names, since the host configures them; nothing else of its
-   * project.json is read (D010, D007). Answers whether the include can be walked.
+   * An include is a wilanis tree of its own. Its aliases come along, so its documents keep naming themselves; its
+   * plugins are judged once its features are walked (D010); nothing else of its project.json is read (D007).
+   * Answers its project document, or nothing when the include cannot be walked.
    */
-  private readInclude(include: ResolvedInclude, index: number): boolean {
+  private readInclude(include: ResolvedInclude, index: number): ProjectDoc | undefined {
     const at = `includes/${index}`;
     const theirs = readProject(include.dir, `${include.from}/project.json`);
     if (!theirs) {
@@ -220,21 +223,22 @@ class Loader {
         message: `'${include.from}' is not a wilanis tree: no project.json in ${include.dir}`,
         hint: 'an include is a package holding project.json and features/',
       });
-      return false;
-    }
-    for (const use of theirs.plugins) {
-      if (this.pluginRoots.has(use.use)) continue;
-      const from = use.use === '@std' || use.use === '@cli' ? '' : `, "from": "..."`;
-      this.refuse({
-        code: 'D010',
-        file: PROJECT_FILE,
-        at,
-        message: `'${include.from}' uses plugin '${use.use}', which this project does not name`,
-        hint: `add { "use": "${use.use}"${from} } to project.json → plugins, with the settings its README says`,
-      });
+      return undefined;
     }
     for (const [alias, target] of Object.entries(theirs.aliases ?? {})) this.adoptAlias(alias, target, include, at);
-    return true;
+    return theirs;
+  }
+
+  /**
+   * D010: a plugin the include names that its walked features use is one this project names, since the host
+   * configures it. One the include names only for what a host leaves behind (its connections, its run alone) is not.
+   */
+  private requireUsedPlugins(include: ResolvedInclude, index: number, theirs: ProjectDoc): void {
+    const docs = this.registry.files.filter(entry => entry.included === include.from).map(entry => entry.doc);
+    const roots = new Set([...this.pluginRoots, ...theirs.plugins.map(use => use.use)]);
+    const used = rootsReferenced(docs, makeResolver(this.aliases, roots));
+    const uses = { from: include.from, at: `includes/${index}`, plugins: theirs.plugins };
+    for (const refusal of unnamedPlugins(uses, used, this.pluginRoots)) this.refuse(refusal);
   }
 
   /** An include's alias comes along; one this project also declares must mean the same thing. */

@@ -6,8 +6,15 @@
  */
 import { existsSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { answersAbove, type LoadResult, nodesOf, type ScenarioDoc, type ScenarioNode, stubsOf } from '@wilanis/core';
-import { HOME_DIR } from './recorded-owner.js';
+import {
+  answersAbove,
+  type LoadResult,
+  nodesOf,
+  SCENARIOS_DIR,
+  type ScenarioDoc,
+  type ScenarioNode,
+  stubsOf,
+} from '@wilanis/core';
 import { unreadSaid, WRITTEN_BY } from './scenario-said.js';
 
 /** What `--pin` answers: whether it wrote the copy, the one line it says, and the file it wrote, below the root. */
@@ -75,7 +82,7 @@ export function pinScenario(load: LoadResult, file: string): Pinned {
   const [nodes, stubs] = [nodesOf(found.doc, above.own?.doc), stubsOf(found.doc, above.own?.doc)];
   const paths = [...nodes.unresolved, ...stubs.unresolved.map(path => `stub ${path}`)];
   if (paths.length) return { ok: false, line: unresolvedSaid(found.doc, above, { from, paths }) };
-  const wrote = `${HOME_DIR}/${basename(from)}`;
+  const wrote = `${SCENARIOS_DIR}/${basename(from)}`;
   if (existsSync(join(load.root, wrote)))
     return {
       ok: false,

@@ -6,22 +6,19 @@
  */
 import { existsSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { HOME } from '@wilanis/core';
-
-/** The one directory placement says a scenario lives in (HOME, D008). */
-export const HOME_DIR = HOME.scenario?.dir ?? 'scenarios';
+import { SCENARIOS_DIR } from '@wilanis/core';
 
 /**
  * Where plain fuzz writes, under the root: a directory of its own inside the scenarios' home, so what fuzz owns sits
  * apart from what a person wrote and from what the other commands record (RFC 0018).
  */
-export const SCENARIOS = `${HOME_DIR}/fuzz`;
+export const SCENARIOS = `${SCENARIOS_DIR}/fuzz`;
 
 /** Where `fuzz --edges` writes, under the root: the one directory it owns. */
-export const EDGES = `${HOME_DIR}/edges`;
+export const EDGES = `${SCENARIOS_DIR}/edges`;
 
 /** Where `--record` writes, under the root, when the flag names no directory. */
-export const RECORDED = `${HOME_DIR}/rehearsed`;
+export const RECORDED = `${SCENARIOS_DIR}/rehearsed`;
 
 /** The directories fuzz writes, plain and `--edges`, which `--record` may not own. */
 const FUZZED = [SCENARIOS, EDGES];
@@ -65,7 +62,7 @@ export function realOf(abs: string): string {
 function ownable(root: string, abs: string): boolean {
   const inside = caseless(root, abs);
   const fuzzed = FUZZED.map(dir => dir.toLowerCase()).some(dir => inside === dir || inside.startsWith(`${dir}/`));
-  return inside.startsWith(`${HOME_DIR.toLowerCase()}/`) && !fuzzed;
+  return inside.startsWith(`${SCENARIOS_DIR.toLowerCase()}/`) && !fuzzed;
 }
 
 /**
@@ -76,7 +73,7 @@ function ownable(root: string, abs: string): boolean {
 export function refusedDir(root: string, dir: string): string | undefined {
   const abs = resolve(root, dir);
   const outside = FUZZED.map(one => `${one}/`).join(' and ');
-  const where = `it may be any directory below ${HOME_DIR}/ outside ${outside}, as ${RECORDED}/ is`;
+  const where = `it may be any directory below ${SCENARIOS_DIR}/ outside ${outside}, as ${RECORDED}/ is`;
   if (!ownable(resolve(root), abs))
     return `--record may not own ${dir}, beside the scenarios a person or fuzz wrote: ${where}`;
   const real = realOf(abs);
