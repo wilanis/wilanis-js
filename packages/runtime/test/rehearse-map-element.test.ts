@@ -7,7 +7,8 @@
  *   nothing steered, and where one of them breaks a guard the whole run of every case ends at the refusal, which is
  *   what a recorded scenario of the branch would then expect.
  * - The switch in the bound graph reads `in`, and stands behind the binding's wrapper `op`, which hands the element on
- *   as it got it: the element is what steers it.
+ *   as it got it: the element is what steers it, read back through the map's `bind` -- field for field, or whole
+ *   under one name.
  */
 import { readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -38,14 +39,22 @@ afterEach(() => {
 const PORT = `${HERE}/domain/triage.port.json`;
 const VERDICTS = `${shape('Verdict')}[]`;
 
+/** How `#judge` is handed each finding: field for field as `score` and `name`, or whole as `finding`. */
+const HANDED = {
+  fields: { accepts: ITEM, in: shape('Item'), bind: { score: 'score', name: 'name' } },
+  whole: { accepts: { finding: { type: shape('Item') } }, in: shape('Judged'), bind: { finding: '' } },
+};
+
 /**
- * A tree whose `all` scans a target and maps `#judge` over the findings, with the nodes of `judge`'s graph and any
- * documents a case adds.
+ * A tree whose `all` scans a target and maps `#judge` over the findings, with the nodes of `judge`'s graph, how each
+ * finding is handed to it, and any documents a case adds.
  */
-function triageOf(judge: object[], docs: Record<string, object> = {}): string {
+function triageOf(judge: object[], more: { docs?: Record<string, object>; handed?: keyof typeof HANDED } = {}): string {
   const asked = { target: STRING, list: { type: `${shape('Item')}[]` } };
+  const handed = HANDED[more.handed ?? 'fields'];
   return treeOf({
     'domain/Item.shape.json': { layer: 'core', fields: ITEM },
+    'domain/Judged.shape.json': { layer: 'core', fields: { finding: { type: shape('Item') } } },
     'domain/Scan.shape.json': { layer: 'core', fields: { run: STRING, findings: { type: `${shape('Item')}[]` } } },
     'domain/Verdict.shape.json': { layer: 'core', fields: { name: STRING, level: STRING } },
     'domain/Ask.shape.json': { layer: 'core', fields: asked },
@@ -59,7 +68,7 @@ function triageOf(judge: object[], docs: Record<string, object> = {}): string {
       operations: {
         all: { description: 'd', accepts: asked, returns: VERDICTS },
         scan: { description: 'd', accepts: asked, returns: shape('Scan') },
-        judge: { description: 'd', accepts: ITEM, returns: shape('Verdict') },
+        judge: { description: 'd', accepts: handed.accepts, returns: shape('Verdict') },
       },
     },
     'data/triage.binding.json': {
@@ -75,18 +84,18 @@ function triageOf(judge: object[], docs: Record<string, object> = {}): string {
     ]),
     'domain/all.graph.json': graph('All', shape('Ask'), { type: VERDICTS, from: 'judged' }, [
       run('scanned', `${PORT}#scan`, { target: '{{in.target}}', list: '{{in.list}}' }),
-      map('judged', `${PORT}#judge`, { over: '{{scanned.findings}}', bind: { score: 'score', name: 'name' }, in: {} }),
+      map('judged', `${PORT}#judge`, { over: '{{scanned.findings}}', bind: handed.bind, in: {} }),
     ]),
-    'domain/judge.graph.json': graph('Judge', shape('Item'), { type: shape('Verdict'), from: ['high', 'low'] }, judge),
+    'domain/judge.graph.json': graph('Judge', handed.in, { type: shape('Verdict'), from: ['high', 'low'] }, judge),
     'edge/triage.trigger.json': trigger('triage', { in: edge('AskIn'), out: `${edge('Out')}[]` }, `${PORT}#all`),
-    ...docs,
+    ...more.docs,
   });
 }
 
-/** The two verdicts `judge` makes, one per branch of its switch, each naming the element it judged. */
-const VERDICT_NODES = [
-  make('high', { name: '{{in.name}}', level: 'high' }, shape('Verdict')),
-  make('low', { name: '{{in.name}}', level: 'low' }, shape('Verdict')),
+/** The two verdicts `judge` makes, one per branch of its switch, each naming the element it judged, read at `name`. */
+const verdicts = (name = '{{in.name}}') => [
+  make('high', { name, level: 'high' }, shape('Verdict')),
+  make('low', { name, level: 'low' }, shape('Verdict')),
 ];
 
 /**
@@ -98,12 +107,14 @@ function guardedTree(): string {
     [
       make('facts', { score: '{{in.score}}', name: '{{in.name}}' }, shape('Item')),
       decide('decide', { score: '{{facts.score}}' }, [{ when: 'score > 5', to: 'high' }], 'low'),
-      ...VERDICT_NODES,
+      ...verdicts(),
     ],
     {
-      'domain/a-verdict-is-fine.invariant.json': {
-        label: 'A verdict is fine',
-        holds: { on: shape('Verdict'), when: "name == 'fine'" },
+      docs: {
+        'domain/a-verdict-is-fine.invariant.json': {
+          label: 'A verdict is fine',
+          holds: { on: shape('Verdict'), when: "name == 'fine'" },
+        },
       },
     },
   );
@@ -113,8 +124,19 @@ function guardedTree(): string {
 function onInTree(): string {
   return triageOf([
     decide('decide', { score: '{{in.score}}' }, [{ when: 'score > 5', to: 'high' }], 'low'),
-    ...VERDICT_NODES,
+    ...verdicts(),
   ]);
+}
+
+/** `judge` is handed each finding whole, bound to `finding`, and decides on `in.finding.score`: the element's score. */
+function wholeTree(): string {
+  return triageOf(
+    [
+      decide('decide', { score: '{{in.finding.score}}' }, [{ when: 'score > 5', to: 'high' }], 'low'),
+      ...verdicts('{{in.finding.name}}'),
+    ],
+    { handed: 'whole' },
+  );
 }
 
 /** The tree rehearsed, once the checker has let it through: a case about the walk must stand on a tree that passes. */
@@ -131,7 +153,10 @@ function branchesOf(run: Rehearsal, graph: string, node: string) {
   if (!decision) throw new Error(`no decision ${graph} '${node}' in:\n${run.lines.join('\n')}`);
   return decision.branches.map(one => [
     one.to,
-    one.uncovered ?? one.settled?.error ?? one.settled?.declared?.reason ?? one.settled?.status,
+    one.uncovered ??
+      one.settled?.error ??
+      one.settled?.declared?.reason ??
+      (one.settled?.misrouted ? `misrouted to ${one.settled.misrouted}` : one.settled?.status),
   ]);
 }
 
@@ -172,19 +197,29 @@ describe('a switch inside a map over a stubbed list', () => {
 /** Seeds 1 to 8, so the switch is steered whatever the scan's generated answer holds. */
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8];
 
+/** Rehearse a tree under every seed, and expect `judge`'s switch steered to both its branches under each. */
+async function steeredUnderEverySeed(dir: string): Promise<void> {
+  dirs.push(dir);
+  for (const seed of SEEDS) {
+    const done = await rehearsed(dir, { seed });
+    expect(branchesOf(done, 'domain/judge.graph.json', 'decide'), `seed ${seed}`).toEqual([
+      ['high', 'done'],
+      ['low', 'done'],
+    ]);
+    expect(done.ok, `seed ${seed}:\n${done.lines.join('\n')}`).toBe(true);
+  }
+}
+
 describe('a switch on in, in a graph a map reaches through a binding', () => {
   it("is steered through the map's element, which the binding's wrapper hands on as it got it", {
     timeout: 60_000,
   }, async () => {
-    const dir = onInTree();
-    dirs.push(dir);
-    for (const seed of SEEDS) {
-      const done = await rehearsed(dir, { seed });
-      expect(branchesOf(done, 'domain/judge.graph.json', 'decide'), `seed ${seed}`).toEqual([
-        ['high', 'done'],
-        ['low', 'done'],
-      ]);
-      expect(done.ok, `seed ${seed}:\n${done.lines.join('\n')}`).toBe(true);
-    }
+    await steeredUnderEverySeed(onInTree());
+  });
+
+  it("is steered through the element read back through the map's bind, where the element is bound whole", {
+    timeout: 60_000,
+  }, async () => {
+    await steeredUnderEverySeed(wholeTree());
   });
 });
