@@ -8,7 +8,7 @@
  */
 import { type Type, typeAt } from '@wilanis/core';
 import type { Branch, Domain } from './domains.js';
-import { elementPathOf, listHolder, ownInputAt, sourceOf } from './frames.js';
+import { elementPathOf, handedAs, listHolder, ownInputAt, sourceOf, throughBind } from './frames.js';
 import { branchesOf } from './solve.js';
 import { getPath, NO_MEMBER, satisfy, setPath } from './stubs.js';
 
@@ -123,6 +123,13 @@ export interface FoundList {
    * since a binding lowers to a frame of its own -- says which node out there actually holds the list.
    */
   from: Frame[];
+  /**
+   * The input names the map hands its operation each element under, and the path within the element each reads: its
+   * lowered `bind`, or the whole element as `item` where it binds nothing. Only a map the walk enters says it.
+   */
+  bind?: Record<string, string[]>;
+  /** True where the spec the map runs is handed its one input `in` unwrapped, as a list guard's nested spec is. */
+  unwrapped?: boolean;
 }
 
 /** The shape of a lowered switch this module needs; `label` carries the rule's source text. */
@@ -185,7 +192,7 @@ function atNode(
       ...walked,
       prefix: [...prefix, id, '0'],
       fromTriggerIn: false,
-      lists: [...lists, { at: here, over: node.over, fromTriggerIn, from: entered }],
+      lists: [...lists, { at: here, over: node.over, fromTriggerIn, from: entered, ...handedAs(node, handler) }],
       entered: [],
     });
   return switchesOf(sub, nested, {
@@ -340,7 +347,7 @@ interface At {
 /**
  * A demand on `in` where `in` is an element a map handed in, met by writing that element into the list the map
  * runs over. The first element stands for all of them, as it does everywhere else in the walk, so the demand
- * lands at index 0.
+ * lands at index 0. `within` is the path inside the element, already read back through the map's `bind`.
  */
 function ofElement(list: FoundList, within: string[], domain: Domain, from: Pick<Stubbing, 'isMap'>) {
   const held = listHolder(list);
@@ -384,7 +391,8 @@ function meet(
   if (src.ref === 'in' && at.steerable) return ofInput([...src.path, ...within], domain, from);
   // inside a map, `in` is the element, handed down unchanged by any call since: what steers it is the list mapped over
   const inElement = src.ref === 'in' && at.element ? elementPathOf([...src.path, ...within], at.frames) : undefined;
-  if (at.element && inElement) return ofElement(at.element, inElement, domain, from);
+  const bound = at.element && inElement && throughBind(at.element, inElement);
+  if (at.element && bound) return ofElement(at.element, bound, domain, from);
   if (src.ref === 'in' || src.ref === 'context' || src.ref === 'const') return 'unreachable';
   return { stub: { target: stubTarget(at.prefix, src.ref, from), path: [...src.path, ...within], value: domain } };
 }

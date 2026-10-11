@@ -5,6 +5,7 @@
  * answered by walking those frames: which node holds the list a map runs over, which node a guard's value on
  * `in` was copied from, and where in a map's element a read of `in` behind further calls lies.
  */
+import { guardSpecAt } from '@wilanis/compiler';
 import type { FoundList, FoundSwitch, Frame } from './branches.js';
 
 /** Where a switch input reads from: a node in the same spec, and the path within that node's output. */
@@ -126,6 +127,29 @@ function tracedOut(read: { ref: string; path: string[] } | undefined, frames: Fr
 export function elementPathOf(path: string[], frames: Frame[]): string[] | undefined {
   const out = handedOut({ ref: 'in', path }, frames);
   return out?.src.ref === 'in' ? out.src.path : undefined;
+}
+
+/**
+ * How a map hands each element to the spec it runs: the names `bind` gives, each with the path it reads in the element,
+ * or `item` whole where it binds nothing; and, for a list guard's nested spec, whether that spec reads its `in`
+ * unwrapped, so its `in` is the element at what `bind` gives `in`.
+ */
+export function handedAs(node: Record<string, unknown>, handler: string): Pick<FoundList, 'bind' | 'unwrapped'> {
+  const bind = (node.bind as Record<string, string[]> | undefined) ?? { item: [] };
+  return guardSpecAt(handler) ? { bind, unwrapped: true } : { bind };
+}
+
+/**
+ * Where in one element of a map a read of what its operation was handed lies: the path `bind` gives the name read
+ * first, then the rest of the read -- the element whole for a name bound to `""`, as for `item` where the map binds
+ * nothing. A spec handed its `in` unwrapped reads what `bind` gives `in` as its whole `in`. Nothing for a name the map
+ * does not bind, which it hands every element alike from its own `in`, so steering the element would not move it.
+ */
+export function throughBind(list: FoundList, path: string[]): string[] | undefined {
+  if (list.unwrapped) return list.bind?.in ? [...list.bind.in, ...path] : undefined;
+  const [name, ...rest] = path;
+  const at = name === undefined ? undefined : list.bind?.[name];
+  return at ? [...at, ...rest] : undefined;
 }
 
 /**
