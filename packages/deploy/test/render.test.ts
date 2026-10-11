@@ -161,9 +161,19 @@ describe('image: the Dockerfile', () => {
 
   it('installs as it ships and runs as the node user, the wilanis command on the path', () => {
     const text = dockerfile(plan(['production']));
-    expect(text).toContain('COPY package.json package-lock.json ./\nRUN npm ci --omit=dev\nCOPY . .\n');
+    expect(text).toContain('COPY package.json package-lock.json ./\nRUN npm ci --omit=dev\n');
+    expect(text).toContain('COPY --from=build /app/node_modules ./node_modules\nCOPY . .\n');
     expect(text).toMatch(/^USER node$/m);
     expect(text).toMatch(/^ENV PATH=\/app\/node_modules\/\.bin:\$PATH$/m);
+  });
+
+  it('installs in a build stage with the tools node-gyp runs, and leaves them out of the image', () => {
+    const [build, image] = dockerfile(plan(['production'])).split(/^(?=# the image)/m);
+    expect(build).toMatch(/^FROM node:22-alpine AS build$/m);
+    expect(build).toMatch(/^RUN apk add --no-cache python3 make g\+\+$/m);
+    expect(build).toMatch(/^ENV npm_config_nodedir=\/usr\/local$/m);
+    expect(image).toMatch(/^FROM node:22-alpine$/m);
+    expect(image).not.toMatch(/apk|npm ci/);
   });
 
   it('exposes each port any workload listens on once, and starts the first workload’s command', () => {

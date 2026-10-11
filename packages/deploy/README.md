@@ -34,7 +34,7 @@ for either.
 
 | Target | Writes | What it is |
 |---|---|---|
-| `image` | `Dockerfile`, `Dockerfile.dockerignore` | the one image every workload runs: the tree installed with `npm ci --omit=dev`, run as `node`, one `EXPOSE` per port, the first workload's command |
+| `image` | `Dockerfile`, `Dockerfile.dockerignore` | the one image every workload runs: the tree installed with `npm ci --omit=dev` in a build stage that holds the tools node-gyp runs (`python3`, `make`, `g++`), copied into an image without them, run as `node`, one `EXPOSE` per port, the first workload's command |
 | `compose` | `compose.yaml`, `.env.example` | one service per workload, on a read-only root with `/tmp` writable, probed by a TCP connect on its first port; `.env.example` names every variable, its key and who reads it, and holds no value |
 | `helm` | `values.yaml` | the values of [`charts/wilanis-tree`](https://github.com/wilanis/wilanis-js/tree/main/charts/wilanis-tree), the chart this repository ships: each workload's command, replicas, ports (named `tcp-<port>`), probe and variables, the Secret's keys by name, what the environment must provide, and every switch off |
 | `plan` | nothing | the plan as JSON on stdout |
