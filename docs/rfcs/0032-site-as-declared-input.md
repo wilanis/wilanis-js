@@ -149,9 +149,12 @@ port  @note/note.port.json
     accepts  text (string), site (@std/Site.shape.json, provided)
 ```
 
-**What `rehearse` and `regress` see.** A literal. The stubbed `record` is handed the same `site` a real one is, the
-solver has nothing to choose there, and two runs of `regress` differ at `noted` only when the document moved or the node
-was renamed -- which is a change, and the diff says so.
+**What `rehearse` and `regress` see.** A literal. The stubbed `record` is handed the same `site` a real one is, and
+the solver has nothing to choose there. `regress` records what each node did -- its status, its reason, the handler it
+ran, where it routed and what it answered -- and not its `in`, so the site is never part of a diff. Moving the graph
+file changes `in.site` at `noted` and `regress` shows nothing there. Renaming the node does show, as `noted: gone`,
+because `regress` finds each node by its id; the site plays no part in it. The report of a run shows the literal under
+`in`.
 
 ## Reference
 
@@ -220,7 +223,8 @@ its site calls it; one that only logs the site does not.
 At trace level `full` (RFC 0006) it is in `wilanis.in` like every input; at `summary` it is not, like every input.
 
 **`rehearse`, `fuzz`, `regress`, `run --seed`.** `stubEffects` records the inputs it is handed, so a stubbed handler
-sees the site; nothing is generated for it, since it is a literal and not a read. `regress` diffs it as any literal.
+sees the site; nothing is generated for it, since it is a literal and not a read. `regress` does not compare a
+node's `in`, so it never diffs the site.
 
 **`start`.** A startup step that names a native `holds` operation with a provided field receives `{ file:
 "@project.json", at: "startup/<index>" }`.
@@ -253,8 +257,9 @@ tree that names no operation declaring `provided` never sees it.
 
 ## Tests
 
-- `packages/core/test/validate.test.ts`: `provided: "site"` accepted on a native port's field; `provided: "run"`
-  refused by the schema; `Site.shape.json` validates as a shape.
+- `packages/core/test/validate-contracts.test.ts`: `provided: "site"` accepted on a native port's field;
+  `provided: "run"` refused by the schema. `packages/runtime/test/site.test.ts`: `Site.shape.json`, which the runtime
+  ships, validates as a shape.
 - `packages/core/test/types.test.ts`: `ObjField.provided` filled from the field.
 - `packages/runtime/test/example.test.ts`, over a copy of the example with the fixture plugin under
   `test/fixtures/plugin-note/` and the `noted` node: the run's report has `in.site` equal to the two strings above; the
@@ -263,9 +268,11 @@ tree that names no operation declaring `provided` never sees it.
   `customer.port.json#register` marks a field `provided`, when `note.port.json#record`'s `site` is typed `string`, marked
   `secret`, or `required: false`; the copy unbroken, `codes(...)` empty. A binding operation calling `record` and a
   startup step naming a fixture `holds` operation that declares a site each receive the site their row above says.
-- `packages/runtime/test/tools.test.ts`, where `regress` is exercised: two runs diff clean at `noted`; editing the node's
-  description diffs nothing; renaming the graph file diffs at `noted` and nowhere else; `describe @note/note.port.json` prints `(provided)`.
-- `packages/view/test/view.test.ts`: the node panel shows `site` marked `provided`.
+- `packages/runtime/test/site.test.ts`: `regress` replays a fuzzed run of the planted tree clean, and replays it clean
+  again after an edit to the description of `noted`; `describe @note/note.port.json` prints `(provided)`. No case
+  moves the graph file: `regress` does not compare a node's `in`, so the case would pass with the site or without it,
+  and would prove nothing.
+- `packages/view/test/site.test.ts`: the node panel shows `site` marked `provided`.
 
 ## Implementation plan
 
@@ -305,9 +312,9 @@ Each step one pull request and one sub-issue of the tracking issue. Steps 1 and 
 - **A literal in the lowered spec, repeated.** Every site of a declaring operation carries its two strings in the IR.
   The alternative, a source arm the engine resolves (`{ site: true }`), would teach the engine a fact about documents,
   which it has never had. The strings are cheaper.
-- **`regress` churns on a rename, and on nothing else.** Moving a graph or renaming a node changes `in.site` at every
-  declaring node in it, and the baseline diffs; that is a true change of what the handler was handed, and the diff
-  names the node. Editing a label or a description changes no spec.
+- **`regress` does not show a moved site.** Moving a graph or renaming a node changes `in.site` at every declaring
+  node in it, but `regress` does not compare a node's `in`, so the baseline does not diff on the site. The report of
+  a run shows it. Editing a label or a description changes no spec.
 - **Prose in a handler's hands, by its own request.** A plugin that opens the document reads the author's sentences and
   may log them or, as RFC 0025 might, hand them to a model. They are literals a reader opening the tree sees; no
   reader's data reaches them. Nothing new is exposed, and nothing is handed to a handler that did not go and read it.
