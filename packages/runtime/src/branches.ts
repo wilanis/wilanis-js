@@ -204,7 +204,7 @@ function atNode(
  * that fed the call. Nothing when the list is composed or literal, since a literal list is already what it is. A
  * holder that is itself a map answers element by element, at `<map>.<index>`, so a stub at the map is one the kernel
  * never reads: its answer holds an element when the list it runs over does, which is the same question one map
- * further out (#869).
+ * further out, asked in the frames that map stands in (#869).
  */
 export function nonEmpty(list: FoundList, from: Stubbing, outermost = false): NonEmpty {
   const src = sourceOf(list.over);
@@ -214,7 +214,7 @@ export function nonEmpty(list: FoundList, from: Stubbing, outermost = false): No
   const held = listHolder(list);
   if (!held) return NOTHING;
   if (!held.path.length && from.isMap?.(held.target)) {
-    const holder = ownListOf(held.target, list, from);
+    const holder = ownListOf(held, list, from);
     return holder ? nonEmpty(holder, from, outermost) : NOTHING;
   }
   return { stubs: stubHolding(held, from), input: [] };
@@ -255,13 +255,21 @@ type NonEmpty = { stubs: Record<string, unknown>; input: { path: string[]; value
 const NOTHING: NonEmpty = { stubs: {}, input: [] };
 
 /**
- * The list a map at a dotted path runs over, as a list of its own to make non-empty. The map stands in the same frame
- * as the list it holds -- it is that list's sibling -- so what steered the one steers the other.
+ * The list a holder map runs over, as a list of its own to make non-empty. The holder stands in the frames
+ * `listHolder` found it in: all of the held list's frames where it is the list's sibling, fewer where the list was
+ * handed into a call and the holder stands outside that call. Its `over` is followed out through its own frames only.
+ * The trigger's input steers it as it steers the held list only where no frame was cut; otherwise `ownInputAt` follows
+ * the frames that are left.
  */
-function ownListOf(at: string, holding: FoundList, from: Pick<Stubbing, 'overOf'>): FoundList | undefined {
-  const over = from.overOf?.(at);
+function ownListOf(
+  held: { target: string; from: Frame[] },
+  holding: FoundList,
+  from: Pick<Stubbing, 'overOf'>,
+): FoundList | undefined {
+  const over = from.overOf?.(held.target);
   if (over === undefined) return undefined;
-  return { at, over, fromTriggerIn: holding.fromTriggerIn, from: holding.from };
+  const fromTriggerIn = held.from.length === holding.from.length && holding.fromTriggerIn;
+  return { at: held.target, over, fromTriggerIn, from: held.from };
 }
 
 /** Does this call hand its callee the caller's `in` untouched, field for field? Then the trigger's input still reaches inside. */

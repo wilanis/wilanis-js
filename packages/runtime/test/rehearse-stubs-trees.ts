@@ -10,10 +10,10 @@ import { join } from 'node:path';
 import { type Kind, schemaUrl } from '@wilanis/core';
 
 export const HERE = '@features/rv';
-const MAKE = '@std/object.port.json#make';
+export const MAKE = '@std/object.port.json#make';
 export const NUMBER = { type: 'number' };
 export const STRING = { type: 'string' };
-const ITEM = { score: NUMBER, name: STRING };
+export const ITEM = { score: NUMBER, name: STRING };
 export const shape = (name: string) => `${HERE}/domain/${name}.shape.json`;
 export const edge = (name: string) => `${HERE}/edge/${name}.shape.json`;
 
@@ -34,7 +34,7 @@ export const decide = (id: string, input: object, rules: { when: string; to: str
   else: otherwise,
 });
 /** A map node: the operation it runs per element of `over`, the element's fields bound by `bind`, and its other inputs. */
-const map = (id: string, op: string, each: { over: string; bind: object; in: object }) => ({
+export const map = (id: string, op: string, each: { over: string; bind: object; in: object }) => ({
   type: '@wilanis/node/map.schema.json',
   id,
   run: op,
@@ -270,47 +270,6 @@ export function mappedTree(): string {
     'data/triage.binding.json': { port, operations: { all: { graph: `${HERE}/domain/all.graph.json` } } },
     'domain/all.graph.json': graph('All', shape('Batch'), { type: `${finding}[]`, from: 'made' }, [
       map('made', MAKE, { over: '{{in.items}}', bind: { value: '' }, in: { type: finding } }),
-    ]),
-    'edge/triage.trigger.json': trigger('triage', { in: edge('BatchIn'), out: `${edge('Out')}[]` }, `${port}#all`),
-  });
-}
-
-/**
- * `all` makes an `Item` of each of the trigger's items with a `map` of `#make`, and judges each made item with a second
- * `map`, so the list the second map runs over is the first map's answer -- which the kernel answers element by element,
- * at `made.<index>`, never at `made` (#869). `judge`'s switch is reached only when the trigger's items hold an element.
- */
-export function chainedTree(): string {
-  const port = `${HERE}/domain/triage.port.json`;
-  return treeOf({
-    'domain/Item.shape.json': { layer: 'core', fields: ITEM },
-    'domain/Verdict.shape.json': { layer: 'core', fields: { name: STRING, level: STRING } },
-    'domain/Batch.shape.json': { layer: 'core', fields: { items: { type: `${shape('Item')}[]` } } },
-    'edge/ItemIn.shape.json': { layer: 'edge', fields: ITEM },
-    'edge/BatchIn.shape.json': { layer: 'edge', fields: { items: { type: `${edge('ItemIn')}[]`, maxItems: 10 } } },
-    'edge/Out.shape.json': { layer: 'edge', fields: { name: STRING, level: STRING } },
-    'domain/triage.port.json': {
-      operations: {
-        all: { description: 'd', accepts: { items: { type: `${shape('Item')}[]` } }, returns: `${shape('Verdict')}[]` },
-        judge: { description: 'd', accepts: ITEM, returns: shape('Verdict') },
-      },
-    },
-    'data/triage.binding.json': {
-      port,
-      operations: {
-        all: { graph: `${HERE}/domain/all.graph.json` },
-        judge: { graph: `${HERE}/domain/judge.graph.json` },
-      },
-    },
-    'domain/all.graph.json': graph('All', shape('Batch'), { type: `${shape('Verdict')}[]`, from: 'judged' }, [
-      map('made', MAKE, { over: '{{in.items}}', bind: { value: '' }, in: { type: shape('Item') } }),
-      map('judged', `${port}#judge`, { over: '{{made}}', bind: { score: 'score', name: 'name' }, in: {} }),
-    ]),
-    'domain/judge.graph.json': graph('Judge', shape('Item'), { type: shape('Verdict'), from: ['high', 'low'] }, [
-      make('facts', { score: '{{in.score}}', name: '{{in.name}}' }, shape('Item')),
-      decide('decide', { score: '{{facts.score}}' }, [{ when: 'score > 5', to: 'high' }], 'low'),
-      make('high', { name: '{{in.name}}', level: 'high' }, shape('Verdict')),
-      make('low', { name: '{{in.name}}', level: 'low' }, shape('Verdict')),
     ]),
     'edge/triage.trigger.json': trigger('triage', { in: edge('BatchIn'), out: `${edge('Out')}[]` }, `${port}#all`),
   });
