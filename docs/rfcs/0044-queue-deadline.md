@@ -2,12 +2,12 @@
 
 - **Status:** draft
 - **Areas:** `area:plugin-queue` (the kind's document, `deliver.ts`, X401, the README); `area:runtime` (one sabotage
-  test, the example); a README sentence in `area:plugin-storage` for the Postgres table broker. Nothing in the engine,
-  the compiler, core or its schemas.
+  test, the example); a sentence in the Postgres table broker's README (`area:plugin-storage`). Nothing in the
+  engine, the compiler, core or its schemas.
 - **Tracking issue:** #910
 - **Depends on:** RFC 0009 (the queue kind and its worker, implemented) and RFC 0012 (a kind hands its run a signal,
-  implemented). Related to issue #907, which makes the Postgres table broker renew a delivery's lock; neither waits on
-  the other (*Runtime behaviour*, last part).
+  implemented). Related: #907 (merged as #914), which makes the Postgres table broker extend a delivery's lock while
+  its run goes on; and #924, which bounds `deadlineMs` in X004 and X251 as this RFC bounds it in X401.
 
 ## Summary
 
@@ -30,12 +30,13 @@ process -- never ends. Four things follow, each read off the code:
   (`Broker.consume` in `packages/plugin-queue/src/brokers.ts`). A delivery whose `handle` never answers holds its slot
   for as long as the process lives. The consume step's `concurrency` is 1 by default (`concurrencyOf` in
   `worker.ts`), so one hung run stops the queue in that process.
-- **The message is held forever, or handed out twice.** The memory broker (`packages/plugin-queue-memory/src/consumer.ts`)
-  holds a delivery until it is answered, so the message is never delivered again and never parked. The Postgres table
-  broker locks a delivery for `queueVisibility` seconds and never extends it (`lockDue` in
-  `packages/plugin-storage-postgres/src/queue-table.ts`; `TableConsumer` in `consumer.ts`). Once the lock lapses,
-  another slot takes the message again while the first run still goes on. Issue #907 makes that broker renew the lock
-  while the run goes on, and with renewal a hung run then holds its message forever there too.
+- **The message is held forever.** The memory broker (`packages/plugin-queue-memory/src/consumer.ts`) holds a
+  delivery until it is answered, so the message is never delivered again and never parked. The Postgres table broker
+  now does the same in effect. Since #914, `TableConsumer.deliver` (`packages/plugin-storage-postgres/src/consumer.ts`)
+  starts a `Renewal` (`renewal.ts`) for each delivery. It extends the row's `locked_until` every half
+  `queueVisibility` (`extend` in `queue-table.ts`) and stops only once `handle` has answered. That is right for a
+  healthy long run, which is no longer handed to a second worker. But a run that never answers is now renewed
+  forever: its message is never delivered again, never dead, and never seen by another process.
 - **The process does not stop.** `wilanis start` answers SIGTERM by calling `stop` (`packages/runtime/src/cli.ts`),
   and the worker's stop waits for every delivery in flight (`consumeOn` in `worker.ts`; `stop` in both consumers). A
   worker with a hung run never exits on SIGTERM, so a rolling deploy waits for a SIGKILL.
@@ -65,11 +66,11 @@ binding operation, and hope the sum is small. That bounds a call, not a run. A `
 multiplies a call, or a native handler with no `timeoutMs` setting is still unbounded, and no document says what the
 whole run may take.
 
-**What this does not try to solve.** It does not make the Postgres broker renew its lock: that is #907. It does not
-give the visibility window a value per queue: with #907 the window only says how long a dead worker keeps its
-message, and one value per connection is enough. It does not cancel the runs in flight when the worker stops: a stop
+**What this does not try to solve.** It does not change how the Postgres broker keeps its lock: #914 did that. It
+does not give the visibility window a value per queue: since #914 the window only says how long a dead worker keeps
+its message, and one value per connection is enough. It does not cancel the runs in flight when the worker stops: a stop
 still drains, now bounded by the deadline. It does not add a deadline to the `@queue` plugin's settings, to the
-consume step, or to `wilanis run` of a queue trigger. It does not fix the same overflow in X004 and X251 (*Drawbacks*).
+consume step, or to `wilanis run` of a queue trigger. It does not bound `deadlineMs` in X004 and X251: that is #924.
 
 ## Guide-level explanation
 
@@ -178,15 +179,16 @@ existing range rule, X251, in the same way.
 
 T001 already refuses a `deadlineMs` that is not a number, since the kind types it. X401 judges the range.
 
-**Why the upper bound.** Node's `setTimeout` takes a 32-bit signed delay. A larger one is set to 1 ms, with only a
+**Why the upper bound.** It follows #924, which bounds `deadlineMs` the same way in X004 (`@http`) and X251
+(`@schedule`), so the three kinds refuse the same numbers. Node's `setTimeout` takes a 32-bit signed delay. A larger one is set to 1 ms, with only a
 `TimeoutOverflowWarning` on stderr. I checked it: `setTimeout(f, 3000000000)` fires after 1 ms. So a `deadlineMs` of
 35 days would cancel every run at once. 2147483647 ms is about 24.8 days, which is longer than any run a queue should
 hold a message for. The Postgres consumer already caps its own timer at the same number (`TIMER_MAX_MS` in
 `packages/plugin-storage-postgres/src/consumer.ts`).
 
 No rule relates `deadlineMs` to a broker's visibility window. `@queue` cannot see a broker's settings: the `Broker`
-contract says nothing about a window, and the memory broker has none. *Runtime behaviour* says why no such rule is
-needed once #907 lands.
+contract says nothing about a window, and the memory broker has none. Since #914 no such rule is needed
+(*Runtime behaviour*, the broker table).
 
 ### Runtime behaviour
 
@@ -223,15 +225,25 @@ No broker code changes in this RFC.
 
 | Broker | How long it holds a delivery today | With `deadlineMs` |
 |---|---|---|
-| memory (`plugin-queue-memory`) | until `handle` answers; no window | until `handle` answers, which is now within the deadline plus settle time. The deadline is the only thing that frees a hung run's slot and message |
-| Postgres table, before #907 | `queueVisibility` seconds (default 30) from the take, never extended. A longer run is taken again by any free slot, one attempt higher, while it still runs; the first run's answer then matches no row (`forget`, `release` and `park` filter on `attempts`) | the same window. Keep `deadlineMs` below `queueVisibility × 1000`: then a cancelled run answers while it still holds the lock, and its retry or dead is kept. A deadline above the window frees the slot but does not stop the second take |
-| Postgres table, after #907 | while `handle` has not answered, renewed at about half the window; `queueVisibility` only says how long a dead worker keeps its message | while `handle` has not answered, which is now within the deadline. Renewal and deadline do not interact: the deadline ends the run, the run's answer ends the renewal |
+| memory (`plugin-queue-memory`) | until `handle` answers; it has no window | until `handle` answers, which is now within the deadline plus the time the handlers in flight take to settle. The deadline is the only thing that frees a hung run's slot and message |
+| Postgres table (`plugin-storage-postgres`) | until `handle` answers: `TableConsumer.deliver` makes a `Renewal` before it calls `handle`, which extends `locked_until` by one window every half window, and it calls `renewal.stop()` after `handle` answers and before the answer is kept. `queueVisibility` only says how long a worker that died keeps its message | until `handle` answers, which is now within the deadline plus settle time. Then `renewal.stop()` runs, and the retry or dead is kept under the same attempt |
 
-So #907 and this RFC close two halves of one problem. #907 stops a healthy long run from being handed out twice. This
-RFC stops a hung run from holding its message, its slot and the process's stop forever. #907 without this RFC makes a
-hang worse on Postgres: today the lapsed lock at least lets the message go to another slot; with renewal it never
-does. Neither change needs the other to work, so they may land in either order. Until #907 lands, the README
-paragraph on `deadlineMs` says to keep it below the window on a broker that does not renew.
+The deadline and the renewal do not interact. The deadline ends the run; the run's answer ends the renewal. No
+number has to be smaller than another: a `deadlineMs` of an hour beside a `queueVisibility` of 30 seconds is right,
+since the lock is extended about 240 times while a healthy run goes on. Two edge cases stay as #914 left them, and
+neither is this RFC's:
+
+- An extension that fails is logged and tried again at the next beat (`Renewal.once`). If the lock lapses meanwhile,
+  another worker takes the message, one attempt higher. That is the redelivery at-least-once allows. The first run's
+  answer then matches no row, since `forget`, `release` and `park` filter on `attempts`.
+- A worker that dies stops extending. The message comes back one window later, as before.
+
+So #914 and this RFC close two halves of one problem. #914 keeps a healthy long run from being handed out twice. This
+RFC keeps a hung run from holding its message, its slot and the process's stop forever. #914 made the second half
+more urgent: before it, a lapsed lock at least let another slot take a hung run's message.
+
+No tree runs an older `@storage-postgres` that does not renew: no package has been published to npm yet
+(`docs/roadmap.md`, M14). So this RFC says nothing about the broker before #914.
 
 **`rehearse`, `fuzz`, `regress`, `wilanis run`.** No change. A rehearsed or fuzzed run is handed no signal and is
 never cancelled. A `cancelAt` scenario on a queue trigger already replays a `cancelled` run (RFC 0012), and the kind's
@@ -251,9 +263,9 @@ command line's context and hands no signal (`packages/runtime/src/serve.ts`); a 
 - `wilanis map` and `wilanis ls`: no change. A deadline is not a document.
 - `packages/plugin-queue/README.md` gains a paragraph on `deadlineMs` beside the one on outcomes, and its rules table's
   X401 row names `deadlineMs`. `docs/refusals/X401.md` gains the range and an example.
-- `packages/plugin-storage-postgres/README.md` and the `queueVisibility` description in its `docs/plugin.json` say that
-  a queue trigger's `deadlineMs` is what bounds a live worker's run, and, until #907 lands, to keep it below the
-  window.
+- `packages/plugin-storage-postgres/README.md` gains one sentence after the paragraph #914 wrote on the lock: a run
+  that never answers keeps its lock for as long as its worker lives, so a queue trigger's `deadlineMs` is what ends
+  it. The `queueVisibility` description in `docs/plugin.json` does not change.
 
 ### Plugin contract
 
@@ -296,7 +308,7 @@ tests use Vitest's fake timers, so no test sleeps.
 | a stop is bounded | a stop called while a run waits on its signal resolves once the deadline has cancelled it and the broker has been answered |
 
 **Postgres**, in `packages/plugin-storage-postgres/test/broker.test.ts`, behind `WILANIS_TEST_POSTGRES_URL`: none of
-its own. The worker test covers the deadline for every broker, and the broker's lock is #907's test.
+its own. The worker test covers the deadline for every broker, and #914's tests cover the lock.
 
 ## Implementation plan
 
@@ -304,20 +316,16 @@ its own. The worker test covers the deadline for every broker, and the broker's 
    `queue.trigger-kind.json`; the timer and the signal in `deliver.ts`, and `cancelled (deadline)` in its line; the
    range in X401's `checkCounts`; the worker and rule tests above; the sabotage cases; `deadlineMs: 30000` on
    `example/features/customers/edge/remove-queued.trigger.json`; the README paragraph and rules row;
-   `docs/refusals/X401.md`. One pull request. A `good first issue`: every piece has a sibling in `@schedule` or
-   `@http` to copy.
-2. **The Postgres broker's words** (`area:plugin-storage`). The `queueVisibility` description in
-   `packages/plugin-storage-postgres/docs/plugin.json` and its README name the queue trigger's `deadlineMs` as the
-   bound on a live worker's run. If #907 has landed, this is one sentence. If it has not, it also says to keep
-   `deadlineMs` below the window, and #907 removes that clause. It may be folded into #907's pull request, whichever
-   lands second.
+   `docs/refusals/X401.md`; the one sentence in `packages/plugin-storage-postgres/README.md`. One pull request. A
+   `good first issue`: every piece has a sibling in `@schedule` or `@http` to copy. It may land before or after #924;
+   whichever lands second makes the three hints read alike.
 
 ## Drawbacks and alternatives
 
 **Do nothing; teach the workaround.** The consumer's own plan is to bound each review by the timeouts its data graphs
 set, and to raise `queueVisibility` to two hours. That bounds a call, not a run: a map of nested graphs, a retried call
-or a native handler with no `timeoutMs` is still unbounded. It cannot free a slot on the memory broker, and after #907
-it cannot free a message on Postgres either. And no document says what the whole run may take, which is the thing a
+or a native handler with no `timeoutMs` is still unbounded. It cannot free a slot on the memory broker, and since #914
+it cannot free a message on Postgres either: a hung run's lock is extended for as long as the worker lives. And no document says what the whole run may take, which is the thing a
 reader of the trigger wants to know. Rejected.
 
 **A new word for a deadline's outcome (`onDeadline: retry | dead`).** A run that passes its deadline once may well pass
@@ -346,11 +354,11 @@ becomes `onFault`.
 **The broker locks for the deadline instead of renewing.** The worker could tell the broker the deadline, and the
 Postgres broker could lock for that long. Rejected: a cancellation is cooperative, so a run can outlast its deadline by
 as long as a handler ignores its signal; a trigger may have no deadline at all; and the `Broker` contract would grow a
-parameter only one broker reads. Renewal (#907) fits every case.
+parameter only one broker reads. Renewal (#914) fits every case, and it has landed.
 
 **A rule that the deadline is below the window.** `@storage-postgres`'s `check` could refuse a queue trigger on one of
-its connections whose `deadlineMs` is not below `queueVisibility`. Rejected: after #907 the relation means nothing, and
-until then the README says it.
+its connections whose `deadlineMs` is not below `queueVisibility`. Rejected: since #914 a live run keeps its lock, so
+the relation means nothing.
 
 **Cost.** One timer per delivery of a trigger with a deadline, cleared when the run answers. One more line in
 `describe` for every queue trigger. The worker's ten timer lines repeat the http kind's `withDeadline` and the
@@ -358,7 +366,7 @@ schedule's `deadlineOf` in spirit (see *Open questions*).
 
 **What this does not fix.** X004 (`@http`) and X251 (`@schedule`) judge `deadlineMs` as "a whole number of 1 or more"
 and set no upper bound, so a deadline above 2147483647 on a route or a schedule cancels its run after 1 ms today. That
-is a defect in two other plugins, outside this RFC's kind; it wants an issue of its own, and the fix is the same bound.
+is a defect in two other plugins. #924 tracks its fix, with the same bound X401 takes here.
 
 ## Open questions
 
@@ -368,8 +376,8 @@ To decide before `accepted`:
    cancelled report: retry with backoff by default, dead on the last attempt, dead at once under `"onFault": "dead"`.
    The alternative is a separate `onDeadline` (above).
 2. **X401 or a new X407.** I recommend widening X401.
-3. **The upper bound.** I recommend X401 refuses above 2147483647, rather than the worker capping the timer without a
-   word.
+3. **The upper bound.** I recommend X401 refuses above 2147483647, as #924 makes X004 and X251 do, rather than the
+   worker capping the timer without a word.
 
 To decide during implementation:
 
