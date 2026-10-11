@@ -16,12 +16,13 @@ import { type Reached, switchesReached, uncoveredBy } from './rehearse-reached.j
 import { whereOf } from './rehearse-where.js';
 import { type PolicyRoot, policyRoot } from './stubbing.js';
 
-/** What a branch's run hands back to be recorded: what it was fired with, what answered, and whether a node broke. */
+/** What a branch's run hands back to be recorded: what it was fired with, what answered, and the nodes that broke. */
 export interface Ran {
   input: unknown;
   stubs: Record<string, unknown>;
   report: Report;
-  broke: boolean;
+  /** The dotted paths of the nodes the run made break: a catch branch's caught node, and any the steering broke. */
+  broken: string[];
 }
 
 /** What a recorded branch reads of the walk: the tree, the trigger, the seed and context it fired with, the probe. */
@@ -83,8 +84,8 @@ export const replayedDoc = (
 
 /**
  * One branch as it is recorded, named by the branch it proves and, where a sibling shares its target, its place: the
- * run it made, or -- where the solver could not solve or steer it -- why no input reaches it. Nothing for a run that
- * broke a node for real, which a scenario's stubs cannot say.
+ * run it made, or -- where the solver could not solve or steer it -- why no input reaches it. A run that broke nodes
+ * -- a switch's catch branch -- names them, so its replay breaks them too (#721).
  */
 export function recordedOf(walk: Walked, decision: Decision, of: { one: Case; cases: Case[]; ran?: Ran }) {
   const { one, cases, ran } = of;
@@ -100,9 +101,10 @@ export function recordedOf(walk: Walked, decision: Decision, of: { one: Case; ca
   const named = { ...namedBy(walk.trigger), branch, seed: walk.seed };
   const unreachable = uncoveredBy(one);
   if (unreachable !== undefined) return { ...named, unreachable };
-  if (!ran || ran.broke) return undefined;
-  const { input, stubs, report } = ran;
-  return { ...named, input, context: walk.context, stubs, report, secret: secretOut(walk.probe, walk.trigger) };
+  if (!ran) return undefined;
+  const { input, stubs, report, broken } = ran;
+  const secret = secretOut(walk.probe, walk.trigger);
+  return { ...named, input, context: walk.context, stubs, broken, report, secret };
 }
 
 /**

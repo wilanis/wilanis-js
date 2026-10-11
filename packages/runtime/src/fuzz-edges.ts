@@ -34,7 +34,8 @@ import { getPath, setPath } from './stubs.js';
 
 /**
  * What `fuzz` answers: whether it wrote every run, every file written, a line per run it did not write (`unwritten`),
- * what the profile skipped, and under `edges` the directory it owns with what was written to it or found different in it.
+ * what the profile skipped, and under `edges` the directory it owns with what was written to it or found different
+ * in it.
  */
 export interface Fuzzing {
   ok: boolean;
@@ -88,8 +89,9 @@ interface Gathered {
 /**
  * Fire every trigger the default profile serves once per edge of its input and write each run under
  * `scenarios/edges/` -- or under `check` compare them with it and write nothing -- but never one of a fault, or one
- * whose replay ended otherwise than the run (`unwritten`), which is said instead, as plain fuzz says it. A trigger with no input, or none whose values are the caller's to choose,
- * has no edge and no file. Throws for an option that would make the directory depend on more than the tree.
+ * whose replay ended otherwise than the run (`unwritten`), which is said instead, as plain fuzz says it. A trigger
+ * with no input, or none whose values are the caller's to choose, has no edge and no file. Throws for an option that
+ * would make the directory depend on more than the tree.
  */
 export async function fuzzEdges(
   load: LoadResult,

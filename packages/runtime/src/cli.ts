@@ -66,10 +66,10 @@ const USAGE = `wilanis -- declarative dataflow, judged by a compiler, run by a s
                    and fixed edge of its input (an empty, one-character and 256-character string, each member of an
                    enum, 0, -1, 0.5 and the largest safe integer, true and false, an empty and a one-element list, an
                    optional field left out) under scenarios/edges/, and --edges --check says whether that directory
-                   is what the tree writes today and exits 1 when it is not, or when a run faults. Every recorder
-                   (fuzz, --edges, rehearse --record) writes nothing of a run whose replay from its stubs ends
-                   otherwise than the run did, says so, and exits 1. --edges fires under seed 1 and the default
-                   profile, as --record solves, and refuses --runs, --seed, --profile and --json
+                   is what the tree writes today and exits 1 when it is not, or when a run faults. --edges fires
+                   under seed 1 and the default profile, as --record solves, and refuses --runs, --seed, --profile
+                   and --json. Every recorder (fuzz, --edges, rehearse --record) writes nothing of a run whose
+                   replay from its stubs ends otherwise than the run did, says so, and exits 1
   wilanis scenarios [root] --check                 rehearse --check and fuzz --edges --check in one step, for CI:
                    exit 1 when either fails
   wilanis scenarios [root] --pin <file>            keep one scenario by hand: copy the file (its path below the root)

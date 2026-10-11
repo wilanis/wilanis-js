@@ -140,7 +140,7 @@ describe('wilanis describe: a trigger counts the scenarios that replay it', () =
     const at = said.findIndex(line => line.startsWith('scenarios  '));
     expect(said[at - 1]).toMatch(/^ {2}context is what/);
     expect(said.slice(at, at + 5)).toEqual([
-      'scenarios  3 recorded, 3 edge(s), 1 fuzzed, 1 by hand',
+      'scenarios  4 recorded, 3 edge(s), 1 fuzzed, 1 by hand',
       '    scenarios/rehearsed/customers.get-customer/',
       '    scenarios/edges/customers.get-customer/',
       '    scenarios/fuzz/',

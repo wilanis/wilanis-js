@@ -748,3 +748,13 @@ Decided during implementation:
   names the branch (or the trigger and the edge or seed), both endings and what to do, and the command exits 1, as it
   does for a fault. The branch is not compared on its own: the switch's inputs are the same stubs in both runs, so
   wherever the replay runs the switch, it routes the same way.
+- **A catch branch is recorded with the nodes it breaks (#721).** The rehearsal walks a switch's catch branch
+  (`<node> broke`) by making the caught node throw (`broken` in `branchOf`), and a scenario's stubs say only what a node
+  answered. A scenario now names the nodes that break under `broken`, by dotted path: the caught node, and any node the
+  steering broke to reach the switch. `rehearse --record` writes it for every branch whose run broke a node, and the one
+  replay function (`replayedReport` in `packages/runtime/src/replay.ts`) fires with those nodes broken, through an
+  embedder of its own, as it does for `cancelAt`. No stub at or under a broken node is used. So the recorder's replay and
+  `regress` take one path, and the #935 check compares the run and its replay as for any other branch. A path under
+  `broken` is a key of the scenario's `expect.nodes`, a node the run reports (S008), judged against the scenario alone
+  as S003 judges `cancelAt`. A guard's branches (`<id>:check`, `in:check`) are still not recorded: whether they belong
+  in the record is open on #20.

@@ -8,9 +8,11 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadTree } from '@wilanis/core';
+import type { Report } from '@wilanis/engine';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { EDGES, embedderFor, fuzz, RECORDED, regress, rehearse } from '../src/index.js';
 import { recordedProfile } from '../src/profile.js';
+import { endedOtherwise } from '../src/replay.js';
 import { copyOfExample, INCLUDES, PLUGINS } from './example-harness.js';
 
 const GET_ROW = 'features/customers/data/get-row.graph.json';
@@ -204,5 +206,47 @@ describe('a sibling that ends the run first only in the replay', () => {
       }
     }
     expect(real.length).toBeGreaterThan(0);
+  });
+});
+
+/** A node of a report that failed: refused where it gives a reason, broke where it gives none. */
+const failed = (fields: { reason?: string; error: string; sub?: unknown }) => ({
+  status: 'failed',
+  startedAt: 0,
+  endedAt: 1,
+  ...fields,
+});
+
+/** A run of get-customer that failed at one node of get-row, reached through the call `op`, as the engine reports it. */
+function failedAt(node: string, fields: { reason?: string; error: string }): Report {
+  const sub = { graph: GET_ROW, status: 'failed', startedAt: 0, endedAt: 1, nodes: { [node]: failed(fields) } };
+  const op = failed({ ...fields, sub });
+  return { graph: 'get-customer', status: 'failed', startedAt: 0, endedAt: 1, nodes: { op } } as unknown as Report;
+}
+
+/**
+ * A sibling can break rather than refuse. Where both happen, the engine says the run refused (`outcomeOf`), so a
+ * replay that breaks is one where the sibling broke before the switch's branch ran: reports made by hand say it.
+ */
+describe('a sibling that breaks first only in the replay', () => {
+  const missing = failedAt('noCustomer', { reason: 'missing', error: 'no customer c1' });
+
+  it('is not recorded: the line says where the replay broke and what it threw', () => {
+    const broke = failedAt('sideFact', { error: 'message: expected a string' });
+    expect(endedOtherwise(missing, broke, 'wilanis rehearse --record')).toBe(
+      "NOT RECORDED: the run that chose the stubs refuses as missing at 'op.noCustomer', and the replay of those " +
+        "stubs breaks at 'op.sideFact': message: expected a string. " +
+        `${WHY}: make one of the two run only after the other is decided, or make it stop refusing or breaking, ` +
+        'then run wilanis rehearse --record again',
+    );
+  });
+
+  it('is recorded where both runs broke at one node, whatever each threw: the node names the fault', () => {
+    const once = failedAt('sideFact', { error: 'message: expected a string' });
+    const again = failedAt('sideFact', { error: 'message: expected text' });
+    expect(endedOtherwise(once, again, 'wilanis rehearse --record')).toBeUndefined();
+    expect(endedOtherwise(missing, failedAt('noCustomer', { reason: 'missing', error: 'no customer c2' }), 'x')).toBe(
+      undefined,
+    );
   });
 });

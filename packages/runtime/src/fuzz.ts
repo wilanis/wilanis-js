@@ -143,8 +143,8 @@ export function fuzz(
  * one of a fault, or one whose replay ended otherwise than the run (`unwritten`). The stubbed world never throws, so a
  * run that faults under stubs is the tree's own bug (a `make` whose value does not fit, a `refuse` whose reason is not
  * a word, a wiring hole), and a scenario pinning it would hold the tree to breaking: the fault is said, nothing is
- * written for it, and the answer is not ok. A trigger the
- * profile does not serve (`walkedUnder`) is not run, and `skipped` says how many and where they are served.
+ * written for it, and the answer is not ok. A trigger the profile does not serve (`walkedUnder`) is not run, and
+ * `skipped` says how many and where they are served.
  */
 async function fuzzSeeds(load: LoadResult, opts: { runs?: number; profile?: string; out?: string }): Promise<Fuzzing> {
   const written: string[] = [];

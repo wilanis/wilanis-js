@@ -5,14 +5,15 @@
  * handler answers, so a run whose effects were generated as it went and the replay of its stubs can end with other
  * nodes cancelled. Recording what the replay answers, fired by the one function `regress` fires with, keeps the two
  * the same. Where the replay ends another way than the run (another node ended it first), the run is not recorded at
- * all (`endedOtherwise`, #935).
+ * all (`endedOtherwise`, #935). A scenario that names nodes that break replays with them broken, as the rehearsal
+ * walked its catch branch, so the recorder and `regress` take one path (#721).
  */
 import type { Loaded, LoadResult, ScenarioDoc, TriggerDoc } from '@wilanis/core';
 import { type NodeReport, type Outcome, outcomeOf, type Report } from '@wilanis/engine';
 import type { Embedder } from './embed.js';
 import { asWritten } from './recorded-answers.js';
 import { replayedDoc } from './rehearse-recorded.js';
-import { embedderFor } from './stubbing.js';
+import { embedderFor, unbroken } from './stubbing.js';
 
 /**
  * What every replay of one tree fires through: stubbed effects under seed 0, and so (`embedderFor`) a fake value for
@@ -33,12 +34,16 @@ export function replayerFor(load: LoadResult, profile?: string): Replayer {
 export const triggerOf = (load: LoadResult, sc: Pick<ScenarioDoc, 'trigger'>): Loaded<TriggerDoc> | undefined =>
   load.registry.all('trigger').find(trigger => trigger.path === load.resolve(sc.trigger));
 
-/** What a replay reads of a scenario: the policy it fires in its trigger's place, its input and context, and where it cancels. */
-type Fired = Pick<ScenarioDoc, 'policy' | 'in' | 'context' | 'cancelAt'>;
+/**
+ * What a replay reads of a scenario: the policy it fires in its trigger's place, its input and context, where it
+ * cancels, and the nodes that break.
+ */
+type Fired = Pick<ScenarioDoc, 'policy' | 'in' | 'context' | 'cancelAt' | 'broken'>;
 
 /**
  * One scenario fired as `regress` fires it: its trigger, or the root of the policy it names, with its input, its
- * context and the stubs given -- and where it pins a cancellation, aborted at that effect (`cancelledReplay`).
+ * context and the stubs given -- and where it pins a cancellation or breaks nodes, through an embedder of its own
+ * (`separateReplay`).
  */
 export function replayedReport(
   load: LoadResult,
@@ -47,12 +52,12 @@ export function replayedReport(
   how: { trigger: Loaded<TriggerDoc>; stubs: Record<string, unknown> },
 ): Promise<Report> {
   const fired = replayedDoc(load, sc, how.trigger);
-  if (sc.cancelAt) return cancelledReplay(load, replayer.stubbed, fired, { sc, stubs: how.stubs });
+  if (sc.cancelAt || sc.broken?.length) return separateReplay(load, replayer.stubbed, fired, { sc, stubs: how.stubs });
   return replayer.emb.fire(fired, sc.in, sc.context ?? {}, { stubs: how.stubs });
 }
 
-/** What a recorder fires its recording with: the way in, and the input, context and stubs it will write. */
-export type Replayable = Pick<ScenarioDoc, 'trigger' | 'policy' | 'in' | 'context' | 'stubs'>;
+/** What a recorder fires its recording with: the way in, and the input, context, stubs and broken nodes it writes. */
+export type Replayable = Pick<ScenarioDoc, 'trigger' | 'policy' | 'in' | 'context' | 'stubs' | 'broken'>;
 
 /**
  * The report a recorded scenario's expectation is read off: the scenario fired as `regress` will fire it, from the
@@ -68,22 +73,25 @@ export function recordedReport(load: LoadResult, replayer: Replayer, recorded: R
 }
 
 /**
- * A scenario that pins a cancellation, replayed: its `cancelAt` is taken out of the stubs `stubsOf` resolved, so the
- * run reaches that effect's stub, which aborts the run's signal there. A node, never a duration, so the replay is the
- * same on every machine; an embedder of its own, since the stub that aborts is this run's alone.
+ * A scenario that pins a cancellation or breaks nodes, replayed through an embedder of its own, since the stub that
+ * aborts and the stubs that throw are this run's alone. Its `cancelAt` is taken out of the stubs `stubsOf` resolved,
+ * so the run reaches that effect's stub, which aborts the run's signal there: a node, never a duration, so the replay
+ * is the same on every machine. Every node at or under a `broken` path throws, and no stub answers in its place, as
+ * when the rehearsal walked the branch a switch's `catch` routes to (`branchOf`).
  */
-function cancelledReplay(
+function separateReplay(
   load: LoadResult,
   stubbed: Replayer['stubbed'],
   trigger: TriggerDoc,
   replayed: { sc: Fired; stubs: Record<string, unknown> },
 ): Promise<Report> {
   const { sc } = replayed;
-  const path = sc.cancelAt ?? '';
   const control = new AbortController();
-  const emb = embedderFor(load, { ...stubbed, cancelAt: { path, abort: () => control.abort() } });
-  const { [path]: _, ...stubs } = replayed.stubs;
-  return emb.fire(trigger, sc.in, sc.context ?? {}, { stubs, signal: control.signal });
+  const cancelAt = sc.cancelAt === undefined ? undefined : { path: sc.cancelAt, abort: () => control.abort() };
+  const broken = new Set(sc.broken ?? []);
+  const emb = embedderFor(load, { ...stubbed, cancelAt, broken });
+  const stubs = Object.fromEntries(Object.entries(replayed.stubs).filter(([path]) => path !== sc.cancelAt));
+  return emb.fire(trigger, sc.in, sc.context ?? {}, { stubs: unbroken(stubs, broken), signal: control.signal });
 }
 
 /** How a run ended: how, a refusal's reason, and the node that ended it, by its dotted path. */
