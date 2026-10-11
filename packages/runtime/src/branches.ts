@@ -8,7 +8,7 @@
  */
 import { type Type, typeAt } from '@wilanis/core';
 import type { Branch, Domain } from './domains.js';
-import { listHolder, ownInputAt, sourceOf } from './frames.js';
+import { elementPathOf, listHolder, ownInputAt, sourceOf } from './frames.js';
 import { branchesOf } from './solve.js';
 import { getPath, NO_MEMBER, satisfy, setPath } from './stubs.js';
 
@@ -177,8 +177,9 @@ function atNode(
   if (!sub) return [];
   const here = [...prefix, id].join('.');
   const walked = { seen: new Set([...seen, handler]), via: [...via, here] };
-  // a mapped operation runs once per element, each under the element's index; the first element stands for all,
-  // and what it receives is the element, never the trigger's input
+  // a mapped operation runs once per element, each under the element's index; the first element stands for all --
+  // `nonEmpty` makes a list the rehearsal sets hold that one alone -- and what it receives is the element, never the
+  // trigger's input
   if (node.kind === 'map')
     return switchesOf(sub, nested, {
       ...walked,
@@ -197,11 +198,14 @@ function atNode(
 }
 
 /**
- * What it takes for a mapped operation to run at all: its list holds at least one element. A demand on the
+ * What it takes for a mapped operation to run, once, for the element the walk steers: its list holds exactly one
+ * element, since a second would run from values nothing steered, and a guard one of them breaks would end every case
+ * of the switch wherever its first element was steered (#904). A demand on the
  * trigger's input when the list is read from it -- field for field, or, for the `outermost` list of a switch,
  * handed down under another name by the frames on the way (`ownInputAt`) -- a stub of the node that holds it
  * otherwise -- a sibling of the map, or, where the map runs over what its frame was handed, the node one hop out
- * that fed the call. Nothing when the list is composed or literal, since a literal list is already what it is. A
+ * that fed the call. Nothing when the list is composed or literal, since a literal list is already what it is, and
+ * such a list keeps every element it has. A
  * holder that is itself a map answers element by element, at `<map>.<index>`, so a stub at the map is one the kernel
  * never reads: its answer holds an element when the list it runs over does, which is the same question one map
  * further out, asked in the frames that map stands in (#869).
@@ -220,8 +224,8 @@ export function nonEmpty(list: FoundList, from: Stubbing, outermost = false): No
   return { stubs: stubHolding(held, from), input: [] };
 }
 
-/** What a list must be to run a mapped operation at all: there, with an element. */
-const AN_ELEMENT: Domain = { minLen: 1, present: true };
+/** What a list the rehearsal sets must be to run a mapped operation for the one element it steers: there, with that element alone. */
+const ONE_ELEMENT: Domain = { minLen: 1, maxLen: 1, present: true };
 
 /**
  * Where in the trigger's own input a list is read from, when it is: field for field where the map reads `in` and
@@ -233,19 +237,19 @@ function handedFrom(src: { ref: string; path: string[] }, list: FoundList, outer
   return outermost ? ownInputAt(list) : undefined;
 }
 
-/** The patch to the trigger's input that puts an element in the list at a path. */
+/** The patch to the trigger's input that makes the list at a path hold one element. */
 function patchOf(path: string[], from: Stubbing): { path: string[]; value: unknown } {
-  const value = satisfy(AN_ELEMENT, getPath(from.inputSeed, path), typeAtPath(from.inType, path), from.seed ?? 1);
+  const value = satisfy(ONE_ELEMENT, getPath(from.inputSeed, path), typeAtPath(from.inType, path), from.seed ?? 1);
   return { path, value };
 }
 
-/** The stub of the node that holds the list, with an element in it; the answer keeps every other field it has, since a sibling may read one. */
+/** The stub of the node that holds the list, with one element in it; the answer keeps every other field it has, since a sibling may read one. */
 function stubHolding(held: { target: string; path: string[] }, from: Stubbing): Record<string, unknown> {
   const { generated, typeOf = () => undefined, seed = 1 } = from;
   const { target, path } = held;
   const base = standIn(target, { generated, typeOf, seed });
   const type = typeOf(target);
-  const filled = satisfy(AN_ELEMENT, getPath(base, path), typeAtPath(type, path), seed);
+  const filled = satisfy(ONE_ELEMENT, getPath(base, path), typeAtPath(type, path), seed);
   return { [target]: setPath(base, path, filled, { type, seed }) };
 }
 
@@ -324,8 +328,13 @@ interface At {
   node: KSwitchLike;
   prefix: string[];
   steerable: boolean;
-  /** the innermost map enclosing the switch, whose element is what its `in` reads */
+  /**
+   * the innermost map enclosing the switch, whose element its `in` reads where every call entered since the map hands
+   * the element down as it got it -- a binding's wrapper `op` among them (#904)
+   */
   element?: FoundList;
+  /** the calls entered since that map, outermost first */
+  frames: Frame[];
 }
 
 /**
@@ -373,8 +382,9 @@ function meet(
   if (!src) return 'unreachable';
   // a switch in the top-level graph reading `in` is steered by the trigger's input, not a stub
   if (src.ref === 'in' && at.steerable) return ofInput([...src.path, ...within], domain, from);
-  // inside a map, `in` is the element: what steers it is the list the map runs over
-  if (src.ref === 'in' && at.element) return ofElement(at.element, [...src.path, ...within], domain, from);
+  // inside a map, `in` is the element, handed down unchanged by any call since: what steers it is the list mapped over
+  const inElement = src.ref === 'in' && at.element ? elementPathOf([...src.path, ...within], at.frames) : undefined;
+  if (at.element && inElement) return ofElement(at.element, inElement, domain, from);
   if (src.ref === 'in' || src.ref === 'context' || src.ref === 'const') return 'unreachable';
   return { stub: { target: stubTarget(at.prefix, src.ref, from), path: [...src.path, ...within], value: domain } };
 }
@@ -439,24 +449,17 @@ function lay(
   return undefined;
 }
 
-/**
- * The map whose element this switch reads as `in`, where it reads one at all: the innermost enclosing map, and
- * only when the switch stands directly in the spec that map runs -- its prefix is the map's own plus the index
- * the walk enters an element under. A switch deeper than that sits in a further call, whose `in` is whatever
- * that call was handed rather than the element, and steering the list would not move it.
- */
-function elementOf(found: FoundSwitch): FoundList | undefined {
-  const innermost = found.lists[found.lists.length - 1];
-  if (!innermost) return undefined;
-  const directly = [...innermost.at.split('.'), '0'].join('.');
-  return found.prefix.join('.') === directly ? innermost : undefined;
-}
-
 /** One branch as a case: the stubs and the input that steer a run into it. */
 function steer(branch: Branch, found: FoundSwitch, from: Settled, steerable: boolean): Case {
   const steered: Steered = { stubs: {}, input: [] };
   const missed: Record<Missed, string[]> = { unreachable: [], exhausted: [] };
-  const at: At = { node: found.node, prefix: found.prefix, steerable, element: elementOf(found) };
+  const at: At = {
+    node: found.node,
+    prefix: found.prefix,
+    steerable,
+    element: found.lists.at(-1),
+    frames: found.from ?? [],
+  };
   const demands = branch.unsolved ? [] : Object.entries(branch.demands);
   for (const [dotted, domain] of demands) {
     const why = lay(meet(dotted, domain, at, from), steered, from);

@@ -1,9 +1,9 @@
 /**
  * Following a value out of the spec that reads it, through the calls that handed it down. A lowered spec reads
  * what it was given as `in`; the call that entered it says, input by input, where each came from one frame further
- * out, and a binding lowers to a frame of its own that hands its caller's value straight on. Two questions are
- * answered by walking those frames: which node holds the list a map runs over, and which node a guard's value on
- * `in` was copied from.
+ * out, and a binding lowers to a frame of its own that hands its caller's value straight on. Three questions are
+ * answered by walking those frames: which node holds the list a map runs over, which node a guard's value on
+ * `in` was copied from, and where in a map's element a read of `in` behind further calls lies.
  */
 import type { FoundList, FoundSwitch, Frame } from './branches.js';
 
@@ -111,6 +111,31 @@ export function upstreamOf(found: FoundSwitch): Upstream | undefined {
 /** One read of `in` followed out through the frames that handed it down, to the node that holds the same field. */
 function tracedOut(read: { ref: string; path: string[] } | undefined, frames: Frame[]): Upstream | undefined {
   if (read?.ref !== 'in') return undefined;
+  const out = handedOut(read, frames);
+  if (!out?.at || ['in', 'context', 'const'].includes(out.src.ref)) return undefined;
+  if (out.src.path.join('.') !== read.path.join('.')) return undefined;
+  return { prefix: out.at.split('.').slice(0, -1), node: out.src.ref };
+}
+
+/**
+ * Where in the element a map hands its operation a read of `in` is, when every call between the map and the read
+ * hands it down as it got it: none declares inputs, as a binding's wrapper does, or each names where it got the value
+ * one frame out and that is its own `in`. `frames` are the calls entered since the map, outermost first. Nothing where
+ * a call composes the value or takes it from a node of its own, since steering the element would not move it then.
+ */
+export function elementPathOf(path: string[], frames: Frame[]): string[] | undefined {
+  const out = handedOut({ ref: 'in', path }, frames);
+  return out?.src.ref === 'in' ? out.src.path : undefined;
+}
+
+/**
+ * A read of `in` followed out a frame at a time, innermost first, while it still reads `in`: the source it reads where
+ * it stops, and the last call it was followed through. Nothing where a call composes it on the way.
+ */
+function handedOut(
+  read: { ref: string; path: string[] },
+  frames: Frame[],
+): { src: { ref: string; path: string[] }; at?: string } | undefined {
   let src = read;
   let at: string | undefined;
   for (let frame = frames.length - 1; src.ref === 'in' && frame >= 0; frame--) {
@@ -119,7 +144,5 @@ function tracedOut(read: { ref: string; path: string[] } | undefined, frames: Fr
     at = frames[frame].at;
     if (given) src = given;
   }
-  if (!at || ['in', 'context', 'const'].includes(src.ref)) return undefined;
-  if (src.path.join('.') !== read.path.join('.')) return undefined;
-  return { prefix: at.split('.').slice(0, -1), node: src.ref };
+  return { src, at };
 }
