@@ -9,7 +9,7 @@ import { basename, join, relative } from 'node:path';
 import { badResolves } from './contracts.js';
 import { type AnyDoc, type Kind, layerOf, type PluginDoc, type PortDoc, type ProjectDoc } from './model.js';
 import { featureOf, stem, treePath, walk } from './paths.js';
-import { ANSWERS_FILE, answersHome, misplaced } from './placement.js';
+import { ANSWERS_FILE, answersHome, misplaced, SCENARIOS_DIR } from './placement.js';
 import type { PluginModule } from './plugin.js';
 import type { Loaded, Refusal, RefusalList, Registry } from './registry.js';
 import { validateDocument } from './validate.js';
@@ -197,7 +197,7 @@ export class Documents {
  */
 function misnamedAnswers(file: string): Refusal | null {
   const named = basename(file) === ANSWERS_FILE;
-  if (file.startsWith('scenarios/') ? answersHome(file) === file : named) return null;
+  if (file.startsWith(`${SCENARIOS_DIR}/`) ? answersHome(file) === file : named) return null;
   return {
     code: 'D003',
     file,

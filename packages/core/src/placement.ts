@@ -44,8 +44,8 @@ export const ANSWERS_FILE = 'answers.json';
  */
 export function answersHome(file: string): string {
   const segments = file.split('/');
-  if (segments[0] === 'scenarios' && segments.length > 2) return `${segments.slice(0, -1).join('/')}/${ANSWERS_FILE}`;
-  return `scenarios/rehearsed/${ANSWERS_FILE}`;
+  if (segments[0] === SCENARIOS_DIR && segments.length > 2) return `${segments.slice(0, -1).join('/')}/${ANSWERS_FILE}`;
+  return `${SCENARIOS_DIR}/rehearsed/${ANSWERS_FILE}`;
 }
 
 /** A document as it is about to be placed: its kind, its tree path, the feature it sits in, and its content. */
