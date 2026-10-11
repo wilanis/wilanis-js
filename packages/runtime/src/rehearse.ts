@@ -330,7 +330,7 @@ async function branchOf(
   const local = ranAt(report, sw);
   if (!local) return { said: { ...at, uncovered: notReached(report) } };
   // a stubbed node's handler never runs, so what the case gave is written over what the run generated
-  const ran = { input: fired, stubs: { ...record, ...given }, report, broke: broken.size > 0 };
+  const ran = { input: fired, stubs: { ...record, ...given }, report, broken: [...broken] };
   return { said: { ...at, settled: settle(local, sw, one.branch.to) }, ran };
 }
 

@@ -3,7 +3,7 @@
  * cancels its replay only at an effect it stubbed (S003), proves a branch the graph still has (S004), and
  * replays a policy only under a trigger that attaches it (S005). A scenario written by hand holds its answers and
  * stubs itself (S006), and every pointer of a recorded one resolves in its directory's answers document (S007), whose
- * shared answers S002 judges once (RFC 0036).
+ * shared answers S002 judges once (RFC 0036). A node it breaks is one its run reports (S008).
  */
 import {
   type AnswersDoc,
@@ -26,8 +26,8 @@ import type { Judge, Refuser } from './judge.js';
 /**
  * The refusals a scenario earns: naming a trigger the tree does not have (S001), pinning a reason on a node
  * that did not refuse (S002), cancelling at a node it did not stub (S003), naming a branch the graph does not
- * have (S004), naming a policy its trigger does not attach (S005), pointing though written by hand (S006), and
- * pointing at what its answers document does not hold (S007).
+ * have (S004), naming a policy its trigger does not attach (S005), pointing though written by hand (S006),
+ * pointing at what its answers document does not hold (S007), and breaking a node its run does not report (S008).
  */
 export function checkScenario(judge: Judge, scenario: Loaded<ScenarioDoc>): void {
   const refuse = judge.refuser(scenario.path);
@@ -38,6 +38,7 @@ export function checkScenario(judge: Judge, scenario: Loaded<ScenarioDoc>): void
   // a shared answer is judged once, in the answers document that holds it, so only the inline ones are judged here
   checkPinnedReasons(nodesOf(scenario.doc, undefined).nodes, INLINE, refuse);
   checkCancelAt(judge, scenario, refuse);
+  checkBroken(scenario.doc, refuse);
   if (scenario.doc.generated === undefined) checkWrittenByHand(scenario.doc, refuse);
   else checkResolved(judge, scenario, refuse);
   if (scenario.doc.branch) checkBranch(judge, scenario.doc.branch, refuse);
@@ -168,6 +169,24 @@ function checkCancelAt(judge: Judge, scenario: Loaded<ScenarioDoc>, refuse: Refu
     'cancelAt',
     'cancelAt names a stubbed effect: one of the keys under stubs',
   );
+}
+
+/**
+ * S008: every node a scenario breaks is a node its run reports, a key of `expect.nodes`. A broken node throws where it
+ * runs, so its run reports it failed; a path the run never reaches breaks nothing, and the catch branch the scenario
+ * was written for is not taken. Judged against the scenario's own record, as S003 judges `cancelAt` against its stubs.
+ */
+function checkBroken(scenario: ScenarioDoc, refuse: Refuser): void {
+  const nodes = scenario.expect.nodes ?? {};
+  for (const [index, path] of (scenario.broken ?? []).entries()) {
+    if (Object.hasOwn(nodes, path)) continue;
+    refuse(
+      'S008',
+      `broken names '${path}', which is not a node this scenario's run reports under expect.nodes`,
+      `broken/${index}`,
+      'broken names a node of the run, one of the keys under expect.nodes, such as op.<node>: wilanis rehearse --record writes it for a catch branch',
+    );
+  }
 }
 
 const REGENERATE =

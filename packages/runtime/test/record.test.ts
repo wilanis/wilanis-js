@@ -7,15 +7,7 @@ import { readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'n
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkTree } from '@wilanis/compiler';
-import {
-  type GraphDoc,
-  isSwitch,
-  type LoadResult,
-  loadTree,
-  type ProjectDoc,
-  policyPath,
-  stubsOf,
-} from '@wilanis/core';
+import { type LoadResult, loadTree, type ProjectDoc, policyPath, stubsOf } from '@wilanis/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PROFILE_VARIABLE, RECORDED, type Rehearsal, regress, rehearse } from '../src/index.js';
 import { recordedProfile } from '../src/profile.js';
@@ -40,13 +32,6 @@ function bytesUnder(dir: string): Record<string, string> {
   return Object.fromEntries(files.sort().map(file => [file, readFileSync(join(dir, file), 'utf8')]));
 }
 
-/** Whether a branch is the one a switch's catch routes a fault to: its run breaks a node, which no stub can say. */
-function caught(loaded: LoadResult, graph: string, node: string, when: string): boolean {
-  const doc = loaded.registry.all('graph').find(one => one.path === loaded.resolve(graph))?.doc as GraphDoc;
-  const sw = doc.nodes.find(one => one.id === node);
-  return !!sw && isSwitch(sw) && Object.keys(sw.catch ?? {}).some(at => when === `${at} broke`);
-}
-
 /** The names of the policies a trigger of the tree attaches: each one's decision is recorded once, whatever the kinds. */
 function attachedPolicies(loaded: LoadResult): Set<string> {
   const attached = new Set(
@@ -56,10 +41,10 @@ function attachedPolicies(loaded: LoadResult): Set<string> {
 }
 
 /**
- * How many files the rehearsal records, read off what it reported: every branch a trigger reached that ran without
- * breaking a node, or that no input reaches, once per trigger reaching it -- guards aside, since the compiler wrote
- * their switch -- and one whole run per trigger with no switch; a policy's decision once, however many kinds its root
- * was walked under.
+ * How many files the rehearsal records, read off what it reported: every branch a trigger reached, a catch branch's
+ * among them, or that no input reaches, once per trigger reaching it -- guards aside, since the compiler wrote their
+ * switch -- and one whole run per trigger with no switch; a policy's decision once, however many kinds its root was
+ * walked under.
  */
 function expectedFiles(loaded: LoadResult, rehearsal: Rehearsal): number {
   const triggers = new Set(loaded.registry.all('trigger').map(one => one.name));
@@ -69,9 +54,7 @@ function expectedFiles(loaded: LoadResult, rehearsal: Rehearsal): number {
   count += new Set(rehearsal.plain.flatMap(one => (policies.has(one.trigger) ? [one.trigger] : []))).size;
   for (const decision of rehearsal.decisions) {
     if (decision.guard) continue;
-    const ran = decision.branches.filter(
-      one => (one.settled || one.uncovered) && !caught(loaded, decision.graph, decision.node, one.when),
-    );
+    const ran = decision.branches.filter(one => one.settled || one.uncovered);
     count += ran.length * decision.triggers.filter(recorded).length;
   }
   return count;
@@ -129,6 +112,16 @@ describe('rehearse --record: the recorded directory', () => {
     // the stub is shared: the scenario names its digest, and the answers file holds the value
     const answers = read(join(dir, RECORDED, 'answers.json'));
     expect(stubsOf(sc, answers)).toMatchObject({ stubs: { 'op.fetched': { status: 404 } }, unresolved: [] });
+    // a catch branch names the node it breaks, so its replay breaks it too (#721)
+    const caught = read(
+      join(dir, RECORDED, 'customers.get-customer/customers.get-row.outcome.unreachable.scenario.json'),
+    );
+    expect(caught).toMatchObject({
+      branch: { graph: `@${GET_ROW}`, node: 'outcome', when: 'fetched broke', to: 'unreachable' },
+      broken: ['op.fetched'],
+      expect: { status: 'failed', reason: 'upstream' },
+    });
+    expect(stubsOf(caught, answers).stubs).not.toHaveProperty('op.fetched');
     // a branch is named by the node the document routes to, not by where a guard moved the made node aside
     expect(written).toContain(
       `${RECORDED}/customers.list-customers/customers.list-rows-by-tier.outcome.none.scenario.json`,

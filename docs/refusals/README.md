@@ -192,6 +192,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [S005](S005.md) | S | live | a scenario's `policy` naming no policy, or one its trigger does not attach |
 | [S006](S006.md) | S | live | a scenario written by hand that points at a shared answer or has `sharedStubs` |
 | [S007](S007.md) | S | live | a recorded scenario's pointer its answers document does not hold, or a stub both inline and shared |
+| [S008](S008.md) | S | live | a path under a scenario's `broken` that is not a key of its `expect.nodes` |
 | [X001](X001.md) | X | live | the @http codec table names something that is not a codec |
 | [X002](X002.md) | X | live | a content type a route, graph or binding uses has no codec in the @http codec table |
 | [X003](X003.md) | X | live | an http connection's throttle could never let a request through |

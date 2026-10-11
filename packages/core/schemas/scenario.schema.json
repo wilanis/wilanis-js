@@ -51,7 +51,7 @@
           "$ref": "common.schema.json#/$defs/ident"
         },
         "when": {
-          "description": "The rule's expression as the graph writes it, or `else` for the else.",
+          "description": "The rule's expression as the graph writes it, `else` for the else, or `<node> broke` for a node the switch catches.",
           "type": "string",
           "minLength": 1
         },
@@ -95,6 +95,16 @@
       "description": "The dotted node path of one stubbed effect at which the replay cancels the run: wilanis regress aborts the run's signal when that node is reached, and the node rejects the way an aborted call does. Must be a key of stubs. wilanis fuzz never writes it; an author does, to pin a deadline.",
       "type": "string",
       "minLength": 1
+    },
+    "broken": {
+      "description": "The dotted node paths of the nodes that break in this run: wilanis regress makes each one throw where it runs, and every effect of the graph it runs, so a switch that catches it routes where its `catch` says. A stub at or under a broken node is not used. wilanis rehearse --record writes it for a switch's catch branch (`<node> broke`), which it walks by making that node break. Each path is a key of `expect.nodes`, a node the run reports (S008).",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
     },
     "expect": {
       "description": "The report this run produced, which wilanis regress replays against and diffs node by node.",

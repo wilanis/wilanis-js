@@ -57,6 +57,13 @@ describe('the baseline', () => {
     const pinned = { stubs: { 'op.asked': {} }, cancelAt: 'op.asked', expect: expected };
     expect(refused(doc('scenario', pinned))).toEqual([]);
   });
+  it('a scenario that breaks nodes conforms too; broken is a list of distinct node paths, never empty', () => {
+    const broken = (nodes: unknown) => doc('scenario', { broken: nodes });
+    expect(refused(broken(['op.fetched', 'op.current.op.fetched']))).toEqual([]);
+    expect(refused(broken([]))).toEqual([at('broken', 'must NOT have fewer than 1 items')]);
+    expect(refused(broken(['op.fetched', 'op.fetched']))).toEqual([at('broken', 'must NOT have duplicate items')]);
+    expect(refused(broken(['']))).toEqual([at('broken/0', 'must NOT have fewer than 1 characters')]);
+  });
   it("a switch that catches a node's fault conforms too; a catch is node ids to node ids", () => {
     const route = { type: NODE_SWITCH, id: 's', in: {}, rules: [{ when: 'x', to: 'row' }], else: 'failed' };
     const graph = (caught: unknown) => doc('graph', { nodes: [{ ...route, catch: caught }] });

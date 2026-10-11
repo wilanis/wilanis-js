@@ -1,7 +1,8 @@
 /**
  * What a scenario names must be in the tree (RFC 0018): the trigger it replays (S001), the branch it proves --
  * a graph, a switch of it, and a node the switch routes to (S004) -- and the policy it replays under a trigger
- * that attaches it (S005). Each case plants one scenario in a copy of the example. The branch is `get-row`'s
+ * that attaches it (S005), and the nodes it breaks, each one its run reports (S008). Each case plants one scenario in a
+ * copy of the example. The branch is `get-row`'s
  * `outcome`, which routes to `noCustomer`, `customer`, `upstreamFailed` (the else) and, when the call broke,
  * `unreachable`; the policies are `@wilanis/access`'s, attached by the customers' triggers.
  */
@@ -131,5 +132,31 @@ describe('S005: a policy scenario replays a policy its trigger attaches', () => 
       },
     });
     expect(planted('scenarios/rehearsed/policies/employees-only/granted.scenario.json', decided)).toEqual([]);
+  });
+});
+
+describe('S008: a scenario breaks only nodes its run reports', () => {
+  const file = 'scenarios/caught.scenario.json';
+  /** A hand-written scenario of GET /customers/{id} whose call breaks, so the catch routes to `unreachable`. */
+  const caught = (broken: string[]) =>
+    scenario(GET, {
+      in: { id: 'c1' },
+      broken,
+      expect: {
+        status: 'failed',
+        reason: 'upstream',
+        nodes: { op: { status: 'failed' }, 'op.fetched': { status: 'failed' }, 'op.unreachable': { status: 'failed' } },
+      },
+    });
+
+  it('refuses a path that is no key of expect.nodes, at its place under broken', () => {
+    expect(planted(file, caught(['op.fetchd']))).toEqual(['S008']);
+    expect(plantedPointing({ [file]: caught(['op.fetched', 'op.fetchd']) })).toEqual([`S008 @${file}#broken/1`]);
+    expect(plantedEditingAllSaying({ [file]: caught(['op.fetchd']) }, {})).toEqual([
+      "S008 broken names 'op.fetchd', which is not a node this scenario's run reports under expect.nodes",
+    ]);
+  });
+  it('passes a node the run reports', () => {
+    expect(planted(file, caught(['op.fetched']))).toEqual([]);
   });
 });

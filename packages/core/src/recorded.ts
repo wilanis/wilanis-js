@@ -5,7 +5,10 @@
 
 import type { Envelope } from './vocabulary.js';
 
-/** The decision a scenario proves: a switch of a graph, one of its rules (`else` for the else), and where it routes. */
+/**
+ * The decision a scenario proves: a switch of a graph, one of its rules (`else` for the else, `<node> broke` for a node
+ * it catches), and where it routes.
+ */
 export interface ScenarioBranch {
   graph: string;
   node: string;
@@ -44,6 +47,11 @@ export interface ScenarioDoc extends Envelope {
   sharedStubs?: Record<string, string>;
   /** The stubbed node at which a replay aborts the run's signal: one of the paths `stubsOf` answers. */
   cancelAt?: string;
+  /**
+   * The nodes that break in this run, by dotted path: each throws where it runs, as does every effect of the graph it
+   * runs, so a switch that catches it routes where its `catch` says. A node of the run, a key of `expect.nodes` (S008).
+   */
+  broken?: string[];
   expect: {
     status: 'done' | 'failed' | 'blocked' | 'cancelled' | 'unreachable';
     output?: unknown;

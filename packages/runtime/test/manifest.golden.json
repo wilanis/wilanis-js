@@ -2230,6 +2230,13 @@
       "included": null
     },
     {
+      "path": "@scenarios/rehearsed/customers.get-customer/customers.get-row.outcome.unreachable.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
       "path": "@scenarios/rehearsed/customers.get-customer/customers.get-row.outcome.upstreamFailed.scenario.json",
       "kind": "scenario",
       "feature": null,
@@ -2343,6 +2350,13 @@
     },
     {
       "path": "@scenarios/rehearsed/customers.update-customer/customers.get-row.outcome.noCustomer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.update-customer/customers.get-row.outcome.unreachable.scenario.json",
       "kind": "scenario",
       "feature": null,
       "layer": null,

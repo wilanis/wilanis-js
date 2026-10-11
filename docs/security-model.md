@@ -103,9 +103,10 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
   of that port; a native port is bound by its plugin alone. [[B001](refusals/B001.md), [B002](refusals/B002.md),
   [B003](refusals/B003.md), [B004](refusals/B004.md)] (before the RFCs)
 - A scenario names a trigger of the tree. [[S001](refusals/S001.md)] (before the RFCs)
-- A scenario expects only what a run can produce: a reason on a node that failed, a cancel where it stubs, a branch
-  the tree has, and a policy its trigger attaches. [[S002](refusals/S002.md), [S003](refusals/S003.md),
-  [S004](refusals/S004.md), [S005](refusals/S005.md)] (RFC 0012, RFC 0014, RFC 0018)
+- A scenario expects only what a run can produce: a reason on a node that failed, a cancel where it stubs, a break
+  of a node its run reports, a branch the tree has, and a policy its trigger attaches. [[S002](refusals/S002.md),
+  [S003](refusals/S003.md), [S004](refusals/S004.md), [S005](refusals/S005.md), [S008](refusals/S008.md)] (RFC 0012,
+  RFC 0014, RFC 0018)
 - A scenario reads every answer it points at: one written by hand holds its answers and stubs itself, and every
   pointer of a recorded one resolves in the answers document its own command wrote above it.
   [[S006](refusals/S006.md), [S007](refusals/S007.md)] (RFC 0036)

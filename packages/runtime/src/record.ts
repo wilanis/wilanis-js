@@ -35,6 +35,8 @@ export interface RecordedRun extends Named {
   context: Record<string, unknown>;
   /** Every effect's answer by dotted node path: what the run generated, with what the case stubbed written over it. */
   stubs: Record<string, unknown>;
+  /** The dotted paths of the nodes the run made break, for a switch's catch branch; none where nothing broke. */
+  broken?: string[];
   report: Report;
   /** Where the trigger's `out` marks a field secret: the output is written with those as the marker. */
   secret: string[][];
@@ -98,7 +100,8 @@ const sorted = (stubs: Record<string, unknown>) =>
 
 /**
  * The scenario one recorded run is written as. A branch no input reaches is written with nothing to run -- no `in`, no
- * `context`, no `stubs` -- and an expectation that says why, which `regress` answers by solving the branch again.
+ * `context`, no `stubs` -- and an expectation that says why, which `regress` answers by solving the branch again. A
+ * run that broke nodes, a switch's catch branch, names them under `broken`, in order, so `regress` breaks them too.
  */
 export function scenarioOf(run: Recording): ScenarioDoc {
   const branch = run.branch && {
@@ -123,6 +126,7 @@ export function scenarioOf(run: Recording): ScenarioDoc {
     in: run.input,
     context: run.context,
     stubs: sorted(run.stubs),
+    ...(run.broken?.length ? { broken: [...run.broken].sort() } : {}),
     expect: expectOf(run.report, run.secret),
   };
 }
@@ -274,13 +278,14 @@ async function replayedRun(load: LoadResult, replayer: Replayer, run: RecordedRu
   return `${wayOf(run)}${run.branch ? `: ${provenAs(run.branch)}` : ''}: ${otherwise}`;
 }
 
-/** What a recorded run is written to fire: its way in, and its input, context and stubs. */
+/** What a recorded run is written to fire: its way in, its input, context and stubs, and the nodes that break. */
 const replayableOf = (run: RecordedRun) => ({
   trigger: run.trigger.path,
   ...(run.policy ? { policy: run.policy.path } : {}),
   in: run.input,
   context: run.context,
   stubs: run.stubs,
+  ...(run.broken?.length ? { broken: run.broken } : {}),
 });
 
 /** Write the runs to the recorded directory, or under `check` compare them with it and write nothing. */
