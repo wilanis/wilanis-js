@@ -163,8 +163,8 @@ written by each binding operation). The compiler then stops reading a field by i
 ## Unscheduled
 
 RFC 0021 (higher-level constructs), RFC 0022 (more storage engines), RFC 0023 (adapters), RFC 0025 (AI
-model calls), RFC 0030 (the cache), RFC 0031 (intent triggers) and RFC 0032 (the site as a declared
-input) each get a milestone with its own demo when someone picks them up. RFC 0032 waits on a consumer
+model calls), RFC 0030 (the cache), RFC 0031 (intent triggers), RFC 0032 (the site as a declared
+input) and RFC 0040 (`contains` in a rule) each get a milestone with its own demo when someone picks them up. RFC 0032 waits on a consumer
 rather than on work: the operation it was written for, RFC 0002's `raw`, is left out of that RFC on
 purpose, and the next consumer is the fault message RFC 0019 asks for, under M13. RFC 0038 (rehearse steers what a caller
 hands) changes no schema and shows in no demo of its own; it builds on #904 (landed in #928), and lands before RFC
