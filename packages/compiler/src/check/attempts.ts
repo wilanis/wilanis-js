@@ -5,7 +5,9 @@
  * applied, a second charge (G018); and its `when` reads the answer, so it types as boolean over the answer's
  * fields (G019). Whether a call is idempotent where it is made is `Judge.idempotentAt`'s answer, never this
  * module's. A binding's retry is judged under the profiles that run its operation there, so G018 names only
- * those. A retry below an atomic graph is refused by G020 in `atomic.ts`, which reads the walk made there.
+ * those. A retry below an atomic graph is refused by G020 in `atomic.ts`, which reads the walk made there. And
+ * what a site waits on is a Node timer, so its `timeoutMs` and its retry's `backoffMs` are at most what one can
+ * wait (G027).
  */
 import {
   type BindingDoc,
@@ -17,6 +19,7 @@ import {
   type Scope,
   show,
   substitute,
+  TIMER_MAX_MS,
   type Type,
   type Values,
 } from '@wilanis/core';
@@ -42,6 +45,32 @@ export interface RetriedCall {
 const NO_EFFECT_HINT = 'nothing here can fail transiently; delete retry';
 const APPLIED_HINT =
   'a call that failed may have been applied; drop retry, or reach an operation that is idempotent or carries a key';
+
+/** What a Node timer does with a longer wait, as G027 says it. */
+const TIMER_SAID = `a Node timer waits at most ${TIMER_MAX_MS} ms (about 24.8 days): a longer one fires after 1 ms`;
+
+/**
+ * G027: a site's `timeoutMs` and its retry's `backoffMs`, each at most `TIMER_MAX_MS`. Each is handed to a timer, and
+ * Node fires a longer one after 1 ms; a backoff that only doubles past the bound is held to it where it is waited.
+ */
+export function checkTimerBounds(refuse: Refuser, at: string, said: { retry?: Retry; timeoutMs?: number }): void {
+  const timeout = said.timeoutMs;
+  if (timeout !== undefined && timeout > TIMER_MAX_MS)
+    refuse(
+      'G027',
+      `timeoutMs is ${timeout}; it is the most this call may take, in milliseconds, and ${TIMER_SAID}, so every try would time out at once`,
+      `${at}/timeoutMs`,
+      `set it to ${TIMER_MAX_MS} or less, or drop it for no limit`,
+    );
+  const backoff = said.retry?.backoffMs;
+  if (backoff !== undefined && backoff > TIMER_MAX_MS)
+    refuse(
+      'G027',
+      `retry.backoffMs is ${backoff}; it is the wait before the second try, in milliseconds, and ${TIMER_SAID}, so the call would be tried again at once`,
+      `${at}/retry/backoffMs`,
+      `set it to ${TIMER_MAX_MS} or less, or drop it for no wait`,
+    );
+}
 
 /** What a call answers once the type variables its inputs bound are put in: what a retry's `when` reads. */
 export function answersOf(judge: Judge, hit: OpHit, subst: Record<string, Type>): Type | undefined {

@@ -5,7 +5,7 @@
  * nothing else. The engine learns nothing: it hands the tag through as `ctx.site`, and a try that did not stand
  * reaches the node's report through `ctx.attempted`.
  */
-import { expr, type Retry, type Values } from '@wilanis/core';
+import { expr, type Retry, TIMER_MAX_MS, type Values } from '@wilanis/core';
 import { type Handler, type HandlerArgs, isRefusal, type Report } from '@wilanis/engine';
 
 /** What one site says about its call: how many more tries, the wait before them, what answer is tried again, the bound. */
@@ -100,9 +100,18 @@ async function tried(base: Handler, args: HandlerArgs, policy: Attempts): Promis
     const why = attempt < policy.times && !ctx.signal?.aborted ? againBecause(ending, policy) : undefined;
     if (why === undefined) return stand(ending, args);
     const endedAt = ctx.clock();
-    if (!(await pause(policy.backoffMs * 2 ** attempt, ctx.signal))) return stand(ending, args);
+    if (!(await pause(waitBefore(policy, attempt), ctx.signal))) return stand(ending, args);
     ctx.attempted({ startedAt, endedAt, error: why, ...(ending.sub ? { sub: ending.sub } : {}) });
   }
+}
+
+/**
+ * The wait after try `attempt` (from 0): `backoffMs`, doubled for each try before, and never past `TIMER_MAX_MS`.
+ * G027 holds `backoffMs` itself to the bound; the doubling would still pass it after enough tries, and Node fires a
+ * longer timer after 1 ms, so the last waits would be none at all rather than the longest.
+ */
+function waitBefore(policy: Attempts, attempt: number): number {
+  return Math.min(policy.backoffMs * 2 ** attempt, TIMER_MAX_MS);
 }
 
 /**

@@ -21,7 +21,7 @@
       "busyTimeoutMs": {
         "type": "number",
         "required": false,
-        "description": "how many milliseconds a writer waits for the file's write lock, held by another handle, before the node fails with 'database is locked'. The wait holds the process, since the driver is synchronous. Absent: 5000."
+        "description": "how many milliseconds a writer waits for the file's write lock, held by another handle, before the node fails with 'database is locked'. The wait holds the process, since the driver is synchronous. At most 2147483647, the longest a Node timer waits. Absent: 5000."
       }
     }
   }

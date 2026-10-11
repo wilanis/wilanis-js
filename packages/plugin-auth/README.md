@@ -77,7 +77,8 @@ trigger, for every trigger kind alike, the runtime calls this plugin's guard:
   Development and tests.
 - `@auth/oidc.connection-kind.json`: an OpenID Connect issuer asked with the password grant; the identity
   token it answers is verified against its published keys, and the identity read from it. The caller then
-  holds *our* token, never the issuer's.
+  holds *our* token, never the issuer's. A request to the issuer is aborted after the connection's `timeoutMs`
+  (default 10000), at most 2147483647, the longest a Node timer waits.
 
 A production profile binds the same domain port to another directory, and nothing else in the tree changes.
 
@@ -87,7 +88,8 @@ X101 `settings.session` names no shape · X102 a challenge by an undeclared meth
 trigger no attachment of which gives a challenge answer · X103 a session write with a key the session shape
 does not declare, or another type · X105 a session write naming an attribute a store scopes a collection by: a
 scope is what the sign-in graph gave `token.port.json#issue`, and nothing writes it again · X106 a delegation
-to `files.port.json` keeping records where the loader reads documents, or outside the tree. The checker's own
+to `files.port.json` keeping records where the loader reads documents, or outside the tree · X107 an OIDC
+connection's `timeoutMs` above 2147483647, which a Node timer would fire after 1 ms. The checker's own
 A004 and A005 judge the attachments: a credential the guard does not verify or the kind cannot hand, and a
 policy reading the caller on a trigger that gives nothing.
 

@@ -42,8 +42,8 @@ opens sets `PRAGMA foreign_keys = ON`.
 
 The plugin's own settings are engine-wide: `keyType` -- `uuidv7` (the default), what `newKey` answers for a
 string key, or `identity`, a number reserved from the table `wilanis_keys` for a number key; and
-`busyTimeoutMs` (default 5000), how long a statement waits for the file before the node fails with
-`database is locked`. One of this process waits its turn on the file (`turns.ts`) without holding the event
+`busyTimeoutMs` (default 5000, at most 2147483647; X234), how long a statement waits for the file before the
+node fails with `database is locked`. One of this process waits its turn on the file (`turns.ts`) without holding the event
 loop; one of another process waits on SQLite's busy handler, which holds the process, since the driver is
 synchronous. Five seconds is better-sqlite3's own default: long enough for a short transaction elsewhere to
 end, short enough that a lock nobody will release fails while someone is still looking.
@@ -89,6 +89,7 @@ error later:
 | X231 | a field this engine has no column for: a `blob`, whose bytes live in the blob registry |
 | X232 | a key it cannot key by, or one `newKey` cannot answer under the configured `keyType` |
 | X233 | a collection name SQLite will not create (one beginning `sqlite_`), or two of one connection that fold to one table |
+| X234 | a `busyTimeoutMs` above 2147483647, which a Node timer would fire after 1 ms |
 
 ## Scopes
 
@@ -133,7 +134,7 @@ rebuild counts them again inside the transaction and fails the plan where any is
 
 Every suite runs unconditionally, against a file in the test's temporary directory: the shared engine suite,
 RFC 0015's scope cases, RFC 0017's planner (a plan that fails half way, a table rebuild included, leaves the file
-and its record as they were), a second load of a tree finding what the first kept, the rules (X231 to X233, which open
+and its record as they were), a second load of a tree finding what the first kept, the rules (X231 to X234, which open
 no file), the pragmas, the keys, and the bundled SQLite's version (3.35 or later, for `RETURNING`).
 
 Part of [wilanis](https://github.com/wilanis/wilanis-js). Apache-2.0.

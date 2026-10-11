@@ -5,9 +5,10 @@
  *
  * C002 has already held these settings to the types the manifest declares -- `endpoint` is a string by the
  * time a rule here looks at it. What is left is what a type cannot say: that the string addresses a collector
- * over http, and that `level` is one of two words rather than any string at all.
+ * over http, that `level` is one of two words rather than any string at all, and that `flushDeadlineMs` is a wait
+ * a Node timer can keep.
  */
-import type { PluginCheckContext } from '@wilanis/core';
+import { type PluginCheckContext, TIMER_MAX_MS } from '@wilanis/core';
 import { isLevel, LEVELS, ROOT } from './paths.js';
 
 type Refuse = PluginCheckContext['refuse'];
@@ -55,8 +56,24 @@ function checkLevel(settings: Record<string, unknown>, refuse: Refuse): void {
   say(refuse, 'level', `level is ${JSON.stringify(level)}; a span carries either ${LEVELS.join(' or ')}`, HINT_LEVEL);
 }
 
-/** What only @otel can judge: X301, an endpoint nothing can be sent to or a level that is not one. */
+/**
+ * X301: a flush deadline longer than a Node timer can wait. Stopping waits on the last flush with a timer, and Node
+ * fires one set past `TIMER_MAX_MS` after 1 ms, so every stop would drop what is still unsent at once.
+ */
+function checkFlushDeadline(settings: Record<string, unknown>, refuse: Refuse): void {
+  const ms = settings.flushDeadlineMs;
+  if (typeof ms !== 'number' || ms <= TIMER_MAX_MS) return;
+  say(
+    refuse,
+    'flushDeadlineMs',
+    `flushDeadlineMs is ${ms}; it is the most stopping waits for the last spans, in milliseconds, and a Node timer waits at most ${TIMER_MAX_MS} ms (about 24.8 days): a longer one fires after 1 ms, so every stop would drop the unsent spans at once`,
+    `set it to ${TIMER_MAX_MS} or less, or drop it for the default of 2000`,
+  );
+}
+
+/** What only @otel can judge: X301, an endpoint, a level or a flush deadline that cannot work as written. */
 export function check({ settings, refuse }: PluginCheckContext): void {
   checkEndpoint(settings, refuse);
   checkLevel(settings, refuse);
+  checkFlushDeadline(settings, refuse);
 }

@@ -3,7 +3,7 @@
  * operation of it and nothing else (B001), and meets each operation's contract (B005): through a data graph
  * whose in and out fit it, or by delegating to an operation the feature allows (L003) with inputs that fit.
  * Its `reads` map is exactly what its delegations read (P005). A retry on an operation is judged in
- * attempts.ts (G017, G018, G019).
+ * attempts.ts (G017, G018, G019), and so are its timeout and backoff, each at most what a Node timer waits (G027).
  */
 import {
   assignable,
@@ -20,7 +20,7 @@ import {
   typeAt,
 } from '@wilanis/core';
 import { passedInputs } from '../documents.js';
-import { checkCallRetry, checkGraphRetry } from './attempts.js';
+import { checkCallRetry, checkGraphRetry, checkTimerBounds } from './attempts.js';
 import { checkInputs, reader } from './inputs.js';
 import { allowing, type Effects, type Judge, type JudgedResolver, type Refuser, type Resolve } from './judge.js';
 import { resolversFor } from './resolvers.js';
@@ -109,6 +109,7 @@ class BindingCheck {
   operation(opName: string, bound: BindingOp): void {
     const op = this.port.doc.operations[opName];
     const at = `operations/${opName}`;
+    checkTimerBounds(this.refuse, at, bound);
     if (!op) {
       const names = Object.keys(this.port.doc.operations).join(', ');
       this.refuse(

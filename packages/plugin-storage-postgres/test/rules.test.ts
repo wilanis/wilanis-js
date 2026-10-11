@@ -1,5 +1,5 @@
 /**
- * X221 to X223: what this engine alone can judge, refused before anything runs and without a database. These
+ * X221 to X224: what this engine alone can judge, refused before anything runs and without a database. These
  * are the rules a reader meets as `wilanis check` output rather than as a driver error at three in the
  * morning, so every case here breaks one document of a small tree and reads the code back.
  *
@@ -140,5 +140,22 @@ describe('what this engine refuses before anything runs', () => {
         doc.collections = { entriesKept: { of: SHAPE, key: 'id' }, entrieskept: { of: SHAPE, key: 'id' } };
       }),
     ).toEqual([['X223', 'collections/entrieskept']]);
+  });
+
+  it('X224 a queueVisibility longer than a Node timer can wait: a running delivery renews its lock every half of it, on a timer', () => {
+    const settled = (value: number) => {
+      const docs = tree();
+      docs['project.json'] = {
+        ...(docs['project.json'] as Record<string, unknown>),
+        plugins: [
+          { use: '@std' },
+          { use: '@storage' },
+          { use: '@storage-postgres', settings: { queueVisibility: value } },
+        ],
+      };
+      return refusals(docs);
+    };
+    expect(settled(4_294_968)).toEqual([['X224', 'plugins/@storage-postgres/settings/queueVisibility']]);
+    expect(settled(4_294_967)).toEqual([]);
   });
 });
