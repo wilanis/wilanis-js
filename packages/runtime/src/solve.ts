@@ -166,16 +166,16 @@ function comparesPaths(node: expr.Expr): boolean {
  * alternatives that all contradict mean the rule is either self-contradictory or shadowed by an earlier one. A rule
  * comparing two paths is never called self-contradictory: the solver meets only `==` and `!=` between two values, one
  * way, so finding none says what the solver cannot do rather than what the rule is. Where such a rule has inputs alone
- * and none once the rules before it are false, it is the rules together that contradict: `pairDemands` finds a pair
- * wherever one exists inside the bounds those rules leave each side, so finding none there means there is none.
+ * and none once the rules before it are false, the message names the solver's limit and not the rules: the cases it
+ * finds for those rules are narrower than what they leave (`!=` against a number is solved as longer, never shorter,
+ * and a pair rule's else is held at the numbers the solver picked), so no pair inside them proves no contradiction.
  */
 function whyUnsolved(when: string, found: { nameable: boolean; pairs: boolean; mine: number; before: number }): string {
   if (!found.mine && found.pairs) return `the solver cannot compare two paths as '${when}' does`;
   if (!found.nameable) return `'${when}' compares values the rehearsal cannot name`;
   if (!found.mine) return `no inputs satisfy '${when}' -- the rule contradicts itself`;
   if (!found.before) return `the rules before it already cover every input, so '${when}' is unreachable`;
-  if (found.pairs)
-    return `no inputs satisfy '${when}' inside the bounds the rules before it leave -- the rules contradict`;
+  if (found.pairs) return `no case the solver finds for the rules before it lets '${when}' hold`;
   return `no inputs satisfy '${when}'`;
 }
 

@@ -89,13 +89,16 @@ function rangeOf(side: Side, within: Demands): Range | undefined {
 }
 
 /**
- * The numbers worth trying on either side: 1 and 2, and each finite end of either range with its neighbours. A pair
- * the operator holds for inside the two ranges, where one exists, is among them: `==` meets at the higher of the two
- * least numbers or the lower of the two highest, an ordering at one end and the number past it, `!=` at two of them.
+ * The numbers worth trying on either side: 1 and 2, and each finite end of either range and each number it excludes,
+ * with the one below it and the two above it, so a run of excluded numbers is stepped past. A pair the operator holds
+ * for inside the two ranges, where one exists, is among them: `==` meets at the higher of the two least numbers or the
+ * lower of the two highest, an ordering at one end and the number past it, `!=` at two of them.
  */
 function worthTrying(ranges: Range[]): number[] {
-  const ends = ranges.flatMap(range => [range.least, range.hi]).filter(Number.isFinite);
-  const near = ends.flatMap(end => [end - 1, end, end + 1]);
+  const ends = ranges
+    .flatMap(range => [range.least, range.hi, ...range.ne])
+    .filter((end): end is number => Number.isFinite(end));
+  const near = ends.flatMap(end => [end - 1, end, end + 1, end + 2]);
   return [...new Set([1, 2, ...near])].sort((one, other) => one - other);
 }
 

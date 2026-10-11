@@ -71,7 +71,7 @@ describe('solving a two-length rule inside the bounds earlier rules set (#915)',
     expect(to(bs, 'not').demands).toEqual({ a: long(1), b: long(1) });
   });
 
-  it('says the rules contradict where no pair fits the bounds they leave', () => {
+  it('names its own limit where no case it finds for the earlier rules lets the rule hold', () => {
     const bs = branchesOf(
       [
         { when: 'len(a) < 3 || len(b) > 2', to: 'skip' },
@@ -80,8 +80,37 @@ describe('solving a two-length rule inside the bounds earlier rules set (#915)',
       'odd',
     );
     expect(to(bs, 'even').unsolved).toBe(
-      "no inputs satisfy 'len(a) == len(b)' inside the bounds the rules before it leave -- the rules contradict",
+      "no case the solver finds for the rules before it lets 'len(a) == len(b)' hold",
     );
     expect(to(bs, 'odd').demands).toEqual({ a: long(3), b: long(1) });
+  });
+
+  it('never says the rules contradict where its own case for them is narrower than they are', () => {
+    // the else of the first rule is solved as len(a) > 2 and len(b) <= 2, yet a = 1, b = 2 also leaves it false
+    const bs = branchesOf(
+      [
+        { when: 'len(a) == 2 || len(b) > 2', to: 'skip' },
+        { when: 'len(a) < len(b)', to: 'shorter' },
+      ],
+      'not',
+    );
+    expect(to(bs, 'shorter').unsolved).toBe(
+      "no case the solver finds for the rules before it lets 'len(a) < len(b)' hold",
+    );
+    expect(to(bs, 'shorter').unsolved).not.toMatch(/contradict/);
+  });
+
+  it('steps past the values earlier rules exclude', () => {
+    const bs = branchesOf(
+      [
+        { when: 'limit < 1', to: 'none' },
+        { when: 'limit == 1', to: 'one' },
+        { when: 'limit == 2', to: 'two' },
+        { when: 'len(rows) == limit', to: 'full' },
+      ],
+      'room',
+    );
+    expect(to(bs, 'full').unsolved).toBeUndefined();
+    expect(to(bs, 'full').demands).toEqual({ rows: long(3), limit: { gte: 1, ne: [1, 2], eq: 3, present: true } });
   });
 });
