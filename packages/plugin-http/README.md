@@ -77,7 +77,8 @@ whatever had settled before. A body past its bound is answered 413 before any co
 JSON body is not parsed, an upload is not stored past the cut. The rest of an over-bound request body is read and
 discarded, so the 413 can be written on the same socket. A connection's `maxBodyBytes` bounds an answer
 from the upstream the same way, and a request past it fails its node as a fault. The `check` hook refuses
-(X004) a limit that is not a whole number of 1 or more.
+(X004) a limit that is not a whole number of 1 or more, and a `deadlineMs` above 2147483647 (about 24.8 days):
+a Node timer cannot wait longer, and fires such a timer after 1 ms.
 
 ```json
 { "use": "@http", "from": "@wilanis/plugin-http",

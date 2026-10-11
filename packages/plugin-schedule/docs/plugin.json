@@ -12,7 +12,7 @@
       "leaseTtlMs": {
         "type": "number",
         "required": false,
-        "description": "how long a hold taken for a tick lasts without renewal, so a process that dies mid-run lets go of the tick; a whole number of 1000 or more, default 30000"
+        "description": "how long a hold taken for a tick lasts without renewal, so a process that dies mid-run lets go of the tick; a whole number from 1000 to 4294967294, since a run renews it every half on a timer, default 30000"
       }
     }
   },

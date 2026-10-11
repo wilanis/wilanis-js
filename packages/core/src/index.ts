@@ -21,6 +21,7 @@ export * from './resolves.js';
 export * from './scope.js';
 export * from './secret.js';
 export * from './templates.js';
+export * from './timer.js';
 export * from './types.js';
 export * from './validate.js';
 export { secretKeysRead } from './value-reads.js';

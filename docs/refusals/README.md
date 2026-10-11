@@ -194,7 +194,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [X001](X001.md) | X | live | the @http codec table names something that is not a codec |
 | [X002](X002.md) | X | live | a content type a route, graph or binding uses has no codec in the @http codec table |
 | [X003](X003.md) | X | live | an http connection's throttle could never let a request through |
-| [X004](X004.md) | X | live | a deadlineMs or maxBodyBytes that is not a whole number of 1 or more |
+| [X004](X004.md) | X | live | a deadlineMs or maxBodyBytes that is not a whole number of 1 or more, or a deadlineMs longer than a Node timer can wait |
 | [X101](X101.md) | X | live | the @auth settings.session names something that is not a shape |
 | [X102](X102.md) | X | live | a challenge by a method the settings do not declare, or one no attachment of the trigger could answer |
 | [X103](X103.md) | X | live | a session read or write whose type or keys fall outside the session shape |

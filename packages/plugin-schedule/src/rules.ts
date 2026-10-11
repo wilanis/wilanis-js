@@ -6,7 +6,14 @@
  * A rule here never judges what a trigger shares with a route: T001 already holds the settings to the kind's
  * contract, T003 the reads of the context, A005 a policy reading a caller nobody is.
  */
-import type { ConnectionDoc, ConnectionKindDoc, PluginCheckContext, StartupStep, TriggerDoc } from '@wilanis/core';
+import {
+  type ConnectionDoc,
+  type ConnectionKindDoc,
+  type PluginCheckContext,
+  type StartupStep,
+  TIMER_MAX_MS,
+  type TriggerDoc,
+} from '@wilanis/core';
 import { knownZone, parseCron } from './cron.js';
 import { KIND, PORT, ROOT, RUN } from './paths.js';
 
@@ -98,17 +105,23 @@ function checkInterval(one: Scheduled, refuse: Refuse): void {
     });
 }
 
-/** X251: a deadline a run can be held to: a whole number of milliseconds, at least one. */
+/** X251: a deadline a run can be held to: a whole number of milliseconds, at least one, that a timer can wait. */
 function checkDeadline(one: Scheduled, refuse: Refuse): void {
   const deadline = one.settings.deadlineMs;
-  if (deadline === undefined || whole(deadline, 1)) return;
-  refuse({
-    code: 'X251',
-    file: one.file,
-    message: `deadlineMs is ${JSON.stringify(deadline)}; it is the most a tick's run may take, so it is a whole number of milliseconds, 1 or more`,
-    at: 'settings/deadlineMs',
-    hint: 'set it to 1 or more, or drop it for no deadline',
-  });
+  if (deadline === undefined) return;
+  const say = (message: string, hint: string) =>
+    refuse({ code: 'X251', file: one.file, message, at: 'settings/deadlineMs', hint });
+  const said = `deadlineMs is ${JSON.stringify(deadline)}; it is the most a tick's run may take`;
+  if (!whole(deadline, 1))
+    say(
+      `${said}, so it is a whole number of milliseconds, 1 or more`,
+      'set it to 1 or more, or drop it for no deadline',
+    );
+  else if ((deadline as number) > TIMER_MAX_MS)
+    say(
+      `${said}, and a Node timer waits at most ${TIMER_MAX_MS} ms (about 24.8 days): a longer one fires after 1 ms, so every run would be cancelled at once`,
+      `set it to ${TIMER_MAX_MS} or less, or drop it for no deadline`,
+    );
 }
 
 /** X252: an `in` nothing fills, since nothing arrives on a tick. */
@@ -168,17 +181,31 @@ function checkLease(scope: Scope, step: StartupStep, index: number, refuse: Refu
     );
 }
 
-/** X251: the plugin's own settings, which C002 has already held to their declared types. */
-function checkSettings(settings: Record<string, unknown>, refuse: Refuse): void {
-  const say = (message: string, name: string, hint: string) =>
-    refuse({ code: 'X251', file: '@project.json', message, at: `plugins/${ROOT}/settings/${name}`, hint });
-  const ttl = settings.leaseTtlMs;
-  if (ttl !== undefined && !whole(ttl, 1000))
+/** The longest hold a run can renew: it is renewed every half of it, and that half is a timer's wait. */
+const LEASE_TTL_MAX_MS = 2 * TIMER_MAX_MS;
+
+/** X251: a hold that outlasts its taking, and whose half a timer can wait. */
+function checkLeaseTtl(ttl: unknown, say: (message: string, name: string, hint: string) => void): void {
+  if (ttl === undefined) return;
+  if (!whole(ttl, 1000))
     say(
       `leaseTtlMs is ${JSON.stringify(ttl)}; a hold shorter than a second expires while it is being taken, so it is a whole number of 1000 or more`,
       'leaseTtlMs',
       'set it to 1000 or more, or drop it for the default of 30000',
     );
+  else if ((ttl as number) > LEASE_TTL_MAX_MS)
+    say(
+      `leaseTtlMs is ${JSON.stringify(ttl)}; a run renews its hold every half of it, and a Node timer waits at most ${TIMER_MAX_MS} ms (about 24.8 days): a longer one fires after 1 ms, so the hold would be renewed without pause`,
+      'leaseTtlMs',
+      `set it to ${LEASE_TTL_MAX_MS} or less, or drop it for the default of 30000`,
+    );
+}
+
+/** X251: the plugin's own settings, which C002 has already held to their declared types. */
+function checkSettings(settings: Record<string, unknown>, refuse: Refuse): void {
+  const say = (message: string, name: string, hint: string) =>
+    refuse({ code: 'X251', file: '@project.json', message, at: `plugins/${ROOT}/settings/${name}`, hint });
+  checkLeaseTtl(settings.leaseTtlMs, say);
   const zone = settings.timezone;
   if (typeof zone === 'string' && !knownZone(zone))
     say(`'${zone}' is not a timezone this runtime knows`, 'timezone', HINT_ZONE);

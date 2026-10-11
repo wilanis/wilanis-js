@@ -17,6 +17,7 @@
  * consumer outlives an outage without hammering the server; the first look is not, so a table `ensure` never
  * made fails the `consume` step instead of a worker that consumes nothing.
  */
+import { TIMER_MAX_MS } from '@wilanis/core';
 import type { Answer, Handle } from '@wilanis/plugin-queue';
 import { forget, park, release, type Table, type Taken, takeDue, untake } from './queue-table.js';
 import { Renewal } from './renewal.js';
@@ -24,8 +25,6 @@ import { Renewal } from './renewal.js';
 /** The first pause after a look failed; each further failure doubles it, up to `FAILED_MAX_MS`. */
 const FAILED_MS = 1000;
 const FAILED_MAX_MS = 30_000;
-/** The longest a timer can be armed for; a message due later is looked at again then, and waited for again. */
-const TIMER_MAX_MS = 2 ** 31 - 1;
 
 /**
  * The queue a consumer works: the table it is kept in, its name, how long a delivery holds its lock before it is
@@ -119,7 +118,10 @@ export class TableConsumer {
     if (taken.length < room && nextMs !== undefined) this.sleep(nextMs);
   }
 
-  /** Arm the one timer, for the moment the soonest waiting message may be handed out. */
+  /**
+   * Arm the one timer, for the moment the soonest waiting message may be handed out. A timer waits at most
+   * `TIMER_MAX_MS`, so a message due later is looked at again then, and waited for again.
+   */
   private sleep(ms: number): void {
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.wake(), Math.min(ms, TIMER_MAX_MS));

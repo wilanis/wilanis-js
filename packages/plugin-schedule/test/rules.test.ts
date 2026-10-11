@@ -6,6 +6,7 @@
  * is not refused, as a tree with routes and no listener is not, and what a trigger shares with a route is the
  * T family's and not this plugin's.
  */
+import { TIMER_MAX_MS } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { codes, editing, PLAIN, refusals, TRIGGER, tree } from './tree.js';
 
@@ -140,6 +141,42 @@ describe('X251: a schedule that is not one', () => {
         'X251',
       ),
     ).toEqual([]);
+  });
+
+  it('a deadline longer than a Node timer can wait, which would fire after 1 ms; the bound itself stands', () => {
+    const found = at(
+      schedule(doc => {
+        doc.settings.deadlineMs = TIMER_MAX_MS + 1;
+      }),
+      'X251',
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0].at).toBe('settings/deadlineMs');
+    expect(found[0].message).toMatch(/a Node timer waits at most 2147483647 ms/);
+    expect(found[0].hint).toBe('set it to 2147483647 or less, or drop it for no deadline');
+    expect(
+      at(
+        schedule(doc => {
+          doc.settings.deadlineMs = TIMER_MAX_MS;
+        }),
+        'X251',
+      ),
+    ).toEqual([]);
+  });
+
+  it('a leaseTtlMs whose half, the wait between renewals, is longer than a Node timer can wait', () => {
+    const ttl = (leaseTtlMs: number) =>
+      at(
+        edit('project.json', doc => {
+          doc.plugins[1].settings = { leaseTtlMs };
+        }),
+        'X251',
+      );
+    const found = ttl(2 * TIMER_MAX_MS + 1);
+    expect(found).toHaveLength(1);
+    expect(found[0].at).toBe('plugins/@schedule/settings/leaseTtlMs');
+    expect(found[0].message).toMatch(/renews its hold every half of it/);
+    expect(ttl(2 * TIMER_MAX_MS)).toEqual([]);
   });
 
   it("the plugin's own leaseTtlMs, judged as @http judges a throttle", () => {
