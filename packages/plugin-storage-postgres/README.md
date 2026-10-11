@@ -39,7 +39,8 @@ has no schema of that name, so a role that owns its schema and has no CREATE on 
 The plugin's own settings are engine-wide: `statementTimeout`, in seconds; `keyType` -- `uuidv7` (the default),
 what `newKey` answers for a string key, or `identity`, one past the highest, for a number key; and
 `queueVisibility`, in seconds (default 30), how long a worker that died keeps its queue message before another
-worker may take it. A live run never loses its message to the window: its worker extends the lock while it runs.
+worker may take it. A live run never loses its message to the window: its worker extends the lock while it runs,
+every half window on a Node timer, so the window is at most 4294967 seconds (about 49.7 days; X224).
 
 ## The lease it keeps
 
@@ -141,6 +142,7 @@ error later:
 | X221 | a field this engine has no column for: a `blob`, whose bytes live in the blob registry |
 | X222 | a key it cannot key by, or one `newKey` cannot answer under the configured `keyType` |
 | X223 | a collection name PostgreSQL will not keep, or two of one connection that fold to one table |
+| X224 | a `queueVisibility` above 4294967 seconds, whose half a Node timer would fire after 1 ms |
 
 ## Tests
 

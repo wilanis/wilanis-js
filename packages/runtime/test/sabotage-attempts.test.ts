@@ -4,8 +4,9 @@
  * retries is held to what it repeats: never a pure call or a graph with no effect (G017), never a call that is
  * not idempotent where it is made (G018), and a `when` that reads the answer as a boolean (G019). Below an
  * atomic graph nothing retries at all (G020): the retry that works is on the binding operation that runs the
- * graph, whose every try is a transaction of its own. The cases break the example's own documents, since the
- * guide's retry is written over get-row's GET and store-and-latest and register-all already say atomic.
+ * graph, whose every try is a transaction of its own. A timeout or a backoff is a Node timer's wait, so each is at
+ * most 2147483647 ms (G027). The cases break the example's own documents, since the guide's retry is written over
+ * get-row's GET and store-and-latest and register-all already say atomic.
  */
 import http from '@wilanis/plugin-http';
 import { describe, expect, it } from 'vitest';
@@ -144,6 +145,20 @@ describe('sabotage: what a retry is written over (RFC 0011)', () => {
       // each try is a transaction of its own and a failed one rolled back, so what it repeats is not G018's
       expect(sabotage(store, onOperation('registerAll', once))).toEqual([]);
     });
+  });
+  it('G027 a timeout or a backoff longer than a Node timer can wait, which Node would fire after 1 ms', () => {
+    const month = 30 * 24 * 60 * 60 * 1000;
+    const timed = { timeoutMs: month, retry: { times: 2, backoffMs: month, when: 'status >= 500' } };
+    expect(sabotagePointing(getRow, onNode('fetched', timed))).toEqual([
+      `G027 @${getRow}#nodes/fetched/timeoutMs`,
+      `G027 @${getRow}#nodes/fetched/retry/backoffMs`,
+    ]);
+    expect(sabotagePointing(rest, onOperation('listAll', { retry: { times: 1 }, timeoutMs: month }))).toEqual([
+      `G027 @${rest}#operations/listAll/timeoutMs`,
+    ]);
+    expect(sabotage(rest, onOperation('listAll', { retry: { times: 1, backoffMs: month } }))).toEqual(['G027']);
+    const bound = { timeoutMs: 2147483647, retry: { times: 30, backoffMs: 2147483647 } };
+    expect(sabotage(rest, onOperation('listAll', bound))).toEqual([]);
   });
   it("accepts the guide's retry over a GET, and a binding operation whose graph only GETs", () => {
     const guide = { timeoutMs: 5000, retry: { times: 2, backoffMs: 200, when: 'status >= 500' } };

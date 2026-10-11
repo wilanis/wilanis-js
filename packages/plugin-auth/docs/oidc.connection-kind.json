@@ -28,7 +28,8 @@
       },
       "timeoutMs": {
         "type": "number",
-        "required": false
+        "required": false,
+        "description": "the most one request to the issuer may take, in milliseconds; past it the request is aborted. At most 2147483647, the longest a Node timer waits. Absent: 10000"
       }
     }
   }

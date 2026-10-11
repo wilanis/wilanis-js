@@ -1,16 +1,24 @@
 /**
- * What this engine alone can judge: X231 to X233, its own band. @storage judges a store against the shapes it
+ * What this engine alone can judge: X231 to X234, its own band. @storage judges a store against the shapes it
  * names and the contracts it holds to; what is here is narrower and is nobody else's business -- which types
- * this engine has a column for, which keys `newKey` can answer, and which names SQLite will keep apart.
+ * this engine has a column for, which keys `newKey` can answer, which names SQLite will keep apart, and whether a
+ * writer's wait for the file is one a timer can keep.
  *
  * A rule here never mentions a graph, exactly as @storage's rules never mention an engine. Only the stores
  * kept over a connection of this plugin's kind are judged: the same documents over the memory engine mean
  * something this plugin has no opinion about.
  */
-import { type ConnectionDoc, kept, type PluginCheckContext, type StoreDoc, type Type } from '@wilanis/core';
+import {
+  type ConnectionDoc,
+  kept,
+  type PluginCheckContext,
+  type StoreDoc,
+  TIMER_MAX_MS,
+  type Type,
+} from '@wilanis/core';
 import { columnOf } from './columns.js';
 import { folded, legal } from './names.js';
-import { isIdentity, type Settings } from './settings.js';
+import { busyTimeoutOf, isIdentity, type Settings } from './settings.js';
 
 type Scope = PluginCheckContext['scope'];
 type Refuse = PluginCheckContext['refuse'];
@@ -119,8 +127,25 @@ function checkNames(kept: Kept[], refuse: Refuse): void {
   }
 }
 
+/**
+ * X234: a `busyTimeoutMs` longer than a Node timer can wait. A writer of this process waits its turn on the file on a
+ * timer (`turns.ts`), and Node fires one set past `TIMER_MAX_MS` after 1 ms. It reads the wait as `busyTimeoutOf`
+ * does, rounded, so the bound is the one the timer is given.
+ */
+function checkBusyTimeout(settings: Settings, refuse: Refuse): void {
+  if (settings.busyTimeoutMs === undefined || busyTimeoutOf(settings) <= TIMER_MAX_MS) return;
+  refuse({
+    code: 'X234',
+    file: '@project.json',
+    message: `busyTimeoutMs is ${settings.busyTimeoutMs}; it is how long a writer waits for the file, in milliseconds, and a Node timer waits at most ${TIMER_MAX_MS} ms (about 24.8 days): a longer one fires after 1 ms, so a writer that has to wait would fail with 'database is locked' at once`,
+    at: `plugins/${ROOT}/settings/busyTimeoutMs`,
+    hint: `set it to ${TIMER_MAX_MS} or less, or drop it for the default of 5000`,
+  });
+}
+
 /** Every X23x refusal this tree earns. */
 export function check(ctx: PluginCheckContext): void {
+  checkBusyTimeout(ctx.settings as Settings, ctx.refuse);
   const kept = keptHere(ctx.scope);
   const identity = isIdentity(ctx.settings as Settings);
   for (const one of kept) {

@@ -4,8 +4,9 @@
  * the last one stands, and the report is one node with the tries before the one it shows.
  */
 import { attempting } from '@wilanis/compiler';
+import { TIMER_MAX_MS } from '@wilanis/core';
 import type { Handler, NodeReport, Report, RunContext } from '@wilanis/engine';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { running, scripted } from './attempts-tree.js';
 
 /** The graph's report under the binding's call, and the node `asked` in it. */
@@ -203,6 +204,42 @@ describe('a retried call whose run is cancelled', () => {
     expect(Date.now() - began).toBeLessThan(1000);
     expect(tries).toBe(1);
     expect(attempted).toEqual([]);
+  });
+});
+
+describe('a backoff that doubles past what a Node timer can wait', () => {
+  it('waits at most TIMER_MAX_MS, rather than the 1 ms Node takes a longer timer for', async () => {
+    const waits: number[] = [];
+    const real = globalThis.setTimeout;
+    // every wait is asked for and recorded, then made at once: 23 doubling waits would take months
+    const spy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((done: () => void, ms?: number) => {
+      waits.push(ms ?? 0);
+      return real(done, 0);
+    }) as typeof setTimeout);
+    let tries = 0;
+    const base: Handler = async () => {
+      tries++;
+      throw new Error('the upstream dropped the call');
+    };
+    const ctx = {
+      nodePath: ['asked'],
+      site: 'asked',
+      clock: Date.now,
+      attach: () => {},
+      attempted: () => {},
+      env: {},
+    } as unknown as RunContext;
+    const wrapped = attempting(base, new Map([['asked', { times: 23, backoffMs: 1000 }]]));
+    try {
+      await expect(wrapped({ in: {}, ctx })).rejects.toThrow('the upstream dropped the call');
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(tries).toBe(24);
+    expect(waits).toHaveLength(23);
+    expect(waits[21]).toBe(1000 * 2 ** 21); // still under the bound: waited as doubled
+    expect(waits[22]).toBe(TIMER_MAX_MS); // 1000 * 2 ** 22 is past it, and would have fired after 1 ms
   });
 });
 

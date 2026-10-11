@@ -1,8 +1,8 @@
 /**
  * What only @http can judge. X001: the codec table names something that is not a codec. X002: a content type used
  * anywhere has no codec in the table. X003: a connection's throttle could never let a request through. X004: a
- * deadline or a body bound, on a route, in the plugin's settings or on a connection, is not a whole number of 1 or more,
- * or a deadline is longer than a Node timer can wait.
+ * deadline, a body bound or a connection's timeout, on a route, in the plugin's settings or on a connection, is not a
+ * whole number of 1 or more, or a deadline or a timeout is longer than a Node timer can wait.
  */
 import { type PluginCheckContext, TIMER_MAX_MS } from '@wilanis/core';
 import { doc, ROOT } from './paths.js';
@@ -39,24 +39,42 @@ function checkThrottles(scope: Scope, refuse: Refuse) {
   }
 }
 
-/** What each limit is, as its refusal says it. */
-const LIMITS: Record<string, string> = {
-  deadlineMs: 'the most a run may take, in milliseconds',
-  maxBodyBytes: 'the most a body may weigh, in bytes',
-};
+/** One limit X004 judges: what it is, what dropping it leaves, and what a timer past the bound would do. */
+interface Limit {
+  what: string;
+  dropped: string;
+  /** what every run or request would suffer where Node fires the timer after 1 ms; absent: no timer waits on it */
+  struck?: string;
+}
 
-/** The limits a timer waits on, so the ones a Node timer bounds: past `TIMER_MAX_MS` it fires after 1 ms. */
-const TIMED = new Set(['deadlineMs']);
+/** Each limit, as its refusal says it. Past `TIMER_MAX_MS` a Node timer fires after 1 ms, so a timed one is bounded. */
+const LIMITS: Record<string, Limit> = {
+  deadlineMs: {
+    what: 'the most a run may take, in milliseconds',
+    dropped: 'no limit',
+    struck: 'every run would be cancelled at once',
+  },
+  maxBodyBytes: { what: 'the most a body may weigh, in bytes', dropped: 'no limit' },
+  timeoutMs: {
+    what: 'the most a request to this connection may take, in milliseconds',
+    dropped: 'the default of 30000',
+    struck: 'every request would be aborted at once',
+  },
+};
 
 /** Why one limit's value cannot be met, as the message and hint X004 says, or undefined where it can be. */
 function unmet(name: string, value: unknown): { message: string; hint: string } | undefined {
-  const said = `${name} is ${JSON.stringify(value)}; it is ${LIMITS[name]}`;
+  const limit = LIMITS[name];
+  const said = `${name} is ${JSON.stringify(value)}; it is ${limit.what}`;
   if (!(Number.isInteger(value) && (value as number) >= 1))
-    return { message: `${said}, a whole number of 1 or more`, hint: 'set it to 1 or more, or drop it for no limit' };
-  if (TIMED.has(name) && (value as number) > TIMER_MAX_MS)
     return {
-      message: `${said}, and a Node timer waits at most ${TIMER_MAX_MS} ms (about 24.8 days): a longer one fires after 1 ms, so every run would be cancelled at once`,
-      hint: `set it to ${TIMER_MAX_MS} or less, or drop it for no limit`,
+      message: `${said}, a whole number of 1 or more`,
+      hint: `set it to 1 or more, or drop it for ${limit.dropped}`,
+    };
+  if (limit.struck && (value as number) > TIMER_MAX_MS)
+    return {
+      message: `${said}, and a Node timer waits at most ${TIMER_MAX_MS} ms (about 24.8 days): a longer one fires after 1 ms, so ${limit.struck}`,
+      hint: `set it to ${TIMER_MAX_MS} or less, or drop it for ${limit.dropped}`,
     };
   return undefined;
 }
@@ -74,7 +92,7 @@ function judgeLimits(
   }
 }
 
-/** X004: the limits of the plugin's settings, of every http trigger, and the answer bound of every http connection. */
+/** X004: the limits of the plugin's settings, of every http trigger, and the bound and timeout of every connection. */
 function checkLimits(scope: Scope, settings: Record<string, unknown>, refuse: Refuse) {
   const both = ['deadlineMs', 'maxBodyBytes'];
   judgeLimits(settings, both, { file: '@project.json', at: `plugins/${ROOT}/settings` }, refuse);
@@ -83,7 +101,12 @@ function checkLimits(scope: Scope, settings: Record<string, unknown>, refuse: Re
       judgeLimits(trigger.doc.settings, both, { file: trigger.path, at: 'settings' }, refuse);
   for (const connection of scope.registry.all('connection'))
     if (scope.canon(connection.doc.kind) === doc('http.connection-kind.json'))
-      judgeLimits(connection.doc.settings, ['maxBodyBytes'], { file: connection.path, at: 'settings' }, refuse);
+      judgeLimits(
+        connection.doc.settings,
+        ['maxBodyBytes', 'timeoutMs'],
+        { file: connection.path, at: 'settings' },
+        refuse,
+      );
 }
 
 /** X001: every path the codec table names is a codec. */

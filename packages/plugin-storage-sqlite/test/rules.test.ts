@@ -1,5 +1,5 @@
 /**
- * X231 to X233: what this engine alone can judge, refused before anything runs and without opening a file. These
+ * X231 to X234: what this engine alone can judge, refused before anything runs and without opening a file. These
  * are the rules a reader meets as `wilanis check` output rather than as a driver error at three in the
  * morning, so every case here breaks one document of a small tree and reads the code back.
  *
@@ -138,5 +138,18 @@ describe('what this engine refuses before anything runs', () => {
         doc.collections = { entriesKept: { of: SHAPE, key: 'id' }, entrieskept: { of: SHAPE, key: 'id' } };
       }),
     ).toEqual([['X233', 'collections/entrieskept']]);
+  });
+
+  it('X234 a busyTimeoutMs longer than a Node timer can wait: a writer of this process waits its turn on a timer', () => {
+    const settled = (value: number) => {
+      const docs = tree();
+      docs['project.json'] = {
+        ...(docs['project.json'] as Record<string, unknown>),
+        plugins: [{ use: '@std' }, { use: '@storage' }, { use: '@storage-sqlite', settings: { busyTimeoutMs: value } }],
+      };
+      return refusals(docs);
+    };
+    expect(settled(2_147_483_648)).toEqual([['X234', 'plugins/@storage-sqlite/settings/busyTimeoutMs']]);
+    expect(settled(2_147_483_647)).toEqual([]);
   });
 });

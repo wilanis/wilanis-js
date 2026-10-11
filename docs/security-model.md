@@ -80,11 +80,13 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
   credentials it reads. [[A004](refusals/A004.md), [A005](refusals/A005.md)] (before the RFCs)
 - A `required` resolver is handed by the trigger's kind or proved by one of its policies, on every trigger that
   reads it. [[A006](refusals/A006.md)] (before the RFCs)
-- A trigger anyone may call takes no list without a `maxItems`, a `maxItems` bounds only a list, and every deadline
-  and body bound the http plugin, its triggers and its connections declare can be met. [[T008](refusals/T008.md),
-  [C016](refusals/C016.md), [X004](refusals/X004.md)] (RFC 0012)
+- A trigger anyone may call takes no list without a `maxItems`, a `maxItems` bounds only a list, and every deadline,
+  body bound and request timeout the http plugin, its triggers and its connections declare can be met, each deadline
+  and timeout within what a Node timer can wait. [[T008](refusals/T008.md), [C016](refusals/C016.md),
+  [X004](refusals/X004.md)] (RFC 0012)
 - A trigger kind correlates a run only by a path its context hands, and the trace exporter's endpoint is an http URL
-  or a secret and its level one the runtime has. [[T007](refusals/T007.md), [X301](refusals/X301.md)] (RFC 0006)
+  or a secret, its level one the runtime has, and its flush deadline one a Node timer can wait.
+  [[T007](refusals/T007.md), [X301](refusals/X301.md)] (RFC 0006)
 - A trigger fed by a connection receives from one that delivers messages, named as a literal. A queue trigger asks
   only what its broker can do; a publish whose connection and queue are written as literals, and that a trigger of
   the same tree receives from, fits the message that trigger takes; no publish and no queue trigger's message
@@ -114,6 +116,8 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
   RFCs)
 - A relative `dir` never puts the guard's files at the tree's root, above it, or where the loader reads documents;
   an absolute one is taken as written. [[X106](refusals/X106.md)] (RFC 0005)
+- A request to an OIDC issuer is given up after a `timeoutMs` a Node timer can wait, so none is aborted after 1 ms.
+  [[X107](refusals/X107.md)] (before the RFCs)
 - A trigger that reaches an operation an access invariant covers attaches the policy it requires, and an
   invariant names only domain operations, paths a trigger's kind or the guard hands and core shapes, and is
   reached.
@@ -146,11 +150,13 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
 - A collection's `renamed` and `was` describe a rename, never one field into two or one table onto another.
   [[C010](refusals/C010.md), [C011](refusals/C011.md)] (RFC 0017)
 - A collection kept in PostgreSQL holds no blob, is keyed by a field the engine can make a key for, and has a name
-  PostgreSQL keeps as a table of its own. [[X221](refusals/X221.md), [X222](refusals/X222.md),
-  [X223](refusals/X223.md)] (RFC 0022)
+  PostgreSQL keeps as a table of its own; a queue it keeps renews a running delivery's lock on a wait a Node timer
+  can keep. [[X221](refusals/X221.md), [X222](refusals/X222.md), [X223](refusals/X223.md),
+  [X224](refusals/X224.md)] (RFC 0022)
 - A collection kept in SQLite holds no blob, is keyed by a field the engine can make a key for under its `keyType`,
   and has a name SQLite will create as a table and keep apart from every other collection of its file once case is
-  ignored. [[X231](refusals/X231.md), [X232](refusals/X232.md), [X233](refusals/X233.md)] (RFC 0022)
+  ignored; a writer waits for the file no longer than a Node timer can wait. [[X231](refusals/X231.md),
+  [X232](refusals/X232.md), [X233](refusals/X233.md), [X234](refusals/X234.md)] (RFC 0022)
 - A collection kept in MySQL holds no blob, is keyed by a field the engine can make a key for under its `keyType`,
   has a name MySQL keeps as a table apart from every other collection of its database once case is ignored, and
   has fields MySQL keeps as columns apart from each other once case is ignored. [[X241](refusals/X241.md),
@@ -169,8 +175,9 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
   (RFC 0016)
 - A `retry` is written only over a call that reaches an effect and is idempotent where it is made, an atomic graph's
   transactional effects excepted, since a failed try rolls them back; its `when` is a boolean over what one try
-  answers, and a domain graph writes no `retry` or `timeoutMs`. [[G017](refusals/G017.md), [G018](refusals/G018.md),
-  [G019](refusals/G019.md), [L012](refusals/L012.md)] (RFC 0011)
+  answers; a `timeoutMs` and a `backoffMs` are each a wait a Node timer can keep; and a domain graph writes no
+  `retry` or `timeoutMs`. [[G017](refusals/G017.md), [G018](refusals/G018.md), [G019](refusals/G019.md),
+  [G027](refusals/G027.md), [L012](refusals/L012.md)] (RFC 0011)
 - An operation that promises `idempotent` keeps the promise under every profile, at every effect it reaches; what a
   port says about repeating an operation is one sound fact; and a trigger fed by a broker that delivers at least once
   fires only an operation that promises it. [[B011](refusals/B011.md), [C015](refusals/C015.md),

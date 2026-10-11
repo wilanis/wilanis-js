@@ -28,7 +28,7 @@
       "flushDeadlineMs": {
         "type": "number",
         "required": false,
-        "description": "the most stopping waits for the last spans to reach the collector, in milliseconds; past it what is still unsent is said in one log line and dropped, and the process goes on stopping. Absent: 2000, which lets a collector that answers at all take the last batch and leaves most of the 10 s a container is given after SIGTERM to everything else that stops, where a collector that cannot be reached would otherwise hold the stop for the ~9 s its exporter spends retrying"
+        "description": "the most stopping waits for the last spans to reach the collector, in milliseconds; past it what is still unsent is said in one log line and dropped, and the process goes on stopping; at most 2147483647, the longest a Node timer waits. Absent: 2000, which lets a collector that answers at all take the last batch and leaves most of the 10 s a container is given after SIGTERM to everything else that stops, where a collector that cannot be reached would otherwise hold the stop for the ~9 s its exporter spends retrying"
       }
     }
   },

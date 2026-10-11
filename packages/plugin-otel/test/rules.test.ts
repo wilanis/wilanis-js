@@ -95,6 +95,22 @@ describe('X301: a level that is not one', () => {
   });
 });
 
+describe('X301: a flush deadline longer than a Node timer can wait', () => {
+  const at = { endpoint: 'http://localhost:4318/v1/traces', service: 'customers' };
+
+  it('30 days, which Node would fire after 1 ms, so every stop would drop the unsent spans at once', () => {
+    const found = judging({ ...at, flushDeadlineMs: 30 * 24 * 60 * 60 * 1000 });
+    expect(found).toHaveLength(1);
+    expect(found[0].at).toBe('plugins/@otel/settings/flushDeadlineMs');
+    expect(found[0].message).toMatch(/a Node timer waits at most 2147483647 ms/);
+    expect(found[0].hint).toBe('set it to 2147483647 or less, or drop it for the default of 2000');
+  });
+
+  it('a deadline at the bound is one a timer keeps', () => {
+    expect(judging({ ...at, flushDeadlineMs: 2147483647 })).toEqual([]);
+  });
+});
+
 describe('what is deliberately not a rule here', () => {
   it('a tree that names no export step exports nothing, and is not refused', () => {
     const docs = tree();

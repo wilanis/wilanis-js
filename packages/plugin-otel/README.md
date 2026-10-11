@@ -60,7 +60,7 @@ is kept as it came, on `wilanis.correlation`, and the run starts a trace of its 
 | `service` | yes | what this tree is called on a span: the `service.name` every exported span carries. |
 | `headers` | no | headers sent with every batch, for a collector that authenticates. |
 | `level` | no | `summary` (the default) or `full`. |
-| `flushDeadlineMs` | no | the most stopping waits for the last spans to reach the collector, in milliseconds; 2000 by default. |
+| `flushDeadlineMs` | no | the most stopping waits for the last spans to reach the collector, in milliseconds; 2000 by default, at most 2147483647. |
 
 ## Levels, and why `summary` is the default
 
@@ -79,7 +79,7 @@ A challenge's `detail` -- its id and how to answer it -- never enters a trace at
 
 | Code | Refuses when |
 |---|---|
-| `X301` | `settings.endpoint` is neither a `{{secrets.<key>}}` read nor an `http(s)://` URL, or `level` is not `summary`/`full` |
+| `X301` | `settings.endpoint` is neither a `{{secrets.<key>}}` read nor an `http(s)://` URL, `level` is not `summary`/`full`, or `flushDeadlineMs` is above 2147483647, which a Node timer would fire after 1 ms |
 
 The endpoint is judged as it is *written*, before any secret is substituted, which is the only moment at
 which a literal URL and a read of a secret can be told apart. The value behind a secret is taken on trust:

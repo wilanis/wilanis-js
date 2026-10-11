@@ -117,6 +117,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [G024](G024.md) | G | live | a catch of a switch, a pure operation or one that refuses on purpose, which break only by a bug |
 | [G025](G025.md) | G | live | a catch of a node where an invariant is guarded, which the guard moves aside |
 | [G026](G026.md) | G | live | a value given for a field the contract marks `provided`, which the compiler writes where the operation is called |
+| [G027](G027.md) | G | live | a timeoutMs or retry.backoffMs longer than a Node timer can wait |
 | [P001](P001.md) | P | live | a static field, or a type reference, given a read where the checker must see a literal |
 | [P002](P002.md) | P | live | a resolver reading a context.* path no trigger kind hands and the guard does not add |
 | [P003](P003.md) | P | live | a resolver named in, const, context or secrets |
@@ -194,12 +195,13 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [X001](X001.md) | X | live | the @http codec table names something that is not a codec |
 | [X002](X002.md) | X | live | a content type a route, graph or binding uses has no codec in the @http codec table |
 | [X003](X003.md) | X | live | an http connection's throttle could never let a request through |
-| [X004](X004.md) | X | live | a deadlineMs or maxBodyBytes that is not a whole number of 1 or more, or a deadlineMs longer than a Node timer can wait |
+| [X004](X004.md) | X | live | a deadlineMs, maxBodyBytes or connection timeoutMs that is not a whole number of 1 or more, or a deadlineMs or timeoutMs longer than a Node timer can wait |
 | [X101](X101.md) | X | live | the @auth settings.session names something that is not a shape |
 | [X102](X102.md) | X | live | a challenge by a method the settings do not declare, or one no attachment of the trigger could answer |
 | [X103](X103.md) | X | live | a session read or write whose type or keys fall outside the session shape |
 | [X105](X105.md) | X | live | a session write of an attribute a store scopes a collection by, which only the sign-in writes |
 | [X106](X106.md) | X | live | files.port.json keeps records in the tree's root, above it, or where the loader reads documents |
+| [X107](X107.md) | X | live | an OIDC connection's timeoutMs longer than a Node timer can wait |
 | [X201](X201.md) | X | live | a store's collection keeps an edge shape, not a core one |
 | [X202](X202.md) | X | live | a collection's key is not a field of its shape, or is an optional one |
 | [X203](X203.md) | X | live | a store's connection is of a kind that reaches no storage engine, or that no loaded plugin grants |
@@ -215,9 +217,11 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [X221](X221.md) | X | live | a field of a collection kept in postgres that is a blob, which this engine has no column for |
 | [X222](X222.md) | X | live | a postgres collection's key that is neither string nor number, or that the plugin's keyType cannot generate |
 | [X223](X223.md) | X | live | a postgres collection name that is no legal table name, or folds to the same table as another's |
+| [X224](X224.md) | X | live | a postgres queueVisibility whose half, the wait between lock renewals, is longer than a Node timer can wait |
 | [X231](X231.md) | X | live | a field of a collection kept in sqlite that is a blob, which this engine has no column for |
 | [X232](X232.md) | X | live | a sqlite collection's key that is neither string nor number, or that the plugin's keyType cannot generate |
 | [X233](X233.md) | X | live | a sqlite collection name that is no legal table name, or folds to the same table as another's |
+| [X234](X234.md) | X | live | a sqlite busyTimeoutMs longer than a Node timer can wait |
 | [X241](X241.md) | X | live | a field of a collection kept in mysql that is a blob, which this engine has no column for |
 | [X242](X242.md) | X | live | a mysql collection's key that is neither string nor number, or that the plugin's keyType cannot generate |
 | [X243](X243.md) | X | live | a mysql collection or field name over 64 characters, or one that folds to the same table or column as another's |
@@ -225,7 +229,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [X252](X252.md) | X | live | a scheduled trigger declares `in` with no `fire.in`, and nothing arrives on a tick |
 | [X253](X253.md) | X | live | `catchUp` is set while no scheduler run step names a lease |
 | [X254](X254.md) | X | live | the scheduler run step's lease names no connection, or one whose kind keeps no leases |
-| [X301](X301.md) | X | live | an @otel endpoint that is neither an http(s) URL nor a secret read, or a level that is not summary or full |
+| [X301](X301.md) | X | live | an @otel endpoint that is neither an http(s) URL nor a secret read, a level that is not summary or full, or a flushDeadlineMs longer than a Node timer can wait |
 | [X401](X401.md) | X | live | a queue setting a worker cannot act on: an outcome that is not ack, retry or dead, or attempts, backoff or concurrency out of range |
 | [X402](X402.md) | X | live | a `retry` outcome, or `onFault` left at retry, on a queue trigger whose connection's kind delivers at most once |
 | [X403](X403.md) | X | live | a `publish` of a type the queue trigger consuming that connection and queue does not accept |

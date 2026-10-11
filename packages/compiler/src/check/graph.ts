@@ -6,7 +6,7 @@
  * and P005 for the `reads` map); an effect no switch routes is read on every branch (G015); no read is named
  * after a node (P006); constants conform (G013). A domain graph that only forwards its input is refused (L007),
  * and writes no retry or timeout (L012) and catches nothing (L013); a data graph's retry is judged in attempts.ts
- * (G017, G018, G019), and what its switches catch in graph-nodes.ts (G021 to G025).
+ * (G017, G018, G019) with its timer bounds (G027), and what its switches catch in graph-nodes.ts (G021 to G025).
  */
 import {
   conforms,
@@ -26,7 +26,7 @@ import {
 } from '@wilanis/core';
 import { outputCandidates } from '../documents.js';
 import { guardsOf } from '../guard.js';
-import { answersOf, checkCallRetry } from './attempts.js';
+import { answersOf, checkCallRetry, checkTimerBounds } from './attempts.js';
 import { checkCatches, checkReason, checkSwitch, elementInputs } from './graph-nodes.js';
 import { GraphReads } from './graph-reads.js';
 import { checkWhole } from './graph-whole.js';
@@ -281,6 +281,7 @@ class GraphCheck {
       checkSwitch(this, node, read);
       return;
     }
+    if (this.role === 'data') checkTimerBounds(this.refuse, `nodes/${node.id}`, node);
     const hit = this.ops.get(node.id);
     if (!hit) return;
     checkReason(this, node, hit, this.judge.scope);
