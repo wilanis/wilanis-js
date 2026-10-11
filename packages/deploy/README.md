@@ -57,7 +57,8 @@ Every file begins with two lines saying it is generated, from which tree and pro
 renders it again. The tree is the source, so regenerate rather than edit. A file whose first line is not that
 header is someone's own -- a Dockerfile the tree outgrew -- and is never overwritten without `--force`; nothing
 is written while one stands where a target would write. `--check` writes nothing and exits 1 naming every file
-a write would change, which is what CI runs over `example/deploy/`. stdout carries the plan and nothing else;
+a write would change, which is what CI runs over `example/deploy/`. A Dockerfile rendered before #920, which moved
+the install into a build stage, fails `--check` once: render it again. stdout carries the plan and nothing else;
 what was written, and what would change, is said on stderr.
 
 ## From code
