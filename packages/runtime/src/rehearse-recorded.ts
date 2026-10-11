@@ -63,7 +63,11 @@ export function recordsInto(triggers: Loaded<TriggerDoc>[], runs: Recording[] | 
  * The root a scenario's replay fires: its trigger, or where it names a policy, the root `policyRoot` builds of that
  * policy under the trigger, so the decision is fired under the kind and settings it was recorded under.
  */
-function replayedRoot(load: LoadResult, sc: ScenarioDoc, trigger: Loaded<TriggerDoc>): Loaded<TriggerDoc> {
+function replayedRoot(
+  load: LoadResult,
+  sc: Pick<ScenarioDoc, 'policy'>,
+  trigger: Loaded<TriggerDoc>,
+): Loaded<TriggerDoc> {
   if (sc.policy === undefined) return trigger;
   const policy = load.registry.get('policy', load.resolve(sc.policy));
   if (!policy) throw new Error(`scenario names unknown policy '${sc.policy}', which wilanis check refuses as S005`);
@@ -71,8 +75,11 @@ function replayedRoot(load: LoadResult, sc: ScenarioDoc, trigger: Loaded<Trigger
 }
 
 /** The trigger document a scenario's replay fires: the document of the root `replayedRoot` answers. */
-export const replayedDoc = (load: LoadResult, sc: ScenarioDoc, trigger: Loaded<TriggerDoc>): TriggerDoc =>
-  replayedRoot(load, sc, trigger).doc;
+export const replayedDoc = (
+  load: LoadResult,
+  sc: Pick<ScenarioDoc, 'policy'>,
+  trigger: Loaded<TriggerDoc>,
+): TriggerDoc => replayedRoot(load, sc, trigger).doc;
 
 /**
  * One branch as it is recorded, named by the branch it proves and, where a sibling shares its target, its place: the

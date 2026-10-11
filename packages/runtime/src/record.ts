@@ -4,11 +4,12 @@
  * (RFC 0018). Rendering is pure, so the directory is a function of the tree and the one seed it is solved under;
  * what the directory may be and what in it is owned is `recorded-dir.ts`'s.
  */
-import { featureOf, type ScenarioBranch, type ScenarioDoc, schemaUrl, stem } from '@wilanis/core';
+import { featureOf, type LoadResult, type ScenarioBranch, type ScenarioDoc, schemaUrl, stem } from '@wilanis/core';
 import { type Report, refusalOf } from '@wilanis/engine';
 import { expectOf } from './fuzz.js';
 import { checkRecorded, keptIn, type RecordCheck, writeRecorded } from './recorded-dir.js';
 import { RECORDED, REHEARSED } from './recorded-owner.js';
+import { recordedReport, replayerFor } from './replay.js';
 
 /** What `--check` says after the files it lists: the one command that brings the directory back. */
 export const RECORD_HINT = 'run wilanis rehearse --record and review the diff';
@@ -237,6 +238,29 @@ function sameDir(under: string, paths: string[], what: keyof typeof MANY): strin
     `under its feature and name (${under}/): rename ${one} or ${two}`
   );
 }
+
+/**
+ * The runs, each with the report its replay answers (`recordedReport`) in place of the one the rehearsal judged. The
+ * rehearsal fires a branch with the case's stubs alone and lets the seed answer every other effect as it runs;
+ * `regress` answers every effect from a stub, in fewer steps, so where a refusal ends a run while other nodes still
+ * run, the two can cancel different nodes. The expectation is read off the replay, so the file replays the same (#908).
+ */
+export async function replayedRuns(load: LoadResult, profile: string | undefined, runs: Recording[]) {
+  const replayer = replayerFor(load, profile);
+  const out: Recording[] = [];
+  for (const run of runs)
+    out.push('unreachable' in run ? run : { ...run, report: await recordedReport(load, replayer, replayableOf(run)) });
+  return out;
+}
+
+/** What a recorded run is written to fire: its way in, and its input, context and stubs. */
+const replayableOf = (run: RecordedRun) => ({
+  trigger: run.trigger.path,
+  ...(run.policy ? { policy: run.policy.path } : {}),
+  in: run.input,
+  context: run.context,
+  stubs: run.stubs,
+});
 
 /** Write the runs to the recorded directory, or under `check` compare them with it and write nothing. */
 export function recordRuns(root: string, how: { record?: string; check?: boolean }, runs: Recording[]): Recorded {
