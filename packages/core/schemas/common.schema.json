@@ -175,7 +175,7 @@
       }
     },
     "retry": {
-      "description": "When a call that faults or times out is tried again: at most times more, waiting backoffMs before the second try and twice as long before each further one. A declared refusal is never tried again: it is the graph deciding, not a fault.",
+      "description": "When a call that faults or times out is tried again: at most times more, waiting backoffMs before the second try and twice as long before each further one, never past 2147483647, the longest a Node timer waits. A declared refusal is never tried again: it is the graph deciding, not a fault.",
       "type": "object",
       "properties": {
         "times": {
@@ -184,7 +184,7 @@
           "minimum": 1
         },
         "backoffMs": {
-          "description": "The wait before the second try, in milliseconds; doubled before each further one. Absent: 0.",
+          "description": "The wait before the second try, in milliseconds: at most 2147483647, the longest a Node timer waits. Doubled before each further one, and never past that bound. Absent: 0.",
           "type": "number",
           "minimum": 0,
           "default": 0
@@ -201,7 +201,7 @@
       "additionalProperties": false
     },
     "timeoutMs": {
-      "description": "The most this call may take, in milliseconds, counted from the moment it starts (a map: each element). When it strikes, the call fails as a fault and the handler is told through its signal. Absent: the call waits as long as its handler does.",
+      "description": "The most this call may take, in milliseconds, counted from the moment it starts (a map: each element). When it strikes, the call fails as a fault and the handler is told through its signal. At most 2147483647, the longest a Node timer waits. Absent: the call waits as long as its handler does.",
       "type": "number",
       "exclusiveMinimum": 0
     },
