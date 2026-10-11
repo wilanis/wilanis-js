@@ -165,8 +165,11 @@ export async function rehearse(
   // A scope of its own rather than an embedder's: what is asked of it reads documents and runs nothing.
   const said = { verbose: opts.verbose, stated: statedOf(new Scope(load.registry, load.resolve)) };
   const ok = format(decisions, plain, lines, said);
-  const recorded = runs ? { recorded: recordRuns(load.root, opts, await replayedRuns(load, profile, runs)) } : {};
-  return { ok, lines, seed, decisions, plain, skipped, ...recorded };
+  // a run whose replay ended otherwise is not recorded, and its line fails the rehearsal (#935)
+  const replayed = runs ? await replayedRuns(load, profile, runs) : { runs: undefined, unwritten: [] };
+  lines.push(...replayed.unwritten);
+  const recorded = replayed.runs ? { recorded: recordRuns(load.root, opts, replayed.runs) } : {};
+  return { ok: ok && !replayed.unwritten.length, lines, seed, decisions, plain, skipped, ...recorded };
 }
 
 /** What walking the triggers gathers: every decision, every plain run, and -- when the rehearsal records -- the runs. */

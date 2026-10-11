@@ -19,8 +19,8 @@ import {
   stubsOf,
   type TriggerDoc,
 } from '@wilanis/core';
-import { outcomeOf, type Report, refusalOf, shownOutput } from '@wilanis/engine';
-import { type Fuzzing, fuzzEdges } from './fuzz-edges.js';
+import { type Report, refusalOf, shownOutput } from '@wilanis/engine';
+import { type Fuzzing, fuzzEdges, unwritten } from './fuzz-edges.js';
 import { activeProfile, skippedLines } from './profile.js';
 import { asWritten } from './recorded-answers.js';
 import { SCENARIOS } from './recorded-owner.js';
@@ -77,13 +77,17 @@ export function expectOf(report: Report, secret: string[][]): ScenarioDoc['expec
   };
 }
 
-/** One fuzzed run: the trigger fired under a seed, what it was fired with, what the stubs answered, its report. */
+/**
+ * One fuzzed run: the trigger fired under a seed, what it was fired with, what the stubs answered, the report of the
+ * run that chose those answers, and the report of their replay, which the scenario's expectation is read off.
+ */
 interface Fuzzed {
   trigger: Loaded<TriggerDoc>;
   seed: number;
   input: unknown;
   context: Record<string, unknown>;
   record: Record<string, unknown>;
+  first: Report;
   report: Report;
   /** Where the trigger's `out` marks a field secret: the marker in the output, beside what its report marks. */
   secret: string[][];
@@ -102,9 +106,9 @@ async function fuzzed(
   const record: Record<string, unknown> = {};
   const emb = embedderFor(load, { seed, record, profile: how.profile });
   const { input, context } = generatedFire(emb, trigger, seed);
-  await emb.fire(trigger.doc, input, context);
+  const first = await emb.fire(trigger.doc, input, context);
   const report = await recordedReport(load, how.replayer, { trigger: trigger.path, in: input, context, stubs: record });
-  return { trigger, seed, input, context, record, report, secret: secretPaths(emb.types(trigger.doc).out) };
+  return { trigger, seed, input, context, record, first, report, secret: secretPaths(emb.types(trigger.doc).out) };
 }
 
 /** The scenario a fuzzed run is written as. */
@@ -136,9 +140,10 @@ export function fuzz(
 
 /**
  * Run each trigger the profile serves under N seeds with stubbed effects and write one scenario per run -- but never
- * one of a fault. The stubbed world never throws, so a run that faults under stubs is the tree's own bug (a `make`
- * whose value does not fit, a `refuse` whose reason is not a word, a wiring hole), and a scenario pinning it would
- * hold the tree to breaking: the fault is said, nothing is written for it, and the answer is not ok. A trigger the
+ * one of a fault, or one whose replay ended otherwise than the run (`unwritten`). The stubbed world never throws, so a
+ * run that faults under stubs is the tree's own bug (a `make` whose value does not fit, a `refuse` whose reason is not
+ * a word, a wiring hole), and a scenario pinning it would hold the tree to breaking: the fault is said, nothing is
+ * written for it, and the answer is not ok. A trigger the
  * profile does not serve (`walkedUnder`) is not run, and `skipped` says how many and where they are served.
  */
 async function fuzzSeeds(load: LoadResult, opts: { runs?: number; profile?: string; out?: string }): Promise<Fuzzing> {
@@ -153,9 +158,9 @@ async function fuzzSeeds(load: LoadResult, opts: { runs?: number; profile?: stri
     if (!walkedUnder(scope, trigger.doc, profile)) continue;
     for (let seed = 1; seed <= (opts.runs ?? 5); seed++) {
       const run = await fuzzed(load, trigger, seed, how);
-      const outcome = outcomeOf(run.report);
-      if (outcome.kind === 'faulted') {
-        lines.push(`${trigger.path} under seed ${seed}: FAULT at '${outcome.at}': ${outcome.error}`);
+      const why = unwritten(run, 'wilanis fuzz');
+      if (why) {
+        lines.push(`${trigger.path} under seed ${seed}: ${why}`);
         continue;
       }
       const file = join(dir, `${trigger.name}.${seed}.scenario.json`);

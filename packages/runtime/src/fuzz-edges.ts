@@ -28,13 +28,13 @@ import { recordedProfile, skippedLines } from './profile.js';
 import { claimDir, dirOf, type Recorded, recordedLines, type Writer } from './record.js';
 import { checkRecorded, keptIn, writeRecorded } from './recorded-dir.js';
 import { EDGED, EDGES } from './recorded-owner.js';
-import { type Replayer, recordedReport, replayerFor } from './replay.js';
+import { endedOtherwise, type Replayer, recordedReport, replayerFor } from './replay.js';
 import { embedderFor, generatedFire } from './stubbing.js';
 import { getPath, setPath } from './stubs.js';
 
 /**
- * What `fuzz` answers: whether no run faulted, every file written, a line per fault, what the profile skipped, and
- * under `edges` the directory it owns with what was written to it or found different in it.
+ * What `fuzz` answers: whether it wrote every run, every file written, a line per run it did not write (`unwritten`),
+ * what the profile skipped, and under `edges` the directory it owns with what was written to it or found different in it.
  */
 export interface Fuzzing {
   ok: boolean;
@@ -61,19 +61,23 @@ export const BESIDE_EDGES: Record<string, string> = {
   json: "fuzz --edges prints no envelope, and an envelope for staleness is RFC 0019's to add: drop --json",
 };
 
-/** One edge's run: the trigger, the edge, what it was fired with, what every effect answered, and its report. */
+/**
+ * One edge's run: the trigger, the edge, what it was fired with, what every effect answered, the report of the run
+ * that chose those answers, and the report of their replay, which the scenario's expectation is read off.
+ */
 interface EdgeRun {
   trigger: Loaded<TriggerDoc>;
   edge: Edge;
   input: unknown;
   context: Record<string, unknown>;
   stubs: Record<string, unknown>;
+  first: Report;
   report: Report;
   /** Where the trigger's `out` marks a field secret: the output is written with those as the marker. */
   secret: string[][];
 }
 
-/** What firing the edges gathers: each run's scenario by file, and a line per run that faulted. */
+/** What firing the edges gathers: each run's scenario by file, and a line per run it does not write (`unwritten`). */
 interface Gathered {
   docs: Record<string, ScenarioDoc>;
   faults: string[];
@@ -83,8 +87,8 @@ interface Gathered {
 
 /**
  * Fire every trigger the default profile serves once per edge of its input and write each run under
- * `scenarios/edges/` -- or under `check` compare them with it and write nothing -- but never one of a fault, which
- * is said instead, as plain fuzz says it. A trigger with no input, or none whose values are the caller's to choose,
+ * `scenarios/edges/` -- or under `check` compare them with it and write nothing -- but never one of a fault, or one
+ * whose replay ended otherwise than the run (`unwritten`), which is said instead, as plain fuzz says it. A trigger with no input, or none whose values are the caller's to choose,
  * has no edge and no file. Throws for an option that would make the directory depend on more than the tree.
  */
 export async function fuzzEdges(
@@ -132,9 +136,8 @@ async function fireEdges(load: LoadResult, how: How, into: Gathered) {
   const { input, context } = generatedFire(emb, trigger, SEED);
   for (const edge of edges(type)) {
     const run = await fired(load, how, { edge, input: withEdge(input, type, edge), context });
-    const outcome = outcomeOf(run.report);
-    if (outcome.kind === 'faulted')
-      into.faults.push(`${trigger.path} with ${edgeSaid(edge)}: FAULT at '${outcome.at}': ${outcome.error}`);
+    const why = unwritten(run, 'wilanis fuzz --edges');
+    if (why) into.faults.push(`${trigger.path} with ${edgeSaid(edge)}: ${why}`);
     else into.docs[fileOf(trigger, edge)] = scenarioOf(run);
   }
 }
@@ -150,10 +153,23 @@ async function fired(
 ): Promise<EdgeRun> {
   const stubs: Record<string, unknown> = {};
   const emb = embedderFor(load, { seed: SEED, record: stubs, profile: how.profile });
-  await emb.fire(how.trigger.doc, given.input, given.context);
+  const first = await emb.fire(how.trigger.doc, given.input, given.context);
   const replayed = { trigger: how.trigger.path, in: given.input, context: given.context, stubs };
   const report = await recordedReport(load, how.replayer, replayed);
-  return { trigger: how.trigger, ...given, stubs, report, secret: secretPaths(emb.types(how.trigger.doc).out) };
+  return { trigger: how.trigger, ...given, stubs, first, report, secret: secretPaths(emb.types(how.trigger.doc).out) };
+}
+
+/**
+ * Why a fuzzed run is not written, as the tail of its line; nothing where it is. Its replay ended otherwise than the
+ * run that chose its stubs (`endedOtherwise`), so the file would pin an ending the run did not have; or it broke, and
+ * the stubbed world never throws, so a scenario of it would hold the tree to its own bug. `again` is the command that
+ * records again.
+ */
+export function unwritten(run: { first: Report; report: Report }, again: string): string | undefined {
+  const otherwise = endedOtherwise(run.first, run.report, again);
+  if (otherwise) return otherwise;
+  const outcome = outcomeOf(run.report);
+  return outcome.kind === 'faulted' ? `FAULT at '${outcome.at}': ${outcome.error}` : undefined;
 }
 
 /**

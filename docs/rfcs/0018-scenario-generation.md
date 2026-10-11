@@ -737,3 +737,14 @@ Decided during implementation:
   `replayedReport`, the one function `regress` fires with, every effect answered by a recorded stub. A recorded
   scenario then replays the same by construction. *What `branchOf` runs is what is recorded* holds for `in` and the
   stubs; the report is the replay's.
+- **A replay that ends otherwise is not recorded (#935).** The replay of the stubs can do more than cancel other nodes:
+  another node can end it first. The run that chose the stubs refused as `missing` at the switch's branch, and the
+  replay refuses as `raced` at a sibling that the seed answered too late to matter the first time. Recording the
+  replay's ending would write `raced` under the file name of the `missing` branch, while the rehearsal line says that
+  branch is ok. Recording the first run's ending would write a file that `regress` reports as a DIFF on its first
+  replay. So each recorder compares the two endings (`endedOtherwise` in `packages/runtime/src/replay.ts`): how the run
+  ended, a refusal's reason, and the node that ended it, by its dotted path. A fault's message is not compared, since
+  the node names the fault. Where they differ, the recorder writes nothing for that run and says so in a line that
+  names the branch (or the trigger and the edge or seed), both endings and what to do, and the command exits 1, as it
+  does for a fault. The branch is not compared on its own: the switch's inputs are the same stubs in both runs, so
+  wherever the replay runs the switch, it routes the same way.
