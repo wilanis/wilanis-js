@@ -60,6 +60,11 @@ table it lives in is the engine's too: `@wilanis/plugin-storage-postgres` keeps 
 the connection's schema and creates it on first contact, and `@wilanis/plugin-storage-memory` keeps nothing
 between processes, so it records nothing and has nothing to migrate.
 
+Each entry names the tree it came from by `project.json -> name`. Since #923, a startup `ensure` names it that way too,
+as `migrate` does; before, it wrote the directory the tree is rooted at. So `migrate --history` of a tree whose
+directory name differs from its project name shows the rows `ensure` wrote before that change under the directory
+name. Plans and drift checks do not read that column.
+
 `wilanis describe <store>` and the viewer read the tree and open no connection, so they say what the store
 declares -- `renamed` and `was` among it -- and never what the database holds. What the database holds is
 `wilanis migrate --history`'s alone to say.

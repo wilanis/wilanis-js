@@ -107,6 +107,18 @@ a blob as rows of a declared shape and writes rows as one; every such operation 
 data graph. Nothing of a file passes through the engine, and a run's blobs are released once the trigger has
 answered.
 
+## Records are a store's
+
+A `store` in a feature's `data/` names a connection and the collections it keeps, each of a core shape and keyed
+by one of its fields. A collection may be `scoped`, and a scope is filled only from what the guard established
+about a caller (A007; RFC 0015). A tick or a queue message has no caller, so a job that keeps its rows apart (a
+host, a batch) keeps the key as a field of the record and filters every read on it with `where`.
+
+`wilanis migrate` plans each connection from this tree's stores alone, and plans a `drop` of a collection the
+connection's record holds and no store declares. So a tree that reads collections another tree migrates never runs
+`wilanis migrate` on that connection, and its store's description says so. RFC 0042 (#922) proposes a way for a
+store to say it.
+
 ## Triggers are generic
 
 A trigger names its kind (an http route, a cli command, whatever a plugin grants), the settings that kind
@@ -180,7 +192,10 @@ guarded: a row the tree did not write is refused where it is read rather than tr
 same rules, visible through `exports` and `dependsOn`, bound by bindings and profiles -- and whose aliases come
 along. Connections, plugins, settings, startup and profiles stay the host's; a port the include leaves unbound
 is the host's to bind. An alias collision is D007, a feature present in both trees is D009, and a package that
-is not a tree (or one using a plugin this project does not name) is D010. `@wilanis/access` is such a tree.
+is not a tree is D010. D010 also refuses a feature the host takes that uses a plugin the host does not name: a
+feature uses a plugin when it names one of the plugin's documents, directly or through an alias the include brings.
+A plugin the include names only for its own connections, its startup or a feature the host does not take stays
+behind with them. `@wilanis/access` is such a tree.
 
 ## Resolvers are reads
 
@@ -243,6 +258,16 @@ records one or a command wrote it, so a hand-written scenario that leaves it out
 wrote under `scenarios/`, replay as they did. A reason pinned on a node whose status is not `failed` is S002. A scenario's `cancelAt` names the stubbed effect at which
 `regress` cancels the replay, so it is a key of the scenario's own `stubs` (S003). `fuzz` writes no scenario of a run that
 faults under stubs: it prints `FAULT at '<node>'` and exits 1.
+
+A run that refuses cancels only the nodes that had not started; the nodes already running settle as they settle. So
+`rehearse --record`, `fuzz --edges` and `fuzz` write `expect` from a second run: the scenario as it will be written,
+fired the way `regress` fires it, every effect answered by a recorded stub. A recorded scenario then replays the same.
+Where that replay ends another way, with another reason, or at another node than the run did, the recorder writes
+nothing for the run, prints `NOT RECORDED` with both endings, and exits 1. Which node ends such a run depends on which
+settles first, and only the author can change that: make one of the two nodes wait for the other, today by routing
+it through a switch that reads the other (RFC 0041, #927, proposes `after`), or stop it from ending the run. A run
+that breaks a node for real is not recorded either, so `rehearse` walks a `catch` branch and no scenario keeps it
+(#721). `wilanis run`, `start`, `migrate`, `map`, `wilanis-deploy` and a served reload leave `scenarios/` unread.
 
 ## Refusal codes
 
