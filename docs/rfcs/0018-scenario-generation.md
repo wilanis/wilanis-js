@@ -727,3 +727,13 @@ Decided during implementation:
   same text, so it stays exact. A diff of a recorded file is now one long line; the files are generated and never
   edited, and `regress`, `describe` and the viewer say what a scenario proves. Every tree's committed directories go
   stale once, and `--record` and `fuzz --edges` rewrite them.
+- **The expectation is the replay's (#908).** A run that refuses cancels only the nodes that had not started; the
+  nodes in flight settle as they settle (`packages/engine/src/run.ts`). A stubbed effect answers in fewer steps than a
+  handler does, so the run that recorded a scenario's stubs, whose unstubbed effects the seed answered as it went, and
+  `regress` replaying those stubs could end with different nodes cancelled: a node `cancelled` in the file came back
+  `done`. `rehearse --record`, `fuzz --edges` and plain `fuzz` still fire the run that generates the stubs, and the
+  rehearsal's lines still judge it, but each reads `expect` (and the description's outcome) off a second run:
+  `recordedReport` in `packages/runtime/src/replay.ts` fires the scenario as it will be written (`asWritten`) through
+  `replayedReport`, the one function `regress` fires with, every effect answered by a recorded stub. A recorded
+  scenario then replays the same by construction. *What `branchOf` runs is what is recorded* holds for `in` and the
+  stubs; the report is the replay's.

@@ -19,12 +19,12 @@ import {
   type TriggerDoc,
 } from '@wilanis/core';
 import { outcomeOf, type Report, refusalOf, shownOutput } from '@wilanis/engine';
-import type { Embedder } from './embed.js';
 import { type Fuzzing, fuzzEdges } from './fuzz-edges.js';
 import { activeProfile, skippedLines } from './profile.js';
 import { asWritten } from './recorded-answers.js';
 import { HOME_DIR, SCENARIOS } from './recorded-owner.js';
 import { replayedDoc, solvedAgain } from './rehearse-recorded.js';
+import { type Replayer, recordedReport, replayedReport, replayerFor, triggerOf } from './replay.js';
 import { unreadSaid } from './scenario-said.js';
 import { embedderFor, generatedFire } from './stubbing.js';
 
@@ -88,12 +88,21 @@ interface Fuzzed {
   secret: string[][];
 }
 
-/** Fire one trigger under one seed with stubbed effects, recording every stub's answer. */
-async function fuzzed(load: LoadResult, trigger: Loaded<TriggerDoc>, seed: number, profile?: string): Promise<Fuzzed> {
+/**
+ * Fire one trigger under one seed with stubbed effects, recording every stub's answer, and read what it is expected to
+ * do off the replay of those stubs (`recordedReport`), so the scenario replays as it was written.
+ */
+async function fuzzed(
+  load: LoadResult,
+  trigger: Loaded<TriggerDoc>,
+  seed: number,
+  how: { profile?: string; replayer: Replayer },
+): Promise<Fuzzed> {
   const record: Record<string, unknown> = {};
-  const emb = embedderFor(load, { seed, record, profile });
+  const emb = embedderFor(load, { seed, record, profile: how.profile });
   const { input, context } = generatedFire(emb, trigger, seed);
-  const report = await emb.fire(trigger.doc, input, context);
+  await emb.fire(trigger.doc, input, context);
+  const report = await recordedReport(load, how.replayer, { trigger: trigger.path, in: input, context, stubs: record });
   return { trigger, seed, input, context, record, report, secret: secretPaths(emb.types(trigger.doc).out) };
 }
 
@@ -138,10 +147,11 @@ async function fuzzSeeds(load: LoadResult, opts: { runs?: number; profile?: stri
   const scope = new Scope(load.registry, load.resolve);
   const dir = join(load.root, opts.out ?? SCENARIOS);
   mkdirSync(dir, { recursive: true });
+  const how = { profile, replayer: replayerFor(load, profile) };
   for (const trigger of load.registry.all('trigger')) {
     if (!walkedUnder(scope, trigger.doc, profile)) continue;
     for (let seed = 1; seed <= (opts.runs ?? 5); seed++) {
-      const run = await fuzzed(load, trigger, seed, profile);
+      const run = await fuzzed(load, trigger, seed, how);
       const outcome = outcomeOf(run.report);
       if (outcome.kind === 'faulted') {
         lines.push(`${trigger.path} under seed ${seed}: FAULT at '${outcome.at}': ${outcome.error}`);
@@ -268,14 +278,13 @@ export interface Regression {
  */
 export async function regress(load: LoadResult, opts: { profile?: string } = {}): Promise<Regression> {
   const profile = activeProfile(load.registry.project?.doc, { flag: opts.profile, env: process.env });
-  const stubbed = { seed: 0, profile, env: fakeEnvFor(load) };
-  const emb = embedderFor(load, stubbed);
+  const replayer = replayerFor(load, profile);
   const scope = new Scope(load.registry, load.resolve);
   const results: Replayed[] = [];
   const lines: string[] = [];
   const unserved: Loaded<TriggerDoc>[] = [];
   for (const sc of load.registry.all('scenario')) {
-    const trigger = load.registry.all('trigger').find(trigger => trigger.path === load.resolve(sc.doc.trigger));
+    const trigger = triggerOf(load, sc.doc);
     // S001 has already refused a scenario whose trigger is gone; skip rather than replay nothing.
     if (!trigger) {
       const gone = `names unknown trigger '${sc.doc.trigger}'`;
@@ -287,7 +296,7 @@ export async function regress(load: LoadResult, opts: { profile?: string } = {})
       unserved.push(trigger);
       continue;
     }
-    const diffs = await replayedDiffs(load, { emb, stubbed }, sc, trigger);
+    const diffs = await replayedDiffs(load, replayer, sc, trigger);
     results.push({ scenario: sc.path, same: diffs.length === 0, diffs });
     lines.push(`${sc.path}: ${diffs.length ? `DIFF ${diffs.join('; ')}` : 'same'}`);
   }
@@ -302,21 +311,18 @@ export async function regress(load: LoadResult, opts: { profile?: string } = {})
  */
 async function replayedDiffs(
   load: LoadResult,
-  how: { emb: Embedder; stubbed: { seed: number; profile?: string; env: NodeJS.ProcessEnv } },
+  replayer: Replayer,
   loaded: Loaded<ScenarioDoc>,
   trigger: Loaded<TriggerDoc>,
 ): Promise<string[]> {
   const sc = loaded.doc;
-  if (sc.expect.status === 'unreachable') return solvedAgain(load, sc, trigger, how.stubbed.profile);
+  if (sc.expect.status === 'unreachable') return solvedAgain(load, sc, trigger, replayer.stubbed.profile);
   const above = answersAbove(load.registry, loaded.path);
   const { nodes, unresolved } = nodesOf(sc, above.own?.doc);
   const { stubs, unresolved: unstubbed } = stubsOf(sc, above.own?.doc);
   if (unresolved.length || unstubbed.length) return unheldDiffs(sc, above, { unresolved, unstubbed });
-  const fired = replayedDoc(load, sc, trigger);
-  const report = sc.cancelAt
-    ? await cancelledReplay(load, how.stubbed, fired, { sc, stubs })
-    : await how.emb.fire(fired, sc.in, sc.context ?? {}, { stubs });
-  return diffOf(report, sc, nodes, secretPaths(how.emb.types(fired).out));
+  const report = await replayedReport(load, replayer, sc, { trigger, stubs });
+  return diffOf(report, sc, nodes, secretPaths(replayer.emb.types(replayedDoc(load, sc, trigger)).out));
 }
 
 /**
@@ -332,29 +338,4 @@ function unheldDiffs(
   const nodes = paths.unresolved.map(path => `${path}: points at ${sc.expect.nodes[path]}, ${holder}`);
   const stubs = paths.unstubbed.map(path => `stub ${path}: points at ${sc.sharedStubs?.[path]}, ${holder}`);
   return [...nodes, ...stubs];
-}
-
-/**
- * A scenario that pins a cancellation, replayed: its `cancelAt` is taken out of the stubs `stubsOf` resolved, so the
- * run reaches that effect's stub, which aborts the run's signal there. A node, never a duration, so the replay is the
- * same on every machine; an embedder of its own, since the stub that aborts is this run's alone.
- */
-function cancelledReplay(
-  load: LoadResult,
-  stubbed: { seed: number; profile?: string; env: NodeJS.ProcessEnv },
-  trigger: TriggerDoc,
-  replayed: { sc: ScenarioDoc; stubs: Record<string, unknown> },
-): Promise<Report> {
-  const { sc } = replayed;
-  const path = sc.cancelAt ?? '';
-  const control = new AbortController();
-  const emb = embedderFor(load, { ...stubbed, cancelAt: { path, abort: () => control.abort() } });
-  const { [path]: _, ...stubs } = replayed.stubs;
-  return emb.fire(trigger, sc.in, sc.context ?? {}, { stubs, signal: control.signal });
-}
-
-function fakeEnvFor(load: LoadResult): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {};
-  for (const name of Object.values(load.registry.project?.doc.secrets ?? {})) env[name] = `stub-${name.toLowerCase()}`;
-  return env;
 }

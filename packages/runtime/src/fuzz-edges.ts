@@ -28,6 +28,7 @@ import { recordedProfile, skippedLines } from './profile.js';
 import { claimDir, dirOf, type Recorded, recordedLines, type Writer } from './record.js';
 import { checkRecorded, keptIn, writeRecorded } from './recorded-dir.js';
 import { EDGED, EDGES } from './recorded-owner.js';
+import { type Replayer, recordedReport, replayerFor } from './replay.js';
 import { embedderFor, generatedFire } from './stubbing.js';
 import { getPath, setPath } from './stubs.js';
 
@@ -97,8 +98,9 @@ export async function fuzzEdges(
   const scope = new Scope(load.registry, load.resolve);
   const triggers = load.registry.all('trigger');
   const gathered: Gathered = { docs: {}, faults: [], dirs: new Map() };
+  const replayer = replayerFor(load, profile);
   for (const trigger of triggers)
-    if (walkedUnder(scope, trigger.doc, profile)) await fireEdges(load, { trigger, profile }, gathered);
+    if (walkedUnder(scope, trigger.doc, profile)) await fireEdges(load, { trigger, profile, replayer }, gathered);
   const recorded = recordedOf(load.root, gathered.docs, opts.check);
   const written = (recorded.written ?? []).map(file => join(load.root, file));
   const skipped = skippedLines(scope, profile, triggers, 'trigger(s)');
@@ -113,8 +115,15 @@ function recordedOf(root: string, docs: Record<string, ScenarioDoc>, check?: boo
   return { dir: EDGES, files: Object.keys(docs).length, ...done, kept: keptIn(root, EDGES, docs, EDGED) };
 }
 
+/** How one trigger's edges are fired: the trigger, the profile, and what each recording is replayed through. */
+interface How {
+  trigger: Loaded<TriggerDoc>;
+  profile?: string;
+  replayer: Replayer;
+}
+
 /** Fire one trigger once per edge of its input, each run from the seed's input and context. */
-async function fireEdges(load: LoadResult, how: { trigger: Loaded<TriggerDoc>; profile?: string }, into: Gathered) {
+async function fireEdges(load: LoadResult, how: How, into: Gathered) {
   const { trigger } = how;
   const emb = embedderFor(load, { seed: SEED, profile: how.profile });
   const type = emb.types(trigger.doc).in;
@@ -130,15 +139,20 @@ async function fireEdges(load: LoadResult, how: { trigger: Loaded<TriggerDoc>; p
   }
 }
 
-/** One run of a trigger with an edge set, every effect stubbed under the seed and recorded. */
+/**
+ * One run of a trigger with an edge set, every effect stubbed under the seed and recorded, and what it is expected to
+ * do read off the replay of those stubs (`recordedReport`), so the scenario replays as it was written.
+ */
 async function fired(
   load: LoadResult,
-  how: { trigger: Loaded<TriggerDoc>; profile?: string },
+  how: How,
   given: { edge: Edge; input: unknown; context: Record<string, unknown> },
 ): Promise<EdgeRun> {
   const stubs: Record<string, unknown> = {};
   const emb = embedderFor(load, { seed: SEED, record: stubs, profile: how.profile });
-  const report = await emb.fire(how.trigger.doc, given.input, given.context);
+  await emb.fire(how.trigger.doc, given.input, given.context);
+  const replayed = { trigger: how.trigger.path, in: given.input, context: given.context, stubs };
+  const report = await recordedReport(load, how.replayer, replayed);
   return { trigger: how.trigger, ...given, stubs, report, secret: secretPaths(emb.types(how.trigger.doc).out) };
 }
 

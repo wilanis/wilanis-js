@@ -10,7 +10,7 @@ import { outcomeOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, over } from './branches.js';
 import type { Embedder } from './embed.js';
 import { activeProfile, recordedProfile, skippedLines } from './profile.js';
-import { type Recorded, type Recording, recordRuns } from './record.js';
+import { type Recorded, type Recording, recordRuns, replayedRuns } from './record.js';
 import { recordedDir } from './recorded-owner.js';
 import { type Decision, format, gather, type PlainRun, short, statedOf, stateName } from './rehearsal-report.js';
 import { heldUpstream } from './rehearse-held.js';
@@ -165,7 +165,7 @@ export async function rehearse(
   // A scope of its own rather than an embedder's: what is asked of it reads documents and runs nothing.
   const said = { verbose: opts.verbose, stated: statedOf(new Scope(load.registry, load.resolve)) };
   const ok = format(decisions, plain, lines, said);
-  const recorded = runs ? { recorded: recordRuns(load.root, opts, runs) } : {};
+  const recorded = runs ? { recorded: recordRuns(load.root, opts, await replayedRuns(load, profile, runs)) } : {};
   return { ok, lines, seed, decisions, plain, skipped, ...recorded };
 }
 
