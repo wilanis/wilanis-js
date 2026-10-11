@@ -13,6 +13,9 @@ interface Home {
   why: string;
 }
 
+/** The one top-level directory every scenario and answers document lives in. */
+export const SCENARIOS_DIR = 'scenarios';
+
 /** The one place placement lives: the layers (or top-level directory) each kind is at home in, and why. */
 export const HOME: Partial<Record<Kind, Home>> = {
   trigger: { layers: ['edge'], why: "a trigger is a way in: it speaks the world's vocabulary" },
@@ -28,8 +31,8 @@ export const HOME: Partial<Record<Kind, Home>> = {
     why: "a resolvers document names what is read from the context, which is the world's vocabulary",
   },
   connection: { dir: 'connections', why: 'a connection is a channel to an external system, shared across features' },
-  scenario: { dir: 'scenarios', why: 'a scenario is a recorded run' },
-  answers: { dir: 'scenarios', why: 'answers are what the recorded scenarios beside them share' },
+  scenario: { dir: SCENARIOS_DIR, why: 'a scenario is a recorded run' },
+  answers: { dir: SCENARIOS_DIR, why: 'answers are what the recorded scenarios beside them share' },
 };
 
 /** The one name an answers document has: the recorded scenarios of the directory it sits in share what it holds. */
