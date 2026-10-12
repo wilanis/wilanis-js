@@ -4538,7 +4538,9 @@
         },
         {
           "operation": "@schedule/scheduler.port.json#run",
-          "via": []
+          "via": [
+            "@connections/customers-postgres.connection.json"
+          ]
         },
         {
           "operation": "@storage/storage.port.json#ensure",

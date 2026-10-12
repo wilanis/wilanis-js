@@ -32,7 +32,7 @@ describe('the reach of a profile', () => {
   };
   const keys = (found: Reach) => new Set(found.operations.map(one => one.key));
   const via = (found: Reach, key: string) =>
-    [...new Set(found.operations.filter(one => one.key === key).map(one => one.connection))].sort();
+    [...new Set(found.operations.filter(one => one.key === key).flatMap(one => one.connections))].sort();
 
   it('holds what live runs: the upstream API, the directories, the tokens, the files, the CSV, and what it holds open', () => {
     const live = reach('live');
@@ -174,6 +174,15 @@ describe('the reach of a profile', () => {
     const worker = reachOf(scope, 'production-worker');
     expect(keys(worker)).toContain('@auth/identity.port.json#verify');
     expect(worker.secrets.map(one => one.variable)).toContain('CUSTOMERS_OPERATOR_PASSWORD_HASH');
+  });
+
+  it('a call reaches the connection its lease names, read by the mark and not by the name (RFC 0037)', () => {
+    // the scheduler's `lease` is no field called `connection`: the port marks it "names": "connection"
+    expect(via(reach('production-scheduler'), '@schedule/scheduler.port.json#run')).toEqual([
+      '@connections/customers-postgres.connection.json',
+    ]);
+    // under the laptop's profiles the step names no lease, so the same operation reaches nothing
+    expect(via(reach('local'), '@schedule/scheduler.port.json#run')).toEqual([]);
   });
 
   it('production reaches the operator directory in place of the employees, and watches nothing', () => {

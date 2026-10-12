@@ -261,11 +261,17 @@ describe('sabotage: a store names a connection and the shapes it keeps', () => {
     ).toContain('C014');
   });
   it('R001 a startup step whose static connection names no connection document', () => {
-    // no startup operation takes a connection today, so the listener is given one in a copy of @http's docs
+    // the scheduler's lease is the one startup field that names a connection, so the listener is given another in a
+    // copy of @http's docs, as a field called connection marked "names": "connection"
     const docs = mkdtempSync(join(tmpdir(), 'wilanis-docs-'));
     cpSync(PLUGINS['@http'].docs, docs, { recursive: true });
     editJson(docs, 'server.port.json', port => {
-      port.operations.listen.accepts.connection = { type: 'string', static: true, required: false };
+      port.operations.listen.accepts.connection = {
+        type: 'string',
+        static: true,
+        names: 'connection',
+        required: false,
+      };
     });
     const tree = copyOfExample();
     editJson(tree, 'project.json', project => {

@@ -26,7 +26,9 @@ export type TypeSpec = TypeRef | InlineObject;
  * on a list, the most items a value may hold. `provided`: the compiler writes the value where the operation is
  * called and an author never does; `site` is the calling document and position, of type `@std/Site.shape.json`.
  * `within`: on a static string field, the type variable its literal is a dotted path within, as bound at the call;
- * `reaches`: the type the value at the end of that path must have.
+ * `reaches`: the type the value at the end of that path must have. `names`: on a native contract's static field or a
+ * connection kind's setting, a string or a list of strings, the kind of document its literal is the path of -- a
+ * connection, or a store that names one; a call reaches every connection its marked fields name.
  */
 export interface Field {
   type: TypeSpec;
@@ -41,7 +43,10 @@ export interface Field {
   within?: string;
   reaches?: TypeRef;
   provided?: Provided;
+  names?: Names;
 }
+/** The kinds of document a field's literal may name: a connection, or a store that names one. */
+export type Names = 'connection' | 'store';
 /** The one value the compiler provides at a call site: where the call was written. */
 export type Provided = 'site';
 export type Fields = Record<string, Field>;

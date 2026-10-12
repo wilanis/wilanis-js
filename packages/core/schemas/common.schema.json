@@ -147,6 +147,14 @@
           "description": "Native contracts only, with `within`: the type the value at the end of the path must have, as `string` or `number`.",
           "$ref": "#/$defs/typeRef"
         },
+        "names": {
+          "description": "Native contracts and connection kinds only. This field's literal is the path of a document of this kind: a connection, or a store that names one. A call reaches every connection its marked fields name; a connection whose kind marks a setting reaches every connection that setting names. The field is a string or a list of strings, and on a contract it is static.",
+          "type": "string",
+          "enum": [
+            "connection",
+            "store"
+          ]
+        },
         "provided": {
           "description": "Native contracts only. The compiler writes this field's value where the operation is called; an author never does. `site`: the calling document and node, of type `@std/Site.shape.json`.",
           "type": "string",

@@ -265,15 +265,15 @@ describe('X254: a lease that keeps none', () => {
     expect(found[0].message).toMatch(/does not declare leases/);
   });
 
-  it('a connection that is not one at all', () => {
-    const found = at(
-      edit('project.json', doc => {
-        doc.startup[0].in.lease = '@connections/nope.connection.json';
-      }),
-      'X254',
-    );
-    expect(found).toHaveLength(1);
-    expect(found[0].message).toMatch(/is not a connection document/);
+  it("a connection that is not one at all is the compiler's R001 at the lease, and no X254", () => {
+    const found = edit('project.json', doc => {
+      doc.startup[0].in.lease = '@connections/nope.connection.json';
+    });
+    expect(at(found, 'X254')).toHaveLength(0);
+    const unknown = at(found, 'R001');
+    expect(unknown).toHaveLength(1);
+    expect(unknown[0].at).toBe('startup/0/in/lease');
+    expect(unknown[0].message).toBe("unknown connection '@connections/nope.connection.json'");
   });
 
   it('the lease the tree names is one whose kind declares it, so nothing is refused', () => {

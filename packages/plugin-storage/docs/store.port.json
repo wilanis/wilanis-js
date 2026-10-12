@@ -11,6 +11,7 @@
         "store": {
           "type": "string",
           "static": true,
+          "names": "store",
           "resolves": {
             "$T": "collections[collection|view].of",
             "$K": "collections[collection|view].of{key}.type"
@@ -50,6 +51,7 @@
         "store": {
           "type": "string",
           "static": true,
+          "names": "store",
           "resolves": {
             "$T": "collections[collection|view].of"
           },
@@ -96,6 +98,7 @@
         "store": {
           "type": "string",
           "static": true,
+          "names": "store",
           "description": "the path of the store document these records are kept by"
         },
         "collection": {
@@ -124,6 +127,7 @@
         "store": {
           "type": "string",
           "static": true,
+          "names": "store",
           "resolves": {
             "$T": "collections[collection|view].of"
           },
@@ -176,6 +180,7 @@
         "store": {
           "type": "string",
           "static": true,
+          "names": "store",
           "resolves": {
             "$T": "collections[collection|view].of",
             "$K": "collections[collection|view].of{key}.type"
@@ -224,6 +229,7 @@
         "store": {
           "type": "string",
           "static": true,
+          "names": "store",
           "resolves": {
             "$T": "collections[collection|view].of",
             "$K": "collections[collection|view].of{key}.type"
@@ -271,6 +277,7 @@
         "store": {
           "type": "string",
           "static": true,
+          "names": "store",
           "resolves": {
             "$K": "collections[collection|view].of{key}.type"
           },

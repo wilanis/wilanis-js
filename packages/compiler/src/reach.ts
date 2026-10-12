@@ -23,7 +23,7 @@ import {
   type TriggerDoc,
   type Values,
 } from '@wilanis/core';
-import { connectionOf, connectionUnder } from './documents.js';
+import { connectionsOf, connectionUnder } from './documents.js';
 
 /**
  * One call the walk follows: what it names, what it gives, where it is written, and what it descended from.
@@ -134,8 +134,11 @@ export interface ReachedNative {
   root: Root;
   /** The canonical path of the binding it was reached through, or nothing where the root names it directly. */
   binding: string | undefined;
-  /** The canonical connection its `in` names, directly or through a store; nothing where it names none. */
-  connection: string | undefined;
+  /**
+   * The canonical connections its `in` names, each once, in field order: every field the contract marks `names`,
+   * a connection directly or through a store, as the profile reaches it. Empty where it names none.
+   */
+  connections: string[];
   /** Running it starts something that outlives the run. */
   holds: boolean;
   /** The graph, binding or project the site is written in, and the node, operation or step that names it. */
@@ -305,20 +308,23 @@ class Reaching implements Listener<Root> {
     this.graphs?.push(entered.path);
   }
 
-  /** A native site: kept where its operation is not pure, with the connection its inputs name. */
+  /** A native site: kept where its operation is not pure, with every connection its inputs name. */
   native(site: NativeSite<Root>): void {
     if (site.op.pure === true) return;
-    const connection = this.standingIn(connectionOf(this.scope, site.op, site.given));
+    const connections = this.standingIn(connectionsOf(this.scope, site.op, site.given));
     const holds = site.op.holds === true;
     const { key, root, binding, file, node } = site;
-    this.found.operations.push({ key, root, binding, connection, holds, file, node });
-    if (connection && !this.found.connections.includes(connection)) this.found.connections.push(connection);
+    this.found.operations.push({ key, root, binding, connections, holds, file, node });
+    for (const one of connections) if (!this.found.connections.includes(one)) this.found.connections.push(one);
     if (holds && !this.found.holds.includes(key)) this.found.holds.push(key);
   }
 
-  /** The connection a named one reaches under the profile: its stand-in, else itself where the stand-in is unknown (R001). */
-  private standingIn(named: string | undefined): string | undefined {
-    return named ? connectionUnder(this.scope, named, this.profile) : undefined;
+  /**
+   * The connections named ones reach under the profile, each once: a stand-in for what it replaces, else the
+   * named one itself, also where the stand-in is unknown (R001).
+   */
+  private standingIn(named: string[]): string[] {
+    return [...new Set(named.map(one => connectionUnder(this.scope, one, this.profile)))];
   }
 
   /**

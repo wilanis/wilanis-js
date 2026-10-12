@@ -120,7 +120,7 @@ function checkReached(judging: Judging, reach: Reach, permits: Permit[]): void {
     refuseReached(
       judging,
       connection,
-      reach.operations.filter(site => site.connection === connection),
+      reach.operations.filter(site => site.connections.includes(connection)),
     );
   }
 }

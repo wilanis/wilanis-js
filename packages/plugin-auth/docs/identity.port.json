@@ -9,6 +9,7 @@
         "connection": {
           "type": "string",
           "static": true,
+          "names": "connection",
           "description": "a connection of kind @auth/directory.connection-kind.json or @auth/oidc.connection-kind.json"
         },
         "username": {

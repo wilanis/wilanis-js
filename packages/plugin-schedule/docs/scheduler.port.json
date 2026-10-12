@@ -10,6 +10,7 @@
         "lease": {
           "type": "string",
           "static": true,
+          "names": "connection",
           "required": false,
           "description": "the path of a connection document whose kind declares `leases`, on which a tick is held so that one instance of several fires it; absent: this process assumes it is alone and fires every tick itself"
         }

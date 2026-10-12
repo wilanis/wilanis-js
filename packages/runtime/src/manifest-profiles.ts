@@ -66,7 +66,7 @@ function reachRows(reach: Reach): ReachRow[] {
   const byOp = new Map<string, string[]>();
   for (const site of reach.operations) {
     const via = byOp.get(site.key) ?? [];
-    if (site.connection) via.push(site.connection);
+    via.push(...site.connections);
     byOp.set(site.key, via);
   }
   return sorted(byOp.keys()).map(operation => ({ operation, via: sorted(byOp.get(operation) ?? []) }));

@@ -1,8 +1,9 @@
 /**
  * Shapes, ports and connections. A shape's fields resolve and speak their own layer (R001, L001, L005). A
- * port's operations resolve; a domain operation speaks core shapes and fixes no value itself (L001, L006), and asks
- * for no site: a field the compiler provides is a native operation's, of the site's shape, never secret and always
- * given (L019, in `provided.ts`);
+ * port's operations resolve; a field that names a connection or a store says so with `names`, statically, and only
+ * on a native contract (C025, in `names.ts`); a domain operation speaks core shapes and fixes no value itself (L001,
+ * L006), and asks for no site: a field the compiler provides is a native operation's, of the site's shape, never
+ * secret and always given (L019, in `provided.ts`);
  * what an operation says about repeating it names its own fields and types as boolean (C015). A field of
  * either bounds its length with maxItems only where it is a list (C016).
  * An operation that says it `listens` holds (L014), and the inputs and settings its address reads are ones it
@@ -25,6 +26,7 @@ import {
 } from '@wilanis/core';
 import type { Judge } from './judge.js';
 import { checkListenPorts, checkListenSetting, fieldsOf, listed, misfit, PARTS, type Part } from './listen-settings.js';
+import { checkKindNames, checkPortNames, checkShapeNames } from './names.js';
 import { checkProvidedAt, checkProvidedFields } from './provided.js';
 import { mismatch } from './typing.js';
 
@@ -38,6 +40,7 @@ export function checkShape(judge: Judge, shape: Loaded<ShapeDoc>): void {
   judge.type(spec, shape.path, 'fields');
   checkMaxItems(judge, shape.path, shape.doc.fields, 'fields');
   checkProvidedAt(judge, { file: shape.path, fields: shape.doc.fields, at: 'fields', what: `shape '${shape.path}'` });
+  checkShapeNames(judge, shape);
   if (!shape.native)
     judge.checkLayer({ spec, from: shape, at: 'fields', layer: shape.doc.layer, what: `shape '${shape.path}'` });
 }
@@ -56,6 +59,7 @@ export function checkPort(judge: Judge, port: Loaded<PortDoc>): void {
       checkMaxItems(judge, port.path, op.returns.fields, `operations/${name}/returns/fields`);
     checkOperationWords(judge, port, name, op);
   }
+  checkPortNames(judge, port);
 }
 
 /** What an operation says about itself beyond its types: a transaction, an address, a promise about repeating it. */
@@ -132,20 +136,21 @@ function notBoolean(judge: Judge, op: Operation, rule: string): string | undefin
 }
 
 /**
- * C009: a transactional operation says where it goes, statically. One of the two fields the compiler knows
- * how to follow -- `connection`, a connection document, or `store`, a store document that names one -- must
- * be accepted and marked static, since an atomic graph's one transaction is judged before anything runs and
- * a value only known at run time could not be judged at all.
+ * C009: a transactional operation says where it goes, in exactly one field it marks `names` -- a connection
+ * document, or a store document that names one. An atomic graph's one transaction is judged before anything
+ * runs, so it falls on what that one field names (`connectionOf`); with none there is nothing to judge, and with
+ * two the transaction would fall on two connections. That the field is static and a string is C025's.
  */
 function checkTransactional(judge: Judge, port: Loaded<PortDoc>, name: string, op: Operation): void {
-  const accepted = judge.accepted(op);
-  const says = (field: string) => accepted[field]?.static === true;
-  if (says('connection') || says('store')) return;
+  const marked = Object.entries(judge.accepted(op)).filter(([, field]) => field.names);
+  if (marked.length === 1) return;
+  const listed = marked.map(([field]) => `'${field}'`).join(', ');
+  const says = marked.length ? `marks ${marked.length} fields "names" (${listed})` : 'marks no field "names"';
   judge.refuser(port.path)(
     'C009',
-    `operation '${name}' is transactional but accepts no static 'connection' or 'store' to resolve one from`,
+    `operation '${name}' is transactional but ${says}: its transaction falls on what one field names`,
     `operations/${name}/accepts`,
-    'accept "connection" (a connection document) or "store" (a store document that names one), marked "static": true',
+    'mark the one field the transaction falls on "names": "connection" or "names": "store", static',
   );
 }
 
@@ -246,10 +251,12 @@ function checkListenInput(where: Part, accepted: Record<string, ObjField>, input
 }
 
 /**
- * The refusals for a connection kind, judged on its own rather than only when a connection names it: its
- * `endpoint` is a dotted path to a string setting it declares (C020).
+ * The refusals for a connection kind, judged on its own rather than only when a connection names it: a setting
+ * marked `names` is a string or a list of strings (C025), and its `endpoint` is a dotted path to a string setting
+ * it declares (C020).
  */
 export function checkConnectionKind(judge: Judge, kind: Loaded<ConnectionKindDoc>): void {
+  checkKindNames(judge, kind);
   const { endpoint } = kind.doc;
   if (endpoint === undefined) return;
   const settings = judge.quiet(kind.doc.settings);

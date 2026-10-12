@@ -7,6 +7,7 @@
 import {
   type Field,
   type GraphDoc,
+  type Names,
   type Operation,
   type PortDoc,
   parsePath,
@@ -114,7 +115,8 @@ function keyedBy(field: Field): string | undefined {
  * The collection a native call site is over, or nothing where it is over none: the site's static inputs read
  * through the port's own `resolves` channel, so the compiler answers it for any port that addresses a store
  * that way and learns nothing of what a store means. A site naming a store the tree lacks, or a collection
- * the store does not declare, answers nothing -- R001 and the plugin's X204 refuse those where they are named.
+ * the store does not declare, answers nothing -- R001 refuses the one and the plugin's X204 the other, where each
+ * is named.
  */
 export function collectionOf(scope: Scope, site: CallSite): CollectionSite | undefined {
   const hit = scope.op(site.key);
@@ -129,28 +131,59 @@ export function collectionOf(scope: Scope, site: CallSite): CollectionSite | und
   return { store: store.path, collection };
 }
 
+/** The fields of an operation that name a connection or a store (`names`), with the word each says, in field order. */
+export function namingFields(scope: Scope, op: Operation): [string, Names][] {
+  return Object.entries(scope.types.accepted(op.accepts)).flatMap(([name, field]): [string, Names][] =>
+    field.names ? [[name, field.names]] : [],
+  );
+}
+
+/** The literals one field gives at a call site: a string, or each string of a list; nothing else is a literal here. */
+export function literalsOf(value: unknown): string[] {
+  if (typeof value === 'string') return [value];
+  return Array.isArray(value) ? value.filter((one): one is string => typeof one === 'string') : [];
+}
+
 /**
- * The canonical connection a native call goes to, or nothing where the call does not say. It is read from
- * one of the two static fields such an operation accepts (C009): `connection`, a connection document's path,
- * or `store`, the path of a store document that names one. The atomic rules read it for where a transaction
- * falls, and the reach of a profile for which connections it needs.
+ * Every canonical connection a native call goes to, each once, in field order: what each field the contract
+ * marks `names` gives at the call, a connection document as itself and a store as the connection it names. The
+ * reach of a profile reads it for which connections the profile needs, so a call that names two -- a store and a
+ * lease -- reaches both.
  *
- * It stays quiet throughout. A field that is absent, or names a document that is not there, is the business
- * of the rules that judge the call site and the store itself -- R001 from `checkConnectionNamed` for a
- * `connection`, R001 from `checkStore` for a store's -- so a tree with one fault answers one refusal rather
- * than the same fault told twice.
+ * It stays quiet throughout. A field that is absent, or names a document that is not there, is the business of
+ * the rules that judge the call site and the store itself -- R001 from `checkNamedLiterals` at the call, R001
+ * from `checkStore` for a store's connection -- so a tree with one fault answers one refusal rather than the
+ * same fault told twice.
+ */
+export function connectionsOf(scope: Scope, op: Operation, given: Values | undefined): string[] {
+  const found: string[] = [];
+  for (const [name, names] of namingFields(scope, op)) {
+    for (const literal of literalsOf(given?.[name])) {
+      const connection = connectionNamed(scope, names, literal);
+      if (connection && !found.includes(connection)) found.push(connection);
+    }
+  }
+  return found;
+}
+
+/** The canonical connection one literal names: the connection itself, or the store's own; nothing where it names none. */
+function connectionNamed(scope: Scope, names: Names, literal: string): string | undefined {
+  if (names === 'connection') return scope.get('connection', literal) ? scope.canon(literal) : undefined;
+  const store = scope.get('store', literal);
+  return store ? scope.canon(store.doc.connection) : undefined;
+}
+
+/**
+ * The one canonical connection a transactional call's transaction falls on, or nothing where the call does not
+ * say: what the operation's one field marked `names` gives (C009 holds a transactional operation to exactly
+ * one). The atomic rules read it for where a transaction falls (L010). An operation that marks several fields
+ * falls on no one of them, so it answers nothing.
  */
 export function connectionOf(scope: Scope, op: Operation, given: Values | undefined): string | undefined {
-  const accepted = scope.types.accepted(op.accepts);
-  const named = (field: string): string | undefined => {
-    const value = given?.[field];
-    return accepted[field]?.static && typeof value === 'string' ? value : undefined;
-  };
-  const direct = named('connection');
-  if (direct) return scope.get('connection', direct) ? scope.canon(direct) : undefined;
-  const store = named('store');
-  const doc = store ? scope.get('store', store) : undefined;
-  return doc ? scope.canon(doc.doc.connection) : undefined;
+  const [only, ...more] = namingFields(scope, op);
+  if (!only || more.length) return undefined;
+  const [first] = literalsOf(given?.[only[0]]);
+  return first === undefined ? undefined : connectionNamed(scope, only[1], first);
 }
 
 /**

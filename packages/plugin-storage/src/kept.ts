@@ -32,7 +32,7 @@ function checkWrite(call: Call, scope: Scope, refuse: Refuse): void {
   if (!says || typeof named !== 'string') return;
   const store = scope.get('store', named);
   const tree = store?.doc.keptBy;
-  if (!store || !tree) return; // X204 where it names no store
+  if (!store || !tree) return; // R001 where it names no store
   const collection = call.given?.collection;
   const what = typeof collection === 'string' ? `${collection} of ${store.path}` : store.path;
   refuse({

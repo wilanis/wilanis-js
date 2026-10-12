@@ -8,7 +8,8 @@
  * X201 a collection keeps a core shape, or one a plugin grants: the world's shape is not what a tree keeps.
  * X202 a key identifies, so it is a field of that shape and a required one.
  * X203 a store's connection reaches a storage engine, which its kind says and nothing else can.
- * X204 a call names a store this tree holds, and a collection that store declares.
+ * X204 a call names a collection the store it names declares. A store this tree does not hold is the compiler's
+ *   R001, at the field the port marks `"names": "store"` (RFC 0037).
  * X207 two collections of one connection are one collection, so they may not declare different shapes.
  * X211 a patch changes fields the shape has, and never the key.
  * X212 ensure is reached by a startup step, and never run by a graph.
@@ -130,21 +131,12 @@ function checkCollisions(scope: Scope, refuse: Refuse): void {
   }
 }
 
-/** X204: the store a call names is one this tree holds, and the collection is one that store declares. */
+/** X204: the collection a call names is one the store it names declares; a store the tree lacks is R001's. */
 function checkCall(call: Call, scope: Scope, refuse: Refuse): void {
   const named = call.given?.store;
   if (typeof named !== 'string') return; // P001, where the call site is judged
   const store = scope.get('store', named);
-  if (!store) {
-    refuse({
-      code: 'X204',
-      file: call.file,
-      message: `'${named}' is not a store of this tree`,
-      at: `${call.at}/store`,
-      hint: 'wilanis ls store',
-    });
-    return;
-  }
+  if (!store) return; // R001, where the call site is judged
   const collection = call.given?.collection;
   if (typeof collection !== 'string' || store.doc.collections[collection]) return;
   const has = Object.keys(store.doc.collections).join(', ');
@@ -220,7 +212,7 @@ function checkChanges(call: Call, scope: Scope, refuse: Refuse): void {
   if (operationOf(call) !== 'patch') return;
   const declared = declaredOf(call, scope);
   const collection = collectionOf(call, scope);
-  if (!declared || !collection) return; // X204, or R001 where the store is judged
+  if (!declared || !collection) return; // R001 for the store, or X204 for the collection
   const changes = call.given?.changes;
   if (changes === undefined) return; // G006, where the call site is judged
   if (typeof changes === 'string') {
@@ -327,7 +319,7 @@ function checkOwnStore(call: Call, scope: Scope, refuse: Refuse): void {
   const named = call.given?.store;
   if (typeof named !== 'string') return; // P001, where the call site is judged
   const store = scope.get('store', named);
-  if (!store) return; // X204
+  if (!store) return; // R001, where the call site is judged
   const mine = featureAt(call.file);
   const theirs = featureAt(store.path);
   if (!mine || !theirs || mine === theirs) return;

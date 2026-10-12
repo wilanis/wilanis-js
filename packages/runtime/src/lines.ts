@@ -53,8 +53,9 @@ function withinSaid(field: { within?: string; reaches?: string }, showType: (spe
 }
 
 /**
- * One input one port's operation accepts: one type parameter is shown as `type`, one static one says so, and one
- * the compiler provides says `(provided)`, so a reader knows the call site never gives it.
+ * One input one port's operation accepts: one type parameter is shown as `type`, one static one says so, one that
+ * names a connection or a store says `(names a connection)` or `(names a store)` beside it, and one the compiler
+ * provides says `(provided)`, so a reader knows the call site never gives it.
  */
 function acceptsLine(
   name: string,
@@ -64,6 +65,7 @@ function acceptsLine(
     enum?: string[];
     binds?: string;
     static?: boolean;
+    names?: string;
     provided?: string;
     resolves?: Record<string, string>;
     within?: string;
@@ -76,10 +78,11 @@ function acceptsLine(
   const optional = field.required === false ? '?' : '';
   const type = field.type === 'type' ? 'type' : showType(field.type);
   const isStatic = field.static || field.type === 'type' ? '  (static)' : '';
+  const names = field.names ? `  (names a ${field.names})` : '';
   const isProvided = field.provided ? '  (provided)' : '';
   const allowed = field.enum ? ` ∈ ${field.enum.join('|')}` : '';
   const says = field.description ? `  -- ${field.description}` : '';
-  return `    in  ${name}${optional}: ${type}${boundSaid(field)}${isStatic}${isProvided}${bindsOf(field)}${withinSaid(field, showType)}${allowed}${says}`;
+  return `    in  ${name}${optional}: ${type}${boundSaid(field)}${isStatic}${names}${isProvided}${bindsOf(field)}${withinSaid(field, showType)}${allowed}${says}`;
 }
 
 /** What one operation takes: the shape it names, said once, or each field it writes. */

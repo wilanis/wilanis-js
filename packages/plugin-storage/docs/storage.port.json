@@ -9,6 +9,7 @@
         "store": {
           "type": "string",
           "static": true,
+          "names": "store",
           "description": "the path of the store document to prepare"
         }
       },

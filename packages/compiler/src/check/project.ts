@@ -16,7 +16,7 @@ import {
   secretKeysRead,
   type Type,
 } from '@wilanis/core';
-import { checkConnectionNamed, providedNames } from './inputs.js';
+import { providedNames } from './inputs.js';
 import { type Judge, underProfile } from './judge.js';
 import { checkPermits } from './permits.js';
 import { checkProfiles } from './profiles.js';
@@ -129,7 +129,7 @@ function checkStepInputs(judge: Judge, step: StartupStep, index: number, op: Ope
   const refuse = judge.refuser(judge.project.path);
   const at = `startup/${index}/in`;
   const accepted = judge.accepted(op);
-  checkConnectionNamed(judge, judge.project.path, accepted, { given: step.in, at });
+  judge.checkNamedLiterals(judge.project.path, accepted, { given: step.in, at });
   const provided = providedNames(accepted);
   for (const name of provided.filter(name => name in (step.in ?? {}))) {
     const message = `'${name}' is provided by the compiler where '${step.run}' is called`;

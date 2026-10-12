@@ -85,7 +85,10 @@ A node's `in` gives every value an operation takes, in one grammar: a literal as
 to read another node, the graph's `in`, a constant (`{{const.initial}}`) or a resolver. Embedded in text it
 interpolates (`"/tasks/{{in.id}}"`). A key that is not an identifier is quoted in brackets:
 `{{context.headers['user-agent']}}`. A contract marks the fields that must be literals `static` (a connection,
-a content type); a `type` field always is. A native contract may mark a field `provided: "site"`: the compiler
+a content type); a `type` field always is. A native contract also marks each static field whose literal is a
+connection or a store document `"names": "connection"` or `"names": "store"`: a call reaches every connection its
+marked fields name, a store's through the store, and the compiler reads them by that mark, never by a field's name
+(C025; RFC 0037). A native contract may mark a field `provided: "site"`: the compiler
 writes the calling document and the position within it there, as `@std/Site.shape.json`, and an author never gives
 it -- not under `in`, not through a map's `bind` (G026; L019 holds the mark; RFC 0032).
 

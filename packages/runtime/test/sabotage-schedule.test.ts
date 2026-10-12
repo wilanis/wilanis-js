@@ -160,12 +160,12 @@ describe('sabotage: what a tick cannot fill or remember -- X252, X253, X254', ()
       }),
     ).toEqual([`X254 @project.json#startup/${KEEP}/in/lease`]);
   });
-  it('X254 a lease that names no connection at all', () => {
+  it("a lease that names no connection at all is R001, the compiler's, and no X254", () => {
     expect(
       sabotage('project.json', project => {
         project.startup[KEEP].in = { lease: '@connections/nope.connection.json' };
       }),
-    ).toEqual(['X254']);
+    ).toEqual(['R001']);
   });
 });
 

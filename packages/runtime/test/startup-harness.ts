@@ -33,7 +33,7 @@ const FAKE_DOCS = {
         description: 'open the connection',
         accepts: {
           name: { type: 'string' },
-          connection: { type: 'string', static: true, required: false },
+          connection: { type: 'string', static: true, names: 'connection', required: false },
         },
         returns: 'string',
       },
