@@ -4,13 +4,15 @@
  * effects reached and the connections they were reached with, what is held open, the startup steps that run there
  * and the variables read), what `listensOf` reads off the steps that run there (the addresses listened on), and
  * what RFC 0016 has the profile permit. It reads the Scope and never the environment: which profile a process would
- * pick is `activeProfile`'s question, and the manifest describes the tree, not the process.
+ * pick is `activeProfile`'s question, and the manifest describes the tree, not the process. A profile is printed
+ * resolved (RFC 0043): a child's block holds what it writes over what it extends, and names the profile it extends.
  */
 import { profilesOf, type Reach, reachOf } from '@wilanis/compiler';
 import { runsUnder, type Scope } from '@wilanis/core';
 import { type ListenRow, listensOf } from './manifest-listens.js';
 import { sorted, sortedBy } from './manifest-rows.js';
 import { declaredProfile } from './profile.js';
+import { permitsRead } from './profile-choices.js';
 
 /** One effectful native operation a profile reaches, and every connection it was reached with. */
 export interface ReachRow {
@@ -27,6 +29,8 @@ export interface NeedRow {
 export interface ProfileBlock {
   default: boolean;
   description: string | null;
+  /** The profile it extends (RFC 0043); null where it extends none. */
+  extends: string | null;
   bindings: Record<string, string>;
   connections: Record<string, string>;
   reaches: ReachRow[];
@@ -41,19 +45,20 @@ export interface ProfileBlock {
 /** The key the unnamed profile of a tree that declares none is written under: JSON has no key for nothing. */
 export const UNNAMED = '';
 
-/** A profile's map as written, canonical on both sides and by key. */
+/** A profile's map as resolved, canonical on both sides and by key. */
 function canonMap(scope: Scope, written: Record<string, string> | undefined): Record<string, string> {
   const pairs = Object.entries(written ?? {}).map(([from, to]) => [scope.canon(from), scope.canon(to)] as const);
   return Object.fromEntries(sortedBy([...pairs], ([from]) => from));
 }
 
 /**
- * What a profile's `permits` names, each entry canonical, by entry: an operation as path#operation, a whole port or a
- * connection as its path. Null where the profile writes none, which permits everything (RFC 0016); the checker holds
- * a list that is written to what the profile reaches, in both directions (C021, C022).
+ * What a profile's `permits` permits, each entry canonical, by entry: an operation as path#operation, a whole port or a
+ * connection as its path; an inherited list as `permitsRead` reads it under the child (RFC 0043). Null where the
+ * profile has none, which permits everything (RFC 0016); the checker holds a list to what the profile reaches, in both
+ * directions (C021, C022).
  */
-function permitsOf(scope: Scope, written: string[] | undefined): string[] | null {
-  return written ? sorted(written.map(entry => scope.canon(entry))) : null;
+function permitsOf(scope: Scope, permits: string[] | undefined): string[] | null {
+  return permits ? sorted(permits.map(entry => scope.canon(entry))) : null;
 }
 
 /** Every effectful operation reached, once, by operation, with the connections its sites named, sorted. */
@@ -89,19 +94,20 @@ function needRows(reach: Reach): NeedRow[] {
 
 /** One profile's block; the unnamed one is the default, since a start that names no profile runs it. */
 function profileBlock(scope: Scope, name: string | undefined): ProfileBlock {
-  const written = name === undefined ? undefined : scope.project?.profiles?.[name];
+  const resolved = name === undefined ? undefined : scope.profile(name);
   const reach = reachOf(scope, name);
   return {
-    default: name === undefined || written?.default === true,
-    description: written?.description ?? null,
-    bindings: canonMap(scope, written?.bindings),
-    connections: canonMap(scope, written?.connections),
+    default: name === undefined || resolved?.default === true,
+    description: resolved?.description ?? null,
+    extends: resolved?.extends ?? null,
+    bindings: canonMap(scope, resolved?.bindings),
+    connections: canonMap(scope, resolved?.connections),
     reaches: reachRows(reach),
     holds: sorted(reach.holds),
     listens: listensOf(scope, name),
     starts: (scope.project?.startup ?? []).filter(step => runsUnder(step, name)).map(step => step.label ?? null),
     needs: needRows(reach),
-    permits: permitsOf(scope, written?.permits),
+    permits: permitsOf(scope, permitsRead(scope, resolved, reach.connections)),
   };
 }
 

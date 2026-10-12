@@ -4049,6 +4049,7 @@
     "live": {
       "default": true,
       "description": "The laptop, and the default, so `npx wilanis start example` names no profile: the customers through their REST API, the directories written in the connections, and a reload on every saved document.",
+      "extends": null,
       "bindings": {
         "@auth/state.port.json": "@features/state/data/auth-files.binding.json",
         "@features/access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
@@ -4179,6 +4180,7 @@
     "local": {
       "default": false,
       "description": "Everything in this process: the customers kept in memory, the directories written in the connections, and a reload on every saved document. Nothing reaches the network, so `wilanis start example --profile local` serves the same routes with no upstream at all.",
+      "extends": null,
       "bindings": {
         "@auth/state.port.json": "@features/state/data/auth-files.binding.json",
         "@features/access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
@@ -4339,6 +4341,7 @@
     "production": {
       "default": false,
       "description": "Behind the load balancer, started with `wilanis start example --profile production`: the customers in PostgreSQL, the one operator account in place of the laptop's employees, and nothing watched. The same routes, policies, shapes and business graphs as every other profile, and not one document under features/ changes: another binding meets customer.port.json, every reference to employees.connection.json reaches employees-production.connection.json instead, and every reference to jobs.connection.json reaches the customer database, so the removals queue is a table beside the customers. The startup steps prepare the database before the port opens, so a tree whose database is unreachable refuses to serve rather than answering every route with a fault. It listens, keeps no schedule and works no queue: run as many of it as the load needs, one process under production-scheduler beside them, and as many under production-worker as the queue needs.",
+      "extends": null,
       "bindings": {
         "@auth/state.port.json": "@features/state/data/auth-storage.binding.json",
         "@features/access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
@@ -4508,6 +4511,7 @@
     "production-scheduler": {
       "default": false,
       "description": "The one process that keeps the schedule beside production, started with `wilanis start example --profile production-scheduler`: production's bindings and connections, so a tick reaches what a route there reaches and a queue is the same table, and production's startup but for the listener, which it never opens. Run one of it beside the production instances, which listen and schedule nothing, and the production-worker processes, which work the queue.",
+      "extends": null,
       "bindings": {
         "@auth/state.port.json": "@features/state/data/auth-storage.binding.json",
         "@features/access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
@@ -4603,6 +4607,7 @@
     "production-worker": {
       "default": false,
       "description": "A process that works the removals queue beside production, started with `wilanis start example --profile production-worker`: production's bindings and connections, so a message reaches what the route that published it reaches and the queue is the same table, and production's startup with the consumer in place of the listener. It opens no port, so a slow removal never holds a route's instance; run as many of it as the queue needs, since each takes messages no other has taken.",
+      "extends": null,
       "bindings": {
         "@auth/state.port.json": "@features/state/data/auth-storage.binding.json",
         "@features/access/domain/identity.port.json": "@features/directories/data/identity.binding.json",

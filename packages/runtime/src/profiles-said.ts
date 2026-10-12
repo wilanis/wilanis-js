@@ -8,9 +8,13 @@
  * The reach is grouped by port: operations of one port reached with the same connections share a line, which
  * reads as the contract a reviewer already knows (`@storage/store.port.json#find, #get, #put`) rather than as a
  * list of connections with every operation behind each repeated.
+ *
+ * A profile is read as resolved (RFC 0043): a child that names a parent under `extends` binds, stands in and permits
+ * what the parent does except where it writes its own, and each row it takes from the parent says so.
  */
 import { type Reach, type ReachedNative, reachOf } from '@wilanis/compiler';
 import { type Loaded, type PortDoc, runsUnder, type Scope, splitRef } from '@wilanis/core';
+import { choicesOf, permitsOfProfile, permitsRead } from './profile-choices.js';
 
 /** Operations of one port the profile reaches with the same connections: the port, the operations, the connections. */
 export interface ReachedGroup {
@@ -28,22 +32,28 @@ export interface ProfileNeed {
   readBy: string[];
 }
 
-/** One profile read back: its choices, as written, and what it reaches, derived by `reachOf`. */
+/** One profile read back: its choices, resolved and spelled as written, and what it reaches, derived by `reachOf`. */
 export interface ProfileReach {
   /** Nothing for the unnamed profile of a project that declares none. */
   name: string | undefined;
   default: boolean;
   description?: string;
-  binds: { port: string; binding: string }[];
-  /** Each connection the documents name and the stand-in this profile reaches in its place. */
-  standsIn: { named: string; standIn: string }[];
+  /** The profile it extends (RFC 0043), whose choices it takes where it writes none of its own. */
+  extends?: string;
+  /** Each domain port it chooses a binding for; `from` names the parent where the choice is the parent's. */
+  binds: { port: string; binding: string; from?: string }[];
+  /** Each connection the documents name and the stand-in this profile reaches in its place; `from` as for `binds`. */
+  standsIn: { named: string; standIn: string; from?: string }[];
   reaches: ReachedGroup[];
   holds: ReachedGroup[];
   /**
-   * The profile's `permits` as it writes them (RFC 0016), which the checker holds to `reaches` and `holds` in both
-   * directions (C021, C022); absent where it writes none, and so permits everything.
+   * What the profile's `permits` permits (RFC 0016), entry by entry, which the checker holds to `reaches` and `holds`
+   * in both directions (C021, C022): its own list as written, or its parent's as `permitsRead` reads it; absent
+   * where it has none, and so permits everything.
    */
   permits?: string[];
+  /** Where the list is the parent's whole (RFC 0043): the parent, and how many entries it writes. */
+  permitsFrom?: { profile: string; entries: number };
   starts: { run: string; label?: string }[];
   needs: ProfileNeed[];
 }
@@ -54,20 +64,31 @@ export function profilesOf(scope: Scope): ProfileReach[] {
   return declared.length ? declared.map(name => profileOf(scope, name)) : [profileOf(scope, undefined)];
 }
 
-/** One profile: what it writes, and the reach `reachOf` derives from it. */
+/** One profile: what it means, resolved, and the reach `reachOf` derives from it. */
 function profileOf(scope: Scope, name: string | undefined): ProfileReach {
-  const written = name ? scope.project?.profiles?.[name] : undefined;
+  const resolved = name ? scope.profile(name) : undefined;
   const reach = reachOf(scope, name);
-  const pairs = (record: Record<string, string> | undefined) => Object.entries(record ?? {});
+  const permits = permitsRead(scope, resolved, reach.connections);
+  const parent = resolved?.inherited.permits ? resolved.extends : undefined;
   return {
     name,
-    default: written?.default === true,
-    ...(written?.description ? { description: written.description } : {}),
-    binds: pairs(written?.bindings).map(([port, binding]) => ({ port, binding })),
-    standsIn: pairs(written?.connections).map(([named, standIn]) => ({ named, standIn })),
+    default: resolved?.default === true,
+    ...(resolved?.description ? { description: resolved.description } : {}),
+    ...(resolved?.extends ? { extends: resolved.extends } : {}),
+    binds: choicesOf(scope, name, 'bindings').map(({ named, chosen, from }) => ({
+      port: named,
+      binding: chosen,
+      ...(from && { from }),
+    })),
+    standsIn: choicesOf(scope, name, 'connections').map(({ named, chosen, from }) => ({
+      named,
+      standIn: chosen,
+      ...(from && { from }),
+    })),
     reaches: groupsOf(reach.operations.filter(one => !one.holds)),
     holds: groupsOf(reach.operations.filter(one => one.holds)),
-    ...(written?.permits ? { permits: written.permits } : {}),
+    ...(permits ? { permits } : {}),
+    ...(parent && resolved?.permits ? { permitsFrom: { profile: parent, entries: resolved.permits.length } } : {}),
     starts: (scope.project?.startup ?? [])
       .filter(step => runsUnder(step, name))
       .map(step => ({ run: step.run, ...(step.label ? { label: step.label } : {}) })),
@@ -112,14 +133,16 @@ export interface StandIn {
   profile: string;
 }
 
-/** Every profile's `connections` entry naming this connection, on either side, in the project's order. */
+/** Every profile's stand-in naming this connection, on either side, in the project's order, an inherited one among them. */
 export function standInsOf(scope: Scope, connection: string): StandIn[] {
-  return Object.entries(scope.project?.profiles ?? {}).flatMap(([profile, written]) =>
-    Object.entries(written.connections ?? {}).flatMap(([named, standIn]): StandIn[] => [
-      ...(scope.canon(standIn) === connection ? [{ role: 'stands in for' as const, other: named, profile }] : []),
-      ...(scope.canon(named) === connection ? [{ role: 'replaced by' as const, other: standIn, profile }] : []),
-    ]),
-  );
+  return scope
+    .profiles()
+    .flatMap(profile =>
+      choicesOf(scope, profile, 'connections').flatMap(({ named, chosen: standIn }): StandIn[] => [
+        ...(scope.canon(standIn) === connection ? [{ role: 'stands in for' as const, other: named, profile }] : []),
+        ...(scope.canon(named) === connection ? [{ role: 'replaced by' as const, other: standIn, profile }] : []),
+      ]),
+    );
 }
 
 // ---- said -----------------------------------------------------------------------------------------
@@ -142,16 +165,19 @@ const counted = (count: number, one: string, many = `${one}s`): string => `${cou
 /**
  * What a profile permits, said against the reach printed above it: `the 19 operations and 3 connections above, by
  * 13 entries`. The checker holds the list to that reach in both directions (C021, C022), so the block counts what
- * the entries cover rather than showing a difference, which is `wilanis check`'s to say; a profile that writes no
- * `permits` permits everything.
+ * the entries cover rather than showing a difference, which is `wilanis check`'s to say; a profile with no
+ * `permits` permits everything. A list taken from the parent (RFC 0043) says whose entries they are: `by
+ * production's 13 entries`.
  */
 export function permitsSaid(profile: ProfileReach): string {
   if (!profile.permits) return 'everything (no permits)';
   const reached = [...profile.reaches, ...profile.holds];
   const operations = reached.reduce((sum, group) => sum + group.operations.length, 0);
   const connections = new Set(reached.flatMap(group => group.connections)).size;
-  const entries = counted(profile.permits.length, 'entry', 'entries');
-  return `the ${counted(operations, 'operation')} and ${counted(connections, 'connection')} above, by ${entries}`;
+  const from = profile.permitsFrom;
+  const entries = counted(from ? from.entries : profile.permits.length, 'entry', 'entries');
+  const by = from ? `${from.profile}'s ${entries}` : entries;
+  return `the ${counted(operations, 'operation')} and ${counted(connections, 'connection')} above, by ${by}`;
 }
 
 /** One need: the variable, the key it answers and who reads it; a key no variable answers says so. */
@@ -162,12 +188,19 @@ export function needSaid(need: ProfileNeed): string {
     : `{{secrets.${need.key}}} (undeclared, ${readers})`;
 }
 
-/** The first line of one profile's block: its name, `(default)` where it is, and what it says of itself. */
+/**
+ * The first line of one profile's block: its name, `(default)` where it is, the profile it extends where it names
+ * one (RFC 0043), and what it says of itself.
+ */
 export function profileHeading(profile: ProfileReach): string {
   if (profile.name === undefined) return 'profile  none declared: each port is met by its one binding';
   const marked = profile.default ? '  (default)' : '';
-  return `profile ${profile.name}${marked}${profile.description ? `  -- ${profile.description}` : ''}`;
+  const extended = profile.extends ? `  extends ${profile.extends}` : '';
+  return `profile ${profile.name}${marked}${extended}${profile.description ? `  -- ${profile.description}` : ''}`;
 }
+
+/** How a row says the parent it was taken from (RFC 0043); nothing for a row the profile writes itself. */
+const fromSaid = (from: string | undefined): string => (from ? `  (from ${from})` : '');
 
 /** One profile's block, as `wilanis describe project.json` prints it. */
 export function profileBlock(profile: ProfileReach): string[] {
@@ -176,13 +209,13 @@ export function profileBlock(profile: ProfileReach): string[] {
     profileHeading(profile),
     ...rows(
       'binds',
-      profile.binds.map(one => `${one.port}  → ${one.binding}`),
+      profile.binds.map(one => `${one.port}  → ${one.binding}${fromSaid(one.from)}`),
       "each port's one binding",
     ),
     ...(profile.standsIn.length
       ? rows(
           'stands in',
-          profile.standsIn.map(one => `${one.named}  → ${one.standIn}`),
+          profile.standsIn.map(one => `${one.named}  → ${one.standIn}${fromSaid(one.from)}`),
           '',
         )
       : []),
@@ -221,15 +254,19 @@ function permitterSaid(scope: Scope, path: string, profile: string, entries: str
 
 /**
  * Who permits a native port or a connection (RFC 0016): `permitted by  production (#ensure)`, every profile whose
- * `permits` names the document or one of its operations, in the project's order. A profile that writes no
- * `permits` permits everything and is not named, since its block in `describe project.json` says so once; so a
- * tree none of whose profiles writes one prints no line, and where one does and none names the document the line
- * says that, which is what a reader about to reach it needs to know.
+ * `permits` names the document or one of its operations, in the project's order, a list a child takes from its
+ * parent read as `permitsRead` reads it (RFC 0043). A profile with no `permits` permits everything and is not
+ * named, since its block in `describe project.json` says so once; so a tree none of whose profiles has one prints
+ * no line, and where one does and none names the document the line says that, which is what a reader about to
+ * reach it needs to know.
  */
 export function permittedLines(scope: Scope, doc: Loaded): string[] {
   if (!permittable(doc)) return [];
-  const writing = Object.entries(scope.project?.profiles ?? {}).filter(([, profile]) => profile.permits);
-  if (!writing.length) return [];
-  const named = writing.flatMap(([name, profile]) => permitterSaid(scope, doc.path, name, profile.permits ?? []));
+  const listing = scope.profiles().flatMap(name => {
+    const permits = permitsOfProfile(scope, name);
+    return permits ? [[name, permits] as const] : [];
+  });
+  if (!listing.length) return [];
+  const named = listing.flatMap(([name, permits]) => permitterSaid(scope, doc.path, name, permits));
   return [`permitted by  ${named.length ? named.join(', ') : 'no profile that writes permits'}`];
 }

@@ -381,9 +381,9 @@
       }
     },
     "profile": {
-      "description": "One place the tree runs (RFC 0013): what the profile writes, and what `reachOf` derives from it.",
+      "description": "One place the tree runs (RFC 0013): what the profile means, resolved, and what `reachOf` derives from it. A profile that extends another (RFC 0043) is printed resolved: what it writes over what it extends.",
       "type": "object",
-      "required": ["default", "description", "bindings", "connections", "reaches", "holds", "listens", "starts", "needs", "permits"],
+      "required": ["default", "description", "extends", "bindings", "connections", "reaches", "holds", "listens", "starts", "needs", "permits"],
       "additionalProperties": false,
       "properties": {
         "default": {
@@ -391,16 +391,20 @@
           "type": "boolean"
         },
         "description": {
-          "description": "What the profile says of itself; null where it says nothing.",
+          "description": "What the profile says of itself; null where it says nothing. Never inherited.",
+          "type": ["string", "null"]
+        },
+        "extends": {
+          "description": "The profile this one starts from (RFC 0043), whose bindings, stand-ins and permits it has except where it writes its own; null where it extends none.",
           "type": ["string", "null"]
         },
         "bindings": {
-          "description": "The bindings the profile chooses, as it writes them: a domain port's canonical path to the canonical path of the binding that meets it there, by port. A port it leaves out is met by its one binding (ports.domain[].bindings). Empty for the unnamed profile.",
+          "description": "The bindings the profile chooses, resolved: what the profile writes over what it extends. A domain port's canonical path to the canonical path of the binding that meets it there, by port. A port it leaves out is met by its one binding (ports.domain[].bindings). Empty for the unnamed profile.",
           "type": "object",
           "additionalProperties": { "type": "string" }
         },
         "connections": {
-          "description": "The stand-ins the profile maps, as it writes them: a connection's canonical path to the canonical path of the connection reached in its place, by connection; empty where it maps none.",
+          "description": "The stand-ins the profile maps, resolved: what the profile writes over what it extends. A connection's canonical path to the canonical path of the connection reached in its place, by connection; empty where it maps none.",
           "type": "object",
           "additionalProperties": { "type": "string" }
         },
@@ -430,7 +434,7 @@
           "items": { "$ref": "#/$defs/need" }
         },
         "permits": {
-          "description": "What the profile permits (RFC 0016), its `permits` with each entry canonical, sorted: an effectful native operation as path#operation, a whole native port as its path, a connection as its path. The checker holds a written list to what the profile reaches in both directions (C021, C022): nothing under `reaches` goes unpermitted, and no entry permits nothing reached. Null where the profile writes none, and so permits everything, as the unnamed profile of a tree that declares none does.",
+          "description": "What the profile permits (RFC 0016), resolved: what the profile writes over what it extends, a list it writes replacing the inherited one whole, and an inherited entry for a connection the profile stands in for read as the checker reads it (the stand-in, and the connection itself where the profile still reaches it). Its `permits` with each entry canonical, sorted: an effectful native operation as path#operation, a whole native port as its path, a connection as its path. The checker holds a written list to what the profile reaches in both directions (C021, C022): nothing under `reaches` goes unpermitted, and no entry permits nothing reached. Null where the profile writes none, and so permits everything, as the unnamed profile of a tree that declares none does.",
           "type": ["array", "null"],
           "items": { "type": "string" },
           "uniqueItems": true
