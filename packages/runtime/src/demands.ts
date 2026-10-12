@@ -5,6 +5,8 @@
  * element from. A read of `in` is followed out of the switch's graph by `traced` in `frames.ts`, through every call and
  * map on the way, and is met where it lands. A traced demand never lands past a guard: where the trace meets a guard's
  * answer, it is written into the value the guard judges, so the guard judges what the rehearsal wrote (RFC 0038).
+ * Where the stubbing follows a pure `make` (`writtenOf`, which `fuzz --edges` alone gives), a demand on its answer goes
+ * on into what it writes out instead, to the input it copies (#1009).
  * Where the trace stops, a literal on the way meets the demand with nothing written, or closes the branch on that
  * path; anything else leaves it unreachable, with the sentence `demand-said.ts` writes.
  */
@@ -13,7 +15,7 @@ import { type Type, typeAt } from '@wilanis/core';
 import type { KSwitchLike, Settled, Stubbing } from './branches.js';
 import { closedSaid, exhaustedOf, stoppedSaid, type Unmet } from './demand-said.js';
 import { type Domain, meets } from './domains.js';
-import { type Landed, type OnNode, type Standing, type Stopped, sourceOf, traced } from './frames.js';
+import { type Landed, type OnNode, type Standing, type Stopped, sourceOf, traced, writtenThrough } from './frames.js';
 import { getPath, NO_MEMBER, satisfy, setPath } from './stubs.js';
 
 export type { Missed, Unmet } from './demand-said.js';
@@ -60,8 +62,22 @@ function withEach(landed: Landed, each: number[] | undefined, length: number): L
 function ofTraced(read: string[], landed: Landed | Stopped, asked: Asked, from: Settled): Met | Unmet | Fixed {
   if ('stopped' in landed) return ofStopped(read, landed, asked, from);
   if ('input' in landed) return ofInput(landed.input, asked, from, landed.each);
+  const through = landed.each ? undefined : writtenFrom(landed.standing.at, landed.path, landed.standing, from);
+  if (through) return ofTraced(read, through, asked, from);
   const each = landed.each ? { each: landed.each } : {};
   return { stub: { ...onNode(landed, from), value: asked.domain, field: asked.field, ...each } };
+}
+
+/**
+ * A demand on a node's answer followed into what the node writes out, where the stubbing follows a pure `make`
+ * (`writtenOf`): at a made site, into the value the guard judges, `<id>:made`. Nothing where the stubbing follows none,
+ * or the node is no such make, and the demand is a stub of its answer as before.
+ */
+function writtenFrom(node: string, path: string[], standing: Standing, from: Settled): Landed | Stopped | undefined {
+  if (!from.writtenOf) return undefined;
+  const made = from.madeOf?.(node) ?? node;
+  const written = from.writtenOf(made);
+  return written === undefined ? undefined : writtenThrough(written, path, { ...standing, at: made });
 }
 
 /** One demand as the solver made it: the field of the switch's inputs it is on, and what that field must hold. */
@@ -152,8 +168,11 @@ export function meet(dotted: string, domain: Domain, at: At, from: Settled): Met
     return ofTraced(read, followed({ ref: 'in', path: read }, at.standing), asked, from);
   }
   if (src.ref === 'context' || src.ref === 'const') return { missed: 'unreachable' };
-  const target = stubTarget([...at.prefix, src.ref].join('.'), from);
-  return { stub: { target, path: [...src.path, ...within], value: domain, field: dotted } };
+  const node = [...at.prefix, src.ref].join('.');
+  const path = [...src.path, ...within];
+  const through = writtenFrom(node, path, { ...at.standing, at: node }, from);
+  if (through) return ofTraced(path, through, asked, from);
+  return { stub: { target: stubTarget(node, from), path, value: domain, field: dotted } };
 }
 
 /**

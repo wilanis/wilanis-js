@@ -189,6 +189,16 @@ function handed(source: unknown, rest: string[], out: Standing): Hop | Stopped {
   return { stopped: out.at, reason: 'composed' };
 }
 
+/**
+ * A read at a path of a value a node writes out, followed to where it lands: the source written at that path, read
+ * where the node stands and traced out from there (`traced`); a literal or a composed value stops it, as a call's input
+ * does (`handed`). What `fuzz --edges` follows a demand on a pure `make`'s answer through, to the input it copies.
+ */
+export function writtenThrough(written: unknown, path: string[], standing: Standing): Landed | Stopped {
+  const next = handed(written, path, standing);
+  return 'src' in next ? traced(next.src, next.here) : next;
+}
+
 /** The node that holds a list, the path within its answer, and the frames and maps it stands in. */
 export interface Holder {
   target: string;

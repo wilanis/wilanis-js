@@ -54,6 +54,11 @@ export interface Stubbing {
   madeOf?: (nodePath: string) => string | undefined;
   /** The graph document the node at a dotted path stands in: where a sentence says a trace stopped. */
   graphOf?: (nodePath: string) => string | undefined;
+  /**
+   * What the node at a dotted path writes out, where it is a pure `make` whose answer a demand is followed through to
+   * the value it copies. Only `fuzz --edges` gives it: it steers the trigger's input and never a node's answer.
+   */
+  writtenOf?: (nodePath: string) => unknown;
 }
 
 /**

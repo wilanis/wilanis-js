@@ -261,11 +261,19 @@ export function answering(walk: Reached, sw: FoundSwitch): Pick<Steering, 'stubs
  * refuses, or none can be taken.
  */
 function answeringCase(walk: Reached, other: FoundSwitch, from: Stubbing): Case | undefined {
-  const spec = specAt(walk, other.prefix);
-  const refuses = (id: string) => (spec?.nodes[id] as { handler?: unknown } | undefined)?.handler === REFUSE;
+  const refuses = refusing(walk, other);
   return casesFor(other, from).find(
     one => one.branch.rule !== CAUGHT && untakenBy(one) === undefined && !refuses(one.branch.to),
   );
+}
+
+/**
+ * Which nodes a switch routes to refuse: those of its spec that run `REFUSE`, the native operation a guard refuses
+ * with too. Answers a test of one node's id.
+ */
+export function refusing(walk: Reached, sw: FoundSwitch): (id: string) => boolean {
+  const spec = specAt(walk, sw.prefix);
+  return id => (spec?.nodes[id] as { handler?: unknown } | undefined)?.handler === REFUSE;
 }
 
 /** The lowered spec at a prefix: the trigger's own, then the spec behind each call the prefix steps into. */
