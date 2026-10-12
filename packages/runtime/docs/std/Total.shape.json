@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
+  "label": "Total",
+  "description": "One group of a list: its key, how many elements have it, and the sum of the number #totals was asked to add.",
+  "layer": "core",
+  "fields": {
+    "key": {
+      "type": "string",
+      "description": "the value of the `by` field the elements of this group share"
+    },
+    "count": {
+      "type": "number",
+      "description": "how many elements have this key"
+    },
+    "sum": {
+      "type": "number",
+      "description": "the sum of the `sum` field over those elements; 0 when #totals was given no `sum`"
+    }
+  }
+}

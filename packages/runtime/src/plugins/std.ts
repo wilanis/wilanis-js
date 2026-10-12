@@ -37,6 +37,35 @@ const trimmed = (value: unknown, type: unknown, env: Record<string, unknown>): u
   return resolve && typeof type === 'string' ? prune(value, resolve(type)) : value;
 };
 
+/** One group of a list, as `@std/Total.shape.json` declares it. */
+interface Total {
+  key: string;
+  count: number;
+  sum: number;
+}
+
+/** What one element adds to its total: its key at `by`, and its number at `sum` (0 with no `sum`); a fault where either is not of its type. */
+const addendOf = (element: unknown, index: number, by: string, sum: string | undefined) => {
+  const key = readPath(element, by.split('.'));
+  if (typeof key !== 'string') throw new Error(`totals: element ${index} has no string at '${by}'`);
+  const added = sum === undefined ? 0 : readPath(element, sum.split('.'));
+  if (typeof added !== 'number') throw new Error(`totals: element ${index} has no number at '${sum}'`);
+  return { key, added };
+};
+
+/** One total per distinct key, in the order each key first appears: how many elements have it, and their sum. */
+const totalsOf = (list: unknown[], by: string, sum: string | undefined): Total[] => {
+  const totals = new Map<string, Total>();
+  list.forEach((element, index) => {
+    const { key, added } = addendOf(element, index, by, sum);
+    const total = totals.get(key) ?? { key, count: 0, sum: 0 };
+    total.count += 1;
+    total.sum += added;
+    totals.set(key, total);
+  });
+  return [...totals.values()];
+};
+
 export const std: PluginModule = {
   root: '@std',
   docs: fileURLToPath(new URL('../../docs/std', import.meta.url)),
@@ -71,6 +100,16 @@ export const std: PluginModule = {
       declared(
         arr(input.list, 'list').slice(Number(input.from), input.to === undefined ? undefined : Number(input.to)),
         input.type,
+        ctx.env,
+      ),
+    '@std/list.port.json#totals': async ({ in: input, ctx }) =>
+      declared(
+        totalsOf(
+          arr(input.list, 'list'),
+          str(input.by, 'by'),
+          input.sum === undefined ? undefined : str(input.sum, 'sum'),
+        ),
+        '@std/Total.shape.json[]',
         ctx.env,
       ),
   },

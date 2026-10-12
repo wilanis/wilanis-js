@@ -97,7 +97,10 @@ naming the result type, and the checker verifies the values given fit it.
 ## The standard library is four ports
 
 `@std/object` (`make`, `merge`), `@std/text` (`fill`, `join`, `split`, `replace`), `@std/list` (`count`,
-`first`, `concat`, `slice`), `@std/outcome` (`refuse`). All pure, legal in any layer.
+`first`, `concat`, `slice`, `totals`), `@std/outcome` (`refuse`). All pure, legal in any layer. `totals` groups a
+list by a string field and answers one `@std/Total.shape.json` per key, in the order each key first appears: the
+key, how many elements have it, and the sum of a number field (0 when none is named). Its `by` and `sum` are paths
+within the element's `type`, and the checker reads each against that type (G028).
 
 ## No absence
 
