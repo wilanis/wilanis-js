@@ -85,12 +85,13 @@ const EXPORT = '@otel/exporter.port.json#export';
 
 /**
  * The example as a test starts it: without the trace exporter, which opens no socket and would spend every stop
- * retrying a collector nobody runs here. Production permits what it reaches, and without the step it exports
- * nothing, so its permit goes too.
+ * retrying a collector nobody runs here. Each profile that writes permits permits what it reaches, and without the
+ * step it exports nothing, so its permit goes too.
  */
 function withoutExporter(project: any) {
   project.startup = project.startup.filter((step: any) => step.run !== EXPORT);
-  project.profiles.production.permits = project.profiles.production.permits.filter((entry: string) => entry !== EXPORT);
+  for (const profile of Object.values(project.profiles) as { permits?: string[] }[])
+    profile.permits = profile.permits?.filter(entry => entry !== EXPORT);
 }
 
 /**

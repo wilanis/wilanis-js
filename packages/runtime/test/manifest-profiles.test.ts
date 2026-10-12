@@ -214,6 +214,7 @@ describe('manifest.schema.json: the profile block', () => {
 
 const JOBS = '@connections/jobs.connection.json';
 const JOBS_STAGING = '@connections/jobs-staging.connection.json';
+/** What production-worker permits, as the example writes it: its own list, since it reaches less than production. */
 const WORKER_PERMITS = [
   '@storage/store.port.json',
   '@storage/storage.port.json#ensure',
@@ -270,15 +271,15 @@ const staging = (away: boolean) => (doc: any) => {
 };
 
 describe('manifestOf: a profile that extends another (RFC 0043)', () => {
-  it('says extends: null on every block of the example, whose profiles extend none', () => {
-    for (const name of Object.keys(manifest.profiles)) expect(block(name).extends).toBeNull();
+  it('says extends: production on the two blocks that extend it, and null on every other', () => {
+    const children = ['production-scheduler', 'production-worker'];
+    for (const name of children) expect(block(name).extends).toBe('production');
+    for (const name of Object.keys(manifest.profiles).filter(one => !children.includes(one)))
+      expect(block(name).extends).toBeNull();
   });
 
   it("holds the child's extends and production's bindings and stand-ins, resolved and canonical", () => {
-    const worker = blockAfter('production-worker', doc => {
-      const { description } = doc.profiles['production-worker'];
-      doc.profiles['production-worker'] = { description, extends: 'production', permits: WORKER_PERMITS };
-    });
+    const worker = block('production-worker');
     expect(worker.extends).toBe('production');
     expect(worker.bindings).toEqual(block('production').bindings);
     expect(worker.connections).toEqual(block('production').connections);

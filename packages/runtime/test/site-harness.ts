@@ -104,8 +104,8 @@ export function siteTree(): string {
   editing(dir, PROJECT, project => {
     project.plugins.push({ use: '@note' });
     project.startup.push(WATCH_STEP);
-    // production says what it reaches (C021), and now reaches the note
-    project.profiles.production.permits.push(NOTE_PORT);
+    // each profile that writes permits says what it reaches (C021), and now reaches the note
+    for (const profile of Object.values<{ permits?: string[] }>(project.profiles)) profile.permits?.push(NOTE_PORT);
   });
   editing(dir, 'features/customers/feature.json', feature => feature.effects.push(`${NOTE_PORT}#record`));
   editing(dir, CREATE_ROW, graph => {

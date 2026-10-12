@@ -76,6 +76,9 @@ export const BINDING = '@features/keeping/data/keep-files.binding.json';
 
 export const REFUSING = '@features/keeping/data/keep-refusing.graph.json';
 
+/** One profile of the example's project.json, as the copy edits it. */
+type Profile = { extends?: string; bindings: Record<string, string>; permits?: string[] };
+
 /** A data graph whose only ending is a `refuse`: what a binding may run without delegating to a refusing operation. */
 const refusingGraph = () => ({
   $schema: schemaRef('graph'),
@@ -110,8 +113,9 @@ function tree(bound: boolean, edit: (doc: any) => void): string {
   project.plugins.push({ use: '@keep' });
   if (bound) {
     writeFileSync(join(dir, 'features/keeping/data/keep-files.binding.json'), JSON.stringify(binding(edit)));
-    for (const profile of Object.values<{ bindings: Record<string, string>; permits?: string[] }>(project.profiles)) {
-      profile.bindings['@keep/memory.port.json'] = BINDING;
+    for (const profile of Object.values<Profile>(project.profiles)) {
+      // a profile that extends another has the parent's binding
+      if (!profile.extends) profile.bindings['@keep/memory.port.json'] = BINDING;
       // what the binding reaches, where the profile lists what its place permits
       profile.permits?.push('@keep/files.port.json#get');
     }

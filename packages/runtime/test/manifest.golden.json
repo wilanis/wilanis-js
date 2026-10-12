@@ -4510,8 +4510,8 @@
     },
     "production-scheduler": {
       "default": false,
-      "description": "The one process that keeps the schedule beside production, started with `wilanis start example --profile production-scheduler`: production's bindings and connections, so a tick reaches what a route there reaches and a queue is the same table, and production's startup but for the listener, which it never opens. Run one of it beside the production instances, which listen and schedule nothing, and the production-worker processes, which work the queue.",
-      "extends": null,
+      "description": "The one process that keeps the schedule beside production, started with `wilanis start example --profile production-scheduler`: production, with the scheduler in place of the listener, which it never opens. It extends production, so a tick reaches what a route there reaches and a queue is the same table. Run one of it beside the production instances, which listen and schedule nothing, and the production-worker processes, which work the queue.",
+      "extends": "production",
       "bindings": {
         "@auth/state.port.json": "@features/state/data/auth-storage.binding.json",
         "@features/access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
@@ -4602,12 +4602,20 @@
           ]
         }
       ],
-      "permits": null
+      "permits": [
+        "@auth/challenge.port.json#issue",
+        "@connections/customers-postgres.connection.json",
+        "@otel/exporter.port.json#export",
+        "@queue/queue.port.json#ensure",
+        "@schedule/scheduler.port.json#run",
+        "@storage/storage.port.json#ensure",
+        "@storage/store.port.json"
+      ]
     },
     "production-worker": {
       "default": false,
-      "description": "A process that works the removals queue beside production, started with `wilanis start example --profile production-worker`: production's bindings and connections, so a message reaches what the route that published it reaches and the queue is the same table, and production's startup with the consumer in place of the listener. It opens no port, so a slow removal never holds a route's instance; run as many of it as the queue needs, since each takes messages no other has taken.",
-      "extends": null,
+      "description": "A process that works the removals queue beside production, started with `wilanis start example --profile production-worker`: production, with the consumer in place of the listener. It extends production, so a message reaches what the route that published it reaches and the queue is the same table. It opens no port, so a slow removal never holds a route's instance; run as many of it as the queue needs, since each takes messages no other has taken.",
+      "extends": "production",
       "bindings": {
         "@auth/state.port.json": "@features/state/data/auth-storage.binding.json",
         "@features/access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
@@ -4698,7 +4706,15 @@
           ]
         }
       ],
-      "permits": null
+      "permits": [
+        "@auth/challenge.port.json#issue",
+        "@connections/customers-postgres.connection.json",
+        "@otel/exporter.port.json#export",
+        "@queue/queue.port.json#ensure",
+        "@queue/worker.port.json#consume",
+        "@storage/storage.port.json#ensure",
+        "@storage/store.port.json"
+      ]
     }
   }
 }

@@ -90,8 +90,12 @@ describe('sabotage: profiles, their stand-ins, and the steps they run', () => {
       sabotage('project.json', doc => {
         doc.startup.at(-1).profiles = profiles;
       });
-    // and production, which no longer listens, permits the listener for nothing (C022)
-    expect(naming(['staging'])).toEqual(['C022', 'B012']);
+    // and production, which no longer listens, permits the listener for nothing (C022); and with no profile
+    // listening, every profile walks every route, so the two that extend production and write their own permits
+    // miss what the routes reach (C021)
+    const codes = naming(['staging']);
+    expect(codes.filter(code => code !== 'C021')).toEqual(['C022', 'B012']);
+    expect(codes).toContain('C021');
     expect(naming(['live', 'production'])).toEqual([]);
   });
   it('B008 judged only under the profiles a step runs under', () => {
@@ -106,39 +110,25 @@ describe('sabotage: profiles, their stand-ins, and the steps they run', () => {
   });
 });
 
-/** Exactly what `production-worker` reaches: production's storage and queue, the consumer, and no listener. */
-const WORKER = [
-  '@storage/store.port.json',
-  '@storage/storage.port.json#ensure',
-  '@queue/queue.port.json#ensure',
-  '@queue/worker.port.json#consume',
-  '@auth/challenge.port.json#issue',
-  '@otel/exporter.port.json#export',
-  '@connections/customers-postgres.connection.json',
-];
-
-/** Exactly what `production-scheduler` reaches: production's storage and queue, the scheduler, and no listener. */
-const SCHEDULER = [...WORKER.filter(entry => !entry.startsWith('@queue/worker')), '@schedule/scheduler.port.json#run'];
-
-/** One profile as a child of another (RFC 0043): it writes its description, its own permits, and what `extra` adds. */
-const extending =
-  (name: string, permits: string[], extra: Record<string, unknown> = {}) =>
-  (doc: any) => {
-    const { description } = doc.profiles[name];
-    doc.profiles[name] = { description, extends: 'production', permits, ...extra };
-  };
-
 /**
  * A profile that names another under `extends` (RFC 0043) means the parent's choices with its own over them. The
- * worker below is planted as such a child: it writes its own `permits`, since it reaches less than production.
+ * example's production-worker and production-scheduler extend production: each has production's bindings and
+ * stand-ins, and writes its own `permits`, since each reaches less than production and one thing production does not.
  */
 describe('sabotage: a profile that extends another', () => {
-  const worker = (extra: Record<string, unknown> = {}) => extending('production-worker', WORKER, extra);
+  /** The example with production-worker naming `parent` under `extends`. */
+  const naming = (parent: string) => (doc: any) => {
+    doc.profiles['production-worker'].extends = parent;
+  };
+  /**
+   * The C024 lines alone. A wrong `extends` resolves as if it were absent, or to the parent as written, and the
+   * worker writes no bindings, so what it then leaves unmet or unpermitted is refused too (B002, C021, C022).
+   */
+  const c024 = (lines: string[]) => lines.filter(one => /^C024\b/.test(one));
 
   it("passes check with the worker extending production, and follows production's bindings with no copy", () => {
-    expect(sabotage('project.json', worker())).toEqual([]);
+    expect(sabotage('project.json', () => {})).toEqual([]);
     const { load, dir } = loadedEditing('project.json', doc => {
-      worker()(doc);
       doc.profiles.production.bindings['@customers/domain/customer.port.json'] =
         '@customers/data/customers-store.binding.json';
     });
@@ -150,30 +140,25 @@ describe('sabotage: a profile that extends another', () => {
     rmSync(dir, { recursive: true, force: true });
   });
   it('C024 a profile extending one the project does not declare, itself, or one that extends another', () => {
-    const naming = (parent: string) => (doc: any) => {
-      doc.profiles['production-worker'].extends = parent;
-    };
     const at = 'C024 @project.json#profiles/production-worker/extends';
-    expect(sabotage('project.json', naming('staging'))).toEqual(['C024']);
-    expect(sabotagePointing('project.json', naming('staging'))).toEqual([at]);
-    expect(sabotagePointing('project.json', naming('production-worker'))).toEqual([at]);
-    expect(sabotageSaying('project.json', naming('staging'))).toEqual([
+    expect(sabotage('project.json', naming('staging'))).toContain('B002');
+    expect(c024(sabotage('project.json', naming('staging')))).toEqual(['C024']);
+    expect(c024(sabotagePointing('project.json', naming('staging')))).toEqual([at]);
+    expect(c024(sabotagePointing('project.json', naming('production-worker')))).toEqual([at]);
+    expect(c024(sabotageSaying('project.json', naming('staging')))).toEqual([
       "C024 profile 'production-worker' extends 'staging', which the project does not declare",
     ]);
-    expect(sabotageHinting('project.json', naming('production-worker'))).toEqual([
-      'C024 name another declared profile: live, local, production, production-scheduler',
+    // the profiles it may extend are those that extend nothing, so not production-scheduler
+    expect(c024(sabotageHinting('project.json', naming('production-worker')))).toEqual([
+      'C024 name another declared profile: live, local, production',
     ]);
-    // the worker keeps its own choices: a chain resolves one step, to the scheduler as it is written
-    const chain = (doc: any) => {
-      extending('production-scheduler', SCHEDULER)(doc);
-      naming('production-scheduler')(doc);
-      doc.profiles['production-worker'].permits = WORKER;
-    };
-    expect(sabotagePointing('project.json', chain)).toEqual([at]);
-    expect(sabotageSaying('project.json', chain)).toEqual([
+    // a chain resolves one step, to the scheduler as it is written
+    const chain = naming('production-scheduler');
+    expect(c024(sabotagePointing('project.json', chain))).toEqual([at]);
+    expect(c024(sabotageSaying('project.json', chain))).toEqual([
       "C024 profile 'production-worker' extends 'production-scheduler', which extends 'production'; a profile extends one that extends nothing",
     ]);
-    expect(sabotageHinting('project.json', chain)).toEqual([
+    expect(c024(sabotageHinting('project.json', chain))).toEqual([
       "C024 extend 'production' directly and write what 'production-scheduler' changes, or remove extends from 'production-scheduler'",
     ]);
   });
@@ -182,19 +167,20 @@ describe('sabotage: a profile that extends another', () => {
       doc.profiles['production-worker'].extends = 'production-scheduler';
       doc.profiles['production-scheduler'].extends = 'production-worker';
     };
-    expect(new Set(sabotagePointing('project.json', cycle))).toEqual(
+    const each = (lines: string[]) => new Set(c024(lines));
+    expect(each(sabotagePointing('project.json', cycle))).toEqual(
       new Set([
         'C024 @project.json#profiles/production-worker/extends',
         'C024 @project.json#profiles/production-scheduler/extends',
       ]),
     );
-    expect(new Set(sabotageSaying('project.json', cycle))).toEqual(
+    expect(each(sabotageSaying('project.json', cycle))).toEqual(
       new Set([
         "C024 profile 'production-worker' extends 'production-scheduler', which extends 'production-worker'; a profile extends one that extends nothing",
         "C024 profile 'production-scheduler' extends 'production-worker', which extends 'production-scheduler'; a profile extends one that extends nothing",
       ]),
     );
-    expect(new Set(sabotageHinting('project.json', cycle))).toEqual(
+    expect(each(sabotageHinting('project.json', cycle))).toEqual(
       new Set([
         "C024 remove extends from 'production-worker', or remove extends from 'production-scheduler'",
         "C024 remove extends from 'production-scheduler', or remove extends from 'production-worker'",
@@ -203,7 +189,10 @@ describe('sabotage: a profile that extends another', () => {
   });
   it('C018 a child mapping an inherited stand-in to itself, refused once, at its own line', () => {
     const employees = '@connections/employees.connection.json';
-    expect(sabotagePointing('project.json', worker({ connections: { [employees]: employees } }))).toEqual([
+    const mapped = (doc: any) => {
+      doc.profiles['production-worker'].connections = { [employees]: employees };
+    };
+    expect(sabotagePointing('project.json', mapped)).toEqual([
       'C018 @project.json#profiles/production-worker/connections',
     ]);
   });

@@ -60,9 +60,16 @@ describe('sabotage: the address a plugin binds and the one it dials (RFC 0024)',
   });
 
   it('L014 listens without holds', () => {
-    const broken = withListen(op => {
+    const all = withListen(op => {
       delete op.holds;
     });
+    // no step then serves a route, so every profile walks every route, and the two that extend production and
+    // write their own permits miss what the routes reach (C021); production already permits it
+    const c021 = all.said.filter(one => one.startsWith('C021 '));
+    expect(c021.length).toBeGreaterThan(0);
+    expect(c021.every(one => /^C021 profile 'production-(worker|scheduler)' /.test(one))).toBe(true);
+    const others = (lines: string[]) => lines.filter(one => !/^C021\b/.test(one));
+    const broken = { found: others(all.found), at: others(all.at), said: others(all.said) };
     expect(broken.found).toEqual(['L014', 'B006']);
     // the example's Listen step then names a native operation that holds nothing, which is B006's to refuse
     expect(broken.at).toEqual([

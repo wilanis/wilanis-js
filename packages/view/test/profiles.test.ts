@@ -51,14 +51,19 @@ describe("the project page's profiles", () => {
     expect(production?.holds.map(group => group.port)).toContain('@http/server.port.json');
   });
 
-  it("carries production's permits as it writes them, and none for a profile that permits everything", async () => {
+  it('carries the permits each profile writes, and none for a profile that permits everything', async () => {
     const load = await loadProject(EXAMPLE);
     const profiles = viewOf(load, '@project.json')?.profiles ?? [];
     const production = profiles.find(profile => profile.name === 'production');
-    expect(production?.permits).toEqual(load.registry.project?.doc.profiles?.production.permits);
     expect(production?.permits).toContain('@storage/storage.port.json#ensure');
     expect(production?.permits).toContain('@connections/customers-postgres.connection.json');
-    for (const open of profiles.filter(profile => profile.name !== 'production')) expect(open.permits).toBeUndefined();
+    const writing = ['production', 'production-scheduler', 'production-worker'];
+    for (const name of writing)
+      expect(profiles.find(profile => profile.name === name)?.permits).toEqual(
+        load.registry.project?.doc.profiles?.[name].permits,
+      );
+    for (const open of profiles.filter(profile => !writing.includes(profile.name)))
+      expect(open.permits).toBeUndefined();
     const said = describeDoc(load, 'project.json');
     for (const profile of profiles) expect(said).toContain(`  permits    ${permitsSaid(profile)}`);
   });
