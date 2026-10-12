@@ -30,12 +30,18 @@ function compare(op: Comparison, left: never, right: never): boolean {
   }
 }
 
+/** `text contains 'word'`: a value that is not a text at run time (one typed unknown) holds no word. */
+function holds(text: unknown, word: unknown): boolean {
+  return typeof text === 'string' && typeof word === 'string' && text.includes(word);
+}
+
 function evaluateBinary(expr: Extract<Expr, { kind: 'bin' }>, values: Values): unknown {
   if (expr.op === '&&') return Boolean(evaluate(expr.left, values)) && Boolean(evaluate(expr.right, values));
   if (expr.op === '||') return Boolean(evaluate(expr.left, values)) || Boolean(evaluate(expr.right, values));
   const left = evaluate(expr.left, values) as never;
   const right = evaluate(expr.right, values) as never;
   if (expr.op === 'in') return Array.isArray(right) && (right as unknown[]).includes(left);
+  if (expr.op === 'contains') return holds(left, right);
   return compare(expr.op, left, right);
 }
 

@@ -2,6 +2,9 @@
 import { COMPARISONS, type Expr, ExprError } from './ast.js';
 import { lex, type Token } from './lex.js';
 
+/** The operators spelled as words; each lexes as an identifier and reads as an operator only after a value. */
+const WORDS = ['in', 'contains'] as const;
+
 /** The AST an expression source says, or an ExprError naming where it stops being one. */
 export function parse(src: string): Expr {
   return new Parser(src).parse();
@@ -79,9 +82,10 @@ class Parser {
       this.index++;
       return { kind: 'bin', op, left, right: this.primary() };
     }
-    if (this.isWord('in')) {
+    const word = WORDS.find(candidate => this.isWord(candidate));
+    if (word) {
       this.index++;
-      return { kind: 'bin', op: 'in', left, right: this.primary() };
+      return { kind: 'bin', op: word, left, right: this.primary() };
     }
     return left;
   }
