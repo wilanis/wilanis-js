@@ -185,6 +185,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [C021](C021.md) | C | live | an operation or connection a profile reaches that its `permits` does not permit |
 | [C022](C022.md) | C | live | a `permits` entry that permits nothing the profile reaches |
 | [C023](C023.md) | C | live | a `permits` entry naming a domain port or its operation, a pure operation, a port with nothing effectful, or a connection the profile replaces |
+| [C024](C024.md) | C | live | a profile extending one the project does not declare, itself, or one that extends another |
 | [S001](S001.md) | S | live | a scenario naming a trigger the tree does not have |
 | [S002](S002.md) | S | live | a scenario, or a shared answer of an answers document, pinning a reason on a node whose status is not failed |
 | [S003](S003.md) | S | live | a `cancelAt` that is not a key of the scenario's `stubs` |

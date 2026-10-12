@@ -4,9 +4,15 @@
  * is C022, an entry that is no permit is C023, and one naming nothing is R001. Every case names the profile it
  * writes `permits` on, so a profile added beside them changes nothing here: one without `permits` is not judged.
  */
-import { schemaUrl } from '@wilanis/core';
+import { readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { reachOf } from '@wilanis/compiler';
+import { Scope, schemaUrl } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import {
+  EXAMPLE,
+  loadedEditingAll,
+  plantedEditingAllAt,
   plantedEditingAllSaying,
   sabotage,
   sabotageHinting,
@@ -203,5 +209,119 @@ describe('sabotage: a feature that reaches out, judged at two altitudes', () => 
     expect(saying).toEqual([
       "C021 profile 'production' does not permit '@connections/quotes.connection.json', reached from @features/hello/edge/hello-gated.trigger.json through @features/hello/data/greeting.binding.json (feature hello)",
     ]);
+  });
+});
+
+const JOBS = '@connections/jobs.connection.json';
+const EMPLOYEES = '@connections/employees.connection.json';
+const POSTGRES = '@connections/customers-postgres.connection.json';
+const EMPLOYEES_STAGING = '@connections/employees-staging.connection.json';
+const JOBS_STAGING = '@connections/jobs-staging.connection.json';
+
+/** Two stand-ins a staging place may name: a directory of the employees' kind, and a broker of the jobs' kind. */
+const STAGING = {
+  'connections/employees-staging.connection.json': JSON.parse(
+    readFileSync(join(EXAMPLE, 'connections/employees.connection.json'), 'utf8'),
+  ),
+  'connections/jobs-staging.connection.json': {
+    $schema: schemaUrl('connection'),
+    description: 'The broker a staging place works its queue on, in its own process.',
+    kind: '@queue-memory/memory.connection-kind.json',
+    settings: {},
+  },
+};
+
+/** `name` made a child of `production` that writes no `permits` (RFC 0043), and runs every step production runs. */
+const inheriting =
+  (name: string, connections: Record<string, string> = {}) =>
+  (doc: any) => {
+    doc.profiles[name] = { extends: 'production', connections };
+    for (const step of doc.startup) if (step.profiles?.includes('production')) step.profiles.push(name);
+  };
+
+/** Every refusal of one code, as `sabotagePointing` or `sabotageSaying` answers them. */
+const only = (code: string, lines: string[]) => lines.filter(line => line.startsWith(`${code} `));
+
+describe('sabotage: permits a profile inherits (RFC 0043)', () => {
+  it("C021 and C022 for an inherited list, at the child's extends, naming the parent and how to replace it", () => {
+    const edit = (doc: any) => {
+      doc.profiles['production-worker'] = { extends: 'production' };
+    };
+    const at = sabotagePointing('project.json', edit);
+    expect(new Set(at)).toEqual(
+      new Set([
+        'C021 @project.json#profiles/production-worker/extends',
+        'C022 @project.json#profiles/production-worker/extends',
+      ]),
+    );
+    const saying = sabotageSaying('project.json', edit);
+    expect(saying).toContainEqual(
+      expect.stringMatching(
+        /^C021 profile 'production-worker' does not permit '@queue\/worker\.port\.json#consume', .*\(permits inherited from 'production'\)$/,
+      ),
+    );
+    expect(saying).toContain(
+      "C022 profile 'production-worker' inherits '@http/server.port.json#listen' from 'production', but nothing it reaches runs it",
+    );
+    expect(new Set(only('C022', sabotageHinting('project.json', edit)))).toEqual(
+      new Set(["C022 write profiles/production-worker/permits: a list it writes replaces production's whole"]),
+    );
+    expect(only('C021', sabotageHinting('project.json', edit))[0]).toMatch(
+      /else, if production-worker may, write profiles\/production-worker\/permits: a list it writes replaces production's whole$/,
+    );
+  });
+  it('an inherited entry for a connection the child stands in for permits the stand-in, where the child reaches it no other way', () => {
+    const edits = { 'project.json': inheriting('production-staging', { [EMPLOYEES]: EMPLOYEES_STAGING }) };
+    expect(plantedEditingAllAt(STAGING, edits)).toEqual([]);
+  });
+  it('a shared target: the inherited entry permits the stand-in, and its own connection the child still reaches', () => {
+    const edits = { 'project.json': inheriting('production-staging', { [JOBS]: JOBS_STAGING }) };
+    expect(plantedEditingAllAt(STAGING, edits)).toEqual([]);
+    const { load, dir } = loadedEditingAll(STAGING, edits);
+    const reached = reachOf(new Scope(load.registry, load.resolve), 'production-staging').connections;
+    expect(reached).toEqual(expect.arrayContaining([JOBS_STAGING, POSTGRES]));
+    rmSync(dir, { recursive: true, force: true });
+  });
+  it('a shared target the child no longer reaches its own way: the entry still permits the stand-in, no C022', () => {
+    const edits = {
+      'project.json': (doc: any) => {
+        inheriting('production-staging', { [JOBS]: JOBS_STAGING })(doc);
+        doc.profiles['production-staging'].bindings = {
+          '@customers/domain/customer.port.json': '@customers/data/customers-store.binding.json',
+          '@auth/state.port.json': '@features/state/data/auth-files.binding.json',
+        };
+        const memory = doc.startup.find((step: any) => step.run.startsWith('@features/state/domain/memory'));
+        memory.profiles = memory.profiles.filter((one: string) => one !== 'production-staging');
+      },
+    };
+    const { load, dir } = loadedEditingAll(STAGING, edits);
+    expect(reachOf(new Scope(load.registry, load.resolve), 'production-staging').connections).not.toContain(POSTGRES);
+    rmSync(dir, { recursive: true, force: true });
+    expect(only('C022', plantedEditingAllAt(STAGING, edits))).toEqual([]);
+  });
+  it('C022 an inherited entry the child reaches neither as written nor through its stand-in', () => {
+    const edits = {
+      'project.json': (doc: any) => {
+        doc.profiles['production-scheduler'] = {
+          extends: 'production',
+          connections: { [EMPLOYEES]: EMPLOYEES_STAGING },
+        };
+      },
+    };
+    expect(only('C022', plantedEditingAllSaying(STAGING, edits))).toContain(
+      `C022 profile 'production-scheduler' inherits '@connections/employees-production.connection.json' from 'production', but no operation it reaches names that connection, nor '${EMPLOYEES_STAGING}', which this profile reaches in its place`,
+    );
+  });
+  it("R001 and C023 for an inherited entry, refused once, at the parent's line", () => {
+    for (const [code, entry] of [
+      ['R001', '@connections/nowhere.connection.json'],
+      ['C023', '@customers/domain/customer.port.json'],
+    ]) {
+      const at = sabotagePointing('project.json', doc => {
+        productionWith(entry)(doc);
+        doc.profiles['production-worker'] = { extends: 'production' };
+      });
+      expect(only(code, at), entry).toEqual([atAdded(code)]);
+    }
   });
 });
