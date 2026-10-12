@@ -255,20 +255,19 @@ describe('sabotage: permits a profile inherits (RFC 0043)', () => {
       ]),
     );
     const saying = sabotageSaying('project.json', edit);
-    expect(saying).toContainEqual(
-      expect.stringMatching(
-        /^C021 profile 'production-worker' does not permit '@queue\/worker\.port\.json#consume', .*\(permits inherited from 'production'\)$/,
-      ),
-    );
+    // the example on docs/refusals/C021.md, word for word
+    expect(only('C021', saying)).toEqual([
+      "C021 profile 'production-worker' does not permit '@queue/worker.port.json#consume', reached from the startup step running @queue/worker.port.json#consume (permits inherited from 'production')",
+    ]);
     expect(saying).toContain(
       "C022 profile 'production-worker' inherits '@http/server.port.json#listen' from 'production', but nothing it reaches runs it",
     );
     expect(new Set(only('C022', sabotageHinting('project.json', edit)))).toEqual(
       new Set(["C022 write profiles/production-worker/permits: a list it writes replaces production's whole"]),
     );
-    expect(only('C021', sabotageHinting('project.json', edit))[0]).toMatch(
-      /else, if production-worker may, write profiles\/production-worker\/permits: a list it writes replaces production's whole$/,
-    );
+    expect(only('C021', sabotageHinting('project.json', edit))).toEqual([
+      "C021 remove the node that reaches it, or bind the port to a binding that does not; else, if production-worker may, write profiles/production-worker/permits: a list it writes replaces production's whole",
+    ]);
   });
   it('an inherited entry for a connection the child stands in for permits the stand-in, where the child reaches it no other way', () => {
     const edits = { 'project.json': inheriting('production-staging', { [EMPLOYEES]: EMPLOYEES_STAGING }) };
