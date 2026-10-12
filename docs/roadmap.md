@@ -151,7 +151,9 @@ RFC 0020, and on RFC 0034, the one word for what a kind hands, which must land b
 RFC 0035, the whole record before the write, whose one schema change lets a port operation's `accepts` name a shape;
 its rules correct the write graphs M06 demonstrated. RFC 0036, recorded scenarios that share their answers, changed
 `scenario.schema.json` compatibly and has landed before the freeze, so a tree like the one it measures starts 1.0
-with its recorded scenarios about a tenth of their size.
+with its recorded scenarios about a tenth of their size. RFC 0039, keep and group a list, lands before the freeze
+too: a `map` may say `where` and need not `run`, a native field may say `within` and `reaches`, and `@std/list`
+gains `totals`. Each change is compatible, but each changes a schema, so 1.0 waits for it.
 
 RFC 0037, a connection is a literal at the call, changes three schemas before the freeze: `common.schema.json` (a
 field says it `names` a connection or a store), `graph.schema.json` and `binding.schema.json` (a data graph's `given`,
@@ -161,8 +163,8 @@ written by each binding operation). The compiler then stops reading a field by i
 ## Unscheduled
 
 RFC 0021 (higher-level constructs), RFC 0022 (more storage engines), RFC 0023 (adapters), RFC 0025 (AI
-model calls), RFC 0030 (the cache), RFC 0031 (intent triggers), RFC 0032 (the site as a declared
-input) and RFC 0039 (keep and group a list) each get a milestone with its own demo when someone picks them up. RFC 0032 waits on a consumer
+model calls), RFC 0030 (the cache), RFC 0031 (intent triggers) and RFC 0032 (the site as a declared
+input) each get a milestone with its own demo when someone picks them up. RFC 0032 waits on a consumer
 rather than on work: the operation it was written for, RFC 0002's `raw`, is left out of that RFC on
 purpose, and the next consumer is the fault message RFC 0019 asks for, under M13. RFC 0038 (rehearse steers what a caller
 hands) changes no schema and shows in no demo of its own; it builds on #904 (landed in #928), and lands before RFC
