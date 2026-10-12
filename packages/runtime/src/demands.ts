@@ -2,12 +2,12 @@
  * Where one demand of a rehearsal case is met. The solver says, field by field, what a switch's inputs must hold for a
  * branch to be taken (`branches.ts` asks it); each such demand is written here into what the rehearsal sets: a patch
  * to the trigger's own input, a stub of the node the input reads, or a stub of the node that holds the list a map hands
- * the switch's graph its element from.
+ * the switch's graph its element from. A read of `in` is followed out of the switch's graph by `traced` in `frames.ts`.
  */
 import { type Type, typeAt } from '@wilanis/core';
-import type { FoundList, Frame, KSwitchLike, Settled, Stubbing } from './branches.js';
+import type { KSwitchLike, Settled, Stubbing } from './branches.js';
 import type { Domain } from './domains.js';
-import { elementPathOf, listHolder, sourceOf, throughBind } from './frames.js';
+import { type Landed, type Standing, type Stopped, sourceOf, traced } from './frames.js';
 import { getPath, NO_MEMBER, satisfy, setPath } from './stubs.js';
 
 /** Where a switch stands: the switch itself, where its siblings are stubbed, and how its `in` can be steered. */
@@ -15,27 +15,32 @@ export interface At {
   node: KSwitchLike;
   prefix: string[];
   steerable: boolean;
-  /**
-   * the innermost map enclosing the switch, whose element its `in` reads where every call entered since the map hands
-   * the element down as it got it -- a binding's wrapper `op` among them (#904)
-   */
-  element?: FoundList;
-  /** the calls entered since that map, outermost first */
-  frames: Frame[];
+  /** where the switch stands in the run: the calls and the maps a read of its `in` is traced out through */
+  standing: Standing;
 }
 
 /**
  * A demand on `in` where `in` is an element a map handed in, met by writing that element into the list the map
  * runs over. The first element stands for all of them, as it does everywhere else in the walk, so the demand
- * lands at index 0. `within` is the path inside the element, already read back through the map's `bind`.
+ * lands at index 0: the trace says where, the element read back through the map's `bind`. Unreachable where the read
+ * lands anywhere but in an element of a list a node holds.
  */
-function ofElement(list: FoundList, within: string[], domain: Domain, from: Pick<Stubbing, 'isMap'>) {
-  const held = listHolder(list);
-  if (!held) return 'unreachable' as const;
-  // a list a map makes is answered element by element: the kernel reads a stub at `<map>.<index>`, never at the map
-  if (!held.path.length && from.isMap?.(held.target))
-    return { stub: { target: `${held.target}.0`, path: within, value: domain } };
-  return { stub: { target: held.target, path: [...held.path, '0', ...within], value: domain } };
+function ofElement(landed: Landed | Stopped, domain: Domain, from: Pick<Stubbing, 'isMap'>) {
+  if (!('node' in landed) || !landed.element) return 'unreachable' as const;
+  return { stub: { ...answerAt(landed.standing.at, landed.path, from), value: domain } };
+}
+
+/**
+ * Where a stub of a node's answer at a path is written: at the node, or -- where the node is a map and the path starts
+ * at an element -- at that element, since the kernel reads a map's stub element by element, at `<map>.<index>`.
+ */
+export function answerAt(
+  target: string,
+  path: string[],
+  from: Pick<Stubbing, 'isMap'>,
+): { target: string; path: string[] } {
+  const [first, ...rest] = path;
+  return first === '0' && from.isMap?.(target) ? { target: `${target}.0`, path: rest } : { target, path };
 }
 
 /** Why a demand is not met: nothing the rehearsal sets reaches it, or no value of its field's type meets it. */
@@ -69,11 +74,10 @@ export function meet(
   if (!src) return 'unreachable';
   // a switch in the top-level graph reading `in` is steered by the trigger's input, not a stub
   if (src.ref === 'in' && at.steerable) return ofInput([...src.path, ...within], domain, from);
-  // inside a map, `in` is the element, handed down unchanged by any call since: what steers it is the list mapped over
-  const inElement = src.ref === 'in' && at.element ? elementPathOf([...src.path, ...within], at.frames) : undefined;
-  const bound = at.element && inElement && throughBind(at.element, inElement);
-  if (at.element && bound) return ofElement(at.element, bound, domain, from);
-  if (src.ref === 'in' || src.ref === 'context' || src.ref === 'const') return 'unreachable';
+  // any other read of `in` is followed out: where it is an element a map handed in, the list mapped over steers it
+  if (src.ref === 'in')
+    return ofElement(traced({ ref: 'in', path: [...src.path, ...within] }, at.standing), domain, from);
+  if (src.ref === 'context' || src.ref === 'const') return 'unreachable';
   return { stub: { target: stubTarget(at.prefix, src.ref, from), path: [...src.path, ...within], value: domain } };
 }
 

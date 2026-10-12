@@ -294,7 +294,7 @@ export class Compiler {
     const graph = this.scope.get('graph', graphRef);
     if (!graph) throw new Error(`unknown graph '${graphRef}'`);
     const handler = `graph:${graph.path}`;
-    const whole = this.takesWhole(graph);
+    const whole = takesWhole(this.scope, graph);
     this.handlers[handler] ??= this.attempting(
       this.nestedRunner(this.lowerGraph(graph), whole, graph.doc.atomic === true),
     );
@@ -341,16 +341,6 @@ export class Compiler {
     return scope ? { ...inputs, [SCOPE]: scope } : inputs;
   }
 
-  /** Whether a graph takes its input whole: it declares an `in` that is not a shape (a list, a scalar), read as {{in}}. */
-  private takesWhole(graph: Loaded<GraphDoc>): boolean {
-    if (!graph.doc.in) return false;
-    try {
-      return this.scope.types.ref(graph.doc.in).kind !== 'object';
-    } catch {
-      return false;
-    }
-  }
-
   /** A document's `reads`: local name -> the segments read below context. A resolver is a read, so it lowers to no node. */
   private resolverRoots(reads: Record<string, string> | undefined): Record<string, string[]> {
     return Object.fromEntries(Object.entries(reads ?? {}).map(([name, ref]) => [name, this.resolverPath(ref)]));
@@ -363,6 +353,19 @@ export class Compiler {
     const resolver = doc?.doc.resolvers[op];
     if (!resolver) throw new Error(`unknown resolver '${ref}'`);
     return splitPath(resolver.read).slice(1);
+  }
+}
+
+/**
+ * Whether a graph takes its input whole: it declares an `in` that is not a shape (a list, a scalar), read as {{in}}.
+ * A call into it hands that value under the one key `in`, and the nested run unwraps it (`nestedRoots`).
+ */
+export function takesWhole(scope: Scope, graph: Loaded<GraphDoc>): boolean {
+  if (!graph.doc.in) return false;
+  try {
+    return scope.types.ref(graph.doc.in).kind !== 'object';
+  } catch {
+    return false;
   }
 }
 

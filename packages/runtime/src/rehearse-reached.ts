@@ -128,8 +128,8 @@ export function reach(walk: Reached, sw: FoundSwitch, under: Record<string, unkn
   const steering: Steering = { stubs: {}, input: [], broken: [] };
   const laid = () => over(walk.stubbing, { ...under, ...steering.stubs });
   // a switch inside a mapped operation runs only when the list it maps over has an element to run for
-  for (const list of sw.lists) {
-    const need = nonEmpty(list, laid(), list === sw.lists[0]);
+  for (const [index, list] of sw.lists.entries()) {
+    const need = nonEmpty(list, laid(), sw.lists.slice(0, index));
     Object.assign(steering.stubs, need.stubs);
     steering.input.push(...need.input);
   }
