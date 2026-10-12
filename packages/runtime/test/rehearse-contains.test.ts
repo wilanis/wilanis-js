@@ -116,11 +116,27 @@ describe('rehearsing a switch over a contains rule', () => {
   }, async () => {
     for (const when of ["email == alt && email contains '@'", "email != alt && email contains '@'"]) {
       for (const { said, ok: done } of await rehearsedWith(when)) {
-        expect(said).toMatch(/when .+ +NEVER RUN/);
+        expect(said).toMatch(
+          /when .+ +NEVER RUN -- email is compared with another value, so the rehearsal cannot change it to hold and lack the words this branch asks for$/m,
+        );
+        expect(said).not.toMatch(/enum/);
         expect(said).toMatch(/ok {2}anything else +refused on purpose at 'name' as name/);
         expect(said).not.toMatch(/WRONG ROUTE|BROKE/);
         expect(done, said).toBe(false);
       }
+    }
+  });
+  it('says a plain text it cannot make holds and lacks its words is never run, and names no enum', {
+    timeout: 60_000,
+  }, async () => {
+    // 'abc def' is the text the rehearsal makes, and it is longer than the rule lets it be
+    const when = "email contains 'abc' && email contains 'def' && len(email) <= 6";
+    for (const { said, ok: done } of await rehearsedWith(when)) {
+      expect(said).toMatch(
+        /when .+ +NEVER RUN -- the rehearsal can make no text for email that holds and lacks every word this branch asks for$/m,
+      );
+      expect(said).not.toMatch(/enum|WRONG ROUTE|BROKE/);
+      expect(done, said).toBe(false);
     }
   });
 });

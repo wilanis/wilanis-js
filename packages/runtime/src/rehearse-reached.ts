@@ -87,20 +87,35 @@ export async function switchesReached(
 
 /**
  * Why no run can take a case, in the words the report prints after `NEVER RUN`: the solver found no input for its
- * rule, what it demands is something the rehearsal cannot set, or it demands a value and leaves no member of the
- * field's enum.
- * Nothing for a case a run can take.
+ * rule, what it demands is something the rehearsal cannot set, or it demands a value no value of the field's type
+ * meets. A field the case says a sentence for (`Case.why`) is said in it; the rest are said together, as they always
+ * were. Nothing for a case a run can take.
  */
 export function uncoveredBy(one: Case): string | undefined {
   if (one.branch.unsolved) return one.branch.unsolved;
-  if (one.unreachable?.length)
-    return `${one.unreachable.join(', ')} comes from nothing the rehearsal sets, so the rehearsal cannot vary it`;
+  if (one.unreachable?.length) return saidOf(one.unreachable, one.why, unreachableSaid);
   if (!one.exhausted?.length) return undefined;
-  const fields = one.exhausted.map(field => `${field}'s`).join(' and ');
+  return saidOf(one.exhausted, one.why, fields => enumSaid(fields, one));
+}
+
+/** The sentences for some fields: each one's own where the case has it, and one sentence for every field left. */
+function saidOf(fields: string[], why: Case['why'], rest: (fields: string[]) => string): string {
+  const unsaid = fields.filter(field => !why?.[field]);
+  const said = fields.flatMap(field => why?.[field] ?? []);
+  return [...(unsaid.length ? [rest(unsaid)] : []), ...said].join('; ');
+}
+
+/** What a field nothing in the rehearsal sets is said as, where nothing says more. */
+const unreachableSaid = (fields: string[]) =>
+  `${fields.join(', ')} comes from nothing the rehearsal sets, so the rehearsal cannot vary it`;
+
+/** Fields whose enum has no member left that the case's rule, or one before it, does not exclude. */
+function enumSaid(fields: string[], one: Case): string {
+  const owned = fields.map(field => `${field}'s`).join(' and ');
   // the else is reached only when every rule is false; a rule's own case may exclude members with a `!=` of its own
   const by =
     one.branch.rule === -1 ? 'named by a rule before it' : `excluded by '${one.branch.when}' or a rule before it`;
-  return `every member of ${fields} enum is ${by}`;
+  return `every member of ${owned} enum is ${by}`;
 }
 
 /**

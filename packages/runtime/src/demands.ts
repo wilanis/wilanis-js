@@ -9,9 +9,12 @@
 import { TAKEN_IDS } from '@wilanis/compiler';
 import { type Type, typeAt } from '@wilanis/core';
 import type { KSwitchLike, Settled, Stubbing } from './branches.js';
+import { exhaustedOf, type Unmet } from './demand-said.js';
 import type { Domain } from './domains.js';
 import { type Landed, type OnNode, type Standing, type Stopped, sourceOf, traced } from './frames.js';
 import { getPath, NO_MEMBER, satisfy, setPath } from './stubs.js';
+
+export type { Missed, Unmet } from './demand-said.js';
 
 /** Where a switch stands: the switch itself, where its siblings are stubbed, and how its `in` can be steered. */
 export interface At {
@@ -42,11 +45,14 @@ function followed(read: { ref: string; path: string[] }, standing: Standing): La
  * else in the walk, at `<map>.0` where the node is a map (`answerAt`) and at the node as `nonEmpty` writes the list. Any
  * other node is stubbed where its answer is stubbed (`stubTarget`). Unreachable where the trace stopped.
  */
-function ofTraced(landed: Landed | Stopped, domain: Domain, from: Settled): Met | Missed {
-  if ('stopped' in landed) return 'unreachable';
-  if ('input' in landed) return ofInput(landed.input, domain, from);
-  return { stub: { ...onNode(landed, from), value: domain } };
+function ofTraced(landed: Landed | Stopped, asked: Asked, from: Settled): Met | Unmet {
+  if ('stopped' in landed) return { missed: 'unreachable' };
+  if ('input' in landed) return ofInput(landed.input, asked, from);
+  return { stub: { ...onNode(landed, from), value: asked.domain, field: asked.field } };
 }
+
+/** One demand as the solver made it: the field of the switch's inputs it is on, and what that field must hold. */
+type Asked = { field: string; domain: Domain };
 
 /** Where a demand that landed on a node is written: the node's stub, or the guard's judged value, at a path. */
 function onNode(landed: OnNode, from: Settled): { target: string; path: string[] } {
@@ -69,42 +75,44 @@ export function answerAt(
   return first === '0' && from.isMap?.(target) ? { target: `${target}.0`, path: rest } : { target, path };
 }
 
-/** Why a demand is not met: nothing the rehearsal sets reaches it, or no value of its field's type meets it. */
-export type Missed = 'unreachable' | 'exhausted';
-
 /**
- * A demand on the trigger's own input at a path: the patch that meets it, or 'exhausted' where it leaves no member of
- * the field's enum. An absent field is the solver's to demand, never this patch's to choose.
+ * A demand on the trigger's own input at a path: the patch that meets it, or 'exhausted' where no value of the field's
+ * type meets it (`exhaustedOf`). An absent field is the solver's to demand, never this patch's to choose.
  */
 function ofInput(
   path: string[],
-  domain: Domain,
+  asked: Asked,
   from: Pick<Stubbing, 'inputSeed' | 'inType'> & { seed: number },
-): { input: { path: string[]; value: unknown } } | Missed {
-  const value = satisfy(domain, getPath(from.inputSeed, path), typeAtPath(from.inType, path), from.seed);
-  return value === NO_MEMBER ? 'exhausted' : { input: { path, value } };
+): { input: { path: string[]; value: unknown } } | Unmet {
+  const type = typeAtPath(from.inType, path);
+  const value = satisfy(asked.domain, getPath(from.inputSeed, path), type, from.seed);
+  return value === NO_MEMBER ? exhaustedOf(asked.field, asked.domain, type) : { input: { path, value } };
 }
 
+/** A stub a demand writes: the node, the path within its answer, what the path must hold, and the field it is for. */
+type Stub = { target: string; path: string[]; value: unknown; field: string };
+
 /** A demand met: a patch to the trigger's input, or a stub written at a node's path. */
-type Met = { input: { path: string[]; value: unknown } } | { stub: { target: string; path: string[]; value: unknown } };
+type Met = { input: { path: string[]; value: unknown } } | { stub: Stub };
 
 /**
  * Where one demand is met: the trigger's input, where the switch reads it as its own; a node of the switch's own graph,
  * stubbed at that node, a guard's answer among them; anything else read off `in`, followed out to where it lands
  * (`ofTraced`); or nowhere.
  */
-export function meet(dotted: string, domain: Domain, at: At, from: Settled): Met | Missed {
+export function meet(dotted: string, domain: Domain, at: At, from: Settled): Met | Unmet {
   const [inputName, ...within] = dotted.split('.');
   const src = sourceOf(at.node.in[inputName]);
-  if (!src) return 'unreachable';
+  if (!src) return { missed: 'unreachable' };
+  const asked = { field: dotted, domain };
   // a switch in the top-level graph reading `in` is steered by the trigger's input, not a stub
-  if (src.ref === 'in' && at.steerable) return ofInput([...src.path, ...within], domain, from);
+  if (src.ref === 'in' && at.steerable) return ofInput([...src.path, ...within], asked, from);
   // any other read of `in` is followed out, through the calls and maps that handed it down, to what the rehearsal sets
   if (src.ref === 'in')
-    return ofTraced(followed({ ref: 'in', path: [...src.path, ...within] }, at.standing), domain, from);
-  if (src.ref === 'context' || src.ref === 'const') return 'unreachable';
+    return ofTraced(followed({ ref: 'in', path: [...src.path, ...within] }, at.standing), asked, from);
+  if (src.ref === 'context' || src.ref === 'const') return { missed: 'unreachable' };
   const target = stubTarget([...at.prefix, src.ref].join('.'), from);
-  return { stub: { target, path: [...src.path, ...within], value: domain } };
+  return { stub: { target, path: [...src.path, ...within], value: domain, field: dotted } };
 }
 
 /**
@@ -132,18 +140,19 @@ export function standIn(target: string, from: Required<Pick<Stubbing, 'generated
 
 /**
  * One demand written into the stub it steers, on top of what earlier demands already wrote there; 'exhausted', and
- * nothing written, where it leaves no member of the field's enum.
+ * nothing written, where no value of the field's type meets it (`exhaustedOf`).
  */
 function write(
   stubs: Record<string, unknown>,
-  stub: { target: string; path: string[]; value: unknown },
+  stub: Stub,
   from: Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>>,
-): Missed | undefined {
+): Unmet | undefined {
   const { target, path } = stub;
   const type = from.typeOf(target);
   const base = target in stubs ? stubs[target] : standIn(target, from);
-  const want = satisfy(stub.value as Domain, getPath(base, path), typeAtPath(type, path), from.seed);
-  if (want === NO_MEMBER) return 'exhausted';
+  const domain = stub.value as Domain;
+  const want = satisfy(domain, getPath(base, path), typeAtPath(type, path), from.seed);
+  if (want === NO_MEMBER) return exhaustedOf(stub.field, domain, typeAtPath(type, path));
   stubs[target] = setPath(base, path, want, { type, seed: from.seed });
   return undefined;
 }
@@ -159,8 +168,8 @@ export function lay(
   met: ReturnType<typeof meet>,
   into: Steered,
   from: Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>>,
-): Missed | undefined {
-  if (typeof met === 'string') return met;
+): Unmet | undefined {
+  if ('missed' in met) return met;
   if (!('input' in met)) return write(into.stubs, met.stub, from);
   into.input.push(met.input);
   return undefined;

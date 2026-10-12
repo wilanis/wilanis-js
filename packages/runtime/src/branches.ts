@@ -7,7 +7,7 @@
  * where every rule is false at once. The solver itself is in domains.ts, and what it writes into a stub in stubs.ts.
  */
 import type { Type } from '@wilanis/core';
-import { type At, answerAt, lay, type Missed, meet, type Steered, standIn, typeAtPath } from './demands.js';
+import { type At, answerAt, lay, type Missed, meet, type Steered, standIn, typeAtPath, type Unmet } from './demands.js';
 import type { Branch, Domain } from './domains.js';
 import { type Holder, handedAs, listHolder, ownInputAt, sourceOf, standingOf } from './frames.js';
 import { branchesOf } from './solve.js';
@@ -75,8 +75,10 @@ export interface Case {
   input?: { path: string[]; value: unknown }[];
   /** Demands that could not be routed to anything the rehearsal can set. */
   unreachable?: string[];
-  /** Demands for a value that exclude every member of the field's enum, so no value of its type meets them. */
+  /** Demands for a value no value of the field's type meets: its enum's members all excluded, or a text it cannot make. */
   exhausted?: string[];
+  /** Why each field under `unreachable` or `exhausted` is, where a sentence says more than today's: by field. */
+  why?: Record<string, string>;
   /** The dotted paths of the nodes made to break, for the branch a `catch` routes a fault to (RFC 0014). */
   broken?: string[];
 }
@@ -355,14 +357,23 @@ function caughtCases(found: FoundSwitch): Case[] {
 /** One branch as a case: the stubs and the input that steer a run into it. */
 function steer(branch: Branch, found: FoundSwitch, from: Settled, steerable: boolean): Case {
   const steered: Steered = { stubs: {}, input: [] };
-  const missed: Record<Missed, string[]> = { unreachable: [], exhausted: [] };
+  const unmet: [string, Unmet][] = [];
   const at: At = { node: found.node, prefix: found.prefix, steerable, standing: standingOf(found) };
   const demands = branch.unsolved ? [] : Object.entries(branch.demands);
   for (const [dotted, domain] of demands) {
     const why = lay(meet(dotted, domain, at, from), steered, from);
-    if (why) missed[why].push(dotted);
+    if (why) unmet.push([dotted, why]);
   }
   const { stubs, input } = steered;
-  const named = Object.entries(missed).filter(([, paths]) => paths.length);
-  return { at: found.at, branch, stubs, ...(input.length ? { input } : {}), ...Object.fromEntries(named) };
+  return { at: found.at, branch, stubs, ...(input.length ? { input } : {}), ...missedOf(unmet) };
+}
+
+/** The demands a case does not meet, as the case says them: the fields under each reason, and the sentence for each. */
+function missedOf(unmet: [string, Unmet][]): Pick<Case, Missed | 'why'> {
+  const out: Pick<Case, Missed | 'why'> = {};
+  for (const [field, { missed, why }] of unmet) {
+    out[missed] = [...(out[missed] ?? []), field];
+    if (why) out.why = { ...out.why, [field]: why };
+  }
+  return out;
 }
