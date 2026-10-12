@@ -18,9 +18,9 @@ import {
   nonEmpty,
   over,
   type Stubbing,
-  setPath,
   switchesOf,
 } from './branches.js';
+import { type Patch, patchInto } from './demands.js';
 import type { Embedder } from './embed.js';
 import { declaredAt, effectAt, madeAt, mapAt, overAt, type Spec, specBehind, whereOf } from './rehearse-where.js';
 import { embedderFor, generatedFire, unbroken } from './stubbing.js';
@@ -130,16 +130,16 @@ function enumSaid(fields: string[], one: Case): string {
 
 /**
  * The trigger's input with one patch written in: a parent the input lacks is made whole from the input type, so the
- * fields beside the one patched are there as the type requires.
+ * fields beside the one patched are there as the type requires; a patch on an element, in every element (`patchInto`).
  */
-export function patched(walk: Reached, input: unknown, patch: { path: string[]; value: unknown }): unknown {
-  return setPath(input, patch.path, patch.value, { type: walk.stubbing.inType, seed: walk.seed });
+export function patched(walk: Reached, input: unknown, patch: Patch): unknown {
+  return patchInto(input, patch, { inType: walk.stubbing.inType, seed: walk.seed });
 }
 
 /** What steers a run: the stubs it is given, the patches to the trigger's input, and the nodes made to break. */
 export interface Steering {
   stubs: Record<string, unknown>;
-  input: { path: string[]; value: unknown }[];
+  input: Patch[];
   broken: string[];
 }
 
@@ -245,7 +245,7 @@ function waitsFor(spec: Spec, id: string, routers: Map<string, string>): string[
  */
 export function answering(walk: Reached, sw: FoundSwitch): Pick<Steering, 'stubs' | 'input'> {
   const stubs: Record<string, unknown> = {};
-  const input: { path: string[]; value: unknown }[] = [];
+  const input: Patch[] = [];
   const encloses = (path: string) => sw.at.startsWith(`${path}.`);
   for (const other of walk.found) {
     const answers = other === sw ? undefined : answeringCase(walk, other, over(walk.stubbing, stubs));
