@@ -1,6 +1,6 @@
 # RFC 0039: Keep and group a list: a `where` on `map`, and `@std/list#totals`
 
-- **Status:** draft
+- **Status:** accepted
 - **Areas:** `area:core` (`map.schema.json`, two keywords on a native contract's field in `common.schema.json`,
   `MapNode` in `nodes.ts`), `area:engine` (`KMap` and `map.ts`), `area:compiler` (`G011` and `G006` widened, one
   new `G` rule, the lowering, `sitesOf`), `area:runtime` (the rehearsal, `describe`, the `@std` plugin, the
