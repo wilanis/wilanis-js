@@ -188,7 +188,10 @@ describe('a sibling that ends the run first only in the replay', () => {
     expect(answer.written.filter(file => file.endsWith('/get-customer.2.scenario.json'))).toEqual([]);
   });
 
-  it('says the same whatever the clock reads: every reading one tick, or every reading a tick on', async () => {
+  // three clocks, each recording the whole example three ways: longer than one rehearsal is given
+  it('says the same whatever the clock reads: every reading one tick, or every reading a tick on', {
+    timeout: 20_000,
+  }, async () => {
     const said = async () => {
       const rehearsed = await rehearse(load(dir), { record: RECORDED });
       const edged = await fuzz(load(dir), { edges: true });
