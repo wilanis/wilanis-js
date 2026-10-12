@@ -7,7 +7,8 @@
 - **Tracking issue:** #910
 - **Depends on:** RFC 0009 (the queue kind and its worker, implemented) and RFC 0012 (a kind hands its run a signal,
   implemented). Related: #907 (merged as #914), which makes the Postgres table broker extend a delivery's lock while
-  its run goes on; and #924, which bounds `deadlineMs` in X004 and X251 as this RFC bounds it in X401.
+  its run goes on; and #924 (fixed by #936), which bounds `deadlineMs` in X004 and X251 by `TIMER_MAX_MS`, as this
+  RFC bounds it in X401.
 
 ## Summary
 
@@ -15,7 +16,7 @@ A queue trigger may say `deadlineMs`: the most one delivery's run may take, in m
 passes, the worker cancels the run as RFC 0012 cancels a route's: nothing more starts, the nodes in flight are told
 through their signal, and the run answers a `cancelled` report. A cancelled run is a fault to its message: it becomes
 `onFault`, so it is retried with the trigger's backoff by default, and dead on the last attempt `maxAttempts` allows.
-X401 refuses a `deadlineMs` that is not a whole number from 1 to 2147483647. `wilanis describe` prints the deadline
+X401 refuses a `deadlineMs` that is not a whole number of 1 or more, or that is above `TIMER_MAX_MS`. `wilanis describe` prints the deadline
 of every queue trigger, `none` included, with no change to its code. Today a queue run that hangs holds its slot
 forever, and with the default `concurrency` of 1 it stops its whole queue in that process.
 
@@ -70,7 +71,7 @@ whole run may take.
 does not give the visibility window a value per queue: since #914 the window only says how long a dead worker keeps
 its message, and one value per connection is enough. It does not cancel the runs in flight when the worker stops: a stop
 still drains, now bounded by the deadline. It does not add a deadline to the `@queue` plugin's settings, to the
-consume step, or to `wilanis run` of a queue trigger. It does not bound `deadlineMs` in X004 and X251: that is #924.
+consume step, or to `wilanis run` of a queue trigger.
 
 ## Guide-level explanation
 
@@ -126,13 +127,21 @@ deadline 30000ms
 receives from  @connections/jobs.connection.json, which delivers at-least-once
 ```
 
-A trigger that writes no `deadlineMs` reads `deadline none` on that line. The refusal an author meets writes a
-number the worker cannot keep:
+A trigger that writes no `deadlineMs` reads `deadline none` on that line. An author who writes a number the worker cannot keep
+meets X401, from its first branch:
 
 ```
 X401  @features/customers/edge/remove-queued.trigger.json#settings/deadlineMs
-    deadlineMs is 0; it is the most one delivery's run may take, so it is a whole number of milliseconds, from 1 to 2147483647
-    → set it to a whole number from 1 to 2147483647, or drop it for no deadline
+    deadlineMs is 0; it is the most one delivery's run may take, so it is a whole number of milliseconds, 1 or more
+    → set it to 1 or more, or drop it for no deadline
+```
+
+A deadline longer than a Node timer can wait reads, from the second branch:
+
+```
+X401  @features/customers/edge/remove-queued.trigger.json#settings/deadlineMs
+    deadlineMs is 3000000000; it is the most one delivery's run may take, and a Node timer waits at most 2147483647 ms (about 24.8 days): a longer one fires after 1 ms, so every run would be cancelled at once
+    → set it to 2147483647 or less, or drop it for no deadline
 ```
 
 **How long a message can be held.** With a deadline, a live worker answers each delivery within `deadlineMs` plus the
@@ -158,9 +167,12 @@ One document of `@wilanis/plugin-queue` changes. `packages/plugin-queue/docs/que
   "deadlineMs": {
     "type": "number",
     "required": false,
-    "description": "the most one delivery's run may take, in milliseconds from the fire, before it is cancelled (RFC 0012); a cancelled run is a fault, so it becomes onFault. A whole number from 1 to 2147483647. Absent: no deadline, and a run that never answers holds its message and its slot until the process is killed"
+    "description": "the most one delivery's run may take, in milliseconds from the fire, before it is cancelled (RFC 0012); a cancelled run is a fault, so it becomes onFault. A whole number from 1 to 2147483647, the longest a Node timer waits. Absent: no deadline, and a run that never answers holds its message and its slot until the process is killed"
   }
   ```
+
+  The description writes the number, because a JSON document cannot name `TIMER_MAX_MS`. The schedule kind's
+  `deadlineMs` writes it the same way. The rule that judges the setting reads the constant.
 
 - `description` gains one sentence after "A fault becomes settings.onFault, retry by default.": "A run past
   settings.deadlineMs is cancelled, and is a fault too."
@@ -169,22 +181,24 @@ No port, operation, codec, shape or connection kind changes. `worker.port.json` 
 
 ### Checker rules
 
-X401 widens; no new code. X401 is "a setting a worker cannot act on" (`packages/plugin-queue/src/rules.ts`), and it
-already judges `maxAttempts` and `backoffMs` in `checkCounts`. The schedule kind put its own `deadlineMs` under its
-existing range rule, X251, in the same way.
+X401 widens; no new code (decided). X401 is "a setting a worker cannot act on" (`packages/plugin-queue/src/rules.ts`),
+and it already judges `maxAttempts` and `backoffMs` in `checkCounts`. The schedule kind put its own `deadlineMs` under
+its existing range rule, X251, in the same way. The new check is a sibling of X251's `checkDeadline` in
+`packages/plugin-schedule/src/rules.ts`, and copies its two branches, with "a tick's run" said as "one delivery's
+run". The message starts `deadlineMs is <value>; it is the most one delivery's run may take`, then:
 
-| Code | Where it lives | Refuses when | Hint |
-|---|---|---|---|
-| X401 | `packages/plugin-queue/src/rules.ts`, `checkCounts`, at `settings/deadlineMs` | a queue trigger's `deadlineMs` is not a whole number from 1 to 2147483647 | `set it to a whole number from 1 to 2147483647, or drop it for no deadline` |
+| Code | Where it lives | Refuses when | Message goes on | Hint |
+|---|---|---|---|---|
+| X401 | `packages/plugin-queue/src/rules.ts`, beside `checkCounts`, at `settings/deadlineMs` | `deadlineMs` is not a whole number of 1 or more | `, so it is a whole number of milliseconds, 1 or more` | `set it to 1 or more, or drop it for no deadline` |
+| X401 | same | `deadlineMs` is above `TIMER_MAX_MS` | `, and a Node timer waits at most ${TIMER_MAX_MS} ms (about 24.8 days): a longer one fires after 1 ms, so every run would be cancelled at once` | `set it to ${TIMER_MAX_MS} or less, or drop it for no deadline` |
 
 T001 already refuses a `deadlineMs` that is not a number, since the kind types it. X401 judges the range.
 
-**Why the upper bound.** It follows #924, which bounds `deadlineMs` the same way in X004 (`@http`) and X251
-(`@schedule`), so the three kinds refuse the same numbers. Node's `setTimeout` takes a 32-bit signed delay. A larger one is set to 1 ms, with only a
-`TimeoutOverflowWarning` on stderr. I checked it: `setTimeout(f, 3000000000)` fires after 1 ms. So a `deadlineMs` of
-35 days would cancel every run at once. 2147483647 ms is about 24.8 days, which is longer than any run a queue should
-hold a message for. The Postgres consumer already caps its own timer at the same number (`TIMER_MAX_MS` in
-`packages/plugin-storage-postgres/src/consumer.ts`).
+**Why the upper bound (decided).** Node's `setTimeout` takes a 32-bit signed delay. A larger one is set to 1 ms, with
+only a `TimeoutOverflowWarning` on stderr, so a `deadlineMs` of 35 days would cancel every run at once. The bound is
+`TIMER_MAX_MS` from `@wilanis/core` (`packages/core/src/timer.ts`), 2^31 - 1 ms, about 24.8 days. The rule imports it
+and writes no number of its own. X004 (`@http`) and X251 (`@schedule`) hold their own `deadlineMs` to the same
+constant since #936, so the three kinds refuse the same numbers.
 
 No rule relates `deadlineMs` to a broker's visibility window. `@queue` cannot see a broker's settings: the `Broker`
 contract says nothing about a window, and the memory broker has none. Since #914 no such rule is needed
@@ -287,11 +301,12 @@ unchanged.
 
 | Code | The edit to the example |
 |---|---|
-| X401 | `"deadlineMs": 0` on `remove-queued.trigger.json`; `"deadlineMs": 1.5`; `"deadlineMs": 2147483648` |
+| X401 | `"deadlineMs": 0` on `remove-queued.trigger.json`; `"deadlineMs": 1.5`; `TIMER_MAX_MS + 1` |
 | none | `"deadlineMs": 30000` on `remove-queued.trigger.json`, as the example then writes it |
 
 **Rules**, in `packages/plugin-queue/test/rules.test.ts`, block `X401: a setting a worker cannot act on`: the three
-values above each refused at `settings/deadlineMs` with the hint; 1 and 2147483647 accepted.
+values above each refused at `settings/deadlineMs` with its branch's message and hint; 1 and `TIMER_MAX_MS`
+accepted.
 
 **The worker**, in `packages/plugin-queue/test/worker.test.ts`, against the fake broker and the `Serving` of
 `harness.ts`. The harness gains one way to answer: a run that waits until its signal aborts and then answers a
@@ -317,8 +332,7 @@ its own. The worker test covers the deadline for every broker, and #914's tests 
    range in X401's `checkCounts`; the worker and rule tests above; the sabotage cases; `deadlineMs: 30000` on
    `example/features/customers/edge/remove-queued.trigger.json`; the README paragraph and rules row;
    `docs/refusals/X401.md`; the one sentence in `packages/plugin-storage-postgres/README.md`. One pull request. A
-   `good first issue`: every piece has a sibling in `@schedule` or `@http` to copy. It may land before or after #924;
-   whichever lands second makes the three hints read alike.
+   `good first issue`: every piece has a sibling in `@schedule` or `@http` to copy.
 
 ## Drawbacks and alternatives
 
@@ -333,11 +347,12 @@ it again, so an author might want it parked while other faults are retried. Not 
 today (`decidedOf`), the issue asks for exactly that, and one word is enough until a tree needs two. `onDeadline`,
 defaulting to `onFault`, can be added later with no document changing meaning. Always `dead` was also considered and
 rejected: a deadline also strikes on an upstream that is slow for a minute, and a retry is the right answer there.
+Decided: a cancelled run goes to `onFault`.
 
 **A new code (`X407`) instead of widening X401.** X401 already means "a setting a worker cannot act on", and it
 already judges the other two numbers of the same trigger. The http kind took a new code, X004, because no rule of its
 own judged a range of a trigger setting; the schedule kind widened X251. One rule per kind of mistake is easier to
-find. I recommend X401.
+find. Decided: X401 widens.
 
 **A deadline in the `@queue` plugin's settings, as the http kind has.** `limitsOf` would print it as
 `(from @queue settings)` with no change. Not taken: each queue has one trigger (X406), so the trigger is already the
@@ -364,20 +379,16 @@ the relation means nothing.
 `describe` for every queue trigger. The worker's ten timer lines repeat the http kind's `withDeadline` and the
 schedule's `deadlineOf` in spirit (see *Open questions*).
 
-**What this does not fix.** X004 (`@http`) and X251 (`@schedule`) judge `deadlineMs` as "a whole number of 1 or more"
-and set no upper bound, so a deadline above 2147483647 on a route or a schedule cancels its run after 1 ms today. That
-is a defect in two other plugins. #924 tracks its fix, with the same bound X401 takes here.
-
 ## Open questions
 
-To decide before `accepted`:
+Decided in review:
 
-1. **What a cancelled run does to its message.** I recommend `onFault`, as today's `decidedOf` already does for a
-   cancelled report: retry with backoff by default, dead on the last attempt, dead at once under `"onFault": "dead"`.
-   The alternative is a separate `onDeadline` (above).
-2. **X401 or a new X407.** I recommend widening X401.
-3. **The upper bound.** I recommend X401 refuses above 2147483647, as #924 makes X004 and X251 do, rather than the
-   worker capping the timer without a word.
+1. **What a cancelled run does to its message:** `onFault`, as `decidedOf` already does for a cancelled report.
+   It is retried with backoff by default, dead on the last attempt, and dead at once under `"onFault": "dead"`. A
+   separate `onDeadline` is not added (*Drawbacks*).
+2. **Which rule:** X401 widens. There is no new code.
+3. **The upper bound:** `TIMER_MAX_MS` (2147483647 ms), refused by X401's second branch. The worker does not cap the
+   timer without a word.
 
 To decide during implementation:
 
