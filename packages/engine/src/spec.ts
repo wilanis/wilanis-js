@@ -31,6 +31,8 @@ export interface KCall {
   pure?: boolean;
   /** An opaque tag the compiler gives this call, handed to the handler as `ctx.site`. The kernel never reads it. */
   site?: string;
+  /** Node ids this node waits for without reading them. */
+  after?: string[];
 }
 export interface KSwitch {
   kind: 'switch';
@@ -60,6 +62,8 @@ export interface KMap {
   pure?: boolean;
   /** An opaque tag the compiler gives this map, handed to every element's handler as `ctx.site`. The kernel never reads it. */
   site?: string;
+  /** Node ids this node waits for without reading them: no element starts before each has answered. */
+  after?: string[];
 }
 export type KNode = KCall | KSwitch | KMap;
 

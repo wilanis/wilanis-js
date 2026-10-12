@@ -6,7 +6,7 @@ import type { KernelSpec, KNode, KSwitch } from './spec.js';
 export interface Plan {
   /** node id -> the switch that names it; such a node runs only when that switch selects it */
   routedBy: Map<string, string>;
-  /** node id -> the nodes it waits for: what it reads, and the switch that routes it */
+  /** node id -> the nodes it waits for: what it reads, what it names under `after`, and the switch that routes it */
   dependencies: Map<string, Set<string>>;
   /** node id -> the nodes that wait for it */
   dependents: Map<string, Set<string>>;
@@ -39,9 +39,13 @@ export function planOf(spec: KernelSpec): Plan {
   return { routedBy, dependencies, dependents: invert(dependencies), catchers: catchersOf(spec) };
 }
 
-/** What one node waits for: the nodes it reads, the switch that routes it, and for a switch what it catches. */
-function waitsFor(spec: KernelSpec, routedBy: Map<string, string>, id: string, node: KNode): Set<string> {
-  const waits = new Set([...nodeRefs(node)].filter(ref => !PSEUDO.has(ref) && ref in spec.nodes));
+/**
+ * What one node waits for: the nodes it reads, those it names under `after`, the switch that routes it, and for a
+ * switch what it catches.
+ */
+export function waitsFor(spec: KernelSpec, routedBy: Map<string, string>, id: string, node: KNode): Set<string> {
+  const named = node.kind === 'switch' ? [] : (node.after ?? []);
+  const waits = new Set([...nodeRefs(node), ...named].filter(ref => !PSEUDO.has(ref) && ref in spec.nodes));
   const router = routedBy.get(id);
   if (router) waits.add(router);
   if (node.kind === 'switch') for (const caught of Object.keys(node.catch ?? {})) waits.add(caught);
