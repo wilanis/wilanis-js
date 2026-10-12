@@ -1,6 +1,6 @@
 # RFC 0043: A profile from another: `extends` names the profile one starts from
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:core` (one key on `project.schema.json`; `ProfileDoc`; one new module that resolves a profile;
   `Scope.profile`, which `bindingFor` and `connectionFor` read), `area:compiler` (one `C` rule in
   `check/profiles.ts`; `checkPermits` reads the resolved list), `area:runtime` (`describe project.json`, the
@@ -235,7 +235,7 @@ None.
 
 ### Checker rules
 
-Numbers are assigned when the implementing pull request lands (current highest: C023, B012).
+Numbers are assigned when the implementing pull request lands (current highest: C023, B012). C0nn landed as C024.
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
