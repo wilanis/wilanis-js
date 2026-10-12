@@ -29,6 +29,7 @@ type Compared = Exclude<expr.BinaryOp, '&&' | '||'>;
 
 const VERB: Record<Compared, [string, string]> = {
   in: ['is among', 'is not among'],
+  contains: ['contains', 'does not contain'],
   '==': ['is', 'is not'],
   '!=': ['is not', 'is'],
   '<': ['is below', 'is at least'],

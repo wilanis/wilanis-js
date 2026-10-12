@@ -79,6 +79,8 @@ function demandOf(target: expr.Expr, truth: Cmp, lit: unknown): Demands[] {
 
 /** Solve one comparison: a literal against a path or its length, two paths for equality, or a length against a side. */
 function compare(node: expr.Expr & { kind: 'bin' }, want: boolean, within: Demands): Demands[] {
+  // `text contains 'word'`: no demand yet (RFC 0040 step 2), so its branches read unsolved rather than solved wrongly
+  if (node.op === 'contains') return [];
   // `lit in path`: the list must hold the literal, or must not
   if (node.op === 'in') return membership(node, want);
   const sides: [expr.Expr, expr.Expr] = [node.left, node.right];
@@ -127,6 +129,8 @@ function lenDomain(op: Cmp, length_: number): Domain {
 
 /** Whether an expression names any path the rehearsal could constrain, satisfiable or not. */
 function nameableBin(node: expr.Expr & { kind: 'bin' }): boolean {
+  // the solver makes no text that holds or lacks a word yet (RFC 0040 step 2)
+  if (node.op === 'contains') return false;
   if (node.op === '&&' || node.op === '||') return nameable(node.left) || nameable(node.right);
   if (node.op === 'in') return node.left.kind === 'lit' && node.right.kind === 'path';
   // first comparison names something when one side is first literal and the other first path or len(path)

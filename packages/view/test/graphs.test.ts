@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { loadProject } from '@wilanis/runtime';
 import { describe, expect, it } from 'vitest';
 import { type DocView, viewOf } from '../src/index.js';
+import { said } from '../src/said.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 const GET_ROW = '@features/customers/data/get-row.graph.json';
@@ -135,6 +136,15 @@ describe('the view model of a graph', () => {
       node.says?.some(line => line.parts.some(part => part.text === ' is among ')),
     );
     expect(rule?.label).toBe('if principal exists and "registrar" is among principal \u203a roles');
+  });
+
+  it('says a contains rule in words, and turns its verb under a !', () => {
+    const words = (when: string) =>
+      said(when)?.map(
+        line => `${line.lead} ${line.parts.map(part => ('value' in part ? part.value : part.text)).join('')}`,
+      );
+    expect(words("email contains '@'")).toEqual(['if email contains "@"']);
+    expect(words("!(email contains '@')")).toEqual(['if email does not contain "@"']);
   });
 
   it('shows the out node as the fields it answers, fed by each candidate in order', async () => {

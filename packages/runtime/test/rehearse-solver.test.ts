@@ -9,6 +9,7 @@ import { checkTree } from '@wilanis/compiler';
 import { loadTree } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_PLUGINS, rehearse } from '../src/index.js';
+import { branchesOf } from '../src/solve.js';
 import {
   decide,
   edge,
@@ -227,5 +228,22 @@ describe('rehearsing a switch whose rules name every member of an enum (#861)', 
       expect(said).not.toMatch(/BROKE|NEVER RUN/);
       expect(ok, said).toBe(true);
     }
+  });
+});
+
+describe('a contains rule before the solver can make a text that holds a word (RFC 0040 step 1)', () => {
+  it('reports each branch unsolved rather than solving it with a demand that constrains nothing', () => {
+    const [rule, otherwise] = branchesOf([{ when: "email contains '@'", to: 'a' }], 'b');
+    expect(rule).toMatchObject({
+      to: 'a',
+      demands: {},
+      unsolved: "'email contains '@'' compares values the rehearsal cannot name",
+    });
+    expect(otherwise).toMatchObject({ to: 'b', demands: {} });
+    expect(otherwise.unsolved).toBeDefined();
+  });
+  it('reports it so under !, where the solver would otherwise take it as a comparison against a literal', () => {
+    const [rule] = branchesOf([{ when: "!(note contains 'http')", to: 'a' }], 'b');
+    expect(rule.unsolved).toBe("'!(note contains 'http')' compares values the rehearsal cannot name");
   });
 });

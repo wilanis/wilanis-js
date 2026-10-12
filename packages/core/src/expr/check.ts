@@ -87,6 +87,8 @@ function pathType(path: string[], inputs: Inputs, proved: Set<string>): Type {
 }
 
 function binaryType(op: BinaryOp, expr: Extract<Expr, { kind: 'bin' }>, inputs: Inputs, proved: Set<string>): Type {
+  // the word a contains looks for is a literal, so it is judged as written rather than typed as a read
+  if (op === 'contains') return containsType(check(expr.left, inputs, proved), expr.right);
   // what the left of an && proves present, the right may read
   const left = check(expr.left, inputs, proved);
   const right = check(expr.right, inputs, op === '&&' ? new Set([...proved, ...provedBy(expr.left)]) : proved);
@@ -107,6 +109,22 @@ function membershipType(left: Type, right: Type): Type {
     throw new ExprError(`a ${show(left)} is never in ${show(right)}`);
   }
   if (left.kind === 'object' || left.kind === 'list') throw new ExprError(`in looks for a scalar, not ${show(left)}`);
+  return BOOLEAN;
+}
+
+/** `text contains 'word'`: the left is a string, the right a non-empty string written in the rule. */
+function containsType(left: Type, right: Expr): Type {
+  if (left.kind !== 'string' && left.kind !== 'unknown') {
+    const hint = left.kind === 'list' ? " -- 'x' in list asks whether a list holds a value" : '';
+    throw new ExprError(`contains looks into a string, not ${show(left)}${hint}`);
+  }
+  if (right.kind !== 'lit') {
+    const named = right.kind === 'path' ? `'${right.path.join('.')}'` : 'a computed value';
+    throw new ExprError(`contains looks for a word written in the rule, as email contains '@', not for ${named}`);
+  }
+  if (typeof right.value !== 'string')
+    throw new ExprError(`contains looks for a string, not ${show(literalType(right.value))}`);
+  if (right.value === '') throw new ExprError("contains '' holds for every text; write the word to look for");
   return BOOLEAN;
 }
 
