@@ -8,8 +8,8 @@
  * `outcomes` to the reasons the run can reach, and whether the connection delivers at all, and whether what it
  * fires may run twice, are the T rules' -- they relate compiler words and know nothing of queues.
  *
- * X401 a setting a worker cannot act on: an outcome that is not ack, retry or dead; attempts, a backoff or a
- *      concurrency that is not a whole number in range.
+ * X401 a setting a worker cannot act on: an outcome that is not ack, retry or dead; attempts, a backoff, a
+ *      deadline or a concurrency that is not a whole number in range.
  * X402 a retry on a connection whose kind delivers at most once: nothing will deliver the message again.
  * X403 a publish of a type the trigger consuming that queue does not accept (`publishes.ts`).
  * X404 a message type carrying a blob, whose handle means nothing in another process (`publishes.ts`).
@@ -19,7 +19,7 @@
  * X406 a second queue trigger receiving from the connection and queue another already receives from: a message
  *      fires one trigger, so the second would never run.
  */
-import type { ConnectionKindDoc, PluginCheckContext } from '@wilanis/core';
+import { type ConnectionKindDoc, type PluginCheckContext, TIMER_MAX_MS } from '@wilanis/core';
 import { placeOf } from './deliver.js';
 import { OUTCOMES } from './outcome.js';
 import { checkPublished, checkTriggerMessage } from './publishes.js';
@@ -66,6 +66,25 @@ function checkCounts(one: Queued, refuse: Refuse): void {
       at: 'settings/backoffMs',
       hint: 'backoffMs is a whole number of milliseconds, 0 or more; drop it for the default of 1000',
     });
+}
+
+/** X401: a deadline a delivery's run can be held to: a whole number of milliseconds, at least one, that a timer can wait. */
+function checkDeadline(one: Queued, refuse: Refuse): void {
+  const deadline = one.settings.deadlineMs;
+  if (deadline === undefined) return;
+  const say = (message: string, hint: string) =>
+    refuse({ code: 'X401', file: one.file, message, at: 'settings/deadlineMs', hint });
+  const said = `deadlineMs is ${JSON.stringify(deadline)}; it is the most one delivery's run may take`;
+  if (!whole(deadline, 1))
+    say(
+      `${said}, so it is a whole number of milliseconds, 1 or more`,
+      'set it to 1 or more, or drop it for no deadline',
+    );
+  else if ((deadline as number) > TIMER_MAX_MS)
+    say(
+      `${said}, and a Node timer waits at most ${TIMER_MAX_MS} ms (about 24.8 days): a longer one fires after 1 ms, so every run would be cancelled at once`,
+      `set it to ${TIMER_MAX_MS} or less, or drop it for no deadline`,
+    );
 }
 
 /** X401: a consume step's concurrency is a number of messages, one or more. */
@@ -193,6 +212,7 @@ export function check({ scope, refuse }: PluginCheckContext): void {
   for (const one of triggers) {
     checkOutcomes(one, refuse);
     checkCounts(one, refuse);
+    checkDeadline(one, refuse);
     checkRetryDelivers(scope, one, refuse);
     checkTriggerMessage(scope, one, refuse);
   }

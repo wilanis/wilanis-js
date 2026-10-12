@@ -86,6 +86,23 @@ Each delivery is one line of the log:
 queue removals m1 attempt 1 → ack (61ms, @customers/domain/customer.port.json#remove done)
 ```
 
+**A deadline** is the trigger's `deadlineMs`: the most one delivery's run may take, in milliseconds. The clock
+starts when the worker fires the trigger, after the message's input has been built and judged. When it passes,
+the run is cancelled as a route's is (RFC 0012): no node that has not started will start, the nodes in flight
+are told through their signal, and the run answers a `cancelled` report. The worker waits for that report, so a
+handler that ignores its signal delays the answer by as long as it runs. A cancelled run is a fault, so it
+becomes `onFault`: retried with the backoff by default, and dead on the last attempt `maxAttempts` allows. The
+line says why:
+
+```
+queue removals m1 attempt 1 → retry (30004ms, @customers/domain/customer.port.json#remove cancelled (deadline))
+```
+
+A trigger with no `deadlineMs` has no deadline: a run that never answers holds its message and its slot until
+the process is killed, and a stop waits for it. With one, a message is worked for at most about
+`maxAttempts × deadlineMs`, plus the backoffs, before it is dead. `deadlineMs` is a whole number from 1 to the
+longest a Node timer waits, 2147483647 (X401).
+
 **At least once.** A broker whose kind declares `"delivery": "at-least-once"` delivers a message again when
 the worker did not acknowledge it -- a process that died between the write and the ack -- so what the
 trigger fires may run twice for one message. The acknowledgement is the worker's, after the run, outside
@@ -195,7 +212,7 @@ and consume, retry with backoff, park the dead, bound concurrency and drain on s
 
 | Code | Refuses |
 |---|---|
-| X401 | an outcome that is not `ack`, `retry` or `dead`; a `maxAttempts`, `backoffMs` or consume `concurrency` that is not a whole number in range |
+| X401 | an outcome that is not `ack`, `retry` or `dead`; a `maxAttempts`, `backoffMs`, `deadlineMs` or consume `concurrency` that is not a whole number in range (a `deadlineMs` from 1 to 2147483647) |
 | X402 | a `retry` outcome, or `onFault` left at `retry`, on a trigger whose connection's kind delivers at most once |
 | X403 | a `publish` of a type the queue trigger consuming that connection and queue does not accept |
 | X404 | a message type, a trigger's or a `publish`'s, with a `blob` field at any depth |

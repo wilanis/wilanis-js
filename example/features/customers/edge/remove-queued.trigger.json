@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger.schema.json",
   "label": "removals queue",
-  "description": "One message per customer to remove, published by POST /customers/{id}/removal. missing is acknowledged (the customer is already gone: the work is done); upstream is retried up to five times, a second apart and then doubling, and then dead-lettered. Employees holding the registrar role only, as for DELETE /customers/{id}: the token rides in the message's headers, and a message whose token does not verify is dead, since redelivering it cannot help.",
+  "description": "One message per customer to remove, published by POST /customers/{id}/removal. missing is acknowledged (the customer is already gone: the work is done); upstream is retried up to five times, a second apart and then doubling, and then dead-lettered. A removal gets 30 seconds, room for a call to customers-api to time out on its own at 10 seconds; a run that takes longer is cancelled and retried like a fault. Employees holding the registrar role only, as for DELETE /customers/{id}: the token rides in the message's headers, and a message whose token does not verify is dead, since redelivering it cannot help.",
   "kind": "@queue/queue.trigger-kind.json",
   "settings": {
     "connection": "@connections/jobs.connection.json",
@@ -9,6 +9,7 @@
     "message": "@customers/edge/IdRequest.shape.json",
     "maxAttempts": 5,
     "backoffMs": 1000,
+    "deadlineMs": 30000,
     "outcomes": {
       "missing": "ack",
       "upstream": "retry",

@@ -4,8 +4,13 @@
  * input from it and gates the run exactly as it gates a request, and the report becomes the message's outcome
  * through `outcomeOf`. Nothing here waits on a broker: the broker decides when a message arrives, and this
  * decides what becomes of it.
+ *
+ * Where the trigger says `deadlineMs`, the run is handed a signal that aborts once the deadline passes (RFC 0044),
+ * as an http route's is (RFC 0012). The worker still waits for the report: a cancelled run answers one, and it is
+ * a fault to its message, so it becomes `onFault`.
  */
 import type { Serving, TriggerDoc } from '@wilanis/core';
+import type { Report } from '@wilanis/engine';
 import type { Answer, Delivery } from './brokers.js';
 import { DEFAULT_BACKOFF_MS, DEFAULT_MAX_ATTEMPTS, type Decided, faultOf, outcomeOf } from './outcome.js';
 import { KIND } from './paths.js';
@@ -83,18 +88,48 @@ const naming = (trigger: TriggerDoc, decided: Decided): Decided => ({
   ended: `${trigger.fire.run} ${decided.ended}`,
 });
 
-/** Fire the trigger for one delivery, in a blob scope of its own, and decide the outcome of its report. */
+/** A queue trigger's deadline, where its settings write one; X401 has held it to a whole number a timer can wait. */
+function deadlineOf(trigger: TriggerDoc): number | undefined {
+  const { deadlineMs } = (trigger.settings ?? {}) as { deadlineMs?: unknown };
+  return typeof deadlineMs === 'number' ? deadlineMs : undefined;
+}
+
+/** A deadline armed at the fire: the signal that aborts once it passes, and how to clear it once the run answers. */
+interface Armed {
+  signal?: AbortSignal;
+  clear: () => void;
+}
+
+/** A deadline armed, as an http route's `withDeadline` arms one; with none, no signal and nothing to clear. */
+function armed(deadlineMs: number | undefined): Armed {
+  if (deadlineMs === undefined) return { clear: () => undefined };
+  const control = new AbortController();
+  const timer = setTimeout(() => control.abort(), deadlineMs);
+  return { signal: control.signal, clear: () => clearTimeout(timer) };
+}
+
+/** What a report means to its message, with a run the deadline cancelled said so, as a scheduled tick's line says it. */
+function decidedFor(trigger: TriggerDoc, report: Report, attempt: number, signal?: AbortSignal): Decided {
+  const decided = outcomeOf(trigger, report, attempt);
+  return report.status === 'cancelled' && signal?.aborted ? { ...decided, ended: 'cancelled (deadline)' } : decided;
+}
+
+/** Fire the trigger for one delivery, in a blob scope of its own and under its deadline, and decide the outcome of its report. */
 async function fired(worked: Worked, trigger: TriggerDoc, context: Record<string, unknown>, attempt: number) {
   const built = worked.serving.inputFor(trigger, context);
   // a message whose input does not fit will not fit on any later delivery either, so it is parked at once
   if ('error' in built) return { outcome: 'dead', ended: `input does not conform: ${built.error}` } as Decided;
   const scope = worked.serving.blobs.scope();
+  // the clock starts here, after the input is built and judged, and covers the gate and the run
+  const { signal, clear } = armed(deadlineOf(trigger));
   try {
-    const report = await worked.serving.fire({ trigger, input: built.input, context, blobs: scope });
-    return naming(trigger, outcomeOf(trigger, report, attempt));
+    const args = { trigger, input: built.input, context, blobs: scope };
+    const report = await worked.serving.fire(signal ? { ...args, signal } : args);
+    return naming(trigger, decidedFor(trigger, report, attempt, signal));
   } catch (error) {
     return naming(trigger, faultOf(trigger, (error as Error).message, attempt));
   } finally {
+    clear();
     await scope.release();
   }
 }

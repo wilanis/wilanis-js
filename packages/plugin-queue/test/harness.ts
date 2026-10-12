@@ -12,11 +12,27 @@ import { consume } from '../src/worker.js';
 import { FakeBroker } from './fake-broker.js';
 import { AT_LEAST_ONCE, JOBS } from './tree.js';
 
-/** What a fake run answers: a report, a throw, or a wait until the case lets it answer. */
+/**
+ * What a fake run answers: a report, a throw, a wait until the case lets it answer, a wait of some milliseconds, or
+ * a wait until its signal aborts, when it answers `cancelled` as a run the engine cancelled does.
+ */
 export interface Answering {
   report?: Partial<Report>;
   error?: string;
   hold?: boolean;
+  afterMs?: number;
+  untilCancelled?: boolean;
+}
+
+/** Wait until a signal aborts; with none, forever, as a run nobody can cancel waits. */
+const aborted = (signal: AbortSignal | undefined) =>
+  new Promise<void>(done => signal?.addEventListener('abort', () => done(), { once: true }));
+
+/** Wait as the case says before the fake run answers. */
+async function waited(answer: Answering, signal: AbortSignal | undefined, open: (() => void)[]): Promise<void> {
+  if (answer.hold) await new Promise<void>(done => open.push(done));
+  if (answer.afterMs !== undefined) await new Promise(done => setTimeout(done, answer.afterMs));
+  if (answer.untilCancelled) await aborted(signal);
 }
 
 /** A report refusing with one reason, as a graph ending on purpose answers. */
@@ -62,19 +78,23 @@ export function serving(
   const fired: { run: string; context: Record<string, unknown> }[] = [];
   const logs: string[] = [];
   const open: (() => void)[] = [];
+  /** The signal each fire was handed, or `none` where the worker handed no signal at all. */
+  const handed: (AbortSignal | undefined | 'none')[] = [];
   const blobs = { scopes: 0, released: 0 };
   let set = triggers;
   let inputFor: Serving['inputFor'] = (_trigger, context) => ({ input: context.message });
   const serving = {
     triggers: (kind: string) => (kind === KIND ? set : []),
-    fire: async ({ trigger, context }: FireArgs) => {
+    fire: async (args: FireArgs) => {
+      const { trigger, context } = args;
       fired.push({ run: trigger.fire.run, context });
+      handed.push('signal' in args ? args.signal : 'none');
       const answer = answering(context);
-      if (answer.hold) await new Promise<void>(done => open.push(done));
+      await waited(answer, args.signal, open);
       if (answer.error) throw new Error(answer.error);
       return {
         graph: trigger.fire.run,
-        status: 'done',
+        status: answer.untilCancelled ? 'cancelled' : 'done',
         output: {},
         nodes: {},
         startedAt: 0,
@@ -89,6 +109,7 @@ export function serving(
   return {
     serving,
     fired,
+    handed,
     logs,
     blobs,
     /** Let the run that is being held answer. */
