@@ -231,30 +231,51 @@ describe('rehearsing a switch whose rules name every member of an enum (#861)', 
   });
 });
 
-describe('a contains rule before the solver can make a text that holds a word (RFC 0040 step 1)', () => {
-  it('reports each branch unsolved rather than solving it with a demand that constrains nothing', () => {
+describe('a contains rule: the solver makes a text that holds the word, or lacks it (RFC 0040)', () => {
+  it('demands the word of the rule and its absence of the else', () => {
     const [rule, otherwise] = branchesOf([{ when: "email contains '@'", to: 'a' }], 'b');
-    expect(rule).toMatchObject({
+    expect(rule).toEqual({
+      rule: 0,
+      when: "email contains '@'",
       to: 'a',
-      demands: {},
-      unsolved: "'email contains '@'' compares values the rehearsal cannot name",
+      demands: { email: { contains: ['@'], present: true } },
     });
-    expect(otherwise).toMatchObject({
-      to: 'b',
-      demands: {},
-      unsolved: "'email contains '@'' compares values the rehearsal cannot name",
-    });
+    // like lacks and ne, a word the text must lack does not demand the text: a missing email holds no @ either
+    expect(otherwise).toEqual({ rule: -1, when: 'else', to: 'b', demands: { email: { omits: ['@'] } } });
   });
-  it('reports it so under !, where the solver would otherwise take it as a comparison against a literal', () => {
-    const [rule] = branchesOf([{ when: "!(note contains 'http')", to: 'a' }], 'b');
-    expect(rule.unsolved).toBe("'!(note contains 'http')' compares values the rehearsal cannot name");
+  it('turns the demand over under !', () => {
+    const [rule, otherwise] = branchesOf([{ when: "!(note contains 'http')", to: 'a' }], 'b');
+    expect(rule.demands).toEqual({ note: { omits: ['http'] } });
+    expect(otherwise.demands).toEqual({ note: { contains: ['http'], present: true } });
   });
-  it('reports it so behind a has(), which the rehearsal can name but which cannot make the rule hold alone', () => {
+  it('solves it behind a has(), and lets the else leave the note out', () => {
     const [rule, otherwise] = branchesOf([{ when: "has(note) && note contains 'x'", to: 'a' }], 'b');
-    expect(rule.unsolved).toBe("'has(note) && note contains 'x'' compares values the rehearsal cannot name");
-    // the else is solved: the note may be missing
+    expect(rule.demands).toEqual({ note: { present: true, contains: ['x'] } });
     expect(otherwise).toMatchObject({ to: 'b', demands: { note: { absent: true } } });
-    expect(otherwise.unsolved).toBeUndefined();
+  });
+  it('makes a later rule hold its word while the text lacks the word an earlier rule looks for', () => {
+    const rules = [
+      { when: "email contains '@'", to: 'a' },
+      { when: "email contains '.'", to: 'c' },
+    ];
+    const [, second, otherwise] = branchesOf(rules, 'b');
+    expect(second.demands).toEqual({ email: { omits: ['@'], contains: ['.'], present: true } });
+    expect(otherwise.demands).toEqual({ email: { omits: ['@', '.'] } });
+  });
+  it('calls a rule that holds a word and lacks a part of it, or is another text, a contradiction', () => {
+    for (const when of ["email contains 'ab' && !(email contains 'b')", "email == 'x' && email contains '@'"]) {
+      const [rule] = branchesOf([{ when, to: 'a' }], 'b');
+      expect(rule.unsolved).toBe(`no inputs satisfy '${when}' -- the rule contradicts itself`);
+    }
+  });
+  it('calls a word longer than the text may be a contradiction', () => {
+    const when = "len(code) < 2 && code contains 'ab'";
+    const [rule] = branchesOf([{ when, to: 'a' }], 'b');
+    expect(rule.unsolved).toBe(`no inputs satisfy '${when}' -- the rule contradicts itself`);
+  });
+  it('still cannot name a text written in the rule, which no input changes', () => {
+    const [rule] = branchesOf([{ when: "'abc' contains 'b'", to: 'a' }], 'b');
+    expect(rule.unsolved).toBe("''abc' contains 'b'' compares values the rehearsal cannot name");
   });
 });
 
