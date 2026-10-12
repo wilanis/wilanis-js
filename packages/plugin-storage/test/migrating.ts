@@ -149,7 +149,7 @@ type Declares = { of: string; key: string; unique?: string[][]; renamed?: Record
  * The tree the cases plan: two connections, each with a store of its own, over two shapes that differ by a name.
  * A store a case marks `keptBy` says another tree keeps its collections, and this tree only reads them.
  */
-function documents(collections: Required<Trees>) {
+function documents(collections: Required<Omit<Trees, 'readings'>>) {
   const connection = (name: string) => ({
     $schema: schemaRef('connection'),
     description: `where the ${name} live`,
@@ -210,6 +210,21 @@ export interface Trees {
   notes?: Record<string, Declares>;
   /** the tree a store says keeps its collections, by the store's connection: `entries` or `notes` */
   keptBy?: { entries?: string; notes?: string };
+  /** a second store over the entries connection, `readings.store.json`, with its collections and who keeps them */
+  readings?: { keptBy?: string; collections: Record<string, Declares> };
+}
+
+/** The second store over the entries connection a case may add, or nothing where it adds none. */
+function readings(second: Trees['readings']): Record<string, unknown> {
+  if (!second) return {};
+  const store = {
+    $schema: schemaRef('store'),
+    description: 'the readings kept so far, over the same connection as the entries',
+    connection: ENTRIES,
+    ...(second.keptBy ? { keptBy: second.keptBy } : {}),
+    collections: second.collections,
+  };
+  return { 'features/customers/data/readings.store.json': store };
 }
 
 /** Write a tree into a directory of its own, which the operating system clears. */
@@ -232,13 +247,14 @@ const PLUGINS: Record<string, PluginModule> = { ...BUILTIN_PLUGINS, '@storage': 
  * registers itself: in the table the environment carries, under the connection kind it grants.
  */
 export function context(trees: Trees = {}, opts: { adopt?: boolean; allowDestructive?: string[] } = {}) {
-  const dir = write(
-    documents({
+  const dir = write({
+    ...documents({
       entries: trees.entries ?? { entries: declares() },
       notes: trees.notes ?? { notes: declares() },
       keptBy: trees.keptBy ?? {},
     }),
-  );
+    ...readings(trees.readings),
+  });
   const load = loadTree(dir, PLUGINS);
   const scope = new Scope(load.registry, load.resolve);
   const { env } = buildEnv(scope);
