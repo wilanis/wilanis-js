@@ -77,7 +77,8 @@ missing. It alters nothing that is there, and asking twice changes nothing.
   attempt higher. An extension that fails is logged and tried again half a window later; the run goes on. An
   acknowledgement deletes the row, a retry sets when it is due again, a dead letter stamps `dead_at` and leaves
   the row for an operator; each names the attempt it answers, so a worker whose lock expired cannot answer for
-  the delivery another worker has since taken.
+  the delivery another worker has since taken. A run that never answers keeps its lock for as long as its worker
+  lives, so a queue trigger's `deadlineMs` is what ends it.
 - **Nothing polls.** A publish or a retry raises a notification when its transaction commits (`LISTEN`/`NOTIFY`
   on one session per connection, outside the pool), and a worker looks at the table when it is notified, when
   a delivery of its own is answered, and when the soonest waiting message falls due by the database's clock.

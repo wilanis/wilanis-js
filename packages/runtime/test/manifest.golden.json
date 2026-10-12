@@ -2994,6 +2994,7 @@
       "settings": {
         "backoffMs": 1000,
         "connection": "@connections/jobs.connection.json",
+        "deadlineMs": 30000,
         "maxAttempts": 5,
         "message": "@customers/edge/IdRequest.shape.json",
         "outcomes": {

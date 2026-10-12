@@ -8,6 +8,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { TIMER_MAX_MS } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { codes, EXAMPLE, planted, relocate, sabotage, sabotagePointing } from './example-harness.js';
 
@@ -33,6 +34,16 @@ describe('sabotage: the example queue (RFC 0009)', () => {
         trigger.settings.maxAttempts = 0;
       }),
     ).toEqual(['X401']);
+  });
+
+  it('X401 a deadline of none, of part of a millisecond, or longer than a Node timer waits', () => {
+    expect(queued.settings.deadlineMs).toBe(30000);
+    for (const deadlineMs of [0, 1.5, TIMER_MAX_MS + 1])
+      expect(
+        sabotagePointing(QUEUED, trigger => {
+          trigger.settings.deadlineMs = deadlineMs;
+        }),
+      ).toEqual([`X401 @${QUEUED}#settings/deadlineMs`]);
   });
 
   it('X403 a publish of a shape the consuming trigger does not accept', () => {

@@ -3,9 +3,9 @@
  * message for each way its run can end, what the step consumes, how it stops, and what it refuses to start
  * with. The broker is real enough to redeliver, so a retry here is a second fire, not a flag.
  */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeBroker } from './fake-broker.js';
-import { consuming, type Held, refusing, serving, trigger, until } from './harness.js';
+import { type Answering, consuming, type Held, refusing, serving, trigger, until } from './harness.js';
 import { JOBS } from './tree.js';
 
 let running: { stop: () => Promise<unknown> } | undefined;
@@ -203,5 +203,94 @@ describe('what the step refuses to start with', () => {
     expect(step.answer).toEqual({ queues: 0, connections: 0 });
     expect(step.held).toEqual([]);
     expect(given.logs).toContain('queue: no queue trigger to consume');
+  });
+});
+
+describe('a deadline (RFC 0044), on a fake clock', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Publish one message and consume it under one trigger, the clock stopped once its run has been fired. */
+  async function delivering(settings: Record<string, unknown>, answer: Answering) {
+    const given = serving([trigger(settings)], () => answer);
+    const broker = new FakeBroker();
+    await broker.publish(JOBS, 'removals', { body: { id: 'golf' }, headers: {} });
+    const step = await consuming(given.serving, {}, broker);
+    await vi.advanceTimersByTimeAsync(0);
+    return { given, broker, step };
+  }
+
+  it('a run past its deadline is told through its signal, and retried with the backoff', async () => {
+    const { given, broker, step } = await delivering({ deadlineMs: 50, backoffMs: 1000 }, { untilCancelled: true });
+    expect(given.handed).toHaveLength(1);
+    const signal = given.handed[0] as AbortSignal;
+    expect(signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(49);
+    expect(broker.answers).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(signal.aborted).toBe(true);
+    expect(broker.answers).toEqual([{ id: 'm1', attempt: 1, outcome: 'retry', backoffMs: 1000 }]);
+    expect(given.logs.at(-1)).toMatch(
+      /^queue removals m1 attempt 1 → retry \(\d+ms, @customers\/domain\/customer\.port\.json#remove cancelled \(deadline\)\)$/,
+    );
+    expect(given.blobs).toEqual({ scopes: 1, released: 1 });
+    await step.stop();
+  });
+
+  it('on the last attempt maxAttempts allows, a run past its deadline is dead', async () => {
+    const { broker, step } = await delivering(
+      { deadlineMs: 50, maxAttempts: 2, backoffMs: 10 },
+      { untilCancelled: true },
+    );
+    await vi.advanceTimersByTimeAsync(200);
+    expect(broker.answers).toEqual([
+      { id: 'm1', attempt: 1, outcome: 'retry', backoffMs: 10 },
+      { id: 'm1', attempt: 2, outcome: 'dead' },
+    ]);
+    expect(broker.parked(JOBS, 'removals')).toHaveLength(1);
+    await step.stop();
+  });
+
+  it('onFault dead parks a run past its deadline at once', async () => {
+    const { broker, step } = await delivering({ deadlineMs: 50, onFault: 'dead' }, { untilCancelled: true });
+    await vi.advanceTimersByTimeAsync(50);
+    expect(broker.answers).toEqual([{ id: 'm1', attempt: 1, outcome: 'dead' }]);
+    await step.stop();
+  });
+
+  it('a run that answers in time is acknowledged, and its deadline is cleared', async () => {
+    const { given, broker, step } = await delivering({ deadlineMs: 50 }, { afterMs: 10 });
+    await vi.advanceTimersByTimeAsync(10);
+    expect(broker.answers).toEqual([{ id: 'm1', attempt: 1, outcome: 'ack' }]);
+    await vi.advanceTimersByTimeAsync(100);
+    expect((given.handed[0] as AbortSignal).aborted).toBe(false);
+    expect(given.logs.at(-1)).toMatch(/#remove done\)$/);
+    await step.stop();
+  });
+
+  it('a trigger with no deadline hands its run no signal', async () => {
+    const { given, broker, step } = await delivering({}, { afterMs: 10 });
+    await vi.advanceTimersByTimeAsync(10);
+    expect(given.handed).toEqual(['none']);
+    expect(broker.answers).toEqual([{ id: 'm1', attempt: 1, outcome: 'ack' }]);
+    await step.stop();
+  });
+
+  it('a stop while a run waits on its signal resolves once the deadline has cancelled it and the broker is answered', async () => {
+    const { broker, step } = await delivering({ deadlineMs: 50 }, { untilCancelled: true });
+    let stopped = false;
+    const stopping = step.stop().then(() => {
+      stopped = true;
+    });
+    await vi.advanceTimersByTimeAsync(49);
+    expect(stopped).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await stopping;
+    expect(broker.answers).toEqual([{ id: 'm1', attempt: 1, outcome: 'retry', backoffMs: 1000 }]);
+    expect(broker.waiting(JOBS, 'removals')).toHaveLength(1);
   });
 });

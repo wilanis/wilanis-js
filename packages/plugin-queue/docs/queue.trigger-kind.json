@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/trigger-kind.schema.json",
   "label": "Queue message",
-  "description": "A message on a queue, consumed while a startup step names @queue/worker.port.json#consume. The body is decoded as JSON into context.message (typed by settings.message); the message's headers, its id, the queue and how many times it has been delivered are in the context too, and the guarding plugin adds the caller it identified from a credential the trigger reads out of the headers. The trigger's input mapping picks what the graph gets; its policies decide before the graph runs. The answer is judged against out and recorded; nobody receives it. A refusal is acknowledged, retried or dead-lettered as settings.outcomes maps its reason; every reason the trigger can reach must be mapped (T005). A fault becomes settings.onFault, retry by default. A retry past maxAttempts is dead. A message whose input does not conform is dead at once, since delivering it again cannot help.",
+  "description": "A message on a queue, consumed while a startup step names @queue/worker.port.json#consume. The body is decoded as JSON into context.message (typed by settings.message); the message's headers, its id, the queue and how many times it has been delivered are in the context too, and the guarding plugin adds the caller it identified from a credential the trigger reads out of the headers. The trigger's input mapping picks what the graph gets; its policies decide before the graph runs. The answer is judged against out and recorded; nobody receives it. A refusal is acknowledged, retried or dead-lettered as settings.outcomes maps its reason; every reason the trigger can reach must be mapped (T005). A fault becomes settings.onFault, retry by default. A run past settings.deadlineMs is cancelled, and is a fault too. A retry past maxAttempts is dead. A message whose input does not conform is dead at once, since delivering it again cannot help.",
   "connection": "connection",
   "refusals": "outcomes",
   "correlation": "headers.traceparent",
@@ -38,6 +38,11 @@
         ],
         "required": false,
         "description": "what a fault -- a node that broke with no reason -- becomes; default retry"
+      },
+      "deadlineMs": {
+        "type": "number",
+        "required": false,
+        "description": "the most one delivery's run may take, in milliseconds from the fire, before it is cancelled (RFC 0012); a cancelled run is a fault, so it becomes onFault. A whole number from 1 to 2147483647, the longest a Node timer waits. Absent: no deadline, and a run that never answers holds its message and its slot until the process is killed"
       },
       "outcomes": {
         "type": {

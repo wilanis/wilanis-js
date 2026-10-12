@@ -6,6 +6,7 @@
  * with queue triggers and no consume step, and what a queue trigger shares with a route, which the T family
  * judges.
  */
+import { TIMER_MAX_MS } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { codes, editing, ID_REQUEST, JOBS, ONCE, PUBLISHING, refusals, TABLE, TRIGGER, tree } from './tree.js';
 
@@ -58,6 +59,45 @@ describe('X401: a setting a worker cannot act on', () => {
     );
     expect(found).toHaveLength(1);
     expect(found[0].at).toBe('settings/backoffMs');
+  });
+
+  it('a deadline of none, of part of a millisecond, or longer than a Node timer waits', () => {
+    const short = [
+      ', so it is a whole number of milliseconds, 1 or more',
+      'set it to 1 or more, or drop it for no deadline',
+    ];
+    const long = [
+      `, and a Node timer waits at most ${TIMER_MAX_MS} ms (about 24.8 days): a longer one fires after 1 ms, so every run would be cancelled at once`,
+      `set it to ${TIMER_MAX_MS} or less, or drop it for no deadline`,
+    ];
+    const cases: [number, string[]][] = [
+      [0, short],
+      [1.5, short],
+      [TIMER_MAX_MS + 1, long],
+    ];
+    for (const [deadlineMs, [tail, hint]] of cases) {
+      const found = at(
+        trigger(doc => {
+          doc.settings.deadlineMs = deadlineMs;
+        }),
+        'X401',
+      );
+      expect(found).toHaveLength(1);
+      expect(found[0].at).toBe('settings/deadlineMs');
+      expect(found[0].message).toBe(`deadlineMs is ${deadlineMs}; it is the most one delivery's run may take${tail}`);
+      expect(found[0].hint).toBe(hint);
+    }
+  });
+
+  it('a deadline of one millisecond, and of the longest a Node timer waits, is fine', () => {
+    for (const deadlineMs of [1, TIMER_MAX_MS])
+      expect(
+        codes(
+          editing(TRIGGER, doc => {
+            doc.settings.deadlineMs = deadlineMs;
+          }),
+        ),
+      ).toEqual([]);
   });
 
   it("the consume step's concurrency of none", () => {

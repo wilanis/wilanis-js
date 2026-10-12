@@ -230,7 +230,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [X253](X253.md) | X | live | `catchUp` is set while no scheduler run step names a lease |
 | [X254](X254.md) | X | live | the scheduler run step's lease names no connection, or one whose kind keeps no leases |
 | [X301](X301.md) | X | live | an @otel endpoint that is neither an http(s) URL nor a secret read, a level that is not summary or full, or a flushDeadlineMs longer than a Node timer can wait |
-| [X401](X401.md) | X | live | a queue setting a worker cannot act on: an outcome that is not ack, retry or dead, or attempts, backoff or concurrency out of range |
+| [X401](X401.md) | X | live | a queue setting a worker cannot act on: an outcome that is not ack, retry or dead, or attempts, backoff, deadline or concurrency out of range |
 | [X402](X402.md) | X | live | a `retry` outcome, or `onFault` left at retry, on a queue trigger whose connection's kind delivers at most once |
 | [X403](X403.md) | X | live | a `publish` of a type the queue trigger consuming that connection and queue does not accept |
 | [X404](X404.md) | X | live | a queue trigger's message type, or a `publish`'s, carrying a blob at any depth |
