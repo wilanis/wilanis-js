@@ -28,7 +28,7 @@
       "backoffMs": {
         "type": "number",
         "required": false,
-        "description": "the wait before the second delivery, doubled before each further one, a whole number of 0 or more; default 1000"
+        "description": "the wait before the second delivery, doubled before each further one, a whole number of 0 or more; default 1000. The wait is a due time the broker keeps, not a Node timer, so no Node timer limit applies"
       },
       "onFault": {
         "type": "string",
