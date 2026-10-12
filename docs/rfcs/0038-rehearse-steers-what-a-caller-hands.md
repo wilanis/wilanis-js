@@ -95,7 +95,8 @@ Two small parts of #850 are not in this RFC:
 
 This RFC does not try to:
 
-- steer more than one element of a list (the first element stands for all, as #904 made true);
+- steer more than one element of a list (the first element stands for all, as #904 made true). #1003 (PR #1006) does
+  it since: the rehearsal writes a demand on a list's element into every element it makes;
 - invert a composed value, such as text with reads in it;
 - vary `context`, which the trigger kind and the guard hand;
 - change how a switch in the same graph as the node it reads is steered;
