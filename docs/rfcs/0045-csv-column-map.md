@@ -1,8 +1,8 @@
 # RFC 0045: `columns`: a CSV header name read into a field of another name
 
 - **Status:** draft
-- **Areas:** `area:plugin-blob` (`csv.port.json`, the two CSV handlers, a first `check` with two X rules). Nothing in
-  core, the compiler, the runtime or the viewer.
+- **Areas:** `area:plugin-blob` (`csv.port.json` and the two CSV handlers). Nothing in core, the compiler, the
+  runtime or the viewer, and no new checker rule.
 - **Tracking issue:** #853
 - **Depends on:** none
 
@@ -13,9 +13,10 @@ header name, as the file writes it, to a field of the row shape. With it, a tree
 `average-revs` into a shape whose field is `averageRevs`, and writes the file back with the same header. A column
 the map does not name is read and written by its own name, as today. The input is typed with what a contract can
 already say (an object open to strings, marked `static`), so the compiler already judges that it is a literal
-(P001) and that its values are strings (G004). Two new rules in `@blob`'s own `check` judge what only the plugin
-understands: each value names a field of the shape (X5n1), and each field has one column (X5n2). No schema under
-`packages/core/schemas/` changes. No codec changes either, because no codec decodes CSV into rows.
+(P001) and that its values are strings (G004). The RFC adds no new rule. A map that names a field the shape does
+not have, or that gives two fields one header, fails the node as a fault the first time it runs, with a message
+that names the map entry. No schema under `packages/core/schemas/` changes. No codec changes either, because no
+codec decodes CSV into rows.
 
 ## Motivation
 
@@ -109,32 +110,29 @@ calls, reads a file and writes it back with the header it came with:
 }
 ```
 
-**What the checker says.** The map is static, so the checker reads it before anything runs. A value that is not a
-field of the shape is X5n1:
+**What a bad map does.** The compiler judges the map's form, because `columns` is typed and static. A read where
+the map belongs (`"columns": "{{in.filename}}"`) is P001, and a value that is not a string (`"E-mail address": 3`)
+is G004. I checked both on the example, with the input added to `csv.port.json` by hand: the checker refuses each
+with today's code, and accepts the map above with no refusal.
+
+What the map *means* against the shape is not a checker rule. The handler judges it when the node runs, before it
+reads or writes a byte, and fails the node as a fault. A map value that is not a field of the shape:
 
 ```
-X5n1  @features/customers/data/parse-drafts.graph.json#nodes/drafts/in/columns/E-mail address
-    columns reads 'E-mail address' into 'mail', which is not a field of @customers/domain/CustomerDraft.shape.json (fields: name, email, tier)
-    → map the column to one of those fields, or add the field to the shape
+csv columns: 'E-mail address' maps to 'mail', which is not a field of @customers/domain/CustomerDraft.shape.json (fields: name, email, tier)
 ```
 
-Two headers that land on one field, or a header that is already another field's own name, is X5n2:
+Two fields that would share one header, because two keys name one field, or because a key is another field's own
+name and no key maps to that field:
 
 ```
-X5n2  @features/customers/data/parse-drafts.graph.json#nodes/drafts/in/columns/Mail
-    columns reads 'E-mail address' and 'Mail' both into 'email', and a field is one column
-    → keep one of the two
+csv columns: 'E-mail address' and 'Mail' both map to 'email'
+csv columns: 'name' maps to 'email', and 'name' is also the header of the field 'name'
 ```
 
-```
-X5n2  @features/customers/data/parse-drafts.graph.json#nodes/drafts/in/columns/name
-    columns reads the column 'name' into 'email', and 'name' is also the column of the field 'name'
-    → give 'name' a column of its own too ("Full name": "name"), or map another header to 'email'
-```
-
-The compiler already judges the rest. A read where the map belongs (`"columns": "{{in.filename}}"`) is P001, and a
-value that is not a string (`"E-mail address": 3`) is G004. I checked both on the example, with the input added to
-`csv.port.json` by hand: the checker refuses each with today's code, and accepts the map above with no refusal.
+`rehearse` and `fuzz` stub `#parse` and `#write`, so they do not find a bad map. A test or a `wilanis run` against
+a real file finds it on the first call, whatever the file holds, because the handler judges the map before it
+reads.
 
 ## Reference
 
@@ -167,47 +165,32 @@ name."
 
 ### Checker rules
 
-Numbers are assigned when the implementing pull request lands. `@blob` has no X codes today. The bands are
-`@http` X0xx, `@auth` X1xx, `@storage` X2xx (with `@schedule` from X251), `@otel` X3xx and `@queue` X4xx
-(`docs/refusals/README.md`, *The families*). I propose X5xx for `@blob`, the next free band.
-
-Both rules live in a new `packages/plugin-blob/src/rules.ts`, exported as the plugin's `check`. They judge every
-call site of `#parse` and `#write`: each `run` or `map` node of every graph, and each operation of every binding,
-whose `run` names one of the two operations. The walk is the one `graphCalls` and `bindingCalls` make in
-`packages/plugin-storage/src/calls.ts`. `@blob` writes its own, about thirty lines, because a plugin imports no
-other plugin that is not a contract it implements. Each rule reads the shape the call's `type` names through
-`scope.types.spec`. Where it does not resolve, or `columns` is absent or not an object, the rule says nothing:
-R001, P001 and G004 speak there.
-
-| Code | Where it lives | Refuses when | Hint |
-|---|---|---|---|
-| X5n1 | `packages/plugin-blob/src/rules.ts` | a value of `columns` is not a field the shape of `type` declares. An open shape is no exception: the map reads into declared fields, which are the ones a cell is coerced for. `at` is `<call>/in/columns/<header name>`. | `map the column to one of those fields, or add the field to the shape` |
-| X5n2 | `packages/plugin-blob/src/rules.ts` | two fields of the shape would share one column. The column of a field is the header name that `columns` maps to it, else the field's own name. So: two keys map to one field, or a key that is the name of another field maps elsewhere while no key maps to that field. `at` is `<call>/in/columns/<header name>` of the later key. | `keep one of the two`, or `give '<field>' a column of its own too, or map another header to '<field>'` |
-
-**A header named twice in the map.** The checker cannot see it. The loader reads a document with `JSON.parse`
-(`packages/core/src/documents.ts`), which keeps the last of two equal keys and says nothing. So X5n2 judges what
-the parsed map can show: one field named twice, and one header standing for two fields.
-
-**Why X5n2 is a rule and not a run-time failure.** The second form is a sure bug. Under `{"name": "email"}`,
-`#parse` reads the column `name` into `email`, and no column is ever read into `name`, so every row fails if `name`
-is required. `#write` writes two columns both headed `name`. The checker sees all of this from the map and the
-shape alone.
+None. The compiler's P001 and G004 already judge the map's form (*What a bad map does*, above). What the map means
+against the shape is judged by the handler when it runs (*Runtime behaviour*).
 
 ### Runtime behaviour
 
 Only the two handlers in `packages/plugin-blob/src/index.ts` change.
 
+- **The map, before anything is read or written.** Both handlers first compute the header of each field of the
+  shape: the key that maps to it, else the field's own name. One function in `index.ts` does it for both
+  operations. It throws, and so fails the node as a fault, where a value of `columns` is not a field the shape
+  declares, or where two fields get one header. The messages are the ones under *What a bad map does*. The shape
+  is named by the path `type` gives, and its fields are listed. An open shape is no exception: the map reads into
+  declared fields, which are the ones a cell is coerced for. The fault is the same on every call, so a `retry` on
+  the node only repeats it.
 - **`#parse`.** `RowReader` is given the map. When it reads the header line, it replaces each trimmed header cell
   that is a key of `columns` with the key's value. `rowOf` then reads each cell into the field of that name, exactly
   as it does today. Coercion, absent optional cells, the blank-line rule, the row's line number in a failure and the
   stop between rows when the signal aborts do not change.
-- **A header that names one field twice.** If two cells of the header line land on one name after the map, the node
-  fails at the header: `csv header: columns 'average-revs' and 'averageRevs' are both read into 'averageRevs'`.
-  Today, a header that repeats a name keeps the last cell of the two and drops the other without a word. This RFC
-  proposes that a repeated header fails whether or not `columns` is given (*Open questions*, 2).
-- **`#write`.** `lines` writes the header row through the inverse map: field `f` under the key whose value is `f`,
-  else under `f`. The order is the shape's field order, as `columnsOf` gives it today. The values of each row are
-  read by field name, as today. X5n1 and X5n2 make the inverse map one to one.
+- **Two cells of the file's header that land on one field.** This RFC does not change it. Today, `a,a` keeps the
+  last cell and drops the other without a word, and a header `average-revs,averageRevs` under
+  `{"average-revs": "averageRevs"}` behaves the same way. Whether today's behaviour is a bug is a separate issue.
+- **A key no header cell writes.** Nothing happens at the header. The field it maps to gets no column, so where that
+  field is required each row fails as today: `csv does not fit <shape>: row 2.averageRevs: required`.
+- **`#write`.** `lines` writes the header row from the headers computed above: field `f` under the key whose value is
+  `f`, else under `f`. The order is the shape's field order, as `columnsOf` gives it today. The values of each row
+  are read by field name, as today.
 - **`rehearse`, `fuzz`, `regress`.** Nothing changes. `#parse` and `#write` are effects and are stubbed. A stub of
   `#parse` is a value of `$T[]`, keyed by field names, which the map does not change.
 
@@ -218,68 +201,57 @@ Only the two handlers in `packages/plugin-blob/src/index.ts` change.
   way. That rendering of an object open to strings is `show` in `packages/core/src/types.ts`, and this RFC does
   not change it.
 - The viewer's port page reads the same document. Nothing changes in `client/index.html`.
-- `docs/refusals/X5n1.md` and `X5n2.md`, from the page template. Their rows go in the index of
-  `docs/refusals/README.md`, and `@blob` X5xx joins the band list under *The families*.
 - The plugin's `README.md` says what `columns` does, on the line for `#parse` and `#write`.
 
 ### Plugin contract
 
-None. `@blob` starts to use `check`, which `PluginModule` in `packages/core/src/plugin.ts` already offers.
+None. `@blob` still has no `check`.
 
 ## Compatibility
 
 No schema changes, and IR v1 is untouched. A document written before this RFC gives no `columns`, so it validates
-and keeps its meaning: every column is read and written by its own name. The one change in meaning is the repeated
-header line under *Runtime behaviour*. A CSV whose header repeats a name was read before, keeping the last of the
-two cells. It now fails the node, if the maintainer accepts that point. After 1.0, adding an optional input to a
-port a plugin grants is a compatible change.
+and keeps its meaning: every column is read and written by its own name. Nothing changes for a file whose header
+repeats a name. After 1.0, adding an optional input to a port a plugin grants is a compatible change.
 
 ## Tests
 
-**The rules.** A new `packages/plugin-blob/test/rules.test.ts` over a small tree of its own, built as
-`packages/plugin-queue/test/tree.ts` builds one. The tree is one feature, a row shape with a number field, and a
-data graph that parses a CSV and writes one, both with a `columns` map. The test package adds
-`@wilanis/compiler` to its `devDependencies`, beside `@wilanis/runtime`, as `@wilanis/plugin-queue` does. A plugin's
-X rules are proved in its own tests, as `@queue`'s are in `packages/plugin-queue/test/rules.test.ts`.
-
-| Case | Edit | Expects |
-|---|---|---|
-| the tree stands | none | no refusal |
-| X5n1 | `"columns": { "average-revs": "averageRevz" }` on the parse | X5n1 at `nodes/<id>/in/columns/average-revs`, naming the shape's fields |
-| X5n1 on write | the same map on the write node | X5n1 at the write node |
-| X5n1 in a binding | the parse run from a binding operation instead of a graph node | X5n1 at `operations/<name>/in/columns/average-revs` |
-| X5n2, two headers | `{ "average-revs": "averageRevs", "avg": "averageRevs" }` | X5n2 at `.../columns/avg` |
-| X5n2, a field's own name | `{ "degree": "averageRevs" }` | X5n2 at `.../columns/degree` |
-| not X5n2, a swap | `{ "degree": "averageRevs", "averageRevs": "degree" }` | no refusal |
-| not X5n2, identity | `{ "degree": "degree" }` | no refusal |
-| left to the compiler | `"columns": "{{in.name}}"`; `{ "average-revs": 3 }` | P001; G004; no X5n1 or X5n2 |
-
-**The handlers.** `packages/plugin-blob/test/blob.test.ts`, beside today's parse and write cases:
+No sabotage test: the RFC adds no checker rule. The handler tests go in `packages/plugin-blob/test/blob.test.ts`,
+beside today's parse and write cases:
 
 - a file headed `url,method,hit-count` with `columns: { "hit-count": "hits" }` reads `hits` as a number;
 - an unmapped column is read by its own name, mapped and unmapped mixed in one header;
 - a key no header writes changes nothing, and a required field it was meant for fails the first row as today;
 - `#write` with the map writes `url,method,hit-count,ok`, and a parse of that blob with the same map gives the rows
   back unchanged;
-- a header whose cells land on one field after the map fails at the header line; so does `a,a` with no map, if
-  *Open questions* 2 is accepted.
+- a map value that is not a field fails `#parse` and `#write` with the message under *What a bad map does*, on an
+  empty file too, so the handler judged the map before it read;
+- two keys that map to one field, and a key that is another field's own name, each fail both operations the same
+  way; a swap (`{ "degree": "averageRevs", "averageRevs": "degree" }`) and an identity (`{ "degree": "degree" }`)
+  do not.
 
 ## Implementation plan
 
 1. **The input and the handlers** (`area:plugin-blob`, `good first issue`). `columns` on `#parse` and `#write` in
-   `csv.port.json`, with the new descriptions; `RowReader`, `lines` and `columnsOf` in `src/index.ts`; the handler
-   tests above; the line in the plugin's `README.md`.
-2. **X5n1 and X5n2** (`area:plugin-blob`). `src/rules.ts` and `check` on the plugin; `test/rules.test.ts` and its
-   small tree; `docs/refusals/X5n1.md` and `X5n2.md`; their rows and the `@blob` band in
-   `docs/refusals/README.md`. Needs step 1, since the rules judge an input the port must accept first.
+   `csv.port.json`, with the new descriptions; the map's headers, `RowReader`, `lines` and `columnsOf` in
+   `src/index.ts`; the handler tests above; the line in the plugin's `README.md`. One pull request.
 
 The consumer then drops `header` from `plugins/scan-codemaat/src/index.ts` and writes
 `"columns": { "average-revs": "averageRevs" }` on its parse. That edit is in the consumer's repository, not here.
 
 ## Drawbacks and alternatives
 
-**Cost.** One more input on two operations, two rules and their pages, and a first `check` in `@blob`. A reader of
-a parse now looks in two places to know which field a column fills: the shape and the map.
+**Cost.** One more input on two operations, and one function that judges the map in the handlers. A reader of a
+parse now looks in two places to know which field a column fills: the shape and the map. A bad map is found when
+the node first runs for real, not by `wilanis check`.
+
+**Rules in `@blob`'s own `check`.** The first draft of this RFC proposed two X rules that judged the map against the
+shape before anything ran. The maintainer decided against new plugin rules in this RFC. The handler's fault
+names the same entries, but only when the node runs.
+
+**No judgement of the map at all.** The handlers could apply the map as written and judge nothing. Then a value
+that is not a field fails a closed shape on each row as `not a declared field`, but is silently kept as text in an
+open shape. On `#write` the entry is silently ignored, and a key that is another field's name writes two columns
+with one header. The handler's judgement costs a few lines and stops all three.
 
 **Do nothing; teach the workaround.** Rewrite the header before the tree reads the file. This works only where a
 plugin produces the file, and there it changes the file the tree keeps (the consumer's `raw`). A file a person
@@ -298,7 +270,8 @@ it puts one file format's spelling into a shape that other ports also read. A sh
 file's, so it belongs where the file is read.
 
 **A map that a read gives at run time.** A dynamic `columns` would let one graph read files of several headers. The
-checker could no longer judge it, and no consumer has asked for it. Static matches `type`, which is static too.
+compiler could no longer type it, and no consumer has asked for it.
+Static matches `type`, which is static too.
 
 **A rename after the parse.** An `@std/object` operation that renames keys, run on the rows. It comes too late: the
 parse fails a closed shape on the unknown column before the rename runs, and only the parse coerces cells.
@@ -311,19 +284,13 @@ that is its own RFC.
 
 ## Open questions
 
-To decide before `accepted`:
+Settled in review:
 
-1. **The band.** X5xx for `@blob`, as the next free hundred. Recommended.
-2. **A repeated header line fails, map or no map.** Today `a,a` keeps the last cell and drops the other without a
-   word. With a map, two cells can land on one field in a new way (`average-revs,averageRevs` under
-   `{"average-revs": "averageRevs"}`). I recommend failing at the header in both cases: one rule, and the silent
-   loss stops. The alternative is to fail only where the map caused the collision and keep today's behaviour for a
-   plain repeat. That changes nothing for an existing tree, at the cost of two behaviours for one shape of fault.
-3. **`#write` takes the map too.** Recommended: one map, the same on both calls, gives a file back with the header
-   it came with, and the cost is the inverse in `lines`. The consumer only reads. If the maintainer prefers the
-   smallest change, `#write` can wait for a tree that writes such a header.
+- **No new rules.** Neither `columns` nor a repeated header in the file becomes a refusal. A bad map is a fault of
+  the handler (*Runtime behaviour*).
+- **`#write` takes the map.** One map, the same on both calls, gives a file back with the header it came with.
 
 May be decided during implementation:
 
 - Whether a key with spaces around it is trimmed before it is compared. Header cells are trimmed today, so such a
-  key never matches. Trimming the key too, or refusing it in X5n1, are both small.
+  key never matches. Trimming the key too, or failing on it with the other faults of the map, are both small.
