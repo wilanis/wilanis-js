@@ -226,7 +226,7 @@ describe('a map without limit or concurrency', () => {
           status: 'done',
           startedAt: 7,
           endedAt: 7,
-          settled: 1,
+          order: 1,
           handler: 'double',
           in: { over: [1, 2] },
           out: [2, 4],

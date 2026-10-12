@@ -46,7 +46,7 @@ export class Run {
   /** How the run ended before quiescence, once it has; the first ending stands. */
   private ending: Ending | undefined;
   private running = 0;
-  /** How many nodes of this run have settled: the next one is `settled` one more, whatever the clock says. */
+  /** How many nodes of this run have settled: the next one takes `order` one more, whatever the clock says. */
   private settles = 0;
   private wake: (() => void) | undefined;
   /** What a map of this run reads and calls through. */
@@ -160,7 +160,7 @@ export class Run {
       .catch(error => this.fail(id, report, error))
       .finally(() => {
         report.endedAt = this.clock();
-        report.settled = ++this.settles;
+        report.order = ++this.settles;
         this.running--;
         this.wake?.();
       });

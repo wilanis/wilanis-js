@@ -117,7 +117,7 @@ describe('two refusals in one tick of the clock', () => {
     const report = await new Kernel(raced).run(spec, { clock: () => 7 });
     expect(report.nodes.late).toMatchObject({ status: 'failed', reason: 'late', endedAt: 7 });
     expect(report.nodes.early).toMatchObject({ status: 'failed', reason: 'early', endedAt: 7 });
-    expect(report.nodes.early.settled).toBeLessThan(report.nodes.late.settled ?? 0);
+    expect(report.nodes.early.order).toBeLessThan(report.nodes.late.order ?? 0);
     expect(outcomeOf(report)).toMatchObject({ kind: 'refused', reason: 'early', at: 'early' });
   });
 });
