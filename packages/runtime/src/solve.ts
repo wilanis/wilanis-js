@@ -65,6 +65,13 @@ function membership(node: expr.Expr & { kind: 'bin' }, want: boolean): Demands[]
   return [{ [key(node.right.path)]: want ? { has: [node.left.value], present: true } : { lacks: [node.left.value] } }];
 }
 
+/** `path contains 'word'`: the text must hold the word, or must not; a text that is not a path names nothing to make. */
+function containment(node: expr.Expr & { kind: 'bin' }, want: boolean): Demands[] {
+  if (node.left.kind !== 'path' || node.right.kind !== 'lit' || typeof node.right.value !== 'string') return [];
+  const word = node.right.value;
+  return [{ [key(node.left.path)]: want ? { contains: [word], present: true } : { omits: [word] } }];
+}
+
 /** What one comparison demands of the path it names: its length when written under len(), else its value. */
 function demandOf(target: expr.Expr, truth: Cmp, lit: unknown): Demands[] {
   // len(path) <op> length_ constrains the path's length; path <op> lit constrains its value
@@ -79,8 +86,8 @@ function demandOf(target: expr.Expr, truth: Cmp, lit: unknown): Demands[] {
 
 /** Solve one comparison: a literal against a path or its length, two paths for equality, or a length against a side. */
 function compare(node: expr.Expr & { kind: 'bin' }, want: boolean, within: Demands): Demands[] {
-  // `text contains 'word'`: no demand yet (RFC 0040 step 2), so its branches read unsolved rather than solved wrongly
-  if (node.op === 'contains') return [];
+  // `path contains 'word'`: the text must hold the word, or must not
+  if (node.op === 'contains') return containment(node, want);
   // `lit in path`: the list must hold the literal, or must not
   if (node.op === 'in') return membership(node, want);
   const sides: [expr.Expr, expr.Expr] = [node.left, node.right];
@@ -132,8 +139,7 @@ function lenDomain(op: Cmp, length_: number): Domain {
  * both must hold, and either side of an `||`, since one alone may.
  */
 function nameableBin(node: expr.Expr & { kind: 'bin' }): boolean {
-  // the solver makes no text that holds or lacks a word yet (RFC 0040 step 2)
-  if (node.op === 'contains') return false;
+  if (node.op === 'contains') return node.left.kind === 'path' && node.right.kind === 'lit';
   if (node.op === '&&') return nameable(node.left) && nameable(node.right);
   if (node.op === '||') return nameable(node.left) || nameable(node.right);
   if (node.op === 'in') return node.left.kind === 'lit' && node.right.kind === 'path';

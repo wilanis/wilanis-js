@@ -19,6 +19,9 @@ export interface Domain {
   /** The path is a list holding each of these (`x in path`) / none of these (`!(x in path)`). */
   has?: unknown[];
   lacks?: unknown[];
+  /** The path is a text holding each of these words (`path contains 'word'`) / none of them (`!(path contains 'word')`). */
+  contains?: string[];
+  omits?: string[];
   /** The path must be truthy / falsy, used when a bare path is the whole predicate. */
   truthy?: boolean;
   /**
@@ -51,10 +54,22 @@ export type Maybe<T> = T | typeof UNSAT;
 /** The dotted path an input is demanded at, which is how a `Demands` set is keyed. */
 export const key = (path: string[]) => path.join('.');
 
-/** Whether the list must both hold and lack the same value. */
+/** Whether what the path must hold clashes with what it must lack: a list the same value, or a text the same words. */
 function contradicts(domain: Domain): boolean {
+  if (wordsClash(domain)) return true;
   if (!domain.has || !domain.lacks) return false;
   return domain.has.some(one => domain.lacks?.some(bad => JSON.stringify(one) === JSON.stringify(bad)));
+}
+
+/**
+ * Whether the words a text must hold and lack clash: a word it must lack is part of one it must hold, or a word it must
+ * hold is longer than the text may be.
+ */
+function wordsClash(domain: Domain): boolean {
+  const held = domain.contains ?? [];
+  if (held.some(word => domain.omits?.some(bad => word.includes(bad)))) return true;
+  const most = domain.maxLen;
+  return most !== undefined && held.some(word => word.length > most);
 }
 
 /** Whether everything gathered for a path can hold at once. */
@@ -136,6 +151,17 @@ function narrowMembers(domain: Domain, by: Domain): Maybe<Domain> {
     domain.present = true;
   }
   if (by.lacks) domain.lacks = [...(domain.lacks ?? []), ...by.lacks];
+  return narrowWords(domain, by);
+}
+
+/** Words: what the text must hold implies the text is there, as membership does; what it must lack does not. */
+function narrowWords(domain: Domain, by: Domain): Maybe<Domain> {
+  if (by.contains) {
+    if (domain.absent) return UNSAT;
+    domain.contains = [...new Set([...(domain.contains ?? []), ...by.contains])];
+    domain.present = true;
+  }
+  if (by.omits) domain.omits = [...new Set([...(domain.omits ?? []), ...by.omits])];
   return domain;
 }
 
@@ -164,13 +190,24 @@ function withinBounds(value: number, domain: Domain): boolean {
   return true;
 }
 
-/** Whether a concrete value satisfies a domain's bounds and exclusions. */
+/** Whether a concrete value satisfies a domain's bounds, exclusions and words. */
 export function fits(value: unknown, domain: Domain): boolean {
   if (domain.ne?.some(excluded => JSON.stringify(excluded) === JSON.stringify(value))) return false;
   if (domain.truthy !== undefined && Boolean(value) !== domain.truthy) return false;
+  if (!fitsWords(value, domain)) return false;
   if (typeof value === 'number' && !withinBounds(value, domain)) return false;
   if (Array.isArray(value)) return fitsAsList(value, domain);
   return !domain.has?.length;
+}
+
+/**
+ * Whether a value holds every word the domain asks for and none it forbids. Only a text holds a word, as `contains`
+ * answers false for any other value, so any other value fits a domain that only forbids words.
+ */
+function fitsWords(value: unknown, domain: Domain): boolean {
+  if (typeof value !== 'string') return !domain.contains?.length;
+  if (domain.contains?.some(word => !value.includes(word))) return false;
+  return !domain.omits?.some(word => value.includes(word));
 }
 
 /** Whether a list is of the length the domain asks for, and holds and lacks what it must. */

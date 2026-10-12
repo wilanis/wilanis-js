@@ -4,6 +4,7 @@
  */
 import { generate, rng, type Type, typeAt } from '@wilanis/core';
 import { type Domain, fits } from './domains.js';
+import { asksWords, fitsText, withWords } from './stubs-words.js';
 
 // ---- from demands to stubs --------------------------------------------------------------------------
 
@@ -108,10 +109,11 @@ function plausible(domain: Domain, value: unknown): boolean {
 }
 
 /**
- * What `satisfy` answers when the domain excludes every member of a string enum: no value of the type meets the
- * demand. An absent field is the solver's to demand, as `absent`, so a case given this answer is one no run can take.
+ * What `satisfy` answers when no value of the type meets the demand: the domain excludes every member of a string enum,
+ * or no text the solver can make holds and lacks the words it asks for. An absent field is the solver's to demand, as
+ * `absent`, so a case given this answer is one no run can take.
  */
-export const NO_MEMBER: unique symbol = Symbol('no member of the enum is left');
+export const NO_MEMBER: unique symbol = Symbol('no value of the type meets the demand');
 
 /**
  * A value the domain does not exclude, of the same family as what it excludes where that can be told. A string with an
@@ -124,6 +126,19 @@ function excluding(domain: Domain, generated: unknown, type: Type | undefined): 
   if (kept && (!members || members.includes(generated as string))) return generated;
   if (members) return members.find(member => fits(member, domain)) ?? NO_MEMBER;
   return unlikeExcluded(domain);
+}
+
+/**
+ * A text that holds and lacks the words the domain asks for. A string enum keeps the generated member where it does,
+ * else takes the first member that does, so the value stays one of its type; any other text is the generated one, or a
+ * fresh one, changed. `NO_MEMBER` where none can be made: a value the solver cannot build is reported, never run.
+ */
+function withWordsOf(domain: Domain, generated: unknown, type: Type | undefined, seed: number): unknown {
+  const members = membersOf(type);
+  const fitting = (one: unknown) => typeof one === 'string' && members?.includes(one) && fitsText(one, domain);
+  if (members) return [generated, ...members].find(fitting) ?? NO_MEMBER;
+  const base = typeof generated === 'string' ? generated : fresh(type, seed);
+  return withWords(domain, typeof base === 'string' ? base : '', PLACEHOLDER) ?? NO_MEMBER;
 }
 
 /** The members of a string enum; undefined for any other type. */
@@ -187,6 +202,7 @@ const DEMANDS: {
   { asks: domain => Boolean(domain.absent), met: () => undefined },
   { asks: domain => domain.eq !== undefined, met: domain => domain.eq },
   { asks: domain => domain.paired !== undefined, met: (domain, _generated, type, seed) => inPair(domain, type, seed) },
+  { asks: asksWords, met: withWordsOf },
   { asks: domain => Boolean(domain.has?.length || domain.lacks?.length), met: withMembers },
   { asks: domain => domain.minLen !== undefined || domain.maxLen !== undefined, met: withLength },
   {
