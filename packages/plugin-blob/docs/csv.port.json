@@ -4,7 +4,7 @@
   "description": "CSV files (RFC 4180: a header row, comma-separated fields, quotes around fields that need them) read as rows of a declared shape, and rows written as a file. The file is streamed both ways; only the rows are values.",
   "operations": {
     "parse": {
-      "description": "Read a CSV blob as a list of rows. The header row names the columns; each following row becomes one value of `type`, its number and boolean fields coerced from text, judged against the shape. An empty cell of an optional field is absent. A row that does not fit the shape fails the node with its line number.",
+      "description": "Read a CSV blob as a list of rows. The header row names the columns; `columns` maps a header name to the field it is read into, and every other column is read into the field of its own name. Each following row becomes one value of `type`, its number and boolean fields coerced from text, judged against the shape. An empty cell of an optional field is absent. A row that does not fit the shape fails the node with its line number.",
       "accepts": {
         "file": {
           "type": "blob",
@@ -14,13 +14,19 @@
           "type": "type",
           "binds": "$T",
           "description": "the shape of one row; its fields are the columns read"
+        },
+        "columns": {
+          "type": { "fields": {}, "open": "string" },
+          "required": false,
+          "static": true,
+          "description": "header names that are not the field's own name: each key is a header name as the file writes it, each value the field of `type` its column is read into (parse) or written from (write). A column the map does not name is read and written by its own name. Absent: every column by its own name."
         }
       },
       "returns": "$T[]",
       "idempotent": true
     },
     "write": {
-      "description": "Write rows as a CSV blob: a header row of the shape's fields in declared order, then one line per row, quoting what needs it. Answers the new file's handle.",
+      "description": "Write rows as a CSV blob: a header row of the shape's fields in declared order, each under the header name `columns` maps to it, else under its own name, then one line per row, quoting what needs it. Answers the new file's handle.",
       "accepts": {
         "rows": {
           "type": "$T[]",
@@ -30,6 +36,12 @@
           "type": "type",
           "binds": "$T",
           "description": "the shape of one row; its fields are the columns written"
+        },
+        "columns": {
+          "type": { "fields": {}, "open": "string" },
+          "required": false,
+          "static": true,
+          "description": "header names that are not the field's own name: each key is a header name as the file writes it, each value the field of `type` its column is read into (parse) or written from (write). A column the map does not name is read and written by its own name. Absent: every column by its own name."
         },
         "filename": {
           "type": "string",

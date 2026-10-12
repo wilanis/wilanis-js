@@ -36,6 +36,46 @@ const rowType = (env: Record<string, unknown>, ref: unknown): Type | undefined =
   return resolve && typeof ref === 'string' ? resolve(ref) : undefined;
 };
 
+// ---- the header of each field ----------------------------------------------------------------------------
+
+const isRecord = (value: unknown): value is Row => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** The field one entry of `columns` reads its header into; throws where the entry cannot mean one. */
+function fieldOfEntry(key: string, value: unknown, fields: string[], ref: unknown): string {
+  if (key !== key.trim())
+    throw new Error(
+      `csv columns: '${key}' has spaces around it, and a header cell is read trimmed, so it never matches; write '${key.trim()}'`,
+    );
+  if (typeof value !== 'string' || !fields.includes(value))
+    throw new Error(
+      `csv columns: '${key}' maps to '${String(value)}', which is not a field of ${String(ref)} (fields: ${fields.join(', ')})`,
+    );
+  return value;
+}
+
+/**
+ * The header each field of the shape is read from and written under: the `columns` key that maps to it, else its
+ * own name. Throws, and so fails the node before a byte is read or written, where the map names no field, gives two
+ * fields one header, or writes a key with spaces around it.
+ */
+function headersOf(columns: unknown, type: Type | undefined, ref: unknown): Map<string, string> {
+  const fields = type?.kind === 'object' ? Object.keys(type.fields) : [];
+  const keyOf = new Map<string, string>();
+  for (const [key, value] of Object.entries(isRecord(columns) ? columns : {})) {
+    const field = fieldOfEntry(key, value, fields, ref);
+    const other = keyOf.get(field);
+    if (other !== undefined) throw new Error(`csv columns: '${other}' and '${key}' both map to '${field}'`);
+    keyOf.set(field, key);
+  }
+  const headers = new Map(fields.map(field => [field, keyOf.get(field) ?? field]));
+  for (const [field, key] of keyOf)
+    if (key !== field && headers.get(key) === key)
+      throw new Error(
+        `csv columns: '${key}' maps to '${field}', and '${key}' is also the header of the field '${key}'`,
+      );
+  return headers;
+}
+
 // ---- CSV as rows of a shape ----------------------------------------------------------------------------
 
 /** One text cell as a value of the field's type: numbers and booleans from their spelling, an empty optional cell absent. */
@@ -58,7 +98,8 @@ function rowOf(header: string[], cells: string[], type: Type): Row {
 }
 
 /**
- * Rows of a shape, read from a CSV blob as it streams: the first line names the columns. Between one row and the
+ * Rows of a shape, read from a CSV blob as it streams: the first line names the columns, each read into the field
+ * whose header it is, else the field of its own name. Between one row and the
  * next it asks the run's signal, and once that has aborted it rejects as an aborted call does, so a cancelled
  * import reads no further into the file.
  */
@@ -67,17 +108,22 @@ class RowReader {
   private line = 0;
   readonly rows: Row[] = [];
 
+  private readonly fieldOf: Map<string, string>;
+
   constructor(
     private readonly type: Type,
+    headers: Map<string, string>,
     private readonly signal: AbortSignal | undefined,
-  ) {}
+  ) {
+    this.fieldOf = new Map([...headers].map(([field, header]) => [header, field]));
+  }
 
   take(rows: string[][]): void {
     for (const cells of rows) {
       this.signal?.throwIfAborted();
       this.line++;
       if (!this.header) {
-        this.header = cells.map(name => name.trim());
+        this.header = cells.map(name => this.fieldOf.get(name.trim()) ?? name.trim());
         continue;
       }
       if (cells.length === 1 && cells[0] === '') continue; // a blank line
@@ -94,13 +140,13 @@ async function parse(
   blobs: BlobStore,
   file: unknown,
   type: Type | undefined,
-  signal?: AbortSignal,
+  { headers, signal }: { headers: Map<string, string>; signal?: AbortSignal },
 ): Promise<unknown[]> {
   if (!type) throw new Error("parse: 'type' must name the row shape");
   signal?.throwIfAborted();
   const decoder = new StringDecoder('utf8');
   const csv = new CsvRows();
-  const reader = new RowReader(type, signal);
+  const reader = new RowReader(type, headers, signal);
   for await (const chunk of blobs.open(handleOf(file, 'file'))) reader.take(csv.feed(decoder.write(chunk as Buffer)));
   reader.take(csv.feed(decoder.end()));
   reader.take(csv.end());
@@ -118,20 +164,26 @@ function columnsOf(rows: unknown[], type: Type | undefined): string[] {
   return Object.keys((rows[0] ?? {}) as Row);
 }
 
-function* lines(rows: unknown[], type: Type | undefined): Iterable<string> {
+/** The lines of a CSV file: a header row, each column under the header `headers` gives it, else its own name; then the rows. */
+function* lines(rows: unknown[], type: Type | undefined, headers: Map<string, string>): Iterable<string> {
   const columns = columnsOf(rows, type);
-  yield `${columns.map(quote).join(',')}\r\n`;
+  yield `${columns.map(column => quote(headers.get(column) ?? column)).join(',')}\r\n`;
   for (const row of rows) yield `${columns.map(column => quote((row as Row)[column])).join(',')}\r\n`;
 }
 
 // ---- the operations ------------------------------------------------------------------------------------
 
-const csvParse: Handler = async ({ in: input, ctx }) =>
-  parse(storeOf(ctx.env), input.file, rowType(ctx.env, input.type), ctx.signal);
+const csvParse: Handler = async ({ in: input, ctx }) => {
+  const type = rowType(ctx.env, input.type);
+  const headers = headersOf(input.columns, type, input.type);
+  return parse(storeOf(ctx.env), input.file, type, { headers, signal: ctx.signal });
+};
 
 const csvWrite: Handler = async ({ in: input, ctx }) => {
+  const type = rowType(ctx.env, input.type);
+  const headers = headersOf(input.columns, type, input.type);
   if (!Array.isArray(input.rows)) throw new Error('write: rows is not a list');
-  return storeOf(ctx.env).put(Readable.from(lines(input.rows, rowType(ctx.env, input.type))), {
+  return storeOf(ctx.env).put(Readable.from(lines(input.rows, type, headers)), {
     contentType: 'text/csv; charset=utf-8',
     filename: typeof input.filename === 'string' ? input.filename : undefined,
   });
