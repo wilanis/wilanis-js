@@ -174,9 +174,9 @@ function fixedList(held: Stopped): Stopped {
 
 /**
  * The read one hop out, from the source a call or a map hands under a name, with the rest of the read under it: a read
- * goes on as that source; an object written out is entered at the next field read; a literal stops the trace with the
- * value at that path; anything else -- text with reads in it, a list written out, an object read whole or at a field it
- * does not write -- is composed. The trace stops at the call or map, where `out` stands.
+ * goes on as that source; an object written out is entered at the next field read, and a field it does not write is a
+ * literal that is not there; a literal stops the trace with the value at that path; anything else -- text with reads in
+ * it, a list written out, an object read whole -- is composed. The trace stops at the call or map, where `out` stands.
  */
 function handed(source: unknown, rest: string[], out: Standing): Hop | Stopped {
   const src = sourceOf(source);
@@ -186,6 +186,8 @@ function handed(source: unknown, rest: string[], out: Standing): Hop | Stopped {
   const [field, ...deeper] = rest;
   if (written.object && field !== undefined && field in written.object)
     return handed(written.object[field], deeper, out);
+  // a field an object written out does not write is not there: a value the tree fixes, as a literal is (#1027)
+  if (written.object && field !== undefined) return { stopped: out.at, reason: 'literal', value: undefined };
   return { stopped: out.at, reason: 'composed' };
 }
 

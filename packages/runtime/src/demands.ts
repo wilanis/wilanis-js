@@ -13,8 +13,9 @@
 import { TAKEN_IDS } from '@wilanis/compiler';
 import { type Type, typeAt } from '@wilanis/core';
 import type { KSwitchLike, Settled, Stubbing } from './branches.js';
+import { intoCall } from './demand-calls.js';
 import { closedSaid, exhaustedOf, stoppedSaid, type Unmet } from './demand-said.js';
-import { type Domain, fits, meets } from './domains.js';
+import { type Domain, meets } from './domains.js';
 import {
   type Holder,
   type Landed,
@@ -69,13 +70,24 @@ function withEach(landed: Landed, each: number[] | undefined, length: number): L
  * list. Any other node is stubbed where its answer is stubbed (`stubTarget`). Where the trace stopped, `ofStopped` says
  * what is left.
  */
-function ofTraced(read: string[], landed: Landed | Stopped, asked: Asked, from: Settled): Met | Unmet | Fixed {
+function ofTraced(read: string[], landed: Landed | Stopped, asked: Asked, from: Settled): Met | Unmet | Fixed | Every {
   if ('stopped' in landed) return ofStopped(read, landed, asked, from);
   if ('input' in landed) return ofInput(landed.input, asked, from, landed.each);
   const through = inward(landed.standing.at, landed.path, landed.standing, from);
   if (through) return ofTraced(read, withEvery(through, landed.each), asked, from);
+  const call = called(landed.standing.at, landed, asked, from);
+  if (call) return call;
   const each = landed.each ? { each: landed.each } : {};
-  return { stub: { ...onNode(landed, from), value: asked.domain, field: asked.field, ...each } };
+  const placed = onNode(landed, from);
+  if (asked.domain.absent && requiredAt(from.typeOf(placed.target), placed.path))
+    return { missed: 'exhausted', why: `'${placed.path.join('.')}' is required in what '${placed.target}' answers` };
+  return { stub: { ...placed, value: asked.domain, field: asked.field, ...each } };
+}
+
+/** Whether the last step of a path names a field its object requires: one a stub can never leave out. */
+function requiredAt(type: Type | undefined, path: string[]): boolean {
+  const parent = path.length ? typeAtPath(type, path.slice(0, -1)) : undefined;
+  return parent?.kind === 'object' && parent.fields[path[path.length - 1] ?? '']?.required === true;
 }
 
 /**
@@ -92,8 +104,8 @@ function writtenFrom(node: string, path: string[], standing: Standing, from: Set
 
 /**
  * A demand on a node's answer carried to what the node is run from, where it is run and never stubbed (#1027): the
- * value a pure `make` copies; the list a map with no rule runs over, for a demand on the whole answer, which is on its
- * length; or the node inside a call into one of the tree's graphs that answers it. Nothing where the node is none of
+ * value a pure `make` copies; or the list a map with no rule runs over, for a demand on the whole answer, which is on
+ * its length. A call into one of the tree's graphs is met inside it (`called`). Nothing where the node is none of
  * these, and the demand stays on its answer.
  */
 function inward(node: string, path: string[], standing: Standing, from: Settled): Landed | Stopped | undefined {
@@ -101,18 +113,24 @@ function inward(node: string, path: string[], standing: Standing, from: Settled)
   if (written) return written;
   // a map with no rule answers one element per element of its `over`: how many it answers is how many that holds
   const over = path.length || from.mapRuleOf?.(node) ? undefined : from.overOf?.(node);
-  if (over !== undefined) return writtenThrough(over, [], { ...standing, at: node });
-  // a read of an element of a map's answer is a read of what that element answers, inside the graph it runs
-  const element = path[0] === '0' && from.isMap?.(node);
-  const inside = from.answeredIn?.(element ? `${node}.0` : node);
-  if (!inside) return undefined;
-  if (element) path = path.slice(1);
-  const segments = inside.at.split('.');
-  // inside one element of a map, `in` is what the map hands the element, read where the map stands
-  const within = inside.list
-    ? { at: inside.at, from: inside.frames, lists: [...standing.lists, { ...inside.list, from: standing.from }] }
-    : { at: inside.at, from: [...standing.from, ...inside.frames], lists: standing.lists };
-  return { node: segments.at(-1) ?? '', prefix: segments.slice(0, -1), path, standing: within };
+  return over === undefined ? undefined : writtenThrough(over, [], { ...standing, at: node });
+}
+
+/** A demand on what the call at a node answers, met inside the graph it runs (`intoCall`); nothing for any other node. */
+function called(
+  node: string,
+  read: { path: string[]; standing: Standing; each?: number[] },
+  asked: Asked,
+  from: Settled,
+) {
+  return intoCall(node, read, {
+    answeredIn: from.answeredIn,
+    isMap: from.isMap,
+    landing: landed => ofTraced(landed.path, landed, asked, from),
+    meet: (dotted, domain, at) => meet(dotted, domain, at, from),
+    overrides: met => overrides(met, from),
+    strict: from.strict,
+  });
 }
 
 /** A landing that stands for every element where the read it was carried from did, its path's end kept as it was. */
@@ -232,6 +250,8 @@ export function meet(dotted: string, domain: Domain, at: At, from: Settled): Met
   if (rule) return throughWhere(rule, { path, domain }, at, (one, held, here) => meet(one, held, here, from));
   const through = inward(node, path, { ...at.standing, at: node }, from);
   if (through) return ofTraced(path, through, asked, from);
+  const call = called(node, { path, standing: { ...at.standing, at: node } }, asked, from);
+  if (call) return call;
   return { stub: { target: stubTarget(node, from), path, value: domain, field: dotted } };
 }
 
@@ -334,15 +354,25 @@ function heldBy(input: unknown, patch: Patch, from: { inType?: Type; seed: numbe
 
 /**
  * Whether a met demand would change a value another decision steered: a stub at a node whose steered answer holds,
- * at the path, something other than what the seed generated there and that the demand does not accept (#1027).
+ * at the path, something other than what the seed generated there and that the demand does not accept -- or, where
+ * the path runs past the end of a list the steering made, that list, which an element demanded of it would grow (#1027).
  */
 export function overrides(met: ReturnType<typeof meet>, from: Settled): boolean {
   if ('all' in met) return met.all.some(one => overrides(one, from));
   if (!('stub' in met) || !from.steered || !(met.stub.target in from.steered)) return false;
-  const { target, path } = met.stub;
-  const now = getPath(from.steered[target], path);
-  const seeded = getPath(from.seeded?.(target), path);
-  return now !== undefined && JSON.stringify(now) !== JSON.stringify(seeded) && !fits(now, met.stub.value as Domain);
+  const { target } = met.stub;
+  const steered = from.steered[target];
+  if (meets(getPath(steered, met.stub.path), met.stub.value as Domain)) return false;
+  const path = steeredAlong(steered, met.stub.path);
+  const now = getPath(steered, path);
+  return now !== undefined && JSON.stringify(now) !== JSON.stringify(getPath(from.seeded?.(target), path));
+}
+
+/** The path itself where the steered value holds something there, else the list it runs past the end of, if any. */
+function steeredAlong(steered: unknown, path: string[]): string[] {
+  if (getPath(steered, path) !== undefined || !path.length) return path;
+  const parent = path.slice(0, -1);
+  return Array.isArray(getPath(steered, parent)) ? parent : path;
 }
 
 /** Where a case is steered: the stubs it writes, and the patches to the trigger's input. */

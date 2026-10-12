@@ -83,6 +83,18 @@ export const bindingGraph = (emb: Embedder, handler: string): string | undefined
  * guard unrehearsed, which is what #437 was.
  */
 export function specBehind(emb: Embedder, handler: string): Spec | undefined {
+  // a walk asks this of the same handlers many times over, and the answer is a function of the embedder's tree alone
+  const known = SPECS.get(emb) ?? new Map<string, Spec | undefined>();
+  SPECS.set(emb, known);
+  if (!known.has(handler)) known.set(handler, specWorkedOut(emb, handler));
+  return known.get(handler);
+}
+
+/** Each embedder's specs behind the handlers asked of it, by handler. */
+const SPECS = new WeakMap<Embedder, Map<string, Spec | undefined>>();
+
+/** The spec behind one handler, worked out: see `specBehind`. */
+function specWorkedOut(emb: Embedder, handler: string): Spec | undefined {
   if (handler.startsWith('graph:')) return calledGraph(emb, handler.slice('graph:'.length));
   if (guardSpecAt(handler)) return emb.guardSpec(handler);
   const ref = bindingGraph(emb, handler);
@@ -146,12 +158,30 @@ export function declaredAt(emb: Embedder, root: Spec, nodePath: string): Type | 
   const mapped = /^\d+$/.test(segments[segments.length - 1] ?? '')
     ? nodeAt(emb, root, segments.slice(0, -1))
     : undefined;
-  if (mapped?.kind === 'map' && mapped.handler === undefined)
-    return elementOf(keptAt(emb, root, segments.slice(0, -1)));
-  const node = mapped?.kind === 'map' ? mapped : nodeAt(emb, root, segments);
-  if (node?.kind === 'map' && node !== mapped && node.handler === undefined) return keptAt(emb, root, segments);
-  if (!node || (node.kind === 'map' && node !== mapped) || typeof node.handler !== 'string') return undefined;
-  return answeredBy(emb, { ...node, handler: node.handler });
+  if (mapped?.kind === 'map') return elementAt(emb, root, { segments, map: mapped });
+  const node = nodeAt(emb, root, segments);
+  if (!node) return delegatedAt(emb, root, segments);
+  if (node.kind === 'map') return node.handler === undefined ? keptAt(emb, root, segments) : undefined;
+  return typeof node.handler === 'string' ? answeredBy(emb, { ...node, handler: node.handler }) : undefined;
+}
+
+/** What one element of a map answers, at the path that names it: an element of a keep's list, or its operation's answer. */
+function elementAt(emb: Embedder, root: Spec, at: { segments: string[]; map: SpecNode }): Type | undefined {
+  const { segments, map } = at;
+  if (map.handler === undefined) return elementOf(keptAt(emb, root, segments.slice(0, -1)));
+  return typeof map.handler === 'string' ? answeredBy(emb, { ...map, handler: map.handler }) : undefined;
+}
+
+/**
+ * The type the one effect under a call answers, where the call's binding operation delegates to it by `run`: the
+ * wrapper's node `op`, which answers what the port operation declares, as the call does (`effectAt`). Nothing for
+ * any other path.
+ */
+function delegatedAt(emb: Embedder, root: Spec, segments: string[]): Type | undefined {
+  if (segments.at(-1) !== 'op') return undefined;
+  const call = nodeAt(emb, root, segments.slice(0, -1));
+  if (typeof call?.handler !== 'string' || !boundOpOf(emb, call.handler)?.run) return undefined;
+  return answeredBy(emb, { ...call, handler: call.handler });
 }
 
 /**
@@ -217,18 +247,31 @@ const MAKE = '@std/object.port.json#make';
 /** The std operation that lays the fields of `over` on top of `base`. */
 const MERGE = '@std/object.port.json#merge';
 
+/** The std operation that answers the first element of a list. */
+const FIRST = '@std/list.port.json#first';
+
+/** A read of element 0 of what a lowered source reads; nothing where the source is not one read. */
+function elementZero(source: unknown): unknown {
+  const read = source as { ref?: unknown; path?: unknown } | undefined;
+  return typeof read?.ref === 'string' && Array.isArray(read.path)
+    ? { ref: read.ref, path: [...read.path, '0'] }
+    : undefined;
+}
+
 /**
  * What the node at a dotted path writes out, where it is a `make`: the lowered source of the `value` it is handed, which
  * its answer is field for field. A `trim` drops only what a closed type does not declare (`prune`), and a rule reads
  * only what the type declares, so a make that trims is followed too. A map of `make` over every element, each handed
  * whole as its `value`, answers the list it runs over element for element, so it writes out its `over`; and a `merge`
- * answers what its `over` holds wherever it holds it, so a demand written there is met (#1027). Nothing for any other
- * node.
+ * answers what its `over` holds wherever it holds it, so a demand written there is met; and `first` answers element 0
+ * of its `list` (#1027). Nothing for any other node.
  */
 export function writtenAt(emb: Embedder, root: Spec, nodePath: string): unknown {
   const node = nodeAt(emb, root, nodePath.split('.')) as (SpecNode & { bind?: unknown; where?: unknown }) | undefined;
   // a merge answers each field of `over` it holds over `base`: a field written into `over` is what it answers
   if (node?.handler === MERGE && node.kind !== 'map') return node.in?.over;
+  // `first` answers element 0 of the list it is handed
+  if (node?.handler === FIRST && node.kind !== 'map') return elementZero(node.in?.list);
   if (node?.handler !== MAKE) return undefined;
   if (node.kind !== 'map') return node.in?.value;
   const whole = JSON.stringify(node.bind) === JSON.stringify({ value: [] });
