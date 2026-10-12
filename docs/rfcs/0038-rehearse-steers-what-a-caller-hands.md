@@ -1,6 +1,6 @@
 # RFC 0038: Rehearse steers what a caller hands: a graph's `in` followed out through maps and calls
 
-- **Status:** draft
+- **Status:** accepted
 - **Areas:** `area:runtime` (`branches.ts`, `frames.ts`, a new `demands.ts`, `rehearse-held.ts`,
   `rehearse-reached.ts`, `rehearsal-report.ts`, the template's loop step 2), `area:compiler` (one private method
   exported, `takesWhole`).

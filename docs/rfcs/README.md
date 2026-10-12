@@ -43,7 +43,7 @@ accepted. Statuses: draft, accepted, implemented, withdrawn.
 | [0035](0035-the-whole-record-before-the-write.md) | The whole record before the write: a guarded shape is made upstream of the effect, never from it | implemented |
 | [0036](0036-shared-answers.md) | Recorded scenarios share their answers: each distinct node answer kept once per directory | implemented |
 | [0037](0037-connections-at-the-call.md) | A connection is a literal at the call: fields that name one, graphs given one, connections made of parts | accepted |
-| [0038](0038-rehearse-steers-what-a-caller-hands.md) | Rehearse steers what a caller hands: a graph's `in` followed out through maps and calls | draft |
+| [0038](0038-rehearse-steers-what-a-caller-hands.md) | Rehearse steers what a caller hands: a graph's `in` followed out through maps and calls | accepted |
 
 Which milestone first shows an RFC is said once, in [`../roadmap.md`](../roadmap.md); the tracking issue
 carries it as GitHub's milestone. Where this list and the outside assessment that seeded it differ, the
