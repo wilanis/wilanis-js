@@ -1,9 +1,10 @@
 /**
  * `wilanis fuzz --edges` and its `--check` (RFC 0018): every trigger fired once per fixed edge of its input type
- * (`edges` in core) -- the seed's input with that one field set, the seed's context, every effect stubbed and
- * recorded -- and each run written as a scenario under `scenarios/edges/`, the directory the command owns, or under
- * `--check` compared with what is there. It fires under seed 1 and the profile project.json marks default, as
- * `rehearse --record` solves, so the directory is a function of the tree alone.
+ * (`edges` in core) -- the seed's input with that one field set and the others made to meet what the trigger's graphs
+ * hold them to (`heldInput`), the seed's context, every effect stubbed and recorded -- and each run written as a
+ * scenario under `scenarios/edges/`, the directory the command owns, or under `--check` compared with what is there.
+ * It fires under seed 1 and the profile project.json marks default, as `rehearse --record` solves, so the directory is
+ * a function of the tree alone.
  */
 import { join } from 'node:path';
 import { walkedUnder } from '@wilanis/compiler';
@@ -23,11 +24,13 @@ import {
   typeAt,
 } from '@wilanis/core';
 import { outcomeOf, type Report } from '@wilanis/engine';
+import { heldInput } from './edges-held.js';
 import { expectOf } from './fuzz.js';
 import { recordedProfile, skippedLines } from './profile.js';
 import { claimDir, dirOf, type Recorded, recordedLines, type Writer } from './record.js';
 import { checkRecorded, keptIn, writeRecorded } from './recorded-dir.js';
 import { EDGED, EDGES } from './recorded-owner.js';
+import { switchesReached } from './rehearse-reached.js';
 import { endedOtherwise, type Replayer, recordedReport, replayerFor } from './replay.js';
 import { embedderFor, generatedFire } from './stubbing.js';
 import { getPath, setPath } from './stubs.js';
@@ -128,7 +131,10 @@ interface How {
   replayer: Replayer;
 }
 
-/** Fire one trigger once per edge of its input, each run from the seed's input and context. */
+/**
+ * Fire one trigger once per edge of its input, each run from the seed's input and context, with the input's other
+ * fields changed where a rule the trigger's graphs hold them to would refuse them (`heldInput`).
+ */
 async function fireEdges(load: LoadResult, how: How, into: Gathered) {
   const { trigger } = how;
   const emb = embedderFor(load, { seed: SEED, profile: how.profile });
@@ -136,8 +142,11 @@ async function fireEdges(load: LoadResult, how: How, into: Gathered) {
   if (!type) return;
   claimDir(into.dirs, dirOf(trigger), { path: trigger.path, what: 'trigger' });
   const { input, context } = generatedFire(emb, trigger, SEED);
+  // what the trigger's graphs hold its input to, so each edge's other fields are made to meet it (#1009)
+  const walk = await switchesReached(load, trigger, SEED, how.profile);
   for (const edge of edges(type)) {
-    const run = await fired(load, how, { edge, input: withEdge(input, type, edge), context });
+    const given = heldInput(walk, withEdge(input, type, edge), edge);
+    const run = await fired(load, how, { edge, input: given, context });
     const why = unwritten(run, 'wilanis fuzz --edges');
     if (why) into.faults.push(`${trigger.path} with ${edgeSaid(edge)}: ${why}`);
     else into.docs[fileOf(trigger, edge)] = scenarioOf(run);

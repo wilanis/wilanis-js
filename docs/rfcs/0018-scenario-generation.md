@@ -75,8 +75,9 @@ report the run produced, replayed by `wilanis regress` and diffed node by node. 
 the branch solver wrote: it carries the *branch* it proves -- a graph, a switch, a rule and the node the rule routes
 to -- and its input and stubs are the smallest change to a seed's values that takes that branch. An *edge case* is a
 scenario `wilanis fuzz --edges` wrote: one field of the trigger's input at a fixed boundary value, everything else
-the seed's. A *hand-written scenario* is one a person wrote or copied and kept, because it says something the
-generated ones do not. The three live apart:
+the seed's -- changed only where a rule the trigger's graphs hold it to would refuse it (#1009). A *hand-written
+scenario* is one a person wrote or copied and kept, because it says something the generated ones do not. The three
+live apart:
 
 ```
 scenarios/
@@ -761,3 +762,20 @@ Decided during implementation:
   `broken` is a key of the scenario's `expect.nodes`, a node the run reports (S008), judged against the scenario alone
   as S003 judges `cancelAt`. A guard's branches (`<id>:check`, `in:check`) are still not recorded: whether they belong
   in the record is open on #20.
+- **What an edge's other fields hold (#1009).** An edge's input is the seed's with the edge set, and each other field
+  is changed where a rule the trigger's graphs hold it to would refuse it, so the run reaches what the edge is named
+  for. Without it, a field invariant the seed's values break ends every edge at that guard: after `Customer: email
+  contains '@'` (RFC 0040), all nine `register-customer` edges ended `invariant` on the generated email before the
+  store. `heldInput` in `packages/runtime/src/edges-held.ts` walks the switches the trigger's run reaches
+  (`switchesReached`, as the rehearsal does) and, for each switch that routes some branch to a refusal -- a guard's
+  `<id>:check` among them -- takes the first branch that answers and that the input already takes, else the first
+  branch that answers, and lays the case's patches to the input (`casesFor`), in the order the switches were found.
+  A demand on a value a pure `#make` writes out is followed through to the field it copies (`writtenOf` on the
+  stubbing, `writtenAt` in `rehearse-where.ts`), so a guard judging a customer made from the input is met in the input;
+  the rehearsal does not follow it and still stubs `<id>:made`. Three things are never changed: the edge's own field and
+  what is above or below it, since that is what the run tests; a field that is absent because the edge is `absent`;
+  and any node's answer, since steering the stubs an edge runs over is #782. So an edge whose own value breaks a rule
+  is refused by that rule (`email.one` by the @ rule), and an edge whose value demands a field the input does not give
+  is refused as before: `tier.enum.gold` asks for a `note` the request has no field for, and ends at the rule that says
+  so. An edge that passes every guard on the input can still be refused by one on a value a stub answered, which
+  is #782's to steer.

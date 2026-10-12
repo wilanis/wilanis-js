@@ -181,6 +181,21 @@ export function madeAt(emb: Embedder, root: Spec, nodePath: string): string | un
   return nodeAt(emb, root, made) ? made.join('.') : undefined;
 }
 
+/** The std operation that makes a value of a declared type from what it is handed, field for field. */
+const MAKE = '@std/object.port.json#make';
+
+/**
+ * What the node at a dotted path writes out, where it is a `make` that does not trim: the lowered source of the `value`
+ * it is handed, which its answer is field for field. Nothing for any other node, nor for a make whose `trim` may be set,
+ * since a trimmed text is not the text it was handed.
+ */
+export function writtenAt(emb: Embedder, root: Spec, nodePath: string): unknown {
+  const node = nodeAt(emb, root, nodePath.split('.'));
+  if (node?.handler !== MAKE) return undefined;
+  const trim = node.in?.trim as { value?: unknown } | undefined;
+  return trim === undefined || trim.value === false ? node.in?.value : undefined;
+}
+
 /** A node of a lowered spec, as far as a walk down a path reads one. */
 type SpecNode = { kind?: string; handler?: unknown; in?: Record<string, unknown>; over?: unknown };
 
