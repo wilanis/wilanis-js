@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/invariant.schema.json",
+  "label": "An address names its domain",
+  "description": "An email address holds an @, so a customer is never kept with a name where the address should be.",
+  "holds": {
+    "on": "@customers/domain/Customer.shape.json",
+    "when": "email contains '@'"
+  }
+}

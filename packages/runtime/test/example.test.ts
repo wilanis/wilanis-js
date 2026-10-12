@@ -39,8 +39,9 @@ describe('the example tree', () => {
     // eleven of the twenty-six decisions are guards the compiler lowered: the one over the CSV export's list of
     // customers, whose nested spec the walk opens by name, the tier listing's, the two over the customer
     // register and update make before anything is written, the REST write's over the customer it is handed, and
-    // the six over the Customer each REST data graph now makes of the row the API answered (#787)
-    expect(text).toMatch(/every branch settled -- 61 branch\(es\), 26 decision\(s\), 18 graph\(s\)/);
+    // the six over the Customer each REST data graph now makes of the row the API answered (#787). Each guard
+    // has three branches, since two invariants hold of a Customer: it holds, or one of the two rules fails
+    expect(text).toMatch(/every branch settled -- 72 branch\(es\), 26 decision\(s\), 18 graph\(s\)/);
   });
   it('reaches both the answer and the declared failure of every data graph', async () => {
     const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'live' });
@@ -235,7 +236,7 @@ describe('branch rehearsal', () => {
         [GetRow]: caughtTo({
           run: '@std/object.port.json#make',
           in: {
-            value: { id: '{{in.id}}', name: 'nobody', email: 'nobody', tier: 'none' },
+            value: { id: '{{in.id}}', name: 'nobody', email: 'nobody@example.test', tier: 'none' },
             type: '@customers/domain/Customer.shape.json',
           },
         }),

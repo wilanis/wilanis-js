@@ -8,7 +8,7 @@
  * not a second decision.
  */
 import { describe, expect, it } from 'vitest';
-import { corrupt, planted, plantedEditingHinting, sabotage, without } from './example-harness.js';
+import { corrupt, planted, plantedEditingHinting, sabotage, sabotageSaying, without } from './example-harness.js';
 
 const SCHEMAS = 'https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas';
 
@@ -188,6 +188,13 @@ describe('sabotage: graphs', () => {
         graph.nodes.find((node: any) => node.id === 'outcome').rules[0].when = 'status >=';
       }),
     ).toEqual(['G011', 'G004']);
+  });
+  it('G011 a rule that looks for the empty word, which every text holds', () => {
+    expect(
+      sabotageSaying('features/customers/domain/list-customers.graph.json', graph => {
+        graph.nodes.find((node: any) => node.id === 'tierGiven').rules[0].when = "has(tier) && tier contains ''";
+      }),
+    ).toEqual(["G011 rule 0: contains '' holds for every text; write the word to look for"]);
   });
   it('G013 a constant whose value is not of its type', () => {
     expect(

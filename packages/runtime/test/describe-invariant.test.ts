@@ -29,6 +29,7 @@ describe('ls: the invariants of a tree', () => {
   it('lists an invariant under its kind, as every other kind is listed', () => {
     expect(ls(example, 'invariant')).toEqual([
       `invariant        ${CALLS}`,
+      'invariant        @features/customers/domain/an-address-names-its-domain.invariant.json',
       `invariant        ${WRITES}`,
       `invariant        ${SESSION}`,
     ]);

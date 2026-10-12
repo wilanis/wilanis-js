@@ -7,7 +7,8 @@
  * The viewer judges neither. `guardsOf` says which sites the compiler guarded and `heldAt` how each conjunct of
  * a rule was established at a site -- the same answers the checker (I005), the lowering and the rehearsal read
  * -- so a badge and the guard in the spec cannot say different things. These cases hold the mapping honest, and
- * the example's own `a-customer-is-reachable` is what a guarded node is read against.
+ * the example's own `a-customer-is-reachable` and `an-address-names-its-domain` are what a guarded node is read
+ * against.
  */
 import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -38,6 +39,9 @@ const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 const PAGE = fileURLToPath(new URL('../client/index.html', import.meta.url));
 const CUSTOMER = '@customers/domain/Customer.shape.json';
 const REACHABLE = '@features/customers/domain/a-customer-is-reachable.invariant.json';
+const ADDRESS = '@features/customers/domain/an-address-names-its-domain.invariant.json';
+/** The labels of the example's two invariants over Customer, in the order a guard names them. */
+const BOTH = ['A customer is reachable', 'An address names its domain'];
 const KEPT_GET = '@features/customers/data/kept-get.graph.json';
 const WRITE_CSV = '@features/customers/data/write-csv.graph.json';
 const PLANTED = '@features/customers/data/proving.graph.json';
@@ -137,7 +141,10 @@ const markedIn = (nodes: unknown[], rest: Record<string, unknown>): Map<string, 
 describe('the canvas marks a node the compiler guarded', () => {
   it('names the invariant, so the badge says which rule the node is held to', async () => {
     const node = await nodeOf(KEPT_GET, 'customer');
-    expect(node.guarded?.by).toEqual([{ path: REACHABLE, label: 'A customer is reachable' }]);
+    expect(node.guarded?.by).toEqual([
+      { path: REACHABLE, label: 'A customer is reachable' },
+      { path: ADDRESS, label: 'An address names its domain' },
+    ]);
     // the node's own document says nothing about any of this: the guard is the compiler's, not the author's
     expect(JSON.stringify(node.op)).toBe('"@std/object.port.json#make"');
   });
@@ -146,7 +153,9 @@ describe('the canvas marks a node the compiler guarded', () => {
     // one guard per site, not one per invariant: the rule is every unproved rule bracketed and conjoined, so a
     // reader who opens the badge sees the condition the graph actually runs and not a rule reassembled here
     const marked = markedIn([makes('row', '{{in}}')], { in: CUSTOMER, out: { type: CUSTOMER, from: 'row' } });
-    expect(marked.get('in')?.guarded?.when).toBe("(len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note)))");
+    expect(marked.get('in')?.guarded?.when).toBe(
+      "(len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))) && (email contains '@')",
+    );
   });
 
   it('marks the graph that takes a value, at `in`, and says a list is judged element by element', async () => {
@@ -154,7 +163,7 @@ describe('the canvas marks a node the compiler guarded', () => {
     // guard stands at `in`, running once per element of the list
     const node = await nodeOf(WRITE_CSV, 'in');
     expect(node.guarded?.arity).toBe('list');
-    expect(node.guarded?.by.map(one => one.label)).toEqual(['A customer is reachable']);
+    expect(node.guarded?.by.map(one => one.label)).toEqual(BOTH);
   });
 
   it('marks nothing on a node that is no site of the shape at all', async () => {
@@ -176,6 +185,7 @@ describe('the canvas marks a node whose rule is proved', () => {
         when: "len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))",
         held: [{ by: 'literal' }, { by: 'literal' }, { by: 'literal' }],
       },
+      { path: ADDRESS, label: 'An address names its domain', when: "email contains '@'", held: [{ by: 'literal' }] },
     ]);
   });
 
@@ -188,7 +198,10 @@ describe('the canvas marks a node whose rule is proved', () => {
         label: 'route',
         in: { row: '{{asked.record}}' },
         rules: [
-          { when: "len(row.name) > 0 && len(row.email) > 0 && (row.tier != 'gold' || has(row.note))", to: 'row' },
+          {
+            when: "len(row.name) > 0 && len(row.email) > 0 && (row.tier != 'gold' || has(row.note)) && row.email contains '@'",
+            to: 'row',
+          },
         ],
         else: 'gone',
       },
@@ -201,13 +214,15 @@ describe('the canvas marks a node whose rule is proved', () => {
       { by: 'narrowed', switch: 'route' },
       { by: 'narrowed', switch: 'route' },
     ]);
+    // a switch that tested the same words proves a contains rule too (RFC 0040)
+    expect(marked.get('row')?.proved?.by[1].held).toEqual([{ by: 'narrowed', switch: 'route' }]);
   });
 
   it('names the node a value was read whole from, since the rule was judged where that value was made', () => {
     const nodes = [reads('asked'), makes('first', '{{asked.record}}'), makes('row', '{{first}}')];
     const marked = markedIn(nodes, { out: { type: CUSTOMER, from: 'row' } });
     // `first` is itself a site and is guarded; `row` reads it whole, so the rule held or was guarded there
-    expect(marked.get('first')?.guarded?.by.map(one => one.label)).toEqual(['A customer is reachable']);
+    expect(marked.get('first')?.guarded?.by.map(one => one.label)).toEqual(BOTH);
     expect(marked.get('row')?.proved?.by[0].held).toEqual([
       { by: 'through', node: 'first' },
       { by: 'through', node: 'first' },

@@ -149,6 +149,23 @@ describe('the proof rules of a field invariant', () => {
     expect(provenAt(narrowing('len(row.url) > 0'), ANSWERS, 'row', "method != 'DELETE'")).toEqual(['guarded']);
   });
 
+  it('proves a contains rule by a literal that holds the word, or by a switch that tested the same words', () => {
+    const literal = [makes('row', { id: 'a', email: 'a@b' })];
+    expect(provenAt(literal, { out: { type: ENTRY, from: 'row' } }, 'row', "email contains '@'")).toEqual(['literal']);
+    expect(provenAt(narrowing("row.email contains '@'"), ANSWERS, 'row', "email contains '@'")).toEqual([
+      'narrowed by route',
+    ]);
+    expect(provenAt(narrowing("!(row.email contains 'http')"), ANSWERS, 'row', "!(email contains 'http')")).toEqual([
+      'narrowed by route',
+    ]);
+  });
+
+  it('guards a contains rule another word or an equality proves: no reasoning about parts of a literal', () => {
+    // both are true, and both are left to the guard, as `x > 1` is left for `x > 0`
+    expect(provenAt(narrowing("row.email contains '@x'"), ANSWERS, 'row', "email contains '@'")).toEqual(['guarded']);
+    expect(provenAt(narrowing("row.email == 'a@b'"), ANSWERS, 'row', "email contains '@'")).toEqual(['guarded']);
+  });
+
   it('guards a node the same switch reaches by a rule and by else: it runs whether the rule held or not', () => {
     // the rule proves len(url) > 0 of the runs it routed, and `else` sends the rest of them to the very same
     // node. Arriving at `row` says nothing about which way brought the run there, so nothing is established.

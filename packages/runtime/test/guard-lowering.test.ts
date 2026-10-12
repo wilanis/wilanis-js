@@ -1,24 +1,26 @@
 /**
- * What a guarded site lowers to (RFC 0007, step 5). The example's field invariant over `Customer` is proved at no
- * site of the customer registry's data graphs, so each of them is compiled with a guard: the node that makes the customer
- * moves aside to `<id>:made`, a switch on the rule takes its place between it and everything downstream, and
- * the branch the rule did not hold on refuses with the one reserved word.
+ * What a guarded site lowers to (RFC 0007, step 5). The example's two field invariants over `Customer` are proved at
+ * no site of the customer registry's data graphs, so each of them is compiled with a guard: the node that makes the
+ * customer moves aside to `<id>:made`, a switch on the rules takes its place between it and everything downstream,
+ * and the branch a rule did not hold on refuses with the one reserved word.
  *
  * The four ids are a contract, not a choice -- the rehearsal, `describe` and the viewer all read a guard by
  * them -- so they are asserted here rather than left to whatever the lowering happens to spell.
  */
-import { rmSync } from 'node:fs';
 import { Compiler, guardsOf, hasGuard, runGraph } from '@wilanis/compiler';
-import { loadTree, Scope, schemaUrl } from '@wilanis/core';
+import { loadTree, Scope } from '@wilanis/core';
 import { type KCall, type KSwitch, outcomeOf } from '@wilanis/engine';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { BUILTIN_PLUGINS, Embedder } from '../src/index.js';
-import { EXAMPLE, INCLUDES, loadedWith, PLUGINS } from './example-harness.js';
+import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
 const KEPT_GET = '@features/customers/data/kept-get.graph.json';
 const WRITE_CSV = '@features/customers/data/write-csv.graph.json';
 const KEPT_LIST = '@features/customers/data/kept-list.graph.json';
 const GREET = '@features/hello/domain/greet.graph.json';
+/** The example's two rules over `Customer`, in the order the registry holds them and the guard asks them. */
+const REACH_RULE = "len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))";
+const ADDRESS_RULE = "email contains '@'";
 
 let scope: Scope;
 let compiler: Compiler;
@@ -44,16 +46,21 @@ describe('lowering a guard', () => {
     expect(hasGuard(scope, graphOf(GREET))).toBe(false);
     const guards = guardsOf(scope, graphOf(KEPT_GET));
     expect(guards.map(one => [one.id, one.arity, one.site.kind])).toEqual([['customer', 'one', 'made']]);
-    expect(guards[0].unproved.map(one => one.invariant.doc.label)).toEqual(['A customer is reachable']);
+    expect(guards[0].unproved.map(one => one.invariant.doc.label)).toEqual([
+      'A customer is reachable',
+      'An address names its domain',
+    ]);
   });
 
   it('puts the original node aside and the guard in its place, under the four ids the RFC names', () => {
     const spec = specOf(KEPT_GET);
+    // and one refusal more for the second rule, `<id>:violated:2`
     expect(Object.keys(spec.nodes).sort()).toEqual([
       'customer',
       'customer:check',
       'customer:made',
       'customer:violated',
+      'customer:violated:2',
       'isKept',
       'noCustomer',
       'stored',
@@ -73,9 +80,10 @@ describe('lowering a guard', () => {
       note: { ref: 'customer:made', path: ['note'] },
     });
     expect(check.rules.map(rule => [rule.label, rule.to])).toEqual([
-      ["(len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note)))", 'customer'],
+      [`(${REACH_RULE}) && (${ADDRESS_RULE})`, 'customer'],
+      [`!(${REACH_RULE})`, 'customer:violated'],
     ]);
-    expect(check.else).toBe('customer:violated');
+    expect(check.else).toBe('customer:violated:2');
   });
 
   it('answers the value the rule let through, and refuses the other branch as invariant', () => {
@@ -103,8 +111,8 @@ describe('lowering a guard', () => {
   });
 
   it('appends the refusal after the value wherever the graph answered with it', () => {
-    // out.from was ["customer", "noCustomer"]; the graph refuses where its guard does, so customer:violated follows customer
-    expect(specOf(KEPT_GET).output).toEqual(['customer', 'customer:violated', 'noCustomer']);
+    // out.from was ["customer", "noCustomer"]; the graph refuses where its guard does, so the refusals follow customer
+    expect(specOf(KEPT_GET).output).toEqual(['customer', 'customer:violated', 'customer:violated:2', 'noCustomer']);
   });
 
   it('guards a list element by element, through a map over a nested spec', () => {
@@ -144,55 +152,28 @@ describe('lowering a guard', () => {
  * invariant but the last asks whether that invariant's own rule is what did not hold and routes to its own
  * refusal, and the last invariant's refusal is the `else`. So the first pair keeps `<id>:check` and
  * `<id>:violated`, a second rule adds `<id>:violated:2` and nothing else, and a value that satisfies one rule
- * and not the other is refused with that other's sentence alone. The second rule is `len(id) > 0`, whose file
- * the registry holds before the example's own, so it is the first the switch asks about.
+ * and not the other is refused with that other's sentence alone. The example holds `Customer` to two rules, and
+ * the registry holds 'A customer is reachable' first, so it is the one the switch asks about.
  */
-const ID_RULE = 'len(id) > 0';
-const REACH_RULE = "len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))";
-const two = loadedWith({
-  'features/customers/domain/a-customer-has-an-id.invariant.json': {
-    $schema: schemaUrl('invariant'),
-    label: 'A customer has an id',
-    description: 'A second rule over the same shape, unproved at the same sites, so one guard stands for both.',
-    holds: { on: '@customers/domain/Customer.shape.json', when: ID_RULE },
-  },
-});
-afterAll(() => rmSync(two.dir, { recursive: true, force: true }));
-
 describe('lowering a guard two invariants are unproved at', () => {
-  const twoScope = new Scope(two.load.registry, two.load.resolve);
-  const embedder = new Embedder(twoScope, two.load.plugins, { env: {}, root: two.dir, profile: 'local' });
+  const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);
+  const embedder = new Embedder(new Scope(load.registry, load.resolve), load.plugins, {
+    env: {},
+    root: EXAMPLE,
+    profile: 'local',
+  });
   const spec = () => embedder.graph(KEPT_GET).spec;
 
-  it('keeps the four ids of the frame and adds one refusal for the second rule', () => {
-    expect(Object.keys(spec().nodes).sort()).toEqual([
-      'customer',
-      'customer:check',
-      'customer:made',
-      'customer:violated',
-      'customer:violated:2',
-      'isKept',
-      'noCustomer',
-      'stored',
-    ]);
-  });
-
-  it('tests the conjunction first, then asks which rule failed, the last being what remains', () => {
+  it('reads one input per root either rule reads, still read off the made value', () => {
     const check = spec().nodes['customer:check'] as KSwitch;
-    expect(check.rules.map(rule => [rule.label, rule.to])).toEqual([
-      [`(${ID_RULE}) && (${REACH_RULE})`, 'customer'],
-      [`!(${ID_RULE})`, 'customer:violated'],
-    ]);
-    expect(check.else).toBe('customer:violated:2');
-    // one input per root either rule reads, still read off the made value
-    expect(Object.keys(check.in).sort()).toEqual(['email', 'id', 'name', 'note', 'tier']);
+    expect(Object.keys(check.in).sort()).toEqual(['email', 'name', 'note', 'tier']);
   });
 
   it('gives each refusal the sentence of its own invariant and no other', () => {
     const first = spec().nodes['customer:violated'] as KCall;
     const second = spec().nodes['customer:violated:2'] as KCall;
-    expect(first.in.message).toEqual({ value: `'A customer has an id' does not hold: ${ID_RULE}` });
-    expect(second.in.message).toEqual({ value: `'A customer is reachable' does not hold: ${REACH_RULE}` });
+    expect(first.in.message).toEqual({ value: `'A customer is reachable' does not hold: ${REACH_RULE}` });
+    expect(second.in.message).toEqual({ value: `'An address names its domain' does not hold: ${ADDRESS_RULE}` });
     for (const node of [first, second]) {
       expect(node.handler).toBe('@std/outcome.port.json#refuse');
       expect(node.in.reason).toEqual({ value: 'invariant' });
@@ -214,30 +195,30 @@ describe('lowering a guard two invariants are unproved at', () => {
   };
 
   it('refuses a value that breaks one rule with that invariant alone, whichever of the two it is', async () => {
-    // the customer is reachable and the id is empty: only the planted invariant's rule fails
-    const noId = await judged({ id: '', name: 'Ada', email: 'ada@example.com', tier: 'bronze' });
-    expect(noId).toMatchObject({
+    // the address holds an @ and the name is empty: only the first rule fails
+    const noName = await judged({ id: 'x', name: '', email: 'ada@example.com', tier: 'bronze' });
+    expect(noName).toMatchObject({
       kind: 'refused',
       reason: 'invariant',
       at: 'customer:violated',
-      message: `'A customer has an id' does not hold: ${ID_RULE}`,
+      message: `'A customer is reachable' does not hold: ${REACH_RULE}`,
     });
-    // the id is there and the address is empty: only the example's own rule fails
-    const noEmail = await judged({ id: 'x', name: 'Ada', email: '', tier: 'bronze' });
-    expect(noEmail).toMatchObject({
+    // the customer is reachable and the address holds no @: only the second rule fails
+    const noAt = await judged({ id: 'x', name: 'Ada', email: 'ada.example.com', tier: 'bronze' });
+    expect(noAt).toMatchObject({
       kind: 'refused',
       reason: 'invariant',
       at: 'customer:violated:2',
-      message: `'A customer is reachable' does not hold: ${REACH_RULE}`,
+      message: `'An address names its domain' does not hold: ${ADDRESS_RULE}`,
     });
-    for (const outcome of [noId, noEmail]) {
+    for (const outcome of [noName, noAt]) {
       if (outcome.kind !== 'refused') throw new Error(outcome.kind);
       expect(outcome.message).not.toContain(';');
     }
   });
 
   it('names the first rule where both fail, and lets a value satisfying both through', async () => {
-    const both = await judged({ id: '', name: '', email: '', tier: 'bronze' });
+    const both = await judged({ id: 'x', name: '', email: '', tier: 'bronze' });
     expect(both).toMatchObject({ kind: 'refused', at: 'customer:violated' });
     const ok = { id: 'x', name: 'Ada', email: 'ada@example.com', tier: 'bronze' };
     const fine = await judged(ok);
