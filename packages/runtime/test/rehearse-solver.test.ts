@@ -239,11 +239,32 @@ describe('a contains rule before the solver can make a text that holds a word (R
       demands: {},
       unsolved: "'email contains '@'' compares values the rehearsal cannot name",
     });
-    expect(otherwise).toMatchObject({ to: 'b', demands: {} });
-    expect(otherwise.unsolved).toBeDefined();
+    expect(otherwise).toMatchObject({
+      to: 'b',
+      demands: {},
+      unsolved: "'email contains '@'' compares values the rehearsal cannot name",
+    });
   });
   it('reports it so under !, where the solver would otherwise take it as a comparison against a literal', () => {
     const [rule] = branchesOf([{ when: "!(note contains 'http')", to: 'a' }], 'b');
     expect(rule.unsolved).toBe("'!(note contains 'http')' compares values the rehearsal cannot name");
+  });
+  it('reports it so behind a has(), which the rehearsal can name but which cannot make the rule hold alone', () => {
+    const [rule, otherwise] = branchesOf([{ when: "has(note) && note contains 'x'", to: 'a' }], 'b');
+    expect(rule.unsolved).toBe("'has(note) && note contains 'x'' compares values the rehearsal cannot name");
+    // the else is solved: the note may be missing
+    expect(otherwise).toMatchObject({ to: 'b', demands: { note: { absent: true } } });
+    expect(otherwise.unsolved).toBeUndefined();
+  });
+});
+
+describe('a rule the solver finds no case for: one it cannot name, and one that contradicts itself', () => {
+  it('says a path looked for in a list behind a has() is two paths it cannot compare, not a contradiction', () => {
+    const [rule] = branchesOf([{ when: 'has(x) && x.r in roles', to: 'a' }], 'b');
+    expect(rule.unsolved).toBe("the solver cannot compare two paths as 'has(x) && x.r in roles' does");
+  });
+  it('still calls a rule no input can satisfy a contradiction', () => {
+    const [rule] = branchesOf([{ when: 'n > 10 && n < 5', to: 'a' }], 'b');
+    expect(rule.unsolved).toBe("no inputs satisfy 'n > 10 && n < 5' -- the rule contradicts itself");
   });
 });
