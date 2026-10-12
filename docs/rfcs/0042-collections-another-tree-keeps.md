@@ -1,6 +1,6 @@
 # RFC 0042: `keptBy`: a store says another tree keeps its collections
 
-- **Status:** draft
+- **Status:** accepted
 - **Areas:** `area:core` (one optional property on `store.schema.json`, `StoreDoc`), `area:plugin-storage` (the
   planner's gathering, three `X` rules), `area:runtime` (`describe`, the template), `area:view` (the store page)
 - **Tracking issue:** #851
