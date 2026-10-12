@@ -154,7 +154,7 @@ its rules correct the write graphs M06 demonstrated. RFC 0036, recorded scenario
 with its recorded scenarios about a tenth of their size. RFC 0039, keep and group a list, lands before the freeze
 too: a `map` may say `where` and need not `run`, a native field may say `within` and `reaches`, and `@std/list`
 gains `totals`. Each change is compatible, but each changes a schema, so 1.0 waits for it. RFC 0040, `contains` in a
-rule, lands before the freeze for the same reason: it changes two schema descriptions. RFC 0041, `after` on a node,
+rule, changed two schema descriptions and has landed before the freeze. RFC 0041, `after` on a node,
 lands before the freeze too: it changes the `run` and `map` node schemas. RFC 0042, a store that says another tree keeps
 its collections, adds `keptBy` to `store.schema.json`, so it lands before the freeze too. RFC 0043, a profile that
 extends another, adds one optional key to `project.schema.json`; it lands before the freeze, as the rule above asks of

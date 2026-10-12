@@ -149,7 +149,8 @@ trigger maps every reason it can reach, its policies' included (T005).
 Validating a credential happens in the guarding plugin, before any policy, never in a graph, and the guard's
 `plugin.json` says which credentials it verifies and what each yields. A trigger with no policies is public.
 `has(principal) && 'registrar' in principal.roles` is a rule: `in` looks into a list, and what `has()` proves
-on the left of `&&` may be read on the right.
+on the left of `&&` may be read on the right. `email contains '@'` looks into a text: it is true when the text holds
+the word exactly as written, case counting, and the word is always a literal in the rule, never a field.
 
 A session is opened when a token is issued and carries attributes of a shape the project names; a graph reads
 and writes them through `@auth/session.port.json`, keyed by `context.session.id`, and `wilanis describe` on the
