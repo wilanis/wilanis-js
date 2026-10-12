@@ -11,6 +11,12 @@ import { show, splitRef } from '@wilanis/core';
 /** The port every store operation is asked through; a call names this port or it is not a store call. */
 export const STORE_PORT = '@storage/store.port.json';
 
+/**
+ * What a store says when another tree keeps its collections (RFC 0042), after that tree's name. `describe` and the
+ * viewer both say it, so the sentence lives here once.
+ */
+export const KEPT_SAID = 'this tree reads it; wilanis migrate never plans it and no graph writes it';
+
 /** One call of the store port: where it was written, which operation, and which collection of which store. */
 export interface StoreCall {
   /** The document the call sits in. */
