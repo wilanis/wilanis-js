@@ -49,7 +49,7 @@ accepted. Statuses: draft, accepted, implemented, withdrawn.
 | [0041](0041-wait-for-a-node.md) | `after`: a node waits for another whose answer it does not read | accepted |
 | [0042](0042-collections-another-tree-keeps.md) | `keptBy`: a store says another tree keeps its collections | accepted |
 | [0043](0043-a-profile-from-another.md) | A profile from another: `extends` names the profile one starts from; reverses what RFC 0013 set aside | accepted |
-| [0044](0044-queue-deadline.md) | A deadline on a queue trigger: `deadlineMs` cancels a delivery's run, which becomes `onFault` | draft |
+| [0044](0044-queue-deadline.md) | A deadline on a queue trigger: `deadlineMs` cancels a delivery's run, which becomes `onFault` | accepted |
 
 Which milestone first shows an RFC is said once, in [`../roadmap.md`](../roadmap.md); the tracking issue
 carries it as GitHub's milestone. Where this list and the outside assessment that seeded it differ, the

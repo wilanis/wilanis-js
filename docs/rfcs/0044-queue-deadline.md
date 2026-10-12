@@ -1,6 +1,6 @@
 # RFC 0044: A deadline on a queue trigger
 
-- **Status:** draft
+- **Status:** accepted
 - **Areas:** `area:plugin-queue` (the kind's document, `deliver.ts`, X401, the README); `area:runtime` (one sabotage
   test, the example); a sentence in the Postgres table broker's README (`area:plugin-storage`). Nothing in the
   engine, the compiler, core or its schemas.
