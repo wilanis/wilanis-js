@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Branch, branchesOf, satisfy } from '../src/branches.js';
+import { type Branch, branchesOf, type FoundList, nonEmpty, satisfy } from '../src/branches.js';
 import { NO_MEMBER } from '../src/stubs.js';
 
 /** The demands of one case, by the node it routes to. */
@@ -235,5 +235,28 @@ describe('turning a demand into a value', () => {
   it('replaces an empty list for a presence, which reads as present but breaks its readers', () => {
     const list = satisfy({ present: true }, [], { kind: 'list', of: { kind: 'string' } }) as unknown[];
     expect(list.length).toBeGreaterThan(0);
+  });
+});
+
+describe('making a mapped list hold an element', () => {
+  it('stubs a list handed in through an outer map inside element 0 of what the outer list holds', () => {
+    const groups: FoundList = {
+      at: 'groups',
+      over: { ref: 'scanned', path: ['groups'] },
+      fromTriggerIn: false,
+      from: [],
+      bind: { items: ['items'] },
+    };
+    const each: FoundList = {
+      at: 'groups.0.each',
+      over: { ref: 'in', path: ['items'] },
+      fromTriggerIn: false,
+      from: [],
+    };
+    const need = nonEmpty(each, { generated: () => undefined }, [groups]);
+    expect(need.input).toEqual([]);
+    expect(Object.keys(need.stubs)).toEqual(['scanned']);
+    const scanned = need.stubs.scanned as { groups: { items: unknown[] }[] };
+    expect(scanned.groups[0].items).toHaveLength(1);
   });
 });

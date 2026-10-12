@@ -3,8 +3,8 @@
  * (RFC 0038, step 1). The frames and lists here are written by hand, as the walk in `branches.ts` records them.
  */
 import { describe, expect, it } from 'vitest';
-import type { FoundList, Frame } from '../src/branches.js';
-import { listHolder, ownInputAt, traced } from '../src/frames.js';
+import type { FoundList, FoundSwitch, Frame, KSwitchLike } from '../src/branches.js';
+import { listHolder, ownInputAt, traced, upstreamOf } from '../src/frames.js';
 
 const read = (...path: string[]) => ({ ref: 'in', path });
 const ref = (node: string, ...path: string[]) => ({ ref: node, path });
@@ -63,6 +63,32 @@ describe('a read of in followed out', () => {
   it('stops at a map whose list is composed', () => {
     const judged = list('judged', { list: [ref('a', 'b')] }, { bind: { score: ['score'] } });
     expect(traced(read('score'), { at: 'judged.0.sw', from: [], lists: [judged] })).toEqual({ stopped: 'judged' });
+  });
+
+  it("crosses an inner map's broadcast in to element 0 of the list an outer map runs over", () => {
+    const groups = list('groups', ref('scanned', 'groups'), { bind: { label: ['label'] } });
+    const each = list('groups.0.op.each', ref('in', 'items'), {
+      in: { label: ref('in', 'label') },
+      from: [{ at: 'groups.0.op', in: {} }],
+    });
+    const landed = traced(read('label'), { at: 'groups.0.op.each.0.sw', from: [], lists: [groups, each] });
+    expect(landed).toMatchObject({ node: 'scanned', path: ['groups', '0', 'label'], element: true });
+  });
+});
+
+describe('the node a guard on in was copied from', () => {
+  it("is found across a map's broadcast in, field for field", () => {
+    const people = list('kept', ref('found', 'rows'), {
+      in: { name: ref('person', 'name'), email: ref('person', 'email') },
+    });
+    const node: KSwitchLike = {
+      kind: 'switch',
+      in: { name: ref('in', 'name'), email: ref('in', 'email') },
+      rules: [],
+      else: 'in:ok',
+    };
+    const found: FoundSwitch = { at: 'kept.0.in:check', prefix: ['kept', '0'], node, via: [], lists: [people] };
+    expect(upstreamOf(found)).toEqual({ prefix: [], node: 'person' });
   });
 });
 
