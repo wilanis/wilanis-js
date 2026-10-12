@@ -107,7 +107,13 @@ export function runsUnder(step: StartupStep, profile: string | undefined): boole
 export interface ProfileDoc {
   description?: string;
   default?: boolean;
-  bindings: Record<string, string>;
+  /**
+   * The profile this one starts from (RFC 0043): its bindings, stand-ins and permits, under this profile's own.
+   * One level: the profile named extends no other. `resolveProfile` in profiles.ts says what a child means.
+   */
+  extends?: string;
+  /** Required where `extends` is absent; a child that writes none has its parent's. */
+  bindings?: Record<string, string>;
   connections?: Record<string, string>;
   /**
    * What the place allows the tree to reach (RFC 0016): effectful native operations, whole native ports and
