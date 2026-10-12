@@ -198,7 +198,7 @@ function checkDead(judging: Judging, reach: Reach, permits: Permit[]): void {
 /** Why a connection entry permits nothing: no reached operation names it, nor a stand-in it carries. */
 function unnamed({ standIns }: Permit): string {
   const also = standIns.map(one => `'${one}'`).join(', ');
-  return `no operation it reaches names that connection${also && `, nor ${also}, which this profile reaches in its place`}`;
+  return `no operation it reaches names that connection${also && `, nor ${also}, which stands in for it in this profile`}`;
 }
 
 /** One C022: at the entry's line, or, for an inherited list, at the child's `extends`, saying where the entry came from. */

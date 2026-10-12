@@ -309,7 +309,7 @@ describe('sabotage: permits a profile inherits (RFC 0043)', () => {
       },
     };
     expect(only('C022', plantedEditingAllSaying(STAGING, edits))).toContain(
-      `C022 profile 'production-scheduler' inherits '@connections/employees-production.connection.json' from 'production', but no operation it reaches names that connection, nor '${EMPLOYEES_STAGING}', which this profile reaches in its place`,
+      `C022 profile 'production-scheduler' inherits '@connections/employees-production.connection.json' from 'production', but no operation it reaches names that connection, nor '${EMPLOYEES_STAGING}', which stands in for it in this profile`,
     );
   });
   it("R001 and C023 for an inherited entry, refused once, at the parent's line", () => {
