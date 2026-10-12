@@ -366,21 +366,31 @@ answered here rule by rule.
 `expr.compilePredicate`, as it lowers a switch's rules, with the rule's text as `label`. A map with no `run` is
 lowered with no `handler`, no `redact` of an operation, and `pure: true`.
 
-**The rehearsal, `packages/runtime/src/branches.ts` and `rehearse-reached.ts`.**
+**The rehearsal, `packages/runtime/src/branches.ts`, `demands.ts` and `rehearse-reached.ts`,** as RFC 0038 leaves
+them: `branches.ts` keeps the walk (`switchesOf`, `atNode`), the lists (`nonEmpty`) and the cases (`casesFor`,
+`steer`); `meet`, `ofElement` and the rest of the demand side live in `demands.ts`; and `traced` in `frames.ts`
+follows a read of `in` out through the calls and maps that handed it down.
 
 - `switchesOf` also yields one found decision for every map with a `where`, at the map's own path. It is a switch
   with one rule and an `else`: `{ rules: [{ label: <where>, to: <map id> }], else: <map id> }`. `branchesOf` solves
   it into two cases, *kept* (the rule true) and *dropped* (the rule false).
-- In `meet`, a demand of the `where` is traced through one frame: the map's own, as RFC 0038 builds a map's frame
-  (its lowered `in`, `over` and `bind`), read as if it bound nothing, since `item` is the element in a `where`
-  whatever `bind` says. So `item.<rest>` lands at element 0 of the list `over` reads, and 0038's `traced` follows
-  that list on out, through `listHolder`, to the node or the trigger's input that holds it; a name of the map's
-  `in` is that source, followed the same way. Where the trace lands on a map, the stub is `<map>.0`; where it
-  stops (a list written out, `context`, a literal), the branch is `NEVER RUN` with 0038's sentence. On `main`
-  today the element case is `At.element` and `ofElement` in `branches.ts`, which already reach through a
-  binding's wrapper `op` (#904); 0038 replaces both with `traced`, and this RFC uses what 0038 leaves rather than
-  extending what it removes. A `where` stands on the map, so its demand never needs the frames inside the
-  operation: the trace starts one frame out from where a switch in the mapped graph would start.
+- The found decision of a `where` carries what 0038's `traced` reads, a `FoundSwitch`'s `from` and `lists`: its
+  innermost list is the map itself, and its `from` is empty, since the rule stands on the map and enters no call
+  inside it. `meet` (in `demands.ts`) traces each of its demands, so the trace starts at the map hop:
+  - `item.<rest>` is the element. `throughBind` maps the read into it, read as if the map bound nothing, since
+    `item` is the element in a `where` whatever `bind` says. The trace lands on an element, at element 0 of the
+    list `over` reads (`listHolder` finds it), and `meet` writes it with `ofElement`, as today: at the node that
+    holds the list, or at `<map>.0` where that holder is itself a map;
+  - a name of the map's `in` is that source, read in the frames the map stands in, as 0038's trace reads a map's
+    `in` sources;
+  - where the trace stops (a list written out, `context`, a literal), the branch is `NEVER RUN`, or `closed`, with
+    0038's sentence.
+
+  On `main` today `meet` and `ofElement` are in `branches.ts`, and `meet` finds the element through `At.element`
+  and `At.frames`, which already reach through a binding's wrapper `op` (#904). 0038 moves `meet` and `ofElement`
+  unchanged into `demands.ts`, and `At.element` and `At.frames` give way to the `FoundSwitch` the trace reads. This
+  RFC uses what 0038 leaves. A `where` stands on the map, so its demand needs none of the frames inside the
+  operation: the trace starts one hop out from where a switch in the mapped graph would start.
 - A switch inside the operation of a map with a `where` runs only for kept elements. The first element stands for
   all, so a case for such a switch first demands that element 0 is kept, the way it first demands that the list
   holds an element (`nonEmpty`). Likewise, `nonEmpty` for a list a keep answers demands an element in `over` *and*
@@ -482,8 +492,8 @@ Each step is one pull request and one sub-issue of #855.
    `checkWhere` (G011), G006 and G024 widened, `nodeOut` for a keep, `sitesOf` skipping a keep, the lowering. The
    example's digest gains `active` and `activeCount`, `Digest.shape.json` gains `active`, and the sabotage tests of
    the table land with it. Waits on the `decision` job.
-3. **The rehearsal steers a `where`.** `switchesOf`, `meet`, `nonEmpty` and the reach of a switch behind a kept
-   element in `branches.ts` and `rehearse-reached.ts`; S004 and the two descriptions in `scenario.schema.json`; the
+3. **The rehearsal steers a `where`.** `switchesOf` and `nonEmpty` in `branches.ts`, the found decision `meet`
+   traces in `demands.ts`, and the reach of a switch behind a kept element in `rehearse-reached.ts`; S004 and the two descriptions in `scenario.schema.json`; the
    example's recorded scenarios rewritten. Lands after RFC 0038's implementation, on its `traced`. Waits on the
    `decision` job.
 4. **A reader sees it.** `describe` (`graph-said.ts`), the viewer, `docs/model.md`, the template's `CLAUDE.md`.
@@ -498,8 +508,10 @@ Steps 1 and 5 can run beside each other. Step 6 needs step 5. Steps 3 and 4 need
 **Order with the open RFCs.** Three other RFCs touch the same files. Each lands as one more optional part on the
 same objects, so none changes what another means; the order only decides who rebases.
 
-- **RFC 0038 lands first.** It rewrites the element walk (`traced` in `frames.ts`, a map as a frame, `meet` reading
-  the trace), and step 3 here is written on it. Steps 1, 2 and 4 to 6 do not touch the rehearsal and may land
+- **RFC 0038 lands first.** It rewrites the element walk: `traced` in `frames.ts` replaces `handedOut`, `passedAs`,
+  `heldOutwards`, `tracedOut` and `elementPathOf`; `meet` and `ofElement` move unchanged from `branches.ts` into a
+  new `demands.ts`, where `meet` reads the trace; and `At.element` and `At.frames` give way to the `FoundSwitch` the
+  trace reads. Step 3 here is written on that. Steps 1, 2 and 4 to 6 do not touch the rehearsal and may land
   before 0038; step 3 waits for 0038's implementation.
 - **RFC 0041 (`after`)** adds `after` to `map.schema.json`, `MapNode`, `KMap`, `lowerNode` and `nodeLine`, the same
   places as steps 1, 2 and 4. Whichever lands second adds its field beside the other's. They meet in four places,
