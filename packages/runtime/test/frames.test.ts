@@ -75,7 +75,7 @@ describe('a read of in followed out', () => {
       from: [{ at: 'judged.0.op', in: {} }],
       lists: [judged],
     });
-    expect(landed).toMatchObject({ node: 'scanned', path: ['findings', '0', 'score'], element: true });
+    expect(landed).toMatchObject({ node: 'scanned', path: ['findings', '0', 'score'], each: [2] });
   });
 
   it('crosses a map to what its own in hands every element alike', () => {
@@ -119,7 +119,7 @@ describe('a read of in followed out', () => {
       from: [{ at: 'groups.0.op', in: {} }],
     });
     const landed = traced(read('label'), { at: 'groups.0.op.each.0.sw', from: [], lists: [groups, each] });
-    expect(landed).toMatchObject({ node: 'scanned', path: ['groups', '0', 'label'], element: true });
+    expect(landed).toMatchObject({ node: 'scanned', path: ['groups', '0', 'label'], each: [2] });
   });
 });
 

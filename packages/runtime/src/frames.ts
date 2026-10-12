@@ -41,21 +41,22 @@ export function standingOf(found: Pick<FoundSwitch, 'at' | 'from' | 'lists'>): S
 
 /**
  * A node of an enclosing spec a read lands on: its id, the prefix its siblings are stubbed under, the path within its
- * answer, and where it stands. `element` where the read crossed a map as the element it hands, so the path runs
- * through element 0 of a list the node holds.
+ * answer, and where it stands. `each` where the read crossed a map as the element it hands: the steps of the path that
+ * are index 0 of a list the node holds and stand for every element of it, counted from the path's end, since a hop out
+ * keeps the end of a path and rewrites its start.
  */
 export interface OnNode {
   node: string;
   prefix: string[];
   path: string[];
   standing: Standing;
-  element?: true;
+  each?: number[];
 }
 
 /** The trigger's own input, at a path: where every call and map on the way hands the read down from `in`. */
 export interface OnInput {
   input: string[];
-  element?: true;
+  each?: number[];
 }
 
 /** Where a traced read lands: something the rehearsal sets. */
@@ -149,15 +150,19 @@ function throughMap(list: FoundList, path: string[], outer: FoundList[]): Hop | 
 
 /**
  * Element 0 of the list a map runs over, at a path within it: where that list's own source lands, with the element
- * under it. The first element stands for all, as it does everywhere in the walk. Stopped where the list is composed or
- * literal, there or further out, since such a list keeps every element it has; and where its trace stops otherwise.
+ * under it. Element 0 stands for every element, and `each` says where it stands, so a demand is written into each one
+ * the list holds (`everyElement`). Stopped where the list is composed or literal, there or further out, since such a
+ * list keeps every element it has; and where its trace stops otherwise.
  */
 function elementOf(list: FoundList, within: string[], here: Standing): Landed | Stopped {
   const over = sourceOf(list.over);
   const held: Landed | Stopped = over ? traced(over, here) : { stopped: list.at, reason: 'composed' };
   if ('stopped' in held) return fixedList(held);
-  if ('input' in held) return { input: [...held.input, '0', ...within], element: true };
-  return { ...held, path: [...held.path, '0', ...within], element: true };
+  // the element's index stands `within` and one more from the end; what the list itself stood in moves out by as much
+  const at = within.length + 1;
+  const each = [...(held.each ?? []).map(one => one + at), at];
+  if ('input' in held) return { input: [...held.input, '0', ...within], each };
+  return { ...held, path: [...held.path, '0', ...within], each };
 }
 
 /** A stop in the trace of a list a map runs over, as the element's: a list composed or literal is a composed list. */
@@ -217,7 +222,7 @@ export function listHolder(list: FoundList, outer: FoundList[] = []): Holder | u
 export function ownInputAt(list: FoundList, outer: FoundList[] = []): string[] | undefined {
   const over = sourceOf(list.over);
   const held = over && traced(over, { at: list.at, from: list.from, lists: outer });
-  return held && 'input' in held && !held.element ? held.input : undefined;
+  return held && 'input' in held && !held.each ? held.input : undefined;
 }
 
 /**
@@ -261,9 +266,9 @@ function copiedFrom(read: Read | undefined, standing: Standing): Upstream | unde
   if (read?.ref !== 'in') return undefined;
   const out = traced(read, standing);
   if (!('node' in out)) return undefined;
-  const field = out.element ? ['0', ...read.path] : read.path;
+  const field = out.each ? ['0', ...read.path] : read.path;
   if (out.path.join('.') !== field.join('.')) return undefined;
-  return out.element ? { prefix: out.prefix, node: out.node, element: true } : { prefix: out.prefix, node: out.node };
+  return out.each ? { prefix: out.prefix, node: out.node, element: true } : { prefix: out.prefix, node: out.node };
 }
 
 /**

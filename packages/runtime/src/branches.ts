@@ -7,7 +7,18 @@
  * where every rule is false at once. The solver itself is in domains.ts, and what it writes into a stub in stubs.ts.
  */
 import type { Type } from '@wilanis/core';
-import { type At, answerAt, lay, type Missed, meet, type Steered, standIn, typeAtPath, type Unmet } from './demands.js';
+import {
+  type At,
+  answerAt,
+  lay,
+  type Missed,
+  meet,
+  type Patch,
+  type Steered,
+  standIn,
+  typeAtPath,
+  type Unmet,
+} from './demands.js';
 import type { Branch, Domain } from './domains.js';
 import { type Holder, handedAs, listHolder, ownInputAt, sourceOf, standingOf } from './frames.js';
 import { branchesOf } from './solve.js';
@@ -74,7 +85,7 @@ export interface Case {
    * Demands that land on the graph's own input rather than a node: path within the input -> value.
    * Only meaningful for a switch in the top-level graph, where the input is the trigger's.
    */
-  input?: { path: string[]; value: unknown }[];
+  input?: Patch[];
   /** Demands that could not be routed to anything the rehearsal can set. */
   unreachable?: string[];
   /** Demands for a value no value of the field's type meets: its enum's members all excluded, or a text it cannot make. */
