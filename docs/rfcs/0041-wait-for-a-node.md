@@ -287,8 +287,8 @@ None.
 
 The two new rules live in a new module, `packages/compiler/src/check/graph-after.ts`, called from `GraphCheck.run` in
 `check/graph.ts` beside `checkCatches`. Each is a G rule about one node's `after`, so it is made in the G family's
-directory. The numbers are assigned when the implementing pull request lands (G027 and G028 are the next free ones
-today).
+directory. G0n1 and G0n2 are placeholders. Each takes the next free G code when the implementing pull request lands.
+Other open RFCs also add G rules, so this RFC claims no number.
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
@@ -361,7 +361,9 @@ write refuses inside an atomic graph, the waiter never starts, and the transacti
 **`rehearse`.** It runs the engine, so a waiter behind a branch is cancelled there, as any other node is. The one
 place that restates the engine's waits is `waitsFor` in `packages/runtime/src/rehearse-reached.ts`. `routingTo`
 uses it to steer every switch that routes a node a found switch waits for. It changes to call the engine's exported
-`waitsFor`, so the two cannot disagree. Without this step, `rehearse` would not steer `isKept` to `customer` to
+`waitsFor`, so the two cannot disagree. It keeps its guard `{ ...node, in: node.in ?? {} }` and hands the engine the
+guarded node. The one node of a binding's wrapper spec has no `in`, and the engine's `nodeRefs` calls
+`Object.values(node.in)`, which throws on it. Without this step, `rehearse` would not steer `isKept` to `customer` to
 reach a switch behind `everyLatest`. That switch would be reported `NEVER RUN`.
 
 **`regress`, `fuzz`, traces.** They run the engine and need nothing new. A scenario recorded before a tree adds
@@ -438,10 +440,23 @@ branch, and no case reports `NEVER RUN`.
    `graph.schema.json` description. One pull request, because a schema that accepts `after` must never reach a
    checker that judges routing without it. It changes a schema, so it waits on the `decision` job. `area:core`,
    `area:compiler`.
-3. **`rehearse` steers through a wait.** `rehearse-reached.ts` calls the engine's `waitsFor`, with the test above.
-   `area:runtime`. `good first issue` after 2.
+3. **`rehearse` steers through a wait.** `waitsFor` in `rehearse-reached.ts` calls the engine's `waitsFor` on
+   `{ ...node, in: node.in ?? {} }`, as it reads `nodeRefs` today. The guard stays: a binding's wrapper node has no
+   `in`, and `nodeRefs` would throw on it. With the test above. `area:runtime`. `good first issue` after 2.
 4. **A reader sees the wait.** `describe`'s `after` line and the viewer's edge, legend and panel, with their tests.
    `area:runtime`, `area:view`. `good first issue` after 2.
+
+**Order with the other open RFCs.** Two of them edit the same places, so whichever lands second rebases on the
+first:
+
+- RFC 0039 (keep and group a list, #919) edits `map.schema.json`, `KMap` in `packages/engine/src/spec.ts`, `MapNode`
+  in `packages/core/src/nodes.ts` and `nodeLine` in `graph-said.ts`. Steps 1, 2 and 4 here edit the same four.
+  Neither RFC changes what the other adds: a map that waits waits as a whole, whatever its own fields say.
+- RFC 0038 (rehearse steers what a caller hands, #930) edits `rehearse-reached.ts`. Step 3 here edits its
+  `waitsFor`.
+
+G0n1 and G0n2 take their numbers in the order the implementing pull requests land, after any G code RFC 0037 or
+RFC 0039 has taken by then.
 
 ## Drawbacks and alternatives
 
@@ -486,23 +501,23 @@ value the operation needs. It is workaround 2 in a standard form.
 then run after a broken node without any document saying what breaking means there, and that is `catch`'s job (RFC
 0014, G022 to G024). It is left out.
 
+## Decisions
+
+The maintainer settled these on #927:
+
+- **G008 counts `after` as a use.** A node that another node waits for exists for its effect, and its answer is not
+  needed. That is the consumer's site 3: `kept` needs no reader once `published` waits for it.
+- **`after` may not name a switch (G0n1).** Waiting for a switch looks like waiting for a check, but holds nothing
+  back: the switch answers on every branch.
+- **G0n2 refuses a direct read only.** A node that waits for `x` and also reads `x` is refused. A node that waits for
+  `x` and reads a node that reads `x` is not. This keeps what a document says equal to what it does, as P005 does for
+  an unused `reads` entry, without a walk over the whole graph.
+- **A domain graph may say `after`.** "Read nothing before the session is known" says what is done, not how a call
+  is made, which is what L012 keeps out of a domain graph. The consumer's site 2 is a domain graph.
+- **No milestone.** `after` is an optional field, so it stays a compatible change after 1.0 (RFC 0008) and need not
+  land before `schemas-v1` is cut. No demo of `docs/roadmap.md` needs it. #857 carries no milestone.
+
 ## Open questions
-
-To decide before `accepted`:
-
-- **Does `after` count as a use for G008?** I recommend yes. A node that another node waits for exists for its
-  effect, and its answer is not needed. That is the consumer's site 3. The other answer keeps G008 strict: every
-  node's *answer* is read. Then site 3 keeps its unused input.
-- **Is `after` naming a switch refused (G0n1)?** I recommend yes. Waiting for a switch looks like waiting for a check
-  but holds nothing back. The other answer is to allow it as "wait for the decision". I found no case that needs that.
-- **Is a redundant `after` refused (G0n2)?** I recommend refusing a direct read only. This is the same reason P005
-  refuses an unused `reads` entry: what a document says should be exactly what it does.
-- **May a domain graph say `after`?** I recommend yes. "Read nothing before the session is known" is a statement about
-  what is done, not about how a call is made, which L012 keeps out of a domain graph. The consumer's site 2 is a
-  domain graph.
-- **Milestone.** I set none on #857. The change is a compatible addition, so RFC 0008 lets it land before or after
-  1.0. No demo of `docs/roadmap.md` needs it. If the maintainer wants it in `schemas-v1` from the start, it belongs
-  under M14 with the other schema changes.
 
 To decide during implementation: the exact wording of the G015 hint where the readers sit behind more than one
 target, and whether the viewer's panel lists "waited for by" on the waited node as well.
