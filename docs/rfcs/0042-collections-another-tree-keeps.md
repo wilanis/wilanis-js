@@ -5,7 +5,8 @@
   planner's gathering, three `X` rules), `area:runtime` (`describe`, the template), `area:view` (the store page)
 - **Tracking issue:** #851
 - **Depends on:** RFC 0017 (implemented: the planner, the record, `wilanis migrate`). RFC 0002 (implemented: a
-  collection is the pair of its connection and its name).
+  collection is the pair of its connection and its name). RFC 0037 (draft, #931) touches the same walk: whichever
+  lands second follows the other (*Implementation plan*).
 
 ## Summary
 
@@ -203,6 +204,20 @@ The reader still needs the keeping tree to have migrated first. A collection the
 fails the reader's first read with the engine's error, as a missing table does today. That is right: only the
 keeping tree may create it.
 
+**A development database.** This holds in development too. X2n1 refuses `ensure` on a kept store, and `migrate`
+skips the connection under every profile, because the mark is on the store and not on the connection a profile
+chooses. So nothing in the reading tree creates a kept collection in a local database, for example a sqlite file
+that a `dev` profile stands in for the production connection. A developer gets one of two ways:
+
+- **The keeping tree's `migrate`.** Point a connection of the keeping tree at the same local database and run
+  `wilanis migrate <keeping tree> --profile <its dev profile> --apply`. The keeping tree creates its collections
+  with its full shapes and records them under its own name, as it does in production.
+- **A fixture.** Copy a database the keeping tree has already migrated, for example a sqlite file kept as a test
+  fixture, and point the reader's connection at the copy.
+
+`rehearse`, `fuzz` and `regress` need neither, because a storage operation is stubbed there and reaches no
+database.
+
 ## Reference
 
 ### Documents and schemas
@@ -251,9 +266,10 @@ None. `@storage/storage.port.json#ensure` keeps its contract; X2n1 keeps it from
 
 All three are `@storage`'s own (`X`), in a new module `packages/plugin-storage/src/kept.ts`, called from the
 plugin's `check` beside `rules.ts`. What a store write is and which store a call names are already read there
-(`operationOf` and `Call` in `calls.ts`); the profiles are read through `scope.profiles()` and
-`scope.connectionFor` (`packages/core/src/scope.ts`); X212 already walks `scope.profiles()` the same way. Codes are placeholders; the implementing pull request takes the next
-free numbers in the family.
+(`operationOf` and `Call` in `calls.ts`; *Implementation plan* says how this meets RFC 0037's change to that
+walk). The profiles are read through `scope.profiles()` and `scope.connectionFor` (`packages/core/src/scope.ts`);
+X212 already walks `scope.profiles()` the same way. Codes are placeholders; the implementing pull request takes
+the next free numbers in the family.
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
@@ -265,10 +281,16 @@ X2n2 judges the connection each store reaches under each profile, since that is 
 gathers by (`gathered` in `migrate-stores.ts` groups by the reached path, `conn.path` in `store.ts`). So a tree
 the checker accepts never brings a connection with kept and unkept stores to the planner.
 
+X2n3 is refused, not left to review. A tree that names itself in `keptBy` would never migrate its own store, and
+nothing would say so: `migrate` would print a skip and exit 0, and the first sign would be a missing table at run
+time. The rule compares `keptBy` with `scope.project`'s `name`, which is the name `treeOf` in
+`packages/plugin-storage/src/record.ts` writes into the record. So the rule and the record agree on what "this
+tree" is.
+
 What is not added. A read (`#get`, `#find`, `#count`) through a kept store is allowed; it is the point. `#newKey`
 is refused with the writes: a key is made to write a record, and the sqlite engine reserves one by writing
-`wilanis_keys` (`packages/plugin-storage-sqlite/src/keys.ts`). A partial shape is not judged against the keeping tree's
-shape: that shape is in another tree, and the checker reads one tree.
+`wilanis_keys` (`packages/plugin-storage-sqlite/src/keys.ts`). A partial shape is not judged against the keeping
+tree's shape: that shape is in another tree, and the checker reads one tree.
 
 ### Runtime behaviour
 
@@ -289,7 +311,9 @@ way, before `reached`. The runtime is unchanged: `targetLines` in `packages/runt
 prints `skipped:`, `report` already exits 0 on a skip, and `--json` already carries `skipped` on the target.
 
 **`ensure`.** Unchanged in code. X2n1 refuses a delegation to `ensure` that names a kept store, so a checked tree
-never runs it on one. The runtime does not repeat the check (a rule lives in one place).
+never runs it on one. The runtime does not repeat the check (a rule lives in one place). So no process of the
+reading tree creates a kept collection under any profile, a development one included; *A development database*
+in the guide says how a developer gets one.
 
 **`plan()`, `rehearse`, `fuzz`, `regress`, `start`.** Unchanged. A read through a kept store is a storage
 operation like any other: stubbed in a rehearsal, run by the engine in `start`.
@@ -360,6 +384,15 @@ No postgres end-to-end test is needed: the change is that the engine is not reac
 
 Steps 2 and 3 depend on step 1 and not on each other. Step 4 depends on step 1.
 
+**Order with RFC 0037.** X2n1 finds a write through the call sites `calls.ts` walks (`graphCalls` and
+`bindingCalls`), and reads the store each one names off its `store` input. RFC 0037 (#931, draft) changes that
+walk: a plugin's `check` walks `scope.graphs()`, and a graph may name its store as `{{given.store}}`, which only
+the walk over `scope.graphs()` sees as a literal. Whichever of the two lands second follows the other. If RFC
+0037 lands first, step 2 reads the store from the walk RFC 0037 leaves, so a write through `{{given.store}}` to a
+kept store is refused like a literal one. If this RFC lands first, RFC 0037's change to `calls.ts` carries X2n1
+over to the new walk, with its sabotage tests. X2n2, X2n3 and step 3 read store documents and profiles, not call
+sites, so the order does not touch them.
+
 ## Drawbacks and alternatives
 
 - **Do nothing; teach the workaround.** Each reading store says "never migrate it from here", and the template
@@ -378,12 +411,11 @@ Steps 2 and 3 depend on step 1 and not on each other. Step 4 depends on step 1.
     then reads the reader's declaration as the record and plans `add` steps for columns that exist.
   - On a database the owner has not migrated, the reader's `migrate` or `ensure` creates the collection with the
     partial shape, and the record then says the reader keeps it.
-  - The `tree` column is not a stable identity. `wilanis migrate` writes `project.json → name` (`applying` in
-    `packages/plugin-storage/src/migrate.ts`), but `ensure` writes the root directory's name (`applying` in
-    `ensure.ts`: `basename(root)`). For the example these differ, `customers` and `example`, so the example's own
-    `migrate` would see the collections its `ensure` made as another tree's and never drop them. A renamed project
-    would lose every drop too.
   - It adds no rule against a write.
+
+  Since #933, `ensure` and `wilanis migrate` both name the tree through `treeOf` in
+  `packages/plugin-storage/src/record.ts`, so the `tree` column now holds one name per tree. That removes one
+  objection this RFC first raised. It does not remove the two that decide: the partial shape and the write.
 
   It would be the right shape only if a reader were also allowed to migrate what it reads, and that is the
   case this RFC says is wrong.
@@ -404,24 +436,23 @@ Steps 2 and 3 depend on step 1 and not on each other. Step 4 depends on step 1.
 
 - **A boolean, `"readOnly": true`.** Shorter, but it does not say who keeps the records. Naming the keeping tree
   tells a reader where the shape is changed and lets the `skipped:` line say who migrates. The checker cannot verify
-  the name, since the other tree is not loaded; X2n3 only refuses this tree's own name.
+  the name, since the other tree is not loaded; X2n3 refuses only this tree's own name.
 
 ## Open questions
 
-To decide before `accepted`:
+None open. Settled in review, with the edits in the text above:
 
-1. **The word.** `keptBy` matches the store's own vocabulary ("what the feature keeps", `kept`, `keeps` in
-   `model.ts`). `migratedBy` says less about writes; `readOnly` drops the owner (*Drawbacks*). I recommend
-   `keptBy`.
-2. **Should `migrate` check a kept store against the record?** It could open the connection and say, for each
-   collection the reader declares, whether the record holds every field it reads in the type it reads, and refuse
-   where it does not. That would catch an owner that renames a field the reader reads. It needs a read of the
-   record that does not run `ensureRecord`, and it turns a skip into a check. I recommend leaving it out of this
-   RFC and opening it as a follow-up if a consumer asks; the reader's first read already fails on a missing column.
-3. **`--history` on a reading tree.** This RFC leaves kept connections out, so `migrate` never opens one. The
-   alternative prints the owner's history read only. I recommend leaving them out: the keeping tree prints it.
+1. **The word is `keptBy`.** It matches the store's own vocabulary ("what the feature keeps", `kept`, `keeps` in
+   `model.ts`). `migratedBy` says less about writes, and `readOnly` drops the owner (*Drawbacks*).
+2. **`migrate` does not check a kept store against the record.** It could open the connection and say, for each
+   collection the reader declares, whether the record holds every field it reads in the type it reads. That needs a
+   read of the record that does not run `ensureRecord`, and it turns a skip into a check. It is left out: the
+   reader's first read already fails on a missing column. A follow-up may add it if a consumer asks.
+3. **`--history` leaves kept connections out**, so `migrate` never opens one. The keeping tree's `--history`
+   prints that connection's history.
+4. **X2n3 is in.** A `keptBy` that names this tree is refused (*Checker rules*).
 
 During implementation:
 
 - The exact wording of the `skipped:` line and of the hints.
-- Whether X2n3 is worth its code, or a review of the template row is enough.
+- The real codes for X2n1, X2n2 and X2n3: the next free numbers in `@storage`'s family when the pull request lands.
