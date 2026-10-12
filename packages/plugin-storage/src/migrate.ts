@@ -146,6 +146,22 @@ function reached(ctx: MigrateContext, one: Gathered): Engine | string {
   }
 }
 
+/** The line a connection another tree keeps is skipped with: who keeps it, and the store that says so. */
+function keptSaid(kept: NonNullable<Gathered['keptBy']>): string {
+  return `kept by ${kept.tree} (keptBy in ${kept.store}); this tree reads it and never migrates it`;
+}
+
+/**
+ * One connection's target. A connection another tree keeps is skipped before any engine is reached, so nothing
+ * opens it, nothing asks its record and no dry run writes to it (RFC 0042): its collections are the keeping
+ * tree's to plan, and a plan from here would drop what this tree never names and remove what it never reads.
+ */
+async function targetFor(ctx: MigrateContext, one: Gathered): Promise<PlanTarget> {
+  if (one.keptBy) return unplanned(one, { skipped: keptSaid(one.keptBy) });
+  const engine = reached(ctx, one);
+  return typeof engine === 'string' ? unplanned(one, { skipped: engine }) : await targetOf(one, engine, ctx);
+}
+
 /**
  * The plan for every store of the tree, one target per connection, ordered by canonical path. A connection
  * whose engine failed to register is skipped with the reason rather than throwing the whole command over: the
@@ -153,10 +169,7 @@ function reached(ctx: MigrateContext, one: Gathered): Engine | string {
  */
 export async function planStores(ctx: MigrateContext): Promise<Plan> {
   const targets: PlanTarget[] = [];
-  for (const one of gathered(ctx)) {
-    const engine = reached(ctx, one);
-    targets.push(typeof engine === 'string' ? unplanned(one, { skipped: engine }) : await targetOf(one, engine, ctx));
-  }
+  for (const one of gathered(ctx)) targets.push(await targetFor(ctx, one));
   return { targets };
 }
 
@@ -211,10 +224,15 @@ export async function applyStores(ctx: MigrateContext, plan: Plan): Promise<Appl
   return applied;
 }
 
-/** Every plan every connection of the tree has a record of, connection by connection in canonical-path order. */
+/**
+ * Every plan every connection of the tree has a record of, connection by connection in canonical-path order. A
+ * connection another tree keeps is left out before any engine is reached: its history is the keeping tree's to
+ * print, and asking for it here would open a database this tree only reads.
+ */
 export async function historyOfStores(ctx: MigrateContext): Promise<Applied[]> {
   const out: Applied[] = [];
   for (const one of gathered(ctx)) {
+    if (one.keptBy) continue;
     const engine = reached(ctx, one);
     if (typeof engine === 'string' || !engine.keeps()) continue;
     out.push(...(await engine.history(one.on)));

@@ -267,3 +267,51 @@ describe('what the record says was applied', () => {
     expect(await historyOfStores(other)).toEqual([]);
   });
 });
+
+/** The line a connection the registry tree keeps is skipped with, naming the store that says so. */
+const KEPT = (store: string) =>
+  `kept by registry (keptBy in @features/customers/data/${store}.store.json); this tree reads it and never migrates it`;
+
+describe('a connection another tree keeps (RFC 0042)', () => {
+  it('a connection whose every store says keptBy is skipped with the line, and its engine is asked nothing', async () => {
+    const { ctx, register } = context({ keptBy: { entries: 'registry', notes: 'registry' } });
+    // the record holds what the keeping tree applied: a plan from here would drop `gone`
+    const { engine, asked } = fake({
+      [ENTRIES]: { recorded: { entries: RECORDED, gone: RECORDED }, catalog: { entries: RECORDED, gone: RECORDED } },
+    });
+    register(engine);
+    const plan = await planStores(ctx);
+    expect(plan.targets.map(one => one.connection)).toEqual([ENTRIES, NOTES]);
+    expect(plan.targets.map(one => one.skipped)).toEqual([KEPT('customers'), KEPT('notes')]);
+    expect(plan.targets.every(one => one.steps.length === 0)).toBe(true);
+    // no history, no record, no catalog, no count: nothing opened either connection
+    expect(asked.reached).toEqual([]);
+    expect(await applyStores(ctx, plan)).toEqual([]);
+    expect(asked.reached).toEqual([]);
+  });
+
+  it('a tree with one kept connection and one of its own plans the second as before', async () => {
+    const { ctx, register } = context({ keptBy: { entries: 'registry' } });
+    const { engine, asked } = fake({});
+    register(engine);
+    const plan = await planStores(ctx);
+    expect(plan.targets[0]).toMatchObject({ connection: ENTRIES, skipped: KEPT('customers'), steps: [] });
+    expect(plan.targets[1].skipped).toBeUndefined();
+    expect(said(plan.targets[1].steps)).toEqual(['create create collection notes']);
+    await applyStores(ctx, plan);
+    expect(asked.applied.map(one => one.on)).toEqual([NOTES]);
+    expect(asked.reached).not.toContain(ENTRIES);
+  });
+
+  it('history leaves a kept connection out, and never asks its engine for it', async () => {
+    const { ctx, register } = context({ keptBy: { entries: 'registry' } });
+    const { engine, asked } = fake({
+      [ENTRIES]: { recorded: { entries: RECORDED } },
+      [NOTES]: { recorded: { notes: RECORDED } },
+    });
+    register(engine);
+    const history = await historyOfStores(ctx);
+    expect(history.map(one => one.connection)).toEqual([NOTES]);
+    expect(asked.reached).toEqual([NOTES]);
+  });
+});
