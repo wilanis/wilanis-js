@@ -12,15 +12,17 @@
 - **Tracking issue:** #909
 - **Depends on:** RFC 0013 (profiles, stand-ins, `reachOf`; implemented) and RFC 0016 (`permits`, C021-C023;
   implemented). It reverses one item RFC 0013 set aside under *Drawbacks and alternatives*, quoted below. It does
-  not edit RFC 0013, which is implemented.
+  not edit RFC 0013, which is implemented. It lands before RFC 0037 (draft), which also changes what C021 and C022
+  read; *Order with RFC 0037*, under *Implementation plan*, says why and what each leaves to the other.
 
 ## Summary
 
 After this RFC a profile may name one other profile it starts from: `"extends": "review"`. The profile then has
 the bindings, the stand-in connections and the permits of `review`, except where it writes its own. A binding it
 writes replaces the inherited binding for that port. A stand-in it writes replaces the inherited stand-in for
-that connection. A `permits` list it writes replaces the inherited list whole. An inherited permit that names a
-connection this profile stands in for is read as the stand-in. `default` and `description` are never inherited.
+that connection. A `permits` list it writes replaces the inherited list whole. An inherited permit for a connection
+this profile stands in for permits the stand-in, and still permits the connection it named wherever this profile
+reaches that connection another way. `default` and `description` are never inherited.
 There is one level: the profile named in `extends` may not extend another. Core resolves a profile once, in
 `Scope.profile(name)`, and every reader of what a profile means reads it there: `bindingFor`, `connectionFor`,
 the checker (B002, B011, C021, C022, C023), `reachOf`, the manifest, `describe` and the viewer. The rules about
@@ -105,8 +107,18 @@ becomes:
 
 `branch` writes no `bindings`, so it has `review`'s 8. It writes no `permits`, so it has `review`'s 30. Two of
 those name `history.connection.json` and `reports.connection.json`, which `branch` stands in for, so under
-`branch` they read as `branch-history.connection.json` and `branch-reports.connection.json`. That is the list
-`branch` writes by hand today, entry for entry.
+`branch` they permit `branch-history.connection.json` and `branch-reports.connection.json`. `branch` reaches
+`history.connection.json` and `reports.connection.json` no other way, so those two entries permit nothing more.
+That is the list `branch` writes by hand today, entry for entry.
+
+**One connection reached two ways.** In the example, `production` stands `customers-postgres.connection.json` in
+for `jobs.connection.json`, so the queue is a table in the customer database. The customer store also names
+`customers-postgres.connection.json` directly. `production` permits it with one entry, which covers both ways. Say
+a child stands its own broker, `jobs-staging.connection.json`, in for `jobs.connection.json`. Its queue now goes to
+`jobs-staging`, but its store still goes to `customers-postgres`. So the inherited entry permits both: the stand-in
+always, and `customers-postgres.connection.json` because the child still reaches it through the store. If the
+entry were only rewritten to the stand-in, the child would be refused C021 for the store's connection, which its
+parent permits and which nothing about the child changed.
 
 **The example, after this RFC.** `production-scheduler` and `production-worker` extend `production`:
 
@@ -178,7 +190,7 @@ block for `branch` holds the resolved bindings, stand-ins and permits, and `"ext
 
 ```json
 "extends": {
-  "description": "The profile this one starts from: its bindings, stand-in connections and permits are this profile's too, except where this profile writes its own. A binding written here replaces the inherited one for that port; a stand-in written here replaces the inherited one for that connection; a permits list written here replaces the inherited list whole. An inherited permit naming a connection this profile stands in for is read as the stand-in. default and description are not inherited. One level: the profile named extends no other (C0nn).",
+  "description": "The profile this one starts from: its bindings, stand-in connections and permits are this profile's too, except where this profile writes its own. A binding written here replaces the inherited one for that port; a stand-in written here replaces the inherited one for that connection; a permits list written here replaces the inherited list whole. An inherited permit naming a connection this profile stands in for permits the stand-in, and the connection itself wherever this profile still reaches it another way. default and description are not inherited. One level: the profile named extends no other (C0nn).",
   "type": "string",
   "pattern": "^[a-z][a-z0-9-]*$"
 }
@@ -195,11 +207,14 @@ child of parent P:
 
 - `bindings`: P's, keyed by the canonical port path, with the child's written over them.
 - `connections`: P's, keyed by the canonical connection path, with the child's written over them.
-- `permits`: the child's own list where it writes one. Else P's list, where P writes one, with each entry that
-  names what P reaches for a connection the child stands in for read as the child's stand-in. "What P reaches for
-  connection A" is P's stand-in for A, or A itself where P has none. Duplicates that this makes are dropped. Else
-  no list (everything).
+- `permits`: the child's own list where it writes one. Else P's list, where P writes one, entry for entry, each
+  marked as inherited. An entry that names what P reaches for a connection A the child stands in for also carries
+  the child's stand-in for A. "What P reaches for A" is P's stand-in for A, or A itself where P has none. Else no
+  list (everything).
 - `default` and `description`: the child's own only.
+
+Core cannot say whether the child still reaches the entry's own connection: that is the reach, which the compiler
+derives (`reachOf`). So core only marks the entry, and the checker reads it (*Checker rules*, C021 and C022).
 
 Where `extends` is wrong, resolution still answers, and the checker refuses (C0nn): a parent the project does
 not declare, or the profile itself, resolves as if there were no `extends`; a parent that extends another
@@ -234,13 +249,22 @@ What changes in the existing rules:
   inherited entry was judged under the parent; judging it again under the child would refuse one line twice.
 - **Judged on the resolved profile: B002, B011.** Both read `bindingFor`, which now reads the resolved profile.
   No change to either function.
-- **Judged on the resolved list: C021, C022, C023.** `checkProject` (`check/project.ts`, line 35) hands
-  `checkPermits` the resolved profile from `Scope.profile(name)`, not the written one. Where the list is
+- **Judged on the resolved list: C021, C022.** `checkProject` (`check/project.ts`, line 35) hands
+  `checkPermits` the resolved profile from `Scope.profile(name)`, not the written one. An inherited entry that
+  carries a stand-in permits two connections: the stand-in, always, and the connection it names, wherever the
+  child's reach (`reach.connections`) holds that connection. C021 reads it so. C022 refuses it only where the child
+  reaches neither, so an entry is never wider than the child's tree, as RFC 0016 asks. Where the list is
   inherited, a refusal is made at `profiles/<child>/extends`, since the child writes no `permits` to point at,
   and its message says `inherits '<entry>' from '<parent>'` (C022) or `(permits inherited from '<parent>')`
-  (C021). The hint adds: `write profiles/<child>/permits: a list it writes replaces <parent>'s whole`. An
-  inherited entry for a connection the child stands in for is read as the stand-in, so it never earns C023. An
-  entry the child writes itself and that names a connection it replaces is C023, as today.
+  (C021). The hint adds: `write profiles/<child>/permits: a list it writes replaces <parent>'s whole`.
+- **Judged once, under the parent: R001 and C023 for an inherited entry.** Whether an entry names anything (R001),
+  and whether it is a permit at all -- not a domain port, its operation, a pure operation or a port with nothing
+  effectful (C023) -- is a fact about the entry, not about the profile. `checkPermits` refuses it under the parent,
+  at the parent's line, `profiles/<parent>/permits/<index>`, as today. Under the child, `readPermit` reads such an
+  inherited entry as permitting nothing and refuses nothing, so one bad line is refused once. The one C023 that
+  depends on the profile, "a connection the profile replaces", cannot reach an inherited entry: where the parent
+  replaces a connection, its own C023 keeps that connection out of its list, and where the child replaces one, the
+  entry carries the stand-in. An entry the child writes itself is judged under the child for all three, as today.
 - **Unchanged: C017.** `default` is not inherited, so the rule reads each profile as written.
 - **Unchanged: B012.** A startup step names profiles by name. A step that names `production` does not run under
   `production-worker`. It must not: in the example, `Listen` names `production`, and the worker must not listen.
@@ -264,7 +288,8 @@ active (RFC 0013, *Plugin contract*).
 - **`wilanis describe project.json`.** `ProfileReach` in `packages/runtime/src/profiles-said.ts` gains
   `extends?: string` and marks each `binds` and `standsIn` row it inherits. `profileOf` (line 58) reads
   `scope.profile(name)` in place of the written profile, so `binds`, `stands in` and `permits` are the resolved
-  ones. `profileHeading` prints `extends <parent>` after the name. A row the child inherits ends with
+  ones, `permits` read as the manifest reads them (below). `profileHeading` prints `extends <parent>` after the
+  name. A row the child inherits ends with
   `(from <parent>)`, and `permitsSaid` says `by <parent>'s N entries` where the list is inherited. The exact
   wording is left to implementation, as RFC 0013 left its own.
 - **`wilanis describe <connection>`.** `standInsOf` (line 116) and `permittedLines` (line 229) read the resolved
@@ -272,6 +297,9 @@ active (RFC 0013, *Plugin contract*).
   said for an inherited stand-in or permit too.
 - **The manifest.** `ProfileBlock` in `packages/runtime/src/manifest-profiles.ts` gains `extends: string | null`.
   `profileBlock` (line 91) reads `scope.profile(name)`, so `bindings`, `connections` and `permits` are resolved.
+  For an inherited list, `permits` holds what the entries permit under the child, as the checker reads them: an
+  entry that carries a stand-in gives the stand-in, and its own connection where the child's reach holds it.
+  `profileBlock` already calls `reachOf` for the same profile, so it reads both from one walk.
   This is what RFC 0013 meant by "the manifest prints resolved anyway", and what `wilanis-deploy` needs, since it
   plans one place from that place's block (`plan.ts`). In `manifest.schema.json`, the profile block gains `extends`
   (`["string", "null"]`, required, as every key there is), and the descriptions of `bindings`, `connections` and
@@ -305,8 +333,9 @@ approval in the `decision` job. It is compatible, so it may land before or after
 - a child with no `bindings` has the parent's; a child binding for one port replaces that one and keeps the rest;
   keys written through two aliases of one port meet as one;
 - a child stand-in for a connection replaces the parent's stand-in for it;
-- a child with no `permits` has the parent's, with the entry for a connection it stands in for read as its
-  stand-in, both where the parent named the connection and where the parent named its own stand-in for it;
+- a child with no `permits` has the parent's, each entry marked inherited, and the entry for a connection it
+  stands in for carrying its stand-in, both where the parent named the connection and where the parent named its
+  own stand-in for it;
 - a child that writes `permits` has exactly its own;
 - `default` and `description` are never inherited;
 - a parent that is not declared, that is the child, or that extends another: resolution answers, follows at most
@@ -331,8 +360,22 @@ example after step 4, where `production-scheduler` and `production-worker` exten
   "@connections/employees.connection.json" }` → C018 (a child cannot drop an inherited stand-in by mapping the
   connection to itself), once, at the child's line;
 - plant `employees-staging.connection.json`, of the employees' kind, and a profile `production-staging` that
-  extends `production` and stands it in for `employees.connection.json` → no refusal, and the resolved permits
-  name `employees-staging.connection.json` where `production`'s name `employees-production.connection.json`.
+  extends `production` and stands it in for `employees.connection.json` → no refusal; the entry for
+  `employees-production.connection.json` permits `employees-staging.connection.json`, and nothing more, since the
+  child reaches `employees-production` no other way;
+- **a shared target:** plant `jobs-staging.connection.json`, of the kind `jobs.connection.json` is
+  (`@queue-memory/memory.connection-kind.json`), and a profile `production-staging` that extends `production` and
+  stands it in for `jobs.connection.json` → no refusal: the inherited `customers-postgres.connection.json` entry
+  permits `jobs-staging`, which the queue reaches, and `customers-postgres`, which the store still reaches. Then
+  bind `customer.port.json` and `@auth/state.port.json` under `production-staging` to bindings that do not reach
+  `customers-postgres` → no C022, and `describe` shows the entry permitting `jobs-staging` alone;
+- **an entry reached neither way:** remove `production-scheduler`'s own `permits`, so it inherits `production`'s,
+  and stand `employees-staging.connection.json` in for `employees.connection.json` under it → C022 for the
+  `employees-production.connection.json` entry, at `profiles/production-scheduler/extends`, since the scheduler
+  reaches neither that connection nor its stand-in (it verifies no one);
+- break an entry of `production`'s `permits` (`@connections/nowhere.connection.json`, then
+  `@customers/domain/customer.port.json`) → R001, then C023, once each, at `profiles/production/permits/<index>`,
+  and nothing under `production-worker`, after its own `permits` is removed so that it inherits the list.
 
 **Discoverability**, in `describe-profiles.test.ts`, `describe-permits.test.ts`, `manifest-profiles.test.ts` and
 `manifest.golden.json`: the heading names the parent; inherited rows are marked; the manifest's block for
@@ -343,8 +386,10 @@ example after step 4, where `production-scheduler` and `production-worker` exten
 1. **Core.** The schema key and the `anyOf`; `ProfileDoc`; `resolveProfile` in `packages/core/src/profiles.ts`;
    `Scope.profile`; `bindingFor` and `connectionFor` read it; the resolution and validation tests. Waits on the
    `decision` job. (`area:core`)
-2. **The checker.** `checkExtends` (C0nn); `checkPermits` on the resolved profile, with the messages, `at` path
-   and hint for an inherited list; the sabotage tests on a planted child. (`area:compiler`)
+2. **The checker.** `checkExtends` (C0nn); `checkPermits` on the resolved profile: an inherited entry that carries
+   a stand-in read as the stand-in and, where still reached, its own connection; R001 and C023 for an inherited
+   entry left to the parent; the messages, `at` path and hint for an inherited list; the sabotage tests on a
+   planted child, the shared target among them. (`area:compiler`)
 3. **Saying it.** `profiles-said.ts` (`extends`, inherited rows, `standInsOf`, `permittedLines`),
    `manifest-profiles.ts` and `manifest.schema.json`, the golden manifest, the viewer's `profilesEl`, and their
    tests. (`area:runtime`, `area:view`)
@@ -357,6 +402,26 @@ example after step 4, where `production-scheduler` and `production-worker` exten
    once steps 1-3 have landed)
 
 Steps 2 and 3 need step 1 and may land in either order. Step 4 needs steps 2 and 3.
+
+**Order with RFC 0037.** RFC 0037 (draft, "A connection is a literal at the call") also changes what C021 and C022
+read: a call may reach several connections (`ReachedNative.connections` in place of `connection`), and a connection
+may have parts, each reached and each replaced by a stand-in. It also takes new C codes. I recommend this RFC lands
+first, for three reasons.
+
+- It is the smaller change: four pull requests, against RFC 0037's five, and none of them edits `reach.ts`, which
+  RFC 0037 rewrites (its walks follow graph instances).
+- The two meet in few places. This RFC adds `Scope.profile`; RFC 0037 adds `Scope.graphs` and `Scope.boundGraph`.
+  In `check/permits.ts`, this RFC changes which profile is read and where an inherited refusal points; RFC 0037
+  changes how many connections a site carries and what a message adds (`(given by ...)`, `(a part of ...)`). So
+  RFC 0037's step 1 rebases over a few lines of messages and an `at` path, and changes no rule of this one.
+- Neither rule depends on the other. Whether a child "still reaches" a connection is read off `reach.connections`,
+  whatever fills it. Under RFC 0037 a part the child stands in for is a connection like any other, and one
+  connection reached two ways becomes more common (a call naming two), which is why the shared-target test above
+  stays in the suite.
+
+If RFC 0037 lands first instead, step 2 of this RFC reads `site.connections` where it would read
+`site.connection`, and nothing else changes. Codes: both RFCs write theirs as `C0nn`. Whichever implementation
+lands first takes the next free C code (C024 on `main` today), and the other takes the code after it.
 
 ## Drawbacks and alternatives
 
@@ -383,12 +448,22 @@ Steps 2 and 3 need step 1 and may land in either order. Step 4 needs steps 2 and
   - *Inherited whole, replaced whole* (this RFC). A child that reaches what its parent reaches, up to its
     stand-ins, writes nothing. A child that reaches something else writes its own list, which the checker holds
     to the child's reach as strictly as any other. It never mixes the two.
-- **An inherited permit read as the stand-in.** A permit names what a place may reach, and C023 already says "a
-  replaced connection is named by its stand-in". The child's `connections` entry is a line a reviewer reads
-  under the child's name. So reading the parent's permit for the replaced connection as a permit for the stand-in
-  says nothing the child's own line does not say. The alternative, dropping that permit and making the child add
-  the stand-in to a list it otherwise does not write, conflicts with "replaced whole": the child would write a
-  list of two and lose the other 28.
+- **An inherited permit that also permits the stand-in.** A permit names what a place may reach, and C023 already
+  says "a replaced connection is named by its stand-in". The child's `connections` entry is a line a reviewer reads
+  under the child's name. So letting the parent's permit for the replaced connection permit the stand-in says
+  nothing the child's own line does not say. Three other readings were weighed.
+  - *Rewrite the entry to the stand-in.* This fails where one connection is reached two ways, as the example's
+    customer database is (by the store, and as the stand-in for `jobs`): the child gets C021 for a connection its
+    parent permits and which nothing about the child changed.
+  - *Keep the entry and add the stand-in as a second entry, each judged alone.* The kept entry is dead in the
+    consumer's `branch`, which reaches `history.connection.json` no other way, so C022 refuses every `branch`.
+  - *Drop the entry and make the child add the stand-in* to a list it otherwise does not write. That conflicts with
+    "replaced whole": the child would write a list of two and lose the other 28.
+
+  The rule taken -- the stand-in always, the named connection where the child still reaches it -- passes both the
+  consumer's case and the shared target, and C022 still refuses an entry the child reaches neither way. The cost
+  is that what a child's inherited list permits depends on the child's reach, not on the documents alone. The
+  manifest already prints the reach beside the list, so it reads both from one `reachOf`.
 - **A child cannot remove an inherited stand-in or binding.** Mapping a connection to itself is C018, and a child
   has no way to say "no binding here". Neither the consumer nor the example needs to remove one. A profile that
   must drop one writes its choices out without `extends`.
@@ -428,23 +503,31 @@ Steps 2 and 3 need step 1 and may land in either order. Step 4 needs steps 2 and
 
 ## Open questions
 
-To decide before `accepted`:
+**Settled in review.** The maintainer accepted these recommendations on the pull request:
 
-- **Take `extends` at all?** I recommend yes. The consumer copies 41 of 49 lines per file in 21 files, the
-  example copies `production` twice, and a changed binding in one copy is drift no rule sees. RFC 0013's reason
-  was "a few repeated lines", and that is no longer true.
-- **One level or chains?** I recommend one level. It can be relaxed later; chains could not be taken back.
-- **Permits: inherited whole with stand-ins read in, replaced whole when written?** I recommend yes, over the
-  three other ways weighed under *Drawbacks and alternatives*.
-- **The example: should `production-scheduler` and `production-worker` extend `production` and write their own
-  `permits`?** I recommend yes. It is the case RFC 0013 named, and a child of a guarded place staying guarded is
-  part of what this RFC decides. The alternative is to show `extends` only in tests.
-- **Plugin settings per profile?** I recommend leaving them out of this RFC.
+- `extends` is taken. The consumer copies 41 of 49 lines per file in 21 files, the example copies `production`
+  twice, and a changed binding in one copy is drift no rule sees. RFC 0013's reason was "a few repeated lines",
+  and that is no longer true.
+- One level, no chains. It can be relaxed later; chains could not be taken back.
+- Permits are inherited whole and replaced whole when written. The reading of an inherited entry for a replaced
+  connection (the stand-in always, the connection where the child still reaches it) and where R001 and C023 fire
+  for an inherited entry were written in answer to the review.
+- The example is migrated: `production-scheduler` and `production-worker` extend `production` and write their own
+  `permits`.
+- Plugin settings stay one per tree, not per profile.
+
+**Still to decide before `accepted`:**
+
 - **The key's name.** `extends` is the word `tsconfig.json` and most configuration formats use. `from` is
   already taken in `project.json` by `plugins[].from` and `includes[].from`, which name an npm package.
-- **The milestone.** The issue is under M14 1.0, since the roadmap cuts 1.0 only when every accepted RFC that
-  changes a schema has landed. The change is compatible, so it could instead go under *Unscheduled* and land
-  after the freeze.
+- **The milestone.** I recommend M14 1.0: the RFC lands before the `schemas-v1` freeze. The roadmap cuts 1.0 only
+  when every accepted RFC that changes a schema has landed, with no exception for a compatible change, and putting
+  this RFC under *Unscheduled* would need one. The work is small (four pull requests, none in the engine or a
+  plugin), and a consumer copies profiles today. *Unscheduled* would fit only if 1.0 were ready before step 1
+  could land; the change is compatible, so it could then land after the freeze, in place (RFC 0008). The
+  maintainer decides at acceptance.
+- **The order with RFC 0037.** I recommend this RFC lands first (*Order with RFC 0037*, under *Implementation
+  plan*). Neither changes a rule of the other, so the other order costs one rebase, not a redesign.
 
 Left to implementation: the exact wording of `describe` and of the viewer's marks; whether
 `ResolvedProfile` marks inherited entries per entry or per list.
