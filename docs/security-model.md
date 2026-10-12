@@ -153,6 +153,9 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
   [X211](refusals/X211.md), [X212](refusals/X212.md), [X213](refusals/X213.md)] (RFC 0003)
 - A collection's `renamed` and `was` describe a rename, never one field into two or one table onto another.
   [[C010](refusals/C010.md), [C011](refusals/C011.md)] (RFC 0017)
+- A store another tree keeps (`keptBy`) is never written through, given a key or prepared by this tree; every store
+  over one connection, under every profile, says the same `keptBy`; and `keptBy` never names this tree.
+  [[X215](refusals/X215.md), [X216](refusals/X216.md), [X217](refusals/X217.md)] (RFC 0042)
 - A collection kept in PostgreSQL holds no blob, is keyed by a field the engine can make a key for, and has a name
   PostgreSQL keeps as a table of its own; a queue it keeps renews a running delivery's lock on a wait a Node timer
   can keep. [[X221](refusals/X221.md), [X222](refusals/X222.md), [X223](refusals/X223.md),

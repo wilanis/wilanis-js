@@ -27,7 +27,7 @@
       "$ref": "common.schema.json#/$defs/path"
     },
     "keptBy": {
-      "description": "The tree that keeps these collections, by its project.json → name. That tree writes the records and runs wilanis migrate over them; this tree only reads them. wilanis migrate never plans a connection whose stores say keptBy, and no graph or startup step of this tree writes through this store (X2n1). A collection may name a shape with fewer fields than the keeping tree's: an engine reads only the fields a shape names. Every store over one connection says the same keptBy, or none says it (X2n2).",
+      "description": "The tree that keeps these collections, by its project.json → name. That tree writes the records and runs wilanis migrate over them; this tree only reads them. wilanis migrate never plans a connection whose stores say keptBy, and no graph or startup step of this tree writes through this store (X215). A collection may name a shape with fewer fields than the keeping tree's: an engine reads only the fields a shape names. Every store over one connection says the same keptBy, or none says it (X216).",
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$"
     },

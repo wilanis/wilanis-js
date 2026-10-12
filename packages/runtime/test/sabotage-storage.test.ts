@@ -297,3 +297,52 @@ describe('what a call may do to the records', () => {
     expect(found).toContain('X213');
   });
 });
+
+const CUSTOMERS = 'features/customers/data/customers.store.json';
+/** The example's store edited to say the billing tree keeps it, without the marks only a migration reads. */
+const keptBy =
+  (tree: string, marks = false) =>
+  (doc: any) => {
+    doc.keptBy = tree;
+    if (marks) return;
+    delete doc.collections.customers.renamed;
+    delete doc.collections.customers.defaults;
+  };
+/** A refusal as `sabotagePointing` answers it, at a document of the customers feature's data layer. */
+const refused = (code: string, where: string) => `${code} @features/customers/data/${where}`;
+
+/** What a store another tree keeps promises (RFC 0042): this tree reads it and never writes or prepares it. */
+describe('a store another tree keeps', () => {
+  it('X215 a write through a kept store, at the put of keep-customer and at every other write', () => {
+    expect(sabotagePointing(CUSTOMERS, keptBy('billing'))).toEqual(
+      [
+        'keep-customer.graph.json#nodes/stored/in',
+        'kept-remove.graph.json#nodes/removed/in',
+        'next-id.graph.json#nodes/key/in',
+        'store-and-latest.graph.json#nodes/stored/in',
+        'store-and-latest.graph.json#nodes/latest/in',
+        'customers-store.binding.json#operations/prepare/in',
+      ].map(where => refused('X215', where)),
+    );
+  });
+
+  it('X215 the ensure a startup step reaches, and X216 the store beside it on the connection that says none', () => {
+    const found = sabotagePointing('features/customers/data/customers-postgres.store.json', keptBy('billing'));
+    expect(found).toContain(refused('X215', 'customers-postgres.binding.json#operations/prepare/in'));
+    expect(found.filter(one => !one.startsWith('X215'))).toEqual([
+      refused('X216', 'customers-postgres.store.json#keptBy'),
+      'X216 @features/state/data/auth.store.json#connection',
+    ]);
+  });
+
+  it('X217 keptBy naming this tree, which keeps its own stores', () => {
+    const found = sabotagePointing(CUSTOMERS, keptBy('customers'));
+    expect(found).toContain(refused('X217', 'customers.store.json#keptBy'));
+  });
+
+  it('D001 renamed and defaults on a kept store: they only instruct a migration, which the keeping tree runs', () => {
+    // the schema refuses the document, so what names it is refused too (X204, G004, G010) and is not the claim
+    const found = sabotagePointing(CUSTOMERS, keptBy('billing', true)).filter(one => one.startsWith('D001'));
+    expect(found).toEqual(['renamed', 'defaults'].map(mark => `D001 ${CUSTOMERS}#collections/customers/${mark}`));
+  });
+});
