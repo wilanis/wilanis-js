@@ -191,38 +191,50 @@ export function ownInputAt(list: FoundList, outer: FoundList[] = []): string[] |
   return held && 'input' in held && !held.element ? held.input : undefined;
 }
 
-/** A node of an enclosing spec: the prefix its siblings are stubbed under, and its id. */
+/**
+ * A node of an enclosing spec: the prefix its siblings are stubbed under, and its id. `element` where the value is an
+ * element of the list the node answers, which a map handed down one element at a time.
+ */
 export interface Upstream {
   prefix: string[];
   node: string;
+  element?: true;
 }
 
 /**
  * The one node of an enclosing spec that every input this switch reads off `in` was copied from, field for field:
- * `in.name` handed down as `{{customer.name}}`, `in.email` as `{{customer.email}}`. Each input is followed out
- * (`traced`) until it names something other than `in`. Nothing where an input reads anything but `in`, where one is
- * composed on the way, where the inputs part company, where a field arrives under another name or as an element of a
- * list, or where the value is the trigger's own input -- what a guard's value is then is the caller's business, and
- * steering it is the rehearsal's as it always was.
+ * `in.name` handed down as `{{customer.name}}`, `in.email` as `{{customer.email}}` -- or, across a map that binds each
+ * field by its own name, as `name` and `email` of each element of the list the node answers. Each input is followed
+ * out (`traced`) until it names something other than `in`. Nothing where an input reads anything but `in`, where one
+ * is composed on the way, where the inputs part company, where a field arrives under another name or inside an
+ * element of a list deeper than the node's whole answer, or where the value is the trigger's own input -- what a
+ * guard's value is then is the caller's business, and steering it is the rehearsal's as it always was.
  */
 export function upstreamOf(found: FoundSwitch): Upstream | undefined {
   let held: Upstream | undefined;
   for (const source of Object.values(found.node.in)) {
     const one = copiedFrom(sourceOf(source), standingOf(found));
-    if (!one) return undefined;
-    if (held && (held.node !== one.node || held.prefix.join('.') !== one.prefix.join('.'))) return undefined;
+    if (!one || (held && !sameUpstream(held, one))) return undefined;
     held = one;
   }
   return held;
 }
 
-/** One read of `in` followed out to the node that holds the same field, under the same name. */
+/** Whether two inputs were copied from the same value: one node, in one spec, whole or element by element alike. */
+const sameUpstream = (one: Upstream, other: Upstream): boolean =>
+  one.node === other.node && one.prefix.join('.') === other.prefix.join('.') && one.element === other.element;
+
+/**
+ * One read of `in` followed out to the node that holds the same field, under the same name: in the node's answer, or
+ * in element 0 of the list it answers, which stands for every element a map hands down.
+ */
 function copiedFrom(read: Read | undefined, standing: Standing): Upstream | undefined {
   if (read?.ref !== 'in') return undefined;
   const out = traced(read, standing);
-  if (!('node' in out) || out.element) return undefined;
-  if (out.path.join('.') !== read.path.join('.')) return undefined;
-  return { prefix: out.prefix, node: out.node };
+  if (!('node' in out)) return undefined;
+  const field = out.element ? ['0', ...read.path] : read.path;
+  if (out.path.join('.') !== field.join('.')) return undefined;
+  return out.element ? { prefix: out.prefix, node: out.node, element: true } : { prefix: out.prefix, node: out.node };
 }
 
 /**

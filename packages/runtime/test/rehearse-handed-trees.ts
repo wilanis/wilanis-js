@@ -15,6 +15,7 @@ import {
   graph,
   HERE,
   ITEM,
+  MAKE,
   make,
   map,
   NUMBER,
@@ -209,19 +210,24 @@ const EDIT = { page: STRING, privateHits: NUMBER };
  * `refresh` makes a plan from the trigger's edits and maps `site.port.json#write` over `{{plan.writes}}`, every field
  * bound by its own name (Item 12). The write is bound to a data graph whose `in` is a `PageEdit`, on which an
  * invariant stands, so the compiler guards each element the map writes at `in:check`. The plan's list is of `Edit`,
- * another shape with the same fields, so nothing upstream judged the rule. With `planHeld`, a rule on the whole plan
- * makes `plan` a guarded site, so the list the map runs over is the answer of `plan:check`.
+ * another shape with the same fields, so nothing upstream judged the rule. `upstream` says what a rule judged first:
+ * nothing; the whole plan, so `plan` is a guarded site and the list the map runs over is the answer of `plan:check`;
+ * or each edit, made a `PageEdit` by the map `edits`, a guarded list site of the shape the write's guard judges.
  */
-export function eachGuardTree(planHeld = false): string {
+export function eachGuardTree(upstream: 'nothing' | 'plan' | 'each' = 'nothing'): string {
   const port = `${HERE}/domain/site.port.json`;
   const written = shape('Written');
   const plan = { writes: { type: `${shape('Edit')}[]` } };
+  const each = upstream === 'each';
+  const edits = each
+    ? [map('edits', MAKE, { over: '{{plan.writes}}', bind: { value: '' }, in: { type: shape('PageEdit') } })]
+    : [];
   return treeOf({
     'domain/Edit.shape.json': { layer: 'core', fields: EDIT },
     'domain/PageEdit.shape.json': { layer: 'core', fields: EDIT },
     'domain/Plan.shape.json': { layer: 'core', fields: plan },
     'domain/Written.shape.json': { layer: 'core', fields: EDIT },
-    ...(planHeld ? { 'domain/a-plan-writes.invariant.json': PLAN_WRITES } : {}),
+    ...(upstream === 'plan' ? { 'domain/a-plan-writes.invariant.json': PLAN_WRITES } : {}),
     'domain/nothing-private-is-written.invariant.json': {
       label: 'Nothing private is written',
       holds: { on: shape('PageEdit'), when: 'privateHits == 0' },
@@ -244,8 +250,9 @@ export function eachGuardTree(planHeld = false): string {
     },
     'domain/refresh.graph.json': graph('Refresh', shape('Plan'), { type: `${written}[]`, from: 'written' }, [
       make('plan', { writes: '{{in.writes}}' }, shape('Plan')),
+      ...edits,
       map('written', `${port}#write`, {
-        over: '{{plan.writes}}',
+        over: each ? '{{edits}}' : '{{plan.writes}}',
         bind: { page: 'page', privateHits: 'privateHits' },
         in: {},
       }),
