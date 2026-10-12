@@ -1,6 +1,6 @@
 # RFC 0037: A connection is a literal at the call: fields that name one, graphs given one, connections made of parts
 
-- **Status:** draft
+- **Status:** accepted
 - **Areas:** `area:core` (one key on a contract field, `given` on a graph and on a binding operation, the instances
   of a graph in `Scope`), `area:compiler` (`connectionOf` answers every field that names a connection; every walk over
   graphs walks instances; rules in the C, R, G, L and B families), `area:runtime` (`describe`, `map`, rehearse's
