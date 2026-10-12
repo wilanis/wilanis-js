@@ -45,7 +45,7 @@ accepted. Statuses: draft, accepted, implemented, withdrawn.
 | [0037](0037-connections-at-the-call.md) | A connection is a literal at the call: fields that name one, graphs given one, connections made of parts | accepted |
 | [0038](0038-rehearse-steers-what-a-caller-hands.md) | Rehearse steers what a caller hands: a graph's `in` followed out through maps and calls | accepted |
 | [0039](0039-keep-and-group-a-list.md) | Keep and group a list: a `where` on `map`, and `@std/list#totals` | accepted |
-| [0040](0040-text-contains.md) | `contains`: a rule asks whether a text holds a word written in the rule | draft |
+| [0040](0040-text-contains.md) | `contains`: a rule asks whether a text holds a word written in the rule | accepted |
 
 Which milestone first shows an RFC is said once, in [`../roadmap.md`](../roadmap.md); the tracking issue
 carries it as GitHub's milestone. Where this list and the outside assessment that seeded it differ, the

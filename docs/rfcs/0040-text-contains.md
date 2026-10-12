@@ -1,6 +1,6 @@
 # RFC 0040: `contains`: a rule asks whether a text holds a word written in the rule
 
-- **Status:** draft
+- **Status:** accepted
 - **Areas:** `area:core` (the expression grammar under `packages/core/src/expr/`; the descriptions of
   `switch.schema.json` and `invariant.schema.json`), `area:runtime` (the branch solver: `solve.ts`, `domains.ts`,
   `stubs.ts`; the template's `CLAUDE.md`), `area:view` (`said.ts`). The compiler changes by one comment:
