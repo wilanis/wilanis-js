@@ -143,6 +143,26 @@ describe('a guard on each element of a list a guard upstream judged element by e
   });
 });
 
+describe('a guard whose value a site upstream proved', () => {
+  it('is held at that site, named, and is no problem', { timeout: 30_000 }, async () => {
+    // `person` is read whole from `named`, a guarded site, so the rule is proved there; keep is handed its fields
+    const done = await rehearse(loaded(peopleTree('proved')), { seed: 1 });
+    const held = "at 'person' in features/people/domain/register-person, where the rule is proved";
+    const decision = done.decisions.find(
+      one => one.graph.endsWith('data/keep-person.graph.json') && one.node === 'in:check',
+    );
+    expect(
+      decision?.branches.map(one => [one.to, one.held]),
+      done.lines.join('\n'),
+    ).toEqual([
+      ['in:ok', held],
+      ['in:violated', held],
+    ]);
+    expect(done.lines).toContain(`  ok  holds     held upstream ${held}`);
+    expect(done.ok, done.lines.join('\n')).toBe(true);
+  });
+});
+
 describe('a demand traced to the answer of a guard upstream', () => {
   it('writes an element of a list a guarded node holds into the value that guard judges', {
     timeout: 30_000,

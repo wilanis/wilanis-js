@@ -2,8 +2,8 @@
  * The small trees `rehearse-handed.test.ts` rehearses (RFC 0038): each hands a graph's `in` a value the rehearsal can
  * follow out to something it sets -- a value a map hands every element, a value a call copies from a node, an object a
  * call writes out, the trigger's input under another name, an element a map writes through a guard -- or, in the
- * people tree, a value a guard upstream judged first. Every tree passes the checker, since a case about the walk must
- * stand on a tree that does.
+ * people tree, a value a guard upstream judged first or a site upstream proved. Every tree passes the checker, since a
+ * case about the walk must stand on a tree that does.
  */
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -280,16 +280,22 @@ const keepGraph = (label: string) => ({
 
 /**
  * What `register` hands `keep`: the person's own fields, which the guard at `person:check` judged; the draft's name
- * beside the person's email; or the person's name beside the draft's email.
+ * beside the person's email; the person's name beside the draft's email; or the person's own fields where the person
+ * is read whole from `named`, another site of the shape guarded at `named:check`, so `person` is a site where the rule
+ * is proved and nothing guards it.
  */
-export type People = 'person' | 'draft' | 'email';
+export type People = 'person' | 'draft' | 'email' | 'proved';
 
 /** What `register` hands `keep` under each variant, field by field. */
 const KEPT: Record<People, object> = {
   person: { name: '{{person.name}}', email: '{{person.email}}' },
   draft: { name: '{{in.name}}', email: '{{person.email}}' },
   email: { name: '{{person.name}}', email: '{{in.email}}' },
+  proved: { name: '{{person.name}}', email: '{{person.email}}' },
 };
+
+/** A person made from the draft `register` takes, field for field. */
+const DRAFTED = { name: '{{in.name}}', email: '{{in.email}}' };
 
 /**
  * `register` fires a domain graph that makes a `Person` (a made site, guarded at `person:check`) and hands it to
@@ -337,7 +343,8 @@ export function peopleTree(handed: People = 'person'): string {
     in: `${PEOPLE}/domain/Draft.shape.json`,
     out: { type: CARD, from: 'card' },
     nodes: [
-      make('person', { name: '{{in.name}}', email: '{{in.email}}' }, PERSON),
+      ...(handed === 'proved' ? [make('named', DRAFTED, PERSON)] : []),
+      run('person', MAKE, { value: handed === 'proved' ? '{{named}}' : DRAFTED, type: PERSON }),
       run('kept', `${PEOPLE_PORT}#keep`, KEPT[handed]),
       make('card', { name: '{{kept.name}}', email: '{{person.email}}' }, CARD),
     ],
