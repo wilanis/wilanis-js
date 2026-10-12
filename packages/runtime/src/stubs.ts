@@ -157,11 +157,14 @@ function unlikeExcluded(domain: Domain): unknown {
 
 /**
  * A path compared with another (`a == b`, `a != b`): `equal` is the value its type generates under the seed, which is
- * the same value for every path of that type, so two paths paired `equal` hold one value; `unequal` is another.
+ * the same value for every path of that type, so two paths paired `equal` hold one value; `unequal` is another. The
+ * value is not changed to hold or lack a word, since its partner would not change with it: where it misses the words
+ * the domain asks for, the answer is `NO_MEMBER`, and the case is reported never run rather than run on the wrong route.
  */
 function inPair(domain: Domain, type: Type | undefined, seed: number): unknown {
   const one = fresh(type, seed);
-  return domain.paired === 'equal' ? one : unlikeFresh(one, type, seed);
+  const value = domain.paired === 'equal' ? one : unlikeFresh(one, type, seed);
+  return asksWords(domain) && !fits(value, domain) ? NO_MEMBER : value;
 }
 
 /** A value of the type unlike `one`: the next seed's where it differs, else `one` changed by the least that tells. */

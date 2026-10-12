@@ -49,27 +49,38 @@ describe('making a text that holds or lacks a word', () => {
     expect(satisfy({ contains: ['l'], present: true }, 'bronze', tier)).toBe('gold');
     expect(satisfy({ omits: ['o'] }, 'gold', tier)).toBe('silver');
   });
+  it('answers NO_MEMBER for a text paired with another, equal or not, that misses its words', () => {
+    for (const paired of ['equal', 'unequal'] as const) {
+      expect(satisfy({ paired, present: true, contains: ['@'] }, undefined, TEXT, 1)).toBe(NO_MEMBER);
+      expect(typeof satisfy({ paired, present: true, omits: ['@'] }, undefined, TEXT, 1)).toBe('string');
+    }
+  });
   it('answers NO_MEMBER for an enum no member of which fits, never a text outside it', () => {
     const tier = { kind: 'string', enum: ['gold', 'silver'] } as const;
     expect(satisfy({ contains: ['@'], present: true }, 'gold', tier)).toBe(NO_MEMBER);
   });
 });
 
-/** `sort` routes an address on whether it holds an `@`: one that does is answered, one that does not is refused. */
-function wordsTree(): string {
+/**
+ * `sort` routes an address on `when`, by default whether it holds an `@`: one the rule holds for is answered, any other
+ * is refused. The address and a second one, `alt`, come from the trigger's input.
+ */
+function wordsTree(when = "email contains '@'"): string {
   const port = `${HERE}/domain/mail.port.json`;
   const result = shape('Result');
   return treeOf({
-    'domain/Ask.shape.json': { layer: 'core', fields: { email: STRING } },
+    'domain/Ask.shape.json': { layer: 'core', fields: { email: STRING, alt: STRING } },
     'domain/Result.shape.json': { layer: 'core', fields: { email: STRING } },
-    'edge/AskIn.shape.json': { layer: 'edge', fields: { email: STRING } },
+    'edge/AskIn.shape.json': { layer: 'edge', fields: { email: STRING, alt: STRING } },
     'edge/Out.shape.json': { layer: 'edge', fields: { email: STRING } },
     'domain/mail.port.json': {
-      operations: { sort: { description: 'd', accepts: { email: STRING }, returns: result, refuses: true } },
+      operations: {
+        sort: { description: 'd', accepts: { email: STRING, alt: STRING }, returns: result, refuses: true },
+      },
     },
     'data/mail.binding.json': { port, operations: { sort: { graph: `${HERE}/domain/sort.graph.json` } } },
     'domain/sort.graph.json': graph('Sort', shape('Ask'), { type: result, from: ['address', 'name'] }, [
-      decide('byWord', { email: '{{in.email}}' }, [{ when: "email contains '@'", to: 'address' }], 'name'),
+      decide('byWord', { email: '{{in.email}}', alt: '{{in.alt}}' }, [{ when, to: 'address' }], 'name'),
       make('address', { email: '{{in.email}}' }, result),
       refuse('name', 'name', result),
     ]),
@@ -77,20 +88,39 @@ function wordsTree(): string {
   });
 }
 
+/** The rehearsal of a `wordsTree` under each of four seeds, as its lines and whether it was ok. */
+async function rehearsedWith(when?: string): Promise<{ said: string; ok: boolean }[]> {
+  const dir = wordsTree(when);
+  const load = loadTree(dir, BUILTIN_PLUGINS);
+  expect(checkTree(load).format()).toBe('');
+  const runs = [];
+  for (const seed of [1, 2, 3, 4]) {
+    const run = await rehearse(load, { seed });
+    runs.push({ said: `seed ${seed}\n${run.lines.join('\n')}`, ok: run.ok });
+  }
+  rmSync(dir, { recursive: true, force: true });
+  return runs;
+}
+
 describe('rehearsing a switch over a contains rule', () => {
   it('runs both of its branches under every seed', { timeout: 60_000 }, async () => {
-    const dir = wordsTree();
-    const load = loadTree(dir, BUILTIN_PLUGINS);
-    expect(checkTree(load).format()).toBe('');
-    const runs = [];
-    for (const seed of [1, 2, 3, 4]) runs.push({ seed, run: await rehearse(load, { seed }) });
-    rmSync(dir, { recursive: true, force: true });
-    for (const { seed, run } of runs) {
-      const said = `seed ${seed}\n${run.lines.join('\n')}`;
+    for (const { said, ok: done } of await rehearsedWith()) {
       expect(said).toMatch(/ok {2}when email contains '@' +answered from 'address'/);
       expect(said).toMatch(/ok {2}anything else +refused on purpose at 'name' as name/);
       expect(said).not.toMatch(/cannot name|BROKE|NEVER RUN/);
-      expect(run.ok, said).toBe(true);
+      expect(done, said).toBe(true);
+    }
+  });
+  it('reports a rule that pairs the text with another and asks a word of it never run, not run on the wrong route', {
+    timeout: 60_000,
+  }, async () => {
+    for (const when of ["email == alt && email contains '@'", "email != alt && email contains '@'"]) {
+      for (const { said, ok: done } of await rehearsedWith(when)) {
+        expect(said).toMatch(/when .+ +NEVER RUN/);
+        expect(said).toMatch(/ok {2}anything else +refused on purpose at 'name' as name/);
+        expect(said).not.toMatch(/WRONG ROUTE|BROKE/);
+        expect(done, said).toBe(false);
+      }
     }
   });
 });
