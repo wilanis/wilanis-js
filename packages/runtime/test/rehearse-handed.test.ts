@@ -129,7 +129,7 @@ describe('a guard on each element of a list a guard upstream judged element by e
   it('is held across a map', { timeout: 30_000 }, async () => {
     // each edit is made a PageEdit at `edits`, whose map judges every element before `written` hands one to the write
     const done = await rehearse(loaded(eachGuardTree('each')), { seed: 1 });
-    const held = "by guard 'edits:check' in features/rv/domain/refresh, which judged this value first";
+    const held = "by guard 'in:check' of 'edits' in features/rv/domain/refresh, which judged this value first";
     const decision = done.decisions.find(one => one.graph.endsWith('data/write.graph.json') && one.node === 'in:check');
     expect(
       decision?.branches.map(one => [one.to, one.held]),

@@ -13,7 +13,7 @@
  * the list the node answers, and that node is judged when it is a list site of the shape: its guard judges every
  * element before the map hands one down (RFC 0038).
  */
-import { type Guard, guardsOf, idsOf, siteId, sitesOf } from '@wilanis/compiler';
+import { type Guard, guardsOf, idsOf, siteId, sitesOf, TAKEN_IDS } from '@wilanis/compiler';
 import type { Loaded, TriggerDoc } from '@wilanis/core';
 import type { FoundSwitch } from './branches.js';
 import type { Embedder } from './embed.js';
@@ -41,14 +41,23 @@ export function heldUpstream(
   const graph = at.site ? undefined : emb.scope.get('graph', at.graph);
   if (!graph) return undefined;
   const shape = emb.scope.canon(guard.shape);
+  // the type checker already keeps an element from landing on a site of one value, and a field on a list site;
+  // the arity says which site the value is judged at, and keeps that true if the walk ever reads more widely
   const arity = upstream.element ? 'list' : 'one';
   const judged = guardsOf(emb.scope, graph).find(
     one => idsOf(one).ok === upstream.node && one.arity === arity && emb.scope.canon(one.shape) === shape,
   );
-  if (judged) return `by guard '${idsOf(judged).check}' in ${short(graph.path)}, which judged this value first`;
+  if (judged) return `by guard ${guardName(judged)} in ${short(graph.path)}, which judged this value first`;
   const proved = sitesOf(emb.scope, shape).find(
     site =>
       site.graph.path === graph.path && site.kind === 'made' && site.arity === arity && siteId(site) === upstream.node,
   );
   return proved ? `at '${upstream.node}' in ${short(graph.path)}, where the rule is proved` : undefined;
 }
+
+/**
+ * How a reader finds an upstream guard: its switch, by id. A list site has no switch of its own -- it is a map over a
+ * nested spec whose switch is the fixed `in:check` -- so it is named as that switch of the site's node.
+ */
+const guardName = (guard: Guard): string =>
+  guard.arity === 'list' ? `'${TAKEN_IDS.check}' of '${guard.id}'` : `'${idsOf(guard).check}'`;
