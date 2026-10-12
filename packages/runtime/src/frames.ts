@@ -9,6 +9,7 @@
  */
 import { guardSpecAt } from '@wilanis/compiler';
 import type { FoundList, FoundSwitch, Frame } from './branches.js';
+import { getPath } from './stubs.js';
 
 /** Where a switch input reads from: a node in the same spec, and the path within that node's output. */
 export function sourceOf(spec_: unknown): { ref: string; path: string[] } | undefined {
@@ -60,9 +61,23 @@ export interface OnInput {
 /** Where a traced read lands: something the rehearsal sets. */
 export type Landed = OnNode | OnInput;
 
-/** Where a trace stopped: the call or map whose value it cannot follow further out. */
+/**
+ * Why a trace stopped: text with reads in it, a list or an object written out (`composed`); a value the tree fixes
+ * (`literal`), a constant among them, since the compiler writes a constant's value where it is read; a read of
+ * `context` (`context`); a list a map runs over that is composed or literal, for a name the map binds from its element
+ * (`composed list`); or a name the call or map does not hand at all (`nothing`).
+ */
+export type StopReason = 'composed' | 'literal' | 'context' | 'composed list' | 'nothing';
+
+/**
+ * Where a trace stopped: the call or map whose value it cannot follow further out, and why. A literal says the value
+ * it fixes at the read's path, and a read of `context` the path it reads there.
+ */
 export interface Stopped {
   stopped: string;
+  reason: StopReason;
+  value?: unknown;
+  context?: string[];
 }
 
 /** One hop of a trace that goes on: the read one frame or map further out, and where it now stands. */
@@ -85,7 +100,8 @@ export function traced(read: Read, standing: Standing): Landed | Stopped {
 
 /** Where a read that names something other than `in` lands: a node of the spec it stands in, unless it reads what no stub sets. */
 function landing({ src, here }: Hop): Landed | Stopped {
-  if (src.ref === 'context' || src.ref === 'const') return { stopped: here.at };
+  if (src.ref === 'context') return { stopped: here.at, reason: 'context', context: src.path };
+  if (src.ref === 'const') return { stopped: here.at, reason: 'nothing' };
   const prefix = here.at.split('.').slice(0, -1);
   return { node: src.ref, prefix, path: src.path, standing: { ...here, at: [...prefix, src.ref].join('.') } };
 }
@@ -114,7 +130,7 @@ function throughFrame(frame: Frame, path: string[], out: Standing): Hop | Stoppe
   if (!names.length) return { src: { ref: 'in', path }, here: out };
   if (frame.unwrapped) return handed(given.in, path, out);
   const [name = names[0], ...rest] = path;
-  return name in given ? handed(given[name], rest, out) : { stopped: frame.at };
+  return name in given ? handed(given[name], rest, out) : { stopped: frame.at, reason: 'nothing' };
 }
 
 /**
@@ -126,33 +142,45 @@ function throughMap(list: FoundList, path: string[], outer: FoundList[]): Hop | 
   const here: Standing = { at: list.at, from: list.from, lists: outer };
   if (within) return elementOf(list, within, here);
   const [name, ...rest] = path;
-  return name !== undefined && list.in && name in list.in ? handed(list.in[name], rest, here) : { stopped: list.at };
+  if (name !== undefined && list.in && name in list.in) return handed(list.in[name], rest, here);
+  return { stopped: list.at, reason: 'nothing' };
 }
 
 /**
  * Element 0 of the list a map runs over, at a path within it: where that list's own source lands, with the element
- * under it. The first element stands for all, as it does everywhere in the walk. Stopped where the list is composed.
+ * under it. The first element stands for all, as it does everywhere in the walk. Stopped where the list is composed or
+ * literal, there or further out, since such a list keeps every element it has; and where its trace stops otherwise.
  */
 function elementOf(list: FoundList, within: string[], here: Standing): Landed | Stopped {
   const over = sourceOf(list.over);
-  const held = over ? traced(over, here) : { stopped: list.at };
-  if ('stopped' in held) return held;
+  const held: Landed | Stopped = over ? traced(over, here) : { stopped: list.at, reason: 'composed' };
+  if ('stopped' in held) return fixedList(held);
   if ('input' in held) return { input: [...held.input, '0', ...within], element: true };
   return { ...held, path: [...held.path, '0', ...within], element: true };
 }
 
+/** A stop in the trace of a list a map runs over, as the element's: a list composed or literal is a composed list. */
+function fixedList(held: Stopped): Stopped {
+  return held.reason === 'composed' || held.reason === 'literal'
+    ? { stopped: held.stopped, reason: 'composed list' }
+    : held;
+}
+
 /**
  * The read one hop out, from the source a call or a map hands under a name, with the rest of the read under it: a read
- * goes on as that source; an object written out is entered at the next field read; anything else is composed, a literal
- * or a list written out, and the trace stops at the call or map, where `out` stands.
+ * goes on as that source; an object written out is entered at the next field read; a literal stops the trace with the
+ * value at that path; anything else -- text with reads in it, a list written out, an object read whole or at a field it
+ * does not write -- is composed. The trace stops at the call or map, where `out` stands.
  */
 function handed(source: unknown, rest: string[], out: Standing): Hop | Stopped {
   const src = sourceOf(source);
   if (src) return { src: { ref: src.ref, path: [...src.path, ...rest] }, here: out };
-  const fields = (source as { object?: Record<string, unknown> } | undefined)?.object;
+  const written = (source ?? {}) as { object?: Record<string, unknown>; value?: unknown };
+  if ('value' in written) return { stopped: out.at, reason: 'literal', value: getPath(written.value, rest) };
   const [field, ...deeper] = rest;
-  if (fields && field !== undefined && field in fields) return handed(fields[field], deeper, out);
-  return { stopped: out.at };
+  if (written.object && field !== undefined && field in written.object)
+    return handed(written.object[field], deeper, out);
+  return { stopped: out.at, reason: 'composed' };
 }
 
 /** The node that holds a list, the path within its answer, and the frames and maps it stands in. */

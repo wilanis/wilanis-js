@@ -34,10 +34,38 @@ describe('a read of in followed out', () => {
     expect(traced(read('0', 'name'), { at: 'op.sw', from, lists: [] })).toEqual({ input: ['ids', '0', 'name'] });
   });
 
-  it('stops where a call composes the value, or hands nothing under the name read', () => {
+  it('stops where a call composes the value, or hands nothing under the name read, and says which', () => {
     const from: Frame[] = [{ at: 'call', in: { label: { concat: ['x', ref('a', 'b')] } } }];
-    expect(traced(read('label'), { at: 'call.sw', from, lists: [] })).toEqual({ stopped: 'call' });
-    expect(traced(read('other'), { at: 'call.sw', from, lists: [] })).toEqual({ stopped: 'call' });
+    expect(traced(read('label'), { at: 'call.sw', from, lists: [] })).toEqual({ stopped: 'call', reason: 'composed' });
+    expect(traced(read('other'), { at: 'call.sw', from, lists: [] })).toEqual({ stopped: 'call', reason: 'nothing' });
+  });
+
+  it('stops at a list or an object written out, read whole or at a field it does not write, as composed', () => {
+    const from: Frame[] = [
+      { at: 'call', in: { tags: { list: [ref('a', 'b')] }, meta: { object: { level: ref('a', 'b') } } } },
+    ];
+    const at = { at: 'call.sw', from, lists: [] };
+    for (const one of [read('tags'), read('meta'), read('meta', 'other')])
+      expect(traced(one, at)).toEqual({ stopped: 'call', reason: 'composed' });
+  });
+
+  it('stops at a literal with the value at the path read, inside an object written out too', () => {
+    const from: Frame[] = [
+      { at: 'call', in: { level: { value: 'full' }, meta: { object: { tier: { value: { name: 'gold' } } } } } },
+    ];
+    const at = { at: 'call.sw', from, lists: [] };
+    expect(traced(read('level'), at)).toEqual({ stopped: 'call', reason: 'literal', value: 'full' });
+    expect(traced(read('meta', 'tier', 'name'), at)).toEqual({ stopped: 'call', reason: 'literal', value: 'gold' });
+    expect(traced(read('meta', 'tier', 'rank'), at)).toEqual({ stopped: 'call', reason: 'literal', value: undefined });
+  });
+
+  it('stops at a read of context, with the path it reads', () => {
+    const from: Frame[] = [{ at: 'call', in: { who: ref('context', 'principal', 'id') } }];
+    expect(traced(read('who'), { at: 'call.sw', from, lists: [] })).toEqual({
+      stopped: 'call',
+      reason: 'context',
+      context: ['principal', 'id'],
+    });
   });
 
   it('crosses a map to element 0 of what the node it runs over holds, through bind', () => {
@@ -60,9 +88,28 @@ describe('a read of in followed out', () => {
     expect(landed).not.toHaveProperty('element');
   });
 
-  it('stops at a map whose list is composed', () => {
+  it('stops at a map whose list is composed, or literal one call further out, as a composed list', () => {
     const judged = list('judged', { list: [ref('a', 'b')] }, { bind: { score: ['score'] } });
-    expect(traced(read('score'), { at: 'judged.0.sw', from: [], lists: [judged] })).toEqual({ stopped: 'judged' });
+    expect(traced(read('score'), { at: 'judged.0.sw', from: [], lists: [judged] })).toEqual({
+      stopped: 'judged',
+      reason: 'composed list',
+    });
+    const handed = list('call.judged', ref('in', 'items'), {
+      bind: { score: ['score'] },
+      from: [{ at: 'call', in: { items: { value: [{ score: 1 }] } } }],
+    });
+    expect(traced(read('score'), { at: 'call.judged.0.sw', from: [], lists: [handed] })).toEqual({
+      stopped: 'call',
+      reason: 'composed list',
+    });
+  });
+
+  it('stops at a name a map neither binds nor hands in its own in, as nothing', () => {
+    const judged = list('judged', ref('scanned', 'findings'), { bind: { score: ['score'] } });
+    expect(traced(read('other'), { at: 'judged.0.sw', from: [], lists: [judged] })).toEqual({
+      stopped: 'judged',
+      reason: 'nothing',
+    });
   });
 
   it("crosses an inner map's broadcast in to element 0 of the list an outer map runs over", () => {

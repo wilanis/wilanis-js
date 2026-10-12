@@ -315,6 +315,8 @@ async function branchOf(
   const at = { when: one.branch.when, to: one.branch.to };
   const uncovered = uncoveredBy(one);
   if (uncovered !== undefined) return { said: { ...at, uncovered } };
+  // a literal a caller hands closes the branch on this path: not a gap, and no problem where another path runs it
+  if (one.closed !== undefined) return { said: { ...at, closed: one.closed } };
   // a caught node breaks for real: its stubbed effect throws, and nothing recorded answers in its place
   const broken = new Set([...steer.pre.broken, ...(one.broken ?? [])]);
   const record: Record<string, unknown> = {};

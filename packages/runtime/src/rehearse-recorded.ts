@@ -12,7 +12,7 @@ import { type Case, casesFor } from './branches.js';
 import type { Embedder } from './embed.js';
 import type { RecordedRun, Recording } from './record.js';
 import type { Decision } from './rehearsal-report.js';
-import { type Reached, switchesReached, uncoveredBy } from './rehearse-reached.js';
+import { type Reached, switchesReached, untakenBy } from './rehearse-reached.js';
 import { whereOf } from './rehearse-where.js';
 import { type PolicyRoot, policyRoot } from './stubbing.js';
 
@@ -84,7 +84,8 @@ export const replayedDoc = (
 
 /**
  * One branch as it is recorded, named by the branch it proves and, where a sibling shares its target, its place: the
- * run it made, or -- where the solver could not solve or steer it -- why no input reaches it. A run that broke nodes
+ * run it made, or -- where the solver could not solve or steer it, or a literal a caller hands closes it on this path
+ * (RFC 0038) -- why no input reaches it. A run that broke nodes
  * -- a switch's catch branch -- names them, so its replay breaks them too (#721).
  */
 export function recordedOf(walk: Walked, decision: Decision, of: { one: Case; cases: Case[]; ran?: Ran }) {
@@ -99,7 +100,7 @@ export function recordedOf(walk: Walked, decision: Decision, of: { one: Case; ca
     ...(shared ? { n: cases.indexOf(one) } : {}),
   };
   const named = { ...namedBy(walk.trigger), branch, seed: walk.seed };
-  const unreachable = uncoveredBy(one);
+  const unreachable = untakenBy(one);
   if (unreachable !== undefined) return { ...named, unreachable };
   if (!ran) return undefined;
   const { input, stubs, report, broken } = ran;
@@ -110,7 +111,7 @@ export function recordedOf(walk: Walked, decision: Decision, of: { one: Case; ca
 /**
  * How a scenario that recorded its branch unreachable differs from what the solver answers today, found as the
  * rehearsal finds it (`switchesReached`) rather than by running it: nothing while the branch is still one no input
- * reaches, and that it is reachable now once the solver can solve and steer its case. A branch no switch the trigger
+ * reaches, and that it is reachable now once the solver can solve and steer its case and no literal closes it. A branch no switch the trigger
  * reaches still has, and a scenario that names none, are differences too: there is nothing left to solve.
  */
 export async function solvedAgain(
@@ -125,7 +126,7 @@ export async function solvedAgain(
   const one = reached && caseOf(reached, branch);
   const named = `branch '${branch.when}' → ${branch.to}`;
   if (!one) return [`${named} is no longer a case of '${branch.node}' where this trigger reaches it`];
-  return uncoveredBy(one) === undefined ? [`${named} is reachable now`] : [];
+  return untakenBy(one) === undefined ? [`${named} is reachable now`] : [];
 }
 
 /**
