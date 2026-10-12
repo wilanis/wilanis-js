@@ -11,7 +11,7 @@
  * graph -- and the guarded site -- it belongs to, and to the type its node declares it answers. `rehearse.ts`
  * beside it walks and runs; nothing here runs anything or reads a report.
  */
-import { bindings, guardSpecAt, takesWhole } from '@wilanis/compiler';
+import { bindings, guardIds, guardSpecAt, takesWhole } from '@wilanis/compiler';
 import {
   type BindingDoc,
   type BindingOp,
@@ -169,6 +169,16 @@ export function effectAt(emb: Embedder, root: Spec, nodePath: string): string | 
 export function overAt(emb: Embedder, root: Spec, nodePath: string): unknown {
   const node = nodeAt(emb, root, nodePath.split('.'));
   return node?.kind === 'map' ? node.over : undefined;
+}
+
+/**
+ * The node the value at a dotted path was moved aside to, where that node is a guard's answer at a made site: the
+ * sibling `<id>:made` the compiler wrote (`guardIds`), which no authored id can be, since a colon is in none.
+ */
+export function madeAt(emb: Embedder, root: Spec, nodePath: string): string | undefined {
+  const segments = nodePath.split('.');
+  const made = [...segments.slice(0, -1), guardIds(segments.at(-1) ?? '').made];
+  return nodeAt(emb, root, made) ? made.join('.') : undefined;
 }
 
 /** A node of a lowered spec, as far as a walk down a path reads one. */
