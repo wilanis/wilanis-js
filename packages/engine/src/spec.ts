@@ -47,7 +47,8 @@ export interface KSwitch {
 }
 export interface KMap {
   kind: 'map';
-  handler: string;
+  /** The operation each kept element runs. Absent: the map runs nothing and answers each kept element as it is. */
+  handler?: string;
   over: KSource;
   in: Record<string, KSource>;
   /** input name -> path within the element ([] = the whole element). Absent: the element arrives as `item`. */
@@ -64,6 +65,12 @@ export interface KMap {
   site?: string;
   /** Node ids this node waits for without reading them: no element starts before each has answered. */
   after?: string[];
+  /**
+   * A rule over each element, as `item`, and over this node's `in`, tried as the element starts: the element is
+   * kept where it holds and dropped where it does not, left out of the answer and never run. Absent: every element
+   * is kept. `label` is the rule as its author wrote it.
+   */
+  where?: { when: (values: Record<string, unknown>) => boolean; label: string };
 }
 export type KNode = KCall | KSwitch | KMap;
 
@@ -114,6 +121,11 @@ export interface NodeReport {
   detail?: Record<string, unknown>;
   /** switch: the node it routed to. */
   selected?: string;
+  /**
+   * One element of a map with a `where`: whether the rule held for it. A dropped element is `cancelled` and never
+   * ran; a seeded one is kept. Absent where the rule was never tried: the element never started, or the rule threw.
+   */
+  kept?: boolean;
   /** call or map: the switch that routed this node's fault; the run went on, so this is not how it ended. */
   caught?: string;
   /** call bound to a graph: the nested run, its answer redacted as this node's `out` is. */

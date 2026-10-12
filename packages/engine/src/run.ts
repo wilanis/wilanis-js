@@ -154,7 +154,7 @@ export class Run {
     const report = this.reports[id];
     report.status = 'running';
     report.startedAt = this.clock();
-    if (node.kind !== 'switch') report.handler = node.handler;
+    if (node.kind !== 'switch' && node.handler !== undefined) report.handler = node.handler;
     this.running++;
     this.runNode(id, node, report)
       .catch(error => this.fail(id, report, error))

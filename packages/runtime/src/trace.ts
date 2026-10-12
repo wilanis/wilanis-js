@@ -49,11 +49,16 @@ function switchSpan(id: string, node: NodeReport, walk: Walk, within?: Report): 
   });
 }
 
-/** A `map`: the node itself, with one child span per element, named `<id>.<index>`. */
+/**
+ * A `map`: the node itself, with one child span per element, named `<id>.<index>`. A map with a `where` says how
+ * many elements its rule kept, read off the elements that say whether they were; a dropped one's span is cancelled.
+ */
 function mapSpan(id: string, node: NodeReport, walk: Walk): Trace {
   const items = node.items ?? [];
+  const judged = items.some(item => item.kept !== undefined);
+  const kept = judged ? `, kept ${items.filter(item => item.kept).length}` : '';
   return span({
-    name: `${id} map ×${items.length}`,
+    name: `${id} map ×${items.length}${kept}`,
     status: nodeStatus(node),
     at: node,
     attributes: nodeAttributes(id, node, walk),
