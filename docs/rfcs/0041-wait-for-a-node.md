@@ -1,6 +1,6 @@
 # RFC 0041: `after`: a node waits for another whose answer it does not read
 
-- **Status:** draft
+- **Status:** accepted
 - **Areas:** `area:engine` (`after` on `KCall` and `KMap`, the wait table `planOf` builds), `area:core` (`after` on
   `node/run.schema.json` and `node/map.schema.json`, `RunNode`, `MapNode`), `area:compiler` (lowering, one wait table
   for the routing rules, two `G` rules, and new meaning for G007, G008, G015, G022, G023), `area:runtime` (what
@@ -514,8 +514,9 @@ The maintainer settled these on #927:
   an unused `reads` entry, without a walk over the whole graph.
 - **A domain graph may say `after`.** "Read nothing before the session is known" says what is done, not how a call
   is made, which is what L012 keeps out of a domain graph. The consumer's site 2 is a domain graph.
-- **No milestone.** `after` is an optional field, so it stays a compatible change after 1.0 (RFC 0008) and need not
-  land before `schemas-v1` is cut. No demo of `docs/roadmap.md` needs it. #857 carries no milestone.
+- **M14 1.0** (decided at acceptance). `after` is an optional field and stays compatible after 1.0 (RFC 0008), but it
+  changes two node schemas, and 1.0 is cut only when every accepted RFC that changes a schema has landed. #857 carries
+  the milestone.
 
 ## Open questions
 
