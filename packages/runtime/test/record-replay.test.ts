@@ -8,7 +8,7 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadTree } from '@wilanis/core';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { EDGES, embedderFor, fuzz, RECORDED, regress, rehearse } from '../src/index.js';
 import { recordedProfile } from '../src/profile.js';
 import { copyOfExample, INCLUDES, PLUGINS } from './example-harness.js';
@@ -18,12 +18,16 @@ const NO_CUSTOMER = 'scenarios/rehearsed/customers.get-customer/customers.get-ro
 const load = (dir: string) => loadTree(dir, PLUGINS, INCLUDES);
 const read = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
 
-/** A GET to the customers API, typed as its row: an effect no switch reads, so the rehearsal never stubs it. */
-const fetchOf = (id: string, path: string) => ({
+/**
+ * A GET to the customers API, typed as its row: an effect no switch reads, so the rehearsal never stubs it. `site`
+ * is what the node carries beside its call, a `timeoutMs` say.
+ */
+const fetchOf = (id: string, path: string, site: Record<string, unknown> = {}) => ({
   type: '@wilanis/node/run.schema.json',
   id,
   label: id,
   run: '@http/http.port.json#request',
+  ...site,
   in: {
     connection: '@connections/customers-api.connection.json',
     method: 'GET',
@@ -107,27 +111,27 @@ describe('a refusal that ends a run while other nodes still run', () => {
 });
 
 /**
- * The example with `get-row` reading the row twice more, one read after the other, and refusing as `raced` once both
- * answered, beside the switch that refuses. Where the seed answers the reads as the run goes, the switch's refusal
- * ends the run first; where the recorded stubs answer them, `sideFact` refuses first: the replay ends otherwise.
+ * The example with `get-row` reading the row once more, under a timeout, and refusing as `raced` as soon as it
+ * answered, beside the switch that refuses; the row itself is read with no timeout and no retry. The order is the
+ * kernel's, step by step, never the clock's. Where the seed answers `side` through its handler, its timeout adds
+ * steps, `side` answers after the row, and the switch's refusal ends the run first. A recorded stub answers in place
+ * of the handler and of its timeout, so where the stubs answer both reads, `sideFact` refuses one step after its read
+ * and the switch two steps after its own: the replay ends at the sibling first.
  */
 function refusingSibling(): string {
   const dir = copyOfExample();
   const doc = read(join(dir, GET_ROW));
+  const [fetched] = doc.nodes;
+  delete fetched.timeoutMs;
+  delete fetched.retry;
   const raced = {
     type: '@wilanis/node/run.schema.json',
     id: 'sideFact',
-    label: 'Refuse once both reads answered',
+    label: 'Refuse once the second read answered',
     run: '@std/outcome.port.json#refuse',
-    in: { reason: 'raced', message: 'raced {{sideTwo.status}}', type: '@customers/domain/Customer.shape.json' },
+    in: { reason: 'raced', message: 'raced {{side.status}}', type: '@customers/domain/Customer.shape.json' },
   };
-  doc.nodes.splice(
-    1,
-    0,
-    fetchOf('side', '/customer/{{in.id}}'),
-    fetchOf('sideTwo', '/customer/{{side.status}}'),
-    raced,
-  );
+  doc.nodes.splice(1, 0, fetchOf('side', '/customer/{{in.id}}', { timeoutMs: 5000 }), raced);
   writeFileSync(join(dir, GET_ROW), JSON.stringify(doc, null, 2));
   return dir;
 }
@@ -179,7 +183,26 @@ describe('a sibling that ends the run first only in the replay', () => {
         'other is decided, or make it stop refusing or breaking, then run wilanis fuzz again',
     );
     expect(answer.ok).toBe(false);
-    const written = answer.written.filter(file => file.includes('/get-customer.'));
-    expect(written.map(file => file.split('/').pop())).toEqual(['get-customer.1.scenario.json']);
+    expect(answer.written.filter(file => file.endsWith('/get-customer.2.scenario.json'))).toEqual([]);
+  });
+
+  it('says the same whatever the clock reads: every reading one tick, or every reading a tick on', async () => {
+    const said = async () => {
+      const rehearsed = await rehearse(load(dir), { record: RECORDED });
+      const edged = await fuzz(load(dir), { edges: true });
+      const fuzzed = await fuzz(load(dir), { runs: 2 });
+      return [...rehearsed.lines, ...edged.lines, ...fuzzed.lines].filter(line => line.includes('NOT RECORDED'));
+    };
+    const real = await said();
+    let tick = 0;
+    for (const clock of [() => 1000, () => ++tick]) {
+      const frozen = vi.spyOn(Date, 'now').mockImplementation(clock);
+      try {
+        expect(await said()).toEqual(real);
+      } finally {
+        frozen.mockRestore();
+      }
+    }
+    expect(real.length).toBeGreaterThan(0);
   });
 });
