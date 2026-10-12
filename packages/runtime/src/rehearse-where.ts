@@ -21,9 +21,11 @@ import {
   substitute,
   type TriggerDoc,
   type Type,
+  typeAt,
   type Values,
 } from '@wilanis/core';
 import type { Embedder } from './embed.js';
+import { sourceOf } from './frames.js';
 
 /**
  * A lowered spec as this walk reads one: its nodes by id, whatever each of them turns out to be; and, for a graph a
@@ -134,18 +136,37 @@ function literalsOf(node: SpecNode): Values {
  * The type the node at a dotted path declares it answers, read off the spec rather than off a run: what a
  * rehearsal needs to build a value for a node no stub recorded -- a call into a graph, whose answer the kernel
  * never generates. A map's element index is a segment of the path and no node of the spec: a path that ends at one
- * names an element, which is what the map's operation answers. Nothing for a map itself, a switch, or a node whose
- * operation leaves its type to the call site.
+ * names an element, which is what the map's operation answers. A keep (a map with no operation) answers the list it
+ * runs over, and each of its elements an element of that list. Nothing for a map with an operation as a whole, a
+ * switch, or a node whose operation leaves its type to the call site.
  */
 export function declaredAt(emb: Embedder, root: Spec, nodePath: string): Type | undefined {
   const segments = nodePath.split('.');
   const mapped = /^\d+$/.test(segments[segments.length - 1] ?? '')
     ? nodeAt(emb, root, segments.slice(0, -1))
     : undefined;
+  if (mapped?.kind === 'map' && mapped.handler === undefined)
+    return elementOf(keptAt(emb, root, segments.slice(0, -1)));
   const node = mapped?.kind === 'map' ? mapped : nodeAt(emb, root, segments);
+  if (node?.kind === 'map' && node !== mapped && node.handler === undefined) return keptAt(emb, root, segments);
   if (!node || (node.kind === 'map' && node !== mapped) || typeof node.handler !== 'string') return undefined;
   return answeredBy(emb, { ...node, handler: node.handler });
 }
+
+/**
+ * What the keep at a path answers: the type of the list it runs over, read off the node of the same spec that list
+ * comes from. Nothing where the list is read from anything else -- the graph's `in`, a constant -- or is composed.
+ */
+function keptAt(emb: Embedder, root: Spec, segments: string[]): Type | undefined {
+  const src = sourceOf(nodeAt(emb, root, segments)?.over);
+  if (!src) return undefined;
+  const from = declaredAt(emb, root, [...segments.slice(0, -1), src.ref].join('.'));
+  const read = from && typeAt(from, src.path);
+  return read && typeof read !== 'string' ? read.type : undefined;
+}
+
+/** The type of one element of a list type; nothing for any other type. */
+const elementOf = (type: Type | undefined): Type | undefined => (type?.kind === 'list' ? type.of : undefined);
 
 /** Whether the node at a dotted path is a map, whose answer the kernel stubs element by element and never whole. */
 export function mapAt(emb: Embedder, root: Spec, nodePath: string): boolean {

@@ -8,7 +8,7 @@
  * behind a call that decides first is still reached (#637).
  */
 import { REFUSE } from '@wilanis/compiler';
-import type { Loaded, LoadResult, TriggerDoc, Type } from '@wilanis/core';
+import { conforms, type Loaded, type LoadResult, type TriggerDoc, type Type } from '@wilanis/core';
 import { type KNode, nodeRefs, PSEUDO } from '@wilanis/engine';
 import {
   CAUGHT,
@@ -84,6 +84,22 @@ export async function switchesReached(
   // run per switch, steered to reach it, fills the recording before any case is built from it.
   for (const sw of found) if (sw.via.length) await warmUp(reached, sw, record, types);
   return reached;
+}
+
+/**
+ * Why a case is not run on the stubs it would be handed, in the words the report prints after `NEVER RUN`: a stub
+ * stands for what an effect hands the graph, so one that does not fit the type its node declares -- or whose type
+ * nothing says -- is a value no real run sees (#1026). Nothing where every stub fits its type.
+ */
+export function misfitOf(stubs: Record<string, unknown>, typeOf: Stubbing['typeOf']): string | undefined {
+  for (const [path, value] of Object.entries(stubs)) {
+    const type = typeOf?.(path);
+    if (!type)
+      return `the rehearsal cannot tell the type '${path}' answers, so it cannot check the stub it would hand it`;
+    const bad = conforms(value, type, path);
+    if (bad) return `the rehearsal's stub does not fit its type: ${bad}`;
+  }
+  return undefined;
 }
 
 /**
