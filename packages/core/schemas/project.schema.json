@@ -189,7 +189,7 @@
             "type": "boolean"
           },
           "extends": {
-            "description": "The profile this one starts from: its bindings, stand-in connections and permits are this profile's too, except where this profile writes its own. A binding written here replaces the inherited one for that port; a stand-in written here replaces the inherited one for that connection; a permits list written here replaces the inherited list whole. An inherited permit naming a connection this profile stands in for permits the stand-in, and the connection itself wherever this profile still reaches it another way. default and description are not inherited. One level: the profile named extends no other.",
+            "description": "The profile this one starts from: its bindings, stand-in connections and permits are this profile's too, except where this profile writes its own. A binding written here replaces the inherited one for that port; a stand-in written here replaces the inherited one for that connection; a permits list written here replaces the inherited list whole. An inherited permit naming a connection this profile stands in for permits the stand-in, and the connection itself wherever this profile still reaches it another way. default and description are not inherited. One level: the profile named extends no other (C024).",
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]*$"
           },

@@ -177,6 +177,9 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
 - A profile that writes `permits` reaches nothing they do not permit, and they permit nothing it does not reach and
   nothing that is never an effect. [[C021](refusals/C021.md), [C022](refusals/C022.md), [C023](refusals/C023.md)]
   (RFC 0016)
+- A profile extends only a declared profile that extends nothing, and one that writes no `permits` is held to the
+  list of the profile it extends, as strictly as to a list of its own. [[C024](refusals/C024.md),
+  [C021](refusals/C021.md), [C022](refusals/C022.md)] (RFC 0043)
 - A `retry` is written only over a call that reaches an effect and is idempotent where it is made, an atomic graph's
   transactional effects excepted, since a failed try rolls them back; its `when` is a boolean over what one try
   answers; a `timeoutMs` and a `backoffMs` are each a wait a Node timer can keep; and a domain graph writes no

@@ -4,7 +4,9 @@
  * of the same kind, or -- where the connection replaced is a broker and nothing else -- for another of any kind
  * delivering alike (R001, C018); every domain port is met under every profile (B002) and keeps every promise its
  * operations make of being repeated (B011) -- but for an operation that, under a profile, only triggers it does
- * not serve reach, which is held to nothing on their behalf (`Judge.judgedUnder`).
+ * not serve reach, which is held to nothing on their behalf (`Judge.judgedUnder`). A profile may start from one
+ * other it names under `extends` (RFC 0043), a declared profile that is not itself and extends nothing (C024); its
+ * own written choices are judged here once, where written, and B002 and B011 read it as resolved.
  */
 import type { ConnectionKindDoc, Loaded, PortDoc, ProfileDoc } from '@wilanis/core';
 import { effectsReachable } from '../refusals.js';
@@ -14,7 +16,10 @@ import { type Judge, underProfile } from './judge.js';
 export function checkProfiles(judge: Judge): void {
   const declared = judge.project.doc.profiles ?? {};
   checkOneDefault(judge, declared);
-  for (const [name, profile] of Object.entries(declared)) checkProfileChoices(judge, name, profile);
+  for (const [name, profile] of Object.entries(declared)) {
+    checkExtends(judge, declared, name, profile.extends);
+    checkProfileChoices(judge, name, profile);
+  }
   for (const port of judge.scope.registry.all('port')) {
     if (port.native) continue;
     for (const profile of judge.profiles()) {
@@ -28,6 +33,39 @@ export function checkProfiles(judge: Judge): void {
 function checkProfileChoices(judge: Judge, name: string, profile: ProfileDoc): void {
   for (const entry of Object.entries(profile.bindings ?? {})) checkProfileBinding(judge, name, entry);
   for (const entry of Object.entries(profile.connections ?? {})) checkProfileConnection(judge, name, entry);
+}
+
+/**
+ * C024: a profile extends a declared profile other than itself, and one that extends nothing: one level, so a
+ * reader opens one more profile and never a chain. A parent that names itself or nothing declared is refused at
+ * its own line; its children are judged again once it is repaired.
+ */
+function checkExtends(
+  judge: Judge,
+  declared: Record<string, ProfileDoc>,
+  name: string,
+  parent: string | undefined,
+): void {
+  if (parent === undefined) return;
+  const refuse = (message: string, hint: string) =>
+    judge.refuser(judge.project.path)('C024', message, `profiles/${name}/extends`, hint);
+  if (parent === name || !Object.hasOwn(declared, parent)) {
+    const which = parent === name ? 'itself' : `'${parent}', which the project does not declare`;
+    const roots = Object.keys(declared).filter(other => other !== name && declared[other].extends === undefined);
+    const hint = roots.length ? `name another declared profile: ${roots.join(', ')}` : 'remove extends';
+    refuse(`profile '${name}' extends ${which}`, hint);
+    return;
+  }
+  const grandparent = declared[parent].extends;
+  if (grandparent === undefined || grandparent === parent || !Object.hasOwn(declared, grandparent)) return;
+  const direct =
+    grandparent === name
+      ? `remove extends from '${name}'`
+      : `extend '${grandparent}' directly and write what '${parent}' changes`;
+  refuse(
+    `profile '${name}' extends '${parent}', which extends '${grandparent}'; a profile extends one that extends nothing`,
+    `${direct}, or remove extends from '${parent}'`,
+  );
 }
 
 /** C017: one profile at most runs when a start names none. */

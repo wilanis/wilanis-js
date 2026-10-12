@@ -1,7 +1,7 @@
 /**
  * The project document. C connections/settings: plugin settings read secrets only and fit the manifest (C001,
  * C002), and every declared secret is read by something (C019). The profiles are judged in `profiles.ts`
- * (C017, C018, R001, B002, B003, B004, B011), and what each permits against what it reaches in `permits.ts`
+ * (C017, C018, C024, R001, B002, B003, B004, B011), and what each permits against what it reaches in `permits.ts`
  * (C021, C022, C023). Startup: each step fires a domain port operation (or a native one
  * that holds) before anything is received, under profiles the project declares (B006, B007, B008, B012), and
  * gives no field the compiler provides (G026). Blobs:
@@ -25,14 +25,17 @@ import { mismatch } from './typing.js';
 
 /**
  * The refusals for the project document: plugin settings read secrets only and fit the manifest (C001, C002),
- * every secret is read (C019), the profiles (`checkProfiles`), and what each profile that writes `permits`
- * permits (`checkPermits`).
+ * every secret is read (C019), the profiles (`checkProfiles`), and what each profile permits, read as resolved
+ * from what it extends (`checkPermits`).
  */
 export function checkProject(judge: Judge): void {
   checkPluginSettings(judge);
   checkSecretsRead(judge);
   checkProfiles(judge);
-  for (const [name, profile] of Object.entries(judge.project.doc.profiles ?? {})) checkPermits(judge, name, profile);
+  for (const name of judge.scope.profiles()) {
+    const resolved = judge.scope.profile(name);
+    if (resolved) checkPermits(judge, name, resolved);
+  }
 }
 
 /** C001, C002: a plugin's settings read secrets only and fit what its manifest declares. */
