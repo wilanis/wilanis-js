@@ -17,7 +17,8 @@ npm install @wilanis/plugin-blob
   Both take `columns`, a static map from a header name, as the file writes it, to the field of the shape it
   is read into or written from (`{ "average-revs": "averageRevs" }`); a column the map does not name keeps
   its own name, so one map written on both calls gives a file back with the header it came with. A map that
-  names no field of the shape, or gives two fields one header, fails the node before it reads or writes.
+  names no field of the shape, or gives two fields one header, or writes a key with spaces around it (a
+  header cell is read trimmed), fails the node before it reads or writes.
 - `@blob/text.port.json#read` reads a blob as UTF-8 text; `#write` stores text as a blob.
 
 Every operation is an effect (it touches the registry), so it lives in a data graph and is listed in the

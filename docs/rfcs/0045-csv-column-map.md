@@ -1,6 +1,6 @@
 # RFC 0045: `columns`: a CSV header name read into a field of another name
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:plugin-blob` (`csv.port.json` and the two CSV handlers). Nothing in core, the compiler, the
   runtime or the viewer, and no new checker rule.
 - **Tracking issue:** #853

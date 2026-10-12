@@ -19,7 +19,7 @@
           "type": { "fields": {}, "open": "string" },
           "required": false,
           "static": true,
-          "description": "header names that are not the field's own name: each key is a header name as the file writes it, each value the field of `type` its column is read into (parse) or written from (write). A column the map does not name is read and written by its own name. Absent: every column by its own name."
+          "description": "header names that are not the field's own name: each key is a header name as the file writes it, each value the field of `type` its column is read into (parse) or written from (write). A column the map does not name is read and written by its own name. A key is compared exactly; one with spaces around it fails the node. Absent: every column by its own name."
         }
       },
       "returns": "$T[]",
@@ -41,7 +41,7 @@
           "type": { "fields": {}, "open": "string" },
           "required": false,
           "static": true,
-          "description": "header names that are not the field's own name: each key is a header name as the file writes it, each value the field of `type` its column is read into (parse) or written from (write). A column the map does not name is read and written by its own name. Absent: every column by its own name."
+          "description": "header names that are not the field's own name: each key is a header name as the file writes it, each value the field of `type` its column is read into (parse) or written from (write). A column the map does not name is read and written by its own name. A key is compared exactly; one with spaces around it fails the node. Absent: every column by its own name."
         },
         "filename": {
           "type": "string",
