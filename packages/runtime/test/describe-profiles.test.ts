@@ -4,8 +4,9 @@
  * what a connection stands in for, or what replaces it, and under which profile.
  *
  * The example says all of it as written: three profiles, `live` the default, `production` standing
- * `employees-production` in for the employee directory, and the watcher run under `live` and `local` alone. A
- * profile that extends another (RFC 0043) is planted, since the example's profiles extend none.
+ * `employees-production` in for the employee directory, and the watcher run under `live` and `local` alone.
+ * `production-scheduler` and `production-worker` extend `production` (RFC 0043); a child that writes a binding of
+ * its own is planted on the worker.
  */
 import { rmSync } from 'node:fs';
 import { checkTree } from '@wilanis/compiler';
@@ -63,7 +64,7 @@ describe('wilanis describe project.json: a block per profile', () => {
   it('says under production-worker what the triggers it serves reach: no sign-in, so no operator hash', () => {
     // it binds what production binds, but opens no port: the routes that sign the operator in never run there
     const worker = block(describeDoc(example, 'project.json'), 'production-worker');
-    expect(worker).toContain(`  stands in  ${EMPLOYEES}  → ${OPERATOR}`);
+    expect(worker).toContain(`  stands in  ${EMPLOYEES}  → ${OPERATOR}  (from production)`);
     expect(worker.some(line => line.includes('@auth/identity.port.json#verify'))).toBe(false);
     expect(worker.some(line => line.includes('@blob/csv.port.json'))).toBe(false);
     expect(worker).toContain(
@@ -141,39 +142,28 @@ const JOBS = '@connections/jobs.connection.json';
 const POSTGRES = '@connections/customers-postgres.connection.json';
 
 /**
- * The example with `production-worker` made a child of `production` (RFC 0043): it writes its description, its own
- * `permits` (it reaches less than production) and one binding of its own, and takes every other choice from
- * production. Answers the load and the directory to remove.
+ * The example with `production-worker`, a child of `production` (RFC 0043), writing one binding of its own beside
+ * its own `permits`, and taking every other choice from production. Answers the load and the directory to remove.
  */
 function workerExtending() {
   return loadedEditing('project.json', doc => {
-    const { description } = doc.profiles['production-worker'];
-    doc.profiles['production-worker'] = {
-      description,
-      extends: 'production',
-      bindings: { '@auth/state.port.json': '@features/state/data/auth-storage.binding.json' },
-      permits: [
-        '@storage/store.port.json',
-        '@storage/storage.port.json#ensure',
-        '@queue/queue.port.json#ensure',
-        '@queue/worker.port.json#consume',
-        '@auth/challenge.port.json#issue',
-        '@otel/exporter.port.json#export',
-        POSTGRES,
-      ],
+    doc.profiles['production-worker'].bindings = {
+      '@auth/state.port.json': '@features/state/data/auth-storage.binding.json',
     };
   });
 }
 
 describe('wilanis describe: a profile that extends another (RFC 0043)', () => {
   it('names the parent on the first line, after the name and before what it says of itself', () => {
+    const said = describeDoc(example, 'project.json');
+    expect(block(said, 'production-worker')[0]).toMatch(/^profile production-worker {2}extends production {2}-- A /);
+    expect(block(said, 'production-scheduler')[0]).toMatch(
+      /^profile production-scheduler {2}extends production {2}-- The /,
+    );
+    for (const alone of ['live', 'local', 'production']) expect(block(said, alone)[0]).not.toContain('extends');
     const { load, dir } = workerExtending();
     try {
       expect(checkTree(load).items).toEqual([]);
-      const said = describeDoc(load, 'project.json');
-      expect(block(said, 'production-worker')[0]).toMatch(/^profile production-worker {2}extends production {2}-- A /);
-      for (const alone of ['live', 'local', 'production', 'production-scheduler'])
-        expect(block(said, alone)[0]).not.toContain('extends');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

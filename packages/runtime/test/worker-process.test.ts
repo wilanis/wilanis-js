@@ -49,10 +49,9 @@ function copyOf(edits: Record<string, Edit>): string {
   edit('project.json', project => {
     project.plugins.find((plugin: { use: string }) => plugin.use === '@http').settings.port = 0;
     project.startup = project.startup.filter((step: { run: string }) => step.run !== '@otel/exporter.port.json#export');
-    // production permits what it reaches, and without the step it exports nothing
-    project.profiles.production.permits = project.profiles.production.permits.filter(
-      (entry: string) => entry !== '@otel/exporter.port.json#export',
-    );
+    // each profile that writes permits permits what it reaches, and without the step it exports nothing
+    for (const profile of Object.values(project.profiles) as { permits?: string[] }[])
+      profile.permits = profile.permits?.filter(entry => entry !== '@otel/exporter.port.json#export');
   });
   for (const [relative, change] of Object.entries(edits)) edit(relative, change);
   return dir;
@@ -73,7 +72,7 @@ const OVER_MEMORY: Record<string, Edit> = {
     for (const step of project.startup) if (step.in?.lease) step.in = undefined;
     for (const profile of Object.values(project.profiles) as { connections?: Record<string, string> }[])
       delete profile.connections?.[JOBS];
-    project.profiles.production.permits.push(JOBS);
+    for (const profile of Object.values(project.profiles) as { permits?: string[] }[]) profile.permits?.push(JOBS);
   },
 };
 

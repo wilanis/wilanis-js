@@ -47,8 +47,14 @@ describe('wilanis describe project.json: what each profile permits', () => {
 
   it('says a profile that writes no permits permits everything', () => {
     const project = describeDoc(example, 'project.json');
-    for (const open of ['live', 'local', 'production-scheduler', 'production-worker'])
+    for (const open of ['live', 'local'])
       expect(block(project, open)).toContain('  permits    everything (no permits)');
+  });
+
+  it("counts the list a profile that extends another writes as its own, not the parent's", () => {
+    const project = describeDoc(example, 'project.json');
+    for (const child of ['production-scheduler', 'production-worker'])
+      expect(block(project, child)).toContain('  permits    the 9 operations and 1 connection above, by 7 entries');
   });
 
   it('counts from the same reach the block prints, and in the singular where there is one', () => {
@@ -71,16 +77,18 @@ describe('wilanis describe project.json: what each profile permits', () => {
 });
 
 describe('wilanis describe <native port>: the profiles that permit it', () => {
-  it('names production after granted by, with the operations it names where it names some', () => {
+  it('names each profile that permits it after granted by, with the operations it names where it names some', () => {
     const storage = said('@storage/storage.port.json');
     expect(storage[storage.findIndex(line => line.startsWith('granted by')) + 1]).toBe(
-      'permitted by  production (#ensure)',
+      'permitted by  production (#ensure), production-scheduler (#ensure), production-worker (#ensure)',
     );
     expect(said('@http/server.port.json')).toContain('permitted by  production (#listen)');
   });
 
-  it('names production alone where it permits the port whole', () => {
-    expect(said('@storage/store.port.json')).toContain('permitted by  production');
+  it('names a profile alone where it permits the port whole', () => {
+    expect(said('@storage/store.port.json')).toContain(
+      'permitted by  production, production-scheduler, production-worker',
+    );
     expect(said('@blob/csv.port.json')).toContain('permitted by  production');
   });
 
@@ -97,12 +105,12 @@ describe('wilanis describe <native port>: the profiles that permit it', () => {
 });
 
 describe('wilanis describe <connection>: the profiles that permit it', () => {
-  it('names production after the kind line, what its engine can do and what the kind delivers', () => {
+  it('names each profile that permits it after the kind line, what its engine can do and what the kind delivers', () => {
     const postgres = said(POSTGRES);
     const kind = postgres.findIndex(line => line.startsWith('kind  '));
     expect(postgres[kind + 1]).toMatch(/^capabilities {2}transactional DDL/);
     expect(postgres[kind + 2]).toMatch(/^delivery {2}at-least-once/);
-    expect(postgres[kind + 3]).toBe('permitted by  production');
+    expect(postgres[kind + 3]).toBe('permitted by  production, production-scheduler, production-worker');
     const people = said('@connections/people.connection.json');
     expect(people[people.findIndex(line => line.startsWith('kind  ')) + 1]).toBe('permitted by  production');
   });
@@ -167,7 +175,9 @@ describe('wilanis describe: permits a profile inherits (RFC 0043)', () => {
     try {
       expect(checkTree(load).items).toEqual([]);
       expect(said(JOBS_STAGING, load)).toContain('permitted by  production-staging');
-      expect(said(POSTGRES, load)).toContain('permitted by  production, production-staging');
+      expect(said(POSTGRES, load)).toContain(
+        'permitted by  production, production-scheduler, production-worker, production-staging',
+      );
       const child = profilesOf(new Scope(load.registry, load.resolve)).find(one => one.name === 'production-staging');
       expect(child?.permits).toEqual(expect.arrayContaining([POSTGRES, JOBS_STAGING]));
       expect(child?.permitsFrom).toEqual({ profile: 'production', entries: 13 });
@@ -181,7 +191,7 @@ describe('wilanis describe: permits a profile inherits (RFC 0043)', () => {
     try {
       expect(checkTree(load).items.filter(refusal => refusal.code === 'C022')).toEqual([]);
       expect(said(JOBS_STAGING, load)).toContain('permitted by  production-staging');
-      expect(said(POSTGRES, load)).toContain('permitted by  production');
+      expect(said(POSTGRES, load)).toContain('permitted by  production, production-scheduler, production-worker');
       const child = profilesOf(new Scope(load.registry, load.resolve)).find(one => one.name === 'production-staging');
       expect(child?.permits).toContain(JOBS_STAGING);
       expect(child?.permits).not.toContain(POSTGRES);

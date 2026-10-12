@@ -46,8 +46,9 @@ describe('sabotage: a broker standing in for another (C018)', () => {
     const said = sabotageSaying('project.json', doc => {
       doc.profiles.production.connections[JOBS] = API;
     });
-    // and production's permits do not list the API the queue now reaches (C021)
-    expect(said.map(one => one.split(' ')[0])).toEqual(['C018', 'C021']);
+    // judged once, at production's line; and the permits of production and of the two profiles that extend it do
+    // not list the API the queue now reaches under each (C021)
+    expect(said.map(one => one.split(' ')[0])).toEqual(['C018', 'C021', 'C021', 'C021']);
     expect(said[0]).toContain('which delivers nothing, where the other delivers at-least-once');
   });
 
@@ -55,7 +56,8 @@ describe('sabotage: a broker standing in for another (C018)', () => {
     const { codes: found } = withBrokenPluginDoc(postgres, 'postgres.connection-kind.json', kind => {
       kind.delivery = 'at-most-once';
     });
-    expect(found.filter(code => code === 'C018')).toHaveLength(3);
+    // once, at production's line: the two profiles that extend it write no stand-in of their own
+    expect(found.filter(code => code === 'C018')).toHaveLength(1);
   });
 
   it('C018 still refuses a connection that delivers nothing standing in for one of another kind', () => {
@@ -70,8 +72,10 @@ describe('sabotage: a broker standing in for another (C018)', () => {
     const said = sabotageSaying('project.json', doc => {
       doc.profiles.production.connections['@connections/customers-postgres.connection.json'] = JOBS;
     });
-    // and production's permits name the store this replaces (C023), leaving it and the broker in its place unlisted (C021)
-    expect(said.map(one => one.split(' ')[0])).toEqual(['C018', 'C023', 'C021', 'C021']);
+    // and the permits of production and of each profile that extends it name the store this replaces (C023),
+    // leaving it and the broker in its place unlisted (C021)
+    const each = ['C023', 'C021', 'C021'];
+    expect(said.map(one => one.split(' ')[0])).toEqual(['C018', ...each, ...each, ...each]);
     expect(said[0]).toContain('marked storage and leases too');
   });
 });

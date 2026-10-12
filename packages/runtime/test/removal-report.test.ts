@@ -48,10 +48,8 @@ function inProcess(): string {
   const path = join(dir, 'project.json');
   const project = JSON.parse(readFileSync(path, 'utf8'));
   project.startup = project.startup.filter((step: { run: string }) => !OUTSIDE.includes(step.run));
-  // production permits what it reaches, and without those steps it reaches none of them
-  project.profiles.production.permits = project.profiles.production.permits.filter(
-    (entry: string) => !OUTSIDE.includes(entry),
-  );
+  // with no listener, every profile walks every route: what a place permits is not this test's claim
+  for (const profile of Object.values(project.profiles) as { permits?: string[] }[]) delete profile.permits;
   writeFileSync(path, JSON.stringify(project));
   return dir;
 }

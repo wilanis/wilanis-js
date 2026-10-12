@@ -48,10 +48,9 @@ function copyServing(edits: Record<string, Edit>): string {
   edit('project.json', project => {
     project.plugins.find((plugin: { use: string }) => plugin.use === '@http').settings.port = 0;
     project.startup = project.startup.filter((step: { run: string }) => step.run !== '@otel/exporter.port.json#export');
-    // production permits what it reaches, and without the step it exports nothing
-    project.profiles.production.permits = project.profiles.production.permits.filter(
-      (entry: string) => entry !== '@otel/exporter.port.json#export',
-    );
+    // each profile that writes permits permits what it reaches, and without the step it exports nothing
+    for (const profile of Object.values(project.profiles) as { permits?: string[] }[])
+      profile.permits = profile.permits?.filter(entry => entry !== '@otel/exporter.port.json#export');
   });
   for (const [relative, change] of Object.entries(edits)) edit(relative, change);
   return dir;
@@ -73,7 +72,8 @@ const OVER_MEMORY: Record<string, Edit> = {
     // a memory store is no broker, so the jobs queue stays in the process rather than standing for it
     for (const profile of Object.values(project.profiles) as { connections?: Record<string, string> }[])
       delete profile.connections?.['@connections/jobs.connection.json'];
-    project.profiles.production.permits.push('@connections/jobs.connection.json');
+    for (const profile of Object.values(project.profiles) as { permits?: string[] }[])
+      profile.permits?.push('@connections/jobs.connection.json');
   },
 };
 

@@ -26,7 +26,8 @@ describe('sabotage: an atomic graph whose connections a profile stands in for on
     expect(said.filter(one => one.startsWith('L010'))).toEqual([
       "L010 atomic graph reaches effects on 2 connections (@connections/customers-postgres.connection.json, @connections/jobs.connection.json) (profile 'production')",
     ]);
-    // and production's permits do not list the in-process broker it now reaches (C021)
-    expect(CODES(said)).toEqual(['C021', 'L010', 'X405']);
+    // and the permits of production, and of the two profiles that extend it and so keep jobs apart too, do not list
+    // the in-process broker each now reaches (C021)
+    expect(CODES(said)).toEqual(['C021', 'C021', 'C021', 'L010', 'X405']);
   });
 });

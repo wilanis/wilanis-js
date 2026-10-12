@@ -325,11 +325,12 @@ describe('sabotage: a binding delegating a guarded write straight to the store',
       },
     },
   };
-  /** Every profile of the example meets the archive port with the binding. */
+  /** Every profile of the example meets the archive port with the binding, a child through its parent's. */
   const bound = {
     'project.json': (project: any) => {
-      for (const profile of Object.values(project.profiles) as { bindings: Record<string, string> }[])
-        profile.bindings['@customers/domain/archive.port.json'] = '@customers/data/archive-store.binding.json';
+      for (const profile of Object.values(project.profiles) as { extends?: string; bindings: Record<string, string> }[])
+        if (!profile.extends)
+          profile.bindings['@customers/domain/archive.port.json'] = '@customers/data/archive-store.binding.json';
     },
   };
 

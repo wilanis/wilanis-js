@@ -2,7 +2,9 @@
  * What a place permits (RFC 0016), against the example's profiles: `permits` is held to what the profile reaches
  * in both directions, so an operation or connection reached and not listed is C021, an entry nothing reaches
  * is C022, an entry that is no permit is C023, and one naming nothing is R001. Every case names the profile it
- * writes `permits` on, so a profile added beside them changes nothing here: one without `permits` is not judged.
+ * writes `permits` on, so a profile added beside them changes nothing here: one that writes no `permits` and
+ * extends none is not judged, and one that extends production and writes its own (production-worker,
+ * production-scheduler) is judged on its own list.
  */
 import { readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -195,10 +197,14 @@ const QUOTES = {
 };
 
 describe('sabotage: a feature that reaches out, judged at two altitudes', () => {
-  it('C021 production refuses the new connection the feature allows itself; L003 does not', () => {
-    const production = [...PRODUCTION, '@http/http.port.json#request'];
+  it('C021 each place that writes permits refuses the new connection the feature allows itself; L003 does not', () => {
+    // every profile runs the greeting, which a command fires; each that writes permits now permits the request
+    const requesting = (project: any) => {
+      for (const profile of Object.values(project.profiles) as { permits?: string[] }[])
+        profile.permits?.push('@http/http.port.json#request');
+    };
     const saying = plantedEditingAllSaying(QUOTES, {
-      'project.json': permitting('production', production),
+      'project.json': requesting,
       'features/hello/feature.json': feature => {
         feature.effects = ['@http/http.port.json#request'];
       },
@@ -206,9 +212,12 @@ describe('sabotage: a feature that reaches out, judged at two altitudes', () => 
         binding.operations.hello.graph = '@hello/data/fetch-quote.graph.json';
       },
     });
-    expect(saying).toEqual([
-      "C021 profile 'production' does not permit '@connections/quotes.connection.json', reached from @features/hello/edge/hello-gated.trigger.json through @features/hello/data/greeting.binding.json (feature hello)",
-    ]);
+    expect(saying).toEqual(
+      ['production', 'production-scheduler', 'production-worker'].map(
+        name =>
+          `C021 profile '${name}' does not permit '@connections/quotes.connection.json', reached from @features/hello/edge/hello-gated.trigger.json through @features/hello/data/greeting.binding.json (feature hello)`,
+      ),
+    );
   });
 });
 
@@ -242,11 +251,14 @@ const inheriting =
 /** Every refusal of one code, as `sabotagePointing` or `sabotageSaying` answers them. */
 const only = (code: string, lines: string[]) => lines.filter(line => line.startsWith(`${code} `));
 
+/** The example with `name`, which extends production, writing no `permits` of its own, so it inherits production's. */
+const inheritingList = (name: string) => (doc: any) => {
+  delete doc.profiles[name].permits;
+};
+
 describe('sabotage: permits a profile inherits (RFC 0043)', () => {
   it("C021 and C022 for an inherited list, at the child's extends, naming the parent and how to replace it", () => {
-    const edit = (doc: any) => {
-      doc.profiles['production-worker'] = { extends: 'production' };
-    };
+    const edit = inheritingList('production-worker');
     const at = sabotagePointing('project.json', edit);
     expect(new Set(at)).toEqual(
       new Set([
@@ -301,10 +313,8 @@ describe('sabotage: permits a profile inherits (RFC 0043)', () => {
   it('C022 an inherited entry the child reaches neither as written nor through its stand-in', () => {
     const edits = {
       'project.json': (doc: any) => {
-        doc.profiles['production-scheduler'] = {
-          extends: 'production',
-          connections: { [EMPLOYEES]: EMPLOYEES_STAGING },
-        };
+        inheritingList('production-scheduler')(doc);
+        doc.profiles['production-scheduler'].connections = { [EMPLOYEES]: EMPLOYEES_STAGING };
       },
     };
     expect(only('C022', plantedEditingAllSaying(STAGING, edits))).toContain(
@@ -318,7 +328,7 @@ describe('sabotage: permits a profile inherits (RFC 0043)', () => {
     ]) {
       const at = sabotagePointing('project.json', doc => {
         productionWith(entry)(doc);
-        doc.profiles['production-worker'] = { extends: 'production' };
+        inheritingList('production-worker')(doc);
       });
       expect(only(code, at), entry).toEqual([atAdded(code)]);
     }
