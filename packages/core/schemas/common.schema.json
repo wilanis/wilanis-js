@@ -138,6 +138,15 @@
           },
           "minProperties": 1
         },
+        "within": {
+          "description": "Native contracts only, on a static string field. The type variable this field's literal is a path within: field names separated by dots, read in the type the variable is bound to where the operation is called. The checker holds the path to a field the type has, required at every step, and ending at a value of the `reaches` type (G028).",
+          "type": "string",
+          "pattern": "^\\$[A-Z][A-Za-z0-9]*$"
+        },
+        "reaches": {
+          "description": "Native contracts only, with `within`: the type the value at the end of the path must have, as `string` or `number`.",
+          "$ref": "#/$defs/typeRef"
+        },
         "provided": {
           "description": "Native contracts only. The compiler writes this field's value where the operation is called; an author never does. `site`: the calling document and node, of type `@std/Site.shape.json`.",
           "type": "string",

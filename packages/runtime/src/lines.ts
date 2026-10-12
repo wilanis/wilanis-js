@@ -44,6 +44,14 @@ function bindsOf(field: { binds?: string; resolves?: Record<string, string> }): 
   return both.length ? ` ${both.join(', ')}` : '';
 }
 
+/** Where a field's literal is a path within a bound type: `  a path within $T to a string`, or nothing. */
+function withinSaid(field: { within?: string; reaches?: string }, showType: (spec: unknown) => string): string {
+  if (!field.within) return '';
+  const reaches = field.reaches ? showType(field.reaches) : undefined;
+  const article = reaches && /^[aeiou]/.test(reaches) ? 'an' : 'a';
+  return `  (a path within ${field.within}${reaches ? ` to ${article} ${reaches}` : ''})`;
+}
+
 /**
  * One input one port's operation accepts: one type parameter is shown as `type`, one static one says so, and one
  * the compiler provides says `(provided)`, so a reader knows the call site never gives it.
@@ -58,6 +66,8 @@ function acceptsLine(
     static?: boolean;
     provided?: string;
     resolves?: Record<string, string>;
+    within?: string;
+    reaches?: string;
     maxItems?: number;
     description?: string;
   },
@@ -69,7 +79,7 @@ function acceptsLine(
   const isProvided = field.provided ? '  (provided)' : '';
   const allowed = field.enum ? ` ∈ ${field.enum.join('|')}` : '';
   const says = field.description ? `  -- ${field.description}` : '';
-  return `    in  ${name}${optional}: ${type}${boundSaid(field)}${isStatic}${isProvided}${bindsOf(field)}${allowed}${says}`;
+  return `    in  ${name}${optional}: ${type}${boundSaid(field)}${isStatic}${isProvided}${bindsOf(field)}${withinSaid(field, showType)}${allowed}${says}`;
 }
 
 /** What one operation takes: the shape it names, said once, or each field it writes. */
@@ -139,7 +149,7 @@ export function portLines(doc: Loaded, showType: (spec: unknown) => string): str
 
 /**
  * What one field says about itself: optional, its type and the most items a list of it holds, the values it
- * allows, what it binds, and its description.
+ * allows, what it binds, the path within a bound type its literal is, and its description.
  */
 export function fieldLine(
   name: string,
@@ -149,6 +159,8 @@ export function fieldLine(
     enum?: string[];
     maxItems?: number;
     binds?: string;
+    within?: string;
+    reaches?: string;
     description?: string;
   },
   showType: (spec: unknown) => string,
@@ -158,7 +170,7 @@ export function fieldLine(
   const allowed = field.enum ? ` ∈ ${field.enum.join('|')}` : '';
   const binds = field.binds ? ` binds ${field.binds}` : '';
   const says = field.description ? `  -- ${field.description}` : '';
-  return `    ${name}${optional}: ${type}${boundSaid(field)}${allowed}${binds}${says}`;
+  return `    ${name}${optional}: ${type}${boundSaid(field)}${allowed}${binds}${withinSaid(field, showType)}${says}`;
 }
 
 /** One mark of a collection, as its line reads: the family, and what that family says here. */

@@ -396,6 +396,7 @@
       if (f.enum) tags.appendChild(el('span', 'tag', 'one of ' + f.enum.join(', ')));
       if (f.maxItems !== undefined) { const b = el('span', 'tag', 'at most ' + f.maxItems); b.title = 'the most items a list may hold; a longer one is refused wherever the type is judged, a body at the edge among them'; tags.appendChild(b); }
       if (f.static || f.type === 'type') tags.appendChild(el('span', 'tag', 'static: written, never read'));
+      if (f.within) { const b = el('span', 'tag', 'a path within ' + f.within + (f.reaches ? ' to ' + showType(f.reaches) : '')); b.title = 'the value is a dotted path within the type ' + f.within + ' is bound to where the operation is called: a field it has, required at every step' + (f.reaches ? ', ending at ' + showType(f.reaches) : '') + ' (G028)'; tags.appendChild(b); }
       if (f.provided) { const b = el('span', 'tag', 'provided: the compiler writes it, never a call site'); b.title = 'the site: the calling document and the position within it, written where the operation is called; a call site that gives it is refused (G026)'; tags.appendChild(b); }
       if (f.secret) tags.appendChild(el('span', 'tag secret', 'secret'));
       tr.appendChild(tags);

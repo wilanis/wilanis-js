@@ -6,7 +6,7 @@
  * present when required (G005), and assignable (G004). Where the operation refuses, its `message` is said to
  * the caller, and reads no field marked secret (G016). A field the contract marks `provided` is the compiler's:
  * it is never given (G026) and never missing (G005 passes it over). A static `connection` written as a literal names a
- * connection document the tree has (R001).
+ * connection document the tree has (R001). A static field marked `within` is a path the bound type holds (G028, `within.ts`).
  */
 import {
   assignable,
@@ -27,6 +27,7 @@ import {
 import { secretPaths } from '../lower.js';
 import { MAKE } from '../std-ops.js';
 import { type Judge, RESERVED, type Reader, type Refuser, type Resolve, type ShapeLayer } from './judge.js';
+import { checkWithin } from './within.js';
 
 /** Where an operation is called: what is given, what it accepts, and how a value given there is typed. */
 export interface CallSite {
@@ -155,6 +156,7 @@ class InputCheck {
     for (const [name, field] of Object.entries(this.accepts))
       if (this.isTypeField(field)) this.checkTypeField(name, field);
     this.bindResolved();
+    checkWithin(this.judge, this.site, this.accepts, this.subst);
     for (const [name, field] of Object.entries(this.accepts)) {
       if (field.provided) this.checkProvided(name);
       else if (!this.isTypeField(field)) this.checkValueField(name, field);

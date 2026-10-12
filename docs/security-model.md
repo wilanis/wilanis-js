@@ -131,6 +131,9 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
 - A field the compiler provides is never written by an author: only a native operation asks for its site, as
   `@std/Site.shape.json`, never secret and always given, and no graph node, binding operation or startup step gives it.
   [[L019](refusals/L019.md), [G026](refusals/G026.md)] (RFC 0032)
+- A path a native operation reads within each element of a list is one the element's type holds: a field at every
+  step, required at every step, and ending at the type the contract says it reaches. [[G028](refusals/G028.md)]
+  (RFC 0039)
 - A store's scope is fed from what the guard hands and never from what the caller could send, and a view that
   sees every row is reached only behind its policy. [[A007](refusals/A007.md), [A008](refusals/A008.md),
   [C012](refusals/C012.md), [C013](refusals/C013.md), [X105](refusals/X105.md), [X214](refusals/X214.md)]

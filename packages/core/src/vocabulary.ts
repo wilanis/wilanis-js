@@ -25,6 +25,8 @@ export type TypeSpec = TypeRef | InlineObject;
  * field's literal names whose value is the type to bind it to (`resolves.ts` holds the grammar). `maxItems`:
  * on a list, the most items a value may hold. `provided`: the compiler writes the value where the operation is
  * called and an author never does; `site` is the calling document and position, of type `@std/Site.shape.json`.
+ * `within`: on a static string field, the type variable its literal is a dotted path within, as bound at the call;
+ * `reaches`: the type the value at the end of that path must have.
  */
 export interface Field {
   type: TypeSpec;
@@ -36,6 +38,8 @@ export interface Field {
   binds?: string;
   static?: boolean;
   resolves?: Record<string, string>;
+  within?: string;
+  reaches?: TypeRef;
   provided?: Provided;
 }
 /** The one value the compiler provides at a call site: where the call was written. */

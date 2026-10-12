@@ -64,6 +64,19 @@ describe('the baseline', () => {
     expect(refused(broken(['op.fetched', 'op.fetched']))).toEqual([at('broken', 'must NOT have duplicate items')]);
     expect(refused(broken(['']))).toEqual([at('broken/0', 'must NOT have fewer than 1 characters')]);
   });
+  it('a static field that is a path within a bound type, and the type it reaches, conform too', () => {
+    const accepts = (by: unknown) => ({
+      list: { type: '$T[]' },
+      type: { type: 'type', binds: '$T' },
+      by: { type: 'string', static: true, ...(by as object) },
+    });
+    const port = (by: unknown) => doc('port', { operations: { totals: { description: 'one', accepts: accepts(by) } } });
+    expect(refused(port({ within: '$T', reaches: 'string' }))).toEqual([]);
+    expect(refused(port({ within: 'T' }))).toEqual([at('operations/totals/accepts/by/within', 'must match')]);
+    expect(refused(port({ within: '$T', reaches: 'strin' }))).toEqual([
+      at('operations/totals/accepts/by/reaches', 'must match'),
+    ]);
+  });
   it("a switch that catches a node's fault conforms too; a catch is node ids to node ids", () => {
     const route = { type: NODE_SWITCH, id: 's', in: {}, rules: [{ when: 'x', to: 'row' }], else: 'failed' };
     const graph = (caught: unknown) => doc('graph', { nodes: [{ ...route, catch: caught }] });
