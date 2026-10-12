@@ -125,11 +125,29 @@ describe('a guard on each element a map writes (Item 12)', () => {
   });
 });
 
+describe('a guard on each element of a list a guard upstream judged element by element', () => {
+  it('is held across a map', { timeout: 30_000 }, async () => {
+    // each edit is made a PageEdit at `edits`, whose map judges every element before `written` hands one to the write
+    const done = await rehearse(loaded(eachGuardTree('each')), { seed: 1 });
+    const held = "by guard 'edits:check' in features/rv/domain/refresh, which judged this value first";
+    const decision = done.decisions.find(one => one.graph.endsWith('data/write.graph.json') && one.node === 'in:check');
+    expect(
+      decision?.branches.map(one => [one.to, one.held]),
+      done.lines.join('\n'),
+    ).toEqual([
+      ['in:ok', held],
+      ['in:violated', held],
+    ]);
+    expect(done.lines).toContain(`  ok  holds     held upstream ${held}`);
+    expect(done.ok, done.lines.join('\n')).toBe(true);
+  });
+});
+
 describe('a demand traced to the answer of a guard upstream', () => {
   it('writes an element of a list a guarded node holds into the value that guard judges', {
     timeout: 30_000,
   }, async () => {
-    const load = loaded(eachGuardTree(true));
+    const load = loaded(eachGuardTree('plan'));
     expect(await steeredBy(load, 'op.written.0.op.in:check')).toEqual([
       { stubs: ['op.plan:made'], input: [], unreachable: [] },
       { stubs: ['op.plan:made'], input: [], unreachable: [] },
