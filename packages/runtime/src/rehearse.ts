@@ -294,6 +294,7 @@ async function decisionFor(walk: Walk, sw: FoundSwitch): Promise<Decision> {
   const cases = casesFor(sw, over(walk.stubbing, { ...others.stubs, ...pre.stubs }));
   for (const one of cases) {
     if (held) decision.branches.push({ when: one.branch.when, to: one.branch.to, held });
+    else if (pre.closed) decision.branches.push({ when: one.branch.when, to: one.branch.to, closed: pre.closed });
     else await ranCase({ walk, sw, decision, guard }, one, { cases, steer: { pre, others } });
   }
   return decision;
@@ -329,6 +330,48 @@ async function branchOf(
   if (uncovered !== undefined) return { said: { ...at, uncovered } };
   // a literal a caller hands closes the branch on this path: not a gap, and no problem where another path runs it
   if (one.closed !== undefined) return { said: { ...at, closed: one.closed } };
+  const tried = await reachedOrAgain(walk, sw, one, steer);
+  if ('closed' in tried) return { said: { ...at, closed: tried.closed } };
+  if (!('report' in tried)) return { said: { ...at, uncovered: tried.misfit } };
+  // a run that never got to the switch proves nothing of the branch, and is not recorded as though it did
+  const local = ranAt(tried.report, sw);
+  if (!local) return { said: { ...at, uncovered: notReached(tried.report) }, ended: tried.report };
+  return { said: { ...at, settled: settle(local, sw, one.branch.to) }, ran: tried };
+}
+
+/**
+ * A case's run, and -- where it never got to the switch -- the run again with what routes there solved over the case:
+ * that routing was solved before the case was laid, and where the case undid it, solving it again over the case makes
+ * a value both read agree, as a member a call before the switch and a call after it are handed. The first run stands
+ * where the second gets no further, and where what the case asks closes the way there, the branch is closed on this path.
+ */
+async function reachedOrAgain(
+  walk: Walk,
+  sw: FoundSwitch,
+  one: Case,
+  steer: { pre: Steering; others: Pick<Steering, 'stubs' | 'input'> },
+): Promise<Ran | { misfit: string } | { closed: string }> {
+  const tried = await attempt(walk, one, steer);
+  if (!('report' in tried) || ranAt(tried.report, sw)) return tried;
+  // over the first routing too: a value a later switch on the way was steered to is one an earlier one keeps -- that
+  // routing and the case pin what they set, and what only makes other decisions answer is laid under them, unpinned
+  const again = reach(walk, sw, steer.others.stubs, { ...steer.pre.stubs, ...one.stubs });
+  // what the case asks closes the way to its switch on this path: no problem where another path runs the branch
+  if (again.closed) return { closed: again.closed };
+  const retried = await attempt(walk, one, { ...steer, pre: again });
+  return 'report' in retried && ranAt(retried.report, sw) ? retried : tried;
+}
+
+/**
+ * One run of a case over what steers the run to its switch: the input it fired, every stub it was handed with what the
+ * run generated beside them, its report and the nodes it broke -- or, where a stub does not fit its node's type, why the
+ * case is not run, since that is data no real run sees (#1026).
+ */
+async function attempt(
+  walk: Walk,
+  one: Case,
+  steer: { pre: Steering; others: Pick<Steering, 'stubs' | 'input'> },
+): Promise<Ran | { misfit: string }> {
   // a caught node breaks for real: its stubbed effect throws, and nothing recorded answers in its place
   const broken = new Set([...steer.pre.broken, ...(one.broken ?? [])]);
   const record: Record<string, unknown> = {};
@@ -339,16 +382,11 @@ async function branchOf(
   for (const patch of patches) fired = patched(walk, fired, patch);
   // each layer was written over the ones before it, so a later stub of a node already holds what an earlier one steered
   const given = unbroken({ ...steer.others.stubs, ...steer.pre.stubs, ...one.stubs }, broken);
-  // a stub that does not fit its node's type is data no real run sees: the case is said, not run (#1026)
   const misfit = misfitOf(given, walk.stubbing.typeOf);
-  if (misfit !== undefined) return { said: { ...at, uncovered: misfit } };
+  if (misfit !== undefined) return { misfit };
   const report = await emb.fire(walk.trigger.doc, fired, walk.context, { stubs: given });
-  // a run that never got to the switch proves nothing of the branch, and is not recorded as though it did
-  const local = ranAt(report, sw);
-  if (!local) return { said: { ...at, uncovered: notReached(report) }, ended: report };
   // a stubbed node's handler never runs, so what the case gave is written over what the run generated
-  const ran = { input: fired, stubs: { ...record, ...given }, report, broken: [...broken] };
-  return { said: { ...at, settled: settle(local, sw, one.branch.to) }, ran };
+  return { input: fired, stubs: { ...record, ...given }, report, broken: [...broken] };
 }
 
 /**

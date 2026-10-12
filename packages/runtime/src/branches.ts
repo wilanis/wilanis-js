@@ -68,6 +68,11 @@ export interface Stubbing {
   /** What the seed generated at a node path, under whatever `over` laid on top: what a steered value is told from. */
   seeded?: (nodePath: string) => unknown;
   /** The stubs other decisions steered, which a case is laid over: a value they set is one a case should keep. */
+  /**
+   * Whether what is `steered` is what a case and the routing to its switch set, and nothing that only makes other
+   * decisions answer: an answer of a call that keeps it, closed by a literal, closes the call (`intoCall`).
+   */
+  strict?: boolean;
   steered?: Record<string, unknown>;
   /** The map with a `where` at a dotted path, whose rule is logic: run, never stubbed (#1027). */
   mapRuleOf?: (nodePath: string) => MapRule | undefined;
@@ -76,14 +81,14 @@ export interface Stubbing {
 /**
  * A stubbing whose seed values are what `stubs` already steered, where it steered them: a case built over it writes
  * its demands on top of those, so laying it over them keeps every field they set that it does not demand itself, and
- * picks the constraints that change the fewest of them (`keeping`).
+ * -- where they `pins` -- picks the constraints that change the fewest of them (`keeping`).
  */
-export function over(from: Stubbing, stubs: Record<string, unknown>): Stubbing {
+export function over(from: Stubbing, stubs: Record<string, unknown>, pins = true): Stubbing {
   return {
     ...from,
     generated: path => (path in stubs ? stubs[path] : from.generated(path)),
     seeded: from.seeded ?? from.generated,
-    steered: { ...from.steered, ...stubs },
+    steered: pins ? { ...from.steered, ...stubs } : from.steered,
   };
 }
 
@@ -420,13 +425,18 @@ function steer(branch: Branch, found: FoundSwitch, from: Settled, steerable: boo
   return { at: found.at, branch, stubs, ...(input.length ? { input } : {}), ...missedOf(unmet) };
 }
 
+/** How many of a branch's sets of constraints `keeping` compares: a rule of many `||` has a set per combination. */
+const MOST_SETS = 16;
+
 /**
  * Which of a branch's sets of constraints a case meets: the one that changes the fewest values other decisions steered,
  * the first among equals, since such a value may be what routes the run to this switch -- a rule `tier != 'gold' ||
  * has(note)` over a record steered to be gold keeps the gold and asks for the note (#1027).
  */
 function keeping(branch: Branch, at: At, from: Settled): Demands {
-  const sets = branch.alternatives ?? [branch.demands];
+  const sets = (branch.alternatives ?? []).slice(0, MOST_SETS);
+  // one set, or none steered to keep: nothing to choose between
+  if (sets.length < 2 || !from.steered || !Object.keys(from.steered).length) return branch.demands;
   const changes = (set: Demands) =>
     Object.entries(set).filter(([dotted, domain]) => overrides(meet(dotted, domain, at, from), from)).length;
   let best = { set: branch.demands, changed: Number.POSITIVE_INFINITY };

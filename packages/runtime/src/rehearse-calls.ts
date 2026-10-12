@@ -12,11 +12,15 @@ import { handedAs } from './frames.js';
 import { bindingGraph, nodeAt, type Spec, specBehind } from './rehearse-where.js';
 
 /**
- * The node inside a call that answers it: its dotted path, and the frames entered to reach it, outermost first. `list`
- * where the call is one element of a map: the map the element runs under, which hands it what it reads of `in`.
+ * The nodes inside a call that may answer it: `at`, the first output candidate that does not refuse, and `answers`,
+ * every such candidate in the order the graph names them, each by its dotted path; the spec they stand in; and the
+ * frames entered to reach it, outermost first. `list` where the call is one element of a map: the map the element runs
+ * under, which hands it what it reads of `in`.
  */
 export interface AnsweredIn {
   at: string;
+  answers: string[];
+  spec: Spec;
   frames: Frame[];
   list?: FoundList;
 }
@@ -75,8 +79,10 @@ function frameOf(at: string, node: Called | undefined, spec: Spec): Frame {
   return spec.whole ? { at, in: given, unwrapped: true } : { at, in: given };
 }
 
-/** The first output candidate of a spec that answers rather than refuses, at its dotted path. */
+/** The output candidates of a spec that answer rather than refuse, at their dotted paths, the first as `at`. */
 function answerOf(spec: Spec, output: string[], at: string, frames: Frame[]): AnsweredIn | undefined {
-  const answers = output.find(id => (spec.nodes[id] as Called | undefined)?.handler !== REFUSE);
-  return answers === undefined ? undefined : { at: `${at}.${answers}`, frames };
+  const answers = output
+    .filter(id => (spec.nodes[id] as Called | undefined)?.handler !== REFUSE)
+    .map(id => `${at}.${id}`);
+  return answers.length ? { at: answers[0], answers, spec, frames } : undefined;
 }

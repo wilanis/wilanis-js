@@ -264,7 +264,8 @@ export interface Parents {
 }
 
 /**
- * A copy of `root` with `path` set to `value`; undefined deletes the key, and leaves alone a parent that is not there.
+ * A copy of `root` with `path` set to `value`; undefined deletes the key -- or, at an index, cuts the list before it --
+ * and leaves alone a parent that is not there.
  * A step whose name is an index makes a list rather than an object, keeping what was already there when it was
  * one: what reads such a value next is a `map`, and an object of numbered keys is not a list to run over. That
  * is how a demand on an element of a list -- the element a guarded list's guard judges -- is written.
@@ -285,17 +286,22 @@ export function setPath(root: unknown, path: string[], value: unknown, parents?:
 
 /** A copy of `root` with one step set to `child`: a list's element at an index, the list grown with empty objects where it is short, or a field. */
 function withChild(root: unknown, head: string, child: unknown): unknown {
-  if (/^\d+$/.test(head)) {
-    const out = Array.isArray(root) ? [...(root as unknown[])] : [];
-    while (out.length <= Number(head)) out.push({});
-    out[Number(head)] = child;
-    return out;
-  }
+  if (/^\d+$/.test(head)) return withElement(root, Number(head), child);
   const base: Record<string, unknown> =
     root && typeof root === 'object' && !Array.isArray(root) ? { ...(root as Record<string, unknown>) } : {};
   if (child === undefined) delete base[head];
   else base[head] = child;
   return base;
+}
+
+/** A copy of a list with one element set, the list grown with empty objects where it is short. */
+function withElement(root: unknown, index: number, child: unknown): unknown[] {
+  const out = Array.isArray(root) ? [...(root as unknown[])] : [];
+  // an element that is not there is a list too short to hold it: a list holds no gaps (#1027)
+  if (child === undefined) return out.slice(0, index);
+  while (out.length <= index) out.push({});
+  out[index] = child;
+  return out;
 }
 
 /** The type one step below a declared type: a field's, or a list's element; nothing where the type says nothing there. */

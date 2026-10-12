@@ -40,13 +40,19 @@ describe('a read of in followed out', () => {
     expect(traced(read('other'), { at: 'call.sw', from, lists: [] })).toEqual({ stopped: 'call', reason: 'nothing' });
   });
 
-  it('stops at a list or an object written out, read whole or at a field it does not write, as composed', () => {
+  it('stops at a list or an object written out, read whole, as composed', () => {
     const from: Frame[] = [
       { at: 'call', in: { tags: { list: [ref('a', 'b')] }, meta: { object: { level: ref('a', 'b') } } } },
     ];
     const at = { at: 'call.sw', from, lists: [] };
-    for (const one of [read('tags'), read('meta'), read('meta', 'other')])
+    for (const one of [read('tags'), read('meta')])
       expect(traced(one, at)).toEqual({ stopped: 'call', reason: 'composed' });
+  });
+
+  it('stops at a field an object written out does not write, as a literal that is not there (#1027)', () => {
+    const from: Frame[] = [{ at: 'call', in: { meta: { object: { level: ref('a', 'b') } } } }];
+    const at = { at: 'call.sw', from, lists: [] };
+    expect(traced(read('meta', 'other'), at)).toEqual({ stopped: 'call', reason: 'literal', value: undefined });
   });
 
   it('stops at a literal with the value at the path read, inside an object written out too', () => {

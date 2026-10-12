@@ -172,6 +172,8 @@ export interface Steering {
   stubs: Record<string, unknown>;
   input: Patch[];
   broken: string[];
+  /** Why no run on this path gets to the switch: a switch on the way that the tree's own values never route there. */
+  closed?: string;
 }
 
 /**
@@ -181,9 +183,17 @@ export interface Steering {
  * would land on a dead path. Each stub is written over `under`, and over what was steered before it, so a node two
  * switches read keeps the field each of them was steered on.
  */
-export function reach(walk: Reached, sw: FoundSwitch, under: Record<string, unknown> = {}): Steering {
+export function reach(
+  walk: Reached,
+  sw: FoundSwitch,
+  under: Record<string, unknown> = {},
+  pinned: Record<string, unknown> = {},
+): Steering {
   const steering: Steering = { stubs: {}, input: [], broken: [] };
-  const laid = () => over(walk.stubbing, { ...under, ...steering.stubs });
+  // `under` is laid as it is, and pins only where nothing is `pinned`; what is pinned, and what this steers, is kept
+  const base = Object.keys(pinned).length ? { ...over(walk.stubbing, under, false), strict: true } : walk.stubbing;
+  const kept = Object.keys(pinned).length ? pinned : under;
+  const laid = () => over(base, { ...kept, ...steering.stubs });
   // a switch inside a mapped operation runs only when the list it maps over has an element to run for
   for (const [index, list] of sw.lists.entries()) {
     const need = nonEmpty(list, laid(), sw.lists.slice(0, index));
@@ -192,10 +202,21 @@ export function reach(walk: Reached, sw: FoundSwitch, under: Record<string, unkn
   }
   for (const at of [...sw.via, sw.at])
     for (const { governing, id } of routingTo(walk, at)) {
-      const want = casesFor(governing, laid()).find(one => routesTo(one, id));
+      const towards = casesFor(governing, laid()).filter(one => one.branch.to === id);
+      const want = towards.find(one => untakenBy(one) === undefined);
       if (want) steerBy(steering, want);
+      else steering.closed ??= shutAt(governing, id, towards);
     }
   return steering;
+}
+
+/**
+ * Why a switch on the way never routes to the node a run must pass, where what closes it is the tree's own values on
+ * this path (#1027); nothing where the case is merely one the solver could not make.
+ */
+function shutAt(governing: FoundSwitch, id: string, towards: Case[]): string | undefined {
+  const shut = towards.find(one => one.closed !== undefined)?.closed;
+  return shut && `'${governing.at.split('.').pop()}' never routes to '${id}' on this path: ${shut}`;
 }
 
 /** One case laid over what a steering already holds: its stubs, its patches to the input, and the nodes it breaks. */
@@ -227,9 +248,6 @@ function routingTo(walk: Reached, at: string): { governing: FoundSwitch; id: str
   }
   return routes;
 }
-
-/** Whether a run can take a case, and it routes to the node named. */
-const routesTo = (one: Case, id: string) => one.branch.to === id && untakenBy(one) === undefined;
 
 /** Which switch of a spec routes each node it names: a rule's target, the fallback, and where a caught fault goes. */
 function routersOf(spec: Spec): Map<string, string> {
