@@ -47,7 +47,7 @@ accepted. Statuses: draft, accepted, implemented, withdrawn.
 | [0039](0039-keep-and-group-a-list.md) | Keep and group a list: a `where` on `map`, and `@std/list#totals` | accepted |
 | [0040](0040-text-contains.md) | `contains`: a rule asks whether a text holds a word written in the rule | implemented |
 | [0041](0041-wait-for-a-node.md) | `after`: a node waits for another whose answer it does not read | accepted |
-| [0042](0042-collections-another-tree-keeps.md) | `keptBy`: a store says another tree keeps its collections | accepted |
+| [0042](0042-collections-another-tree-keeps.md) | `keptBy`: a store says another tree keeps its collections | implemented |
 | [0043](0043-a-profile-from-another.md) | A profile from another: `extends` names the profile one starts from; reverses what RFC 0013 set aside | implemented |
 | [0044](0044-queue-deadline.md) | A deadline on a queue trigger: `deadlineMs` cancels a delivery's run, which becomes `onFault` | implemented |
 | [0045](0045-csv-column-map.md) | `columns`: a CSV header name read into a field of another name | implemented |

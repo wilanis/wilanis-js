@@ -156,7 +156,7 @@ too: a `map` may say `where` and need not `run`, a native field may say `within`
 gains `totals`. Each change is compatible, but each changes a schema, so 1.0 waits for it. RFC 0040, `contains` in a
 rule, changed two schema descriptions and has landed before the freeze. RFC 0041, `after` on a node,
 lands before the freeze too: it changes the `run` and `map` node schemas. RFC 0042, a store that says another tree keeps
-its collections, adds `keptBy` to `store.schema.json`, so it lands before the freeze too. RFC 0043, a profile that
+its collections, added `keptBy` to `store.schema.json` and has landed before the freeze. RFC 0043, a profile that
 extends another, added one optional key to `project.schema.json` and has landed before the freeze.
 
 RFC 0037, a connection is a literal at the call, changes three schemas before the freeze: `common.schema.json` (a

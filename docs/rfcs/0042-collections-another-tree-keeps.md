@@ -1,6 +1,6 @@
 # RFC 0042: `keptBy`: a store says another tree keeps its collections
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:core` (one optional property on `store.schema.json`, `StoreDoc`), `area:plugin-storage` (the
   planner's gathering, three `X` rules), `area:runtime` (`describe`, the template), `area:view` (the store page)
 - **Tracking issue:** #851
@@ -269,7 +269,7 @@ plugin's `check` beside `rules.ts`. What a store write is and which store a call
 (`operationOf` and `Call` in `calls.ts`; *Implementation plan* says how this meets RFC 0037's change to that
 walk). The profiles are read through `scope.profiles()` and `scope.connectionFor` (`packages/core/src/scope.ts`);
 X212 already walks `scope.profiles()` the same way. Codes are placeholders; the implementing pull request takes
-the next free numbers in the family.
+the next free numbers in the family. X2n1, X2n2 and X2n3 landed as X215, X216 and X217.
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
@@ -321,7 +321,7 @@ operation like any other: stubbed in a rehearsal, run by the engine in `start`.
 ### Discoverability
 
 - `wilanis describe <store>` (`storeLines` in `packages/runtime/src/lines.ts`) prints one line after the engine
-  lines: `kept by      customers -- this tree reads it; wilanis migrate never plans it and no graph writes it`.
+  lines: `kept by     customers -- this tree reads it; wilanis migrate never plans it and no graph writes it`.
 - `wilanis migrate` prints the `skipped:` line above, one per kept connection; `--json` carries it as `skipped`.
 - The viewer's store page (`renderDocPage` in `packages/view/client/index.html`) shows the same sentence under the
   heading, and leaves out the `default` and `renamed` columns, which a kept store cannot have.
