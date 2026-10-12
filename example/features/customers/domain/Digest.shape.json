@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
   "label": "Digest",
   "layer": "core",
-  "description": "What the digest answers: how many customers there are, how many of them are active, and one line per customer as text.",
+  "description": "What the digest answers: how many customers there are, how many of them are active, how many each tier holds, and one line per customer as text.",
   "fields": {
     "count": {
       "type": "number",
@@ -11,6 +11,10 @@
     "active": {
       "type": "number",
       "description": "how many customers are active"
+    },
+    "tiers": {
+      "type": "@std/Total.shape.json[]",
+      "description": "how many customers each tier holds, in the order each tier first appears"
     },
     "text": {
       "type": "string",

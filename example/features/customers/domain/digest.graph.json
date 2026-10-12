@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Digest",
-  "description": "Every customer of every tenant counted and listed, composed into one Digest: the count from one node, the active ones kept and counted by another, the text from a third.",
+  "description": "Every customer of every tenant counted and listed, composed into one Digest: the count from one node, the active ones kept and counted by another, the customers per tier totalled by a third, the text from a fourth.",
   "out": {
     "type": "@customers/domain/Digest.shape.json",
     "from": "digest"
@@ -63,6 +63,17 @@
     },
     {
       "type": "@wilanis/node/run.schema.json",
+      "id": "tiers",
+      "label": "Customers per tier",
+      "run": "@std/list.port.json#totals",
+      "in": {
+        "list": "{{all}}",
+        "type": "@customers/domain/Customer.shape.json",
+        "by": "tier"
+      }
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
       "id": "digest",
       "label": "The digest",
       "run": "@std/object.port.json#make",
@@ -70,6 +81,7 @@
         "value": {
           "count": "{{count}}",
           "active": "{{activeCount}}",
+          "tiers": "{{tiers}}",
           "text": "{{joined}}"
         },
         "type": "@customers/domain/Digest.shape.json"

@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/port.schema.json",
   "label": "Lists",
-  "description": "Lists: count, first, concat, slice. Where the result type depends on the list, it is declared in type.",
+  "description": "Lists: count, first, concat, slice, totals. Where the result type depends on the list, it is declared in type.",
   "operations": {
     "concat": {
       "description": "a followed by b.",
@@ -66,6 +66,36 @@
         }
       },
       "returns": "$T",
+      "pure": true
+    },
+    "totals": {
+      "description": "One total per distinct value of the string field `by`: how many elements have it, and the sum of the number field `sum` over them (0 without `sum`). Totals come in the order each key first appears in the list.",
+      "accepts": {
+        "list": {
+          "type": "$T[]"
+        },
+        "type": {
+          "type": "type",
+          "binds": "$T",
+          "description": "the element type"
+        },
+        "by": {
+          "type": "string",
+          "static": true,
+          "within": "$T",
+          "reaches": "string",
+          "description": "the dotted path within each element of the key it is grouped by"
+        },
+        "sum": {
+          "type": "string",
+          "static": true,
+          "required": false,
+          "within": "$T",
+          "reaches": "number",
+          "description": "the dotted path within each element of the number added up per key"
+        }
+      },
+      "returns": "@std/Total.shape.json[]",
       "pure": true
     }
   }

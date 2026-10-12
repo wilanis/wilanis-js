@@ -10,7 +10,8 @@
       "@std/outcome.port.json"
     ],
     "shapes": [
-      "@std/Site.shape.json"
+      "@std/Site.shape.json",
+      "@std/Total.shape.json"
     ]
   }
 }
