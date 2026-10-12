@@ -1,6 +1,6 @@
 # RFC 0043: A profile from another: `extends` names the profile one starts from
 
-- **Status:** draft
+- **Status:** accepted
 - **Areas:** `area:core` (one key on `project.schema.json`; `ProfileDoc`; one new module that resolves a profile;
   `Scope.profile`, which `bindingFor` and `connectionFor` read), `area:compiler` (one `C` rule in
   `check/profiles.ts`; `checkPermits` reads the resolved list), `area:runtime` (`describe project.json`, the
@@ -323,8 +323,8 @@ use `extends` gets the same manifest but for `"extends": null` in each block, so
 by those lines.
 
 The change is under `packages/core/schemas/`, so the implementing pull request waits for the maintainer's
-approval in the `decision` job. It is compatible, so it may land before or after the `schemas-v1` freeze (RFC
-0008). IR v1 is unaffected: no lowered form carries a profile.
+approval in the `decision` job. It is compatible (RFC 0008), and it lands before the `schemas-v1` freeze, in M14
+(decided at acceptance). IR v1 is unaffected: no lowered form carries a profile.
 
 ## Tests
 
@@ -405,8 +405,8 @@ Steps 2 and 3 need step 1 and may land in either order. Step 4 needs steps 2 and
 
 **Order with RFC 0037.** RFC 0037 (draft, "A connection is a literal at the call") also changes what C021 and C022
 read: a call may reach several connections (`ReachedNative.connections` in place of `connection`), and a connection
-may have parts, each reached and each replaced by a stand-in. It also takes new C codes. I recommend this RFC lands
-first, for three reasons.
+may have parts, each reached and each replaced by a stand-in. It also takes new C codes. This RFC lands first (decided
+at acceptance), for three reasons.
 
 - It is the smaller change: four pull requests, against RFC 0037's five, and none of them edits `reach.ts`, which
   RFC 0037 rewrites (its walks follow graph instances).
@@ -516,18 +516,17 @@ lands first takes the next free C code (C024 on `main` today), and the other tak
   `permits`.
 - Plugin settings stay one per tree, not per profile.
 
-**Still to decide before `accepted`:**
+**Settled at acceptance:**
 
-- **The key's name.** `extends` is the word `tsconfig.json` and most configuration formats use. `from` is
-  already taken in `project.json` by `plugins[].from` and `includes[].from`, which name an npm package.
-- **The milestone.** I recommend M14 1.0: the RFC lands before the `schemas-v1` freeze. The roadmap cuts 1.0 only
-  when every accepted RFC that changes a schema has landed, with no exception for a compatible change, and putting
-  this RFC under *Unscheduled* would need one. The work is small (four pull requests, none in the engine or a
-  plugin), and a consumer copies profiles today. *Unscheduled* would fit only if 1.0 were ready before step 1
-  could land; the change is compatible, so it could then land after the freeze, in place (RFC 0008). The
-  maintainer decides at acceptance.
-- **The order with RFC 0037.** I recommend this RFC lands first (*Order with RFC 0037*, under *Implementation
-  plan*). Neither changes a rule of the other, so the other order costs one rebase, not a redesign.
+- **The key is `extends`.** It is the word `tsconfig.json` and most configuration formats use. `from` was already taken
+  in `project.json` by `plugins[].from` and `includes[].from`, which name an npm package.
+- **The milestone is M14 1.0.** The RFC lands before the `schemas-v1` freeze. The roadmap cuts 1.0 only when every
+  accepted RFC that changes a schema has landed, with no exception for a compatible change, and putting this RFC under
+  *Unscheduled* would have needed one. The work is small (four pull requests, none in the engine or a plugin), and a
+  consumer copies profiles today. *Unscheduled* would have fit only if 1.0 were ready before step 1 could land; the
+  change is compatible, so it could then have landed after the freeze, in place (RFC 0008).
+- **This RFC lands before RFC 0037** (*Order with RFC 0037*, under *Implementation plan*). Neither changes a rule of the
+  other, so the other order would have cost one rebase, not a redesign.
 
 Left to implementation: the exact wording of `describe` and of the viewer's marks; whether
 `ResolvedProfile` marks inherited entries per entry or per list.
