@@ -17,20 +17,24 @@ the file, the rule and the fix.
    node the graph declares. A switch's `catch` is a branch too, `when <node> broke`, walked by making that stubbed
    effect break. The three to fix: `NEVER RUN` is a rule no inputs can reach, `BROKE` is a branch that fails
    where the graph declares no failure, `BLOCKED` is a wiring hole.
-   Rehearse steers a value a switch or a guard reads where it can follow it to something it sets: the trigger's
-   input, a node's answer, or an element of a list a node holds -- through every call and every map on the way,
-   including a value a map's `in` hands every element. It never writes a value past a guard a caller's value went
-   through: it writes into the value that guard judges, so where that guard refuses it, the branch says the run ended
-   at `<id>:violated`. To steer a switch inside a map, it gives the list it sets one element, written the same way
-   where a guard's answer holds the list; a literal or composed list keeps what it has. A rule a map runs on each
-   element is met in every element of a list the rehearsal stubs or hands in, so such a list keeps more than one
-   element. A guard on a value that a
-   guard of the same shape already judged upstream, across a map too, or that a site upstream proved, is `held
-   upstream`, which is fine. Text composed from reads, a list written out, `context` and a literal a rule compares
+   Rehearse stubs an effect alone -- a call of a plugin operation that is not `pure` -- and runs every other node: a
+   call into the tree's own graphs, a `make`, a `merge`, `first`, a map, a guard. A value a switch or a guard reads is
+   followed back through them to what rehearse sets, an effect's answer or the trigger's input, through every call and
+   every map on the way, including a value a map's `in` hands every element. A map's `where` is solved as a switch's
+   rule is, so a switch on what a map keeps is steered through the list it runs over. Into a call of one of the tree's
+   graphs, a value is followed to the output node that can answer what the switch needs, and the switch of that graph
+   that routes there is steered too. To steer a switch inside a map, it gives the list it sets one element; a literal
+   or composed list keeps what it has. A rule a map runs on each element is met in every element of a list the
+   rehearsal stubs or hands in, so such a list keeps more than one element. A guard on a value a guard of the same rule
+   already judged on the way -- in a graph the value came through, across a map too, or in the same graph over the
+   value this one is made from -- or that a site upstream proved, is `held upstream`, which is fine. Text composed from
+   reads, a list written out, `context`, a pure operation rehearse cannot follow back, and a literal a rule compares
    with another value stop it, and `NEVER RUN` names the node where it stopped: hand the value as one read of a node
-   there, or decide before the call. A literal or a constant closes the branches it excludes on that path, and the
-   line reads `-- ... closed on this path`; that is fine where another path runs them, and `NEVER RUN` where every
-   caller hands a literal it excludes.
+   there, or decide before the call. A literal or a constant closes the branches it excludes on that path -- a field an
+   object written out does not write is a literal that is not there -- and so does a called graph none of whose
+   answers holds what the branch needs; the line reads `-- ... closed on this path`. That is fine where another path
+   runs the branch, and `NEVER RUN` where every path closes it. A stub that would not fit its node's type is never
+   run: the line names the node and says why.
    A `catch` branch is recorded like any other branch: its scenario names the nodes that break under `broken`, and
    `regress` breaks them again.
 3. `wilanis regress` replays the scenarios; a `DIFF` is a change in behaviour. Run it after any change to a graph or
