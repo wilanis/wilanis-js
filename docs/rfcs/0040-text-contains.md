@@ -362,7 +362,8 @@ None.
 IR v1: two schema descriptions change; no field, no kind, no `$id`. Every document that validated before still
 validates. Every rule that parsed before parses to the same tree, since `<primary> contains ...` did not parse
 before. A rule that reads a field named `contains` keeps reading it. This is a compatible change under RFC 0008
-before and after 1.0, so it does not need to land before the `schemas-v1` freeze.
+before and after 1.0. It still changes two schema descriptions, so it lands before the `schemas-v1` freeze, in M14
+(decided at acceptance).
 
 ## Tests
 
