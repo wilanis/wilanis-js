@@ -256,7 +256,8 @@ scenario under `scenarios/` node by node. `fuzz` records the reason a node refus
 both, so a refusal that became a fault reads `reason missing → none`. The run's reason is compared where the scenario
 records one or a command wrote it, so a hand-written scenario that leaves it out, and a flat file an older `fuzz`
 wrote under `scenarios/`, replay as they did. A reason pinned on a node whose status is not `failed` is S002. A scenario's `cancelAt` names the stubbed effect at which
-`regress` cancels the replay, so it is a key of the scenario's own `stubs` (S003). `fuzz` writes no scenario of a run that
+`regress` cancels the replay, so it is a key of the scenario's own `stubs` (S003). A scenario's `broken` names the nodes that break in its run,
+each a key of its `expect.nodes` (S008). `fuzz` writes no scenario of a run that
 faults under stubs: it prints `FAULT at '<node>'` and exits 1.
 
 A run that refuses cancels only the nodes that had not started; the nodes already running settle as they settle. So
@@ -265,9 +266,8 @@ fired the way `regress` fires it, every effect answered by a recorded stub. A re
 Where that replay ends another way, with another reason, or at another node than the run did, the recorder writes
 nothing for the run, prints `NOT RECORDED` with both endings, and exits 1. Which node ends such a run depends on which
 settles first, and only the author can change that: make one of the two nodes wait for the other, today by routing
-it through a switch that reads the other (RFC 0041, #927, proposes `after`), or stop it from ending the run. A run
-that breaks a node for real is not recorded either, so `rehearse` walks a `catch` branch and no scenario keeps it
-(#721). `wilanis run`, `start`, `migrate`, `map`, `wilanis-deploy` and a served reload leave `scenarios/` unread.
+it through a switch that reads the other (RFC 0041, #927, proposes `after`), or stop it from ending the run. A `catch`
+branch is recorded with the nodes it breaks (`broken`), and `regress` breaks them on replay (#721). `wilanis run`, `start`, `migrate`, `map`, `wilanis-deploy` and a served reload leave `scenarios/` unread.
 
 ## Refusal codes
 
