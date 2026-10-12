@@ -6,6 +6,8 @@
  * Nothing here opens anything or asks an engine a question: it reads the documents the tree already holds,
  * through the same `storeFor` every operation of this plugin reads a store with, and hands the planner what it
  * takes. What a connection is called to a reader is here too, since a target says which engine it is against.
+ * So is who keeps a connection's collections where this tree only reads them (`keptBy`, RFC 0042), since that
+ * is said on the store and a plan is per connection.
  */
 import type { ConnectionDoc, Loaded, MigrateContext, StoreDoc } from '@wilanis/core';
 import type { Lowering } from './ensure.js';
@@ -19,6 +21,12 @@ export interface Gathered {
   /** what the operator reads as the engine behind it: the connection kind, and the plugin that grants it */
   engine: string;
   lowering: Lowering;
+  /**
+   * the tree that keeps these collections, and the store that says so, where this tree only reads them. Read off
+   * the first store gathered over the connection, since the checker holds every store over one connection to
+   * the same keptBy (RFC 0042).
+   */
+  keptBy?: { tree: string; store: string };
 }
 
 /**
@@ -42,6 +50,11 @@ function engineSaid(store: Loaded<StoreDoc>, ctx: MigrateContext): string {
   return kind.native ? `${kind.path}, granted by ${kind.native}` : kind.path;
 }
 
+/** Who keeps a store's collections where this tree only reads them, as a gathering carries it, or nothing. */
+function keptOf(store: Loaded<StoreDoc>): Pick<Gathered, 'keptBy'> {
+  return store.doc.keptBy ? { keptBy: { tree: store.doc.keptBy, store: store.path } } : {};
+}
+
 /**
  * The stores a plan is made of, one entry per connection, in the order of the canonical paths -- which is the
  * order the runtime prints and applies them in, so what a connection's plan is judged against is what the
@@ -58,7 +71,13 @@ export function gathered(ctx: MigrateContext): Gathered[] {
     if (!lowering) continue;
     const held = byConnection.get(lowering.on.connection);
     if (held) Object.assign(held.lowering.declaring.collections, lowering.declaring.collections);
-    else byConnection.set(lowering.on.connection, { on: lowering.on, engine: engineSaid(store, ctx), lowering });
+    else
+      byConnection.set(lowering.on.connection, {
+        on: lowering.on,
+        engine: engineSaid(store, ctx),
+        lowering,
+        ...keptOf(store),
+      });
   }
   return [...byConnection.values()].sort((one, other) => one.on.connection.localeCompare(other.on.connection));
 }

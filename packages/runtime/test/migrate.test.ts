@@ -80,6 +80,24 @@ describe('wilanis migrate: what it plans and prints', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('a connection another tree keeps is skipped with who keeps it, beside one this tree applies, and exits 0', async () => {
+    // RFC 0042: @storage skips a connection whose stores say keptBy; the runtime only prints the skip
+    const kept =
+      'kept by customers (keptBy in @invoices/data/customers.store.json); this tree reads it and never migrates it';
+    const { dir, calls, plugins } = tree({
+      targets: [
+        target([], { skipped: kept }),
+        target([step({ target: 'invoices' })], { connection: '@connections/invoices.connection.json' }),
+      ],
+    });
+    const answer = await run(dir, plugins, { apply: true });
+    expect(answer.lines).toContain(`  skipped: ${kept}`);
+    expect(calls).not.toContain('apply:@connections/customers.connection.json');
+    expect(calls).toContain('apply:@connections/invoices.connection.json');
+    expect(answer.code).toBe(0);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("a target's notes are printed and judged by nothing: they neither refuse nor stop a step applying", async () => {
     // a plugin with something to say about the tree -- a mark that has done its work -- has no step to say it
     // with, and a line that judged would refuse a connection nothing is wrong with

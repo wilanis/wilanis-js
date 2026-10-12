@@ -38,6 +38,8 @@ export interface Holding {
 export interface Asked {
   applied: Ran[];
   counted: Step[];
+  /** every connection a question was put to the engine about, once per question, in the order asked */
+  reached: string[];
 }
 
 /** One plan the fake engine applied, as it remembers it: what reached it, and who said they were running it. */
@@ -88,8 +90,11 @@ function recordOf(ran: Ran, id: number): Applied {
  * for one has a bug the count would otherwise hide. Every name it answers is folded, as that engine's are.
  */
 export function fake(holding: Record<string, Holding>, opts: { keeps?: boolean } = {}) {
-  const asked: Asked = { applied: [], counted: [] };
-  const held = (on: On) => holding[on.connection] ?? {};
+  const asked: Asked = { applied: [], counted: [], reached: [] };
+  const held = (on: On) => {
+    asked.reached.push(on.connection);
+    return holding[on.connection] ?? {};
+  };
   const engine = {
     async recorded(on: On, collection: string) {
       return under(held(on).recorded, collection);
@@ -107,6 +112,7 @@ export function fake(holding: Record<string, Holding>, opts: { keeps?: boolean }
       return under(one.rows, step.target) ?? 0;
     },
     async apply(on: On, steps: Step[], record: Recording, applying: Applying) {
+      asked.reached.push(on.connection);
       const ran: Ran = { on: on.connection, steps, record, applying };
       asked.applied.push(ran);
       return recordOf(ran, asked.applied.length);
@@ -139,8 +145,11 @@ export function fake(holding: Record<string, Holding>, opts: { keeps?: boolean }
 /** One collection as a store declares it, with the marks RFC 0017 adds. */
 type Declares = { of: string; key: string; unique?: string[][]; renamed?: Record<string, string>; was?: string };
 
-/** The tree the cases plan: two connections, each with a store of its own, over two shapes that differ by a name. */
-function documents(collections: { entries: Record<string, Declares>; notes: Record<string, Declares> }) {
+/**
+ * The tree the cases plan: two connections, each with a store of its own, over two shapes that differ by a name.
+ * A store a case marks `keptBy` says another tree keeps its collections, and this tree only reads them.
+ */
+function documents(collections: Required<Trees>) {
   const connection = (name: string) => ({
     $schema: schemaRef('connection'),
     description: `where the ${name} live`,
@@ -173,12 +182,14 @@ function documents(collections: { entries: Record<string, Declares>; notes: Reco
       $schema: schemaRef('store'),
       description: 'the entries kept so far',
       connection: ENTRIES,
+      ...(collections.keptBy.entries ? { keptBy: collections.keptBy.entries } : {}),
       collections: collections.entries,
     },
     'features/customers/data/notes.store.json': {
       $schema: schemaRef('store'),
       description: 'the notes kept so far',
       connection: NOTES,
+      ...(collections.keptBy.notes ? { keptBy: collections.keptBy.notes } : {}),
       collections: collections.notes,
     },
   };
@@ -193,10 +204,12 @@ export const RENAMED_SHAPE = '@features/customers/domain/Renamed.shape.json';
 /** `entries` as the tree declares it, with whatever marks a case adds. */
 export const declares = (over: Partial<Declares> = {}): Declares => ({ of: SHAPE, key: 'id', ...over });
 
-/** What a case varies about the tree it plans: the collections each connection's store declares. */
+/** What a case varies about the tree it plans: the collections each connection's store declares, and who keeps them. */
 export interface Trees {
   entries?: Record<string, Declares>;
   notes?: Record<string, Declares>;
+  /** the tree a store says keeps its collections, by the store's connection: `entries` or `notes` */
+  keptBy?: { entries?: string; notes?: string };
 }
 
 /** Write a tree into a directory of its own, which the operating system clears. */
@@ -223,6 +236,7 @@ export function context(trees: Trees = {}, opts: { adopt?: boolean; allowDestruc
     documents({
       entries: trees.entries ?? { entries: declares() },
       notes: trees.notes ?? { notes: declares() },
+      keptBy: trees.keptBy ?? {},
     }),
   );
   const load = loadTree(dir, PLUGINS);

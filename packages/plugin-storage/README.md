@@ -65,6 +65,25 @@ as `migrate` does; before, it wrote the directory the tree is rooted at. So `mig
 directory name differs from its project name shows the rows `ensure` wrote before that change under the directory
 name. Plans and drift checks do not read that column.
 
+Two trees may reach one database: one tree writes the records and migrates them, and the other only reads
+them. Both read the one record there, so a plan from the reading tree would drop the collections it never
+names and remove the fields its shapes leave out. So the reading tree's store says `keptBy`, the
+`project.json -> name` of the tree that keeps the collections (RFC 0042). `wilanis migrate` then skips every
+connection whose stores say `keptBy`. It prints `skipped: kept by <tree> (keptBy in <store>); this tree reads it
+and never migrates it`, and exits 0 for it. It opens nothing on that connection, not even on a dry run, and
+`--history` leaves the connection out. The keeping tree's `migrate` plans that connection, and its `--history`
+prints it. The skip holds under every profile, because the mark is on the store and not on the connection a
+profile chooses. So the reading tree's `migrate` never creates a kept collection, in a development database
+either. A developer gets one in two ways:
+
+- **The keeping tree's `migrate`.** Point a connection of the keeping tree at the same local database and run
+  `wilanis migrate <keeping tree> --profile <its dev profile> --apply`. The keeping tree creates its collections
+  with its full shapes and records them under its own name.
+- **A fixture.** Copy a database the keeping tree has already migrated, for example a sqlite file kept as a
+  test fixture, and point the reading tree's connection at the copy.
+
+`rehearse`, `fuzz` and `regress` need neither, because they stub every storage operation and reach no database.
+
 `wilanis describe <store>` and the viewer read the tree and open no connection, so they say what the store
 declares -- `renamed` and `was` among it -- and never what the database holds. What the database holds is
 `wilanis migrate --history`'s alone to say.
