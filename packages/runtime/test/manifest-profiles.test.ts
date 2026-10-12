@@ -2,17 +2,18 @@
  * RFC 0026's manifest, steps 2 and 3: the profile blocks `manifestOf` answers beside the inventory, each what RFC
  * 0013's `reachOf` derives under one profile and what RFC 0016 has it permit, and `--profile`, which narrows them to
  * one. The inventory, its determinism and the command's other cases are in manifest.test.ts; this file holds the
- * per-profile half, the `--profile staging` case among it, since manifest.test.ts is at the house rules' length.
+ * per-profile half, the `--profile staging` case among it, since manifest.test.ts is at the house rules' length. A
+ * block is of the profile resolved (RFC 0043): a planted child holds what it writes over what it extends.
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type LoadResult, loadTree, type Registry } from '@wilanis/core';
+import { type LoadResult, loadTree, type Registry, schemaUrl } from '@wilanis/core';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadProject, type Manifest, manifestOf, type ProjectLoad } from '../src/index.js';
-import { codes, copyOfExample, EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
+import { codes, copyOfExample, EXAMPLE, INCLUDES, loadedEditingAll, PLUGINS } from './example-harness.js';
 
 const RUNTIME = fileURLToPath(new URL('..', import.meta.url));
 const read = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
@@ -207,6 +208,112 @@ describe('manifest.schema.json: the profile block', () => {
     expect(valid(permitting([42]))).toBe(false);
     expect(valid(permitting('@http/server.port.json#listen'))).toBe(false);
     const { permits: _, ...unsaid } = production;
+    expect(valid({ ...manifest, profiles: { ...manifest.profiles, production: unsaid } })).toBe(false);
+  });
+});
+
+const JOBS = '@connections/jobs.connection.json';
+const JOBS_STAGING = '@connections/jobs-staging.connection.json';
+const WORKER_PERMITS = [
+  '@storage/store.port.json',
+  '@storage/storage.port.json#ensure',
+  '@queue/queue.port.json#ensure',
+  '@queue/worker.port.json#consume',
+  '@auth/challenge.port.json#issue',
+  '@otel/exporter.port.json#export',
+  POSTGRES,
+];
+
+/** A broker of the jobs' kind, for a staging place to stand in for the jobs connection. */
+const BROKER = {
+  'connections/jobs-staging.connection.json': {
+    $schema: schemaUrl('connection'),
+    description: 'The broker a staging place works its queue on, in its own process.',
+    kind: '@queue-memory/memory.connection-kind.json',
+    settings: {},
+  },
+};
+
+/**
+ * One profile's block of the manifest of a copy of the example, edited, and the copy removed after. The copy is
+ * held to the codes `refused` lists, none by default: the manifest is of a tree the checker accepts.
+ */
+function blockAfter(
+  name: string,
+  edit: (doc: any) => void,
+  docs: Record<string, unknown> = {},
+  refused: string[] = [],
+) {
+  const { load, dir } = loadedEditingAll(docs, { 'project.json': edit });
+  try {
+    expect(new Set(codes(dir))).toEqual(new Set(refused));
+    const narrowed = manifestOf(load, { root: 'example', profile: name });
+    expect(valid(narrowed)).toBe(true);
+    return narrowed.profiles[name];
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** `production-staging`, a child of production with no permits of its own, standing jobs-staging in for the jobs. */
+const staging = (away: boolean) => (doc: any) => {
+  doc.profiles['production-staging'] = { extends: 'production', connections: { [JOBS]: JOBS_STAGING } };
+  for (const step of doc.startup) if (step.profiles?.includes('production')) step.profiles.push('production-staging');
+  if (!away) return;
+  // its customers and its auth state kept where they do not reach the customer database
+  doc.profiles['production-staging'].bindings = {
+    '@customers/domain/customer.port.json': '@customers/data/customers-store.binding.json',
+    '@auth/state.port.json': '@features/state/data/auth-files.binding.json',
+  };
+  const memory = doc.startup.find((step: any) => step.run.startsWith('@features/state/domain/memory'));
+  memory.profiles = memory.profiles.filter((one: string) => one !== 'production-staging');
+};
+
+describe('manifestOf: a profile that extends another (RFC 0043)', () => {
+  it('says extends: null on every block of the example, whose profiles extend none', () => {
+    for (const name of Object.keys(manifest.profiles)) expect(block(name).extends).toBeNull();
+  });
+
+  it("holds the child's extends and production's bindings and stand-ins, resolved and canonical", () => {
+    const worker = blockAfter('production-worker', doc => {
+      const { description } = doc.profiles['production-worker'];
+      doc.profiles['production-worker'] = { description, extends: 'production', permits: WORKER_PERMITS };
+    });
+    expect(worker.extends).toBe('production');
+    expect(worker.bindings).toEqual(block('production').bindings);
+    expect(worker.connections).toEqual(block('production').connections);
+    expect(worker.description).toEqual(example.registry.project?.doc.profiles?.['production-worker'].description);
+    expect(worker.permits).toEqual([...WORKER_PERMITS].sort());
+  });
+
+  it('a shared target: the inherited entry gives the stand-in, and the database the child still reaches', () => {
+    const child = blockAfter('production-staging', staging(false), BROKER);
+    expect(child.extends).toBe('production');
+    expect(child.connections[JOBS]).toBe(JOBS_STAGING);
+    expect(child.permits).toEqual(expect.arrayContaining([JOBS_STAGING, POSTGRES]));
+    expect(child.permits?.length).toBe((block('production').permits?.length ?? 0) + 1);
+  });
+
+  it('a shared target the child no longer reaches its own way: the inherited entry gives jobs-staging alone', () => {
+    // the bindings it moves to reach what production does not permit (C021), but no inherited entry is dead (C022)
+    const child = blockAfter('production-staging', staging(true), BROKER, ['C021']);
+    expect(child.permits).toContain(JOBS_STAGING);
+    expect(child.permits).not.toContain(POSTGRES);
+    expect(child.permits?.length).toBe(block('production').permits?.length);
+  });
+});
+
+describe('manifest.schema.json: extends on the profile block', () => {
+  it('requires it on every block: a profile name, or null', () => {
+    const production = block('production');
+    const extending = (value: unknown) => ({
+      ...manifest,
+      profiles: { ...manifest.profiles, production: { ...production, extends: value } },
+    });
+    expect(valid(extending(null))).toBe(true);
+    expect(valid(extending('live'))).toBe(true);
+    expect(valid(extending(42))).toBe(false);
+    const { extends: _, ...unsaid } = production;
     expect(valid({ ...manifest, profiles: { ...manifest.profiles, production: unsaid } })).toBe(false);
   });
 });

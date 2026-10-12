@@ -4,13 +4,15 @@
  * what a connection stands in for, or what replaces it, and under which profile.
  *
  * The example says all of it as written: three profiles, `live` the default, `production` standing
- * `employees-production` in for the employee directory, and the watcher run under `live` and `local` alone.
+ * `employees-production` in for the employee directory, and the watcher run under `live` and `local` alone. A
+ * profile that extends another (RFC 0043) is planted, since the example's profiles extend none.
  */
+import { rmSync } from 'node:fs';
 import { checkTree } from '@wilanis/compiler';
 import { loadTree, Scope } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { describe as describeDoc, profilesOf } from '../src/index.js';
-import { EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
+import { EXAMPLE, INCLUDES, loadedEditing, PLUGINS } from './example-harness.js';
 
 const API = '@connections/customers-api.connection.json';
 const EMPLOYEES = '@connections/employees.connection.json';
@@ -127,5 +129,109 @@ describe('wilanis describe <connection>: what it stands in for, and what replace
     const said = describeDoc(example, API);
     expect(said).not.toContain('stands in for');
     expect(said).not.toContain('replaced by');
+  });
+});
+
+const PRODUCTION_BINDS = [
+  '@customers/domain/customer.port.json  → @customers/data/customers-postgres.binding.json',
+  '@access/domain/identity.port.json  → @features/directories/data/identity.binding.json',
+];
+const STATE = '@auth/state.port.json  → @features/state/data/auth-storage.binding.json';
+const JOBS = '@connections/jobs.connection.json';
+const POSTGRES = '@connections/customers-postgres.connection.json';
+
+/**
+ * The example with `production-worker` made a child of `production` (RFC 0043): it writes its description, its own
+ * `permits` (it reaches less than production) and one binding of its own, and takes every other choice from
+ * production. Answers the load and the directory to remove.
+ */
+function workerExtending() {
+  return loadedEditing('project.json', doc => {
+    const { description } = doc.profiles['production-worker'];
+    doc.profiles['production-worker'] = {
+      description,
+      extends: 'production',
+      bindings: { '@auth/state.port.json': '@features/state/data/auth-storage.binding.json' },
+      permits: [
+        '@storage/store.port.json',
+        '@storage/storage.port.json#ensure',
+        '@queue/queue.port.json#ensure',
+        '@queue/worker.port.json#consume',
+        '@auth/challenge.port.json#issue',
+        '@otel/exporter.port.json#export',
+        POSTGRES,
+      ],
+    };
+  });
+}
+
+describe('wilanis describe: a profile that extends another (RFC 0043)', () => {
+  it('names the parent on the first line, after the name and before what it says of itself', () => {
+    const { load, dir } = workerExtending();
+    try {
+      expect(checkTree(load).items).toEqual([]);
+      const said = describeDoc(load, 'project.json');
+      expect(block(said, 'production-worker')[0]).toMatch(/^profile production-worker {2}extends production {2}-- A /);
+      for (const alone of ['live', 'local', 'production', 'production-scheduler'])
+        expect(block(said, alone)[0]).not.toContain('extends');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('prints the resolved choices: its own binding unmarked, every other row ending (from production)', () => {
+    const { load, dir } = workerExtending();
+    try {
+      const said = describeDoc(load, 'project.json');
+      const worker = block(said, 'production-worker');
+      expect(worker.slice(1, 6)).toEqual([
+        `  binds      ${STATE}`,
+        ...PRODUCTION_BINDS.map(row => `             ${row}  (from production)`),
+        `  stands in  ${EMPLOYEES}  → ${OPERATOR}  (from production)`,
+        `             ${JOBS}  → ${POSTGRES}  (from production)`,
+      ]);
+      // the parent prints its own rows unmarked, and the child's reach follows the stand-ins it inherits
+      expect(block(said, 'production')).toContain(`  binds      ${PRODUCTION_BINDS[0]}`);
+      expect(worker.some(line => line.includes(`via ${EMPLOYEES}`) || line.includes(`via ${JOBS}`))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('marks each inherited row with the parent in what the viewer reads, and the profile it extends', () => {
+    const { load, dir } = workerExtending();
+    try {
+      const worker = profilesOf(new Scope(load.registry, load.resolve)).find(one => one.name === 'production-worker');
+      expect(worker?.extends).toBe('production');
+      expect(worker?.binds).toEqual([
+        { port: '@auth/state.port.json', binding: '@features/state/data/auth-storage.binding.json' },
+        {
+          port: '@customers/domain/customer.port.json',
+          binding: '@customers/data/customers-postgres.binding.json',
+          from: 'production',
+        },
+        {
+          port: '@access/domain/identity.port.json',
+          binding: '@features/directories/data/identity.binding.json',
+          from: 'production',
+        },
+      ]);
+      expect(worker?.standsIn.map(one => one.from)).toEqual(['production', 'production']);
+      expect(worker?.permitsFrom).toBeUndefined();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('says of a connection what replaces it under the child too, where the stand-in is inherited', () => {
+    const { load, dir } = workerExtending();
+    try {
+      const employees = describeDoc(load, EMPLOYEES).split('\n');
+      expect(employees).toContain(`replaced by ${OPERATOR} under production`);
+      expect(employees).toContain(`replaced by ${OPERATOR} under production-worker`);
+      expect(describeDoc(load, OPERATOR).split('\n')).toContain(`stands in for ${EMPLOYEES} under production-worker`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

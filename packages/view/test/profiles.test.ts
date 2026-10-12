@@ -97,9 +97,30 @@ describe("the project page's profiles", () => {
     expect(page).toContain('if (v.profiles) profilesEl(page, v.profiles);');
     const rows = ["row('binds'", "row('stands in'", "row('reaches'", "row('holds'", "row('permits'", "row('starts'"];
     for (const row of [...rows, "row('needs'"]) expect(page).toContain(row);
-    expect(page).toContain("row('permits', (p.permits || []).map(permitEl), 'everything (no permits)');");
+    expect(page).toContain(
+      "row('permits', (p.permits || []).map(entry => p.permitsFrom ? frag(permitEl(entry), inheritedEl(p.permitsFrom.profile)) : permitEl(entry)), 'everything (no permits)');",
+    );
     expect(page).toMatch(/if \(p\.default\) h\.appendChild\(el\('span', 'badge ok', 'default'\)\)/);
     expect(page).toMatch(/function groupEl\(g\)[\s\S]*?' {2}via '/);
+  });
+
+  it('names beside the heading the profile it extends, and marks each row it takes from it (RFC 0043)', async () => {
+    const page = await readFile(PAGE, 'utf8');
+    expect(page).toContain('h.id = profileId(p.name);');
+    expect(page).toContain('if (p.extends) h.appendChild(extendsEl(p.extends));');
+    expect(page).toContain(
+      "row('binds', p.binds.map(b => pair(b.port, b.binding, b.from)), 'each port’s one binding');",
+    );
+    expect(page).toContain("row('stands in', p.standsIn.map(s => pair(s.named, s.standIn, s.from)), '');");
+    const { extendsEl, inheritedEl, profileId } = await lifted('extendsEl', 'inheritedEl', 'profileId');
+    const extended = extendsEl('production') as Drawn & { onclick?: unknown };
+    expect(words(extended)).toBe('extends production');
+    expect(extended).toMatchObject({ tag: 'span', cls: 'tag' });
+    // a link to the parent's block on this page: it scrolls there, since the hash names the document shown
+    expect(extended.children[0]).toMatchObject({ tag: 'a', text: 'production' });
+    expect(typeof (extended.children[0] as Drawn & { onclick?: unknown }).onclick).toBe('function');
+    expect(profileId('production')).toBe('profile-production');
+    expect(words(inheritedEl('production') as Drawn)).toBe('from production');
   });
 
   it('draws an entry of permits as the port or connection it names, linked, and the operation beside it', async () => {

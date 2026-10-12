@@ -1169,27 +1169,39 @@
    * A block per profile (RFC 0013), the rows `wilanis describe project.json` prints: what it binds and stands in,
    * and what the tree reaches, holds, starts and needs there. Reaches and holds are grouped by port, the
    * operations of one port reached with the same connections on one row with those connections beside them.
-   * Below them, what the place permits (RFC 0016): the entries as the profile writes them, or everything.
+   * Below them, what the place permits (RFC 0016): the entries as the profile writes them, or everything. A profile
+   * that extends another (RFC 0043) names it beside its heading, linked to its block, and each row it takes from it
+   * says so.
    */
   function profilesEl(page, profiles) {
     page.appendChild(el('h2', null, 'Profiles'));
-    page.appendChild(el('p', null, 'Each profile is one place the tree runs. What it reaches is derived from its choices, not written: every effectful operation the tree runs there, the connections those name, what it holds open, and the variables it needs set before it starts. What it permits is written, by whoever answers for the place, and the checker holds it to what the profile reaches in both directions; a profile that writes no permits permits everything.'));
+    page.appendChild(el('p', null, 'Each profile is one place the tree runs. What it reaches is derived from its choices, not written: every effectful operation the tree runs there, the connections those name, what it holds open, and the variables it needs set before it starts. What it permits is written, by whoever answers for the place, and the checker holds it to what the profile reaches in both directions; a profile that writes no permits permits everything. A profile that extends another has that profile’s bindings, stand-ins and permits wherever it writes none of its own, and each row it takes says which profile it came from.'));
     for (const p of profiles) {
-      const h = el('h3', null, p.name === undefined ? 'none declared' : p.name); if (p.default) h.appendChild(el('span', 'badge ok', 'default')); if (p.name !== undefined && !STATIC) h.appendChild(el('code')).appendChild(manifestLink(p.name)); page.appendChild(h);
+      const h = el('h3', null, p.name === undefined ? 'none declared' : p.name); h.id = profileId(p.name); if (p.default) h.appendChild(el('span', 'badge ok', 'default')); if (p.extends) h.appendChild(extendsEl(p.extends)); if (p.name !== undefined && !STATIC) h.appendChild(el('code')).appendChild(manifestLink(p.name)); page.appendChild(h);
       page.appendChild(el('p', null, p.name === undefined ? 'The project declares no profile: each port is met by its one binding.' : (p.description || '')));
       const t = el('table');
       const row = (label, items, none) => { const tr = el('tr'); tr.appendChild(el('td', 'name', label)); const td = el('td'); if (!items.length) td.appendChild(el('span', 'miss', none)); items.forEach((it, i) => { if (i) td.appendChild(el('br')); td.appendChild(it); }); tr.appendChild(td); t.appendChild(tr); };
-      const pair = (from, to) => frag(link(from), TO, link(to));
-      row('binds', p.binds.map(b => pair(b.port, b.binding)), 'each port’s one binding');
-      if (p.standsIn.length) row('stands in', p.standsIn.map(s => pair(s.named, s.standIn)), '');
+      const pair = (from, to, parent) => parent ? frag(link(from), TO, link(to), inheritedEl(parent)) : frag(link(from), TO, link(to));
+      row('binds', p.binds.map(b => pair(b.port, b.binding, b.from)), 'each port’s one binding');
+      if (p.standsIn.length) row('stands in', p.standsIn.map(s => pair(s.named, s.standIn, s.from)), '');
       row('reaches', p.reaches.map(groupEl), 'nothing effectful');
       row('holds', p.holds.map(groupEl), 'nothing open');
-      row('permits', (p.permits || []).map(permitEl), 'everything (no permits)');
+      row('permits', (p.permits || []).map(entry => p.permitsFrom ? frag(permitEl(entry), inheritedEl(p.permitsFrom.profile)) : permitEl(entry)), 'everything (no permits)');
       row('starts', p.starts.length ? [frag(...p.starts.flatMap((s, i) => [...(i ? [' · '] : []), link(s.run.split('#')[0], s.label || showOp(s.run))]))] : [], 'nothing');
       row('needs', p.needs.map(needEl), 'no variable');
       page.appendChild(t);
     }
   }
+  /** The id of a profile's heading on the project page, which another profile's `extends` scrolls to. */
+  function profileId(name) { return 'profile-' + (name === undefined ? '' : name); }
+  /** Beside a profile's heading, the profile it extends (RFC 0043): its name, a link that scrolls to its block. */
+  function extendsEl(parent) {
+    const a = el('a', null, parent); a.title = 'the block of profile ' + parent;
+    a.onclick = () => { const to = document.getElementById(profileId(parent)); if (to) to.scrollIntoView({ block: 'start' }); };
+    const tag = el('span', 'tag', 'extends '); tag.appendChild(a); return tag;
+  }
+  /** The mark on a row a profile takes from the profile it extends, rather than writes itself (RFC 0043). */
+  function inheritedEl(parent) { return el('span', 'tag', 'from ' + parent); }
   /** Operations of one port reached with the same connections: the port, each operation, and the connections. */
   function groupEl(g) {
     const f = frag(link(g.port), ' ' + g.operations.map(op => '#' + op).join(', '));
