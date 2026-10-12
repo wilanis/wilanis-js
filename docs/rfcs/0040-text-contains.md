@@ -14,7 +14,7 @@
 
 A rule may say `email contains '@'`: true when the text holds the word, exactly as written. It is one more binary
 operator of the one expression grammar, so it works wherever a rule is written: a `switch` rule, an invariant's
-`holds.when`, a `retry.when`, an operation's `idempotent`. The right side is always a non-empty string literal,
+`holds.when`, a `retry.when`, an operation's `idempotent`, and, once RFC 0039 lands, a `map`'s `where`. The right side is always a non-empty string literal,
 never a path. The match is case-sensitive and compares characters as JavaScript's `String.prototype.includes`
 does, which is what `contains` already means in `@storage`'s `where` grammar. The checker proves it where the
 text is a literal (I005 refuses a literal that fails it), a `switch` that tested the same words proves it for
@@ -147,7 +147,9 @@ I004  @features/customers/domain/an-address-names-its-domain.invariant.json#hold
 ```
 
 The same message comes through G011 for a `switch` rule, G019 for a `retry.when`, and C015 for an `idempotent`
-rule. No new code is needed: each of those codes already says "this expression does not type".
+rule. Where RFC 0039 (draft, #919) lands, a `map`'s `where` is one more such place: `"where": "item.email contains
+'@'"` keeps the elements whose address holds an `@`, a wrong `contains` there is G011 at `nodes/<id>/where`, and
+the rehearsal steers its *kept* and *dropped* branches with the same solver. No new code is needed: each of those codes already says "this expression does not type".
 
 ## Reference
 
@@ -231,7 +233,7 @@ No new code. The table names the existing codes that meet the new operator.
 
 | Code | Where it lives | What changes |
 |---|---|---|
-| G011 | `check/graph-nodes.ts` (`checkRule`) | a switch rule with a wrong `contains` is refused with the `ExprError` message above |
+| G011 | `check/graph-nodes.ts` (`checkRule`) | a switch rule with a wrong `contains` is refused with the `ExprError` message above; where RFC 0039 lands, a map's `where` too (`checkWhere`, at `nodes/<id>/where`) |
 | I004 | `check/invariant-holds.ts` (`checkRule`) | the same for `holds.when` |
 | G019 | `check/attempts.ts` | the same for `retry.when` |
 | C015 | `check/contracts.ts` (`notBoolean`) | the same for an `idempotent` rule |
@@ -402,10 +404,17 @@ Each step is one pull request and one sub-issue, and each leaves `npm test` pass
 
 1. **Core and viewer: the operator.** `ast.ts`, `parse.ts`, `check.ts`, `evaluate.ts` and their tests; the
    `VERB` row in `packages/view/src/said.ts` and its test (the build fails without it); the two schema
-   descriptions, so this step waits on the `decision` job. The solver answers no alternative for `contains`
-   until step 2, so a rehearsal of a tree using it reports the branch unsolved rather than wrong. No tree in the
-   repository uses it yet. A good first issue, with the design above.
-2. **Runtime: the solver.** `containment` and `nameableBin` in `solve.ts`; `contains` and `omits` in `domains.ts`
+   descriptions, so this step waits on the `decision` job. The step also makes the solver refuse to guess:
+   `compare` in `solve.ts` answers `[]` for `contains`, and `nameableBin` answers `false`, before anything else.
+   Without those two lines a `contains` rule would fall through on `main` today: `compare` would take the
+   operator as a `Cmp`, `demandOf` would call `valueDomain`, and for a string literal that answers `{ ne: [] }`,
+   a demand that constrains nothing; `nameableBin` would answer `true` for a path against a literal. Both
+   branches would then read as solved, and the rehearsal would run them with values that do not meet the rule.
+   With the two lines, until step 2 a rehearsal reports each branch of a `contains` rule unsolved ("compares
+   values the rehearsal cannot name"), which is true. A test in `rehearse-solver.test.ts` holds it. No tree in the
+   repository uses the operator yet. A good first issue, with the design above.
+2. **Runtime: the solver.** `containment` in `solve.ts`, which replaces step 1's `[]`, and `nameableBin`
+   answering `true` for a path against a literal; `contains` and `omits` in `domains.ts`
    (`narrow`, `consistent`, `fits`); `withWords` in `stubs.ts`; their tests.
 3. **The example, the proof tests and the words.** The invariant in `example/`, re-recorded `example/scenarios/`
    (the generated emails gain an `@`, and the guard gains a refusal), the sabotage cases, the proof tests, the
@@ -443,10 +452,10 @@ see Open questions.
 
 ## Open questions
 
-- **`startsWith` now or later?** I recommend later: amend this RFC when a tree needs it. It is one more `BinaryOp`,
-  a `prefix` demand (prepend the word; remove it where it must not lead), one `VERB` row. Deciding now means the
-  word lands with no use in `example/` to keep it honest.
-- **The example's demonstration.** I recommend the new invariant on `Customer` (`email contains '@'`) over a
-  switch: it exercises the solver on both sides, the proof, and I005, in a tree that already has a guarded
+- **`startsWith` now or later?** Decided on review: later. An amendment to this RFC adds it when a tree uses it.
+  It is one more `BinaryOp`, a `prefix` demand (prepend the word; remove it where it must not lead), one `VERB`
+  row.
+- **The example's demonstration.** Decided on review: the new invariant on `Customer` (`email contains '@'`),
+  not a switch. It exercises the solver on both sides, the proof, and I005, in a tree that already has a guarded
   `Customer`. The cost is a re-record of `example/scenarios/`, since generated emails gain an `@`.
 - **The name of `NO_MEMBER`.** It may be decided during implementation.
