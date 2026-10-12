@@ -11,7 +11,9 @@
   (an operation bound to a graph gains `given`). All additive; one behaviour changes (*Compatibility*).
 - **Tracking issue:** #849
 - **Depends on:** RFC 0013 (the reach of a profile, stand-ins), RFC 0016 (`permits`), RFC 0004 (C009 and L010, the
-  one connection of a transaction), RFC 0002 (a store names its connection). All implemented.
+  one connection of a transaction), RFC 0002 (a store names its connection). All implemented. Order with the open
+  RFCs: RFC 0039 and RFC 0043 touch the same code, and RFC 0042 depends on a question this RFC defers (*Order with
+  other RFCs*).
 
 ## Summary
 
@@ -283,14 +285,15 @@ No shipped connection kind has parts.
 
 ### Checker rules
 
-Numbers are assigned when the implementing pull request lands (highest today: A008, B012, C023, D014, G026, I008,
-L019, P006, R001, S007, T010).
+Every new code is written as a placeholder (`C0nn`, `G0nn`, `L0nn`, `B0nn`). The number is the next free one in its
+family when the implementing pull request lands; other open RFCs (0039, 0041) also add G rules, so no number here is
+reserved.
 
 | Code | Where it lives | Refuses when | Hint |
 |---|---|---|---|
 | C0nn | `check/contracts.ts`, `checkPort` and `checkConnectionKind` | `names` on a field that is not a string or a list of strings; on a contract field that is not `static`; on a field of a shape or of a domain operation; or a native static field called `connection` or `store` that does not say `names` | `mark it "names": "connection" or "names": "store", static, of type string or string[]` (for the last case: `the compiler reads a field by its mark, no longer by its name: add "names": "<word>"`) |
 | C009 (restated) | `check/contracts.ts`, `checkTransactional` | a `transactional` operation marks no field `names`, or more than one: its transaction falls on what the one field names | `mark the one field the transaction falls on "names": "connection" or "names": "store", static` |
-| R001 (existing) | one `Judge` method, called by `checkInputs` (`check/inputs.ts`, a node and a delegation), `checkStepInputs` (`check/project.ts`, a startup step), the binding's `given` (`check/bindings.ts`) and `checkConnection` (a part) | a literal in a field marked `names` names no document of that kind | `wilanis ls connection` or `wilanis ls store` |
+| R001 (existing) | one `Judge` method, called by `checkInputs` (`check/inputs.ts`, a node and a delegation), `checkStepInputs` (`check/project.ts`, a startup step), the binding's `given` (`check/bindings.ts`) and `checkConnection` (a part) | a literal in a field marked `names` names no document of that kind. It widens `checkConnectionNamed` (#912) from the field called `connection` to every marked field. X204's unknown-store branch is retired | `wilanis ls connection` or `wilanis ls store` |
 | C0nn | `check/contracts.ts`, `checkConnection` | a connection reaches itself through its parts | `a part is another connection; break the chain at <path>` |
 | G0nn | `check/graph-reads.ts` | `{{given.x}}` read other than whole in a static field marked with the given's word, or inside text; or a declared given nothing reads | `a given says where the graph goes: read it in a field marked "names": "<word>", or in text; or remove it from given` |
 | L0nn | `check/graph.ts` | a domain graph declares `given` | `a domain graph reaches no connection; declare given on the data graph that does` |
@@ -370,15 +373,24 @@ a kind with parts reads each part from `env.connections` by its path.
 Three schemas change, each additively: a document written before this RFC validates and keeps its meaning, with one
 exception. The compiler stops reading a field by its name. A plugin outside this repository whose port has a static
 field called `connection` or `store` without `names` is refused by C0nn until it adds the word. Every shipped port
-adds it in the same pull request. The alternative, reading the name as an implied mark, keeps two ways to say one
-thing; *Open questions* asks the maintainer to choose.
+adds it in the same pull request. The maintainer decided this on review: the name is no longer an implied mark,
+because that would keep two ways to say one thing.
 
 C009 keeps its meaning for every shipped transactional operation, since each has exactly one field that names a
 connection or a store (`@queue#publish`: `connection`; the `@storage` operations: `store`).
 
-R001 at a marked field refuses a tree that names a connection document it does not have. Today such a tree passes
-`check` (GAPS.md, "Item 32: check passes a tree that lacks a connection an included graph names"). If that fix
-lands first on the field called `connection`, this RFC moves it onto the mark.
+R001 for an unknown connection is not new. Since #912 (bb7086e3), `checkConnectionNamed` in `check/inputs.ts`
+refuses a literal that names no connection document, but only in a static field called `connection`: a graph node and
+a delegation reach it through `checkInputs`, a startup step through `checkStepInputs`. This RFC keeps that rule and its
+two callers, and changes what it reads: every field marked `names` in place of the one field called `connection`. So
+a `lease` that names no connection, which passes `check` today, is refused, and so is a store that names no store.
+
+For a store, the refusal moves from `@storage` to the compiler. `@storage`'s X204 (`checkCall` in
+`packages/plugin-storage/src/rules.ts`) refuses `'<path>' is not a store of this tree` today, and it would say the
+same fault as R001 at the same `at`. This RFC retires X204's unknown-store branch, and X204 keeps its other branch, a
+collection the store does not declare. The reason: a store is a core kind since RFC 0002, the compiler already reads
+it (`connectionOf`, `collectionOf`), and one rule in one place judges every marked field, whatever plugin grants the
+port. `checkChanges` in the same file already expects this: "X204, or R001 where the store is judged".
 
 The example's eight postgres graph copies are deleted and its two bindings give `store`. The recorded scenarios under
 `example/scenarios/` are recorded again; their names do not change, since they name the memory graphs the `live`
@@ -398,7 +410,7 @@ example after step 5:
 - add a PostgreSQL connection `@connections/ticks.connection.json` that nothing else names, give it to the
   `production-scheduler` step as `lease`, and give that profile a `permits` that lists everything else it reaches →
   C021 naming the lease (the same tree passes before step 1);
-- write `"store": "@customers/data/customer.store.json"` in `kept-get.graph.json` → R001;
+- write `"store": "@customers/data/customer.store.json"` in `kept-get.graph.json` → R001, and no X204;
 - drop `given` from `customers-postgres.binding.json#get` → B0nn; add `"given": { "other": ... }` → B0nn; delete every
   binding operation that names `kept-get.graph.json` → B0nn;
 - read `{{given.store}}` in `noCustomer`'s `reason` → G0nn; declare a second given nothing reads → G0nn;
@@ -425,8 +437,8 @@ store, read off the trace.
 
 1. **Fields that name a connection.** `names` on `common.schema.json` and `Field`; C0nn and C009 restated in
    `check/contracts.ts`; every shipped port marked; `connectionsOf` in `documents.ts` reading marks, not names;
-   `reachOf` and `checkPermits` over every connection a site names; R001 at a marked literal through one `Judge`
-   method; `describe <port>` and the reach lines of `describe project.json`; the sabotage tests for these rules.
+   `reachOf` and `checkPermits` over every connection a site names; R001 at a marked literal, `checkConnectionNamed` (#912) widened to every
+   marked field; X204's unknown-store branch retired in `packages/plugin-storage/src/rules.ts`; `describe <port>` and the reach lines of `describe project.json`; the sabotage tests for these rules.
    (`area:core`, `area:compiler`, `area:runtime`, the plugins' `docs/`)
 2. **Parts.** `names` on a connection kind's setting; R001 and the cycle C0nn in `checkConnection`; parts in the reach
    and its secrets; `describe <connection>` and the viewer's connection page; the test plugin and its tests.
@@ -495,20 +507,42 @@ not allow. And #851, a store that reads collections another tree owns, is about 
 `permits` cannot name it. A part that is a connection document gets all of these from rules that exist.
 
 **An implied mark by name, beside `names`.** Fewer edits to third-party ports, and two ways to say one thing; the
-checker would still have to read names forever. *Open questions*.
+checker would still have to read names forever. Rejected on review (*Compatibility*).
+
+## Order with other RFCs
+
+- **RFC 0039 (keep and group a list).** Both RFCs add keywords to `common.schema.json → $defs/field` and to `Field` in
+  `model.ts`: this one `names`, RFC 0039 `within` and `reaches`. The keywords mean different things and no field needs
+  both, so neither RFC depends on the other. The schema change of whichever lands second is rebased on the first, and
+  its implementing pull request keeps both keywords in the field's description.
+- **RFC 0043 (a profile from another).** Both change `permits`, `reachOf` and how a profile is resolved. RFC 0043
+  resolves a profile once (`Scope.profile`), and `connectionFor`, `bindingFor` and `checkPermits` read that. This RFC
+  changes what the reach holds: every connection a call names, the parts, and the instances of a graph. The two meet
+  in `connectionUnder` and `checkPermits`. Neither needs the other first. Whichever lands second adds a sabotage test
+  for the other's case: a part or a given connection reached under a profile that `extends` another, held to the
+  `permits` the child resolves.
+- **RFC 0042 (`keptBy`).** It depends on the question this RFC defers, a store given its connection (*Drawbacks and
+  alternatives*). Its X2n1 finds a write through a kept store with the `@storage` call-site walk in `calls.ts`
+  (`graphCalls`), which step 4 of this RFC moves to `Scope.graphs()`. After step 4, a write through `{{given.store}}`
+  is found in each instance, with the store that instance names. If RFC 0042 lands first, step 4 keeps X2n1's
+  sabotage tests passing and adds one where the kept store is given. If a later RFC lets one store be reached on
+  several connections, `keptBy` has to say which of them another tree keeps; that RFC decides it together with RFC 0042.
 
 ## Open questions
 
-Before `accepted`:
+None before `accepted`.
 
-- **The name convention.** Does the compiler stop reading a static field called `connection` or `store` (this RFC:
-  C0nn refuses one without `names`, and every shipped port adds the word), or does the name stay an implied mark? I
-  recommend the refusal: one rule in one place, and it is cheap before 1.0.
-- **Parts in `permits`.** Does a profile's `permits` list each part (this RFC), or does permitting a connection permit
-  its parts? I recommend listing them: a part is a system the tree talks to, and RFC 0016 asks "may this tree talk to
-  that system" per connection.
-- **Text reads of a given.** This RFC lets a message read `{{given.store}}`. Refusing it would keep a given to static
-  fields only. I recommend allowing it: the consumer's messages name the store they could not read.
+**Settled on review, so the reasoning survives.**
+
+- **The name convention goes.** The compiler stops reading a static field because it is called `connection` or
+  `store`. C0nn refuses such a field without `names`, and every shipped port adds the word in step 1. One rule lives
+  in one place, and the change is cheap before 1.0.
+- **Each part is listed in `permits`.** Permitting a connection does not permit its parts. A part is a system the tree
+  talks to, and RFC 0016 asks "may this tree talk to that system" once per connection. C021 names a part that is
+  reached and not listed, with `(a part of <connection>)`.
+- **A given may be read inside text.** A message may read `{{given.store}}`. A given is still read whole only in a
+  static field marked with its word (G0nn). The consumer's messages name the store they could not read.
+- **An unknown store is the compiler's R001, not `@storage`'s X204.** *Compatibility* says why.
 
 May be decided during implementation:
 

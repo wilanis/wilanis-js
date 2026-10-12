@@ -153,6 +153,11 @@ its rules correct the write graphs M06 demonstrated. RFC 0036, recorded scenario
 `scenario.schema.json` compatibly and has landed before the freeze, so a tree like the one it measures starts 1.0
 with its recorded scenarios about a tenth of their size.
 
+RFC 0037, a connection is a literal at the call, changes three schemas before the freeze: `common.schema.json` (a
+field says it `names` a connection or a store), `graph.schema.json` and `binding.schema.json` (a data graph's `given`,
+written by each binding operation). The compiler then stops reading a field by its name, which is cheap only before
+1.0.
+
 ## Unscheduled
 
 RFC 0021 (higher-level constructs), RFC 0022 (more storage engines), RFC 0023 (adapters), RFC 0025 (AI
