@@ -7,6 +7,7 @@
 import { fileURLToPath } from 'node:url';
 import type { PluginModule } from '@wilanis/core';
 import { handlers } from './handlers.js';
+import { checkKept } from './kept.js';
 import { applyStores, historyOfStores, planStores } from './migrate.js';
 import { check } from './rules.js';
 
@@ -62,7 +63,11 @@ const plugin: PluginModule = {
   root: '@storage',
   docs: fileURLToPath(new URL('../docs', import.meta.url)),
   handlers,
-  check,
+  // what a store declares and what a call asks of it (rules.ts), and what a store another tree keeps promises (kept.ts)
+  check: ctx => {
+    check(ctx);
+    checkKept(ctx);
+  },
   // the one planner's second caller: `ensure` prepares a store at startup, and this plans every store of the
   // tree for an operator to read before anything is applied (RFC 0017)
   migrate: { plan: planStores, apply: applyStores, history: historyOfStores },

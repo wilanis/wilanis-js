@@ -217,6 +217,9 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [X212](X212.md) | X | live | `ensure` is run by a graph, or delegated to by a binding no startup step reaches |
 | [X213](X213.md) | X | live | a graph or binding of one feature names another feature's store |
 | [X214](X214.md) | X | live | a call site writes a `scope`, which only the store says and the compiler fills |
+| [X215](X215.md) | X | live | a call writes through a store another tree keeps (`keptBy`), makes a key for one, or prepares one |
+| [X216](X216.md) | X | live | two stores over one connection, under some profile, do not say the same `keptBy` |
+| [X217](X217.md) | X | live | a store's `keptBy` names this tree's own `project.json → name` |
 | [X221](X221.md) | X | live | a field of a collection kept in postgres that is a blob, which this engine has no column for |
 | [X222](X222.md) | X | live | a postgres collection's key that is neither string nor number, or that the plugin's keyType cannot generate |
 | [X223](X223.md) | X | live | a postgres collection name that is no legal table name, or folds to the same table as another's |
