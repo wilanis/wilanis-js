@@ -12,7 +12,7 @@
 - **Tracking issue:** #909
 - **Depends on:** RFC 0013 (profiles, stand-ins, `reachOf`; implemented) and RFC 0016 (`permits`, C021-C023;
   implemented). It reverses one item RFC 0013 set aside under *Drawbacks and alternatives*, quoted below. It does
-  not edit RFC 0013, which is implemented. It lands before RFC 0037 (draft), which also changes what C021 and C022
+  not edit RFC 0013, which is implemented. It lands before RFC 0037 (accepted), which also changes what C021 and C022
   read; *Order with RFC 0037*, under *Implementation plan*, says why and what each leaves to the other.
 
 ## Summary
@@ -403,7 +403,7 @@ example after step 4, where `production-scheduler` and `production-worker` exten
 
 Steps 2 and 3 need step 1 and may land in either order. Step 4 needs steps 2 and 3.
 
-**Order with RFC 0037.** RFC 0037 (draft, "A connection is a literal at the call") also changes what C021 and C022
+**Order with RFC 0037.** RFC 0037 (accepted, "A connection is a literal at the call") also changes what C021 and C022
 read: a call may reach several connections (`ReachedNative.connections` in place of `connection`), and a connection
 may have parts, each reached and each replaced by a stand-in. It also takes new C codes. This RFC lands first (decided
 at acceptance), for three reasons.
