@@ -22,7 +22,9 @@ the file, the rule and the fix.
    including a value a map's `in` hands every element. It never writes a value past a guard a caller's value went
    through: it writes into the value that guard judges, so where that guard refuses it, the branch says the run ended
    at `<id>:violated`. To steer a switch inside a map, it gives the list it sets one element, written the same way
-   where a guard's answer holds the list; a literal or composed list keeps what it has. A guard on a value that a
+   where a guard's answer holds the list; a literal or composed list keeps what it has. A rule a map runs on each
+   element is met in every element of a list the rehearsal stubs or hands in, so such a list keeps more than one
+   element. A guard on a value that a
    guard of the same shape already judged upstream, across a map too, or that a site upstream proved, is `held
    upstream`, which is fine. Text composed from reads, a list written out, `context` and a literal a rule compares
    with another value stop it, and `NEVER RUN` names the node where it stopped: hand the value as one read of a node
