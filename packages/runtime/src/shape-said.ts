@@ -7,7 +7,7 @@
  * reader who cannot see it here has to grep for the shape's path, which is the one thing `describe` exists to
  * avoid. Nothing here judges: the checker has already refused a write that does not fit.
  */
-import { kept, type Loaded, type LoadResult, type Scope, type ShapeDoc } from '@wilanis/core';
+import { callOf, kept, type Loaded, type LoadResult, type Scope, type ShapeDoc } from '@wilanis/core';
 import { overShape } from './invariant-lines.js';
 import { fieldLine } from './lines.js';
 
@@ -29,8 +29,9 @@ function graphWriters(load: LoadResult, shape: string, scope: Scope): string[] {
   const out: string[] = [];
   for (const graph of load.registry.all('graph'))
     for (const node of graph.doc.nodes) {
-      if (!('run' in node)) continue;
-      const said = writerLine({ file: graph.path, where: node.id, run: node.run, given: node.in }, shape, scope);
+      const run = callOf(node);
+      if (!run) continue;
+      const said = writerLine({ file: graph.path, where: node.id, run, given: node.in }, shape, scope);
       if (said) out.push(said);
     }
   return out;

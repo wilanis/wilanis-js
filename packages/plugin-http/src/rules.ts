@@ -4,7 +4,7 @@
  * deadline, a body bound or a connection's timeout, on a route, in the plugin's settings or on a connection, is not a
  * whole number of 1 or more, or a deadline or a timeout is longer than a Node timer can wait.
  */
-import { type PluginCheckContext, TIMER_MAX_MS } from '@wilanis/core';
+import { callOf, type PluginCheckContext, TIMER_MAX_MS } from '@wilanis/core';
 import { doc, ROOT } from './paths.js';
 
 type Scope = PluginCheckContext['scope'];
@@ -170,8 +170,10 @@ function checkBindingCalls(scope: Scope, need: ReturnType<typeof needsCodec>) {
 /** X002: the content types every graph's http nodes give. */
 function checkGraphCalls(scope: Scope, need: ReturnType<typeof needsCodec>) {
   for (const graph of scope.registry.all('graph'))
-    for (const node of graph.doc.nodes)
-      if ('run' in node && callsHttp(scope, node.run)) checkCall(need, node.in, graph.path, `nodes/${node.id}/in`);
+    for (const node of graph.doc.nodes) {
+      const run = callOf(node);
+      if (run && callsHttp(scope, run)) checkCall(need, node.in, graph.path, `nodes/${node.id}/in`);
+    }
 }
 
 /**

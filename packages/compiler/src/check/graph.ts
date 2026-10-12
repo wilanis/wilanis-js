@@ -27,7 +27,7 @@ import {
 import { outputCandidates } from '../documents.js';
 import { guardsOf } from '../guard.js';
 import { answersOf, checkCallRetry, checkTimerBounds } from './attempts.js';
-import { checkCatches, checkReason, checkSwitch, elementInputs } from './graph-nodes.js';
+import { checkCatches, checkReason, checkSwitch, checkWhere, elementInputs } from './graph-nodes.js';
 import { GraphReads } from './graph-reads.js';
 import { checkWhole } from './graph-whole.js';
 import { checkInputs } from './inputs.js';
@@ -37,6 +37,7 @@ import {
   type Judge,
   type JudgedResolver,
   RESERVED,
+  type Reader,
   type Refuser,
   type ShapeLayer,
 } from './judge.js';
@@ -191,12 +192,16 @@ class GraphCheck {
     }
   }
 
-  /** What a node may be in this role: a domain graph's switch catches nothing (L013); a call runs what the role may run. */
+  /**
+   * What a node may be in this role: a domain graph's switch catches nothing (L013); a call runs what the role may
+   * run; a map that only keeps runs nothing, and keeps in any layer.
+   */
   private checkFits(node: Node): void {
     if (isSwitch(node)) {
       if (this.role === 'domain' && node.catch) this.refuseCatch(node);
       return;
     }
+    if (node.run === undefined) return;
     const hit = this.judge.opAt(node.run, this.graph, `nodes/${node.id}/run`);
     if (!hit) return;
     this.ops.set(node.id, hit);
@@ -282,8 +287,18 @@ class GraphCheck {
       return;
     }
     if (this.role === 'data') checkTimerBounds(this.refuse, `nodes/${node.id}`, node);
+    if (isMap(node) && node.run === undefined) {
+      // a map that only keeps runs nothing: its list and its rule are all there is to judge
+      elementInputs(this, node, read);
+      checkWhere(this, node, read);
+      return;
+    }
     const hit = this.ops.get(node.id);
-    if (!hit) return;
+    if (hit) this.checkCall(node, hit, read, reads);
+  }
+
+  /** A node that calls an operation: what it gives the operation, a map's rule, and a data graph's retry. */
+  private checkCall(node: RunNode | MapNode, hit: OpHit, read: Reader, reads: GraphReads): void {
     checkReason(this, node, hit, this.judge.scope);
     const extra = isMap(node) ? elementInputs(this, node, read) : {};
     const subst = checkInputs(this.judge, {
@@ -300,6 +315,7 @@ class GraphCheck {
       extra,
       said: hit.op.refuses ? path => reads.rootOf(path) : undefined,
     });
+    if (isMap(node)) checkWhere(this, node, read);
     if (this.role === 'data' && node.retry) {
       const site = {
         file: this.file,

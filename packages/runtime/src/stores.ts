@@ -6,7 +6,7 @@
  * the JSON cannot see any of it, which is what `describe` and the viewer exist to fix.
  */
 import type { ConnectionDoc, LoadResult, Scope, StoreDoc } from '@wilanis/core';
-import { show, splitRef } from '@wilanis/core';
+import { callOf, show, splitRef } from '@wilanis/core';
 
 /** The port every store operation is asked through; a call names this port or it is not a store call. */
 export const STORE_PORT = '@storage/store.port.json';
@@ -78,7 +78,7 @@ function namesOf(given: Record<string, unknown> | undefined, scope: Scope) {
 }
 
 /** One call, when it runs an operation of the store port against a store written as a literal. */
-function callOf(
+function storeCallOf(
   site: { file: string; where: string; run: string; given: Record<string, unknown> | undefined },
   scope: Scope,
 ): StoreCall | undefined {
@@ -94,8 +94,9 @@ function graphCalls(load: LoadResult, scope: Scope): StoreCall[] {
   const out: StoreCall[] = [];
   for (const graph of load.registry.all('graph'))
     for (const node of graph.doc.nodes) {
-      if (!('run' in node)) continue;
-      const call = callOf({ file: graph.path, where: node.id, run: node.run, given: node.in }, scope);
+      const run = callOf(node);
+      if (!run) continue;
+      const call = storeCallOf({ file: graph.path, where: node.id, run, given: node.in }, scope);
       if (call) out.push(call);
     }
   return out;
@@ -107,7 +108,7 @@ function bindingCalls(load: LoadResult, scope: Scope): StoreCall[] {
   for (const binding of load.registry.all('binding'))
     for (const [name, op] of Object.entries(binding.doc.operations)) {
       if (!op.run) continue;
-      const call = callOf({ file: binding.path, where: name, run: op.run, given: op.in }, scope);
+      const call = storeCallOf({ file: binding.path, where: name, run: op.run, given: op.in }, scope);
       if (call) out.push(call);
     }
   return out;
@@ -128,7 +129,7 @@ export function callsAgainst(store: string, load: LoadResult, scope: Scope): Sto
  * and the operation, so `wilanis map` ends a line at the records rather than at the port that speaks for them.
  */
 export function storeTail(run: string, given: Record<string, unknown> | undefined, scope: Scope): string {
-  const call = callOf({ file: '', where: '', run, given }, scope);
+  const call = storeCallOf({ file: '', where: '', run, given }, scope);
   if (!call) return '';
   const store = scope.get('store', call.store);
   return ` → store ${store?.path ?? call.store}${call.collection ? ` ${call.collection}` : ''} (${call.op})`;

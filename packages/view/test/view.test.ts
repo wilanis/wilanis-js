@@ -135,7 +135,7 @@ describe('the view model of the example', () => {
     });
     expect(edge(seen, { from: 'joined', fromPort: '', to: 'digest', toPort: 'value' })).toMatchObject({ kind: 'data' });
     const out = seen.graph!.nodes.find(node => node.id === 'out')!;
-    expect(out.fields!.map(port => port.name)).toEqual(['count', 'text']);
+    expect(out.fields!.map(port => port.name)).toEqual(['count', 'active', 'text']);
     expect(edge(seen, { from: 'digest', fromPort: '', to: 'out', toPort: '' })).toMatchObject({ kind: 'out' });
   });
 

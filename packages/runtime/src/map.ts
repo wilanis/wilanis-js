@@ -39,14 +39,15 @@ interface Into {
   binding: string;
 }
 
-/** Where one node of one graph leads: one switch's routes, one native operation, or the binding that meets it. */
+/** Where one node of one graph leads: one switch's routes, a map that only keeps, one native operation, or the binding that meets it. */
 function nodeLines(node: Record<string, unknown>, indent: string, walk: Walk): { lines: string[]; into?: Into } {
   const { scope } = walk;
   const id = String(node.id);
-  if (!('run' in node)) {
+  if (!('run' in node) && 'rules' in node) {
     const rules = node.rules as { to: string }[];
     return { lines: [`${indent}  ${id} [switch → ${[...rules.map(rule => rule.to), node.else].join(' | ')}]`] };
   }
+  if (!('run' in node)) return { lines: [`${indent}  ${id} [keeps]`] };
   const run = String(node.run);
   const found = scope.op(run);
   if (typeof found === 'string') return { lines: [`${indent}  ${id} ?? ${run}`] };

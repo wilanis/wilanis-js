@@ -73,13 +73,20 @@ export class GraphReads {
     this.narrowing = new Narrowing(judge.scope, table.nodes);
   }
 
-  /** A reader with the narrowing of node `id` in force. */
+  /**
+   * A reader with the narrowing of node `id` in force. A value read twice at one place -- a map's `in` typed for
+   * its operation and again for its `where` -- is typed once and refused once.
+   */
   readFor(id: string): Reader {
+    const typed = new Map<string, Read | undefined>();
     return (value, at) => {
+      if (typed.has(at)) return typed.get(at);
       const previous = this.reading;
       this.reading = id;
       try {
-        return this.valueRead(value, at);
+        const read = this.valueRead(value, at);
+        typed.set(at, read);
+        return read;
       } finally {
         this.reading = previous;
       }
@@ -114,7 +121,10 @@ export class GraphReads {
     }
   }
 
-  /** The type a node answers: a switch the id it chose, a call its operation's returns, a map a list of them. */
+  /**
+   * The type a node answers: a switch the id it chose, a call its operation's returns, a map a list of them, and
+   * a map that only keeps the type of its `over`, since it answers elements of that list as they are.
+   */
   nodeOut(id: string): Type | undefined {
     if (this.outTypes.has(id)) return this.outTypes.get(id);
     if (this.computing.has(id)) return undefined;
@@ -129,11 +139,21 @@ export class GraphReads {
     const node = this.table.nodes.get(id);
     if (!node) return undefined;
     if (isSwitch(node)) return STRING;
+    if (isMap(node) && node.run === undefined) return this.listAt(node.over);
     const hit = this.table.ops.get(id);
     if (!hit) return undefined; // its operation was refused already
     let returns = this.judge.quiet(hit.op.returns) ?? EMPTY_OBJECT;
     if (hasVars(returns)) returns = substitute(returns, bindings(this.judge.scope, hit.op, node.in));
     return isMap(node) ? { kind: 'list', of: returns } : returns;
+  }
+
+  /** The list a value reads, typed quietly: what is wrong with it is refused where the node reading it is judged. */
+  private listAt(value: unknown): Type | undefined {
+    const read = this.judge.scope.valueRead(value, (root, path) => {
+      const from = this.rootOf([root, ...path]);
+      return from ? typeAt(from.type, from.below) : undefined;
+    });
+    return typeof read === 'object' && read.type.kind === 'list' ? read.type : undefined;
   }
 
   /**

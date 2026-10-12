@@ -16,6 +16,7 @@
  */
 import { collectionOf, effectsReachable, profilesWalking, takesScope, viewsReachedBy } from '@wilanis/compiler';
 import {
+  callOf,
   type GraphDoc,
   type Loaded,
   type LoadResult,
@@ -122,7 +123,7 @@ export function writtenAtSignIn(key: string, load: LoadResult): WrittenAt[] {
   const out: WrittenAt[] = [];
   for (const graph of load.registry.all('graph'))
     for (const node of (graph.doc as GraphDoc).nodes) {
-      if (!('run' in node) || !writesAttribute(node.in, key)) continue;
+      if (!callOf(node) || !writesAttribute(node.in, key)) continue;
       out.push({ file: graph.path, node: node.id });
     }
   return out;

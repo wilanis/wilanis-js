@@ -8,8 +8,10 @@
 import {
   type BindingDoc,
   type BindingOp,
+  callOf,
   expr,
   type GraphDoc,
+  isMap,
   isRun,
   isSwitch,
   type Loaded,
@@ -43,12 +45,13 @@ import { type GuardHandlers, guardsOf, MAKE, REFUSE, TAKEN_IDS } from './guard.j
 import { lowerGuards } from './guard-lowering.js';
 import {
   alsoAnswering,
-  bindPaths,
   handedAs,
   inputsByName,
+  keepOf,
   lowerScope,
   lowerValue,
   lowerValues,
+  mapParts,
   type Roots,
   redactOf,
   SCOPE,
@@ -238,7 +241,8 @@ export class Compiler {
 
   /**
    * One node as the kernel runs it; a call or map that says `retry` or `timeoutMs` is tagged `<graph>#<id>`, and one
-   * whose operation is pure says so, which is how a report knows its answer is a function of its inputs alone.
+   * whose operation is pure says so, which is how a report knows its answer is a function of its inputs alone. A
+   * map's `where` is compiled as a switch's rule is, and a map that only keeps has no handler.
    */
   private lowerNode(node: Node, roots: Roots, graphPath: string): KNode {
     if (isSwitch(node)) {
@@ -246,8 +250,11 @@ export class Compiler {
       const caught = node.catch ? { catch: { ...node.catch } } : {};
       return { kind: 'switch', in: lowerValues(node.in, roots), rules, else: node.else, ...caught };
     }
-    const { handler, op } = this.handlerFor(node.run);
-    const authored = this.withScope(lowerValues(node.in, roots), { key: node.run, given: node.in });
+    if (isMap(node) && node.run === undefined) return keepOf(node, roots);
+    const run = callOf(node);
+    if (run === undefined) throw new Error(`${graphPath}: node '${node.id}' runs no operation`);
+    const { handler, op } = this.handlerFor(run);
+    const authored = this.withScope(lowerValues(node.in, roots), { key: run, given: node.in });
     const site = siteOf({ graph: graphPath, node: node.id });
     const inputs = trimming(handler, node, withProvided(authored, this.scope.types.accepted(op.accepts), site));
     const redact = redactOf(this.scope, op, node.in);
@@ -263,9 +270,7 @@ export class Compiler {
       onItemFailure: node.onItemFailure ?? 'fail',
       redact,
       ...pure,
-      bind: bindPaths(node.bind),
-      ...(node.limit === undefined ? {} : { limit: node.limit }),
-      ...(node.concurrency === undefined ? {} : { concurrency: node.concurrency }),
+      ...mapParts(node),
       ...tagged,
     };
   }

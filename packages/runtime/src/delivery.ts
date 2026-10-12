@@ -7,7 +7,7 @@
  * trigger's settings of those names say the same: the pairing X403 judges, read off the documents, so a broker
  * published later is paired the day it ships.
  */
-import type { ConnectionKindDoc, Loaded, Scope, TriggerDoc, Values } from '@wilanis/core';
+import { type ConnectionKindDoc, callOf, type Loaded, type Scope, type TriggerDoc, type Values } from '@wilanis/core';
 
 /** How many times a connection may hand one message to a trigger receiving from it. */
 export type Delivery = NonNullable<ConnectionKindDoc['delivery']>;
@@ -84,13 +84,12 @@ export function sendOf(site: Site, scope: Scope): Send | undefined {
 
 /** Every graph node of the tree that runs an operation, itself or once per element. */
 const nodeSites = (scope: Scope): Site[] =>
-  scope.registry
-    .all('graph')
-    .flatMap(graph =>
-      graph.doc.nodes.flatMap(node =>
-        'run' in node ? [{ file: graph.path, where: node.id, run: node.run, given: node.in }] : [],
-      ),
-    );
+  scope.registry.all('graph').flatMap(graph =>
+    graph.doc.nodes.flatMap(node => {
+      const run = callOf(node);
+      return run ? [{ file: graph.path, where: node.id, run, given: node.in }] : [];
+    }),
+  );
 
 /** Every binding operation of the tree that delegates to another operation. */
 const delegationSites = (scope: Scope): Site[] =>

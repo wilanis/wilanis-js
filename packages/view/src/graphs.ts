@@ -7,7 +7,7 @@
  */
 import { atomicOf, siteOf } from '@wilanis/compiler';
 import type { GraphDoc, Loaded, Scope, Type, Values } from '@wilanis/core';
-import { isMap, isRun, isSwitch, show, typeAt } from '@wilanis/core';
+import { callOf, isMap, isRun, isSwitch, show, typeAt, WHOLE_TEMPLATE } from '@wilanis/core';
 import { attemptsOf } from './attempts.js';
 import { markCatches } from './catches.js';
 import { markGuards } from './guards.js';
@@ -147,7 +147,7 @@ class GraphBuilder {
     return keeps ? { keeps } : {};
   }
 
-  /** One node of the graph: a switch becomes a rule node per rule, a run or a map becomes one node. */
+  /** One node of the graph: a switch becomes a rule node per rule, a run or a map becomes one node; a keep runs nothing. */
   private addNode(node: GraphDoc['nodes'][number]) {
     if (isSwitch(node)) {
       node.rules.forEach((rule, index) => {
@@ -155,9 +155,10 @@ class GraphBuilder {
       });
       return;
     }
-    const target = targetOf(this.scope, node.run);
-    const result = resultType(this.scope, target.op, node.in);
-    if (isRun(node)) this.addRun(node, target, result);
+    const run = callOf(node);
+    const target = run ? targetOf(this.scope, run) : undefined;
+    const result = resultType(this.scope, target?.op, node.in);
+    if (isRun(node) && target) this.addRun(node, target, result);
     else if (isMap(node)) this.addMap(node, target, result);
   }
 
@@ -233,10 +234,10 @@ class GraphBuilder {
 
   private addMap(
     node: Extract<GraphDoc['nodes'][number], { over: unknown }>,
-    target: ReturnType<typeof targetOf>,
+    target: ReturnType<typeof targetOf> | undefined,
     result: Type | undefined,
   ) {
-    const list: Type | undefined = result ? { kind: 'list', of: result } : undefined;
+    const list: Type | undefined = target ? result && { kind: 'list', of: result } : this.readType(node.over);
     this.types.set(node.id, list);
     this.nodes.push({
       id: node.id,
@@ -246,20 +247,30 @@ class GraphBuilder {
       description: node.description,
       inputs: [
         { name: 'over', ...written(this.scope, node.over), description: 'the list mapped over' },
-        ...inputPorts(this.scope, target.op, node.in, {
+        ...inputPorts(this.scope, target?.op, node.in, {
           bind: node.bind,
           site: siteOf({ graph: this.graph.path, node: node.id }),
         }),
       ],
       outputs: list ? [{ name: WHOLE, type: show(list) }] : [],
-      target: target.target,
+      target: target?.target,
       bind: node.bind,
       onItemFailure: node.onItemFailure,
-      ...this.keeps(node.run, node.in),
+      ...(node.run ? this.keeps(node.run, node.in) : {}),
       ...fanOutOf(node),
       ...attemptsOf(node),
     });
     wire(this.edges, node.id, { over: node.over, ...(node.in ?? {}) }, this.resolvers);
+  }
+
+  /** The type a whole read names, from the nodes typed so far: what a map that only keeps answers, its over's type. */
+  private readType(value: unknown): Type | undefined {
+    const whole = typeof value === 'string' ? WHOLE_TEMPLATE.exec(value) : null;
+    if (!whole) return undefined;
+    const [root, ...path] = whole[1].split('.');
+    const base = this.types.get(root);
+    const read = base && typeAt(base, path);
+    return typeof read === 'object' ? read.type : undefined;
   }
 
   /**

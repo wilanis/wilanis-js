@@ -1,6 +1,7 @@
 /**
  * The nodes a graph is made of, one type per schema under schemas/node/: a run calls one operation, a switch
- * routes on its rules, a map runs one operation per element. `model.ts` re-exports them with the graph document.
+ * routes on its rules, a map runs one operation per element, or keeps the elements its `where` holds for.
+ * `model.ts` re-exports them with the graph document.
  */
 
 import type { Retry, Value, Values } from './vocabulary.js';
@@ -35,8 +36,11 @@ export interface MapNode {
   id: string;
   label?: string;
   description?: string;
-  run: string;
+  /** The operation run per kept element. Absent: the map keeps, and answers the kept elements as they are. */
+  run?: string;
   over: Value;
+  /** A rule over each element, as `item`, and over `in`: the elements it does not hold for are dropped. */
+  where?: string;
   in?: Values;
   bind?: Record<string, string>;
   onItemFailure?: 'fail' | 'collect';
@@ -55,3 +59,5 @@ export const isRun = (node: Node): node is RunNode => node.type === NODE_RUN;
 export const isSwitch = (node: Node): node is SwitchNode => node.type === NODE_SWITCH;
 /** Whether a graph node is the one that runs per element, narrowed so its `over` and binding may be read. */
 export const isMap = (node: Node): node is MapNode => node.type === NODE_MAP;
+/** Which operation a node calls, if any: a run's, a map's, or nothing for a switch or a map that only keeps. */
+export const callOf = (node: Node): string | undefined => (isSwitch(node) ? undefined : node.run);

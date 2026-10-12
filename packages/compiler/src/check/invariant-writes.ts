@@ -10,6 +10,7 @@
  */
 import {
   type BindingDoc,
+  callOf,
   type GraphDoc,
   type InvariantDoc,
   isMap,
@@ -120,8 +121,9 @@ function graphWrites(
   const out: Write[] = [];
   let typeOf: Write['typeOf'] | undefined;
   for (const node of graph.doc.nodes) {
-    if (isSwitch(node)) continue;
-    const target = targetOf(judge, node.run, node.in, known.guarded);
+    const run = callOf(node);
+    if (isSwitch(node) || !run) continue;
+    const target = targetOf(judge, run, node.in, known.guarded);
     if (!target) continue;
     typeOf ??= graphTyping(judge, graph);
     const sites = sitesIn(known.sites.get(target.shape) ?? [], graph);
@@ -146,7 +148,8 @@ function graphTyping(judge: Judge, graph: Loaded<GraphDoc>): Write['typeOf'] {
   const nodes = new Map(graph.doc.nodes.map(node => [node.id, node]));
   const ops = new Map<string, OpHit>();
   for (const node of nodes.values()) {
-    const hit = isSwitch(node) ? undefined : judge.scope.op(node.run);
+    const run = callOf(node);
+    const hit = run ? judge.scope.op(run) : undefined;
     if (hit && typeof hit !== 'string') ops.set(node.id, hit);
   }
   const constTypes: Record<string, Type> = {};

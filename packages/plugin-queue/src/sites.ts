@@ -4,8 +4,7 @@
  * delegation -- with what it was given, and every startup step that names `consume`.
  */
 import {
-  isMap,
-  isRun,
+  callOf,
   type PluginCheckContext,
   type StartupStep,
   type TriggerDoc,
@@ -51,11 +50,11 @@ function canonical(run: string | undefined, scope: Scope): string {
 function graphCalls(scope: Scope): Published[] {
   return scope.registry.all('graph').flatMap(graph =>
     graph.doc.nodes
-      .filter(node => (isRun(node) || isMap(node)) && canonical(node.run, scope) === PUBLISH)
+      .filter(node => canonical(callOf(node), scope) === PUBLISH)
       .map(node => ({
         file: graph.path,
         at: `nodes/${node.id}/in`,
-        given: (node as { in?: Values }).in ?? {},
+        given: node.in ?? {},
         atomic: graph.doc.atomic === true,
       })),
   );

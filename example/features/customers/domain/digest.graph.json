@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/graph.schema.json",
   "label": "Digest",
-  "description": "Every customer of every tenant counted and listed, composed into one Digest: the count from one node, the text from another.",
+  "description": "Every customer of every tenant counted and listed, composed into one Digest: the count from one node, the active ones kept and counted by another, the text from a third.",
   "out": {
     "type": "@customers/domain/Digest.shape.json",
     "from": "digest"
@@ -46,6 +46,22 @@
       }
     },
     {
+      "type": "@wilanis/node/map.schema.json",
+      "id": "active",
+      "label": "The active customers",
+      "over": "{{all}}",
+      "where": "has(item.active) && item.active == true"
+    },
+    {
+      "type": "@wilanis/node/run.schema.json",
+      "id": "activeCount",
+      "label": "How many are active",
+      "run": "@std/list.port.json#count",
+      "in": {
+        "list": "{{active}}"
+      }
+    },
+    {
       "type": "@wilanis/node/run.schema.json",
       "id": "digest",
       "label": "The digest",
@@ -53,6 +69,7 @@
       "in": {
         "value": {
           "count": "{{count}}",
+          "active": "{{activeCount}}",
           "text": "{{joined}}"
         },
         "type": "@customers/domain/Digest.shape.json"

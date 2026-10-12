@@ -10,7 +10,7 @@
  * lowers a refusal there, so `invariant` is a word every trigger reaching it must map (T005) and none reaching
  * no guard may map (T006). A proved site adds nothing, which is what makes proving a rule worth the trouble.
  */
-import { isSwitch, policyPath, type Scope, type TriggerDoc, type Values } from '@wilanis/core';
+import { callOf, policyPath, type Scope, type TriggerDoc, type Values } from '@wilanis/core';
 import { guardsOf, INVARIANT } from './guard.js';
 
 /** One refusal a port operation can end in: the literal reason, the graph (or binding) that calls refuse, and the node (or binding operation) that does. */
@@ -192,8 +192,8 @@ class Walk {
     for (const guard of guardsOf(this.scope, graph))
       this.refusals.push({ reason: INVARIANT, file: graph.path, node: guard.id });
     for (const node of graph.doc.nodes) {
-      if (isSwitch(node)) continue;
-      this.call({ run: node.run, given: node.in, file: graph.path, node: node.id, through });
+      const run = callOf(node);
+      if (run) this.call({ run, given: node.in, file: graph.path, node: node.id, through });
     }
   }
 
