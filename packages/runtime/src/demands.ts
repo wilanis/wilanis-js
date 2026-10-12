@@ -1,13 +1,16 @@
 /**
  * Where one demand of a rehearsal case is met. The solver says, field by field, what a switch's inputs must hold for a
  * branch to be taken (`branches.ts` asks it); each such demand is written here into what the rehearsal sets: a patch
- * to the trigger's own input, a stub of the node the input reads, or a stub of the node that holds the list a map hands
- * the switch's graph its element from. A read of `in` is followed out of the switch's graph by `traced` in `frames.ts`.
+ * to the trigger's own input, a stub of a node's answer, or a stub of the node that holds the list a map hands an
+ * element from. A read of `in` is followed out of the switch's graph by `traced` in `frames.ts`, through every call and
+ * map on the way, and is met where it lands. A traced demand never lands past a guard: where the trace meets a guard's
+ * answer, it is written into the value the guard judges, so the guard judges what the rehearsal wrote (RFC 0038).
  */
+import { TAKEN_IDS } from '@wilanis/compiler';
 import { type Type, typeAt } from '@wilanis/core';
 import type { KSwitchLike, Settled, Stubbing } from './branches.js';
 import type { Domain } from './domains.js';
-import { type Landed, type Standing, type Stopped, sourceOf, traced } from './frames.js';
+import { type Landed, type OnNode, type Standing, type Stopped, sourceOf, traced } from './frames.js';
 import { getPath, NO_MEMBER, satisfy, setPath } from './stubs.js';
 
 /** Where a switch stands: the switch itself, where its siblings are stubbed, and how its `in` can be steered. */
@@ -20,14 +23,37 @@ export interface At {
 }
 
 /**
- * A demand on `in` where `in` is an element a map handed in, met by writing that element into the list the map
- * runs over. The first element stands for all of them, as it does everywhere else in the walk, so the demand
- * lands at index 0: the trace says where, the element read back through the map's `bind`. Unreachable where the read
- * lands anywhere but in an element of a list a node holds.
+ * A read of `in` followed out to what the rehearsal sets (`traced`), never past a guard: where it lands on `in:ok`, the
+ * value a taken site's guard let through, it goes on as `in`, out to the caller that handed the value the guard judged.
  */
-function ofElement(landed: Landed | Stopped, domain: Domain, from: Pick<Stubbing, 'isMap'>) {
-  if (!('node' in landed) || !landed.element) return 'unreachable' as const;
-  return { stub: { ...answerAt(landed.standing.at, landed.path, from), value: domain } };
+function followed(read: { ref: string; path: string[] }, standing: Standing): Landed | Stopped {
+  let landed = traced(read, standing);
+  while ('node' in landed && landed.node === TAKEN_IDS.ok) {
+    const again = traced({ ref: 'in', path: landed.path }, landed.standing);
+    landed = landed.element && !('stopped' in again) ? { ...again, element: true } : again;
+  }
+  return landed;
+}
+
+/**
+ * A demand met where a traced read lands: a patch to the trigger's input, or a stub of the node it lands on. A node that
+ * is a guard's answer at a made site is stubbed at `<id>:made`, the value the guard judges, never past it. An element
+ * of a list a node holds is written at index 0 of that list, the first element standing for all as it does everywhere
+ * else in the walk, at `<map>.0` where the node is a map (`answerAt`) and at the node as `nonEmpty` writes the list. Any
+ * other node is stubbed where its answer is stubbed (`stubTarget`). Unreachable where the trace stopped.
+ */
+function ofTraced(landed: Landed | Stopped, domain: Domain, from: Settled): Met | Missed {
+  if ('stopped' in landed) return 'unreachable';
+  if ('input' in landed) return ofInput(landed.input, domain, from);
+  return { stub: { ...onNode(landed, from), value: domain } };
+}
+
+/** Where a demand that landed on a node is written: the node's stub, or the guard's judged value, at a path. */
+function onNode(landed: OnNode, from: Settled): { target: string; path: string[] } {
+  const node = from.madeOf?.(landed.standing.at) ?? landed.standing.at;
+  const placed = answerAt(node, landed.path, from);
+  if (landed.element || placed.target !== node) return placed;
+  return { target: stubTarget(node, from), path: placed.path };
 }
 
 /**
@@ -59,26 +85,26 @@ function ofInput(
   return value === NO_MEMBER ? 'exhausted' : { input: { path, value } };
 }
 
-/** Where one demand is met: the trigger's input, an element of a mapped list, a node's stub, or nowhere. */
-export function meet(
-  dotted: string,
-  domain: Domain,
-  at: At,
-  from: Settled,
-):
-  | { input: { path: string[]; value: unknown } }
-  | { stub: { target: string; path: string[]; value: unknown } }
-  | Missed {
+/** A demand met: a patch to the trigger's input, or a stub written at a node's path. */
+type Met = { input: { path: string[]; value: unknown } } | { stub: { target: string; path: string[]; value: unknown } };
+
+/**
+ * Where one demand is met: the trigger's input, where the switch reads it as its own; a node of the switch's own graph,
+ * stubbed at that node, a guard's answer among them; anything else read off `in`, followed out to where it lands
+ * (`ofTraced`); or nowhere.
+ */
+export function meet(dotted: string, domain: Domain, at: At, from: Settled): Met | Missed {
   const [inputName, ...within] = dotted.split('.');
   const src = sourceOf(at.node.in[inputName]);
   if (!src) return 'unreachable';
   // a switch in the top-level graph reading `in` is steered by the trigger's input, not a stub
   if (src.ref === 'in' && at.steerable) return ofInput([...src.path, ...within], domain, from);
-  // any other read of `in` is followed out: where it is an element a map handed in, the list mapped over steers it
+  // any other read of `in` is followed out, through the calls and maps that handed it down, to what the rehearsal sets
   if (src.ref === 'in')
-    return ofElement(traced({ ref: 'in', path: [...src.path, ...within] }, at.standing), domain, from);
+    return ofTraced(followed({ ref: 'in', path: [...src.path, ...within] }, at.standing), domain, from);
   if (src.ref === 'context' || src.ref === 'const') return 'unreachable';
-  return { stub: { target: stubTarget(at.prefix, src.ref, from), path: [...src.path, ...within], value: domain } };
+  const target = stubTarget([...at.prefix, src.ref].join('.'), from);
+  return { stub: { target, path: [...src.path, ...within], value: domain } };
 }
 
 /**
@@ -87,8 +113,7 @@ export function meet(
  * effect is what the kernel stubs and what a seed records; a stub at the call would answer only where every node is
  * answered from a stub, as in the rehearsal, and never where effects alone are, as in an edge's run (#788).
  */
-function stubTarget(prefix: string[], ref: string, from: Pick<Stubbing, 'effectOf'>): string {
-  const direct = [...prefix, ref].join('.');
+function stubTarget(direct: string, from: Pick<Stubbing, 'effectOf'>): string {
   return from.effectOf?.(direct) ?? direct;
 }
 

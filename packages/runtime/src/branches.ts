@@ -36,6 +36,11 @@ export interface Stubbing {
   effectOf?: (nodePath: string) => string | undefined;
   /** The lowered `over` of the map at a dotted path: the list it runs over, which is what makes its answer non-empty. */
   overOf?: (nodePath: string) => unknown;
+  /**
+   * Where the node at a dotted path is a guard's answer at a made site, the node its value was moved aside to,
+   * `<path>:made`: what the guard judges, and where a demand traced to the answer is written, never past the guard.
+   */
+  madeOf?: (nodePath: string) => string | undefined;
 }
 
 /**
@@ -268,11 +273,13 @@ function patchOf(path: string[], from: Stubbing): { path: string[]; value: unkno
 
 /**
  * The stub of the node that holds the list, with one element in it; the answer keeps every other field it has, since a
- * sibling may read one. A list inside element 0 of a map's answer is stubbed at that element (`answerAt`).
+ * sibling may read one. A list inside element 0 of a map's answer is stubbed at that element (`answerAt`). A holder that
+ * is a guard's answer is stubbed at the value the guard judges, `<id>:made`, never past it: where the element a switch
+ * reads is written (`meet`), so the two meet in one stub.
  */
 function stubHolding(held: Holder, from: Stubbing): Record<string, unknown> {
   const { generated, typeOf = () => undefined, seed = 1 } = from;
-  const { target, path } = answerAt(held.target, held.path, from);
+  const { target, path } = answerAt(from.madeOf?.(held.target) ?? held.target, held.path, from);
   const base = standIn(target, { generated, typeOf, seed });
   const type = typeOf(target);
   const filled = satisfy(ONE_ELEMENT, getPath(base, path), typeAtPath(type, path), seed);
