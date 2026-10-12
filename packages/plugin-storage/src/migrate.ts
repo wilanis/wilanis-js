@@ -152,9 +152,10 @@ function keptSaid(kept: NonNullable<Gathered['keptBy']>): string {
 }
 
 /**
- * One connection's target. A connection another tree keeps is skipped before any engine is reached, so nothing
- * opens it, nothing asks its record and no dry run writes to it (RFC 0042): its collections are the keeping
- * tree's to plan, and a plan from here would drop what this tree never names and remove what it never reads.
+ * One connection's target. A connection another tree keeps is skipped before any engine is reached, so this
+ * runs no statement there: nothing asks its record and no dry run writes to it (RFC 0042). Its collections are
+ * the keeping tree's to plan, and a plan from here would drop what this tree never names and remove what it
+ * never reads.
  */
 async function targetFor(ctx: MigrateContext, one: Gathered): Promise<PlanTarget> {
   if (one.keptBy) return unplanned(one, { skipped: keptSaid(one.keptBy) });
@@ -227,7 +228,7 @@ export async function applyStores(ctx: MigrateContext, plan: Plan): Promise<Appl
 /**
  * Every plan every connection of the tree has a record of, connection by connection in canonical-path order. A
  * connection another tree keeps is left out before any engine is reached: its history is the keeping tree's to
- * print, and asking for it here would open a database this tree only reads.
+ * print, and asking for it here would run a statement on a database this tree only reads.
  */
 export async function historyOfStores(ctx: MigrateContext): Promise<Applied[]> {
   const out: Applied[] = [];

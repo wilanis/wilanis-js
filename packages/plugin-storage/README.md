@@ -69,9 +69,9 @@ Two trees may reach one database: one tree writes the records and migrates them,
 them. Both read the one record there, so a plan from the reading tree would drop the collections it never
 names and remove the fields its shapes leave out. So the reading tree's store says `keptBy`, the
 `project.json -> name` of the tree that keeps the collections (RFC 0042). `wilanis migrate` then skips every
-connection whose stores say `keptBy`. It prints `skipped: kept by <tree> (keptBy in <store>); this tree reads it
-and never migrates it`, and exits 0 for it. It opens nothing on that connection, not even on a dry run, and
-`--history` leaves the connection out. The keeping tree's `migrate` plans that connection, and its `--history`
+connection where a store says `keptBy`. It prints `skipped: kept by <tree> (keptBy in <store>); this tree reads
+it and never migrates it`, and exits 0 for it. It runs no statement of its own on that connection, not even on a
+dry run, and `--history` leaves the connection out. The keeping tree's `migrate` plans that connection, and its `--history`
 prints it. The skip holds under every profile, because the mark is on the store and not on the connection a
 profile chooses. So the reading tree's `migrate` never creates a kept collection, in a development database
 either. A developer gets one in two ways:

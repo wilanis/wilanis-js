@@ -119,8 +119,8 @@ connection's record holds and no store declares. Two trees may reach one databas
 migrates the records and the other only reads them. The reading tree's store then says `keptBy`, the
 `project.json → name` of the tree that keeps the collections (RFC 0042). Its collections may name shapes with
 fewer fields than the keeping tree's, since an engine reads only the fields a shape names. `wilanis migrate` skips
-a connection whose stores say `keptBy`: it opens nothing there and prints which tree keeps it. That tree's own
-`migrate` plans the connection.
+a connection where a store says `keptBy`: it runs no statement of its own there and prints which tree keeps it.
+That tree's own `migrate` plans the connection.
 
 ## Triggers are generic
 

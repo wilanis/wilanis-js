@@ -22,9 +22,9 @@ export interface Gathered {
   engine: string;
   lowering: Lowering;
   /**
-   * the tree that keeps these collections, and the store that says so, where this tree only reads them. Read off
-   * the first store gathered over the connection, since the checker holds every store over one connection to
-   * the same keptBy (RFC 0042).
+   * the tree that keeps these collections, and the store that says so, where this tree only reads them (RFC
+   * 0042). Any one store over the connection that says keptBy sets it, whatever order the stores are gathered
+   * in: planning a connection that holds another tree's collections would run this tree's steps on its tables.
    */
   keptBy?: { tree: string; store: string };
 }
@@ -51,8 +51,8 @@ function engineSaid(store: Loaded<StoreDoc>, ctx: MigrateContext): string {
 }
 
 /** Who keeps a store's collections where this tree only reads them, as a gathering carries it, or nothing. */
-function keptOf(store: Loaded<StoreDoc>): Pick<Gathered, 'keptBy'> {
-  return store.doc.keptBy ? { keptBy: { tree: store.doc.keptBy, store: store.path } } : {};
+function keptOf(store: Loaded<StoreDoc>): Gathered['keptBy'] {
+  return store.doc.keptBy ? { tree: store.doc.keptBy, store: store.path } : undefined;
 }
 
 /**
@@ -70,14 +70,13 @@ export function gathered(ctx: MigrateContext): Gathered[] {
     const lowering = lowered(ctx, store);
     if (!lowering) continue;
     const held = byConnection.get(lowering.on.connection);
-    if (held) Object.assign(held.lowering.declaring.collections, lowering.declaring.collections);
-    else
-      byConnection.set(lowering.on.connection, {
-        on: lowering.on,
-        engine: engineSaid(store, ctx),
-        lowering,
-        ...keptOf(store),
-      });
+    if (held) {
+      Object.assign(held.lowering.declaring.collections, lowering.declaring.collections);
+      held.keptBy ??= keptOf(store);
+    } else {
+      const keptBy = keptOf(store);
+      byConnection.set(lowering.on.connection, { on: lowering.on, engine: engineSaid(store, ctx), lowering, keptBy });
+    }
   }
   return [...byConnection.values()].sort((one, other) => one.on.connection.localeCompare(other.on.connection));
 }

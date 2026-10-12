@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Declared } from '../src/index.js';
 import { applyStores, historyOfStores, planStores } from '../src/index.js';
-import { context, declares, ENTRIES, fake, NOTES, RENAMED_SHAPE, said } from './migrating.js';
+import { context, declares, ENTRIES, fake, NOTES, RENAMED_SHAPE, said, type Trees } from './migrating.js';
 
 /** `entries` as the record holds it once a create applied: an id, a url and an optional agent. */
 const RECORDED: Declared = {
@@ -268,6 +268,9 @@ describe('what the record says was applied', () => {
   });
 });
 
+/** What the second store over the entries connection declares, where a case adds one. */
+const READINGS = { readings: declares() };
+
 /** The line a connection the registry tree keeps is skipped with, naming the store that says so. */
 const KEPT = (store: string) =>
   `kept by registry (keptBy in @features/customers/data/${store}.store.json); this tree reads it and never migrates it`;
@@ -301,6 +304,25 @@ describe('a connection another tree keeps (RFC 0042)', () => {
     await applyStores(ctx, plan);
     expect(asked.applied.map(one => one.on)).toEqual([NOTES]);
     expect(asked.reached).not.toContain(ENTRIES);
+  });
+
+  it('a connection is skipped wherever its kept store comes, before or after a store that says nothing', async () => {
+    // whichever store migrate gathers first, one store saying keptBy is enough to skip the connection:
+    // planning it would run this tree's steps on the other tree's tables
+    const cases: { trees: Trees; store: string }[] = [
+      { trees: { keptBy: { entries: 'registry' }, readings: { collections: READINGS } }, store: 'customers' },
+      { trees: { readings: { keptBy: 'registry', collections: READINGS } }, store: 'readings' },
+    ];
+    for (const { trees, store } of cases) {
+      const { ctx, register } = context(trees);
+      const { engine, asked } = fake({});
+      register(engine);
+      const plan = await planStores(ctx);
+      expect(plan.targets[0]).toMatchObject({ connection: ENTRIES, skipped: KEPT(store), steps: [] });
+      expect(said(plan.targets[1].steps)).toEqual(['create create collection notes']);
+      expect(await historyOfStores(ctx)).toEqual([]);
+      expect(asked.reached).not.toContain(ENTRIES);
+    }
   });
 
   it('history leaves a kept connection out, and never asks its engine for it', async () => {
