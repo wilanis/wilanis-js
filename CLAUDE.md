@@ -110,9 +110,10 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
 ## How to change things
 
 - **A new rule.** Add it to its family's module under `packages/compiler/src/check/` -- `project.ts` (C, B at
-  the project, startup), `profiles.ts` (C017, C018 and, under each profile, B002, B003, B004, B011: what a
-  profile chooses and whether every domain port is met and keeps its promises under it), `contracts.ts` (shapes,
-  ports and what an operation `listens` on, connection kinds and connections) with `listen-settings.ts` beside it
+  the project, startup), `profiles.ts` (C017, C018; C024: a profile's `extends` names a declared profile, not
+  itself and not one that extends another; and, under each profile, B002, B003, B004, B011: what a profile chooses
+  and whether every domain port is met and keeps its promises under it), `contracts.ts` (shapes, ports and what an
+  operation `listens` on, connection kinds and connections) with `listen-settings.ts` beside it
   (L017: the setting a `listens` part reads is one the granting plugin declares, of the part's type; L018: a port
   the tree writes where a `listens` reads it is one a socket can bind; and the part helpers L015 shares),
   `resolvers.ts` (P), `inputs.ts` (a call site's inputs) with `within.ts` beside it (G028: a static field marked
