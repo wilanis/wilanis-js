@@ -16,6 +16,7 @@ import { type Decision, format, gather, type PlainRun, short, statedOf, stateNam
 import { heldUpstream } from './rehearse-held.js';
 import {
   answering,
+  misfitOf,
   patched,
   type Reached,
   reach,
@@ -327,6 +328,9 @@ async function branchOf(
   for (const patch of patches) fired = patched(walk, fired, patch);
   // each layer was written over the ones before it, so a later stub of a node already holds what an earlier one steered
   const given = unbroken({ ...steer.others.stubs, ...steer.pre.stubs, ...one.stubs }, broken);
+  // a stub that does not fit its node's type is data no real run sees: the case is said, not run (#1026)
+  const misfit = misfitOf(given, walk.stubbing.typeOf);
+  if (misfit !== undefined) return { said: { ...at, uncovered: misfit } };
   const report = await emb.fire(walk.trigger.doc, fired, walk.context, { stubs: given });
   // a run that never got to the switch proves nothing of the branch, and is not recorded as though it did
   const local = ranAt(report, sw);
