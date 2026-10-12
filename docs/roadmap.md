@@ -172,10 +172,9 @@ model calls), RFC 0030 (the cache), RFC 0031 (intent triggers) and RFC 0032 (the
 milestone with its own demo when someone picks them up. RFC 0032 waits on a consumer rather than on work: the operation
 it was written for, RFC 0002's `raw`, is left out of that RFC on purpose, and the next consumer is the fault message RFC
 0019 asks for, under M13. RFC 0038 (rehearse steers what a caller hands) changes no schema and shows in no demo of its
-own; it builds on #904 (landed in #928), and lands before RFC 0039, which edits the same walk. RFC 0044 (a deadline on a
-queue trigger) changes no core schema, so it need not land before the freeze; it is picked up when a queue consumer
-needs it. RFC 0045 (a CSV header name read into a field of another name) is in no milestone: it changes a port a plugin
-grants and no schema, so 1.0 does not wait on it.
+own; it builds on #904 (landed in #928), and lands before RFC 0039, which edits the same walk. RFC 0045 (a CSV header
+name read into a field of another name) is in no milestone: it changes a port a plugin grants and no schema, so 1.0
+does not wait on it.
 
 ## Process RFCs
 
