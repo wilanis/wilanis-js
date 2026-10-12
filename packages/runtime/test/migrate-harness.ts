@@ -1,7 +1,8 @@
 /**
  * The fake plugin `wilanis migrate`'s tests plan against: a tree whose one plugin keeps state in the world
- * and answers whatever plan a test hands it. Shared by `migrate.test.ts` (what is planned and printed) and
- * `migrate-apply.test.ts` (what is applied and recorded).
+ * and answers whatever plan a test hands it. Shared by `migrate.test.ts` (what is planned and printed),
+ * `migrate-json.test.ts` (the same as the RFC 0019 envelope) and `migrate-apply.test.ts` (what is applied and
+ * recorded).
  */
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -144,3 +145,20 @@ export const target = (steps: PlanStep[], over: Partial<PlanTarget> = {}): PlanT
 /** Run the command over a tree the harness wrote, saying nothing to the terminal. */
 export const run = (dir: string, plugins: Record<string, PluginModule>, opts = {}) =>
   migrate(loadTree(dir, plugins), { log: () => {}, ...opts });
+
+/** A tree that declares production, so a test can plan under it; live is the default where no profile is named. */
+export const PROFILED = { profiles: { live: true, production: false } };
+
+/** A tree whose project.json names a startup operation no plugin grants: it does not check. */
+export function refuse(dir: string) {
+  writeFileSync(
+    join(dir, 'project.json'),
+    JSON.stringify({
+      $schema: schemaUrl('project'),
+      name: 'boot',
+      description: 'a tree that refuses',
+      plugins: [{ use: '@std' }, { use: '@fake' }],
+      startup: [{ run: '@fake/nowhere.port.json#listen' }],
+    }),
+  );
+}
