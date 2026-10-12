@@ -22,7 +22,17 @@ import {
 } from './branches.js';
 import { type Patch, patchInto } from './demands.js';
 import type { Embedder } from './embed.js';
-import { declaredAt, effectAt, madeAt, mapAt, overAt, type Spec, specBehind, whereOf } from './rehearse-where.js';
+import {
+  declaredAt,
+  effectAt,
+  madeAt,
+  mapAt,
+  mapRuleAt,
+  overAt,
+  type Spec,
+  specBehind,
+  whereOf,
+} from './rehearse-where.js';
 import { embedderFor, generatedFire, unbroken } from './stubbing.js';
 
 /** What a trigger's run reaches: the tree, the trigger, the switches found, and what each case fires and stubs with. */
@@ -75,6 +85,7 @@ export async function switchesReached(
     effectOf: (path: string) => effectAt(probe, spec, path),
     overOf: (path: string) => overAt(probe, spec, path),
     madeOf: (path: string) => madeAt(probe, spec, path),
+    mapRuleOf: (path: string) => mapRuleAt(probe, spec, path),
     graphOf: (path: string) => whereOf(probe, trigger, path.split('.').slice(0, -1)).graph,
   };
   const reached: Reached = { load, trigger, seed, profile, found, stubbing, input, context, probe };

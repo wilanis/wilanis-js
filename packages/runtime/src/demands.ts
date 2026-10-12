@@ -16,6 +16,7 @@ import type { KSwitchLike, Settled, Stubbing } from './branches.js';
 import { closedSaid, exhaustedOf, stoppedSaid, type Unmet } from './demand-said.js';
 import { type Domain, meets } from './domains.js';
 import { type Landed, type OnNode, type Standing, type Stopped, sourceOf, traced, writtenThrough } from './frames.js';
+import { throughWhere } from './map-rules.js';
 import { getPath, NO_MEMBER, satisfy, setPath } from './stubs.js';
 
 export type { Missed, Unmet } from './demand-said.js';
@@ -148,14 +149,17 @@ export type Patch = { path: string[]; value: unknown; each?: { at: number[]; dom
 type Stub = { target: string; path: string[]; value: unknown; field: string; each?: number[] };
 
 /** A demand met: a patch to the trigger's input, or a stub written at a node's path. */
-type Met = { input: Patch } | { stub: Stub };
+export type Met = { input: Patch } | { stub: Stub };
+
+/** One demand met as several, every one to be laid: what a keep's answer asks of the list it runs over. */
+export type Every = { all: (Met | Unmet | Fixed | Every)[] };
 
 /**
  * Where one demand is met: the trigger's input, where the switch reads it as its own; a node of the switch's own graph,
  * stubbed at that node, a guard's answer among them; anything else read off `in`, followed out to where it lands
  * (`ofTraced`); or nowhere.
  */
-export function meet(dotted: string, domain: Domain, at: At, from: Settled): Met | Unmet | Fixed {
+export function meet(dotted: string, domain: Domain, at: At, from: Settled): Met | Unmet | Fixed | Every {
   const [inputName, ...within] = dotted.split('.');
   const src = sourceOf(at.node.in[inputName]);
   if (!src) return { missed: 'unreachable' };
@@ -170,6 +174,9 @@ export function meet(dotted: string, domain: Domain, at: At, from: Settled): Met
   if (src.ref === 'context' || src.ref === 'const') return { missed: 'unreachable' };
   const node = [...at.prefix, src.ref].join('.');
   const path = [...src.path, ...within];
+  // a map's rule is logic, run and never stubbed: what it must answer is asked of the list it runs over (#1027)
+  const rule = from.mapRuleOf?.(node);
+  if (rule) return throughWhere(rule, { path, domain }, at, (one, held, here) => meet(one, held, here, from));
   const through = writtenFrom(node, path, { ...at.standing, at: node }, from);
   if (through) return ofTraced(path, through, asked, from);
   return { stub: { target: stubTarget(node, from), path, value: domain, field: dotted } };
@@ -275,6 +282,7 @@ export function lay(
 ): Unmet | undefined {
   if ('missed' in met) return met;
   if ('fixed' in met) return undefined;
+  if ('all' in met) return met.all.map(one => lay(one, into, from)).find(why => why !== undefined);
   if (!('input' in met)) return write(into.stubs, met.stub, from);
   into.input.push(met.input);
   return undefined;

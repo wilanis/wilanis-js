@@ -26,6 +26,7 @@ import {
 } from '@wilanis/core';
 import type { Embedder } from './embed.js';
 import { sourceOf } from './frames.js';
+import type { MapRule } from './map-rules.js';
 
 /**
  * A lowered spec as this walk reads one: its nodes by id, whatever each of them turns out to be; and, for a graph a
@@ -167,6 +168,14 @@ function keptAt(emb: Embedder, root: Spec, segments: string[]): Type | undefined
 
 /** The type of one element of a list type; nothing for any other type. */
 const elementOf = (type: Type | undefined): Type | undefined => (type?.kind === 'list' ? type.of : undefined);
+
+/** The map with a `where` at a dotted path: its list, its other inputs, its rule, and whether it runs an operation. */
+export function mapRuleAt(emb: Embedder, root: Spec, nodePath: string): MapRule | undefined {
+  const node = nodeAt(emb, root, nodePath.split('.'));
+  const where = (node as { where?: { label?: unknown } } | undefined)?.where?.label;
+  if (node?.kind !== 'map' || typeof where !== 'string') return undefined;
+  return { over: node.over, in: node.in, where, runs: node.handler !== undefined };
+}
 
 /** Whether the node at a dotted path is a map, whose answer the kernel stubs element by element and never whole. */
 export function mapAt(emb: Embedder, root: Spec, nodePath: string): boolean {
