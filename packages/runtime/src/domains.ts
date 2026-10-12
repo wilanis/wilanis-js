@@ -46,6 +46,8 @@ export interface Branch {
   demands: Demands;
   /** Set when the branch could not be solved from its expressions. */
   unsolved?: string;
+  /** Every set of constraints that reaches the target, `demands` first: a rule with `||` has one per side. */
+  alternatives?: Demands[];
 }
 
 export const UNSAT = Symbol('unsatisfiable');

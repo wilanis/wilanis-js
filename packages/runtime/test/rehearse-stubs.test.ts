@@ -16,9 +16,10 @@ import { rmSync } from 'node:fs';
 import { checkTree } from '@wilanis/compiler';
 import { loadTree } from '@wilanis/core';
 import { afterEach, describe, expect, it } from 'vitest';
-import { BUILTIN_PLUGINS, type Rehearsal, rehearse } from '../src/index.js';
+import { type Rehearsal, rehearse } from '../src/index.js';
 import { calledTree, chainedTree } from './rehearse-stubs-chained.js';
 import { layersTree, mappedTree, nonemptyTree, parentTree } from './rehearse-stubs-trees.js';
+import { SOURCED } from './source-plugin.js';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -28,7 +29,7 @@ afterEach(() => {
 /** The tree rehearsed, once the checker has let it through: a case about the walk must stand on a tree that passes. */
 async function rehearsed(dir: string, seed = 1): Promise<Rehearsal> {
   dirs.push(dir);
-  const load = loadTree(dir, BUILTIN_PLUGINS);
+  const load = loadTree(dir, SOURCED);
   const refused = checkTree(load).format();
   if (refused) throw new Error(`the tree a case rehearses must itself pass:\n${refused}`);
   return rehearse(load, { seed });

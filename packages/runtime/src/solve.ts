@@ -220,25 +220,28 @@ function negatedThrough(parsed: (expr.Expr | undefined)[], upto: number): Demand
   return alternatives;
 }
 
-/** The first of the pairings of a rule's demand with a case where the earlier rules are false that can hold at once. */
-function firstMerged(pairings: [Demands, Demands][]): Demands | undefined {
-  for (const [demand, earlier] of pairings) {
-    const merged = merge(demand, earlier);
-    if (merged !== UNSAT) return merged;
-  }
-  return undefined;
+/**
+ * Every case where a rule holds and every earlier rule is false, in order: those of the rule solved alone, so a rule
+ * the earlier ones leave alone keeps the case it always had, else those solved inside each earlier case, so a length
+ * the earlier rules push past 2 is met at the numbers they leave. A case steered over values another decision set picks
+ * the first that leaves them as they are (#1027).
+ */
+function everyBoth(mine: Demands[], parsed: expr.Expr, before: Demands[]): Demands[] {
+  const alone = allMerged(mine.flatMap(demand => before.map((earlier): [Demands, Demands] => [demand, earlier])));
+  if (alone.length) return alone;
+  return allMerged(
+    before.flatMap(earlier => solve(parsed, true, earlier).map((demand): [Demands, Demands] => [demand, earlier])),
+  );
 }
 
-/**
- * The first case where a rule holds and every earlier rule is false: the rule's demands solved alone first, so a rule
- * the earlier ones leave alone keeps the case it always had, then solved inside each earlier case, so a length the
- * earlier rules push past 2 is met at the numbers they leave.
- */
-function firstBoth(mine: Demands[], parsed: expr.Expr, before: Demands[]): Demands | undefined {
-  const alone = mine.flatMap(demand => before.map((earlier): [Demands, Demands] => [demand, earlier]));
-  const inside = () =>
-    before.flatMap(earlier => solve(parsed, true, earlier).map((demand): [Demands, Demands] => [demand, earlier]));
-  return firstMerged(alone) ?? firstMerged(inside());
+/** The pairings that can hold at once, each merged, once each. */
+function allMerged(pairings: [Demands, Demands][]): Demands[] {
+  const out = new Map<string, Demands>();
+  for (const [demand, earlier] of pairings) {
+    const merged = merge(demand, earlier);
+    if (merged !== UNSAT) out.set(JSON.stringify(merged), merged);
+  }
+  return [...out.values()];
 }
 
 /** One rule's branch: the case that reaches its target, or why none could be solved. */
@@ -251,8 +254,8 @@ function branchFor(
   const base = { rule: at, when: rule.when, to: rule.to };
   if (!parsed) return { ...base, demands: {}, unsolved: 'the expression does not parse' };
   const mine = solve(parsed, true, {});
-  const hit = firstBoth(mine, parsed, before);
-  if (hit) return { ...base, demands: hit };
+  const hits = everyBoth(mine, parsed, before);
+  if (hits.length) return { ...base, demands: hits[0], alternatives: hits };
   return {
     ...base,
     demands: {},
@@ -295,7 +298,7 @@ function elseFor(
   elseTo: string,
 ): Branch {
   const base = { rule: -1, when: 'else', to: elseTo };
-  if (none.length) return { ...base, demands: none[0] };
+  if (none.length) return { ...base, demands: none[0], alternatives: none };
   const unnamed = rules.find((_, at) => parsed[at] !== undefined && !nameable(parsed[at]));
   const unsolved = unnamed
     ? `'${unnamed.when}' compares values the rehearsal cannot name`

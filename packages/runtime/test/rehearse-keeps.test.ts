@@ -10,6 +10,7 @@ import { loadTree } from '@wilanis/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { BUILTIN_PLUGINS, Embedder, rehearse } from '../src/index.js';
 import { keptTree } from './rehearse-keep-trees.js';
+import { SOURCED } from './source-plugin.js';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -46,5 +47,28 @@ describe('a switch on what a keep answers', () => {
       Embedder.prototype.fire = fire;
     }
     expect(stubbed.flat().filter(path => path.endsWith('.kept'))).toEqual([]);
+  });
+});
+
+describe('a run steered through a call into a graph', () => {
+  it('stubs only the effect the graph calls, and takes every branch from it', { timeout: 30_000 }, async () => {
+    const dir = keptTree({ source: true });
+    dirs.push(dir);
+    const load = loadTree(dir, SOURCED);
+    expect(checkTree(load).format()).toBe('');
+    const stubbed: string[][] = [];
+    const fire = Embedder.prototype.fire;
+    Embedder.prototype.fire = function (trigger, input, context, opts) {
+      stubbed.push(Object.keys(opts?.stubs ?? {}));
+      return fire.call(this, trigger, input, context, opts);
+    };
+    try {
+      const done = await rehearse(load, { seed: 1 });
+      expect(done.ok, done.lines.join('\n')).toBe(true);
+    } finally {
+      Embedder.prototype.fire = fire;
+    }
+    // the call `got`, the make `r` inside it and the keep are run; only `@source`, the one effect, answers from a stub
+    expect([...new Set(stubbed.flat())]).toEqual(['op.got.op.fetched']);
   });
 });

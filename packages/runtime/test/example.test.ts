@@ -52,9 +52,10 @@ describe('the example tree', () => {
     // the three graphs behind an id declare what a missing id means, and say so in one word the trigger maps
     expect(text.match(/refused on purpose at 'noCustomer' as missing: "no customer /g)).toHaveLength(3);
     // every branch that answers names the node it answered from, never a bare status word: the customers feature's
-    // eighteen -- the data graphs' seven, each now the Customer made of the row before its guard, the listing's two
-    // routes, and the holds of the nine guards the walk runs -- and the access feature's eight
-    expect(text.match(/answered from '/g)).toHaveLength(26);
+    // seventeen -- the data graphs' seven, each now the Customer made of the row before its guard, the listing's two
+    // routes, and the holds of the eight guards the walk runs; write-csv's is held upstream, since list-rows, which the
+    // export calls and runs, judged the list first -- and the access feature's eight
+    expect(text.match(/answered from '/g)).toHaveLength(25);
     // the rule is shown as a condition, not as a bare expression next to a node id
     expect(text).toMatch(/when status == 200 && has\(body\)/);
     expect(text).toMatch(/anything else/);

@@ -32,7 +32,7 @@ import type { MapRule } from './map-rules.js';
  * A lowered spec as this walk reads one: its nodes by id, whatever each of them turns out to be; and, for a graph a
  * call names, whether it takes its input whole, handed under the one key `in` (`takesWhole`).
  */
-export type Spec = { nodes: Record<string, unknown>; whole?: boolean };
+export type Spec = { nodes: Record<string, unknown>; whole?: boolean; output?: string[] };
 
 /**
  * Where a switch is, as a decision names it: the graph document it belongs to, and -- when it sits inside the
@@ -214,23 +214,32 @@ export function madeAt(emb: Embedder, root: Spec, nodePath: string): string | un
 /** The std operation that makes a value of a declared type from what it is handed, field for field. */
 const MAKE = '@std/object.port.json#make';
 
+/** The std operation that lays the fields of `over` on top of `base`. */
+const MERGE = '@std/object.port.json#merge';
+
 /**
- * What the node at a dotted path writes out, where it is a `make` that does not trim: the lowered source of the `value`
- * it is handed, which its answer is field for field. Nothing for any other node, nor for a make whose `trim` may be set,
- * since a trimmed text is not the text it was handed.
+ * What the node at a dotted path writes out, where it is a `make`: the lowered source of the `value` it is handed, which
+ * its answer is field for field. A `trim` drops only what a closed type does not declare (`prune`), and a rule reads
+ * only what the type declares, so a make that trims is followed too. A map of `make` over every element, each handed
+ * whole as its `value`, answers the list it runs over element for element, so it writes out its `over`; and a `merge`
+ * answers what its `over` holds wherever it holds it, so a demand written there is met (#1027). Nothing for any other
+ * node.
  */
 export function writtenAt(emb: Embedder, root: Spec, nodePath: string): unknown {
-  const node = nodeAt(emb, root, nodePath.split('.'));
+  const node = nodeAt(emb, root, nodePath.split('.')) as (SpecNode & { bind?: unknown; where?: unknown }) | undefined;
+  // a merge answers each field of `over` it holds over `base`: a field written into `over` is what it answers
+  if (node?.handler === MERGE && node.kind !== 'map') return node.in?.over;
   if (node?.handler !== MAKE) return undefined;
-  const trim = node.in?.trim as { value?: unknown } | undefined;
-  return trim === undefined || trim.value === false ? node.in?.value : undefined;
+  if (node.kind !== 'map') return node.in?.value;
+  const whole = JSON.stringify(node.bind) === JSON.stringify({ value: [] });
+  return whole && node.where === undefined ? node.over : undefined;
 }
 
 /** A node of a lowered spec, as far as a walk down a path reads one. */
 type SpecNode = { kind?: string; handler?: unknown; in?: Record<string, unknown>; over?: unknown };
 
 /** The node a dotted path ends at: the spec behind each call stepped into, and a map's element index stepped over. */
-function nodeAt(emb: Embedder, root: Spec, segments: string[]): SpecNode | undefined {
+export function nodeAt(emb: Embedder, root: Spec, segments: string[]): SpecNode | undefined {
   let spec: Spec | undefined = root;
   for (let at = 0; spec && at < segments.length; at++) {
     const node = spec.nodes?.[segments[at]] as SpecNode | undefined;

@@ -22,6 +22,7 @@ import {
 } from './branches.js';
 import { type Patch, patchInto } from './demands.js';
 import type { Embedder } from './embed.js';
+import { answeredWithin } from './rehearse-calls.js';
 import {
   declaredAt,
   effectAt,
@@ -32,6 +33,7 @@ import {
   type Spec,
   specBehind,
   whereOf,
+  writtenAt,
 } from './rehearse-where.js';
 import { embedderFor, generatedFire, unbroken } from './stubbing.js';
 
@@ -86,6 +88,8 @@ export async function switchesReached(
     overOf: (path: string) => overAt(probe, spec, path),
     madeOf: (path: string) => madeAt(probe, spec, path),
     mapRuleOf: (path: string) => mapRuleAt(probe, spec, path),
+    answeredIn: (path: string) => answeredWithin(probe, spec, path),
+    writtenOf: (path: string) => writtenAt(probe, spec, path),
     graphOf: (path: string) => whereOf(probe, trigger, path.split('.').slice(0, -1)).graph,
   };
   const reached: Reached = { load, trigger, seed, profile, found, stubbing, input, context, probe };

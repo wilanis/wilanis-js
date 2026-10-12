@@ -6,8 +6,9 @@ import { rmSync } from 'node:fs';
 import { checkTree } from '@wilanis/compiler';
 import { loadTree } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_PLUGINS, rehearse } from '../src/index.js';
+import { rehearse } from '../src/index.js';
 import { decide, edge, graph, HERE, make, run, STRING, shape, treeOf, trigger } from './rehearse-stubs-trees.js';
+import { SOURCE, SOURCED } from './source-plugin.js';
 
 /**
  * `compare` reads two answers, a trend and the runs it covers, and asks whether they are as long as each other:
@@ -17,48 +18,45 @@ function lengthsTree(): string {
   const port = `${HERE}/domain/trend.port.json`;
   const result = shape('Result');
   const ask = { target: STRING };
-  return treeOf({
-    'domain/Trend.shape.json': { layer: 'core', fields: { points: { type: 'string[]' } } },
-    'domain/Runs.shape.json': { layer: 'core', fields: { items: { type: 'string[]' } } },
-    'domain/Result.shape.json': { layer: 'core', fields: { label: STRING } },
-    'domain/Ask.shape.json': { layer: 'core', fields: ask },
-    'edge/AskIn.shape.json': { layer: 'edge', fields: ask },
-    'edge/Out.shape.json': { layer: 'edge', fields: { label: STRING } },
-    'domain/trend.port.json': {
-      operations: {
-        compare: { description: 'd', accepts: ask, returns: result },
-        trend: { description: 'd', accepts: ask, returns: shape('Trend') },
-        runs: { description: 'd', accepts: ask, returns: shape('Runs') },
+  return treeOf(
+    {
+      'domain/Trend.shape.json': { layer: 'core', fields: { points: { type: 'string[]' } } },
+      'domain/Runs.shape.json': { layer: 'core', fields: { items: { type: 'string[]' } } },
+      'domain/Result.shape.json': { layer: 'core', fields: { label: STRING } },
+      'domain/Ask.shape.json': { layer: 'core', fields: ask },
+      'edge/AskIn.shape.json': { layer: 'edge', fields: ask },
+      'edge/Out.shape.json': { layer: 'edge', fields: { label: STRING } },
+      'domain/trend.port.json': {
+        operations: {
+          compare: { description: 'd', accepts: ask, returns: result },
+          trend: { description: 'd', accepts: ask, returns: shape('Trend') },
+          runs: { description: 'd', accepts: ask, returns: shape('Runs') },
+        },
       },
-    },
-    'data/trend.binding.json': {
-      port,
-      operations: {
-        compare: { graph: `${HERE}/domain/compare.graph.json` },
-        trend: { graph: `${HERE}/data/trend.graph.json` },
-        runs: { graph: `${HERE}/data/runs.graph.json` },
+      'data/trend.binding.json': {
+        port,
+        operations: {
+          compare: { graph: `${HERE}/domain/compare.graph.json` },
+          trend: { run: SOURCE, in: { type: shape('Trend') } },
+          runs: { run: SOURCE, in: { type: shape('Runs') } },
+        },
       },
+      'domain/compare.graph.json': graph('Compare', shape('Ask'), { type: result, from: ['even', 'uneven'] }, [
+        run('trend', `${port}#trend`, { target: '{{in.target}}' }),
+        run('runs', `${port}#runs`, { target: '{{in.target}}' }),
+        decide(
+          'same',
+          { trend: '{{trend.points}}', runs: '{{runs.items}}' },
+          [{ when: 'len(trend) == len(runs)', to: 'even' }],
+          'uneven',
+        ),
+        make('even', { label: 'even' }, result),
+        make('uneven', { label: 'uneven' }, result),
+      ]),
+      'edge/compare.trigger.json': trigger('compare', { in: edge('AskIn'), out: edge('Out') }, `${port}#compare`),
     },
-    'data/trend.graph.json': graph('Trend', shape('Ask'), { type: shape('Trend'), from: 't' }, [
-      make('t', { points: ['{{in.target}}'] }, shape('Trend')),
-    ]),
-    'data/runs.graph.json': graph('Runs', shape('Ask'), { type: shape('Runs'), from: 'r' }, [
-      make('r', { items: ['{{in.target}}'] }, shape('Runs')),
-    ]),
-    'domain/compare.graph.json': graph('Compare', shape('Ask'), { type: result, from: ['even', 'uneven'] }, [
-      run('trend', `${port}#trend`, { target: '{{in.target}}' }),
-      run('runs', `${port}#runs`, { target: '{{in.target}}' }),
-      decide(
-        'same',
-        { trend: '{{trend.points}}', runs: '{{runs.items}}' },
-        [{ when: 'len(trend) == len(runs)', to: 'even' }],
-        'uneven',
-      ),
-      make('even', { label: 'even' }, result),
-      make('uneven', { label: 'uneven' }, result),
-    ]),
-    'edge/compare.trigger.json': trigger('compare', { in: edge('AskIn'), out: edge('Out') }, `${port}#compare`),
-  });
+    { source: true },
+  );
 }
 
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -66,7 +64,7 @@ const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8];
 describe('rehearsing a switch that compares the lengths of two reads (#905)', () => {
   it('walks the rule and its else under every seed', { timeout: 60_000 }, async () => {
     const dir = lengthsTree();
-    const load = loadTree(dir, BUILTIN_PLUGINS);
+    const load = loadTree(dir, SOURCED);
     expect(checkTree(load).format()).toBe('');
     const runs = [];
     for (const seed of SEEDS) runs.push({ seed, run: await rehearse(load, { seed }) });

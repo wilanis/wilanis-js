@@ -9,13 +9,13 @@
  *   nothing the rehearsal can set reaches it, and nothing on this path can make it refuse.
  * - `rename` fires `store` straight from the trigger's input, into a data graph of its own with the same taken
  *   guard. Nothing upstream judges that value, so the guard is steered through the trigger's input as before.
- * - A variant hands `keep` the draft's name rather than the person's, so the value reaching the data graph is not
- *   one the upstream guard judged. The rehearsal follows the name out to the trigger's input and steers the guard
- *   there (RFC 0038, which amends RFC 0035 here).
+ * - A variant hands `keep` the draft's name rather than the person's. The rehearsal follows the name out to the
+ *   trigger's input and steers it there, which answers `holds`; but the person is made from that same name and judged
+ *   at `person:check` first, so a name that breaks the rule never gets past it to `keep` (#1027).
  *
- * `person:check` is steered by stubbing `person:made`, a pure `#make` no seed records, so the stand-in is built from
- * the type the `#make` is given. Its holds branch must answer through `card`, which makes a `Card` from the person's
- * email and refuses one that is not a string -- what a stand-in built from the rule alone handed it.
+ * `person:check` is steered through `person:made`, a pure `#make`: never stubbed, it is followed to the draft it copies,
+ * the trigger's input (#1027). Its holds branch must answer through `card`, which makes a `Card` from the person's
+ * email and refuses one that is not a string.
  */
 import { rmSync } from 'node:fs';
 import { checkTree } from '@wilanis/compiler';
@@ -74,14 +74,18 @@ describe('a guard whose value an enclosing graph already judged', () => {
     ]);
   });
 
-  it('is steered where the value is not the one upstream judged', { timeout: 30_000 }, async () => {
-    // the name is the draft's, handed down from the trigger's input: the trace follows it there and patches it
+  it('is steered where the value is not the one upstream judged, and held where its rule was', {
+    timeout: 30_000,
+  }, async () => {
+    // the name is the draft's, handed down from the trigger's input: the trace follows it there and patches it; the
+    // person made of that name is judged first, so a name that breaks the rule is refused there and never reaches keep
     const done = await rehearsed(treeOf('draft'));
     expect(decision(done.lines, "data/keep-person  guard 'in:check'")).toEqual([
       "features/people/data/keep-person  guard 'in:check' A person is reachable  2/2 branches",
       "  ok  holds     answered from 'in:ok'",
-      expect.stringMatching(/^ {2}ok {2}violated {2}refused on purpose at 'in:violated' as invariant/),
+      "  ok  violated  held upstream by guard 'person:check' in features/people/domain/register-person, which judged this value first",
     ]);
+    expect(done.ok, done.lines.join('\n')).toBe(true);
   });
 });
 

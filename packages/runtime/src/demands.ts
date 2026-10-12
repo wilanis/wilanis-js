@@ -14,8 +14,17 @@ import { TAKEN_IDS } from '@wilanis/compiler';
 import { type Type, typeAt } from '@wilanis/core';
 import type { KSwitchLike, Settled, Stubbing } from './branches.js';
 import { closedSaid, exhaustedOf, stoppedSaid, type Unmet } from './demand-said.js';
-import { type Domain, meets } from './domains.js';
-import { type Landed, type OnNode, type Standing, type Stopped, sourceOf, traced, writtenThrough } from './frames.js';
+import { type Domain, fits, meets } from './domains.js';
+import {
+  type Holder,
+  type Landed,
+  type OnNode,
+  type Standing,
+  type Stopped,
+  sourceOf,
+  traced,
+  writtenThrough,
+} from './frames.js';
 import { throughWhere } from './map-rules.js';
 import { getPath, NO_MEMBER, satisfy, setPath } from './stubs.js';
 
@@ -63,8 +72,8 @@ function withEach(landed: Landed, each: number[] | undefined, length: number): L
 function ofTraced(read: string[], landed: Landed | Stopped, asked: Asked, from: Settled): Met | Unmet | Fixed {
   if ('stopped' in landed) return ofStopped(read, landed, asked, from);
   if ('input' in landed) return ofInput(landed.input, asked, from, landed.each);
-  const through = landed.each ? undefined : writtenFrom(landed.standing.at, landed.path, landed.standing, from);
-  if (through) return ofTraced(read, through, asked, from);
+  const through = inward(landed.standing.at, landed.path, landed.standing, from);
+  if (through) return ofTraced(read, withEvery(through, landed.each), asked, from);
   const each = landed.each ? { each: landed.each } : {};
   return { stub: { ...onNode(landed, from), value: asked.domain, field: asked.field, ...each } };
 }
@@ -79,6 +88,47 @@ function writtenFrom(node: string, path: string[], standing: Standing, from: Set
   const made = from.madeOf?.(node) ?? node;
   const written = from.writtenOf(made);
   return written === undefined ? undefined : writtenThrough(written, path, { ...standing, at: made });
+}
+
+/**
+ * A demand on a node's answer carried to what the node is run from, where it is run and never stubbed (#1027): the
+ * value a pure `make` copies; the list a map with no rule runs over, for a demand on the whole answer, which is on its
+ * length; or the node inside a call into one of the tree's graphs that answers it. Nothing where the node is none of
+ * these, and the demand stays on its answer.
+ */
+function inward(node: string, path: string[], standing: Standing, from: Settled): Landed | Stopped | undefined {
+  const written = writtenFrom(node, path, standing, from);
+  if (written) return written;
+  // a map with no rule answers one element per element of its `over`: how many it answers is how many that holds
+  const over = path.length || from.mapRuleOf?.(node) ? undefined : from.overOf?.(node);
+  if (over !== undefined) return writtenThrough(over, [], { ...standing, at: node });
+  // a read of an element of a map's answer is a read of what that element answers, inside the graph it runs
+  const element = path[0] === '0' && from.isMap?.(node);
+  const inside = from.answeredIn?.(element ? `${node}.0` : node);
+  if (!inside) return undefined;
+  if (element) path = path.slice(1);
+  const segments = inside.at.split('.');
+  // inside one element of a map, `in` is what the map hands the element, read where the map stands
+  const within = inside.list
+    ? { at: inside.at, from: inside.frames, lists: [...standing.lists, { ...inside.list, from: standing.from }] }
+    : { at: inside.at, from: [...standing.from, ...inside.frames], lists: standing.lists };
+  return { node: segments.at(-1) ?? '', prefix: segments.slice(0, -1), path, standing: within };
+}
+
+/** A landing that stands for every element where the read it was carried from did, its path's end kept as it was. */
+function withEvery(landed: Landed | Stopped, each: number[] | undefined): Landed | Stopped {
+  return each && !('stopped' in landed) ? { ...landed, each: [...(landed.each ?? []), ...each] } : landed;
+}
+
+/**
+ * A demand on what the node holding a list answers, met as a demand on a switch's read that lands there is: carried
+ * inward where the node is run and never stubbed (#1027), else written at the node.
+ */
+export function onHolder(held: Holder, domain: Domain, from: Settled): Met | Unmet | Fixed | Every {
+  const segments = held.target.split('.');
+  const standing = { at: held.target, from: held.from, lists: held.lists };
+  const landed: OnNode = { node: segments.at(-1) ?? '', prefix: segments.slice(0, -1), path: held.path, standing };
+  return ofTraced(held.path, landed, { field: held.target, domain }, from);
 }
 
 /** One demand as the solver made it: the field of the switch's inputs it is on, and what that field must hold. */
@@ -135,15 +185,18 @@ function ofInput(
   const type = typeAtPath(from.inType, path);
   const value = satisfy(asked.domain, getPath(from.inputSeed, path), type, from.seed);
   if (value === NO_MEMBER) return exhaustedOf(asked.field, asked.domain, type);
-  return { input: each ? { path, value, each: { at: each, domain: asked.domain } } : { path, value } };
+  return {
+    input: each ? { path, value, each: { at: each, domain: asked.domain } } : { path, value, held: asked.domain },
+  };
 }
 
 /**
  * A patch to the trigger's input: the path and the value written there. `each` where the path runs through an element
  * of a list that stands for every element: the steps that do, counted from the path's end, and the demand each element
- * is made to meet, since what the list holds is known only when the patch is laid over the ones before it.
+ * is made to meet, since what the list holds is known only when the patch is laid over the ones before it. `held`
+ * where the demand is met by what the path holds when the patch is laid, as a list made to hold one element is.
  */
-export type Patch = { path: string[]; value: unknown; each?: { at: number[]; domain: Domain } };
+export type Patch = { path: string[]; value: unknown; each?: { at: number[]; domain: Domain }; held?: Domain };
 
 /** A stub a demand writes: the node, the path within its answer, what it must hold, the field, and where it stands for every element. */
 type Stub = { target: string; path: string[]; value: unknown; field: string; each?: number[] };
@@ -177,7 +230,7 @@ export function meet(dotted: string, domain: Domain, at: At, from: Settled): Met
   // a map's rule is logic, run and never stubbed: what it must answer is asked of the list it runs over (#1027)
   const rule = from.mapRuleOf?.(node);
   if (rule) return throughWhere(rule, { path, domain }, at, (one, held, here) => meet(one, held, here, from));
-  const through = writtenFrom(node, path, { ...at.standing, at: node }, from);
+  const through = inward(node, path, { ...at.standing, at: node }, from);
   if (through) return ofTraced(path, through, asked, from);
   return { stub: { target: stubTarget(node, from), path, value: domain, field: dotted } };
 }
@@ -258,6 +311,7 @@ const indexesOf = (list: unknown): string[] =>
  */
 export function patchInto(input: unknown, patch: Patch, from: { inType?: Type; seed: number }): unknown {
   const parents = { type: from.inType, seed: from.seed };
+  if (patch.held) return setPath(input, patch.path, heldBy(input, patch, from), parents);
   if (!patch.each) return setPath(input, patch.path, patch.value, parents);
   let out = input;
   for (const path of everyElement(input, patch.path, patch.each.at)) {
@@ -266,6 +320,29 @@ export function patchInto(input: unknown, patch: Patch, from: { inType?: Type; s
     out = setPath(out, path, want === NO_MEMBER ? patch.value : want, parents);
   }
   return out;
+}
+
+/**
+ * What a patch whose demand is `held` writes: that demand met by what the input holds at the path by now, so a patch
+ * laid after another keeps what the other wrote there -- a list cut to one element keeps the element a guard was
+ * steered on (#1027). The value it was solved with where nothing there meets it.
+ */
+function heldBy(input: unknown, patch: Patch, from: { inType?: Type; seed: number }): unknown {
+  const want = satisfy(patch.held ?? {}, getPath(input, patch.path), typeAtPath(from.inType, patch.path), from.seed);
+  return want === NO_MEMBER ? patch.value : want;
+}
+
+/**
+ * Whether a met demand would change a value another decision steered: a stub at a node whose steered answer holds,
+ * at the path, something other than what the seed generated there and that the demand does not accept (#1027).
+ */
+export function overrides(met: ReturnType<typeof meet>, from: Settled): boolean {
+  if ('all' in met) return met.all.some(one => overrides(one, from));
+  if (!('stub' in met) || !from.steered || !(met.stub.target in from.steered)) return false;
+  const { target, path } = met.stub;
+  const now = getPath(from.steered[target], path);
+  const seeded = getPath(from.seeded?.(target), path);
+  return now !== undefined && JSON.stringify(now) !== JSON.stringify(seeded) && !fits(now, met.stub.value as Domain);
 }
 
 /** Where a case is steered: the stubs it writes, and the patches to the trigger's input. */

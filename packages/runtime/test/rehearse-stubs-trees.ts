@@ -8,6 +8,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { type Kind, schemaUrl } from '@wilanis/core';
+import { SOURCE } from './source-plugin.js';
 
 export const HERE = '@features/rv';
 export const MAKE = '@std/object.port.json#make';
@@ -42,7 +43,7 @@ export const map = (id: string, op: string, each: { over: string; bind: object; 
 });
 
 /** A CLI trigger firing one operation. */
-export const trigger = (command: string, types: { in: string; out: string }, op: string) => ({
+export const trigger = (command: string, types: { in?: string; out: string }, op: string) => ({
   label: command,
   kind: '@cli/cli.trigger-kind.json',
   settings: { command },
@@ -53,7 +54,7 @@ export const trigger = (command: string, types: { in: string; out: string }, op:
 /** A graph of the feature: its label, input, output and nodes. */
 export const graph = (
   label: string,
-  input: string,
+  input: string | undefined,
   out: { type: string; from: string | string[] },
   nodes: object[],
 ) => ({
@@ -63,8 +64,11 @@ export const graph = (
   nodes,
 });
 
-/** Write a tree of one feature `rv` holding the documents given by their path under the feature, into a fresh directory. */
-export function treeOf(docs: Record<string, object>): string {
+/**
+ * Write a tree of one feature `rv` holding the documents given by their path under the feature, into a fresh directory.
+ * With `source`, the tree names `@source` (`source-plugin.ts`) and may read through it; it is then loaded with `SOURCED`.
+ */
+export function treeOf(docs: Record<string, object>, opts: { source?: boolean } = {}): string {
   const dir = mkdtempSync(join(tmpdir(), 'wilanis-stubs-'));
   const put = (rel: string, doc: object) => {
     mkdirSync(join(dir, rel, '..'), { recursive: true });
@@ -74,8 +78,9 @@ export function treeOf(docs: Record<string, object>): string {
       .at(-1) as Kind;
     writeFileSync(join(dir, rel), JSON.stringify({ $schema: schemaUrl(kind), description: 'd', ...doc }));
   };
-  put('project.json', { name: 'rv', plugins: [{ use: '@std' }, { use: '@cli' }] });
-  put('features/rv/feature.json', {});
+  const plugins = [{ use: '@std' }, { use: '@cli' }, ...(opts.source ? [{ use: '@source' }] : [])];
+  put('project.json', { name: 'rv', plugins });
+  put('features/rv/feature.json', opts.source ? { effects: ['@source/source.port.json#read'] } : {});
   for (const [rel, doc] of Object.entries(docs)) put(`features/rv/${rel}`, doc);
   return dir;
 }
@@ -151,46 +156,51 @@ export function layersTree(): string {
     commit: STRING,
     previous: { type: 'string', required: false },
   };
-  return treeOf({
-    'domain/Read.shape.json': { layer: 'core', fields: read },
-    'domain/Result.shape.json': { layer: 'core', fields: { status: STRING, count: NUMBER } },
-    'domain/Ask.shape.json': { layer: 'core', fields: { target: STRING } },
-    'edge/AskIn.shape.json': { layer: 'edge', fields: { target: STRING } },
-    'edge/Out.shape.json': { layer: 'edge', fields: { status: STRING, count: NUMBER } },
-    'domain/scan.port.json': {
-      operations: {
-        check: { description: 'd', accepts: { target: STRING }, returns: result, refuses: true },
-        read: { description: 'd', accepts: { target: STRING }, returns: shape('Read') },
+  return treeOf(
+    {
+      'domain/Read.shape.json': { layer: 'core', fields: read },
+      'domain/Result.shape.json': { layer: 'core', fields: { status: STRING, count: NUMBER } },
+      'domain/Ask.shape.json': { layer: 'core', fields: { target: STRING } },
+      'edge/AskIn.shape.json': { layer: 'edge', fields: { target: STRING } },
+      'edge/Out.shape.json': { layer: 'edge', fields: { status: STRING, count: NUMBER } },
+      'domain/scan.port.json': {
+        operations: {
+          check: { description: 'd', accepts: { target: STRING }, returns: result, refuses: true },
+          read: { description: 'd', accepts: { target: STRING }, returns: shape('Read') },
+        },
       },
-    },
-    'data/scan.binding.json': {
-      port,
-      operations: {
-        check: { graph: `${HERE}/domain/check.graph.json` },
-        read: { graph: `${HERE}/data/read.graph.json` },
+      'data/scan.binding.json': {
+        port,
+        operations: {
+          check: { graph: `${HERE}/domain/check.graph.json` },
+          read: { run: SOURCE, in: { type: shape('Read') } },
+        },
       },
+      'domain/check.graph.json': graph(
+        'Check',
+        shape('Ask'),
+        { type: result, from: ['good', 'same', 'broke', 'disagree'] },
+        [
+          run('got', `${port}#read`, { target: '{{in.target}}' }),
+          decide('status', { status: '{{got.status}}' }, [{ when: "status == 'clean'", to: 'ok' }], 'broke'),
+          refuse('broke', 'broke', result),
+          make('ok', { status: '{{got.status}}', count: '{{got.count}}' }, result),
+          decide(
+            'agree',
+            { agrees: '{{got.agrees}}', n: '{{ok.count}}' },
+            [{ when: 'agrees', to: 'moved' }],
+            'disagree',
+          ),
+          refuse('disagree', 'disagree', result),
+          decide('moved', { commit: '{{got.commit}}' }, [{ when: "commit == 'same'", to: 'same' }], 'good'),
+          refuse('same', 'same', result),
+          make('good', { status: '{{ok.status}}', count: '{{ok.count}}' }, result),
+        ],
+      ),
+      'edge/check.trigger.json': trigger('check', { in: edge('AskIn'), out: edge('Out') }, `${port}#check`),
     },
-    'data/read.graph.json': graph('Read', shape('Ask'), { type: shape('Read'), from: 'r' }, [
-      make('r', { status: 'broke', agrees: false, count: 0, commit: '{{in.target}}' }, shape('Read')),
-    ]),
-    'domain/check.graph.json': graph(
-      'Check',
-      shape('Ask'),
-      { type: result, from: ['good', 'same', 'broke', 'disagree'] },
-      [
-        run('got', `${port}#read`, { target: '{{in.target}}' }),
-        decide('status', { status: '{{got.status}}' }, [{ when: "status == 'clean'", to: 'ok' }], 'broke'),
-        refuse('broke', 'broke', result),
-        make('ok', { status: '{{got.status}}', count: '{{got.count}}' }, result),
-        decide('agree', { agrees: '{{got.agrees}}', n: '{{ok.count}}' }, [{ when: 'agrees', to: 'moved' }], 'disagree'),
-        refuse('disagree', 'disagree', result),
-        decide('moved', { commit: '{{got.commit}}' }, [{ when: "commit == 'same'", to: 'same' }], 'good'),
-        refuse('same', 'same', result),
-        make('good', { status: '{{ok.status}}', count: '{{ok.count}}' }, result),
-      ],
-    ),
-    'edge/check.trigger.json': trigger('check', { in: edge('AskIn'), out: edge('Out') }, `${port}#check`),
-  });
+    { source: true },
+  );
 }
 
 /**
@@ -201,47 +211,47 @@ export function parentTree(): string {
   const port = `${HERE}/domain/rep.port.json`;
   const result = shape('Result');
   const meta = { cost: { type: 'number', required: false }, modules: NUMBER };
-  return treeOf({
-    'domain/Meta.shape.json': { layer: 'core', fields: meta },
-    'domain/Read.shape.json': {
-      layer: 'core',
-      fields: { meta: { type: shape('Meta'), required: false }, commit: STRING },
-    },
-    'domain/Result.shape.json': {
-      layer: 'core',
-      fields: { c: { type: 'number', required: false }, meta: { type: shape('Meta'), required: false } },
-    },
-    'domain/Ask.shape.json': { layer: 'core', fields: { target: STRING } },
-    'edge/AskIn.shape.json': { layer: 'edge', fields: { target: STRING } },
-    'edge/MetaOut.shape.json': { layer: 'edge', fields: meta },
-    'edge/Out.shape.json': {
-      layer: 'edge',
-      fields: { c: { type: 'number', required: false }, meta: { type: edge('MetaOut'), required: false } },
-    },
-    'domain/rep.port.json': {
-      operations: {
-        report: { description: 'd', accepts: { target: STRING }, returns: result },
-        read: { description: 'd', accepts: { target: STRING }, returns: shape('Read') },
+  return treeOf(
+    {
+      'domain/Meta.shape.json': { layer: 'core', fields: meta },
+      'domain/Read.shape.json': {
+        layer: 'core',
+        fields: { meta: { type: shape('Meta'), required: false }, commit: STRING },
       },
-    },
-    'data/rep.binding.json': {
-      port,
-      operations: {
-        report: { graph: `${HERE}/domain/report.graph.json` },
-        read: { graph: `${HERE}/data/read.graph.json` },
+      'domain/Result.shape.json': {
+        layer: 'core',
+        fields: { c: { type: 'number', required: false }, meta: { type: shape('Meta'), required: false } },
       },
+      'domain/Ask.shape.json': { layer: 'core', fields: { target: STRING } },
+      'edge/AskIn.shape.json': { layer: 'edge', fields: { target: STRING } },
+      'edge/MetaOut.shape.json': { layer: 'edge', fields: meta },
+      'edge/Out.shape.json': {
+        layer: 'edge',
+        fields: { c: { type: 'number', required: false }, meta: { type: edge('MetaOut'), required: false } },
+      },
+      'domain/rep.port.json': {
+        operations: {
+          report: { description: 'd', accepts: { target: STRING }, returns: result },
+          read: { description: 'd', accepts: { target: STRING }, returns: shape('Read') },
+        },
+      },
+      'data/rep.binding.json': {
+        port,
+        operations: {
+          report: { graph: `${HERE}/domain/report.graph.json` },
+          read: { run: SOURCE, in: { type: shape('Read') } },
+        },
+      },
+      'domain/report.graph.json': graph('Report', shape('Ask'), { type: result, from: ['measured', 'notMeasured'] }, [
+        run('got', `${port}#read`, { target: '{{in.target}}' }),
+        decide('has', { meta: '{{got.meta}}' }, [{ when: 'has(meta.cost)', to: 'measured' }], 'notMeasured'),
+        make('measured', { c: '{{got.meta.cost}}', meta: '{{got.meta}}' }, result),
+        make('notMeasured', {}, result),
+      ]),
+      'edge/report.trigger.json': trigger('report', { in: edge('AskIn'), out: edge('Out') }, `${port}#report`),
     },
-    'data/read.graph.json': graph('Read', shape('Ask'), { type: shape('Read'), from: 'r' }, [
-      make('r', { commit: '{{in.target}}' }, shape('Read')),
-    ]),
-    'domain/report.graph.json': graph('Report', shape('Ask'), { type: result, from: ['measured', 'notMeasured'] }, [
-      run('got', `${port}#read`, { target: '{{in.target}}' }),
-      decide('has', { meta: '{{got.meta}}' }, [{ when: 'has(meta.cost)', to: 'measured' }], 'notMeasured'),
-      make('measured', { c: '{{got.meta.cost}}', meta: '{{got.meta}}' }, result),
-      make('notMeasured', {}, result),
-    ]),
-    'edge/report.trigger.json': trigger('report', { in: edge('AskIn'), out: edge('Out') }, `${port}#report`),
-  });
+    { source: true },
+  );
 }
 
 /**
