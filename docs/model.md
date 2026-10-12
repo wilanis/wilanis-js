@@ -71,6 +71,15 @@ Dataflow. Nodes have explicit types: `@wilanis/node/run.schema.json`, `switch`, 
 sources have settled, and independent nodes run concurrently. `switch` routes to exactly one node and cancels
 the rest; `has(x)` in a rule proves `x` present for the routed node. Reconvergence happens only at `out.from`.
 
+A run or a map may say `after` (optional): a list of ids of nodes in the same graph. A node runs when every value
+it reads has settled and every node it names under `after` has answered. It does not read their answers, and its
+operation is not given them. A node behind a switch's branch makes the waiter run only on that branch, and one
+that refuses or breaks means the waiter never starts. So a node that waits for a routed node takes what that
+routing proved, as a reader of it does. On a map the wait is for the node as a whole: no element starts, and no
+`where` is tried, before each has answered. `after` names a node that is not this one and not a switch (G029),
+and not one this node already reads (G030). A node another names under `after` is used (G008), a cycle through
+`after` is a cycle (G007), and a waiter on a caught node is held as a reader of it is (G022, G023).
+
 A switch may say `catch` (optional): node id to node id. When a named node breaks (its handler threw something
 that is not a refusal, the graph it ran broke, its timeout struck), the run goes on and the switch routes to the
 node named for it, as if a rule had held; the rules and `else` are not tried. The caught node is one the switch

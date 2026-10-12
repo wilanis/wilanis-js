@@ -3,7 +3,8 @@
  * (L002, L003, L008); inputs fit their contracts (see inputs.ts); a switch's rules are boolean and route to
  * nodes of this graph, each routed once (G009, G011); a map iterates a list and binds its element (G012); no
  * cycle (G007); out.from names nodes that answer the out type (G010); everything declared is read (G008,
- * and P005 for the `reads` map); an effect no switch routes is read on every branch (G015); no read is named
+ * and P005 for the `reads` map); a node's `after` names a node it may wait for and does not read (G029, G030,
+ * in graph-after.ts); an effect no switch routes is read on every branch (G015); no read is named
  * after a node (P006); constants conform (G013). A domain graph that only forwards its input is refused (L007),
  * and writes no retry or timeout (L012) and catches nothing (L013); a data graph's retry is judged in attempts.ts
  * (G017, G018, G019) with its timer bounds (G027), and what its switches catch in graph-nodes.ts (G021 to G025).
@@ -27,6 +28,7 @@ import {
 import { outputCandidates } from '../documents.js';
 import { guardsOf } from '../guard.js';
 import { answersOf, checkCallRetry, checkTimerBounds } from './attempts.js';
+import { checkAfter } from './graph-after.js';
 import { checkCatches, checkReason, checkSwitch, checkWhere, elementInputs } from './graph-nodes.js';
 import { GraphReads } from './graph-reads.js';
 import { checkWhole } from './graph-whole.js';
@@ -115,6 +117,7 @@ class GraphCheck {
     });
     this.checkReadNames(resolvers);
     for (const node of this.nodes.values()) this.checkNode(node, reads);
+    checkAfter({ refuse: this.refuse, nodes: this.nodes, scope: this.judge.scope });
     if (this.role === 'data') this.checkCatches(reads);
     this.checkReadsUsed(resolvers, reads);
     reads.checkEffectsRouted(this.routedBy, outputCandidates(doc) ?? []);
@@ -257,7 +260,8 @@ class GraphCheck {
     const { refuse, nodes, routedBy, ops } = this;
     const { scope } = this.judge;
     const guarded = new Set(guardsOf(scope, this.graph).flatMap(one => (one.site.kind === 'made' ? [one.id] : [])));
-    checkCatches({ refuse, nodes, routedBy, ops, scope, dependencies: reads.narrowing.dependencies, guarded });
+    const { dependencies, waits } = reads.narrowing;
+    checkCatches({ refuse, nodes, routedBy, ops, scope, dependencies, waits, guarded });
   }
 
   /** L013: what an effect breaking means is the data layer's, where the effect runs; a domain graph catches nothing. */

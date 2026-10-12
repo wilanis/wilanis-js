@@ -119,7 +119,9 @@ branches `then` and `otherwise`. Neither is a place to put new debt.
   `resolvers.ts` (P), `inputs.ts` (a call site's inputs) with `within.ts` beside it (G028: a static field marked
   `within` names a path the bound type holds, of the `reaches` type), `bindings.ts` (B), `required.ts` (B009, B010:
   what a binding of a port a plugin requires may read and may reach), `graph.ts` with `graph-nodes.ts`,
-  `graph-reads.ts`, `graph-whole.ts`, `graph-routing.ts` (where a node sits in the routing, which G015 judges an effect by) and `narrowing.ts` (G), `graph-making.ts` (L016: a data
+  `graph-reads.ts`, `graph-whole.ts`, `graph-routing.ts` (where a node sits in the routing, which G015 judges an effect by),
+  `graph-after.ts` (G029, G030: what a node's `after` may name) and `narrowing.ts` (G; who reads whom and who waits
+  for whom, the two tables the G rules are judged over), `graph-making.ts` (L016: a data
   graph composing a value a field invariant guards that one of its effects reads, walked once over the tree after
   the graphs), `triggers.ts` (T) with
   `bounds.ts` for the lists T008 finds unbounded and `delivery.ts` (T009, T010: what a trigger's connection

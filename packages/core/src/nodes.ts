@@ -19,6 +19,8 @@ export interface RunNode {
   in?: Values;
   retry?: Retry;
   timeoutMs?: number;
+  /** Nodes of this graph it waits for without reading their answers: it starts once each has answered. */
+  after?: string[];
 }
 export interface SwitchNode {
   type: typeof NODE_SWITCH;
@@ -51,6 +53,8 @@ export interface MapNode {
   /** Per element: each element's call is bounded and retried on its own. */
   retry?: Retry;
   timeoutMs?: number;
+  /** Nodes of this graph it waits for as a whole: no element starts, and no `where` is tried, before each has answered. */
+  after?: string[];
 }
 export type Node = RunNode | SwitchNode | MapNode;
 /** Whether a graph node is the one that calls an operation, narrowed so its `run` and `in` may be read. */
@@ -61,3 +65,5 @@ export const isSwitch = (node: Node): node is SwitchNode => node.type === NODE_S
 export const isMap = (node: Node): node is MapNode => node.type === NODE_MAP;
 /** Which operation a node calls, if any: a run's, a map's, or nothing for a switch or a map that only keeps. */
 export const callOf = (node: Node): string | undefined => (isSwitch(node) ? undefined : node.run);
+/** Which nodes a node waits for without reading them: a run's or a map's `after`, and nothing for a switch. */
+export const afterOf = (node: Node): string[] => (isSwitch(node) ? [] : (node.after ?? []));

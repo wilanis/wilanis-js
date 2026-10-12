@@ -119,6 +119,8 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [G026](G026.md) | G | live | a value given for a field the contract marks `provided`, which the compiler writes where the operation is called |
 | [G027](G027.md) | G | live | a timeoutMs or retry.backoffMs longer than a Node timer can wait |
 | [G028](G028.md) | G | live | a static field a native contract marks `within` whose path the bound type does not hold, passes through an optional field, or ends at a value not of the `reaches` type |
+| [G029](G029.md) | G | live | an `after` entry naming an unknown node, the node itself, or a switch, which answers on every branch |
+| [G030](G030.md) | G | live | an `after` entry naming a node the node already reads, which it waits for already |
 | [P001](P001.md) | P | live | a static field, or a type reference, given a read where the checker must see a literal |
 | [P002](P002.md) | P | live | a resolver reading a context.* path no trigger kind hands and the guard does not add |
 | [P003](P003.md) | P | live | a resolver named in, const, context or secrets |

@@ -13,7 +13,16 @@
  * A conjunct is kept renamed -- the switch's input names rewritten to the read paths its `in` gives them --
  * so it says the same thing wherever it is asked about, in the one spelling every reader of the graph uses.
  */
-import { expr, isSwitch, type Node, type Scope, type SwitchNode, splitPath, WHOLE_TEMPLATE } from '@wilanis/core';
+import {
+  afterOf,
+  expr,
+  isSwitch,
+  type Node,
+  type Scope,
+  type SwitchNode,
+  splitPath,
+  WHOLE_TEMPLATE,
+} from '@wilanis/core';
 import { targetsOf } from './graph-routing.js';
 import { readValuesOf } from './judge.js';
 import { atOrBelow } from './typing.js';
@@ -102,18 +111,32 @@ function provedBy(node: SwitchNode, when: string): expr.Expr[] {
  * What a graph's routing proves: for each node, the conjuncts a switch's rule established before routing to
  * it -- or to anything it reads -- each spelled as a read path of this graph. `establishedFor` answers them;
  * `presentFor` answers the `has(...)` ones as paths, which is what a read losing its optionality needs. It
- * also answers which nodes read which, the dependency table G007 and G010 are judged over.
+ * also answers which nodes read which, the table the rules about values are judged over, and which nodes wait
+ * for which, the table every routing rule (G007, G010, G015, G022, G023) is judged over.
+ *
+ * A node waits for what it reads and for what it names under `after` (RFC 0041): it starts only once each has
+ * answered, as the engine's `waitsFor` says. So a node that waits for a routed node runs only where that node
+ * ran, and takes what its routing established, as a reader of it does.
  */
 export class Narrowing {
   /** node id -> the nodes it reads */
   readonly dependencies = new Map<string, Set<string>>();
+  /** node id -> the nodes it waits for: what it reads, what it names under `after`, and once `checkWhole` adds it, its router */
+  readonly waits = new Map<string, Set<string>>();
+  /** the nodes some node names under `after`: each is used, as a node read is (G008) */
+  readonly waited = new Set<string>();
   /** node id -> the conjuncts the switch routing to it established, each with the switch that did */
   private readonly proved = new Map<string, Established[]>();
 
   constructor(scope: Scope, nodes: Map<string, Node>) {
     for (const node of nodes.values()) {
       const roots = scope.templateReads(readValuesOf(node)).map(read => read[0]);
-      this.dependencies.set(node.id, new Set(roots.filter(root => nodes.has(root))));
+      const reads = new Set(roots.filter(root => nodes.has(root)));
+      // a node naming itself or no node is G029's; it adds no wait, so it earns no second refusal as a cycle
+      const after = afterOf(node).filter(id => id !== node.id && nodes.has(id));
+      for (const id of after) this.waited.add(id);
+      this.dependencies.set(node.id, reads);
+      this.waits.set(node.id, new Set([...reads, ...after]));
       if (isSwitch(node)) this.collectProofs(node);
     }
   }
@@ -136,14 +159,15 @@ export class Narrowing {
   }
 
   /**
-   * What a node may take as established: what routed it, and what routed anything it reads, each with the
-   * switch that established it, so a reader can be told which decision proved an invariant.
+   * What a node may take as established: what routed it, and what routed anything it waits for, each with the
+   * switch that established it, so a reader can be told which decision proved an invariant. A node that only
+   * waits for a routed node starts only where that node ran, so the rule held there too.
    */
   establishedFor(id: string, seen = new Set<string>()): Established[] {
     if (seen.has(id)) return [];
     seen.add(id);
     const out = [...(this.proved.get(id) ?? [])];
-    for (const dependency of this.dependencies.get(id) ?? []) out.push(...this.establishedFor(dependency, seen));
+    for (const dependency of this.waits.get(id) ?? []) out.push(...this.establishedFor(dependency, seen));
     return out;
   }
 

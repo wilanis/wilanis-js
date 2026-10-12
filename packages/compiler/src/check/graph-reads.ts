@@ -20,7 +20,7 @@ import {
   WHOLE_TEMPLATE,
 } from '@wilanis/core';
 import { bindings } from '../documents.js';
-import { firstReaders, type Routing, readersOf, readOnSomeBranchesOnly, routed } from './graph-routing.js';
+import { firstReaders, type Routing, readersOf, readOnSomeBranchesOnly, routed, waitTarget } from './graph-routing.js';
 import type { RootOf } from './inputs.js';
 import type { Judge, JudgedResolver, Reader, Refuser } from './judge.js';
 import { Narrowing } from './narrowing.js';
@@ -44,6 +44,17 @@ export interface GraphTable {
 function hintForRoot(root: string | undefined): string {
   if (!root) return 'read in, const, or a node that runs before this one';
   return `to read the context, bind the name: "reads": { "${root}": "@<feature>/edge/<file>.resolvers.json#${root}" }`;
+}
+
+/**
+ * G015's hint. Routing the effect comes first, since it is most often what was meant. Where its first readers
+ * sit behind one target of one switch, the effect may instead wait for that target, which keeps the rule routed
+ * to the node that leans on what it proved (RFC 0041). Where they sit behind several, `after` cannot say "one of
+ * them", so it is not offered.
+ */
+function routeHint(id: string, named: string, target: string | undefined): string {
+  const wait = target ? `, let it wait for the node that rule routes to ("after": ["${target}"])` : '';
+  return `route the effect under the branch that reads it: make '${id}' the 'to' of the switch rule that leads to ${named}${wait}, or read its answer from every branch`;
 }
 
 /**
@@ -98,27 +109,29 @@ export class GraphReads {
    * switch chose, so an effect no switch routes runs on every branch; where every reader of its answer sits
    * behind a branch, and no switch that always runs is reached through all of its targets, the effect ran for
    * nothing on the rest -- most often a write the author meant one branch to make. An effect out.from names
-   * is the graph's answer, and a pure node running for nothing costs nothing. One no value read at all is
-   * G008's alone, judged by the same `readNodes`, so a node earns one refusal for one misunderstanding.
+   * is the graph's answer, and a pure node running for nothing costs nothing. One no value read and no node
+   * waits for is G008's alone, judged by the same `used`, so a node earns one refusal for one misunderstanding.
+   * A node that waits for the effect under `after` counts as a reader of it, and one that waits for a routed
+   * node is routed (RFC 0041).
    */
   checkEffectsRouted(routedBy: Map<string, string>, candidates: string[]): void {
-    const routing: Routing = { routedBy, dependencies: this.narrowing.dependencies };
-    const readers = readersOf(routing.dependencies);
+    const routing: Routing = { routedBy, waits: this.narrowing.waits };
+    const readers = readersOf(routing.waits);
     for (const [id, hit] of this.table.ops) {
-      if (hit.op.pure === true || !this.readNodes.has(id) || candidates.includes(id)) continue;
+      if (hit.op.pure === true || !this.used(id) || candidates.includes(id)) continue;
       if (routed(routing, id)) continue;
       const who = [...(readers.get(id) ?? [])];
       if (!readOnSomeBranchesOnly(routing, this.table.nodes, who)) continue;
-      const named = firstReaders(routing, who)
-        .map(reader => `'${reader}'`)
-        .join(', ');
-      this.refuse(
-        'G015',
-        `effect '${id}' runs on every branch, but its answer is read only under ${named}`,
-        `nodes/${id}`,
-        `route the effect under the branch that reads it: make '${id}' the 'to' of the switch rule that leads to ${named}, or read its answer from every branch`,
-      );
+      const first = firstReaders(routing, who);
+      const named = first.map(reader => `'${reader}'`).join(', ');
+      const message = `effect '${id}' runs on every branch, but its answer is read only under ${named}`;
+      this.refuse('G015', message, `nodes/${id}`, routeHint(id, named, waitTarget(routing, id, first)));
     }
+  }
+
+  /** Is a node used: a value reads its answer, out.from names it, or another node waits for it under `after`? */
+  used(id: string): boolean {
+    return this.readNodes.has(id) || this.narrowing.waited.has(id);
   }
 
   /**

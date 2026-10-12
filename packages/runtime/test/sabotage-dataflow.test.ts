@@ -79,7 +79,7 @@ describe('sabotage: a graph written as control flow', () => {
     const hints = sabotageHinting(GRAPH, toggle);
     for (const id of ['pin', 'unpin'])
       expect(hints).toContain(
-        `G008 nothing routes to '${id}', so it runs on every branch: make it the 'to' of a switch rule, or read its answer from every branch`,
+        `G008 nothing routes to '${id}', so it runs on every branch: make it the 'to' of a switch rule, or read its answer from every branch, or, where another node must not start before it, name it in that node's after`,
       );
   });
 
