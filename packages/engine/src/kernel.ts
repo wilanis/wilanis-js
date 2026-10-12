@@ -51,15 +51,25 @@ export type Outcome =
   | { kind: 'cancelled' };
 
 /**
- * The node that ended the run: the first `failed` one, by when it settled, a refusal was wanted from, or a fault
- * was. A node that failed after the run had ended -- a map whose elements the ending held back -- is not it.
+ * The node that ended the run: the first `failed` one, in the order the nodes settled, a refusal was wanted from, or
+ * a fault was. A node that failed after the run had ended -- a map whose elements the ending held back -- is not it.
  */
 function endedAt(report: Report, refused: boolean): [string, NodeReport] | undefined {
   const failed = Object.entries(report.nodes)
     .filter(([, node]) => node.status === 'failed')
-    .sort(([, one], [, other]) => (one.endedAt ?? 0) - (other.endedAt ?? 0));
+    .sort(([, one], [, other]) => settledBefore(one, other));
   if (refused) return failed.find(([, node]) => node.reason !== undefined);
   return failed.find(([, node]) => node.reason === undefined && node.caught === undefined);
+}
+
+/**
+ * Which of two nodes settled first, as a sort compares them: by the place each took as the run's nodes settled
+ * (`settled`), since two nodes can settle in one tick of the clock and `endedAt` would then keep the graph's order.
+ * A report the kernel did not make, which carries no place, is ordered by `endedAt`.
+ */
+function settledBefore(one: NodeReport, other: NodeReport): number {
+  if (one.settled !== undefined && other.settled !== undefined) return one.settled - other.settled;
+  return (one.endedAt ?? 0) - (other.endedAt ?? 0);
 }
 
 /** A failed run's ending: the refusal the graph declared, or the fault of the node that broke. */

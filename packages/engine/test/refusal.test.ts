@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { KernelSpec } from '../src/index.js';
-import { Kernel, refusalOf } from '../src/index.js';
+import { Kernel, outcomeOf, Refusal, refusalOf } from '../src/index.js';
 import { handlers } from './handlers.js';
 
 describe('a refusal', () => {
@@ -93,5 +93,31 @@ describe('a refusal', () => {
     );
     expect(refusalOf(broke)).toBeUndefined();
     expect(broke.nodes.m.error).toBe("map 'm' element 0: boom");
+  });
+});
+
+describe('two refusals in one tick of the clock', () => {
+  it('report the node that settled first, not the one the graph lists first', async () => {
+    // `late` refuses only once every pending microtask has run, so `early` has settled and the run has ended by then,
+    // while `late` was already in flight: it settles as it settles, failed, after `early`
+    const raced = {
+      early: async () => {
+        throw new Refusal('early', 'no early');
+      },
+      late: async () => {
+        await new Promise(resolve => setImmediate(resolve));
+        throw new Refusal('late', 'no late');
+      },
+    };
+    const spec: KernelSpec = {
+      name: 't',
+      output: ['late', 'early'],
+      nodes: { late: { kind: 'call', handler: 'late', in: {} }, early: { kind: 'call', handler: 'early', in: {} } },
+    };
+    const report = await new Kernel(raced).run(spec, { clock: () => 7 });
+    expect(report.nodes.late).toMatchObject({ status: 'failed', reason: 'late', endedAt: 7 });
+    expect(report.nodes.early).toMatchObject({ status: 'failed', reason: 'early', endedAt: 7 });
+    expect(report.nodes.early.settled).toBeLessThan(report.nodes.late.settled ?? 0);
+    expect(outcomeOf(report)).toMatchObject({ kind: 'refused', reason: 'early', at: 'early' });
   });
 });
