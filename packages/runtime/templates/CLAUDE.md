@@ -17,12 +17,18 @@ the file, the rule and the fix.
    node the graph declares. A switch's `catch` is a branch too, `when <node> broke`, walked by making that stubbed
    effect break. The three to fix: `NEVER RUN` is a rule no inputs can reach, `BROKE` is a branch that fails
    where the graph declares no failure, `BLOCKED` is a wiring hole.
-   Rehearse steers three things: the trigger's input, a node's answer in the graph whose switch reads it, and a field
-   of the element a map hands -- the first and the last through calls that hand them on unchanged. To steer a switch
-   inside a map, it gives the list it sets (the trigger's input, or a node's answer) one element; a literal or
-   composed list keeps what it has, and its elements are not steered. A value that a map's own `in` gives or that a
-   caller composes stays `NEVER RUN`: make it a node's answer in the graph that reads it (with
-   `@std/object.port.json#make`, for example), or decide before the call.
+   Rehearse steers a value a switch or a guard reads where it can follow it to something it sets: the trigger's
+   input, a node's answer, or an element of a list a node holds -- through every call and every map on the way,
+   including a value a map's `in` hands every element. It never writes a value past a guard a caller's value went
+   through: it writes into the value that guard judges, so where that guard refuses it, the branch says the run ended
+   at `<id>:violated`. To steer a switch inside a map, it gives the list it sets one element, written the same way
+   where a guard's answer holds the list; a literal or composed list keeps what it has. A guard on a value that a
+   guard of the same shape already judged upstream, across a map too, or that a site upstream proved, is `held
+   upstream`, which is fine. Text composed from reads, a list written out, `context` and a literal a rule compares
+   with another value stop it, and `NEVER RUN` names the node where it stopped: hand the value as one read of a node
+   there, or decide before the call. A literal or a constant closes the branches it excludes on that path, and the
+   line reads `-- ... closed on this path`; that is fine where another path runs them, and `NEVER RUN` where every
+   caller hands a literal it excludes.
    A `catch` branch is recorded like any other branch: its scenario names the nodes that break under `broken`, and
    `regress` breaks them again.
 3. `wilanis regress` replays the scenarios; a `DIFF` is a change in behaviour. Run it after any change to a graph or

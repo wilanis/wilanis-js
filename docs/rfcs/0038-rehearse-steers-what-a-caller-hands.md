@@ -1,6 +1,6 @@
 # RFC 0038: Rehearse steers what a caller hands: a graph's `in` followed out through maps and calls
 
-- **Status:** accepted
+- **Status:** implemented
 - **Areas:** `area:runtime` (`branches.ts`, `frames.ts`, a new `demands.ts`, `rehearse-held.ts`,
   `rehearse-reached.ts`, `rehearsal-report.ts`, the template's loop step 2), `area:compiler` (one private method
   exported, `takesWhole`).
@@ -12,7 +12,7 @@
   through calls that hand it down as they got it, the binding wrapper `<map>.0.op` among them (`elementPathOf`), and
   a read is mapped through the map's `bind` (`handedAs`, `throughBind`, `FoundList.bind` and `FoundList.unwrapped`).
   This RFC builds on that code and does not specify it again. It amends one sentence of RFC 0035 and what RFC 0018's
-  `NEVER RUN` says; on acceptance, both headers gain `Amended by: RFC 0038`.
+  `NEVER RUN` says; both headers carry `Amended by: RFC 0038`.
 - **Order with RFC 0039** (#919, keep and group a list): RFC 0039 edits `meet` and `switchesOf` and relies on the
   element walk this RFC rewrites. This RFC lands first, and RFC 0039 follows the spec written here: the trace in
   `frames.ts`, `meet` in `demands.ts`, and `FoundList.in` beside `bind`.
@@ -206,6 +206,14 @@ guard at a made site, it is written at `<id>:made`, the value the guard judges. 
 as `in`, out to the caller. So the upstream guard judges what the rehearsal wrote. If the demand breaks that guard's
 rule, the run ends there, and the branch says so.
 
+The list a map runs over is written the same way. To run the map for one element, the rehearsal gives the list one
+element (`nonEmpty`). Where a guard's answer `<id>` holds that list, `stubHolding` writes it at `<id>:made`, even
+where no switch reads the element, so that guard judges the one-element stand-in. A run steered to a switch inside the
+map steers that guard to `holds` too (`reach`), so a rule that asks for more elements, such as `len(writes) > 1`, gets
+them. Where the guard's rule still refuses the stand-in, the run ends there, and the branch reads "did not reach it:
+the run ended at '<id>:violated'". Without this, the element would be written at `<id>:made` and the list at `<id>`;
+the stub at `<id>` would answer first, and the element's demand would be lost.
+
 Take the tree of `packages/runtime/test/rehearse-held-guards.test.ts`. `register-person` makes a `Person` at node
 `person` (guarded at `person:check`) and calls `keep`, whose data graph takes a `Person` (guarded at `in:check`).
 Suppose the call hands `"name": "{{person.name}}"` and `"email": "{{in.email}}"`. The values do not all come from one
@@ -366,7 +374,11 @@ string>`, the sentence for each field in `unreachable`, and `closed?: string`. `
 **4. Held across a map.** `heldUpstream` in `rehearse-held.ts` reads `upstreamOf`, which now crosses maps. A guard's
 value that lands at element 0 of a node that is a guarded *list* site of the same shape (`Guard.arity === 'list'`,
 whose map judges every element) is held there. Without this, a demand on such a guard would be written at the
-list's `<id>:made`, judged by the list's own guard first, and read as "did not reach it".
+list's `<id>:made`, judged by the list's own guard first, and read as "did not reach it". The sentence names the
+upstream guard as `'in:check' of '<id>'`: a list site lowers to a map `<id>` over a nested spec whose check is
+`in:check` (`TAKEN_IDS.check`), so no node `<id>:check` exists for a reader to find. A list site is never proved, since
+the proof rules read only a `run` node's `in` (`siteRead` in `prove.ts`); "where the rule is proved" names a site of
+one value.
 
 **5. The report.** `Decision['branches'][number]` in `rehearsal-report.ts` gains `closed?: string`. `branchLine`
 prints it as `--  <branch>  closed on this path: <sentence>`, and it is no problem. `mergeBranch` treats it as it
@@ -386,14 +398,23 @@ a guard's answer (decision 2).
 - A recorded unreachable scenario's `expect.unreachable`, and `wilanis describe <scenario>` and the viewer's
   scenario page that print it, carry the new sentence.
 - `packages/runtime/templates/CLAUDE.md`, loop step 2: the paragraph #944 added ("Rehearse steers three things: ...
-  A value that a map's own `in` gives or that a caller composes stays `NEVER RUN` ...") is replaced by: "Rehearse
-  steers a value a switch or a guard reads where it can follow it to something it sets: the trigger's input, a node's
-  answer, or an element of a list a node holds -- through every call and every map on the way, including a value a
-  map's `in` hands every element. It never writes a value past a guard a caller's value went through. To steer a
-  switch inside a map, it gives the list it sets one element; a literal or composed list keeps what it has. Text
-  composed from reads, a list written out and `context` stop it, and `NEVER RUN` names the node where it stopped:
-  hand the value as one read of a node there, or decide before the call. A literal or a constant closes the branches
-  it excludes on that path; that is fine where another path runs them."
+  A value that a map's own `in` gives or that a caller composes stays `NEVER RUN` ...") is replaced by the paragraph
+  below. This is the text as it landed (#968): it says what the code does, which the first draft of this RFC did not
+  all say -- the list written into what a guard judges, `held upstream` across a map and where the rule is proved, and
+  a literal a rule compares with another value.
+
+  > Rehearse steers a value a switch or a guard reads where it can follow it to something it sets: the trigger's
+  > input, a node's answer, or an element of a list a node holds -- through every call and every map on the way,
+  > including a value a map's `in` hands every element. It never writes a value past a guard a caller's value went
+  > through: it writes into the value that guard judges, so where that guard refuses it, the branch says the run
+  > ended at `<id>:violated`. To steer a switch inside a map, it gives the list it sets one element, written the same
+  > way where a guard's answer holds the list; a literal or composed list keeps what it has. A guard on a value that a
+  > guard of the same shape already judged upstream, across a map too, or that a site upstream proved, is `held
+  > upstream`, which is fine. Text composed from reads, a list written out, `context` and a literal a rule compares
+  > with another value stop it, and `NEVER RUN` names the node where it stopped: hand the value as one read of a node
+  > there, or decide before the call. A literal or a constant closes the branches it excludes on that path, and the
+  > line reads `-- ... closed on this path`; that is fine where another path runs them, and `NEVER RUN` where every
+  > caller hands a literal it excludes.
 
 ### Plugin contract
 
@@ -435,7 +456,10 @@ go in a new `rehearse-handed-trees.ts`, built with the helpers `rehearse-stubs-t
 - **A guard on each element (Item 12).** A map of a port operation over a node's list, bound to a data graph whose
   `in` is a guarded shape: `in:check` settles `holds` from `in:ok` and `violated` as `invariant`.
 - **Held across a map.** The same, where the list is a guarded list site of the same shape upstream: both branches
-  `held upstream by guard '<id>:check'`.
+  `held upstream by guard 'in:check' of '<id>'`.
+- **Held where the rule is proved.** The people tree, where `person` is read whole from another guarded site of the
+  shape, so the rule is proved at `person` and nothing guards it there: both branches of `keep`'s `in:check` read
+  `held upstream at 'person' in features/people/domain/register-person, where the rule is proved`.
 - **The amended case.** `rehearse-held-guards.test.ts`, the `draft` variant, which hands `"name": "{{in.name}}"` and
   `"email": "{{person.email}}"`. The solver's `violated` case demands only `len(name) == 0` (checked against the
   built solver: `branchesOf` answers `{ name: { maxLen: 0 } }` for the else). The trace follows `name` to the
@@ -531,8 +555,14 @@ The maintainer settled these on the pull request (#930), each as recommended:
 
 ## Open questions
 
-To decide during implementation:
+Both were decided during implementation:
 
-1. Whether `traced` gives up after a fixed number of frames. The walk already stops at a handler it has seen
-   (`seen` in `atNode`), so frames are bounded by the tree; a limit seems unneeded.
-2. The exact words of each sentence, as long as each names the field, the node, the graph and the edit.
+1. Whether `traced` gives up after a fixed number of frames. It does not: the walk never enters a handler twice on
+   one path, so the frames are bounded by the tree (`traced` in `frames.ts` says so).
+2. The exact words of each sentence, as long as each names the field, the node, the graph and the edit. They are in
+   `stoppedSaid` and `closedSaid` (`demand-said.ts`) and `closedSaid` (`rehearsal-report.ts`), and differ from the
+   table above in small ways. A name the frame does not hand reads `is not handed on at <node>`. The `context` and
+   `composed list` sentences end with the edit (`hand it as one read of a node there to steer it`, `map over one read
+   of a node there`). A literal that a rule compares with another value cannot steer the rule, so it reads `NEVER
+   RUN` with its own sentence and is not closed. A branch closed on every path adds `no run takes it until a caller
+   hands a value it accepts`.

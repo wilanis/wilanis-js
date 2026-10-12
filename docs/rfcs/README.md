@@ -43,7 +43,7 @@ accepted. Statuses: draft, accepted, implemented, withdrawn.
 | [0035](0035-the-whole-record-before-the-write.md) | The whole record before the write: a guarded shape is made upstream of the effect, never from it | implemented |
 | [0036](0036-shared-answers.md) | Recorded scenarios share their answers: each distinct node answer kept once per directory | implemented |
 | [0037](0037-connections-at-the-call.md) | A connection is a literal at the call: fields that name one, graphs given one, connections made of parts | accepted |
-| [0038](0038-rehearse-steers-what-a-caller-hands.md) | Rehearse steers what a caller hands: a graph's `in` followed out through maps and calls | accepted |
+| [0038](0038-rehearse-steers-what-a-caller-hands.md) | Rehearse steers what a caller hands: a graph's `in` followed out through maps and calls | implemented |
 | [0039](0039-keep-and-group-a-list.md) | Keep and group a list: a `where` on `map`, and `@std/list#totals` | accepted |
 | [0040](0040-text-contains.md) | `contains`: a rule asks whether a text holds a word written in the rule | accepted |
 | [0041](0041-wait-for-a-node.md) | `after`: a node waits for another whose answer it does not read | accepted |
