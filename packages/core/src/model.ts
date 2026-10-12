@@ -389,6 +389,8 @@ export const kept = (store: StoreDoc): [string, Collection][] =>
  */
 export interface StoreDoc extends Envelope {
   connection: string;
+  /** The tree that writes and migrates these collections, by its project.json → name; this tree only reads them. */
+  keptBy?: string;
   /** Local name -> the resolver that declares it (`@feature/edge/file.resolvers.json#name`); read by some `scoped`. */
   reads?: Record<string, string>;
   collections: Record<string, StoreCollection>;
