@@ -427,11 +427,12 @@ lands first takes the next free C code (C024 on `main` today), and the other tak
 
 - **The indirection RFC 0013 named is real.** A reader of `branch` must open `review` to know what `branch`
   binds. Three things keep the cost down. There is one level, so the reader opens one more profile and never a
-  chain. `describe`, the manifest and the viewer print the resolved profile, and mark what is inherited. And the
-  parent is in the same file. The other cost is that a diff to `review` changes `branch` with no line under
-  `branch` in the diff. RFC 0016 says "the diff under the word `production` is the review". After this RFC, the
-  diff under the parent is also the review of its children, and `extends` is the line that says so. The checker
-  still holds each child to its own reach, both ways.
+  chain. `describe`, the manifest and the viewer print the resolved profile; `describe` and the viewer mark what
+  is inherited, and the manifest names the parent in `extends`. And the parent is in the same file. The other
+  cost is that a diff to `review` changes `branch` with no line under `branch` in the diff. RFC 0016 says "the
+  diff under the word `production` is the review". After this RFC, the diff under the parent is also the review
+  of its children, and `extends` is the line that says so. The checker still holds each child to its own reach,
+  both ways.
 - **Chains.** Letting a parent extend another would let a tree build a ladder (`base` → `production` →
   `production-worker`). Neither the consumer nor the example needs one, and each step would be one more profile a
   reader opens. A refusal can be relaxed later with no tree breaking. A chain allowed now could not be refused
