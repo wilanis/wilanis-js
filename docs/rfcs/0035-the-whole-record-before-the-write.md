@@ -10,6 +10,9 @@
   0002 and RFC 0003 (storage: `put`, `patch`, and the declaration a `changes` is judged against). It supersedes RFC
   0033, which laid out three ways to move or compensate the guard and chose none; that RFC is withdrawn when this
   one is accepted.
+- **Amended by:** RFC 0038. A guard on `in` whose value nothing upstream judged is no longer steered only "as
+  before": the rehearsal follows the value out, through calls and maps, to what it sets, and never writes it past a
+  guard upstream.
 
 ## Summary
 

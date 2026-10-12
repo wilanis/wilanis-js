@@ -6,6 +6,9 @@
 - **Depends on:** none. RFC 0006 (accepted) adds `handler` to a scenario's `expect.nodes`; the two compose, and
   whichever lands second edits `pick` in `packages/runtime/src/fuzz.ts` beside the other's field. RFC 0019 reads this
   RFC's output (`regress` diffs, `--check` staleness) as JSON; nothing here waits for it.
+- **Amended by:** RFC 0038. A read of `in` is followed out through calls and maps before it is called `NEVER RUN`;
+  where it stops, the sentence says where and why, and a branch a literal closes on one path is `closed`, not a
+  problem, where another path runs it.
 
 ## Summary
 
