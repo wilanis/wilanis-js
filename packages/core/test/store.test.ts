@@ -61,6 +61,23 @@ describe('store', () => {
     ]);
     expect(refused(collections({ was: 'two words' }))).toEqual([at('collections/customers/was', 'identifier')]);
   });
+  it('a store may say which tree keeps its collections, by that tree name, and then instructs no migration', () => {
+    const customers = { of: '@features/f/domain/Customer.shape.json', key: 'id' };
+    // a kept store still says what the records are and what a read does: unique, refs and scoped instruct no migration
+    const read = { ...customers, unique: [['email']], description: 'the customers, as the customers tree keeps them' };
+    expect(refused(doc('store', { keptBy: 'platform-runtime', collections: { customers: read } }))).toEqual([]);
+    // the name is a project.json name, kebab-case
+    expect(refused(doc('store', { keptBy: 'Platform Runtime' }))).toEqual([
+      at('keptBy', 'must match', 'project.json → name'),
+    ]);
+    // renamed, was and defaults only instruct a migration, and only the keeping tree runs one
+    const marked = { ...customers, renamed: { email: 'emailAddress' }, was: 'people', defaults: { tier: 'bronze' } };
+    expect(refused(doc('store', { keptBy: 'platform-runtime', collections: { customers: marked } }))).toEqual([
+      at('collections/customers/renamed', "'renamed' is not allowed here"),
+      at('collections/customers/was', "'was' is not allowed here"),
+      at('collections/customers/defaults', "'defaults' is not allowed here"),
+    ]);
+  });
   it('a constraint names each field by its identifier, and names at least one', () => {
     const collections = (one: Record<string, unknown>) =>
       doc('store', { collections: { customers: { of: '@features/f/domain/Customer.shape.json', key: 'id', ...one } } });

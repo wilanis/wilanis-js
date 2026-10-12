@@ -26,6 +26,11 @@
       "description": "The connection the records live behind, by path. Its kind must be one a storage engine plugin grants -- one whose connection kind document says \"storage\": true.",
       "$ref": "common.schema.json#/$defs/path"
     },
+    "keptBy": {
+      "description": "The tree that keeps these collections, by its project.json → name. That tree writes the records and runs wilanis migrate over them; this tree only reads them. wilanis migrate never plans a connection whose stores say keptBy, and no graph or startup step of this tree writes through this store (X2n1). A collection may name a shape with fewer fields than the keeping tree's: an engine reads only the fields a shape names. Every store over one connection says the same keptBy, or none says it (X2n2).",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
     "reads": {
       "description": "The reads this store's collections are scoped by: local name -> the resolver that declares it, as @feature/edge/file.resolvers.json#name, the way a data graph or a binding binds one. Every entry is read by some collection's `scoped` (P005), and the compiler carries the read to every storage operation over that collection, so no document writes a scope.",
       "type": "object",
@@ -166,6 +171,27 @@
           }
         },
         "additionalProperties": false
+      }
+    }
+  },
+  "if": {
+    "description": "`keptBy` is what makes a store one this tree only reads.",
+    "required": ["keptBy"]
+  },
+  "then": {
+    "description": "A kept store carries no instruction to a migration that never runs: `renamed`, `was` and `defaults` only instruct one, and the keeping tree's own store says them.",
+    "properties": {
+      "collections": {
+        "description": "Every collection of a kept store: what it holds and how a read sees it, and nothing that renames a field or the collection or fills a new column.",
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "renamed": false,
+            "was": false,
+            "defaults": false
+          }
+        }
       }
     }
   },
