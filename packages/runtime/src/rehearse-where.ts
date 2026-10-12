@@ -11,7 +11,7 @@
  * graph -- and the guarded site -- it belongs to, and to the type its node declares it answers. `rehearse.ts`
  * beside it walks and runs; nothing here runs anything or reads a report.
  */
-import { bindings, guardSpecAt } from '@wilanis/compiler';
+import { bindings, guardSpecAt, takesWhole } from '@wilanis/compiler';
 import {
   type BindingDoc,
   type BindingOp,
@@ -25,8 +25,11 @@ import {
 } from '@wilanis/core';
 import type { Embedder } from './embed.js';
 
-/** A lowered spec as this walk reads one: its nodes by id, whatever each of them turns out to be. */
-export type Spec = { nodes: Record<string, unknown> };
+/**
+ * A lowered spec as this walk reads one: its nodes by id, whatever each of them turns out to be; and, for a graph a
+ * call names, whether it takes its input whole, handed under the one key `in` (`takesWhole`).
+ */
+export type Spec = { nodes: Record<string, unknown>; whole?: boolean };
 
 /**
  * Where a switch is, as a decision names it: the graph document it belongs to, and -- when it sits inside the
@@ -77,10 +80,17 @@ export const bindingGraph = (emb: Embedder, handler: string): string | undefined
  * guard unrehearsed, which is what #437 was.
  */
 export function specBehind(emb: Embedder, handler: string): Spec | undefined {
-  if (handler.startsWith('graph:')) return graphSpec(emb, handler.slice('graph:'.length));
+  if (handler.startsWith('graph:')) return calledGraph(emb, handler.slice('graph:'.length));
   if (guardSpecAt(handler)) return emb.guardSpec(handler);
   const ref = bindingGraph(emb, handler);
   return ref ? { nodes: { op: { kind: 'call', handler: `graph:${ref}` } } } : undefined;
+}
+
+/** The spec of a graph a call names, and whether the graph takes its input whole, as the compiler decides it. */
+function calledGraph(emb: Embedder, ref: string): Spec | undefined {
+  const spec = graphSpec(emb, ref);
+  const graph = emb.scope.get('graph', ref);
+  return spec && graph ? { ...spec, whole: takesWhole(emb.scope, graph) } : spec;
 }
 
 /**
