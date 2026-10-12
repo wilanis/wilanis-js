@@ -62,7 +62,8 @@ A profile that is another with a few choices changed names it under `extends` an
 bindings and stand-ins replace the parent's one by one, and a `permits` it writes replaces the parent's whole.
 `default` and `description` are never inherited, and the parent extends no other (C024). A startup step that
 names the parent does not run under the child; name both. `wilanis describe project.json`, the manifest and the
-viewer print what the child resolves to, and mark what it takes from the parent.
+viewer print what the child resolves to; `describe` and the viewer mark what it takes from the parent, and the
+manifest names the parent in `extends`.
 
 ## Graphs
 
