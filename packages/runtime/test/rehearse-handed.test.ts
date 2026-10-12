@@ -1,9 +1,10 @@
 /**
  * How the rehearsal steers a switch or a guard that reads `in` where `in` is no longer the trigger's own (RFC 0038,
  * step 2). The read is followed out through every call and map that handed it down (`traced`), to what the rehearsal
- * sets: a node's answer, an element of a list a node holds, or the trigger's input. A traced demand never lands past
- * a guard: where it meets a guard's answer, it is written into the value the guard judges, so the guard judges it.
- * The trees are in `rehearse-handed-trees.ts`.
+ * sets: an effect's answer or the trigger's input. A node that calls nothing outside the process -- a call into a graph,
+ * a `make`, a guard's made value -- is run, never stubbed: the read goes on through it to what it copies (#1027). These
+ * trees read nothing outside the process, so every demand lands on the trigger's input. The trees are in
+ * `rehearse-handed-trees.ts`.
  */
 import { rmSync } from 'node:fs';
 import { checkTree } from '@wilanis/compiler';
@@ -55,8 +56,8 @@ describe('a value a map hands every element alike (M2)', () => {
   it("is followed out through the map's own in to the node that answers it", { timeout: 30_000 }, async () => {
     const load = loaded(broadcastTree());
     expect(await steeredBy(load, 'op.judged.0.op.isFirst')).toEqual([
-      { stubs: ['op.info'], input: [], unreachable: [] },
-      { stubs: ['op.info'], input: [], unreachable: [] },
+      { stubs: [], input: ['target'], unreachable: [] },
+      { stubs: [], input: ['target'], unreachable: [] },
     ]);
     const done = await rehearse(load, { seed: 1 });
     expect(branchesOf(done, 'domain/judge.graph.json', 'isFirst')).toEqual([
@@ -79,8 +80,8 @@ describe('a value a calling graph hands', () => {
     it(`is followed out to the node it is ${what}`, { timeout: 30_000 }, async () => {
       const load = loaded(calledTree(handed));
       expect(await steeredBy(load, 'op.judged.op.isHigh')).toEqual([
-        { stubs: ['op.facts'], input: [], unreachable: [] },
-        { stubs: ['op.facts'], input: [], unreachable: [] },
+        { stubs: [], input: ['target'], unreachable: [] },
+        { stubs: [], input: ['target'], unreachable: [] },
       ]);
       const done = await rehearse(load, { seed: 1 });
       expect(branchesOf(done, 'domain/judge.graph.json', 'isHigh')).toEqual([
@@ -113,8 +114,8 @@ describe('a guard on each element a map writes (Item 12)', () => {
   }, async () => {
     const load = loaded(eachGuardTree());
     expect(await steeredBy(load, 'op.written.0.op.in:check')).toEqual([
-      { stubs: ['op.plan'], input: [], unreachable: [] },
-      { stubs: ['op.plan'], input: [], unreachable: [] },
+      { stubs: [], input: ['writes.0.privateHits'], unreachable: [] },
+      { stubs: [], input: ['writes.0.privateHits'], unreachable: [] },
     ]);
     const done = await rehearse(load, { seed: 1 });
     expect(branchesOf(done, 'data/write.graph.json', 'in:check')).toEqual([
@@ -164,13 +165,13 @@ describe('a guard whose value a site upstream proved', () => {
 });
 
 describe('a demand traced to the answer of a guard upstream', () => {
-  it('writes an element of a list a guarded node holds into the value that guard judges', {
+  it('carries an element of a list a guarded node holds through the value that guard judges, to what it copies', {
     timeout: 30_000,
   }, async () => {
     const load = loaded(eachGuardTree('plan'));
     expect(await steeredBy(load, 'op.written.0.op.in:check')).toEqual([
-      { stubs: ['op.plan:made'], input: [], unreachable: [] },
-      { stubs: ['op.plan:made'], input: [], unreachable: [] },
+      { stubs: [], input: ['writes.0.privateHits'], unreachable: [] },
+      { stubs: [], input: ['writes.0.privateHits'], unreachable: [] },
     ]);
     const done = await rehearse(load, { seed: 1 });
     expect(branchesOf(done, 'data/write.graph.json', 'in:check')).toEqual([
@@ -185,8 +186,8 @@ describe('a demand traced to the answer of a guard upstream', () => {
   }, async () => {
     const load = loaded(throughGuardTree());
     expect(await steeredBy(load, 'op.judged.op.rated.op.isHigh')).toEqual([
-      { stubs: ['op.facts'], input: [], unreachable: [] },
-      { stubs: ['op.facts'], input: [], unreachable: [] },
+      { stubs: [], input: ['target'], unreachable: [] },
+      { stubs: [], input: ['target'], unreachable: [] },
     ]);
     const done = await rehearse(load, { seed: 1 });
     expect(branchesOf(done, 'domain/rate.graph.json', 'isHigh')).toEqual([
@@ -196,19 +197,20 @@ describe('a demand traced to the answer of a guard upstream', () => {
     expect(done.ok, done.lines.join('\n')).toBe(true);
   });
 
-  it('is written into the value that guard judges, never past it', { timeout: 30_000 }, async () => {
-    // keep is handed the person's name, which person:check judged, beside the draft's email
+  it('is carried through the value that guard judges, which then judges it first', { timeout: 30_000 }, async () => {
+    // keep is handed the person's name, which person:check judged, beside the draft's email: the name is followed
+    // through person:made to the draft it copies, so a name that breaks the rule is refused at person:check first
     const load = loaded(peopleTree('email'));
     const steered = await steeredBy(load, 'op.kept.op.in:check');
-    for (const one of steered) expect(one.stubs).not.toContain('op.person');
-    expect(steered.flatMap(one => one.stubs)).toContain('op.person:made');
+    for (const one of steered) expect(one.stubs).toEqual([]);
     const done = await rehearse(load, { seed: 1 });
     const lines = done.lines;
     const at = lines.findIndex(line => line.includes("data/keep-person  guard 'in:check'"));
     expect(lines.slice(at, at + 3)).toEqual([
-      "features/people/data/keep-person  guard 'in:check' A person is reachable  1/2 branches",
+      "features/people/data/keep-person  guard 'in:check' A person is reachable  2/2 branches",
       "  ok  holds     answered from 'in:ok'",
-      "  ??  violated  NEVER RUN -- the rehearsal did not reach it: the run ended at 'person:violated' in features/people/domain/register-person, which refused as invariant",
+      "  ok  violated  held upstream by guard 'person:check' in features/people/domain/register-person, which judged this value first",
     ]);
+    expect(done.ok, done.lines.join('\n')).toBe(true);
   });
 });

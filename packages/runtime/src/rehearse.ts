@@ -5,7 +5,7 @@
 import { type Guard, guardsOf, idsOf, TAKEN_IDS, walkedUnder } from '@wilanis/compiler';
 import type { Loaded, LoadResult, TriggerDoc } from '@wilanis/core';
 import { Scope } from '@wilanis/core';
-import type { Outcome, Report } from '@wilanis/engine';
+import type { Report } from '@wilanis/engine';
 import { outcomeOf } from '@wilanis/engine';
 import { type Case, casesFor, type FoundSwitch, over } from './branches.js';
 import type { Embedder } from './embed.js';
@@ -13,7 +13,7 @@ import { activeProfile, recordedProfile, skippedLines } from './profile.js';
 import { type Recorded, type Recording, recordRuns, replayedRuns } from './record.js';
 import { recordedDir } from './recorded-owner.js';
 import { type Decision, format, gather, type PlainRun, short, statedOf, stateName } from './rehearsal-report.js';
-import { heldUpstream } from './rehearse-held.js';
+import { endedIn, heldUpstream, judgedFirst } from './rehearse-held.js';
 import {
   answering,
   misfitOf,
@@ -293,17 +293,28 @@ async function decisionFor(walk: Walk, sw: FoundSwitch): Promise<Decision> {
   // each case writes its demands over what steers the run to the switch, so a node both read keeps every field
   const cases = casesFor(sw, over(walk.stubbing, { ...others.stubs, ...pre.stubs }));
   for (const one of cases) {
-    if (held) {
-      decision.branches.push({ when: one.branch.when, to: one.branch.to, held });
-      continue;
-    }
-    const { said, ran } = await branchOf(walk, sw, one, { pre, others });
-    decision.branches.push(said);
-    // a guard's switch is the compiler's, in no document a scenario can name: it is not recorded
-    const recorded = guard ? undefined : recordedOf(walk, decision, { one, cases, ran });
-    if (recorded) walk.runs?.push(recorded);
+    if (held) decision.branches.push({ when: one.branch.when, to: one.branch.to, held });
+    else await ranCase({ walk, sw, decision, guard }, one, { cases, steer: { pre, others } });
   }
   return decision;
+}
+
+/** What one decision's cases are run in: the walk, the switch, the decision they are said in, and its guard. */
+type Deciding = { walk: Walk; sw: FoundSwitch; decision: Decision; guard?: Guard };
+
+/** One case of a decision run and said, and recorded where the rehearsal records and the switch is the author's. */
+async function ranCase(
+  { walk, sw, decision, guard }: Deciding,
+  one: Case,
+  how: { cases: Case[]; steer: { pre: Steering; others: Pick<Steering, 'stubs' | 'input'> } },
+): Promise<void> {
+  const { said, ran, ended } = await branchOf(walk, sw, one, how.steer);
+  // a value made to break a guard's rule may meet the same rule first, in a guard the run passes on the way (#1027)
+  const first = guard && judgedFirst(walk.probe, ended, guard);
+  decision.branches.push(first ? { when: one.branch.when, to: one.branch.to, held: first } : said);
+  // a guard's switch is the compiler's, in no document a scenario can name: it is not recorded
+  const recorded = guard ? undefined : recordedOf(walk, decision, { one, cases: how.cases, ran });
+  if (recorded) walk.runs?.push(recorded);
 }
 
 /** One case of a switch: the branch it reaches, or why nothing can reach it. */
@@ -312,7 +323,7 @@ async function branchOf(
   sw: FoundSwitch,
   one: Case,
   steer: { pre: Steering; others: Pick<Steering, 'stubs' | 'input'> },
-): Promise<{ said: Decision['branches'][number]; ran?: Ran }> {
+): Promise<{ said: Decision['branches'][number]; ran?: Ran; ended?: Report }> {
   const at = { when: one.branch.when, to: one.branch.to };
   const uncovered = uncoveredBy(one);
   if (uncovered !== undefined) return { said: { ...at, uncovered } };
@@ -334,7 +345,7 @@ async function branchOf(
   const report = await emb.fire(walk.trigger.doc, fired, walk.context, { stubs: given });
   // a run that never got to the switch proves nothing of the branch, and is not recorded as though it did
   const local = ranAt(report, sw);
-  if (!local) return { said: { ...at, uncovered: notReached(report) } };
+  if (!local) return { said: { ...at, uncovered: notReached(report) }, ended: report };
   // a stubbed node's handler never runs, so what the case gave is written over what the run generated
   const ran = { input: fired, stubs: { ...record, ...given }, report, broken: [...broken] };
   return { said: { ...at, settled: settle(local, sw, one.branch.to) }, ran };
@@ -360,12 +371,3 @@ const WENT: Record<Report['status'], string> = {
   blocked: 'blocked',
   cancelled: 'was cancelled',
 };
-
-/** Where a run that did not answer ended: the innermost graph, through each failed call's own run, and its outcome. */
-function endedIn(report: Report): (Extract<Outcome, { kind: 'refused' | 'faulted' }> & { graph: string }) | undefined {
-  const outcome = outcomeOf(report);
-  if (outcome.kind !== 'refused' && outcome.kind !== 'faulted') return undefined;
-  const node = report.nodes[outcome.at];
-  const deeper = node?.sub ?? node?.items?.find(item => item.status === 'failed')?.sub;
-  return (deeper && endedIn(deeper)) || { ...outcome, graph: report.graph };
-}

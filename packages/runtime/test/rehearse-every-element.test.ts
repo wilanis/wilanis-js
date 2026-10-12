@@ -3,7 +3,7 @@
  * map runs per element -- a guard on each customer of a list -- judges every element, so a stub or an input whose
  * other elements keep their generated values breaks it wherever a generated value does: a generated email never holds
  * an `@`. The rehearsal keeps a list of more than one element and writes the demand into each, each changed from its
- * own generated value. The trees are in `rehearse-every-element-trees.ts`.
+ * own generated value -- in the trigger's input, where these trees read every list from (#1027). The trees are in `rehearse-every-element-trees.ts`.
  */
 import { rmSync } from 'node:fs';
 import { checkTree } from '@wilanis/compiler';
@@ -34,15 +34,16 @@ const SEEDS = [1, 2, 3, 4, 5, 6];
 
 /**
  * The customers a run of switch `loud` is steered with under a seed, where the rule on each one is met by the other
- * decisions on the way (`answering`): the stub of the list the node makes, or the list in the trigger's patched input.
+ * decisions on the way (`answering`): the list in the trigger's patched input. Where the node makes the list, it makes
+ * it of `in.list` with a pure `make`, which is run and never stubbed, so the demand lands on the input there too (#1027).
  */
-async function customersSteered(load: LoadResult, held: Held, seed: number): Promise<{ email: string }[]> {
+async function customersSteered(load: LoadResult, seed: number): Promise<{ email: string }[]> {
   const trigger = load.registry.all('trigger')[0];
   const walk = trigger && (await switchesReached(load, trigger, seed));
   const sw = walk?.found.find(one => one.at === 'op.loud');
   if (!walk || !sw) throw new Error(`no switch 'loud': ${walk?.found.map(one => one.at).join(', ')}`);
   const steered = answering(walk, sw);
-  if (held === 'node') return steered.stubs['op.customers:made'] as { email: string }[];
+  expect(steered.stubs).toEqual({});
   let input = walk.input;
   for (const patch of steered.input) input = patched(walk, input, patch);
   return (input as { list: { email: string }[] }).list;
@@ -63,7 +64,7 @@ describe('a demand on a list element a node holds', () => {
     const load = loaded('node');
     const sizes = new Set<number>();
     for (const seed of SEEDS) {
-      const customers = await customersSteered(load, 'node', seed);
+      const customers = await customersSteered(load, seed);
       sizes.add(customers.length);
       for (const one of customers) expect(one.email, `seed ${seed}`).toContain('@');
       const { settled, ok, said } = await loudUnder(load, seed);
@@ -77,7 +78,7 @@ describe('a demand on a list element a node holds', () => {
   it('writes a value the rule pins into every element alike', { timeout: 60_000 }, async () => {
     const load = loaded('node', "email == 'ada@example.org'");
     for (const seed of SEEDS) {
-      const customers = await customersSteered(load, 'node', seed);
+      const customers = await customersSteered(load, seed);
       expect(customers.map(one => one.email)).toEqual(customers.map(() => 'ada@example.org'));
       const { ok, said } = await loudUnder(load, seed);
       expect(ok, said).toBe(true);
@@ -92,7 +93,7 @@ describe("a demand on an element of a list the trigger's input holds", () => {
     const load = loaded('input');
     const sizes = new Set<number>();
     for (const seed of SEEDS) {
-      const customers = await customersSteered(load, 'input', seed);
+      const customers = await customersSteered(load, seed);
       sizes.add(customers.length);
       for (const one of customers) expect(one.email, `seed ${seed}`).toContain('@');
       const { settled, ok, said } = await loudUnder(load, seed);

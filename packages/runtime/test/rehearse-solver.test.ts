@@ -8,7 +8,7 @@ import { rmSync } from 'node:fs';
 import { checkTree } from '@wilanis/compiler';
 import { loadTree } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_PLUGINS, rehearse } from '../src/index.js';
+import { rehearse } from '../src/index.js';
 import { branchesOf } from '../src/solve.js';
 import {
   decide,
@@ -24,6 +24,7 @@ import {
   treeOf,
   trigger,
 } from './rehearse-stubs-trees.js';
+import { SOURCE, SOURCED } from './source-plugin.js';
 
 /**
  * `check` reads a scan and decides on it three times: `status` names two of its three enum members and sends the third,
@@ -45,51 +46,56 @@ function scanTree(): string {
     { when: "status == 'clean'", to: 'ok' },
     { when: "status == 'findings'", to: 'broke' },
   ];
-  return treeOf({
-    'domain/Read.shape.json': { layer: 'core', fields: read },
-    'domain/Result.shape.json': { layer: 'core', fields: { status, count: NUMBER } },
-    'domain/Ask.shape.json': { layer: 'core', fields: { target: STRING } },
-    'edge/AskIn.shape.json': { layer: 'edge', fields: { target: STRING } },
-    'edge/Out.shape.json': { layer: 'edge', fields: { status: STRING, count: NUMBER } },
-    'domain/scan.port.json': {
-      operations: {
-        check: { description: 'd', accepts: { target: STRING }, returns: result, refuses: true },
-        read: { description: 'd', accepts: { target: STRING }, returns: shape('Read') },
+  return treeOf(
+    {
+      'domain/Read.shape.json': { layer: 'core', fields: read },
+      'domain/Result.shape.json': { layer: 'core', fields: { status, count: NUMBER } },
+      'domain/Ask.shape.json': { layer: 'core', fields: { target: STRING } },
+      'edge/AskIn.shape.json': { layer: 'edge', fields: { target: STRING } },
+      'edge/Out.shape.json': { layer: 'edge', fields: { status: STRING, count: NUMBER } },
+      'domain/scan.port.json': {
+        operations: {
+          check: { description: 'd', accepts: { target: STRING }, returns: result, refuses: true },
+          read: { description: 'd', accepts: { target: STRING }, returns: shape('Read') },
+        },
       },
-    },
-    'data/scan.binding.json': {
-      port,
-      operations: {
-        check: { graph: `${HERE}/domain/check.graph.json` },
-        read: { graph: `${HERE}/data/read.graph.json` },
+      'data/scan.binding.json': {
+        port,
+        operations: {
+          check: { graph: `${HERE}/domain/check.graph.json` },
+          read: { run: SOURCE, in: { type: shape('Read') } },
+        },
       },
+      'domain/check.graph.json': graph(
+        'Check',
+        shape('Ask'),
+        { type: result, from: ['good', 'same', 'broke', 'disagree'] },
+        [
+          run('got', `${port}#read`, { target: '{{in.target}}' }),
+          decide('status', { status: '{{got.status}}' }, rules, 'ok'),
+          refuse('broke', 'broke', result),
+          make('ok', { status: '{{got.status}}', count: '{{got.count}}' }, result),
+          decide(
+            'agree',
+            { agrees: '{{got.agrees}}', n: '{{ok.count}}' },
+            [{ when: 'agrees', to: 'moved' }],
+            'disagree',
+          ),
+          refuse('disagree', 'disagree', result),
+          decide(
+            'moved',
+            { previous: '{{got.previous}}', commit: '{{got.commit}}' },
+            [{ when: 'has(previous) && previous == commit', to: 'same' }],
+            'good',
+          ),
+          refuse('same', 'same', result),
+          make('good', { status: '{{ok.status}}', count: '{{ok.count}}' }, result),
+        ],
+      ),
+      'edge/check.trigger.json': trigger('check', { in: edge('AskIn'), out: edge('Out') }, `${port}#check`),
     },
-    'data/read.graph.json': graph('Read', shape('Ask'), { type: shape('Read'), from: 'r' }, [
-      make('r', { status: 'broke', agrees: false, count: 0, commit: '{{in.target}}' }, shape('Read')),
-    ]),
-    'domain/check.graph.json': graph(
-      'Check',
-      shape('Ask'),
-      { type: result, from: ['good', 'same', 'broke', 'disagree'] },
-      [
-        run('got', `${port}#read`, { target: '{{in.target}}' }),
-        decide('status', { status: '{{got.status}}' }, rules, 'ok'),
-        refuse('broke', 'broke', result),
-        make('ok', { status: '{{got.status}}', count: '{{got.count}}' }, result),
-        decide('agree', { agrees: '{{got.agrees}}', n: '{{ok.count}}' }, [{ when: 'agrees', to: 'moved' }], 'disagree'),
-        refuse('disagree', 'disagree', result),
-        decide(
-          'moved',
-          { previous: '{{got.previous}}', commit: '{{got.commit}}' },
-          [{ when: 'has(previous) && previous == commit', to: 'same' }],
-          'good',
-        ),
-        refuse('same', 'same', result),
-        make('good', { status: '{{ok.status}}', count: '{{ok.count}}' }, result),
-      ],
-    ),
-    'edge/check.trigger.json': trigger('check', { in: edge('AskIn'), out: edge('Out') }, `${port}#check`),
-  });
+    { source: true },
+  );
 }
 
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -97,7 +103,7 @@ const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8];
 describe('rehearsing a tree whose switches read an enum and compare two fields', () => {
   it('settles every branch under every seed', { timeout: 60_000 }, async () => {
     const dir = scanTree();
-    const load = loadTree(dir, BUILTIN_PLUGINS);
+    const load = loadTree(dir, SOURCED);
     expect(checkTree(load).format()).toBe('');
     const runs = [];
     for (const seed of SEEDS) runs.push({ seed, run: await rehearse(load, { seed }) });
@@ -142,49 +148,49 @@ function exhaustedTree(variant: Variant): string {
   if (routesAbsent) rules.push({ when: `!has(${held})`, to: 'missing' });
   const missing = routesAbsent ? [make('missing', { label: 'missing' }, result)] : [];
   const read = nested ? { info: { type: shape('Info'), required: false } } : { status };
-  return treeOf({
-    'domain/Info.shape.json': { layer: 'core', fields: { status } },
-    'domain/Read.shape.json': { layer: 'core', fields: { ...read, commit: STRING } },
-    'domain/Result.shape.json': { layer: 'core', fields: { label: STRING } },
-    'domain/Ask.shape.json': { layer: 'core', fields: { target: STRING } },
-    'edge/AskIn.shape.json': { layer: 'edge', fields: { target: STRING } },
-    'edge/Out.shape.json': { layer: 'edge', fields: { label: STRING } },
-    'domain/scan.port.json': {
-      operations: {
-        sort: { description: 'd', accepts: { target: STRING }, returns: result },
-        read: { description: 'd', accepts: { target: STRING }, returns: shape('Read') },
+  return treeOf(
+    {
+      'domain/Info.shape.json': { layer: 'core', fields: { status } },
+      'domain/Read.shape.json': { layer: 'core', fields: { ...read, commit: STRING } },
+      'domain/Result.shape.json': { layer: 'core', fields: { label: STRING } },
+      'domain/Ask.shape.json': { layer: 'core', fields: { target: STRING } },
+      'edge/AskIn.shape.json': { layer: 'edge', fields: { target: STRING } },
+      'edge/Out.shape.json': { layer: 'edge', fields: { label: STRING } },
+      'domain/scan.port.json': {
+        operations: {
+          sort: { description: 'd', accepts: { target: STRING }, returns: result },
+          read: { description: 'd', accepts: { target: STRING }, returns: shape('Read') },
+        },
       },
-    },
-    'data/scan.binding.json': {
-      port,
-      operations: {
-        sort: { graph: `${HERE}/domain/sort.graph.json` },
-        read: { graph: `${HERE}/data/read.graph.json` },
+      'data/scan.binding.json': {
+        port,
+        operations: {
+          sort: { graph: `${HERE}/domain/sort.graph.json` },
+          read: { run: SOURCE, in: { type: shape('Read') } },
+        },
       },
+      'domain/sort.graph.json': graph(
+        'Sort',
+        shape('Ask'),
+        { type: result, from: ['known', ...(routesAbsent ? ['missing'] : []), 'unknown'] },
+        [
+          run('got', `${port}#read`, { target: '{{in.target}}' }),
+          decide('status', { [held]: `{{got.${held}}}` }, rules, 'unknown'),
+          make('known', { label: '{{got.commit}}' }, result),
+          ...missing,
+          make('unknown', { label: 'unknown' }, result),
+        ],
+      ),
+      'edge/sort.trigger.json': trigger('sort', { in: edge('AskIn'), out: edge('Out') }, `${port}#sort`),
     },
-    'data/read.graph.json': graph('Read', shape('Ask'), { type: shape('Read'), from: 'r' }, [
-      make('r', { ...(nested ? {} : { status: 'broke' }), commit: '{{in.target}}' }, shape('Read')),
-    ]),
-    'domain/sort.graph.json': graph(
-      'Sort',
-      shape('Ask'),
-      { type: result, from: ['known', ...(routesAbsent ? ['missing'] : []), 'unknown'] },
-      [
-        run('got', `${port}#read`, { target: '{{in.target}}' }),
-        decide('status', { [held]: `{{got.${held}}}` }, rules, 'unknown'),
-        make('known', { label: '{{got.commit}}' }, result),
-        ...missing,
-        make('unknown', { label: 'unknown' }, result),
-      ],
-    ),
-    'edge/sort.trigger.json': trigger('sort', { in: edge('AskIn'), out: edge('Out') }, `${port}#sort`),
-  });
+    { source: true },
+  );
 }
 
 /** The rehearsal's lines for an `exhaustedTree` under every seed, and whether each rehearsal was ok. */
 async function rehearsedUnder(variant: Variant): Promise<{ said: string; ok: boolean }[]> {
   const dir = exhaustedTree(variant);
-  const load = loadTree(dir, BUILTIN_PLUGINS);
+  const load = loadTree(dir, SOURCED);
   expect(checkTree(load).format()).toBe('');
   const runs = [];
   for (const seed of SEEDS) {
@@ -234,14 +240,22 @@ describe('rehearsing a switch whose rules name every member of an enum (#861)', 
 describe('a contains rule: the solver makes a text that holds the word, or lacks it (RFC 0040)', () => {
   it('demands the word of the rule and its absence of the else', () => {
     const [rule, otherwise] = branchesOf([{ when: "email contains '@'", to: 'a' }], 'b');
+    // one set of constraints each, so the only alternative is the demand itself
     expect(rule).toEqual({
       rule: 0,
       when: "email contains '@'",
       to: 'a',
       demands: { email: { contains: ['@'], present: true } },
+      alternatives: [{ email: { contains: ['@'], present: true } }],
     });
     // like lacks and ne, a word the text must lack does not demand the text: a missing email holds no @ either
-    expect(otherwise).toEqual({ rule: -1, when: 'else', to: 'b', demands: { email: { omits: ['@'] } } });
+    expect(otherwise).toEqual({
+      rule: -1,
+      when: 'else',
+      to: 'b',
+      demands: { email: { omits: ['@'] } },
+      alternatives: [{ email: { omits: ['@'] } }],
+    });
   });
   it('turns the demand over under !', () => {
     const [rule, otherwise] = branchesOf([{ when: "!(note contains 'http')", to: 'a' }], 'b');

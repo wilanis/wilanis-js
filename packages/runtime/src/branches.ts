@@ -13,15 +13,18 @@ import {
   lay,
   type Missed,
   meet,
+  onHolder,
+  overrides,
   type Patch,
   type Steered,
   standIn,
   typeAtPath,
   type Unmet,
 } from './demands.js';
-import type { Branch, Domain } from './domains.js';
+import type { Branch, Demands, Domain } from './domains.js';
 import { type Holder, handedAs, listHolder, ownInputAt, sourceOf, standingOf } from './frames.js';
 import type { MapRule } from './map-rules.js';
+import type { AnsweredIn } from './rehearse-calls.js';
 import { branchesOf } from './solve.js';
 import { getPath, satisfy, setPath } from './stubs.js';
 
@@ -60,16 +63,28 @@ export interface Stubbing {
    * the value it copies. Only `fuzz --edges` gives it: it steers the trigger's input and never a node's answer.
    */
   writtenOf?: (nodePath: string) => unknown;
+  /** Where the call at a dotted path into one of the tree's graphs answers from: it is run, never stubbed (#1027). */
+  answeredIn?: (nodePath: string) => AnsweredIn | undefined;
+  /** What the seed generated at a node path, under whatever `over` laid on top: what a steered value is told from. */
+  seeded?: (nodePath: string) => unknown;
+  /** The stubs other decisions steered, which a case is laid over: a value they set is one a case should keep. */
+  steered?: Record<string, unknown>;
   /** The map with a `where` at a dotted path, whose rule is logic: run, never stubbed (#1027). */
   mapRuleOf?: (nodePath: string) => MapRule | undefined;
 }
 
 /**
  * A stubbing whose seed values are what `stubs` already steered, where it steered them: a case built over it writes
- * its demands on top of those, so laying it over them keeps every field they set that it does not demand itself.
+ * its demands on top of those, so laying it over them keeps every field they set that it does not demand itself, and
+ * picks the constraints that change the fewest of them (`keeping`).
  */
 export function over(from: Stubbing, stubs: Record<string, unknown>): Stubbing {
-  return { ...from, generated: path => (path in stubs ? stubs[path] : from.generated(path)) };
+  return {
+    ...from,
+    generated: path => (path in stubs ? stubs[path] : from.generated(path)),
+    seeded: from.seeded ?? from.generated,
+    steered: { ...from.steered, ...stubs },
+  };
 }
 
 /** Where a walk over a spec has reached: the path so far, the handlers already walked, and the lists it passed through. */
@@ -278,7 +293,7 @@ export function nonEmpty(list: FoundList, from: Stubbing, outer: FoundList[] = [
     const holder = ownListOf(held, list, from);
     return holder ? nonEmpty(holder, from, held.lists) : NOTHING;
   }
-  return { stubs: stubHolding(held, from), input: [] };
+  return heldOne(held, from);
 }
 
 /** What a list the rehearsal sets must be to run a mapped operation for the one element it steers: there, with that element alone. */
@@ -294,9 +309,20 @@ function handedFrom(src: { ref: string; path: string[] }, list: FoundList, outer
 }
 
 /** The patch to the trigger's input that makes the list at a path hold one element. */
-function patchOf(path: string[], from: Stubbing): { path: string[]; value: unknown } {
+function patchOf(path: string[], from: Stubbing): Patch {
   const value = satisfy(ONE_ELEMENT, getPath(from.inputSeed, path), typeAtPath(from.inType, path), from.seed ?? 1);
-  return { path, value };
+  return { path, value, held: ONE_ELEMENT };
+}
+
+/**
+ * What makes the node that holds a list answer one element: the demand carried inward where that node is run and never
+ * stubbed (#1027), to the effect it lands on; the holder's own stub only where the demand cannot be carried.
+ */
+function heldOne(held: Holder, from: Stubbing): NonEmpty {
+  const settled: Settled = { ...from, typeOf: from.typeOf ?? (() => undefined), seed: from.seed ?? 1 };
+  const steered: Steered = { stubs: {}, input: [] };
+  if (lay(onHolder(held, ONE_ELEMENT, settled), steered, settled)) return { stubs: stubHolding(held, from), input: [] };
+  return steered;
 }
 
 /**
@@ -385,13 +411,30 @@ function steer(branch: Branch, found: FoundSwitch, from: Settled, steerable: boo
   const steered: Steered = { stubs: {}, input: [] };
   const unmet: [string, Unmet][] = [];
   const at: At = { node: found.node, prefix: found.prefix, steerable, standing: standingOf(found) };
-  const demands = branch.unsolved ? [] : Object.entries(branch.demands);
+  const demands = branch.unsolved ? [] : Object.entries(keeping(branch, at, from));
   for (const [dotted, domain] of demands) {
     const why = lay(meet(dotted, domain, at, from), steered, from);
     if (why) unmet.push([dotted, why]);
   }
   const { stubs, input } = steered;
   return { at: found.at, branch, stubs, ...(input.length ? { input } : {}), ...missedOf(unmet) };
+}
+
+/**
+ * Which of a branch's sets of constraints a case meets: the one that changes the fewest values other decisions steered,
+ * the first among equals, since such a value may be what routes the run to this switch -- a rule `tier != 'gold' ||
+ * has(note)` over a record steered to be gold keeps the gold and asks for the note (#1027).
+ */
+function keeping(branch: Branch, at: At, from: Settled): Demands {
+  const sets = branch.alternatives ?? [branch.demands];
+  const changes = (set: Demands) =>
+    Object.entries(set).filter(([dotted, domain]) => overrides(meet(dotted, domain, at, from), from)).length;
+  let best = { set: branch.demands, changed: Number.POSITIVE_INFINITY };
+  for (const set of sets) {
+    const changed = changes(set);
+    if (changed < best.changed) best = { set, changed };
+  }
+  return best.set;
 }
 
 /**
