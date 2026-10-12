@@ -94,6 +94,24 @@ describe('shared answers (RFC 0036)', () => {
   });
 });
 
+describe('a profile (RFC 0043)', () => {
+  const profiled = (profile: Record<string, unknown>) => doc('project', { profiles: { worker: profile } });
+
+  it('that extends another and writes no bindings conforms; one with bindings and no extends does too', () => {
+    expect(refused(profiled({ extends: 'production' }))).toEqual([]);
+    expect(refused(profiled({ bindings: {} }))).toEqual([]);
+    expect(refused(profiled({ extends: 'production', bindings: {}, permits: [] }))).toEqual([]);
+  });
+  it('that writes neither is refused, and so is a parent that is no profile name', () => {
+    expect(refused(profiled({ description: 'a worker' }))).toEqual([
+      at('profiles/worker', "missing 'bindings'"),
+      at('profiles/worker', "missing 'extends'"),
+    ]);
+    const [[path, message]] = refused(profiled({ extends: 'Production' }));
+    expect([path, message.startsWith('must match')]).toEqual(['profiles/worker/extends', true]);
+  });
+});
+
 describe('the envelope', () => {
   it('a document is a JSON object', () => {
     expect(refused([])).toEqual([at(undefined, 'a document is a JSON object')]);

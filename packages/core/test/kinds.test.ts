@@ -189,7 +189,10 @@ describe('project and feature', () => {
       at('secrets/k', 'environment variable', 'UPPER_CASE'),
     ]);
     expect(refused(doc('project', { profiles: { Prod: { bindings: {} } } }))).toEqual([at('profiles', 'kebab-case')]);
-    expect(refused(doc('project', { profiles: { prod: {} } }))).toEqual([at('profiles/prod', "missing 'bindings'")]);
+    expect(refused(doc('project', { profiles: { prod: {} } }))).toEqual([
+      at('profiles/prod', "missing 'bindings'"),
+      at('profiles/prod', "missing 'extends'"),
+    ]);
     expect(
       refused(doc('project', { profiles: { prod: { bindings: { 'tasks.port.json': '@x/b.binding.json' } } } })),
     ).toEqual([at('profiles/prod/bindings', 'domain port path')]);

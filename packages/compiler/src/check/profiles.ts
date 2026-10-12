@@ -26,7 +26,7 @@ export function checkProfiles(judge: Judge): void {
 
 /** What one profile chooses: a binding per domain port, and a stand-in per connection. */
 function checkProfileChoices(judge: Judge, name: string, profile: ProfileDoc): void {
-  for (const entry of Object.entries(profile.bindings)) checkProfileBinding(judge, name, entry);
+  for (const entry of Object.entries(profile.bindings ?? {})) checkProfileBinding(judge, name, entry);
   for (const entry of Object.entries(profile.connections ?? {})) checkProfileConnection(judge, name, entry);
 }
 

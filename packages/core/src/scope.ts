@@ -18,6 +18,7 @@ import type {
   ProjectDoc,
   TriggerKindDoc,
 } from './model.js';
+import { type ResolvedProfile, resolveProfile } from './profiles.js';
 import { type Loaded, type Registry, splitRef } from './registry.js';
 import type { Resolves } from './resolves.js';
 import { PLACEHOLDER } from './templates.js';
@@ -55,6 +56,7 @@ function placeholderObject(value: string): Type {
 export class Scope {
   readonly types: TypeResolver;
   readonly project: ProjectDoc | undefined;
+  private readonly resolved = new Map<string, ResolvedProfile | undefined>();
 
   constructor(
     readonly registry: Registry,
@@ -109,10 +111,7 @@ export class Scope {
 
   /** The binding for a domain port under a profile: the profile's choice, else the one and only binding. */
   bindingFor(portPath: string, profile?: string): Loaded<BindingDoc> | string {
-    const declared = profile ? this.project?.profiles?.[profile] : undefined;
-    const chosen = declared
-      ? Object.entries(declared.bindings).find(([ref]) => this.canon(ref) === portPath)?.[1]
-      : undefined;
+    const chosen = profile ? this.profile(profile)?.bindings[portPath] : undefined;
     if (chosen)
       return this.get('binding', chosen) ?? `profile '${profile}' names unknown binding '${chosen}' for '${portPath}'`;
     const all = this.bindingsFor(portPath);
@@ -127,13 +126,18 @@ export class Scope {
    */
   connectionFor(connectionPath: string, profile?: string): Loaded<ConnectionDoc> | string {
     const path = this.canon(connectionPath);
-    const declared = profile ? this.project?.profiles?.[profile]?.connections : undefined;
-    const standIn = declared ? Object.entries(declared).find(([ref]) => this.canon(ref) === path)?.[1] : undefined;
+    const standIn = profile ? this.profile(profile)?.connections[path] : undefined;
     const found = this.get('connection', standIn ?? path);
     if (found) return found;
     return standIn
       ? `profile '${profile}' names unknown connection '${standIn}' for '${path}'`
       : `unknown connection '${path}'`;
+  }
+
+  /** What a declared profile means: its own choices over those of the profile it extends, resolved once per name. */
+  profile(name: string): ResolvedProfile | undefined {
+    if (!this.resolved.has(name)) this.resolved.set(name, resolveProfile(this.project?.profiles, name, this.canon));
+    return this.resolved.get(name);
   }
 
   /** The names of the profiles the project declares: the sets of choices a tree may be checked or run under. */
