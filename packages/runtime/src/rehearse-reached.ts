@@ -22,7 +22,7 @@ import {
   switchesOf,
 } from './branches.js';
 import type { Embedder } from './embed.js';
-import { declaredAt, effectAt, madeAt, mapAt, overAt, type Spec, specBehind } from './rehearse-where.js';
+import { declaredAt, effectAt, madeAt, mapAt, overAt, type Spec, specBehind, whereOf } from './rehearse-where.js';
 import { embedderFor, generatedFire, unbroken } from './stubbing.js';
 
 /** What a trigger's run reaches: the tree, the trigger, the switches found, and what each case fires and stubs with. */
@@ -75,6 +75,7 @@ export async function switchesReached(
     effectOf: (path: string) => effectAt(probe, spec, path),
     overOf: (path: string) => overAt(probe, spec, path),
     madeOf: (path: string) => madeAt(probe, spec, path),
+    graphOf: (path: string) => whereOf(probe, trigger, path.split('.').slice(0, -1)).graph,
   };
   const reached: Reached = { load, trigger, seed, profile, found, stubbing, input, context, probe };
 
@@ -96,6 +97,15 @@ export function uncoveredBy(one: Case): string | undefined {
   if (one.unreachable?.length) return saidOf(one.unreachable, one.why, unreachableSaid);
   if (!one.exhausted?.length) return undefined;
   return saidOf(one.exhausted, one.why, fields => enumSaid(fields, one));
+}
+
+/**
+ * Why no run takes a case on this path: why none can at all (`uncoveredBy`), else the literals a caller hands that
+ * close it here, which another path may not. What a recorded scenario says of a branch it records unreachable, and
+ * nothing for a case a run on this path can take.
+ */
+export function untakenBy(one: Case): string | undefined {
+  return uncoveredBy(one) ?? (one.closed === undefined ? undefined : `closed on this path: ${one.closed}`);
 }
 
 /** The sentences for some fields: each one's own where the case has it, and one sentence for every field left. */
@@ -188,7 +198,7 @@ function routingTo(walk: Reached, at: string): { governing: FoundSwitch; id: str
 }
 
 /** Whether a run can take a case, and it routes to the node named. */
-const routesTo = (one: Case, id: string) => one.branch.to === id && uncoveredBy(one) === undefined;
+const routesTo = (one: Case, id: string) => one.branch.to === id && untakenBy(one) === undefined;
 
 /** Which switch of a spec routes each node it names: a rule's target, the fallback, and where a caught fault goes. */
 function routersOf(spec: Spec): Map<string, string> {
@@ -254,7 +264,7 @@ function answeringCase(walk: Reached, other: FoundSwitch, from: Stubbing): Case 
   const spec = specAt(walk, other.prefix);
   const refuses = (id: string) => (spec?.nodes[id] as { handler?: unknown } | undefined)?.handler === REFUSE;
   return casesFor(other, from).find(
-    one => one.branch.rule !== CAUGHT && uncoveredBy(one) === undefined && !refuses(one.branch.to),
+    one => one.branch.rule !== CAUGHT && untakenBy(one) === undefined && !refuses(one.branch.to),
   );
 }
 

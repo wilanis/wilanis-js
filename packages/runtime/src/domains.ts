@@ -200,6 +200,29 @@ export function fits(value: unknown, domain: Domain): boolean {
   return !domain.has?.length;
 }
 
+/** The demands that ask a path for a value of some kind, which a path the tree leaves out never meets. */
+const ASKS_A_VALUE = ['present', 'eq', 'gt', 'gte', 'lt', 'lte', 'minLen', 'maxLen', 'has', 'contains'] as const;
+
+/**
+ * Whether a value the tree fixes -- a literal or a constant a caller hands -- meets a demand: there or left out as it
+ * asks, the one value it names, the length a text is held to, and whatever `fits` judges. A comparison with another
+ * path (`paired`) is not judged here: what the value is compared with is not fixed.
+ */
+export function meets(value: unknown, domain: Domain): boolean {
+  if (value === undefined) return domain.truthy !== true && ASKS_A_VALUE.every(asked => domain[asked] === undefined);
+  if (domain.absent) return false;
+  if (domain.eq !== undefined && JSON.stringify(domain.eq) !== JSON.stringify(value)) return false;
+  if (typeof value === 'string' && !withinLength(value.length, domain)) return false;
+  return fits(value, domain);
+}
+
+/** Whether a length is inside the bounds a domain sets on `len(path)`. */
+function withinLength(length: number, domain: Domain): boolean {
+  return (
+    (domain.minLen === undefined || length >= domain.minLen) && (domain.maxLen === undefined || length <= domain.maxLen)
+  );
+}
+
 /**
  * Whether a value holds every word the domain asks for and none it forbids. Only a text holds a word, as `contains`
  * answers false for any other value, so any other value fits a domain that only forbids words.

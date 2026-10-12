@@ -29,9 +29,11 @@ export interface Decision {
   triggers: string[];
   /**
    * Each branch, and what became of it: how it settled, why nothing can reach it, or -- for a guard whose value an
-   * enclosing graph already judged on this path (RFC 0035) -- where it was held instead, which is not a problem.
+   * enclosing graph already judged on this path (RFC 0035) -- where it was held instead, which is not a problem. Beside
+   * any of those, `closed` where a literal a caller hands excludes it on some path (RFC 0038): no problem where another
+   * path runs it or holds it, and a branch never run where every path closes it.
    */
-  branches: { when: string; to: string; settled?: Settled; uncovered?: string; held?: string }[];
+  branches: { when: string; to: string; settled?: Settled; uncovered?: string; held?: string; closed?: string }[];
 }
 
 /**
@@ -81,26 +83,55 @@ export function gather(decisions: Decision[], decision: Decision) {
   for (const branch of decision.branches) mergeBranch(hit.branches, branch);
 }
 
-/** The same branch reached from two triggers should settle the same way; keep the worse of the two. */
+/**
+ * The same branch reached from two triggers should settle the same way; keep the worse of the two. A branch held or
+ * closed on one path and run on another is not worse: the run stands for it, as it says more. Every distinct literal
+ * that closes it on some path is kept, so a branch every path closes says each.
+ */
 function mergeBranch(into: Decision['branches'], branch: Decision['branches'][number]) {
   const at = into.find(one => one.when === branch.when && one.to === branch.to);
   if (!at) {
     into.push(branch);
     return;
   }
+  if (branch.closed) alsoClosed(at, branch.closed);
   if (branch.uncovered && !at.uncovered) {
     at.uncovered = branch.uncovered;
     at.settled = undefined;
   }
-  // held on one path and run on another: the run says more, so it stands for the branch
-  if (branch.settled && at.held) {
+  standsFor(at, branch);
+}
+
+/**
+ * What one more path's outcome makes of a branch: a run stands for a hold or a closed branch, a hold for a closed one,
+ * and of two runs the worse stays.
+ */
+function standsFor(at: Decision['branches'][number], branch: Decision['branches'][number]) {
+  const open = !(at.settled || at.uncovered);
+  // held or closed on one path and run on another: the run says more, so it stands for the branch
+  if (branch.settled && (at.held || open)) {
     at.settled = branch.settled;
     at.held = undefined;
     return;
   }
+  if (branch.held && open && !at.held) at.held = branch.held;
   const worse = branch.settled?.error || branch.settled?.blocked || branch.settled?.misrouted;
   if (branch.settled && at.settled && worse) at.settled = branch.settled;
 }
+
+/** One more literal that closes a branch on some path, kept beside the ones already said unless it is one of them. */
+function alsoClosed(at: Decision['branches'][number], closed: string) {
+  if (at.closed === undefined) at.closed = closed;
+  else if (!at.closed.split('; ').includes(closed)) at.closed = `${at.closed}; ${closed}`;
+}
+
+/** Whether a branch is closed on every path that reaches it: no path ran it, held it, or left it uncovered. */
+const closedEverywhere = (branch: Decision['branches'][number]): boolean =>
+  branch.closed !== undefined && !branch.settled && !branch.held && !branch.uncovered;
+
+/** What a branch closed on every path says after `NEVER RUN`: every literal that closes it, and the edit. */
+const closedSaid = (closed: string) =>
+  `every caller hands a literal it excludes: ${closed}; no run takes it until a caller hands a value it accepts`;
 
 /**
  * A switch rule as a condition to read. The expression is the truth, but `else` is not a condition and
@@ -145,6 +176,11 @@ function branchLine(
     return {
       line: `  ??  ${when}  NEVER RUN -- ${branch.uncovered}`,
       problem: `${where}: the '${branch.when}' branch to ${branch.to} can never run -- ${branch.uncovered}`,
+    };
+  if (branch.closed !== undefined && closedEverywhere(branch))
+    return {
+      line: `  ??  ${when}  NEVER RUN -- ${closedSaid(branch.closed)}`,
+      problem: `${where}: the '${branch.when}' branch to ${branch.to} can never run -- ${closedSaid(branch.closed)}`,
     };
   if (branch.held) return { line: `  ok  ${when}  held upstream ${branch.held}` };
   const settled = branch.settled;
@@ -254,7 +290,7 @@ const headed = (decision: Decision): string =>
 /** One decision: how many branches were covered, and how each settled. */
 function decisionLines(decision: Decision, lines: string[], verbose?: boolean): string[] {
   const { guard } = decision;
-  const covered = decision.branches.filter(branch => !branch.uncovered).length;
+  const covered = decision.branches.filter(branch => !branch.uncovered && !closedEverywhere(branch)).length;
   const via = verbose ? `  [via ${decision.triggers.join(', ')}]` : '';
   const named = `${short(decision.graph)}${marked(decision.atomic)}`;
   lines.push(`${named}  ${headed(decision)}  ${covered}/${decision.branches.length} branches${via}`);
@@ -266,6 +302,9 @@ function decisionLines(decision: Decision, lines: string[], verbose?: boolean): 
     const said = branchLine(branch, at, width);
     lines.push(said.line);
     if (said.problem) problems.push(said.problem);
+    // a run or a hold on another path stands for the branch; the path a literal closes it on is said beneath
+    if (branch.closed !== undefined && !said.problem)
+      lines.push(`  --  ${branchName(branch, guard).padEnd(width)}  closed on this path: ${branch.closed}`);
   }
   return problems;
 }

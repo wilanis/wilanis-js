@@ -41,6 +41,8 @@ export interface Stubbing {
    * `<path>:made`: what the guard judges, and where a demand traced to the answer is written, never past the guard.
    */
   madeOf?: (nodePath: string) => string | undefined;
+  /** The graph document the node at a dotted path stands in: where a sentence says a trace stopped. */
+  graphOf?: (nodePath: string) => string | undefined;
 }
 
 /**
@@ -79,6 +81,11 @@ export interface Case {
   exhausted?: string[];
   /** Why each field under `unreachable` or `exhausted` is, where a sentence says more than today's: by field. */
   why?: Record<string, string>;
+  /**
+   * Where a literal a caller hands excludes what the branch demands, so no run takes it on this path: the sentences
+   * that say which node hands which literal, joined. Not a gap in the walk, and no problem where another path runs it.
+   */
+  closed?: string;
   /** The dotted paths of the nodes made to break, for the branch a `catch` routes a fault to (RFC 0014). */
   broken?: string[];
 }
@@ -368,10 +375,17 @@ function steer(branch: Branch, found: FoundSwitch, from: Settled, steerable: boo
   return { at: found.at, branch, stubs, ...(input.length ? { input } : {}), ...missedOf(unmet) };
 }
 
-/** The demands a case does not meet, as the case says them: the fields under each reason, and the sentence for each. */
-function missedOf(unmet: [string, Unmet][]): Pick<Case, Missed | 'why'> {
-  const out: Pick<Case, Missed | 'why'> = {};
+/**
+ * The demands a case does not meet, as the case says them: the fields under each reason and the sentence for each, and
+ * the sentences of the literals that close it on this path, joined.
+ */
+function missedOf(unmet: [string, Unmet][]): Pick<Case, Exclude<Missed, 'closed'> | 'why' | 'closed'> {
+  const closed = unmet.flatMap(([, one]) => (one.missed === 'closed' && one.why ? [one.why] : []));
+  const out: Pick<Case, Exclude<Missed, 'closed'> | 'why' | 'closed'> = closed.length
+    ? { closed: closed.join('; ') }
+    : {};
   for (const [field, { missed, why }] of unmet) {
+    if (missed === 'closed') continue;
     out[missed] = [...(out[missed] ?? []), field];
     if (why) out.why = { ...out.why, [field]: why };
   }

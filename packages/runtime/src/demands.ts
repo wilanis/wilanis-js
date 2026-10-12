@@ -5,12 +5,14 @@
  * element from. A read of `in` is followed out of the switch's graph by `traced` in `frames.ts`, through every call and
  * map on the way, and is met where it lands. A traced demand never lands past a guard: where the trace meets a guard's
  * answer, it is written into the value the guard judges, so the guard judges what the rehearsal wrote (RFC 0038).
+ * Where the trace stops, a literal on the way meets the demand with nothing written, or closes the branch on that
+ * path; anything else leaves it unreachable, with the sentence `demand-said.ts` writes.
  */
 import { TAKEN_IDS } from '@wilanis/compiler';
 import { type Type, typeAt } from '@wilanis/core';
 import type { KSwitchLike, Settled, Stubbing } from './branches.js';
-import { exhaustedOf, type Unmet } from './demand-said.js';
-import type { Domain } from './domains.js';
+import { closedSaid, exhaustedOf, stoppedSaid, type Unmet } from './demand-said.js';
+import { type Domain, meets } from './domains.js';
 import { type Landed, type OnNode, type Standing, type Stopped, sourceOf, traced } from './frames.js';
 import { getPath, NO_MEMBER, satisfy, setPath } from './stubs.js';
 
@@ -43,16 +45,33 @@ function followed(read: { ref: string; path: string[] }, standing: Standing): La
  * is a guard's answer at a made site is stubbed at `<id>:made`, the value the guard judges, never past it. An element
  * of a list a node holds is written at index 0 of that list, the first element standing for all as it does everywhere
  * else in the walk, at `<map>.0` where the node is a map (`answerAt`) and at the node as `nonEmpty` writes the list. Any
- * other node is stubbed where its answer is stubbed (`stubTarget`). Unreachable where the trace stopped.
+ * other node is stubbed where its answer is stubbed (`stubTarget`). Where the trace stopped, `ofStopped` says what is
+ * left.
  */
-function ofTraced(landed: Landed | Stopped, asked: Asked, from: Settled): Met | Unmet {
-  if ('stopped' in landed) return { missed: 'unreachable' };
+function ofTraced(read: string[], landed: Landed | Stopped, asked: Asked, from: Settled): Met | Unmet | Fixed {
+  if ('stopped' in landed) return ofStopped(read, landed, asked, from);
   if ('input' in landed) return ofInput(landed.input, asked, from);
   return { stub: { ...onNode(landed, from), value: asked.domain, field: asked.field } };
 }
 
 /** One demand as the solver made it: the field of the switch's inputs it is on, and what that field must hold. */
 type Asked = { field: string; domain: Domain };
+
+/** A demand a value the tree fixes already meets: nothing to write, since every run on this path hands that value. */
+export type Fixed = { fixed: true };
+
+/**
+ * A demand on a read of `in` whose trace stopped: met with nothing written where a literal on the way meets it, closed
+ * on this path where the literal excludes it, and unreachable otherwise -- each with the sentence that says where the
+ * trace stopped. A literal compared with another value is unreachable: what it is compared with is not fixed.
+ */
+function ofStopped(read: string[], stopped: Stopped, asked: Asked, from: Settled): Unmet | Fixed {
+  const { domain } = asked;
+  if (stopped.reason !== 'literal' || domain.paired)
+    return { missed: 'unreachable', why: stoppedSaid(read, stopped, from.graphOf) };
+  if (meets(stopped.value, domain)) return { fixed: true };
+  return { missed: 'closed', why: closedSaid(read, stopped, from.graphOf) };
+}
 
 /** Where a demand that landed on a node is written: the node's stub, or the guard's judged value, at a path. */
 function onNode(landed: OnNode, from: Settled): { target: string; path: string[] } {
@@ -100,7 +119,7 @@ type Met = { input: { path: string[]; value: unknown } } | { stub: Stub };
  * stubbed at that node, a guard's answer among them; anything else read off `in`, followed out to where it lands
  * (`ofTraced`); or nowhere.
  */
-export function meet(dotted: string, domain: Domain, at: At, from: Settled): Met | Unmet {
+export function meet(dotted: string, domain: Domain, at: At, from: Settled): Met | Unmet | Fixed {
   const [inputName, ...within] = dotted.split('.');
   const src = sourceOf(at.node.in[inputName]);
   if (!src) return { missed: 'unreachable' };
@@ -108,8 +127,10 @@ export function meet(dotted: string, domain: Domain, at: At, from: Settled): Met
   // a switch in the top-level graph reading `in` is steered by the trigger's input, not a stub
   if (src.ref === 'in' && at.steerable) return ofInput([...src.path, ...within], asked, from);
   // any other read of `in` is followed out, through the calls and maps that handed it down, to what the rehearsal sets
-  if (src.ref === 'in')
-    return ofTraced(followed({ ref: 'in', path: [...src.path, ...within] }, at.standing), asked, from);
+  if (src.ref === 'in') {
+    const read = [...src.path, ...within];
+    return ofTraced(read, followed({ ref: 'in', path: read }, at.standing), asked, from);
+  }
   if (src.ref === 'context' || src.ref === 'const') return { missed: 'unreachable' };
   const target = stubTarget([...at.prefix, src.ref].join('.'), from);
   return { stub: { target, path: [...src.path, ...within], value: domain, field: dotted } };
@@ -170,6 +191,7 @@ export function lay(
   from: Required<Pick<Stubbing, 'generated' | 'typeOf' | 'seed'>>,
 ): Unmet | undefined {
   if ('missed' in met) return met;
+  if ('fixed' in met) return undefined;
   if (!('input' in met)) return write(into.stubs, met.stub, from);
   into.input.push(met.input);
   return undefined;
