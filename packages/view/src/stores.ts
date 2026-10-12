@@ -7,7 +7,7 @@
  */
 import type { Loaded, LoadResult, Scope, StoreDoc, Values } from '@wilanis/core';
 import { keeps, kept, splitRef } from '@wilanis/core';
-import { callsAgainst, engineOf, keyTypeOf, STORE_PORT } from '@wilanis/runtime';
+import { callsAgainst, engineOf, KEPT_SAID, keyTypeOf, STORE_PORT } from '@wilanis/runtime';
 import { markContextPorts, readsOf } from './reads.js';
 import { type Over, scopedColumns, scopeOf, viewsOf } from './scopes.js';
 import type { VKeeps, VNode, VScopedColumn, VStore, VStoreCall } from './types.js';
@@ -47,7 +47,8 @@ function scopedOf(scope: Scope, doc: Loaded<StoreDoc>): Record<string, VScopedCo
 /**
  * What a store adds to its view: the engine that keeps its records, its key types, what runs against it, and --
  * where it scopes a collection -- what it reads from the context, drawn as a graph's context node is, with the
- * scope and the views that cross it. A store that scopes nothing carries none of the three.
+ * scope and the views that cross it. A store that scopes nothing carries none of the three. A store another tree
+ * keeps says which, in the words `describe` uses.
  */
 export function storeView(scope: Scope, load: LoadResult, doc: Loaded): VStore {
   const store = doc.doc as StoreDoc;
@@ -66,6 +67,7 @@ export function storeView(scope: Scope, load: LoadResult, doc: Loaded): VStore {
     ...storeContext(scope, store),
     ...(Object.keys(scoped).length ? { scoped } : {}),
     ...(Object.keys(views).length ? { views } : {}),
+    ...(store.keptBy ? { kept: { by: store.keptBy, said: KEPT_SAID } } : {}),
   };
 }
 

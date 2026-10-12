@@ -23,6 +23,7 @@ const shape = (label: string, fields: Record<string, unknown>) => ({
 });
 
 const STORE = '@features/customers/data/customers.store.json';
+const KEPT_ELSEWHERE = '@features/customers/data/billed.store.json';
 const { load, dir } = loadedWith({
   'features/customers/domain/Note.shape.json': shape('Note', {
     id: { type: 'string' },
@@ -50,6 +51,15 @@ const { load, dir } = loadedWith({
         refs: { customerId: { collection: 'customers', onRemove: 'refuse' } },
       },
     },
+  },
+  // another tree keeps these notes (RFC 0042): this one only reads them, and says so
+  'features/customers/data/billed.store.json': {
+    $schema: schemaUrl('store'),
+    label: 'Billed notes',
+    description: 'The notes the billing tree writes, read here.',
+    connection: '@connections/customers.connection.json',
+    keptBy: 'billing',
+    collections: { notes: { of: '@customers/domain/Note.shape.json', key: 'id' } },
   },
 });
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -98,6 +108,23 @@ describe('describe: a store', () => {
     expect(said()).not.toContain('in the database');
     expect(said()).not.toContain('migration ');
     expect(said()).not.toContain('applied at');
+  });
+});
+
+describe('describe: a store another tree keeps', () => {
+  const said = () => describeDoc(load, KEPT_ELSEWHERE).split('\n');
+
+  it('names the keeping tree on one line after the engine, and says what that means here', () => {
+    const lines = said();
+    const kept = lines.indexOf(
+      'kept by     billing -- this tree reads it; wilanis migrate never plans it and no graph writes it',
+    );
+    expect(kept).toBeGreaterThan(-1);
+    expect(lines[kept - 1].startsWith('engine      ')).toBe(true);
+  });
+
+  it('says nothing of the sort for a store this tree keeps itself', () => {
+    expect(describeDoc(load, STORE)).not.toContain('kept by');
   });
 });
 

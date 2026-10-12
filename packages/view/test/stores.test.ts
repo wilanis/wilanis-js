@@ -4,10 +4,14 @@
  * a key is, and which graphs run against it. A node that reaches a store has to say so, so a reader following
  * a graph arrives at the records rather than at the port that speaks for them.
  */
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { schemaUrl } from '@wilanis/core';
 import { loadProject } from '@wilanis/runtime';
 import { describe, expect, it } from 'vitest';
 import { type DocView, viewOf } from '../src/index.js';
+import { type Drawn, lifted, PAGE, words } from './page-harness.js';
+import { plantedViews } from './scoped-harness.js';
 
 const EXAMPLE = fileURLToPath(new URL('../../../example', import.meta.url));
 const STORE = '@features/customers/data/customers.store.json';
@@ -95,5 +99,58 @@ describe('the view of a node that reaches a store', () => {
   it('leaves a node that reaches no store without one', async () => {
     const graph = await view('@features/customers/data/kept-get.graph.json');
     expect(graph.graph?.nodes.find(one => one.id === 'customer')?.keeps).toBeUndefined();
+  });
+});
+
+describe('the view of a store another tree keeps (RFC 0042)', () => {
+  const keptSaid = 'this tree reads it; wilanis migrate never plans it and no graph writes it';
+  const billedStore = '@features/customers/data/billed.store.json';
+  const billed = () =>
+    plantedViews(
+      {
+        'features/customers/data/billed.store.json': {
+          $schema: schemaUrl('store'),
+          label: 'Billed customers',
+          description: 'The customers the billing tree writes, read here.',
+          connection: '@connections/customers.connection.json',
+          keptBy: 'billing',
+          collections: { customers: { of: '@customers/domain/Customer.shape.json', key: 'id' } },
+        },
+      },
+      [billedStore],
+    )[0];
+
+  it('names the keeping tree, with the sentence describe prints', () => {
+    expect(billed().store?.kept).toEqual({ by: 'billing', said: keptSaid });
+  });
+
+  it('says nothing of the sort for a store the tree keeps itself', async () => {
+    expect((await view(STORE)).store?.kept).toBeUndefined();
+  });
+
+  it('shows the sentence under the heading, before the engine the records live behind', async () => {
+    const { keptEl } = await lifted('keptEl');
+    const drawn = keptEl({ by: 'billing', said: keptSaid }) as Drawn;
+    expect(drawn).toMatchObject({ tag: 'p', cls: 'lead' });
+    expect(words(drawn)).toBe(`Kept by billing \u2014 ${keptSaid}.`);
+    const page = await readFile(PAGE, 'utf8');
+    expect(page).toMatch(
+      /case 'store': \{\n.*\n\s+if \(s\.kept\) page\.appendChild\(keptEl\(s\.kept\)\);\n\s+const chain/,
+    );
+  });
+
+  it('leaves out the default and renamed columns, which a kept store cannot have', async () => {
+    const { storeColumns } = await lifted('storeColumns');
+    const all = ['collection', 'records of', 'keyed by', 'unique', 'scoped by', 'refs', 'default', 'renamed', 'holds'];
+    expect(storeColumns(undefined)).toEqual(all);
+    expect(storeColumns({ by: 'billing', said: keptSaid })).toEqual(
+      all.filter(heading => heading !== 'default' && heading !== 'renamed'),
+    );
+    // each row leaves out the same two cells, so the rest stay under their headings
+    const page = await readFile(PAGE, 'utf8');
+    expect(page).toContain('for (const h of storeColumns(s.kept)) hd.appendChild');
+    expect(page).toContain(
+      "if (!s.kept) { tr.appendChild(el('td', 'mono', defaultsOf(c))); tr.appendChild(renamedCell(c)); }",
+    );
   });
 });

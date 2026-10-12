@@ -534,6 +534,16 @@
   }
 
   /**
+   * Under a store page's heading, where another tree keeps the store's collections (RFC 0042): that tree, by its
+   * project name, and what it means here, in the words `wilanis describe` prints.
+   */
+  function keptEl(kept) { const p = el('p', 'lead'); p.appendChild(frag('Kept by ', el('code', null, kept.by), ' \u2014 ' + kept.said + '.')); return p; }
+  /**
+   * The columns of a store page's collections. A store another tree keeps has no `default` and no `renamed`
+   * column: those marks only instruct a migration, which this tree never runs over it, and the schema refuses them.
+   */
+  function storeColumns(kept) { return ['collection', 'records of', 'keyed by', 'unique', 'scoped by', 'refs', ...(kept ? [] : ['default', 'renamed']), 'holds']; }
+  /**
    * What a store reads from the context to fill its scopes, drawn as a graph's context node is: one port per name
    * it binds, each labelled as the store reads it and opening the resolvers document that declares it. A store
    * binds a read the way a data graph does, so a reader meets the same node here.
@@ -877,6 +887,7 @@
       }
       case 'store': {
         const s = v.store || { keyTypes: {}, calls: [] };
+        if (s.kept) page.appendChild(keptEl(s.kept));
         const chain = el('div', 'chain'); chain.appendChild(step('kept behind', link(d.connection)));
         if (s.kind) { chain.appendChild(arrow()); chain.appendChild(step('by the engine', link(s.kind, s.kindLabel))); }
         page.appendChild(chain);
@@ -893,7 +904,7 @@
         const renamedCell = c => { const td = el('td', 'mono'); const pairs = Object.entries(c.renamed || {}); if (!pairs.length) return td; pairs.forEach(([now, before], i) => { if (i) td.appendChild(frag(', ')); td.appendChild(frag(now + ' ')); td.appendChild(el('span', 'was', before)); }); td.appendChild(el('span', 'until', UNTIL)); return td; };
         // a scope says whose rows these are: the column the store keeps beside the record, and the read that fills it
         const scopedCell = name => { const td = el('td', 'mono'); const by = (s.scoped || {})[name] || []; by.forEach((c, i) => { if (i) td.appendChild(frag(', ')); td.appendChild(frag(scopeSaid(c))); }); if (by.length) td.appendChild(el('span', 'until', 'unique holds within the scope; the compiler puts it on every operation')); return td; };
-        const t = el('table'); const hd = el('tr'); for (const h of ['collection', 'records of', 'keyed by', 'unique', 'scoped by', 'refs', 'default', 'renamed', 'holds']) hd.appendChild(el('th', null, h)); t.appendChild(hd);
+        const t = el('table'); const hd = el('tr'); for (const h of storeColumns(s.kept)) hd.appendChild(el('th', null, h)); t.appendChild(hd);
         // a view has none of these: it is the viewed collection's rows, and is listed on its own below
         for (const [name, c] of Object.entries(d.collections).filter(([n]) => !(s.views || {})[n])) {
           const tr = el('tr'); const nm = el('td', 'name', name);
@@ -901,8 +912,8 @@
           tr.appendChild(nm);
           tr.appendChild(el('td')).appendChild(typeEl(c.of)); tr.appendChild(el('td', 'mono', keyOf(name, c)));
           tr.appendChild(el('td', 'mono', uniqueOf(c))); tr.appendChild(scopedCell(name));
-          tr.appendChild(el('td', 'mono', refsOf(c))); tr.appendChild(el('td', 'mono', defaultsOf(c)));
-          tr.appendChild(renamedCell(c));
+          tr.appendChild(el('td', 'mono', refsOf(c)));
+          if (!s.kept) { tr.appendChild(el('td', 'mono', defaultsOf(c))); tr.appendChild(renamedCell(c)); }
           tr.appendChild(el('td', 'desc', c.description || ''));
           t.appendChild(tr);
         }

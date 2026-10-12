@@ -23,7 +23,7 @@ import { promisedSaid } from './attempts-said.js';
 import { boundSaid } from './limits-said.js';
 import { readsLines } from './reads-said.js';
 import { scopedOf, scopeLines } from './scope-said.js';
-import { callsAgainst, engineOf, keyTypeOf } from './stores.js';
+import { callsAgainst, engineOf, KEPT_SAID, keyTypeOf } from './stores.js';
 
 /** A spec as one reader sees it, or the spec itself when it does not resolve. */
 export function shower(scope: Scope) {
@@ -287,6 +287,9 @@ function engineLines(store: StoreDoc, scope: Scope): string[] {
   return [...lines, `engine      ${engine.kind}${granted}`];
 }
 
+/** The tree that keeps this store's collections, where another one does (RFC 0042): this tree only reads them. */
+const keptLines = (store: StoreDoc): string[] => (store.keptBy ? [`kept by     ${store.keptBy} -- ${KEPT_SAID}`] : []);
+
 /** Every call site that runs an operation of the store port against this store, and which collection each names. */
 function runLines(path: string, load: LoadResult, scope: Scope): string[] {
   const calls = callsAgainst(path, load, scope);
@@ -298,7 +301,7 @@ function runLines(path: string, load: LoadResult, scope: Scope): string[] {
 }
 
 /**
- * A store: the engine its records live behind, the reads its scopes are filled from, every collection with
+ * A store: the engine its records live behind, the tree that keeps them where another one does, the reads its scopes are filled from, every collection with
  * what it holds its records to, and the graphs that run an operation against it. A mark family with nothing
  * to say prints no line, so a collection that declares nothing reads as one.
  *
@@ -310,6 +313,7 @@ export function storeLines(doc: Loaded, load: LoadResult, scope: Scope): string[
   const within: Within = { store, load, scope };
   return [
     ...engineLines(store.doc, scope),
+    ...keptLines(store.doc),
     ...readsLines(store.doc.reads, scope),
     ...Object.entries(store.doc.collections).flatMap(([name, collection]) => collectionLines(name, collection, within)),
     ...runLines(doc.path, load, scope),

@@ -441,6 +441,8 @@ export interface VStore {
   scoped?: Record<string, VScopedColumn[]>;
   /** Each collection that is a view, by name: the collection it sees every scope of, and the policy it is behind. */
   views?: Record<string, VStoreViewOf>;
+  /** The tree that keeps its collections, where another one does (RFC 0042), with what that means here. */
+  kept?: { by: string; said: string };
 }
 
 /** One view of this store: the scoped collection whose rows it sees, and the policy every trigger reaching it attaches. */

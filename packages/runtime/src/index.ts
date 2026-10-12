@@ -95,6 +95,7 @@ export {
 export {
   callsAgainst,
   engineOf,
+  KEPT_SAID,
   keyTypeOf,
   STORE_PORT,
   type StoreCall,
