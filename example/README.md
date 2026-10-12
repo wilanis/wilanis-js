@@ -355,8 +355,9 @@ does the same for the guard's memory. `@reload/watch.port.json#watch` serves the
 document changes, without closing the port; it names `"profiles": ["live", "local"]`, so it watches on a laptop
 and production runs every other step and not that one. `@schedule/scheduler.port.json#run` keeps the schedule, which is empty here:
 on the laptop in the one process there is, and behind the load balancer in one process alone. `production-scheduler`
-binds what `production` binds and starts what it starts but the listener, and the run step names it with a lease
-in the customer database, while `listen` names neither it nor `production-worker`. So the instances run under `production`
+names `production` under `extends`, so it binds what `production` binds without a copy, and writes only its own
+`permits`, since it reaches less. It starts what `production` starts but the listener, and the run step names it
+with a lease in the customer database, while `listen` names neither it nor `production-worker`. So the instances run under `production`
 only listen, one process under `production-scheduler` only schedules, and `wilanis describe project.json` prints
 under each profile what it holds and starts.
 `@otel/exporter.port.json#export` sends every run as spans to a collector on :4318; it is the one step marked
@@ -364,12 +365,12 @@ under each profile what it holds and starts.
 in the log rather than delaying the run. `@queue/worker.port.json#consume` works the removals queue (below):
 on the laptop beside the listener, before it so that on the way out the port closes first and the messages in
 flight are answered after, and behind the load balancer under `production-worker` alone. That profile, too,
-binds what `production` binds, and starts what it starts with the consumer in place of the listener, so the
-instances under `production` answer routes and publish, and as many processes under `production-worker` as the
-queue needs work it and open no port. `@http/server.port.json#listen` opens :8099 -- **delete that step
-and nothing listens**, since no runtime opens a port merely because http triggers exist. The first four are
-domain port operations, so whichever binding the profile chose is what gets checked; the last five are
-`holds` operations, which a plugin grants and the runtime stops when the process ends.
+extends `production` and writes its own `permits`. It starts what `production` starts with the consumer in place of
+the listener, so the instances under `production` answer routes and publish, and as many processes under
+`production-worker` as the queue needs work it and open no port. `@http/server.port.json#listen` opens :8099 --
+**delete that step and nothing listens**, since no runtime opens a port merely because http triggers exist. The
+first four are domain port operations, so whichever binding the profile chose is what gets checked; the last five
+are `holds` operations, which a plugin grants and the runtime stops when the process ends.
 `wilanis describe @http/server.port.json` says which plugin grants it.
 
 ## The port, and what meets it
