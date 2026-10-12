@@ -101,7 +101,8 @@ export function traced(read: Read, standing: Standing): Landed | Stopped {
 /** Where a read that names something other than `in` lands: a node of the spec it stands in, unless it reads what no stub sets. */
 function landing({ src, here }: Hop): Landed | Stopped {
   if (src.ref === 'context') return { stopped: here.at, reason: 'context', context: src.path };
-  if (src.ref === 'const') return { stopped: here.at, reason: 'nothing' };
+  // the compiler writes a constant's value where it is read, so a read of const is a literal it left unlowered
+  if (src.ref === 'const') return { stopped: here.at, reason: 'literal' };
   const prefix = here.at.split('.').slice(0, -1);
   return { node: src.ref, prefix, path: src.path, standing: { ...here, at: [...prefix, src.ref].join('.') } };
 }

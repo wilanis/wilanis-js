@@ -235,8 +235,7 @@ function fitsWords(value: unknown, domain: Domain): boolean {
 
 /** Whether a list is of the length the domain asks for, and holds and lacks what it must. */
 function fitsAsList(list: unknown[], domain: Domain): boolean {
-  if (domain.minLen !== undefined && list.length < domain.minLen) return false;
-  if (domain.maxLen !== undefined && list.length > domain.maxLen) return false;
+  if (!withinLength(list.length, domain)) return false;
   const holds = (wanted: unknown) => list.some(item => JSON.stringify(wanted) === JSON.stringify(item));
   if (domain.has?.some(wanted => !holds(wanted))) return false;
   return !domain.lacks?.some(holds);
