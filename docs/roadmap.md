@@ -155,7 +155,8 @@ with its recorded scenarios about a tenth of their size. RFC 0039, keep and grou
 too: a `map` may say `where` and need not `run`, a native field may say `within` and `reaches`, and `@std/list`
 gains `totals`. Each change is compatible, but each changes a schema, so 1.0 waits for it. RFC 0040, `contains` in a
 rule, lands before the freeze for the same reason: it changes two schema descriptions. RFC 0041, `after` on a node,
-lands before the freeze too: it changes the `run` and `map` node schemas.
+lands before the freeze too: it changes the `run` and `map` node schemas. RFC 0042, a store that says another tree keeps
+its collections, adds `keptBy` to `store.schema.json`, so it lands before the freeze too.
 
 RFC 0037, a connection is a literal at the call, changes three schemas before the freeze: `common.schema.json` (a
 field says it `names` a connection or a store), `graph.schema.json` and `binding.schema.json` (a data graph's `given`,
