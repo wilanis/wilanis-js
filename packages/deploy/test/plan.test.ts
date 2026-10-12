@@ -3,9 +3,9 @@
  * loading a tree -- the golden plan, the same bytes however the manifest's arrays are ordered, more than one profile,
  * the two refusals, and no variable's value anywhere in the answer.
  *
- * The fixture is what `wilanis manifest example` prints, never written by hand. When the example changes,
- * regenerate it from the repository's root with
- *   npx wilanis manifest example > packages/deploy/test/fixtures/customers.manifest.json
+ * The fixture is what `wilanis manifest example` prints, never written by hand, and fixture.test.ts holds it so.
+ * When the example changes, regenerate it with
+ *   npx vitest run packages/deploy/test/fixture.test.ts -u
  * and read the diff: it is a diff of what the tree is, and the golden below moves only where a plan does.
  */
 import { readFileSync } from 'node:fs';

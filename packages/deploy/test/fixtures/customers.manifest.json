@@ -89,6 +89,12 @@
       "from": "@wilanis/plugin-storage-postgres",
       "version": "0.1.0",
       "guard": false
+    },
+    {
+      "use": "@storage-sqlite",
+      "from": "@wilanis/plugin-storage-sqlite",
+      "version": "0.1.0",
+      "guard": false
     }
   ],
   "includes": [
@@ -1048,6 +1054,13 @@
       "included": null
     },
     {
+      "path": "@features/customers/domain/an-address-names-its-domain.invariant.json",
+      "kind": "invariant",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
       "path": "@features/customers/domain/backfill-customers.graph.json",
       "kind": "graph",
       "feature": "customers",
@@ -1727,6 +1740,13 @@
       "included": null
     },
     {
+      "path": "@scenarios/edges/answers.json",
+      "kind": "answers",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
       "path": "@scenarios/edges/customers.delete-customer/id.empty.scenario.json",
       "kind": "scenario",
       "feature": null,
@@ -2119,6 +2139,13 @@
       "included": null
     },
     {
+      "path": "@scenarios/rehearsed/answers.json",
+      "kind": "answers",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
       "path": "@scenarios/rehearsed/customers.delete-customer/customers.delete-row.outcome.customer.scenario.json",
       "kind": "scenario",
       "feature": null,
@@ -2204,6 +2231,13 @@
     },
     {
       "path": "@scenarios/rehearsed/customers.get-customer/customers.get-row.outcome.noCustomer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.get-customer/customers.get-row.outcome.unreachable.scenario.json",
       "kind": "scenario",
       "feature": null,
       "layer": null,
@@ -2323,6 +2357,13 @@
     },
     {
       "path": "@scenarios/rehearsed/customers.update-customer/customers.get-row.outcome.noCustomer.scenario.json",
+      "kind": "scenario",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@scenarios/rehearsed/customers.update-customer/customers.get-row.outcome.unreachable.scenario.json",
       "kind": "scenario",
       "feature": null,
       "layer": null,
@@ -2455,6 +2496,13 @@
       "included": null
     },
     {
+      "path": "@std/Site.shape.json",
+      "kind": "shape",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
       "path": "@std/list.port.json",
       "kind": "port",
       "feature": null,
@@ -2519,6 +2567,20 @@
     },
     {
       "path": "@storage-postgres/postgres.connection-kind.json",
+      "kind": "connection-kind",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@storage-sqlite/plugin.json",
+      "kind": "plugin",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
+      "path": "@storage-sqlite/sqlite.connection-kind.json",
       "kind": "connection-kind",
       "feature": null,
       "layer": null,
@@ -2953,6 +3015,7 @@
       "settings": {
         "backoffMs": 1000,
         "connection": "@connections/jobs.connection.json",
+        "deadlineMs": 30000,
         "maxAttempts": 5,
         "message": "@customers/edge/IdRequest.shape.json",
         "outcomes": {
@@ -4447,8 +4510,8 @@
     },
     "production-scheduler": {
       "default": false,
-      "description": "The one process that keeps the schedule beside production, started with `wilanis start example --profile production-scheduler`: production's bindings and connections, so a tick reaches what a route there reaches and a queue is the same table, and production's startup but for the listener, which it never opens. Run one of it beside the production instances, which listen and schedule nothing, and the production-worker processes, which work the queue.",
-      "extends": null,
+      "description": "The one process that keeps the schedule beside production, started with `wilanis start example --profile production-scheduler`: production, with the scheduler in place of the listener, which it never opens. It extends production, so a tick reaches what a route there reaches and a queue is the same table. Run one of it beside the production instances, which listen and schedule nothing, and the production-worker processes, which work the queue.",
+      "extends": "production",
       "bindings": {
         "@auth/state.port.json": "@features/state/data/auth-storage.binding.json",
         "@features/access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
@@ -4539,12 +4602,20 @@
           ]
         }
       ],
-      "permits": null
+      "permits": [
+        "@auth/challenge.port.json#issue",
+        "@connections/customers-postgres.connection.json",
+        "@otel/exporter.port.json#export",
+        "@queue/queue.port.json#ensure",
+        "@schedule/scheduler.port.json#run",
+        "@storage/storage.port.json#ensure",
+        "@storage/store.port.json"
+      ]
     },
     "production-worker": {
       "default": false,
-      "description": "A process that works the removals queue beside production, started with `wilanis start example --profile production-worker`: production's bindings and connections, so a message reaches what the route that published it reaches and the queue is the same table, and production's startup with the consumer in place of the listener. It opens no port, so a slow removal never holds a route's instance; run as many of it as the queue needs, since each takes messages no other has taken.",
-      "extends": null,
+      "description": "A process that works the removals queue beside production, started with `wilanis start example --profile production-worker`: production, with the consumer in place of the listener. It extends production, so a message reaches what the route that published it reaches and the queue is the same table. It opens no port, so a slow removal never holds a route's instance; run as many of it as the queue needs, since each takes messages no other has taken.",
+      "extends": "production",
       "bindings": {
         "@auth/state.port.json": "@features/state/data/auth-storage.binding.json",
         "@features/access/domain/identity.port.json": "@features/directories/data/identity.binding.json",
@@ -4635,7 +4706,15 @@
           ]
         }
       ],
-      "permits": null
+      "permits": [
+        "@auth/challenge.port.json#issue",
+        "@connections/customers-postgres.connection.json",
+        "@otel/exporter.port.json#export",
+        "@queue/queue.port.json#ensure",
+        "@queue/worker.port.json#consume",
+        "@storage/storage.port.json#ensure",
+        "@storage/store.port.json"
+      ]
     }
   }
 }
