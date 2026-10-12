@@ -5,7 +5,16 @@
  * reasons, asked for what a transaction holds instead. The rules over it live in `atomic.ts`, and a reader is
  * told what it found in `atomic-said.ts`; neither walks again.
  */
-import { type GraphDoc, isMap, isSwitch, type Loaded, type Retry, type Scope, type Values } from '@wilanis/core';
+import {
+  callOf,
+  type GraphDoc,
+  isMap,
+  isSwitch,
+  type Loaded,
+  type Retry,
+  type Scope,
+  type Values,
+} from '@wilanis/core';
 import { connectionOf, connectionUnder } from '../documents.js';
 
 /** One effect an atomic graph reaches: what it runs, where that call is written, and whether it may take part. */
@@ -98,11 +107,12 @@ class Walk {
     if (this.seen.has(graph.path)) return;
     this.seen.add(graph.path);
     for (const node of graph.doc.nodes) {
-      if (isSwitch(node)) continue;
+      const run = callOf(node);
+      if (isSwitch(node) || !run) continue;
       if (isMap(node)) this.found.maps.push({ onItemFailure: node.onItemFailure, file: graph.path, node: node.id });
       // a domain graph writes no retry at all, which L012 says, so only a data graph's node is kept
       if (this.scope.roleOf(graph.path) === 'data') this.retried(node.retry, graph.path, `nodes/${node.id}`);
-      this.call({ run: node.run, given: node.in, file: graph.path, node: node.id, from: from ?? node.id });
+      this.call({ run, given: node.in, file: graph.path, node: node.id, from: from ?? node.id });
     }
   }
 

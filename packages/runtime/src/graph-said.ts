@@ -15,7 +15,7 @@
  * the same sites the compiler lowers at, so what a reader is told and what the tree was held to are one answer.
  */
 import { atomicOf, type Guard, guardSpecName, guardsOf, idsOf, violatedIds } from '@wilanis/compiler';
-import { type GraphDoc, isMap, isSwitch, type Loaded, type Scope, type SwitchNode } from '@wilanis/core';
+import { callOf, type GraphDoc, isMap, isSwitch, type Loaded, type Scope, type SwitchNode } from '@wilanis/core';
 import { attemptsSaid } from './attempts-said.js';
 import { invariantName } from './invariant-lines.js';
 import { fanOutSaid } from './limits-said.js';
@@ -63,7 +63,7 @@ function catchesSaid(node: SwitchNode, made: Map<string, string>): string {
 }
 
 /**
- * One node as a reader meets it: what it runs, how far a map fans out and how often it is tried, or the branches
+ * One node as a reader meets it: what it runs (or that a map only keeps), how far a map fans out and how often it is tried, or the branches
  * it routes to, under whatever id it has once the guards are lowered. A `switch` that routed to a guarded node
  * routes to the node that moved aside, since the value is made where it was made before and the guard stands
  * between it and everything downstream.
@@ -74,7 +74,7 @@ function nodeLine(node: GraphDoc['nodes'][number], id: string, made: Map<string,
     return `    ${id}  switch → ${routes.join(' | ')}${catchesSaid(node, made)}`;
   }
   const fanOut = isMap(node) ? fanOutSaid(node) : '';
-  return `    ${id}  ${node.run}${fanOut}${attemptsSaid(node)}`;
+  return `    ${id}  ${callOf(node) ?? 'keeps'}${fanOut}${attemptsSaid(node)}`;
 }
 
 // ---- the nodes the compiler lowered, which the file does not have -------------------------------

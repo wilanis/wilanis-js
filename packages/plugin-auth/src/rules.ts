@@ -6,7 +6,7 @@
  * X106 (dirs.ts): files.port.json keeps records where the loader reads documents, or outside the tree. X107
  * (timeout.ts): an OIDC connection's timeoutMs is longer than a Node timer can wait.
  */
-import { isMap, isRun, type PluginCheckContext, type PolicyDoc, policyPath, type ShapeDoc } from '@wilanis/core';
+import { callOf, type PluginCheckContext, type PolicyDoc, policyPath, type ShapeDoc } from '@wilanis/core';
 import { checkDirs } from './dirs.js';
 import { type ScopedAttribute, scopedAttributes } from './scoped.js';
 import { doc, ROOT, type Settings } from './settings.js';
@@ -182,9 +182,10 @@ function judgeWrite(write: Write, session: Session) {
 /** X103 and X105: every session write a graph's nodes make. */
 function checkGraphWrites(session: Session) {
   for (const graph of session.scope.registry.all('graph'))
-    for (const node of graph.doc.nodes)
-      if (isRun(node) || isMap(node))
-        judgeWrite({ file: graph.path, at: `nodes/${node.id}/in`, run: node.run, given: node.in }, session);
+    for (const node of graph.doc.nodes) {
+      const run = callOf(node);
+      if (run) judgeWrite({ file: graph.path, at: `nodes/${node.id}/in`, run, given: node.in }, session);
+    }
 }
 
 /** X103 and X105: every session write a binding's operations make. */

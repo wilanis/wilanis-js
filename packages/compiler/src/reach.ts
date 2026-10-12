@@ -12,8 +12,8 @@
 import {
   type BindingDoc,
   type BindingOp,
+  callOf,
   type GraphDoc,
-  isSwitch,
   type Loaded,
   type Operation,
   policyPath,
@@ -112,8 +112,8 @@ export class Walk<R> {
     if (!graph) return;
     this.listener.graph?.(graph);
     for (const node of graph.doc.nodes) {
-      if (isSwitch(node)) continue;
-      this.follow({ run: node.run, given: node.in, file: graph.path, node: node.id, binding, root });
+      const run = callOf(node);
+      if (run) this.follow({ run, given: node.in, file: graph.path, node: node.id, binding, root });
     }
   }
 }

@@ -9,10 +9,10 @@
  * carries, the calling document and the position within it, as a refusal against that place would write them.
  */
 import {
+  callOf,
   type GraphDoc,
   hasVars,
   isMap,
-  isSwitch,
   type Loaded,
   type Node,
   type Scope,
@@ -115,8 +115,9 @@ function arityOf(scope: Scope, type: Type | undefined, want: string): SiteArity 
  * is the shape or a list of it.
  */
 function madeArity(scope: Scope, node: Node, want: string): SiteArity | undefined {
-  if (isSwitch(node)) return undefined;
-  const hit = scope.op(node.run);
+  const run = callOf(node);
+  if (!run) return undefined; // a switch routes, and a map that only keeps makes nothing: its elements are over's
+  const hit = scope.op(run);
   if (typeof hit === 'string' || !hit.port.native || hit.op.refuses) return undefined;
   const answered = quietSpec(scope, hit.op.returns);
   if (!answered) return undefined;

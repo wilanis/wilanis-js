@@ -8,9 +8,9 @@
  * answered and composes nothing, whatever reads it after.
  */
 import {
+  callOf,
   type GraphDoc,
   isMap,
-  isSwitch,
   type Loaded,
   NODE_RUN,
   type Node,
@@ -76,7 +76,7 @@ function readSite(judge: Judge, sites: Site[], site: Site): boolean {
  */
 function perElement(site: Site): Site {
   const node = site.node;
-  if (!node || !isMap(node) || !node.bind || !readWhole(node.over)) return site;
+  if (!node || !isMap(node) || !node.run || !node.bind || !readWhole(node.over)) return site;
   const bound: Values = {};
   for (const name of Object.keys(node.bind)) bound[name] = node.over;
   const call: RunNode = { type: NODE_RUN, id: node.id, run: node.run, in: { ...node.in, ...bound } };
@@ -102,10 +102,14 @@ function effectFed(judge: Judge, graph: Loaded<GraphDoc>, from: string): Fed | u
   return undefined;
 }
 
-/** Whether a node acts: it runs an operation that does not declare itself pure. One that names nothing is R001's. */
+/**
+ * Whether a node acts: it runs an operation that does not declare itself pure. One that names nothing is R001's,
+ * and a switch or a map that only keeps runs nothing.
+ */
 function acts(judge: Judge, node: Node | undefined): boolean {
-  if (!node || isSwitch(node)) return false;
-  const hit = judge.scope.op(node.run);
+  const run = node && callOf(node);
+  if (!run) return false;
+  const hit = judge.scope.op(run);
   return typeof hit !== 'string' && hit.op.pure !== true;
 }
 

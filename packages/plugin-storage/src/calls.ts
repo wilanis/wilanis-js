@@ -5,9 +5,8 @@
  */
 import {
   type BindingDoc,
+  callOf,
   type GraphDoc,
-  isMap,
-  isRun,
   keeps,
   type Loaded,
   type ObjField,
@@ -81,15 +80,17 @@ function acceptsOf(binding: Loaded<BindingDoc>, name: string, scope: Scope): Typ
 export function graphCalls(scope: Scope): Call[] {
   const out: Call[] = [];
   for (const graph of scope.registry.all('graph'))
-    for (const node of graph.doc.nodes)
-      if ((isRun(node) || isMap(node)) && isStorageCall(node.run, scope))
+    for (const node of graph.doc.nodes) {
+      const run = callOf(node);
+      if (run && isStorageCall(run, scope))
         out.push({
           file: graph.path,
           at: `nodes/${node.id}/in`,
-          run: canonical(String(node.run), scope),
+          run: canonical(run, scope),
           given: node.in,
           reads: inOf(graph, scope),
         });
+    }
   return out;
 }
 

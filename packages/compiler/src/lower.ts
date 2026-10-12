@@ -1,13 +1,16 @@
 /**
  * Lowering values to kernel sources. A literal bakes; a whole {{template}} reads a node, the input, a resolver
  * (a read below context) or a constant; text with templates concatenates; lists and objects lower each member.
+ * A map's own parts lower beside its values: what it binds, its bounds, its `where`, and a map that only keeps.
  * Also the scope a site over a scoped collection carries, which no document writes, and the secret paths of a
  * type, which a call's report redacts.
  */
 import {
+  expr,
   type Fields,
   hasVars,
   type Loaded,
+  type MapNode,
   type Operation,
   type Scope,
   type StoreDoc,
@@ -20,7 +23,7 @@ import {
   type Values,
   WHOLE_TEMPLATE,
 } from '@wilanis/core';
-import { type KSource, type Redact, readPath } from '@wilanis/engine';
+import { type KMap, type KSource, type Redact, readPath } from '@wilanis/engine';
 import { bindings, type CallSite, collectionOf } from './documents.js';
 import type { SiteLiteral } from './sites.js';
 
@@ -112,6 +115,33 @@ export function withProvided(
 export function bindPaths(bind: Record<string, string> | undefined): Record<string, string[]> | undefined {
   if (!bind) return undefined;
   return Object.fromEntries(Object.entries(bind).map(([name, path]) => [name, path ? path.split('.') : []]));
+}
+
+/** What a map says beside its operation, as the kernel reads it: what it binds, its bounds, and its `where`. */
+export function mapParts(node: MapNode): Pick<KMap, 'bind' | 'limit' | 'concurrency' | 'where'> {
+  return {
+    bind: bindPaths(node.bind),
+    ...(node.limit === undefined ? {} : { limit: node.limit }),
+    ...(node.concurrency === undefined ? {} : { concurrency: node.concurrency }),
+    // compiled as a switch's rule is, and labelled with the rule as its author wrote it
+    ...(node.where === undefined ? {} : { where: { when: expr.compilePredicate(node.where), label: node.where } }),
+  };
+}
+
+/**
+ * A map that only keeps: no handler, so each kept element is answered as it is. Its answer is a function of the
+ * element alone, so it is `pure`, and nothing is redacted, since it runs nothing.
+ */
+export function keepOf(node: MapNode, roots: Roots): KMap {
+  const parts = mapParts(node);
+  return {
+    kind: 'map',
+    over: lowerValue(node.over, roots),
+    in: lowerValues(node.in, roots),
+    onItemFailure: 'fail',
+    pure: true,
+    ...parts,
+  };
 }
 
 /** The input a scoped site carries its scope under, which no document may write (RFC 0015). */

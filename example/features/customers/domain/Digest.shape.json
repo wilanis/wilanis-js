@@ -2,11 +2,15 @@
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/shape.schema.json",
   "label": "Digest",
   "layer": "core",
-  "description": "What the digest answers: how many customers there are, and one line per customer as text.",
+  "description": "What the digest answers: how many customers there are, how many of them are active, and one line per customer as text.",
   "fields": {
     "count": {
       "type": "number",
       "description": "how many customers"
+    },
+    "active": {
+      "type": "number",
+      "description": "how many customers are active"
     },
     "text": {
       "type": "string",

@@ -102,6 +102,20 @@ describe('G024: only an effect is caught', () => {
     };
     expect(sabotage(GET_ROW, refusing)).toEqual(['G024']);
   });
+  it('refuses catching a map that only keeps: it runs nothing that could break', () => {
+    const keeping = (doc: any) => {
+      doc.constants = { tiers: { type: 'string[]', value: ['gold', 'silver'] } };
+      doc.nodes.push({
+        type: '@wilanis/node/map.schema.json',
+        id: 'gold',
+        over: '{{const.tiers}}',
+        where: "item == 'gold'",
+      });
+      nodeOf(doc, 'outcome').in.gold = '{{gold}}';
+      caught(doc, { gold: 'unreachable' });
+    };
+    expect(sabotageHinting(GET_ROW, keeping)).toEqual([`G024 ${hint}`]);
+  });
 });
 
 describe('G022: whatever else reads a caught node runs behind the switch', () => {

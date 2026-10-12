@@ -2,10 +2,12 @@
  * The node kinds with rules of their own. A switch's rules are boolean over its inputs (G011) and route to
  * nodes of the graph, each routed once (G009); what it catches is a node it reads that can break (G021, G024),
  * read elsewhere only behind it (G022), and never read where its fault goes (G023). A map iterates a list that is there (G012, G004) and hands its
- * element to the operation as `item` or through bind, never also in `in` (G006). A node that refuses names
+ * element to the operation as `item` or through bind, never also in `in` (G006); its `where` is a boolean over
+ * the element as `item` and its `in`, as a switch's rule is (G011). A node that refuses names
  * its outcome in a word of its own, and not the one the compiler's guards are refused with (I006).
  */
 import {
+  callOf,
   expr,
   isMap,
   isSwitch,
@@ -42,28 +44,65 @@ export function checkSwitch(site: NodeSite, node: SwitchNode, read: Reader): voi
     const typed = read(value, `nodes/${node.id}/in/${name}`);
     if (typed) inputs[name] = typed;
   }
-  for (const index of node.rules.keys()) checkRule(site, node, index, inputs);
+  for (const [index, rule] of node.rules.entries()) {
+    const at = `nodes/${node.id}/rules/${index}/when`;
+    checkRule(site, { text: rule.when, at, said: `rule ${index}`, word: 'when', over: "this node's inputs" }, inputs);
+  }
   for (const target of [...node.rules.map(rule => rule.to), node.else]) checkRoute(site, node, target);
 }
 
-function checkRule(site: NodeSite, node: SwitchNode, index: number, inputs: Record<string, Read>): void {
-  const when = node.rules[index].when;
-  const at = `nodes/${node.id}/rules/${index}/when`;
+/**
+ * G011, of a map's `where`: a boolean over the element as `item` and the map's typed `in`, as a switch's rule is
+ * over its inputs. `item` is the element whatever `bind` hands the operation, so the rule reads the same either way.
+ * A list G012 or G004 refused has no element to type the rule by; it was said where the element is typed.
+ */
+export function checkWhere(site: NodeSite, node: MapNode, read: Reader): void {
+  if (node.where === undefined) return;
+  const at = `nodes/${node.id}`;
+  const over = read(node.over, `${at}/over`);
+  if (over?.type.kind !== 'list' || over.optional) return;
+  const inputs: Record<string, Read> = {};
+  for (const [name, value] of Object.entries(node.in ?? {})) {
+    const typed = read(value, `${at}/in/${name}`);
+    if (typed) inputs[name] = typed;
+  }
+  inputs.item = { type: over.type.of, optional: false };
+  const rule: Rule = {
+    text: node.where,
+    at: `${at}/where`,
+    said: 'where',
+    word: 'where',
+    over: "item and this node's in",
+  };
+  checkRule(site, rule, inputs);
+}
+
+/** A rule a node tries over its inputs: its text, where it is written, and how a refusal names it and its inputs. */
+interface Rule {
+  text: string;
+  at: string;
+  said: string;
+  word: 'when' | 'where';
+  over: string;
+}
+
+/** G011: a rule parses, reads only what its inputs hold (proved present where optional), and answers a boolean. */
+function checkRule(site: NodeSite, rule: Rule, inputs: Record<string, Read>): void {
   try {
-    const type = expr.check(expr.parse(when), inputs);
+    const type = expr.check(expr.parse(rule.text), inputs);
     if (type.kind !== 'boolean')
       site.refuse(
         'G011',
-        `rule ${index}: '${when}' is ${show(type)}, not boolean`,
-        at,
-        'compare the value, as in a.b == 1, so when answers a boolean',
+        `${rule.said}: '${rule.text}' is ${show(type)}, not boolean`,
+        rule.at,
+        `compare the value, as in a.b == 1, so ${rule.word} answers a boolean`,
       );
   } catch (error) {
     site.refuse(
       'G011',
-      `rule ${index}: ${(error as Error).message}`,
-      at,
-      "write when as an expression over this node's inputs",
+      `${rule.said}: ${(error as Error).message}`,
+      rule.at,
+      `write ${rule.word} as an expression over ${rule.over}`,
     );
   }
 }
@@ -182,11 +221,16 @@ function whyNotRouted(site: CatchSite, one: Caught): string | undefined {
   return undefined;
 }
 
-/** G024: a switch, a pure operation and a refusing one break only by a bug -- a refusal is never caught at all. */
+/**
+ * G024: a switch, a map that only keeps, a pure operation and a refusing one break only by a bug -- a refusal is
+ * never caught at all. A keep that breaks its `limit` broke on a list the graph holds, which is no effect either.
+ */
 function whyNeverBreaks(site: CatchSite, one: Caught): string | undefined {
   const node = site.nodes.get(one.node);
   if (!node) return undefined;
   if (isSwitch(node)) return `catches switch '${one.node}', which routes and has no effect to break`;
+  if (!callOf(node))
+    return `catches '${one.node}', which only keeps the elements its where holds for: it has no effect to break`;
   const hit = site.ops.get(one.node);
   if (hit?.op.pure === true) return `catches '${one.node}', which runs pure '${node.run}'`;
   if (hit?.op.refuses) return `catches '${one.node}', which runs '${node.run}': it refuses on purpose, never caught`;
@@ -276,7 +320,16 @@ export function elementInputs(site: NodeSite, node: MapNode, read: Reader): Reco
     );
     return {};
   }
-  if (node.bind) return boundInputs(site, node, over.type.of);
+  if (node.bind) {
+    if (node.where !== undefined && 'item' in (node.in ?? {}))
+      site.refuse(
+        'G006',
+        `'item' is the element in where; do not give it in in`,
+        `${at}/in/item`,
+        'rename the input; in a where, item is the element',
+      );
+    return boundInputs(site, node, over.type.of);
+  }
   if ('item' in (node.in ?? {}))
     site.refuse(
       'G006',

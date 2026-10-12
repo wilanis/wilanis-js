@@ -96,12 +96,12 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [G003](G003.md) | G | live | a read that cannot be typed: no such field, constant, earlier node, or name under reads |
 | [G004](G004.md) | G | live | a value that does not fit its input: optional where the contract requires it, or of the wrong type |
 | [G005](G005.md) | G | live | a required input of the operation left out of a node's or a delegation's in |
-| [G006](G006.md) | G | live | a value given under in that is no input of the operation, or a map's item or bound name given again |
+| [G006](G006.md) | G | live | a value given under in that is no input of the operation, or a map's item or bound name given again, or item given beside a where |
 | [G007](G007.md) | G | live | a cycle through what nodes read and how switches route |
 | [G008](G008.md) | G | live | a field of in, a constant or a node that nothing reads |
 | [G009](G009.md) | G | live | a switch routing to an unknown node, to itself, or to a node another switch routes |
 | [G010](G010.md) | G | live | out.from naming no node, an unknown node or a switch, a candidate of the wrong type, or one never routed |
-| [G011](G011.md) | G | live | a switch rule whose when does not parse, does not type, or is not boolean |
+| [G011](G011.md) | G | live | a switch rule's when or a map's where that does not parse, does not type, or is not boolean |
 | [G012](G012.md) | G | live | a map over something that is not a list, or a bind path the element does not hold |
 | [G013](G013.md) | G | live | a constant whose value does not conform to its declared type |
 | [G014](G014.md) | G | live | a collecting map inside an atomic graph, or a graph one reaches, whose transaction a failed element ends |
@@ -114,7 +114,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [G021](G021.md) | G | live | a catch naming a node the switch does not read or another switch catches, or routing to no other node |
 | [G022](G022.md) | G | live | a reader of a caught node that does not run behind the catching switch |
 | [G023](G023.md) | G | live | a read of the node that broke, where its fault is routed or behind it |
-| [G024](G024.md) | G | live | a catch of a switch, a pure operation or one that refuses on purpose, which break only by a bug |
+| [G024](G024.md) | G | live | a catch of a switch, a map that only keeps, a pure operation or one that refuses on purpose, which break only by a bug |
 | [G025](G025.md) | G | live | a catch of a node where an invariant is guarded, which the guard moves aside |
 | [G026](G026.md) | G | live | a value given for a field the contract marks `provided`, which the compiler writes where the operation is called |
 | [G027](G027.md) | G | live | a timeoutMs or retry.backoffMs longer than a Node timer can wait |
