@@ -6,9 +6,9 @@
  * exits, and destroying a store removes only the files it holds (#843).
  */
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { checkTree } from '@wilanis/compiler';
 import { type BlobStore, type LoadResult, loadTree, type PluginModule, Scope, schemaRef } from '@wilanis/core';
@@ -115,15 +115,30 @@ describe('the blob registry behind a connection', () => {
   });
 });
 
-/** The folders under the system temp dir that this process's blob stores made. */
-const madeHere = () => readdirSync(tmpdir()).filter(name => name.startsWith(`wilanis-blobs-${process.pid}-`));
+/**
+ * The folders under the system temp dir named for this process's pid: what its blob stores made, and what an
+ * earlier process with the same pid left behind when it died before its exit cleanup ran (#993).
+ */
+const namedForThisPid = () => readdirSync(tmpdir()).filter(name => name.startsWith(`wilanis-blobs-${process.pid}-`));
 
 describe('the blob registry on disk', () => {
-  it('is one folder for every store of a process when the tree names none', () => {
-    const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);
-    const dirs = Array.from({ length: 5 }, (_, seed) => (embedderFor(load, { seed }).blobs as FileBlobStore).dir);
-    expect(new Set(dirs).size).toBe(1);
-    expect(madeHere()).toHaveLength(1);
+  it('is one folder for every store of a process when the tree names none, beside a stale one of the same pid', () => {
+    const stale = join(tmpdir(), `wilanis-blobs-${process.pid}-stale`);
+    mkdirSync(stale, { recursive: true });
+    try {
+      const before = namedForThisPid();
+      const load = loadTree(EXAMPLE, PLUGINS, INCLUDES);
+      const dirs = Array.from({ length: 5 }, (_, seed) => (embedderFor(load, { seed }).blobs as FileBlobStore).dir);
+      const shared = [...new Set(dirs)];
+      expect(shared).toHaveLength(1);
+      expect(shared.map(dir => dirname(dir))).toEqual([tmpdir()]);
+      const ours = shared.map(dir => basename(dir));
+      const after = namedForThisPid();
+      expect(after).toEqual(expect.arrayContaining([...ours, basename(stale)]));
+      expect(after.filter(name => !ours.includes(name))).toEqual(before.filter(name => !ours.includes(name)));
+    } finally {
+      rmSync(stale, { recursive: true, force: true });
+    }
   });
 
   it('leaves a folder the tree names, and a file it did not write there, when destroyed', async () => {
