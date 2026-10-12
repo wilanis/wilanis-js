@@ -376,9 +376,9 @@ value that lands at element 0 of a node that is a guarded *list* site of the sam
 whose map judges every element) is held there. Without this, a demand on such a guard would be written at the
 list's `<id>:made`, judged by the list's own guard first, and read as "did not reach it". The sentence names the
 upstream guard as `'in:check' of '<id>'`: a list site lowers to a map `<id>` over a nested spec whose check is
-`in:check` (`TAKEN_IDS.check`), so no node `<id>:check` exists for a reader to find. A list site is never proved, since
-the proof rules read only a `run` node's `in` (`siteRead` in `prove.ts`); "where the rule is proved" names a site of
-one value.
+`in:check` (`TAKEN_IDS.check`), so no node `<id>:check` exists for a reader to find. A list site a map makes, or a
+graph's `in`, is never proved, since the proof rules read only a `run` node's `in` (`siteRead` in `prove.ts`); the
+test of "where the rule is proved" uses a site of one value.
 
 **5. The report.** `Decision['branches'][number]` in `rehearsal-report.ts` gains `closed?: string`. `branchLine`
 prints it as `--  <branch>  closed on this path: <sentence>`, and it is no problem. `mergeBranch` treats it as it
