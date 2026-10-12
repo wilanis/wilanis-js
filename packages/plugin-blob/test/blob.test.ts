@@ -159,6 +159,97 @@ describe('csv.port.json', () => {
   });
 });
 
+describe('csv.port.json: columns, a header name read into a field of another name', () => {
+  const Pair: Type = types.inline({
+    fields: { entity: { type: 'string' }, degree: { type: 'number' }, averageRevs: { type: 'number' } },
+  });
+  const pairs = { ...env, resolveType: (ref: string) => (ref === 'Pair' ? Pair : env.resolveType(ref)) };
+  const pairCtx = { env: pairs, nodePath: [], attach: () => {} } as never;
+  const onPairs = (op: string, inputs: Record<string, unknown>) =>
+    plugin.handlers[`@blob/${op}`]({ in: inputs, ctx: pairCtx });
+  const csv = (body: string) => store.put(body, { contentType: 'text/csv' });
+
+  it('parse: the mapped column is read into its field and coerced by its type', async () => {
+    const file = await csv('url,method,hit-count\nhttps://a/,GET,3\n');
+    expect(await run('csv.port.json#parse', { file, type: 'Row', columns: { 'hit-count': 'hits' } })).toEqual([
+      { url: 'https://a/', method: 'GET', hits: 3 },
+    ]);
+  });
+  it('parse: mapped and unmapped columns mixed in one header, each into its field', async () => {
+    const file = await csv('entity,average-revs,degree\na.ts,4.5,80\n');
+    const columns = { 'average-revs': 'averageRevs' };
+    expect(await onPairs('csv.port.json#parse', { file, type: 'Pair', columns })).toEqual([
+      { entity: 'a.ts', degree: 80, averageRevs: 4.5 },
+    ]);
+  });
+  it('parse: a key no header writes changes nothing, and a required field it was meant for fails the first row', async () => {
+    const plain = await csv('url,method\nhttps://a/,GET\n');
+    expect(await run('csv.port.json#parse', { file: plain, type: 'Row', columns: { 'hit-count': 'hits' } })).toEqual([
+      { url: 'https://a/', method: 'GET' },
+    ]);
+    const file = await csv('entity,degree\na.ts,80\n');
+    const columns = { 'average-revs': 'averageRevs' };
+    await expect(onPairs('csv.port.json#parse', { file, type: 'Pair', columns })).rejects.toThrow(
+      'row 2.averageRevs: required',
+    );
+  });
+  it('write: the mapped field under its header, in the shape order; parse with the same map gives the rows back', async () => {
+    const rows = [
+      { url: 'https://a/', method: 'GET', hits: 2, ok: true },
+      { url: 'https://b/', method: 'POST' },
+    ];
+    const columns = { 'hit-count': 'hits' };
+    const file = await run('csv.port.json#write', { rows, type: 'Row', columns });
+    expect(await text(store.open(file as never))).toBe(
+      'url,method,hit-count,ok\r\nhttps://a/,GET,2,true\r\nhttps://b/,POST,,\r\n',
+    );
+    expect(await run('csv.port.json#parse', { file, type: 'Row', columns })).toEqual(rows);
+  });
+
+  const fails = async (columns: Record<string, unknown>, message: string) => {
+    const file = await csv(''); // an empty file: the map is judged before anything is read
+    await expect(onPairs('csv.port.json#parse', { file, type: 'Pair', columns })).rejects.toThrow(message);
+    await expect(onPairs('csv.port.json#write', { rows: [], type: 'Pair', columns })).rejects.toThrow(message);
+  };
+  it('a map value that is not a field fails parse and write before a byte is read or written', async () => {
+    await fails(
+      { 'average-revs': 'avgRevs' },
+      "csv columns: 'average-revs' maps to 'avgRevs', which is not a field of Pair (fields: entity, degree, averageRevs)",
+    );
+  });
+  it('two keys that map to one field fail both operations', async () => {
+    await fails(
+      { 'average-revs': 'averageRevs', avg: 'averageRevs' },
+      "csv columns: 'average-revs' and 'avg' both map to 'averageRevs'",
+    );
+  });
+  it("a key that is another field's own header fails both operations", async () => {
+    await fails(
+      { degree: 'averageRevs' },
+      "csv columns: 'degree' maps to 'averageRevs', and 'degree' is also the header of the field 'degree'",
+    );
+  });
+  it('a key with spaces around it fails both operations, since a header cell is read trimmed', async () => {
+    await fails(
+      { ' average-revs': 'averageRevs' },
+      "csv columns: ' average-revs' has spaces around it, and a header cell is read trimmed, so it never matches; write 'average-revs'",
+    );
+  });
+  it('a swap and an identity are maps like any other, and give the file back', async () => {
+    for (const columns of [{ degree: 'averageRevs', averageRevs: 'degree' }, { degree: 'degree' }]) {
+      const rows = [{ entity: 'a.ts', degree: 80, averageRevs: 4.5 }];
+      const file = await onPairs('csv.port.json#write', { rows, type: 'Pair', columns });
+      expect(await onPairs('csv.port.json#parse', { file, type: 'Pair', columns })).toEqual(rows);
+    }
+    const swapped = await onPairs('csv.port.json#write', {
+      rows: [{ entity: 'a.ts', degree: 80, averageRevs: 4.5 }],
+      type: 'Pair',
+      columns: { degree: 'averageRevs', averageRevs: 'degree' },
+    });
+    expect(await text(store.open(swapped as never))).toBe('entity,averageRevs,degree\r\na.ts,80,4.5\r\n');
+  });
+});
+
 describe('text.port.json', () => {
   it('write then read, round trip, with the content type given or the default', async () => {
     const written = await run('text.port.json#write', {
