@@ -115,9 +115,12 @@ about a caller (A007; RFC 0015). A tick or a queue message has no caller, so a j
 host, a batch) keeps the key as a field of the record and filters every read on it with `where`.
 
 `wilanis migrate` plans each connection from this tree's stores alone, and plans a `drop` of a collection the
-connection's record holds and no store declares. So a tree that reads collections another tree migrates never runs
-`wilanis migrate` on that connection, and its store's description says so. RFC 0042 (#922) proposes a way for a
-store to say it.
+connection's record holds and no store declares. Two trees may reach one database, where one tree writes and
+migrates the records and the other only reads them. The reading tree's store then says `keptBy`, the
+`project.json → name` of the tree that keeps the collections (RFC 0042). Its collections may name shapes with
+fewer fields than the keeping tree's, since an engine reads only the fields a shape names. `wilanis migrate` skips
+a connection whose stores say `keptBy`: it opens nothing there and prints which tree keeps it. That tree's own
+`migrate` plans the connection.
 
 ## Triggers are generic
 
