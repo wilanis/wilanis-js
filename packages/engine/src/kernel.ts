@@ -64,11 +64,11 @@ function endedAt(report: Report, refused: boolean): [string, NodeReport] | undef
 
 /**
  * Which of two nodes settled first, as a sort compares them: by the place each took as the run's nodes settled
- * (`settled`), since two nodes can settle in one tick of the clock and `endedAt` would then keep the graph's order.
+ * (`order`), since two nodes can settle in one tick of the clock and `endedAt` would then keep the graph's order.
  * A report the kernel did not make, which carries no place, is ordered by `endedAt`.
  */
 function settledBefore(one: NodeReport, other: NodeReport): number {
-  if (one.settled !== undefined && other.settled !== undefined) return one.settled - other.settled;
+  if (one.order !== undefined && other.order !== undefined) return one.order - other.order;
   return (one.endedAt ?? 0) - (other.endedAt ?? 0);
 }
 

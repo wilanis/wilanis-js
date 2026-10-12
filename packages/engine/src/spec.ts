@@ -135,7 +135,7 @@ export interface NodeReport {
    * The place this node took among its run's nodes as they settled: 1 for the first. Two nodes can settle in one
    * tick of the clock, so `endedAt` cannot order them; this can, and it is what `outcomeOf` finds the ending by.
    */
-  settled?: number;
+  order?: number;
 }
 
 /** One try of a node that did not stand: when it ran, why it was tried again, and the nested run when it was a graph. */
