@@ -21,6 +21,7 @@ import {
 } from './demands.js';
 import type { Branch, Domain } from './domains.js';
 import { type Holder, handedAs, listHolder, ownInputAt, sourceOf, standingOf } from './frames.js';
+import type { MapRule } from './map-rules.js';
 import { branchesOf } from './solve.js';
 import { getPath, satisfy, setPath } from './stubs.js';
 
@@ -59,6 +60,8 @@ export interface Stubbing {
    * the value it copies. Only `fuzz --edges` gives it: it steers the trigger's input and never a node's answer.
    */
   writtenOf?: (nodePath: string) => unknown;
+  /** The map with a `where` at a dotted path, whose rule is logic: run, never stubbed (#1027). */
+  mapRuleOf?: (nodePath: string) => MapRule | undefined;
 }
 
 /**
