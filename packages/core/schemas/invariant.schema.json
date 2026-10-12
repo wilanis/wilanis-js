@@ -73,7 +73,7 @@
           "$ref": "common.schema.json#/$defs/path"
         },
         "when": {
-          "description": "The rule, in the grammar a switch rule uses -- has(), len(), comparisons, in, &&, ||, ! -- whose roots are the shape's fields: \"len(url) > 0 && (method != 'DELETE' || has(ua))\".",
+          "description": "The rule, in the grammar a switch rule uses -- has(), len(), comparisons, in, contains, &&, ||, ! -- whose roots are the shape's fields: \"len(url) > 0 && (method != 'DELETE' || has(ua))\".",
           "type": "string",
           "minLength": 1
         }
