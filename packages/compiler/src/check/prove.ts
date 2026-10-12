@@ -6,7 +6,10 @@
  *
  * Being wrong here silently removes a guard, so each rule answers only what it can see. The implication
  * table below is small on purpose: an ordering proves a weaker ordering on the same literal, and equality
- * with a literal proves inequality with another. Everything else is guarded.
+ * with a literal proves inequality with another. Everything else is guarded. So `contains` (RFC 0040) is proved
+ * only by the same words: a switch that tested `email contains '@'` proves it, and one that tested
+ * `email contains '@x'` or `email == 'a@b'` does not. Both are true, and both would be reasoning about the parts
+ * of a literal, which is the arithmetic this module leaves to the guard.
  */
 import { expr, isRun, type Node, type Scope, splitPath, type Values, WHOLE_TEMPLATE } from '@wilanis/core';
 import { type Site, siteId } from '../sites.js';

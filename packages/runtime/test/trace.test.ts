@@ -118,6 +118,7 @@ describe('one fire, said as spans', () => {
       'customer:check',
       'customer',
       'customer:violated',
+      'customer:violated:2',
     ]);
   });
 

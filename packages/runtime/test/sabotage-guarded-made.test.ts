@@ -29,6 +29,8 @@ const EACH_FOUND = 'features/customers/data/rewrite-bronze.graph.json';
 const STORE = { store: '@customers/data/customers.store.json', collection: 'customers' };
 const CUSTOMER = '@customers/domain/Customer.shape.json';
 const REACHABLE = "'A customer is reachable' (@features/customers/domain/a-customer-is-reachable.invariant.json)";
+/** The example's two invariants over Customer, as L016 names them: two rules guard what is made. */
+const GUARDING = `${REACHABLE} and 'An address names its domain' (@features/customers/domain/an-address-names-its-domain.invariant.json) guard`;
 const HINT = 'a data graph translates; make the record in a domain graph and hand it to this one whole, as its in';
 
 const run = (id: string, op: string, input: Record<string, unknown>) => ({
@@ -134,7 +136,7 @@ describe('sabotage: a data graph makes the customer it writes', () => {
   it('L016 says what is made, the invariant guarding it and the effect that reads it, and hints the domain graph', () => {
     const [[file, edit]] = Object.entries(REBOUND);
     expect(plantedEditingSaying({ [KEPT_UPDATE]: MERGED_BELOW }, file, edit)).toEqual([
-      `L016 data graph makes a Customer, which ${REACHABLE} guards, and the effect 'stored' reads it`,
+      `L016 data graph makes a Customer, which ${GUARDING}, and the effect 'stored' reads it`,
     ]);
     expect(plantedEditingHinting({ [KEPT_UPDATE]: MERGED_BELOW }, file, edit)).toEqual([`L016 ${HINT}`]);
   });
@@ -157,7 +159,7 @@ describe('sabotage: a data graph makes the customer it writes', () => {
       graph.nodes[1].in.mark = '{{latest.record}}';
     };
     expect(sabotageSaying(KEEP, deriving)).toEqual([
-      `L016 data graph makes a Customer, which ${REACHABLE} guards, and the effect 'latest' reads it through 'latestRow'`,
+      `L016 data graph makes a Customer, which ${GUARDING}, and the effect 'latest' reads it through 'latestRow'`,
     ]);
   });
 

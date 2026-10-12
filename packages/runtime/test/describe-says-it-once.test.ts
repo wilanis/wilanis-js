@@ -74,7 +74,7 @@ describe('describe: no kind answers with the document as JSON', () => {
     // `customer` is guarded, so the graph also answers with the guard's refusal and whatever routed `customer` routes
     // the node it moved aside to: the lines say the graph a run walks, not the one the file spells
     expect(said).toContain(
-      'answers @customers/domain/Customer.shape.json  from customer | customer:violated | repeated | nothingWritten',
+      'answers @customers/domain/Customer.shape.json  from customer | customer:violated | customer:violated:2 | repeated | nothingWritten',
     );
     expect(said).toContain('    stored  @storage/store.port.json#put');
     expect(said).toContain('    bothWritten  switch → repeated | customer:made | nothingWritten');

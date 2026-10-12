@@ -1054,6 +1054,13 @@
       "included": null
     },
     {
+      "path": "@features/customers/domain/an-address-names-its-domain.invariant.json",
+      "kind": "invariant",
+      "feature": "customers",
+      "layer": "domain",
+      "included": null
+    },
+    {
       "path": "@features/customers/domain/backfill-customers.graph.json",
       "kind": "graph",
       "feature": "customers",

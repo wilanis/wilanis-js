@@ -124,6 +124,10 @@ documents settle the rule the checker proves it and nothing is added to the run;
 the compiler lowers a guard the author never wrote, which refuses with the reserved word `invariant` -- which
 is why every write route maps `"invariant": 500`.
 
+`an-address-names-its-domain.invariant.json` is a second rule over the same shape, `email contains '@'`: an
+address holds an `@`, so a name is never kept where the address should be. Where a site is unproved for both,
+one guard tests both rules and refuses with the sentence of the one that failed.
+
 `writes-are-for-registrars.invariant.json` is the other form, over operations rather than fields: it names
 the six operations that change a customer and says what must gate every way in that reaches them. Without it
 the six write triggers are six coincidences.

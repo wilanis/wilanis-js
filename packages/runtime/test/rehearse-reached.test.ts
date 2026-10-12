@@ -38,6 +38,7 @@ describe('the rehearsal reaches a switch behind a call that decides first', () =
     expect(guard?.branches.map(one => [one.to, one.settled?.status, one.settled?.declared?.reason])).toEqual([
       ['customer', 'done', undefined],
       ['customer:violated', 'failed', 'invariant'],
+      ['customer:violated:2', 'failed', 'invariant'],
     ]);
     for (const one of [...(row?.branches ?? []), ...(guard?.branches ?? [])])
       expect(one.settled?.propagated).toBeUndefined();
@@ -78,6 +79,7 @@ describe("the rehearsal steers a guard's own graph to the node it judges (#569)"
       expect(guard?.branches.map(one => [one.to, one.settled?.status, one.settled?.declared?.reason])).toEqual([
         ['customer', 'done', undefined],
         ['customer:violated', 'failed', 'invariant'],
+        ['customer:violated:2', 'failed', 'invariant'],
       ]);
       const kept = decisionOf(run, 'data/kept-get.graph.json', decides.id);
       expect(kept?.branches.map(one => [one.to, one.settled?.status])).toEqual([

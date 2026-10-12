@@ -2,15 +2,15 @@
  * What the rehearsal says about a guard (RFC 0007, step 6). A guard is a switch the compiler lowered where a
  * field invariant could not be proved, so the branch solver inverts its rule like any other and the walk tries
  * both branches: nothing new is solved. What is held here is only what a reader is told -- that the decision is
- * headed by the invariant it stands for rather than by a node the author never wrote, that its two branches
- * read `holds` and `violated`, that the violated one is refused on purpose as a declared refusal is, and that
- * the summary says, invariant by invariant, where the tree met each one.
+ * headed by the invariants it stands for rather than by a node the author never wrote, that its branches read
+ * `holds` and one `violated` per rule, that each violated one is refused on purpose as a declared refusal is, and
+ * that the summary says, invariant by invariant, where the tree met each one.
  *
  * The example's own invariants carry most of the claims: the field form is guarded at every site of `Customer`,
  * which is what the checker could prove and no more. `proved at N site(s)` with an N above zero needs a site the
  * proof rules do settle, so the last case plants one, the way `invariant-proof.test.ts` plants its own.
  *
- * One case counts the guards the walk reaches rather than only checking that each one it found settles 2/2, since
+ * One case counts the guards the walk reaches rather than only checking that each one it found settles 3/3, since
  * the looser claim is true of a walk that reaches one guard and of a walk that reaches them all. It reaches every
  * guard the profile binds, of either arity: a list site lowers to a `map` over a nested spec, and the walk opens
  * that spec by the name the compiler keys it under, so its `in:check` is a decision like any other (#437).
@@ -21,12 +21,16 @@
  */
 
 import { rmSync } from 'node:fs';
-import { loadTree, schemaUrl } from '@wilanis/core';
+import { loadTree } from '@wilanis/core';
 import { describe, expect, it } from 'vitest';
 import { rehearse } from '../src/index.js';
 import { EXAMPLE, INCLUDES, loadedWith, PLUGINS } from './example-harness.js';
 
 const CUSTOMER = '@customers/domain/Customer.shape.json';
+/** What each of the example's two invariants over `Customer` says where a value does not satisfy it. */
+const REACH_SAID =
+  "'A customer is reachable' does not hold: len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))";
+const ADDRESS_SAID = "'An address names its domain' does not hold: email contains '@'";
 
 /** The example rehearsed under the profile whose bindings reach the store, where the guards are lowered. */
 const localRun = () => rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed: 1, profile: 'local' });
@@ -58,21 +62,26 @@ describe('the rehearsal reports a guard', () => {
     expect(run.ok).toBe(true);
     // the compiler's own node, named by the rule it tests rather than by an id nobody wrote
     expect(run.lines).toContain(
-      "features/customers/data/kept-get  guard 'customer:check' A customer is reachable  2/2 branches",
+      "features/customers/data/kept-get  guard 'customer:check' A customer is reachable; An address names its domain  3/3 branches",
     );
     // and the switch the author did write is untouched, still headed as a switch
     expect(run.lines).toContain("features/customers/data/kept-get  switch 'isKept'  2/2 branches");
   });
 
-  it("labels a guard's branches holds and violated, and refuses the violated one on purpose", async () => {
+  /**
+   * A site two invariants are unproved at is one guard with one refusal per rule (#492): the conjunction holds,
+   * or the first rule broke, or what remains -- the second -- did. The report reads the two refusals as two
+   * `violated` branches, each quoting the sentence of its own invariant, so a reader is told which rule a value
+   * can break here and never that both broke at once. The second rule's branch runs with an email the solver
+   * made to lack the `@` (RFC 0040), and the value's with one made to hold it.
+   */
+  it("labels a guard's branches holds and violated, one violated per rule, each refused on purpose", async () => {
     const said = decision((await localRun()).lines, "kept-get  guard 'customer:check'");
     expect(said[1]).toBe("  ok  holds     answered from 'customer'");
-    expect(said[2]).toMatch(/^ {2}ok {2}violated {2}refused on purpose at 'customer:violated' as invariant: /);
     // the message is the invariant's own, so a reader sees which rule the value did not satisfy
-    expect(said[2]).toContain(
-      "'A customer is reachable' does not hold: len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))",
-    );
-    expect(said).toHaveLength(3);
+    expect(said[2]).toBe(`  ok  violated  refused on purpose at 'customer:violated' as invariant: "${REACH_SAID}"`);
+    expect(said[3]).toBe(`  ok  violated  refused on purpose at 'customer:violated:2' as invariant: "${ADDRESS_SAID}"`);
+    expect(said).toHaveLength(4);
   });
 
   it('solves both branches of every guard, at every seed: a guard is a switch and nothing new is solved', async () => {
@@ -80,13 +89,13 @@ describe('the rehearsal reports a guard', () => {
       const run = await rehearse(loadTree(EXAMPLE, PLUGINS, INCLUDES), { seed, profile: 'local' });
       const guards = run.lines.filter(isGuard);
       expect(guards.length).toBeGreaterThan(0);
-      for (const line of guards) expect(line).toContain('2/2 branches');
+      for (const line of guards) expect(line).toContain('3/3 branches');
     }
   });
 
   /**
    * How many guards the walk reaches, named rather than counted loosely, because "every guard it found settles
-   * 2/2" is true of a walk that finds one of them and of a walk that finds them all. It reaches twelve, which is
+   * 3/3" is true of a walk that finds one of them and of a walk that finds them all. It reaches twelve, which is
    * every guard this profile can run: `local` binds twelve of the twenty-three guarded sites -- six made sites
    * of arity `one` at `<id>:check` (the five named `customer`, and `kept` behind keep-customer's write), two
    * taken ones at `in:check` (the whole customer store-and-latest and keep-customer are handed to write), and
@@ -111,10 +120,11 @@ describe('the rehearsal reports a guard', () => {
     // the two taken customers and the four lists, the lists judged element by element inside a nested spec
     // whose ids are the fixed `in:*`
     expect(guards.filter(line => line.includes("guard 'in:check'"))).toHaveLength(6);
-    // every one of them walks both branches, a list's exactly as a single value's
-    for (const line of guards) expect(line).toContain('2/2 branches');
+    // every one of them walks all three branches, a list's exactly as a single value's
+    for (const line of guards) expect(line).toContain('3/3 branches');
     // while the summary counts every site the checker could not prove, over the tree rather than the profile
     expect(stated(run.lines)).toContain('  A customer is reachable  proved at 0 site(s), guarded at 30');
+    expect(stated(run.lines)).toContain('  An address names its domain  proved at 0 site(s), guarded at 30');
   });
 
   it("labels a list guard's branches holds and violated, as a guard of arity one's are", async () => {
@@ -123,20 +133,21 @@ describe('the rehearsal reports a guard', () => {
     expect(said[1]).toBe("  ok  holds     answered from 'in:ok'");
     expect(said[2]).toMatch(/^ {2}ok {2}violated {2}refused on purpose at 'in:violated' as invariant: /);
     // the map runs with onItemFailure 'fail', so the list refuses with the first element's reason
-    expect(said[2]).toContain(
-      "'A customer is reachable' does not hold: len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))",
-    );
-    expect(said).toHaveLength(3);
+    expect(said[2]).toContain(REACH_SAID);
+    expect(said[3]).toMatch(/^ {2}ok {2}violated {2}refused on purpose at 'in:violated:2' as invariant: /);
+    expect(said[3]).toContain(ADDRESS_SAID);
+    expect(said).toHaveLength(4);
   });
 
   it('says how many invariants the tree declares, and where each is met', async () => {
     const said = stated((await localRun()).lines);
-    expect(said).toHaveLength(3);
+    expect(said).toHaveLength(4);
     // the access form holds at the triggers that reach what it gates and meet what it requires
     expect(said).toContain('  Writes are for registrars  holds at 6 trigger(s)');
     expect(said).toContain("  The session is the caller's  holds at 3 trigger(s)");
     // and the field form counts its sites: every site of Customer in the example is one the checker could not prove
     expect(said).toContain('  A customer is reachable  proved at 0 site(s), guarded at 30');
+    expect(said).toContain('  An address names its domain  proved at 0 site(s), guarded at 30');
   });
 
   it('counts the same invariants under a profile that reaches almost none of the guarded sites', async () => {
@@ -150,46 +161,6 @@ describe('the rehearsal reports a guard', () => {
     // makes of the row the API answered (#787) -- which is the difference between what a tree states and what one
     // profile's run can exercise
     expect(run.lines.filter(isGuard)).toHaveLength(11);
-  });
-
-  /**
-   * A site two invariants are unproved at is one guard with one refusal per rule (#492): the conjunction holds,
-   * or the first rule broke, or what remains -- the second -- did. The report reads the two refusals as two
-   * `violated` branches, each quoting the sentence of its own invariant, so a reader is told which rule a value
-   * can break here and never that both broke at once.
-   */
-  it('reports a guard two invariants share as one decision with a violated branch per rule', async () => {
-    const { load, dir } = loadedWith({
-      'features/customers/domain/a-customer-has-an-id.invariant.json': {
-        $schema: schemaUrl('invariant'),
-        label: 'A customer has an id',
-        description: 'A second rule over the same shape, unproved at the same sites, so one guard stands for both.',
-        holds: { on: CUSTOMER, when: 'len(id) > 0' },
-      },
-    });
-    try {
-      const run = await rehearse(load, { seed: 1, profile: 'local' });
-      expect(run.ok).toBe(true);
-      const said = decision(run.lines, "kept-get  guard 'customer:check'");
-      expect(said[0]).toBe(
-        "features/customers/data/kept-get  guard 'customer:check' A customer has an id; A customer is reachable  3/3 branches",
-      );
-      expect(said[1]).toBe("  ok  holds     answered from 'customer'");
-      expect(said[2]).toBe(
-        `  ok  violated  refused on purpose at 'customer:violated' as invariant: "'A customer has an id' does not hold: len(id) > 0"`,
-      );
-      expect(said[3]).toBe(
-        `  ok  violated  refused on purpose at 'customer:violated:2' as invariant: "'A customer is reachable' does not hold: len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))"`,
-      );
-      expect(said).toHaveLength(4);
-      // a list site's nested spec is the same three ways round, at the fixed `in:*`
-      const list = decision(run.lines, "kept-list  guard 'in:check'");
-      expect(list[0]).toContain('3/3 branches');
-      expect(list[2]).toContain("at 'in:violated' as invariant: \"'A customer has an id' does not hold");
-      expect(list[3]).toContain("at 'in:violated:2' as invariant: \"'A customer is reachable' does not hold");
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
   });
 
   it('counts a site the proof rules settle as proved rather than guarded', async () => {
@@ -213,9 +184,9 @@ describe('the rehearsal reports a guard', () => {
     });
     try {
       const said = stated((await rehearse(load, { seed: 1, profile: 'local' })).lines);
-      const line = said.find(one => one.includes('A customer is reachable'));
-      // one more site than the example has, and it is the proved one: the other sixteen still carry a guard
-      expect(line).toBe('  A customer is reachable  proved at 1 site(s), guarded at 30');
+      // one more site than the example has, and it is the proved one for both rules, since its address holds an @
+      expect(said).toContain('  A customer is reachable  proved at 1 site(s), guarded at 30');
+      expect(said).toContain('  An address names its domain  proved at 1 site(s), guarded at 30');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

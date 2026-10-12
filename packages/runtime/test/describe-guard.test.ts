@@ -11,15 +11,19 @@
  * must say the same thing, and two spellings of one fact are two facts to a reader.
  */
 import { rmSync } from 'node:fs';
-import { loadTree, schemaUrl } from '@wilanis/core';
+import { join } from 'node:path';
+import { loadTree } from '@wilanis/core';
 import { afterAll, describe, expect, it } from 'vitest';
 import { describe as describeDoc } from '../src/index.js';
-import { EXAMPLE, INCLUDES, loadedWith, PLUGINS } from './example-harness.js';
+import { copyOfExample, EXAMPLE, INCLUDES, PLUGINS } from './example-harness.js';
 
 const example = loadTree(EXAMPLE, PLUGINS, INCLUDES);
 
-const CALLS = "'A customer is reachable' (@features/customers/domain/a-customer-is-reachable.invariant.json)";
-const RULE = "(len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note)))";
+const REACHABLE = "'A customer is reachable' (@features/customers/domain/a-customer-is-reachable.invariant.json)";
+const ADDRESS = "'An address names its domain' (@features/customers/domain/an-address-names-its-domain.invariant.json)";
+/** The example's two invariants over `Customer`, in the order the registry holds them and the guard conjoins them. */
+const CALLS = `${REACHABLE} and ${ADDRESS}`;
+const RULE = "(len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))) && (email contains '@')";
 
 const KEPT_GET = '@customers/data/kept-get.graph.json';
 const KEPT_LIST = '@customers/data/kept-list.graph.json';
@@ -29,17 +33,28 @@ const GREET = '@hello/domain/greet.graph.json';
 describe('describe: a graph whose made value is guarded', () => {
   const said = () => describeDoc(example, KEPT_GET);
 
-  it('names the invariant and its rule once, above the nodes the guard is', () => {
-    // the fact all three share belongs above the three, as a policy's `gates:` line already does. The rule is
-    // printed exactly as the switch tests it, brackets and all, so a reader can match the two
+  it('names the invariants and their rules once, above the nodes the guard is', () => {
+    // the fact all of them share belongs above them, as a policy's `gates:` line already does. The rules are
+    // printed exactly as the switch tests them, brackets and all, in the order the registry holds them, which is
+    // the order `guardsOf` conjoins them in: the header and the switch read the same way round
     expect(said()).toContain(`    guard for ${CALLS}, when ${RULE}:`);
     expect(said().split(CALLS)).toHaveLength(2);
   });
 
   it('prints each node the compiler lowered, marked as a guard, under the id the spec gives it', () => {
-    expect(said()).toContain('        customer:check  switch → customer | customer:violated  (guard)');
+    // one guard however many rules, whose switch routes to one refusal per rule, the first keeping its id
+    expect(said().split('guard for')).toHaveLength(2);
+    expect(said()).toContain(
+      '        customer:check  switch → customer | customer:violated | customer:violated:2  (guard)',
+    );
     expect(said()).toContain('        customer  answers customer:made, which the rule let through  (guard)');
-    expect(said()).toContain("        customer:violated  refuses 'invariant'  (guard)");
+  });
+
+  it('says which invariant each refusal is for, in the order the header names them', () => {
+    expect(said()).toContain("        customer:violated  refuses 'invariant' for 'A customer is reachable'  (guard)");
+    expect(said()).toContain(
+      "        customer:violated:2  refuses 'invariant' for 'An address names its domain'  (guard)",
+    );
   });
 
   it('prints the author s own node under the id it moved aside to, and does not call it a guard', () => {
@@ -53,9 +68,10 @@ describe('describe: a graph whose made value is guarded', () => {
     expect(said()).not.toContain('    isKept  switch → customer | noCustomer');
   });
 
-  it('answers with the guard s refusal too, which is how the graph refuses when its own rule fails', () => {
+  it('answers with the guard s refusals too, which is how the graph refuses when one of its rules fails', () => {
+    // with either refusal, since it refuses with whichever the guard routed to
     expect(said()).toContain(
-      'answers @customers/domain/Customer.shape.json  from customer | customer:violated | noCustomer',
+      'answers @customers/domain/Customer.shape.json  from customer | customer:violated | customer:violated:2 | noCustomer',
     );
   });
 });
@@ -101,57 +117,33 @@ describe('describe: a graph with nothing to guard', () => {
   });
 });
 
-// ---- two rules over one shape, unproved at one site -------------------------------------------------
+// ---- one rule over the shape ------------------------------------------------------------------------
 
 /**
- * A site is guarded once however many rules were unproved there (RFC 0007, decided during implementation): the
- * one switch tests their conjunction, and where it fails routes to the refusal of the first rule that did not
- * hold, so the caller is told that rule alone (#492). The header must read correctly in that case too, or a
- * reader would go looking for a rule the guard tests and the line never named; and each refusal must say whose
- * it is, or a reader could not tell `customer:violated` from `customer:violated:2`.
+ * A site is guarded once however many rules were unproved there (RFC 0007, decided during implementation), and
+ * each refusal says whose it is where there are several, or a reader could not tell `customer:violated` from
+ * `customer:violated:2`. Where the guard stands for one rule alone, the header has said whose it is. The example
+ * holds `Customer` to two rules, so a copy without the address rule is the case of one.
  */
-const SECOND = '@features/customers/domain/a-customer-has-an-id.invariant.json';
-const { load: two, dir: twoDir } = loadedWith({
-  'features/customers/domain/a-customer-has-an-id.invariant.json': {
-    $schema: schemaUrl('invariant'),
-    label: 'A customer has an id',
-    description: 'A second rule over the same shape, unproved at the same sites, so one guard stands for both.',
-    holds: { on: '@customers/domain/Customer.shape.json', when: 'len(id) > 0' },
-  },
-});
-afterAll(() => rmSync(twoDir, { recursive: true, force: true }));
+const oneDir = copyOfExample();
+rmSync(join(oneDir, 'features/customers/domain/an-address-names-its-domain.invariant.json'));
+const one = loadTree(oneDir, PLUGINS, INCLUDES);
+afterAll(() => rmSync(oneDir, { recursive: true, force: true }));
 
-describe('describe: a site two invariants are unproved at', () => {
-  it('names both invariants above the one guard, and both rules as the switch conjoins them', () => {
-    // in the order the registry holds them, which is the order `guardsOf` conjoins the rules in: the header
-    // and the switch's own predicate read the same way round, so a reader can match one to the other
-    const said = describeDoc(two, KEPT_GET);
-    expect(said).toContain(
-      `    guard for 'A customer has an id' (${SECOND}) and ${CALLS}, when (len(id) > 0) && ${RULE}:`,
-    );
-  });
-
-  it('still lowers one guard, whose switch routes to one refusal per rule, the first keeping its id', () => {
-    const said = describeDoc(two, KEPT_GET);
-    expect(said.split('guard for')).toHaveLength(2);
-    expect(said).toContain(
-      '        customer:check  switch → customer | customer:violated | customer:violated:2  (guard)',
-    );
-    expect(said).toContain('        customer  answers customer:made, which the rule let through  (guard)');
-  });
-
-  it('says which invariant each refusal is for, in the order the header names them', () => {
-    const said = describeDoc(two, KEPT_GET);
-    expect(said).toContain("        customer:violated  refuses 'invariant' for 'A customer has an id'  (guard)");
-    expect(said).toContain("        customer:violated:2  refuses 'invariant' for 'A customer is reachable'  (guard)");
-    // and the graph answers with either refusal, since it refuses with whichever the guard routed to
-    expect(said).toContain(
-      'answers @customers/domain/Customer.shape.json  from customer | customer:violated | customer:violated:2 | noCustomer',
+describe('describe: a site one invariant is unproved at', () => {
+  it('names the one invariant and its rule above the guard', () => {
+    expect(describeDoc(one, KEPT_GET)).toContain(
+      `    guard for ${REACHABLE}, when (len(name) > 0 && len(email) > 0 && (tier != 'gold' || has(note))):`,
     );
   });
 
   it('does not repeat the invariant on the refusal where the guard stands for one rule alone', () => {
     // the header has said it; a second spelling on the one refusal would be the same fact twice
-    expect(describeDoc(example, KEPT_GET)).toContain("        customer:violated  refuses 'invariant'  (guard)");
+    const said = describeDoc(one, KEPT_GET);
+    expect(said).toContain('        customer:check  switch → customer | customer:violated  (guard)');
+    expect(said).toContain("        customer:violated  refuses 'invariant'  (guard)");
+    expect(said).toContain(
+      'answers @customers/domain/Customer.shape.json  from customer | customer:violated | noCustomer',
+    );
   });
 });

@@ -1,6 +1,7 @@
 /**
  * Sabotage: a write of a shape a field invariant guards (RFC 0035). The example's customers are held to 'A customer
- * is reachable', whose rule reads name, email, tier and note, and keep-customer writes the record whole, read from
+ * is reachable', whose rule reads name, email, tier and note, and to 'An address names its domain', whose rule reads
+ * email, and keep-customer writes the record whole, read from
  * its `in`, where RFC 0007 guards it. Turning that write into a patch of a field the rule reads, or of changes whose
  * type may carry one (I007), or writing a record no site of the shape made or took (I008), is what these rules
  * answer, on every path a write takes: a graph's node, a map's bound element, and a binding's delegation straight to
@@ -23,9 +24,11 @@ import {
 const KEEP = 'features/customers/data/keep-customer.graph.json';
 const AT = `@${KEEP}#nodes/stored/in`;
 const REACHABLE = "'A customer is reachable' (@features/customers/domain/a-customer-is-reachable.invariant.json)";
+/** Both invariants over Customer, as a refusal names them where a write touches what each of them reads. */
+const BOTH = `${REACHABLE} and 'An address names its domain' (@features/customers/domain/an-address-names-its-domain.invariant.json)`;
 const WHOLE = 'a rule over the whole record cannot be held on a part of one';
-const GUARDED = `patch writes 'name', 'email', 'tier' and 'note', which ${REACHABLE} reads; ${WHOLE}`;
-const UNJUDGED = `so nothing judges it against ${REACHABLE} before the store keeps it`;
+const GUARDED = `patch writes 'name', 'email', 'tier' and 'note', which ${BOTH} read; ${WHOLE}`;
+const UNJUDGED = `so nothing judges it against ${BOTH} before the store keeps it`;
 const STORE = { store: '@customers/data/customers.store.json', collection: 'customers' };
 const CUSTOMER = '@customers/domain/Customer.shape.json';
 const UPDATE = '@customers/domain/CustomerUpdate.shape.json';
@@ -232,7 +235,7 @@ describe('sabotage: a guarded write read from what is no site of the shape', () 
 
 const REF = '@customers/domain/CustomerRef.shape.json';
 const OPEN = { fields: {}, open: 'string' };
-const EVERY = `'name', 'email', 'tier' and 'note', which ${REACHABLE} reads; ${WHOLE}`;
+const EVERY = `'name', 'email', 'tier' and 'note', which ${BOTH} read; ${WHOLE}`;
 /** A planted data graph that patches the customer `in.id` names with `changes`, after `before`. */
 const patchingOne = (takes: string, before: unknown[], changes: string) =>
   writingOne(takes, before, run('stored', '@storage/store.port.json#patch', { ...STORE, key: '{{in.id}}', changes }));

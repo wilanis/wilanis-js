@@ -38,10 +38,10 @@ npx wilanis check .
 ```
 
 ```
-ok: 224 documents, IR v1, runtime reads v1
+ok: 225 documents, IR v1, runtime reads v1
 ```
 
-Every one of the 224 is a JSON document; there is no JavaScript in the tree, and `check` judged every
+Every one of the 225 is a JSON document; there is no JavaScript in the tree, and `check` judged every
 profile at once. Open the viewer on the rule and search for *Writes are for registrars*:
 
 ```
@@ -211,7 +211,7 @@ npx wilanis check .
 ```
 
 ```
-ok: 225 documents, IR v1, runtime reads v1
+ok: 226 documents, IR v1, runtime reads v1
 ```
 
 Three rounds of write, check, edit, and the agent read no manual.
@@ -241,9 +241,10 @@ features/access/domain/require-registrar  switch 'isRegistrar'  3/3 branches
 ```
 
 ```
-every branch settled -- 56 branch(es), 25 decision(s), 19 graph(s).
-3 invariant(s) declared:
+every branch settled -- 68 branch(es), 25 decision(s), 19 graph(s).
+4 invariant(s) declared:
   A customer is reachable  proved at 0 site(s), guarded at 30
+  An address names its domain  proved at 0 site(s), guarded at 30
   Writes are for registrars  holds at 7 trigger(s)
   The session is the caller's  holds at 3 trigger(s)
 ```
@@ -361,7 +362,7 @@ curl -s localhost:8099/customers -H "authorization: Bearer $TOKEN" -w '  [%{http
 
 **Point at.** `[]`. Four good rows went in before the fifth refused, and bo's tenant holds none of them; a
 list is a signed-in read, answered from the caller's tenant only. The
-sentence in the 500 is the tree's other invariant, `a-customer-is-reachable.invariant.json`, in its own words;
+sentence in the 500 is another invariant of the tree, `a-customer-is-reachable.invariant.json`, in its own words;
 nobody wrote that message. Then open `features/customers/domain/register-all.graph.json` and point at one line:
 
 ```json
@@ -387,7 +388,7 @@ route, policy, shape or business graph differs from `local`, and beat 1 judged i
 over the route (`cp $DEMO/archive-customer.step2.trigger.json features/customers/edge/archive-customer.trigger.json`):
 the log prints `reload refused, still serving the last good tree:` with the two A006 and the I001, hints and all, while
 `curl` keeps answering 401, so an agent editing a live tree cannot make the write public for one request.
-Paste the finished file back and it prints `reload: 225 documents, serving the new tree`. It needs nothing
+Paste the finished file back and it prints `reload: 226 documents, serving the new tree`. It needs nothing
 beyond what this script already runs; `build.mjs` runs it as its last step.
 
 ## Reset

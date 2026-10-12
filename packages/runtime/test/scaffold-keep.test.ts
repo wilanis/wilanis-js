@@ -66,7 +66,9 @@ describe('wilanis new graph --port: load, make, keep', () => {
     expect(checkedTaking(file, UPDATE)).toEqual([]);
     const said = describeDoc(loadTree(dir, PLUGINS, INCLUDES), '@customers/domain/rename-customer.graph.json');
     expect(said).toContain('    customer:made  @std/object.port.json#merge');
-    expect(said).toContain('        customer:check  switch → customer | customer:violated  (guard)');
+    expect(said).toContain(
+      '        customer:check  switch → customer | customer:violated | customer:violated:2  (guard)',
+    );
   });
 
   it('reads and writes through the operations --read and --write name', () => {
