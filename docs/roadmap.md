@@ -157,8 +157,8 @@ gains `totals`. Each change is compatible, but each changes a schema, so 1.0 wai
 rule, lands before the freeze for the same reason: it changes two schema descriptions. RFC 0041, `after` on a node,
 lands before the freeze too: it changes the `run` and `map` node schemas. RFC 0042, a store that says another tree keeps
 its collections, adds `keptBy` to `store.schema.json`, so it lands before the freeze too. RFC 0043, a profile that
-extends another, adds one optional key to `project.schema.json`: once accepted, it lands before the freeze, or moves to
-*Unscheduled*.
+extends another, adds one optional key to `project.schema.json`; once accepted, it lands before the freeze, as the rule
+above asks of every accepted RFC that changes a schema.
 
 RFC 0037, a connection is a literal at the call, changes three schemas before the freeze: `common.schema.json` (a
 field says it `names` a connection or a store), `graph.schema.json` and `binding.schema.json` (a data graph's `given`,
