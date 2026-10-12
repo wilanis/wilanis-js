@@ -113,9 +113,10 @@ function acts(judge: Judge, node: Node | undefined): boolean {
 function refuse(judge: Judge, at: { site: Site; shape: string; fed: Fed }): void {
   const { site, shape, fed } = at;
   const made = site.arity === 'list' ? `a list of ${shapeName(judge, shape)}` : `a ${shapeName(judge, shape)}`;
-  const which = listed(invariantsOn(judge.scope, shape).map(named));
+  const invariants = invariantsOn(judge.scope, shape);
+  const which = `${listed(invariants.map(named))} ${invariants.length > 1 ? 'guard' : 'guards'}`;
   const through = fed.through.length ? ` through ${listed(fed.through.map(id => `'${id}'`))}` : '';
-  const message = `data graph makes ${made}, which ${which} guards, and the effect '${fed.effect}' reads it${through}`;
+  const message = `data graph makes ${made}, which ${which}, and the effect '${fed.effect}' reads it${through}`;
   const hint = 'a data graph translates; make the record in a domain graph and hand it to this one whole, as its in';
   judge.refuser(site.graph.path)('L016', message, `nodes/${siteId(site)}`, hint);
 }
