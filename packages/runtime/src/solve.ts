@@ -127,13 +127,21 @@ function lenDomain(op: Cmp, length_: number): Domain {
   }
 }
 
-/** Whether an expression names any path the rehearsal could constrain, satisfiable or not. */
+/**
+ * Whether an expression names only what the rehearsal could constrain, satisfiable or not: both sides of an `&&`, since
+ * both must hold, and either side of an `||`, since one alone may.
+ */
 function nameableBin(node: expr.Expr & { kind: 'bin' }): boolean {
   // the solver makes no text that holds or lacks a word yet (RFC 0040 step 2)
   if (node.op === 'contains') return false;
-  if (node.op === '&&' || node.op === '||') return nameable(node.left) || nameable(node.right);
+  if (node.op === '&&') return nameable(node.left) && nameable(node.right);
+  if (node.op === '||') return nameable(node.left) || nameable(node.right);
   if (node.op === 'in') return node.left.kind === 'lit' && node.right.kind === 'path';
-  // first comparison names something when one side is first literal and the other first path or len(path)
+  return nameableComparison(node);
+}
+
+/** Whether a comparison names something: one side a literal and the other a path or len(path), or two paths. */
+function nameableComparison(node: expr.Expr & { kind: 'bin' }): boolean {
   const sides = [node.left, node.right];
   const at = sides.findIndex(side => side.kind === 'lit');
   if (at < 0) return pairOf(node) !== undefined;
@@ -266,11 +274,25 @@ export function branchesOf(rules: { when: string; to: string }[], elseTo: string
   });
   const allFalseBefore = (upto: number) => negatedThrough(parsed, upto);
   for (let at = 0; at < rules.length; at++) out.push(branchFor(rules[at], at, parsed[at], allFalseBefore(at)));
-  const none = allFalseBefore(rules.length);
-  out.push(
-    none.length
-      ? { rule: -1, when: 'else', to: elseTo, demands: none[0] }
-      : { rule: -1, when: 'else', to: elseTo, demands: {}, unsolved: 'no inputs make every rule false at once' },
-  );
+  out.push(elseFor(rules, parsed, allFalseBefore(rules.length), elseTo));
   return out;
+}
+
+/**
+ * The else's branch: the first case where every rule is false, or why none could be solved -- the first rule the
+ * rehearsal cannot name, whose falsehood it cannot make, or else that the rules cover every input together.
+ */
+function elseFor(
+  rules: { when: string }[],
+  parsed: (expr.Expr | undefined)[],
+  none: Demands[],
+  elseTo: string,
+): Branch {
+  const base = { rule: -1, when: 'else', to: elseTo };
+  if (none.length) return { ...base, demands: none[0] };
+  const unnamed = rules.find((_, at) => parsed[at] !== undefined && !nameable(parsed[at]));
+  const unsolved = unnamed
+    ? `'${unnamed.when}' compares values the rehearsal cannot name`
+    : 'no inputs make every rule false at once';
+  return { ...base, demands: {}, unsolved };
 }
