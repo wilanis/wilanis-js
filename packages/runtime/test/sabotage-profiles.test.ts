@@ -177,6 +177,30 @@ describe('sabotage: a profile that extends another', () => {
       "C024 extend 'production' directly and write what 'production-scheduler' changes, or remove extends from 'production-scheduler'",
     ]);
   });
+  it('C024 two profiles that extend each other, each at its own extends, each told to remove one', () => {
+    const cycle = (doc: any) => {
+      doc.profiles['production-worker'].extends = 'production-scheduler';
+      doc.profiles['production-scheduler'].extends = 'production-worker';
+    };
+    expect(new Set(sabotagePointing('project.json', cycle))).toEqual(
+      new Set([
+        'C024 @project.json#profiles/production-worker/extends',
+        'C024 @project.json#profiles/production-scheduler/extends',
+      ]),
+    );
+    expect(new Set(sabotageSaying('project.json', cycle))).toEqual(
+      new Set([
+        "C024 profile 'production-worker' extends 'production-scheduler', which extends 'production-worker'; a profile extends one that extends nothing",
+        "C024 profile 'production-scheduler' extends 'production-worker', which extends 'production-scheduler'; a profile extends one that extends nothing",
+      ]),
+    );
+    expect(new Set(sabotageHinting('project.json', cycle))).toEqual(
+      new Set([
+        "C024 remove extends from 'production-worker', or remove extends from 'production-scheduler'",
+        "C024 remove extends from 'production-scheduler', or remove extends from 'production-worker'",
+      ]),
+    );
+  });
   it('C018 a child mapping an inherited stand-in to itself, refused once, at its own line', () => {
     const employees = '@connections/employees.connection.json';
     expect(sabotagePointing('project.json', worker({ connections: { [employees]: employees } }))).toEqual([
