@@ -5,10 +5,12 @@
   `MapNode` in `nodes.ts`), `area:engine` (`KMap` and `map.ts`), `area:compiler` (`G011` and `G006` widened, one
   new `G` rule, the lowering, `sitesOf`), `area:runtime` (the rehearsal, `describe`, the `@std` plugin, the
   template), `area:view` (the map node and the port page). The three plugins that walk calls (`@auth`, `@queue`,
-  `@storage`) and `packages/deploy` learn that a map may call nothing.
+  `@storage`) learn that a map may call nothing.
 - **Tracking issue:** #855
-- **Depends on:** none. It builds on RFC 0007 (invariants: the sites and proofs this RFC leaves as they are) and
-  RFC 0018 (scenario generation: the branches a rehearsal walks), both implemented.
+- **Depends on:** RFC 0038 (the rehearsal follows a read of `in` out through maps and calls): this RFC lands after
+  it, and its rehearsal step is written on 0038's `traced`. It builds on RFC 0007 (invariants: the sites and proofs
+  this RFC leaves as they are) and RFC 0018 (scenario generation: the branches a rehearsal walks), both
+  implemented. *Order with the open RFCs* (under *Implementation plan*) says how it meets RFC 0037 and RFC 0041.
 
 ## Summary
 
@@ -218,7 +220,7 @@ A document that breaks either of these is refused by the schema, as D001.
 **`MapNode` in `packages/core/src/nodes.ts`** gains `where?: string`, and `run` becomes `run?: string`. Core adds
 one helper beside `isMap`, `callOf(node)`, which answers the operation a node calls or nothing. Every reader of
 `node.run` on a map uses it: the compiler's checks and lowering, `sites.ts`, `reach.ts`, `atomic-reach.ts`,
-`graph-said.ts`, the viewer's `graphs.ts`, `packages/deploy/src/helm.ts`, and the call walks in `plugin-auth`,
+`graph-said.ts`, the viewer's `graphs.ts`, and the call walks in `plugin-auth`,
 `plugin-queue` and `plugin-storage`. A map that calls nothing makes no call, reaches no effect, and is no site.
 
 **Two keywords on a native contract's field, `common.schema.json` `$defs/field`.**
@@ -369,12 +371,16 @@ lowered with no `handler`, no `redact` of an operation, and `pure: true`.
 - `switchesOf` also yields one found decision for every map with a `where`, at the map's own path. It is a switch
   with one rule and an `else`: `{ rules: [{ label: <where>, to: <map id> }], else: <map id> }`. `branchesOf` solves
   it into two cases, *kept* (the rule true) and *dropped* (the rule false).
-- In `meet`, a demand on `item` is a demand on the first element of the list the map runs over. It is met by
-  `ofElement` with the map itself as the list, so it lands at index 0 of the node that holds `over`
-  (`listHolder`), or at `<map>.0` where that holder is itself a map. A demand on a name of the map's `in` is met
-  as a switch's input is. This is the mechanism a switch in a mapped graph already uses, with one hop fewer:
-  `elementOf` finds an element only where the switch stands directly in the spec the map runs, and a `where`
-  stands on the map.
+- In `meet`, a demand of the `where` is traced through one frame: the map's own, as RFC 0038 builds a map's frame
+  (its lowered `in`, `over` and `bind`), read as if it bound nothing, since `item` is the element in a `where`
+  whatever `bind` says. So `item.<rest>` lands at element 0 of the list `over` reads, and 0038's `traced` follows
+  that list on out, through `listHolder`, to the node or the trigger's input that holds it; a name of the map's
+  `in` is that source, followed the same way. Where the trace lands on a map, the stub is `<map>.0`; where it
+  stops (a list written out, `context`, a literal), the branch is `NEVER RUN` with 0038's sentence. On `main`
+  today the element case is `At.element` and `ofElement` in `branches.ts`, which already reach through a
+  binding's wrapper `op` (#904); 0038 replaces both with `traced`, and this RFC uses what 0038 leaves rather than
+  extending what it removes. A `where` stands on the map, so its demand never needs the frames inside the
+  operation: the trace starts one frame out from where a switch in the mapped graph would start.
 - A switch inside the operation of a map with a `where` runs only for kept elements. The first element stands for
   all, so a case for such a switch first demands that element 0 is kept, the way it first demands that the list
   holds an element (`nonEmpty`). Likewise, `nonEmpty` for a list a keep answers demands an element in `over` *and*
@@ -472,13 +478,14 @@ Each step is one pull request and one sub-issue of #855.
 1. **The kernel keeps.** `KMap.where`, an optional `handler`, `NodeReport.kept`, `runElement` and `collectMap` in
    `packages/engine/src/map.ts`, the trace span. Engine tests only; no document can say it yet.
 2. **A map may say `where`.** `map.schema.json` (`where`, the `anyOf`, `dependentRequired`), `MapNode` and
-   `callOf` in core, every reader of `run` moved to `callOf` (compiler, runtime, view, deploy, the three plugins),
+   `callOf` in core, every reader of `run` moved to `callOf` (compiler, runtime, view, the three plugins),
    `checkWhere` (G011), G006 and G024 widened, `nodeOut` for a keep, `sitesOf` skipping a keep, the lowering. The
    example's digest gains `active` and `activeCount`, `Digest.shape.json` gains `active`, and the sabotage tests of
    the table land with it. Waits on the `decision` job.
 3. **The rehearsal steers a `where`.** `switchesOf`, `meet`, `nonEmpty` and the reach of a switch behind a kept
    element in `branches.ts` and `rehearse-reached.ts`; S004 and the two descriptions in `scenario.schema.json`; the
-   example's recorded scenarios rewritten. Waits on the `decision` job.
+   example's recorded scenarios rewritten. Lands after RFC 0038's implementation, on its `traced`. Waits on the
+   `decision` job.
 4. **A reader sees it.** `describe` (`graph-said.ts`), the viewer, `docs/model.md`, the template's `CLAUDE.md`.
    Can be taken by a new contributor (`good first issue`) once step 2 has landed.
 5. **A path within the element is typed.** `within` and `reaches` in `common.schema.json` and `Field`, the G0nn
@@ -488,13 +495,40 @@ Each step is one pull request and one sub-issue of #855.
 
 Steps 1 and 5 can run beside each other. Step 6 needs step 5. Steps 3 and 4 need step 2.
 
+**Order with the open RFCs.** Three other RFCs touch the same files. Each lands as one more optional part on the
+same objects, so none changes what another means; the order only decides who rebases.
+
+- **RFC 0038 lands first.** It rewrites the element walk (`traced` in `frames.ts`, a map as a frame, `meet` reading
+  the trace), and step 3 here is written on it. Steps 1, 2 and 4 to 6 do not touch the rehearsal and may land
+  before 0038; step 3 waits for 0038's implementation.
+- **RFC 0041 (`after`)** adds `after` to `map.schema.json`, `MapNode`, `KMap`, `lowerNode` and `nodeLine`, the same
+  places as steps 1, 2 and 4. Whichever lands second adds its field beside the other's. They meet in four places,
+  and each follows from what both RFCs already say:
+  - *A map with both waits, then keeps.* 0041 says "no element starts before every node under `after` has
+    answered". The `where` is part of starting an element, so no rule is tried before the wait is over either.
+  - *A keep may say `after`.* `after` is a wait, not part of a call, so it stays outside `dependentRequired`: a map
+    with no `run` may wait. `lowerNode` copies `after` onto the `KMap` whether or not it has a handler.
+  - *A node may wait for a keep.* A keep answers like any node, `[]` when it keeps nothing, so a node whose
+    `after` names it starts once it has answered. 0041's G0n1 refuses only an unknown node, the node itself or a
+    switch; a keep is none of these.
+  - *Nothing new is read.* A `where` reads `item` (from `over`) and the map's `in`, which 0041's G0n2 already counts
+    as what the map reads. `after` names no element, so a `where` cannot read a node it only waits for: the rule
+    reads what `in` gives it, and a node named only under `after` is not in `in`.
+  `nodeLine` prints both: `active  keeps all where <rule>  after <ids>`.
+- **RFC 0037** adds `names` to `common.schema.json → $defs/field` and to `Field`, where step 5 adds `within` and
+  `reaches`. The keywords are independent: `names` marks a field that names a connection or a store, `within` a
+  field that names a path in the element. A field never needs both. Either may land first.
+
+Every new refusal code in these RFCs is a placeholder (`G0nn`) until its implementing pull request lands, so the
+three RFCs do not compete for a number.
+
 ## Drawbacks and alternatives
 
 **What it costs.** `MapNode.run` becomes optional, and every reader of a node's `run` learns that a map may call
 nothing. Once the field is optional, TypeScript names each such place; they are in the compiler, the runtime, the
-viewer, `packages/deploy`, and three plugins. The rehearsal gains one more kind of decision. Two keywords join a
-native field's grammar. A `where` is one more place a decision can sit, beside a switch; *Open questions* asks
-whether that is one too many.
+viewer, and three plugins. (`packages/deploy/src/helm.ts` calls an `isMap`, but it is the `yaml` package's, and
+deploy reads no map's `run`.) The rehearsal gains one more kind of decision. Two keywords join a
+native field's grammar. A `where` is one more place a decision can sit, beside a switch.
 
 **Do nothing; teach the workaround.** The plugin that reads the data answers it already split or already summed,
 as the consumer's `@copies` and `@guidance` do. The template would say: "a graph cannot filter or sum a list; a
@@ -517,15 +551,14 @@ Rejected.
 plainly and leaves `map` as it is. `model.md` already says a fourth node type is a compatible change. It costs
 about as much: every place that switches on a node's type learns it, as every reader of `run` learns `callOf`. It
 gives up `where` on a map that runs something, which is the same rule with an operation after it. And it is two
-words for one idea: "the elements a rule holds for". This RFC prefers one node with an optional part. The
-maintainer may prefer the other (decision point 1).
+words for one idea: "the elements a rule holds for". The review chose one node with an optional part (*Open
+questions*, 1).
 
 **`run` stays required; a keep is a `#make` of the element.** No schema change beyond `where`. The author writes
 `"run": "@std/object.port.json#make", "bind": { "value": "" }, "in": { "type": "<the element's shape>" }` to keep
 elements unchanged. That is a call per element whose only job is to say "nothing", and it is a made site of the
 shape (`sitesOf`), so a shape with an invariant gets a guard per kept element that judges a value already judged.
-It is the kind of tax #791 was written about. Rejected, but it is the fallback if decision point 1 goes against
-an optional `run`.
+It is the kind of tax #791 was written about. Rejected.
 
 **Group and sum as two operations.** `group` answers `{ key, items: $T[] }[]` and `sum` adds a `number[]`. Each
 is smaller. But a graph cannot then put a sum beside its key: a map over the groups answers sums in order, and
@@ -545,32 +578,31 @@ type the graph again, which is the compiler's work done a second time. Rejected 
 
 ## Open questions
 
-To decide before `accepted`:
+Decided in review on #919:
 
-1. **Optional `run`, a `keep` node, or `run` required.** Recommendation: optional `run` on `map`. One node for
-   "the elements a rule holds for", with or without an operation after it.
-2. **G011 widened or a new code.** Recommendation: widen G011. The rule is the same ("a rule answers a boolean
-   over typed inputs") and so is the fix. A new code would split one rule in two places.
-3. **`within` and `reaches` as keywords, or another way to type a path.** Recommendation: the keywords (see the
-   alternatives above).
-4. **`totals` as one operation; `sum` of 0 when no `sum` is given; a string key only; first-seen order.**
-   Recommendation: all four as written. A total with no `sum` could leave `sum` absent instead. But then every
-   read of `{{t.sum}}` into a required number would need a switch first ("No absence", `model.md`), which costs
-   the common case to serve the rare one.
+1. **`run` becomes optional on a map.** One node for "the elements a rule holds for", with or without an operation
+   after it. The fourth node type `keep`, and a required `run` with a `#make` per element, are the alternatives
+   above, not taken.
+2. **G011 is widened** to a map's `where`. The rule is the same ("a rule answers a boolean over typed inputs") and
+   so is the fix; a new code would split one rule in two places.
+3. **`within` and `reaches` are keywords** on a native contract's field, so the compiler types a path within the
+   element in one place.
+4. **`totals` is written as above:** one operation; `sum` is 0 when no `sum` is given; the key is a string only;
+   totals come in the order each key first appears. A total with no `sum` could leave `sum` absent instead, but
+   then every read of `{{t.sum}}` into a required number would need a switch first ("No absence", `model.md`).
+5. **This RFC lands before 1.0, in M14.** Every change is compatible, but each changes a schema, and M14 cuts 1.0
+   "only when every accepted RFC that changes a schema has landed or been withdrawn". The freeze waits for it;
+   `docs/roadmap.md` says so in M14's paragraph, and #855 carries the M14 milestone.
 
 May be decided during implementation, or later:
 
-5. **Does a `has()` in a `where` narrow the kept element?** Today `has(x)` in a switch's rule proves `x` present for
+6. **Does a `has()` in a `where` narrow the kept element?** Today `has(x)` in a switch's rule proves `x` present for
    the routed node. A `where` could do the same for each element of its answer, so a later map could read
    `item.active` without a `has()`. That needs a type for "this shape, with `active` required", which the type
    system does not have; `nodeOut` would have to make one. Recommendation: not in this RFC; wait for a tree that
    needs it.
-6. **Should a `where` count toward an invariant where a `#make` retypes the kept element whole?** Rule 3 above says
+7. **Should a `where` count toward an invariant where a `#make` retypes the kept element whole?** Rule 3 above says
    no. Recommendation: keep it no until a tree shows a guard that this would remove.
-7. **Two keys.** The consumer's `risk` counts per module and per priority. With this RFC that is a keep per
+8. **Two keys.** The consumer's `risk` counts per module and per priority. With this RFC that is a keep per
    priority and a `totals` by module after each. A `by` that takes a list of paths would do it in one node.
    Recommendation: wait for a second tree.
-8. **Milestone.** The tracking issue has none: no open milestone of `docs/roadmap.md` fits, so this RFC is listed
-   under *Unscheduled*. M14 cuts 1.0 "only when every accepted RFC that changes a schema has landed or been
-   withdrawn". Every change here is compatible, so it could land after 1.0 in place. If it is accepted before 1.0
-   is cut, M14's sentence puts it in front of 1.0. The maintainer says which.
