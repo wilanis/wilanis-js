@@ -208,16 +208,18 @@ function alsoFalse(alternatives: Demands[], rule: expr.Expr): Demands[] {
   return next;
 }
 
-/** Every alternative in which rules [0, upto) are all false. A rule that does not parse cannot be negated. */
-function negatedThrough(parsed: (expr.Expr | undefined)[], upto: number): Demands[] {
-  let alternatives: Demands[] = [{}];
-  for (let at = 0; at < upto; at++) {
-    const rule = parsed[at];
-    if (!rule) return [];
-    alternatives = alsoFalse(alternatives, rule);
-    if (!alternatives.length) return [];
+/**
+ * For each count of rules from 0 to all of them, every alternative in which that many first rules are all false: each
+ * built on the one before, so a switch of n rules negates each rule once. A rule that does not parse cannot be
+ * negated, and nothing after it can be false with it.
+ */
+function negatedPrefixes(parsed: (expr.Expr | undefined)[]): Demands[][] {
+  const out: Demands[][] = [[{}]];
+  for (const rule of parsed) {
+    const before = out[out.length - 1];
+    out.push(rule && before.length ? alsoFalse(before, rule) : []);
   }
-  return alternatives;
+  return out;
 }
 
 /**
@@ -268,11 +270,29 @@ function branchFor(
   };
 }
 
+/** The cases already solved, by the rules and else they were solved for; cleared whole when it holds this many. */
+const solved = new Map<string, Branch[]>();
+const SOLVED_MAX = 1000;
+
 /**
  * Every case of one switch: one per rule, plus the else. A rule's case makes that rule true and every
- * earlier rule false, which is what the kernel requires to reach its target.
+ * earlier rule false, which is what the kernel requires to reach its target. A rehearsal asks again for the same
+ * switch at every decision and warm-up that reaches it, so the cases are solved once per rules and else, and each
+ * caller is handed its own copy.
  */
 export function branchesOf(rules: { when: string; to: string }[], elseTo: string): Branch[] {
+  const at = JSON.stringify([rules, elseTo]);
+  let branches = solved.get(at);
+  if (!branches) {
+    branches = solvedBranches(rules, elseTo);
+    if (solved.size >= SOLVED_MAX) solved.clear();
+    solved.set(at, branches);
+  }
+  return structuredClone(branches);
+}
+
+/** The cases of one switch, solved. */
+function solvedBranches(rules: { when: string; to: string }[], elseTo: string): Branch[] {
   const out: Branch[] = [];
   const parsed = rules.map(rule => {
     try {
@@ -281,9 +301,9 @@ export function branchesOf(rules: { when: string; to: string }[], elseTo: string
       return undefined;
     }
   });
-  const allFalseBefore = (upto: number) => negatedThrough(parsed, upto);
-  for (let at = 0; at < rules.length; at++) out.push(branchFor(rules[at], at, parsed[at], allFalseBefore(at)));
-  out.push(elseFor(rules, parsed, allFalseBefore(rules.length), elseTo));
+  const falseBefore = negatedPrefixes(parsed);
+  for (let at = 0; at < rules.length; at++) out.push(branchFor(rules[at], at, parsed[at], falseBefore[at]));
+  out.push(elseFor(rules, parsed, falseBefore[rules.length], elseTo));
   return out;
 }
 
