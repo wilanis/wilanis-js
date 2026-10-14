@@ -159,6 +159,10 @@ lands before the freeze too: it changes the `run` and `map` node schemas. RFC 00
 its collections, adds `keptBy` to `store.schema.json`, so it lands before the freeze too. RFC 0043, a profile that
 extends another, added one optional key to `project.schema.json` and has landed before the freeze.
 
+RFC 0046, arithmetic on numbers, adds a fifth port to `@std` and changes no schema, so the freeze does not wait for
+it and it may land on either side of the cut. It sits here because the template an agent session reads at 1.0 names
+the standard library, and a consumer tree that checks writing needs to multiply and divide its counts now.
+
 RFC 0037, a connection is a literal at the call, changes three schemas before the freeze: `common.schema.json` (a
 field says it `names` a connection or a store), `graph.schema.json` and `binding.schema.json` (a data graph's `given`,
 written by each binding operation). The compiler then stops reading a field by its name, which is cheap only before
