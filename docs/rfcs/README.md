@@ -51,7 +51,7 @@ accepted. Statuses: draft, accepted, implemented, withdrawn.
 | [0043](0043-a-profile-from-another.md) | A profile from another: `extends` names the profile one starts from; reverses what RFC 0013 set aside | implemented |
 | [0044](0044-queue-deadline.md) | A deadline on a queue trigger: `deadlineMs` cancels a delivery's run, which becomes `onFault` | implemented |
 | [0045](0045-csv-column-map.md) | `columns`: a CSV header name read into a field of another name | implemented |
-| [0046](0046-number-arithmetic.md) | Arithmetic on numbers: `@std/number` adds, subtracts, multiplies and divides | draft |
+| [0046](0046-number-arithmetic.md) | Arithmetic on numbers: `@std/number` adds, subtracts, multiplies, divides and rounds | draft |
 
 Which milestone first shows an RFC is said once, in [`../roadmap.md`](../roadmap.md); the tracking issue
 carries it as GitHub's milestone. Where this list and the outside assessment that seeded it differ, the
