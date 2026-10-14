@@ -6,6 +6,7 @@
  * starts: what had not started is cancelled, what was in flight settles as it settles.
  */
 import { type MapHost, runMap, shownAnswer } from './map.js';
+import { NodePlace } from './place.js';
 import { type Plan, planOf, targetsOf } from './plan.js';
 import { readAsSecret, redactAttempt, redactReport, redactValue, showingOf, shownOut } from './redact.js';
 import { answered, type Ending, initialReport, noteRefusal, reportOf } from './report.js';
@@ -39,7 +40,7 @@ export class Run {
   private readonly showing: Reader = showingOf(this.values, this.shown);
   private readonly reports: Record<string, NodeReport> = {};
   private readonly plan: Plan;
-  private readonly root: string[];
+  private readonly root: NodePlace | undefined;
   /** What every stamp of this run is read from: the clock given, or `Date.now`. */
   private readonly clock: () => number;
   private readonly startedAt: number;
@@ -58,7 +59,7 @@ export class Run {
     private readonly opts: RunOptions,
   ) {
     this.plan = planOf(spec);
-    this.root = opts.nodePath ?? [];
+    this.root = opts.place ?? NodePlace.of(opts.nodePath);
     this.clock = opts.clock ?? Date.now;
     this.startedAt = this.clock();
     for (const [key, value] of Object.entries(opts.initial ?? {})) this.values.set(key, value);
@@ -71,7 +72,7 @@ export class Run {
       clock: this.clock,
       ended: () => this.ending !== undefined,
       call: (node, path, inputs, report) =>
-        this.invoke(node.handler, inputs, this.contextFor(node, [...this.root, ...path], report)),
+        this.invoke(node.handler, inputs, this.contextFor(node, NodePlace.below(this.root, path), report)),
     };
   }
 
@@ -265,7 +266,11 @@ export class Run {
     const inputs = readAll(node.in, this.values);
     report.in = redactValue(readAll(node.in, this.showing), node.redact?.in) as Record<string, unknown>;
     const secrets = readAsSecret(inputs, report.in);
-    const out = await this.invoke(node.handler, inputs, this.contextFor(node, [...this.root, id], report));
+    const out = await this.invoke(
+      node.handler,
+      inputs,
+      this.contextFor(node, NodePlace.below(this.root, [id]), report),
+    );
     this.finish(id, report, out, shownOut(report.sub, out, node, secrets));
   }
 
@@ -278,9 +283,12 @@ export class Run {
    * What a handler sees: where it runs and the site it was tagged with, the context, the embedder's env, and the
    * two doors into its own report -- where to hang a nested run, and where to record a try that did not stand.
    */
-  private contextFor(node: KCall | KMap, nodePath: string[], report: NodeReport): RunContext {
+  private contextFor(node: KCall | KMap, place: NodePlace, report: NodeReport): RunContext {
     return {
-      nodePath,
+      get nodePath() {
+        return place.path();
+      },
+      place,
       ...(node.site !== undefined ? { site: node.site } : {}),
       attach: sub => {
         report.sub = redactReport(sub, node.redact?.out);
@@ -300,8 +308,11 @@ export class Run {
 
   /** Call a handler, unless a result is pre-recorded for this node path. */
   private async invoke(handler: string, inputs: Record<string, unknown>, ctx: RunContext): Promise<unknown> {
-    const key = ctx.nodePath.join('.');
-    if (this.opts.stubs && key in this.opts.stubs) return this.opts.stubs[key];
+    const stubs = this.opts.stubs;
+    if (stubs) {
+      const key = ctx.nodePath.join('.');
+      if (key in stubs) return stubs[key];
+    }
     const fn = this.handlers[handler];
     if (!fn) throw new Error(`no handler '${handler}'`);
     return fn({ in: inputs, ctx });

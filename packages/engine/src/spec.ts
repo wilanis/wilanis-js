@@ -3,6 +3,8 @@
  * nodes, sources, handlers, and pre-supplied values. The compiler lowers a graph document to this.
  */
 
+import type { NodePlace } from './place.js';
+
 /** Where a node's value comes from at run time. `ref` may be a node id or a pseudo-node ('in', 'const', 'context'). */
 export type KSource =
   | { ref: string; path: string[] }
@@ -177,8 +179,10 @@ export interface Report {
 }
 
 export interface RunContext {
-  /** Dotted position of the running node, for nested stubs and reports. */
+  /** Dotted position of the running node, for nested stubs and reports. Spelled out from `place` when read. */
   nodePath: string[];
+  /** Where the running node is, as a link: what a nested run is handed, so its nodes' places cost one link each. */
+  place?: NodePlace;
   /** Attach the nested report of a graph-bound operation to the calling node. */
   attach: (sub: Report) => void;
   /** Record a try of this node that did not stand: the node's report keeps them, in order, under `attempts`. */
@@ -231,4 +235,6 @@ export interface RunOptions {
   clock?: () => number;
   env?: Record<string, unknown>;
   nodePath?: string[];
+  /** Where the run is nested, as a link; read before `nodePath`, which a caller that holds no link gives instead. */
+  place?: NodePlace;
 }
