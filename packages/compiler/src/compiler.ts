@@ -197,7 +197,7 @@ export class Compiler {
           signal: ctx.signal,
           clock: ctx.clock,
           env,
-          nodePath: ctx.nodePath,
+          ...(ctx.place ? { place: ctx.place } : { nodePath: ctx.nodePath }),
         });
       const report = atomic ? await inScope(ctx.env, once) : await once(ctx.env);
       ctx.attach(report);
