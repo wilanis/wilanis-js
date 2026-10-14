@@ -73,68 +73,78 @@ function widen(types: Type[]): Type {
 
 /** Runtime check of a value against a type; returns the first problem or null. */
 export function conforms(value: unknown, type: Type, at = '$'): string | null {
+  const problem = problemOf(value, type);
+  return problem === null ? null : at + problem;
+}
+
+/**
+ * The first problem of a value against a type, written from the value itself: `: expected string`, `[3]: expected
+ * string`, `.name: required`. Each caller prefixes where the value sits only once a problem is found, so a value that
+ * conforms costs no text at all, however many elements and fields it has.
+ */
+function problemOf(value: unknown, type: Type): string | null {
   switch (type.kind) {
     case 'unknown':
     case 'var':
       return null;
     case 'type':
-      return isTypeRef(value) ? null : `${at}: expected a type reference`;
+      return isTypeRef(value) ? null : ': expected a type reference';
     case 'string':
-      return conformsString(value, type.enum, at);
+      return problemOfString(value, type.enum);
     case 'number':
-      return typeof value === 'number' && Number.isFinite(value) ? null : `${at}: expected number`;
+      return typeof value === 'number' && Number.isFinite(value) ? null : ': expected number';
     case 'boolean':
-      return typeof value === 'boolean' ? null : `${at}: expected boolean`;
+      return typeof value === 'boolean' ? null : ': expected boolean';
     case 'blob':
-      return isBlobHandle(value) ? null : `${at}: expected a blob (the handle of a stored file: id, contentType, size)`;
+      return isBlobHandle(value) ? null : ': expected a blob (the handle of a stored file: id, contentType, size)';
     case 'list':
-      return conformsList(value, type, at);
+      return problemOfList(value, type);
     case 'object':
-      return conformsObject(value, type, at);
+      return problemOfObject(value, type);
   }
 }
 
-function conformsString(value: unknown, allowed: string[] | undefined, at: string): string | null {
-  if (typeof value !== 'string') return `${at}: expected string`;
+function problemOfString(value: unknown, allowed: string[] | undefined): string | null {
+  if (typeof value !== 'string') return ': expected string';
   if (allowed && !allowed.includes(value))
-    return `${at}: ${JSON.stringify(value)} not in ${show({ kind: 'string', enum: allowed })}`;
+    return `: ${JSON.stringify(value)} not in ${show({ kind: 'string', enum: allowed })}`;
   return null;
 }
 
 /** A list: an array no longer than its bound, each item conforming to what it is a list of. */
-function conformsList(value: unknown, type: ListType, at: string): string | null {
-  if (!Array.isArray(value)) return `${at}: expected list`;
-  if (type.max !== undefined && value.length > type.max) return `${at}: at most ${type.max} items`;
-  for (const [index, item] of value.entries()) {
-    const bad = conforms(item, type.of, `${at}[${index}]`);
-    if (bad) return bad;
+function problemOfList(value: unknown, type: ListType): string | null {
+  if (!Array.isArray(value)) return ': expected list';
+  if (type.max !== undefined && value.length > type.max) return `: at most ${type.max} items`;
+  for (let index = 0; index < value.length; index++) {
+    const bad = problemOf(value[index], type.of);
+    if (bad) return `[${index}]${bad}`;
   }
   return null;
 }
 
-function conformsObject(value: unknown, type: ObjectType, at: string): string | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return `${at}: expected object`;
+function problemOfObject(value: unknown, type: ObjectType): string | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return ': expected object';
   const object = value as Record<string, unknown>;
   for (const [name, field] of Object.entries(type.fields)) {
-    const bad = conformsField(object[name], field, `${at}.${name}`);
-    if (bad) return bad;
+    const bad = problemOfField(object[name], field);
+    if (bad) return `.${name}${bad}`;
   }
-  return conformsExtras(object, type, at);
+  return problemOfExtras(object, type);
 }
 
 /** One declared field: absent is fine unless required; present must conform. */
-function conformsField(value: unknown, field: ObjField, at: string): string | null {
-  if (value === undefined) return field.required ? `${at}: required` : null;
-  return conforms(value, field.type, at);
+function problemOfField(value: unknown, field: ObjField): string | null {
+  if (value === undefined) return field.required ? ': required' : null;
+  return problemOf(value, field.type);
 }
 
 /** Keys the type does not declare: refused when it is closed, judged against what it is open to otherwise. */
-function conformsExtras(object: Record<string, unknown>, type: ObjectType, at: string): string | null {
+function problemOfExtras(object: Record<string, unknown>, type: ObjectType): string | null {
   for (const name of Object.keys(object)) {
     if (type.fields[name]) continue;
-    if (!type.open) return `${at}.${name}: not a declared field`;
-    const bad = conforms(object[name], type.open, `${at}.${name}`);
-    if (bad) return bad;
+    if (!type.open) return `.${name}: not a declared field`;
+    const bad = problemOf(object[name], type.open);
+    if (bad) return `.${name}${bad}`;
   }
   return null;
 }

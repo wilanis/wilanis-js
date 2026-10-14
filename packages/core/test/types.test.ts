@@ -72,3 +72,28 @@ describe('the class of a field, as a storage engine names it', () => {
     expect(fieldClass({ kind: 'type' })).toBeUndefined();
   });
 });
+
+describe('conforms', () => {
+  const tagged = { kind: 'list', of: { kind: 'string', enum: ['a'] } } as const;
+  const rows = {
+    kind: 'list',
+    of: {
+      kind: 'object',
+      open: false,
+      fields: { name: { required: true, type: { kind: 'string' } }, tags: { required: false, type: tagged } },
+    },
+  } as const;
+
+  it('names where the first problem sits, through every list and object on the way', () => {
+    expect(conforms([{ name: 'x' }, {}], rows)).toBe('$[1].name: required');
+    expect(conforms([{ name: 1 }], rows)).toBe('$[0].name: expected string');
+    expect(conforms([{ name: 'x', tags: ['a', 'b'] }], rows)).toBe('$[0].tags[1]: "b" not in "a"');
+    expect(conforms([{ name: 'x', extra: 1 }], rows)).toBe('$[0].extra: not a declared field');
+    expect(conforms('no', rows)).toBe('$: expected list');
+    expect(conforms(5, { kind: 'string' }, '$.field')).toBe('$.field: expected string');
+  });
+
+  it('answers null for a value that conforms', () => {
+    expect(conforms([{ name: 'x', tags: ['a'] }, { name: 'y' }], rows)).toBeNull();
+  });
+});
