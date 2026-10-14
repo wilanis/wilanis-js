@@ -1,6 +1,6 @@
 # RFC 0046: Arithmetic on numbers: `@std/number` adds, subtracts, multiplies, divides and rounds
 
-- **Status:** draft
+- **Status:** accepted
 - **Areas:** `area:runtime` (the `@std` plugin: a new `docs/std/number.port.json`, `docs/std/plugin.json`,
   `src/plugins/std.ts`, a new `src/arithmetic.ts`; the rehearsal: `rehearse-where.ts`, `rehearse-reached.ts`,
   `rehearse.ts`, `branches.ts`, `demands.ts`, a new `demand-arithmetic.ts`, `demand-said.ts`; the template's
