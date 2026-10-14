@@ -159,8 +159,19 @@ export class Compiler {
     const binding = this.scope.bindingFor(hit.path, this.opts.profile);
     if (typeof binding === 'string') throw new Error(binding);
     const key = `${binding.path}#${hit.opName}`;
-    this.handlers[key] ??= this.attempting(this.nestedRunner(this.lowerBindingOp(binding, hit)));
+    this.register(key, () => this.attempting(this.nestedRunner(this.lowerBindingOp(binding, hit))));
     return { handler: key, op: hit.op };
+  }
+
+  /**
+   * Register the handler a key names, once. The key is taken before the handler is made, so a graph that calls
+   * itself, directly or through other graphs, finds its own handler while it is lowered instead of lowering again.
+   * Nothing runs until compiling ends, so the placeholder is never called.
+   */
+  private register(key: string, make: () => Handler): void {
+    if (this.handlers[key]) return;
+    this.handlers[key] = () => Promise.reject(new Error(`handler '${key}' ran before it was compiled`));
+    this.handlers[key] = make();
   }
 
   /**
@@ -300,8 +311,8 @@ export class Compiler {
     if (!graph) throw new Error(`unknown graph '${graphRef}'`);
     const handler = `graph:${graph.path}`;
     const whole = takesWhole(this.scope, graph);
-    this.handlers[handler] ??= this.attempting(
-      this.nestedRunner(this.lowerGraph(graph), whole, graph.doc.atomic === true),
+    this.register(handler, () =>
+      this.attempting(this.nestedRunner(this.lowerGraph(graph), whole, graph.doc.atomic === true)),
     );
     const names = Object.keys(this.scope.types.accepted(op.accepts));
     const redact = redactOf(this.scope, op, undefined);
