@@ -94,10 +94,12 @@ it -- not under `in`, not through a map's `bind` (G026; L019 holds the mark; RFC
 `object#make`, `object#merge`, `list#first`, `list#concat`, `http#request` take a `type` or `returns` field
 naming the result type, and the checker verifies the values given fit it.
 
-## The standard library is four ports
+## The standard library is five ports
 
 `@std/object` (`make`, `merge`), `@std/text` (`fill`, `join`, `split`, `replace`), `@std/list` (`count`,
-`first`, `concat`, `slice`), `@std/outcome` (`refuse`). All pure, legal in any layer.
+`first`, `concat`, `slice`), `@std/number` (`add`, `subtract`, `multiply`, `divide`, `floor`, `round`),
+`@std/outcome` (`refuse`). All pure, legal in any layer. A number operation whose result is not a finite number
+breaks its node (RFC 0046).
 
 ## No absence
 

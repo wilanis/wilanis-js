@@ -2510,6 +2510,13 @@
       "included": null
     },
     {
+      "path": "@std/number.port.json",
+      "kind": "port",
+      "feature": null,
+      "layer": null,
+      "included": null
+    },
+    {
       "path": "@std/object.port.json",
       "kind": "port",
       "feature": null,
@@ -3646,6 +3653,42 @@
           },
           {
             "name": "slice",
+            "pure": true,
+            "holds": false
+          }
+        ]
+      },
+      {
+        "path": "@std/number.port.json",
+        "grantedBy": "@std",
+        "operations": [
+          {
+            "name": "add",
+            "pure": true,
+            "holds": false
+          },
+          {
+            "name": "divide",
+            "pure": true,
+            "holds": false
+          },
+          {
+            "name": "floor",
+            "pure": true,
+            "holds": false
+          },
+          {
+            "name": "multiply",
+            "pure": true,
+            "holds": false
+          },
+          {
+            "name": "round",
+            "pure": true,
+            "holds": false
+          },
+          {
+            "name": "subtract",
             "pure": true,
             "holds": false
           }
