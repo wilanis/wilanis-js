@@ -1,4 +1,4 @@
-# RFC 0046: Arithmetic on numbers: `@std/number` adds, subtracts, multiplies and divides
+# RFC 0046: Arithmetic on numbers: `@std/number` adds, subtracts, multiplies, divides and rounds
 
 - **Status:** draft
 - **Areas:** `area:runtime` (the `@std` plugin: a new `docs/std/number.port.json`, `docs/std/plugin.json`,
@@ -15,15 +15,16 @@
 ## Summary
 
 A graph can compute a number. `@std/number.port.json` is a fifth port of the standard library, granted by `@std`,
-with four pure operations: `add`, `subtract`, `multiply` and `divide`. Each takes two numbers, `a` and `b`, and
-answers a number. The arithmetic is JavaScript's `+`, `-`, `*` and `/` over IEEE 754 doubles. A result that is not a
+with six pure operations. `add`, `subtract`, `multiply` and `divide` take two numbers, `a` and `b`; `floor` and
+`round` take one, `a`, and `round` a static count of `digits`. Each answers a number. The arithmetic is JavaScript's
+`+`, `-`, `*` and `/` over IEEE 754 doubles, and `round` rounds half away from zero by a rule the port states. A result that is not a
 finite number (a division by zero, an overflow to `Infinity`, `NaN`) is a fault of the node, as `@std/list#first`
 faults on an empty list. No checker rule refuses it. An author guards a division with a switch on `b != 0` that
 routes to the `divide` node. The rehearsal follows a demand on an arithmetic answer back to an operand: it holds the
 other operand at a literal or at the value it has on the run, and inverts the operation. So a switch such as
 `ratio > 60` over `multiply(bold, 100)` has both branches steered from the data that feeds the multiply, and never
 from a stub on the multiply node. The rule grammar does not change: a rule still compares, and arithmetic happens in
-nodes. No rounding operation is added; *Open questions* asks whether `floor` and `round` come here or later.
+nodes.
 
 ## Motivation
 
@@ -51,8 +52,7 @@ ways, as RFC 0040's consumer had:
 Now that a graph may call itself (issue #1032, fixed in #1033, after 1feb33d), a graph that counts down needs
 `subtract` too.
 
-**What this does not try to solve.** Rounding (`floor`, `round`): see *Open questions*. Showing a number with a fixed
-count of decimals: `#fill` writes `String(value)` (`packages/runtime/src/plugins/std.ts`), so a grade of `7` shows as
+**What this does not try to solve.** Showing a number with a fixed count of decimals: `#fill` writes `String(value)` (`packages/runtime/src/plugins/std.ts`), so a grade of `7` shows as
 `7`, not `7.0`. Arithmetic inside a rule. A sum or a mean over a whole list. Set intersection and union. Integers
 beyond 2^53.
 
@@ -66,8 +66,10 @@ beyond 2^53.
 | `@std/number.port.json#subtract` | `a - b` |
 | `@std/number.port.json#multiply` | `a × b` |
 | `@std/number.port.json#divide` | `a / b` |
+| `@std/number.port.json#floor` | the largest whole number not above `a` |
+| `@std/number.port.json#round` | `a` rounded to `digits` decimals, half away from zero |
 
-Both inputs are required numbers. A literal is written as it is (`"b": 100`), a constant as a read of it
+Every input is a required number, except `round`'s `digits`. A literal is written as it is (`"b": 100`), a constant as a read of it
 (`"b": "{{const.limit}}"`), and another node's answer as a read (`"a": "{{activeCount}}"`). A read of an optional
 number needs a `has()` first, as every read does (G004).
 
@@ -144,6 +146,18 @@ So subtract one from the other, and compare the difference with 0. This is the f
   "in": { "margin": "{{margin}}" }, "rules": [{ "when": "margin > 0", "to": "busy" }], "else": "quiet" }
 ```
 
+### Rounding
+
+`floor(-2.5)` is `-3`: rounded down means toward minus infinity. `round` rounds half away from zero. With
+`m = 10^digits`, it answers `sign(a) × r / m`, where `r` is the whole number nearest to `|a| × m`, computed in
+doubles, the larger one where two are equally near. So `round(2.5)` is `3`, `round(-2.5)` is `-3`, and
+`round(-7.25, 1)` is `-7.3`. The rule is the definition, so a value that is not exact in binary rounds as the rule
+computes it: `round(1.005, 2)` is `1`, since `1.005 × 100` is `100.49999999999999`. A result of `-0` is answered as
+`0`. `digits` is static, a whole number from 0 to 15, and 0 when absent; any other value breaks the node on every run.
+
+The consumer's indent level is `floor(divide(spaces, 2))`, and its grade is shown as `round(grade, 1)`. Showing `8.0`
+with its trailing zero is a text concern (`#fill` writes `String(value)`), not this RFC's.
+
 ### What the rehearsal does
 
 `wilanis rehearse` stubs effects alone and runs the arithmetic. For `percent > 60`, it asks `activePercent` for a
@@ -160,8 +174,7 @@ features/customers/domain/digest  switch 'mostlyActive'  2/2 branches
 ```
 
 (`activeCount` is itself a `#count`. At 1feb33d the rehearsal does not follow a `#count` back to its list, so the
-demand stops there as a stub of the count, as it does for any switch over a count today. *Open questions* 2 and 3
-say more.)
+demand stops there as a stub of the count, as it does for any switch over a count today. #1036 tracks that.)
 
 Where the rehearsal cannot follow a demand back, the branch reads `NEVER RUN` and names the node:
 
@@ -184,7 +197,7 @@ not wait on the `decision` job.
 {
   "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/port.schema.json",
   "label": "Numbers",
-  "description": "Numbers: add, subtract, multiply, divide. IEEE 754 doubles, as JavaScript computes them; whole numbers are exact up to 2^53. A result that is not a finite number breaks the node.",
+  "description": "Numbers: add, subtract, multiply, divide, floor, round. IEEE 754 doubles, as JavaScript computes them; whole numbers are exact up to 2^53. A result that is not a finite number breaks the node.",
   "operations": {
     "add": {
       "description": "a + b.",
@@ -209,6 +222,21 @@ not wait on the `decision` job.
       "accepts": { "a": { "type": "number" }, "b": { "type": "number" } },
       "returns": "number",
       "pure": true
+    },
+    "floor": {
+      "description": "The largest whole number not above a: floor(-2.5) is -3.",
+      "accepts": { "a": { "type": "number" } },
+      "returns": "number",
+      "pure": true
+    },
+    "round": {
+      "description": "a rounded to digits decimals, half away from zero: sign(a) × r / 10^digits, where r is the whole number nearest to |a| × 10^digits in doubles, the larger where two are equally near. -0 is answered as 0.",
+      "accepts": {
+        "a": { "type": "number" },
+        "digits": { "type": "number", "required": false, "static": true, "description": "a whole number from 0 to 15; 0 when absent" }
+      },
+      "returns": "number",
+      "pure": true
     }
   }
 }
@@ -217,10 +245,13 @@ not wait on the `decision` job.
 `subtract` is in the port because without it `a - b` takes a `multiply` by `-1` and an `add`, and because the
 difference against 0 is how a rule compares two computed numbers (*Comparing two computed numbers*, above).
 
+`digits` is `static`, a literal where the node is written, because a precision is a decision of the graph, not a
+value of the run, and the rehearsal then never has to solve for it.
+
 **`packages/runtime/docs/std/plugin.json`** lists `@std/number.port.json` under `grants.ports`. Its description
 becomes "Pure operations on objects, text, lists, numbers and outcomes. Safe in any layer."
 
-**The handlers.** A new module `packages/runtime/src/arithmetic.ts` holds the four operations once:
+**The handlers.** A new module `packages/runtime/src/arithmetic.ts` holds the six operations once, in two tables:
 
 ```ts
 /** The operations of `@std/number`, by name: what the handlers answer, and what the rehearsal inverts and computes. */
@@ -230,13 +261,23 @@ export const ARITHMETIC = {
   multiply: (a: number, b: number) => a * b,
   divide: (a: number, b: number) => a / b,
 } as const;
+
+/** The operations of `@std/number` that take one number: `round` half away from zero, `-0` answered as 0. */
+export const ROUNDING = {
+  floor: (a: number) => Math.floor(a),
+  round: (a: number, digits = 0) => (Math.sign(a) * Math.round(Math.abs(a) * 10 ** digits)) / 10 ** digits + 0,
+} as const;
 ```
 
-`std.ts` gains one handler per operation, `@std/number.port.json#<name>`. Each reads `a` and `b` through a `num`
-helper beside `str` and `arr` (it throws `a: expected a number` for anything else), answers `ARITHMETIC[name](a, b)`,
-and throws `<name>: the result is not a finite number` where `Number.isFinite` is false of the result. The test is on
+`Math.round` rounds a half up, toward plus infinity, which on `|a| × m`, never negative, is away from zero.
+
+`std.ts` gains one handler per operation, `@std/number.port.json#<name>`. Each reads its operands through a `num`
+helper beside `str` and `arr` (it throws `a: expected a number` for anything else), answers `ARITHMETIC[name](a, b)`
+or `ROUNDING[name](a, digits)`, and throws `<name>: the result is not a finite number` where `Number.isFinite` is
+false of the result. `round` first throws `round: digits must be a whole number from 0 to 15` for any other
+`digits`. The test is on
 the result alone: an operand is never `Infinity` or `NaN`, since JSON has neither and an operation that made one
-faulted. The rehearsal reads the same table (below), so the solver and the handler cannot disagree on what an
+faulted. The rehearsal reads the same tables (below), so the solver and the handler cannot disagree on what an
 operation answers. The module comment of `std.ts` gains "numbers".
 
 No other port, kind, codec or shape.
@@ -287,16 +328,16 @@ pure node. Take a tree that reads a list through the test plugin `@source`, coun
 `{ "op.n": 0 }`. Each such run computes nothing from its data: the count disagrees with the list it counts. Issue
 #1027 decided against this ("Where no demand can be carried back, the case is reported, never run on a stub the rule
 forbids"), and the template says such an operation stops the trace with `NEVER RUN`. The code does not do that yet
-for `count`, `slice`, `concat`, `fill`, `join`, `split` and `replace`. Without this RFC's rehearsal step, the four new
+for `count`, `slice`, `concat`, `fill`, `join`, `split` and `replace`. Without this RFC's rehearsal step, the six new
 operations would meet the same fallback: `ratio > 60` over `multiply(bold, 100)` would settle on a stub at the
-multiply node. *Open questions* 3 asks which of the two the maintainer intends for the other pure operations. This RFC
-does not need the answer, because it handles every arithmetic node itself and never falls through to that stub.
+multiply node. #1036 tracks the bug for the other pure operations. This RFC does not depend on it, because it handles
+every arithmetic node itself and never falls through to that stub.
 
 **What changes.**
 
 1. `rehearse-where.ts` gains `arithmeticAt(emb, root, nodePath)`, beside `writtenAt`: for a node that is a `call` (not
-   a map) whose handler is one of the four operations, `{ op, a, b }`, with `a` and `b` its lowered sources. Nothing
-   for any other node.
+   a map) whose handler is one of the six operations, `{ op, a, b }` or `{ op, a, digits }`, with `a` and `b` its
+   lowered sources and `digits` the literal. Nothing for any other node.
 2. `Stubbing` in `branches.ts` gains `arithmeticOf?: (nodePath) => Arithmetic | undefined` and
    `probed?: (nodePath) => unknown`, what the node answered in the first run. `switchesReached` in
    `rehearse-reached.ts` sets both. For `probed`, it keeps the report of `probe.fire`, which it discards today, and
@@ -351,6 +392,11 @@ the node stands, and `each` where the demand stands for every element.
    | `divide`, `a`, `c ≠ 0` | `1/c`, `0` | each times `c`, flipped where `c < 0` |
    | `divide`, `a`, `c = 0` | | the node breaks on every such run: unreachable (sentence *breaks*) |
    | `divide`, `b` | | not solved: unreachable (sentence *divisor*) |
+   | `floor`, `a` | | the demand passes to `a` as it is: on a whole number `floor(x)` is `x`, and the solver's domains hold whole numbers (step 4) |
+   | `round`, `a` | | the same, for every `digits`: a whole number rounds to itself |
+
+   `floor` and `round` have one operand, so step 2 has nothing to choose: `a` is steered where it lands, fixed where it
+   is a literal (the answer is then computed once, as for two fixed operands), and unknown otherwise.
 
    `present` passes to `x` as it is. `absent` cannot be met, since the node answers whenever it runs: closed
    (sentence *answers*). `paired` (the switch compares the answer with another read, `==` or `!=`) cannot be inverted,
@@ -427,13 +473,14 @@ caller's number is recorded as a fault there too. `regress` replays what was rec
 - `wilanis manifest` lists the new port under `documents` and `ports`, so the two generated goldens move:
   `packages/runtime/test/manifest.golden.json` and `packages/deploy/test/fixtures/customers.manifest.json`.
 - `docs/model.md`: the heading *The standard library is four ports* becomes *five ports*, and its line gains
-  "`@std/number` (`add`, `subtract`, `multiply`, `divide`)".
+  "`@std/number` (`add`, `subtract`, `multiply`, `divide`, `floor`, `round`)".
 - `packages/runtime/templates/CLAUDE.md`:
   - **The standard library** becomes "five ports", and names `@std/number.port.json` (`add`, `subtract`, `multiply`,
-    `divide` two numbers `a` and `b`; a result that is not a finite number breaks the node, so route a `divide`
-    behind a switch on `b != 0`). It gains: "A rule compares a value with a literal; to compare two computed
+    `divide` two numbers `a` and `b`; `floor` and `round` one, `a`, with `round` taking a static `digits` and rounding
+    half away from zero; a result that is not a finite number breaks the node, so route a `divide` behind a switch on
+    `b != 0`). It gains: "A rule compares a value with a literal; to compare two computed
     numbers, `subtract` one from the other and compare the difference with 0."
-  - Loop step 2 lists `add`, `subtract`, `multiply` and `divide` among the nodes rehearse runs and follows a value
+  - Loop step 2 lists the six `@std/number` operations among the nodes rehearse runs and follows a value
     back through, and says: "A value an arithmetic operation answers is followed to an operand, the other held at the
     literal or the value it has on the run; a divisor, an equality no whole number meets, and an operand read from
     `context` stop it."
@@ -459,12 +506,13 @@ None.
      words in the viewer's `said.ts`, and a place in `prove.ts`'s spelling.
 
   *Drawbacks and alternatives* says where the grammar would do better.
-- **No rounding.** See *Open questions* 1.
+- **One rounding rule.** `round` rounds half away from zero. Half to even, `ceil` and `trunc` are left out until a
+  tree needs them; `ceil(x)` is `subtract(0, floor(subtract(0, x)))` meanwhile.
 - **No integer type.** A number is a double; a whole number is exact up to 2^53, and a result past it is still
   finite, so it is not a fault.
 - **No refusal of a literal 0 divisor.** `"b": 0` breaks on every run that reaches it, and the rehearsal says so
   (*breaks*). A checker rule could refuse it; it is left out, as decided for every non-finite result.
-- **No following of `#count`.** See *Open questions* 2.
+- **No following of `#count`.** That is a bug against #1027's decision, tracked as #1036.
 
 ## Compatibility
 
@@ -483,12 +531,17 @@ trees that call them. This RFC adds `packages/runtime/test/std-number.test.ts`, 
 - `divide(1, 0)`, `divide(0, 0)` and `multiply(1e308, 10)` throw `<op>: the result is not a finite number`, and the
   message holds neither operand;
 - `add(Number.MAX_SAFE_INTEGER, 2)` answers, since its result is finite;
-- a string operand throws `a: expected a number`.
+- a string operand throws `a: expected a number`;
+- `floor(-2.5)` is `-3` and `floor(3.5)` is `3`;
+- `round(2.5)` is `3`, `round(-2.5)` is `-3`, `round(-7.25, 1)` is `-7.3`, `round(1.005, 2)` is `1`,
+  `round(0.49999999999999994)` is `0`, and `round(-0.2)` is `0` and not `-0` (`Object.is`);
+- `round(1, 16)`, `round(1, 1.5)` and `round(1, -1)` throw the `digits` message; `round(1e308, 15)` throws
+  `round: the result is not a finite number`.
 
 **The rehearsal** (`packages/runtime/test/rehearse-arithmetic.test.ts`, with its trees in
 `rehearse-arithmetic-trees.ts`, built with the helpers of `rehearse-stubs-trees.ts` and reading their data through
 `@source`, as `rehearse-keep-trees.ts` does):
-- for each of the four operations, a switch `y > k` over its answer, one operand a field of a `@source` read and the
+- for each of `add`, `subtract`, `multiply` and `divide`, a switch `y > k` over its answer, one operand a field of a `@source` read and the
   other a literal: both branches settled, and every stub handed to a run is at the `@source` effect, never at the
   arithmetic node (the check `rehearse-keeps.test.ts` makes by wrapping `Embedder.prototype.fire`). The literal on
   the left and on the right; `subtract` with the read as `b`; `multiply` by a negative literal; `divide` by a literal;
@@ -496,6 +549,8 @@ trees that call them. This RFC adds `packages/runtime/test/std-number.test.ts`, 
 - the two-products form (`multiply`, `multiply`, `subtract`, `margin > 0`): both branches settled;
 - the guarded divide (`b != 0` routing to the `divide`, a switch over its answer): every branch of both switches
   settled, none `BROKE`;
+- a switch `level > 1` over `floor(divide(x, 2))`, and one over `round(x, 1)`: both branches settled, the stubs at
+  the `@source` effect;
 - `NEVER RUN` with each sentence: a literal dividend over a `@source` divisor (*divisor*); `y == 10` over
   `multiply(x, 3)` (*whole*); an operand read from `context`; a `multiply` of two literals whose answer the branch
   excludes (closed, *fixed*);
@@ -514,7 +569,7 @@ trees that call them. This RFC adds `packages/runtime/test/std-number.test.ts`, 
 
 Each step is one pull request and one sub-issue, and each leaves `npm test` passing.
 
-1. **The port and its handlers.** `number.port.json`, the grant in `plugin.json`, `arithmetic.ts`, the four handlers
+1. **The port and its handlers.** `number.port.json`, the grant in `plugin.json`, `arithmetic.ts`, the six handlers
    in `std.ts`, `std-number.test.ts`, the two regenerated goldens, the line in `docs/model.md`, and the template's
    **The standard library** bullet. No `decision` job. Until step 2, a switch over an arithmetic answer is steered by
    a stub at the arithmetic node, the fallback a switch over a `#count` meets today: it settles, on a value no operand
@@ -523,12 +578,10 @@ Each step is one pull request and one sub-issue, and each leaves `npm test` pass
    `Stubbing` and `switchesReached`, with `reportAt` moved; `throughArithmetic` in `demand-arithmetic.ts` and its two
    calls in `demands.ts`; `computedSaid` in `demand-said.ts`; `rehearse-arithmetic.test.ts` and its trees; the proof
    test; the template's loop step 2.
-3. **Only where *Open questions* 2 says so: follow `#count`.** A demand on a count's answer becomes a demand on its
-   list's length, as `lenDomain` in `solve.ts` writes one, carried by `inward`. It is independent of steps 1 and 2.
 
 ## Drawbacks and alternatives
 
-**What it costs.** A fifth port and four handlers of one line each. One module in the rehearsal, expected to be
+**What it costs.** A fifth port and six handlers of one line each. One module in the rehearsal, expected to be
 about the size of `demand-calls.ts`, and one more kind of node the demand walk knows. The held value adds `probed`, so the
 first run's report is kept for the length of the walk instead of discarded.
 
@@ -548,7 +601,7 @@ parses now changes its meaning.
 **Hold the other operand at 1 (or 0) when both can be steered.** No first-run report, no `probed`. Rejected: it fails
 on the motivating form. In `margin = activeHundreds − countSixties`, holding `countSixties` at 1 asks
 `multiply(count, 60)` for exactly 1, so `count` for 1/60, which no whole number is; holding it at 0 asks for an empty
-customer list, where `activeCount` cannot then be 1 once counts are followed (*Open questions* 2). The value the run
+customer list, where `activeCount` cannot then be 1 once counts are followed (#1036). The value the run
 already has keeps the data the case starts from, which is what the rest of the rehearsal does (`overrides`,
 `chosen`).
 
@@ -556,7 +609,11 @@ already has keeps the data the case starts from, which is what the rest of the r
 `count = 0` above, with the same problem, and it multiplies the cases tried per arithmetic node. Rejected for the held
 value; it may be worth a second look if the held value turns out to miss often.
 
-**One operation with a static `op` field** (`#compute`, `"op": "*"`). Fewer handlers. Rejected: four names read
+**`round` with `Math.round` on `a` itself.** `Math.round(-2.5)` is `-2`: it rounds a half toward plus infinity,
+which is not half away from zero. And `Math.floor(|a| × m + 0.5)` rounds `0.49999999999999994` to `1`, since the sum
+rounds up in doubles. Rejected for both.
+
+**One operation with a static `op` field** (`#compute`, `"op": "*"`). Fewer handlers. Rejected: six names read
 plainly in a graph, in `describe` and in the viewer, and each says its own way to fail.
 
 **Each tree writes its own plugin.** That is today's workaround. The checker cannot see the arithmetic, and the
@@ -567,34 +624,23 @@ fraction. Rejected.
 
 ## Open questions
 
-1. **Rounding: `floor` and `round` in this RFC, or later?** The consumer needs both. Its indent level is the count of
-   leading spaces divided by 2, rounded down: `floor(divide(spaces, 2))`. Its readability grade is shown rounded half
-   away from zero to one decimal. Points to decide:
-   - `floor` is small and has one meaning: the rehearsal inverts it as `floor(x) > k` iff `x >= k + 1` for a whole
-     `k`, which fits the whole-number domains. For a negative number "rounded down" means toward −∞, which is what
-     `Math.floor` does; the consumer's counts are never negative.
-   - `round` needs a written rule. JavaScript's `Math.round` rounds a half up, toward +∞ (`Math.round(-2.5)` is `-2`),
-     which is not half away from zero. Rounding to one decimal by `round(x × 10) / 10` meets a double that is not
-     exact (`1.005 × 100` is `100.49999999999999`). So `round` would take a static `digits` and state its half rule.
-   - Showing `7.0` is a text concern: `#fill` writes `String(value)`. That is a separate operation in `@std/text`.
+Settled in review on #1035:
 
-   Recommendation: `floor` in this RFC, as a fifth operation; `round` and fixed decimals in a later amendment, once
-   the half rule is chosen.
-2. **Should the rehearsal follow `@std/list#count` back to its list?** Every operand in the consumer's rules is a
-   count. Today a demand on a count stops at a stub of the count (see *The rehearsal today*), so arithmetic followed
-   back from a switch ends at a value the list does not have. A count's answer `> k` is the list's `len > k`, which
-   `lenDomain` in `solve.ts` already writes, and `inward` already carries a length demand to a map's `over`.
-   Recommendation: yes, as step 3, or as a `bug` under #1027, since #1027 decided that a pure operation is never
-   stubbed.
-3. **What should a pure operation the rehearsal cannot follow do?** The template (loop step 2) says it stops the trace
-   with `NEVER RUN`, and #1027 decided the same. At 1feb33d the code writes a stub at the pure node instead, and the
-   branch settles. This RFC handles arithmetic nodes itself, so it does not depend on the answer. But step 1 lands
-   with the fallback as it is, and the maintainer may prefer the fallback fixed first.
-4. **Should `warmUp` keep its reports too?** `probed` reads only the first run. A node behind a branch the first run
+1. **`floor` and `round` are in this RFC.** The consumer needs both, and each is one line. `round` rounds half away
+   from zero, by the rule in *Rounding*, with a static `digits`; the rule is the definition, so a value that is not
+   exact in binary rounds as the rule computes it. Half to even and `ceil` wait for a tree that needs them.
+2. **Following `#count` back to its list is not this RFC.** #1027 already decided that a pure operation is never
+   stubbed, and that a count still is is a bug against that decision: #1036. This RFC follows its own nodes and does
+   not wait for it.
+3. **A pure operation the rehearsal cannot follow** reads `NEVER RUN`, as #1027 and the template say. The code that
+   stubs it instead is the same bug, #1036.
+4. **The names are `@std/number`, `a`, `b` and `digits`.** `@std/list#concat` already names its two operands `a`
+   and `b`.
+5. **This RFC sits in M14**, the open milestone (one milestone is worked at a time, `CONTRIBUTING.md`), and the
+   freeze does not wait for it, since it changes no schema. `docs/roadmap.md` says so in M14's paragraph.
+
+May be decided during implementation:
+
+6. **Should `warmUp` keep its reports too?** `probed` reads only the first run. A node behind a branch the first run
    did not take has no first-run answer, so a held operand there is unknown (*neither known*). The runs `warmUp`
-   makes to reach nested switches could fill `probed` as they fill `record`. Recommendation: decide during
-   implementation, on whether a test meets the case.
-5. **Names.** `@std/number` and `a`, `b`, as decided. `math` and `left`, `right` were the alternatives. May be
-   decided in review.
-6. **The roadmap slot.** M14, with a sentence that the freeze does not wait for it (`docs/roadmap.md`). The
-   alternative is *Unscheduled*, which would leave the tracking issue with no milestone.
+   makes to reach nested switches could fill `probed` as they fill `record`. Decide on whether a test meets the case.
