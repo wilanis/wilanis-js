@@ -1,11 +1,12 @@
 /**
- * @std: the pure native operations every graph may use in any layer: objects, text, lists, outcomes. No effects, no connections.
+ * @std: the pure native operations every graph may use in any layer: objects, text, lists, numbers, outcomes. No effects, no connections.
  * Result types are declared, never inferred: an operation whose result depends on its use takes a `type` field, a literal where it is called.
  */
 import { fileURLToPath } from 'node:url';
 import type { PluginModule } from '@wilanis/core';
 import { conforms, prune, type Type } from '@wilanis/core';
 import { Refusal, readPath } from '@wilanis/engine';
+import { ARITHMETIC, ROUNDING } from '../arithmetic.js';
 
 const obj = (value: unknown, what: string): Record<string, unknown> => {
   if (value === undefined) return {};
@@ -21,6 +22,26 @@ const arr = (value: unknown, what: string): unknown[] => {
   if (!Array.isArray(value)) throw new Error(`${what}: expected a list`);
   return value;
 };
+const num = (value: unknown, what: string): number => {
+  if (typeof value !== 'number') throw new Error(`${what}: expected a number`);
+  return value;
+};
+/** A number operation's answer, or a fault where it is not finite; the message never names an operand, which may be secret. */
+const finite = (op: string, value: number): number => {
+  if (!Number.isFinite(value)) throw new Error(`${op}: the result is not a finite number`);
+  return value;
+};
+/** One of the operations of `@std/number` that take two numbers, over `a` and `b`. */
+const twoNumbers = (op: keyof typeof ARITHMETIC, input: Record<string, unknown>): number =>
+  finite(op, ARITHMETIC[op](num(input.a, 'a'), num(input.b, 'b')));
+/** `round`'s `digits`: a whole number from 0 to 15, 0 when absent. */
+const digitsOf = (value: unknown): number => {
+  if (value === undefined) return 0;
+  if (!Number.isInteger(value) || (value as number) < 0 || (value as number) > 15)
+    throw new Error('round: digits must be a whole number from 0 to 15');
+  return value as number;
+};
+
 /** Judge a result against the declared type when the embedder can resolve it. */
 const declared = (value: unknown, type: unknown, env: Record<string, unknown>): unknown => {
   const resolve = env.resolveType as ((ref: string) => Type) | undefined;
@@ -67,6 +88,13 @@ export const std: PluginModule = {
       return declared(list[0], input.type, ctx.env);
     },
     '@std/list.port.json#count': async ({ in: input }) => arr(input.list, 'list').length,
+    '@std/number.port.json#add': async ({ in: input }) => twoNumbers('add', input),
+    '@std/number.port.json#subtract': async ({ in: input }) => twoNumbers('subtract', input),
+    '@std/number.port.json#multiply': async ({ in: input }) => twoNumbers('multiply', input),
+    '@std/number.port.json#divide': async ({ in: input }) => twoNumbers('divide', input),
+    '@std/number.port.json#floor': async ({ in: input }) => finite('floor', ROUNDING.floor(num(input.a, 'a'))),
+    '@std/number.port.json#round': async ({ in: input }) =>
+      finite('round', ROUNDING.round(num(input.a, 'a'), digitsOf(input.digits))),
     '@std/list.port.json#slice': async ({ in: input, ctx }) =>
       declared(
         arr(input.list, 'list').slice(Number(input.from), input.to === undefined ? undefined : Number(input.to)),

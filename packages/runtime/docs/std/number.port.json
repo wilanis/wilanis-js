@@ -1,0 +1,85 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wilanis/wilanis-js/main/packages/core/schemas/port.schema.json",
+  "label": "Numbers",
+  "description": "Numbers: add, subtract, multiply, divide, floor, round. IEEE 754 doubles, as JavaScript computes them; whole numbers are exact up to 2^53. A result that is not a finite number breaks the node, and the fault names the operation, never an operand.",
+  "operations": {
+    "add": {
+      "description": "a + b.",
+      "accepts": {
+        "a": {
+          "type": "number"
+        },
+        "b": {
+          "type": "number"
+        }
+      },
+      "returns": "number",
+      "pure": true
+    },
+    "subtract": {
+      "description": "a - b. To compare two computed numbers, subtract one from the other and compare the difference with 0.",
+      "accepts": {
+        "a": {
+          "type": "number"
+        },
+        "b": {
+          "type": "number"
+        }
+      },
+      "returns": "number",
+      "pure": true
+    },
+    "multiply": {
+      "description": "a × b; fails where the result overflows to Infinity.",
+      "accepts": {
+        "a": {
+          "type": "number"
+        },
+        "b": {
+          "type": "number"
+        }
+      },
+      "returns": "number",
+      "pure": true
+    },
+    "divide": {
+      "description": "a / b; fails where b is 0 (guard with a switch on b != 0 that routes here) or the result overflows.",
+      "accepts": {
+        "a": {
+          "type": "number"
+        },
+        "b": {
+          "type": "number"
+        }
+      },
+      "returns": "number",
+      "pure": true
+    },
+    "floor": {
+      "description": "The largest whole number not above a: floor(-2.5) is -3.",
+      "accepts": {
+        "a": {
+          "type": "number"
+        }
+      },
+      "returns": "number",
+      "pure": true
+    },
+    "round": {
+      "description": "a rounded to digits decimals, half away from zero: sign(a) × r / 10^digits, where r is the whole number nearest to |a| × 10^digits in doubles, the larger where two are equally near. round(2.5) is 3, round(-2.5) is -3, round(1.005, 2) is 1 since 1.005 × 100 is 100.49999999999999. -0 is answered as 0.",
+      "accepts": {
+        "a": {
+          "type": "number"
+        },
+        "digits": {
+          "type": "number",
+          "required": false,
+          "static": true,
+          "description": "a whole number from 0 to 15; 0 when absent"
+        }
+      },
+      "returns": "number",
+      "pure": true
+    }
+  }
+}
