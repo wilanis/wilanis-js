@@ -46,9 +46,24 @@ export function intoCall(
   const within = inside.list
     ? { from: inside.frames, lists: [...standing.lists, { ...inside.list, from: standing.from }] }
     : { from: [...standing.from, ...inside.frames], lists: standing.lists };
-  const tried = inside.answers.flatMap(answer => fromAnswer(inside, answer, { path, each: read.each, within }, how));
-  return chosen(tried, node, how);
+  const graph = inside.spec;
+  if (following.has(graph))
+    return { missed: 'unreachable', why: `the call at '${node}' runs its own graph again, inside itself` };
+  following.add(graph);
+  try {
+    const tried = inside.answers.flatMap(answer => fromAnswer(inside, answer, { path, each: read.each, within }, how));
+    return chosen(tried, node, how);
+  } finally {
+    following.delete(graph);
+  }
 }
+
+/**
+ * The graphs a demand is being followed into right now, outermost first. A graph that calls itself would be followed
+ * into without end (#1044), so a call into a graph already here is not followed: the demand is followed once through
+ * each graph, and the case takes another of its answers.
+ */
+const following = new Set<object>();
 
 /**
  * The one of the ways to steer a call that a case takes: of those a run can be steered to, the first that leaves what
