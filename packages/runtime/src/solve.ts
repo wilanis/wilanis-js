@@ -271,24 +271,33 @@ function branchFor(
 }
 
 /** The cases already solved, by the rules and else they were solved for; cleared whole when it holds this many. */
-const solved = new Map<string, Branch[]>();
+const solved = new Map<string, readonly Branch[]>();
 const SOLVED_MAX = 1000;
 
 /**
  * Every case of one switch: one per rule, plus the else. A rule's case makes that rule true and every
  * earlier rule false, which is what the kernel requires to reach its target. A rehearsal asks again for the same
- * switch at every decision and warm-up that reaches it, so the cases are solved once per rules and else, and each
- * caller is handed its own copy.
+ * switch at every decision and warm-up that reaches it, so the cases are solved once per rules and else and shared,
+ * frozen, by every caller.
  */
-export function branchesOf(rules: { when: string; to: string }[], elseTo: string): Branch[] {
+export function branchesOf(rules: { when: string; to: string }[], elseTo: string): readonly Branch[] {
   const at = JSON.stringify([rules, elseTo]);
   let branches = solved.get(at);
   if (!branches) {
-    branches = solvedBranches(rules, elseTo);
+    branches = frozen(solvedBranches(rules, elseTo));
     if (solved.size >= SOLVED_MAX) solved.clear();
     solved.set(at, branches);
   }
-  return structuredClone(branches);
+  return branches;
+}
+
+/** A value frozen at every depth, so callers that share it can read it and none can change it under another. */
+function frozen<T>(value: T): T {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const part of Object.values(value)) frozen(part);
+  }
+  return value;
 }
 
 /** The cases of one switch, solved. */
