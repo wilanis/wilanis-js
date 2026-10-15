@@ -44,6 +44,7 @@ import { type CallSite, outputCandidates, passedInputs } from './documents.js';
 import { type GuardHandlers, guardsOf, MAKE, REFUSE, TAKEN_IDS } from './guard.js';
 import { lowerGuards } from './guard-lowering.js';
 import {
+  afterParts,
   alsoAnswering,
   handedAs,
   inputsByName,
@@ -253,7 +254,8 @@ export class Compiler {
   /**
    * One node as the kernel runs it; a call or map that says `retry` or `timeoutMs` is tagged `<graph>#<id>`, and one
    * whose operation is pure says so, which is how a report knows its answer is a function of its inputs alone. A
-   * map's `where` is compiled as a switch's rule is, and a map that only keeps has no handler.
+   * map's `where` is compiled as a switch's rule is, and a map that only keeps has no handler. A run's or a map's
+   * `after` is copied as it is written, whether or not the map runs anything.
    */
   private lowerNode(node: Node, roots: Roots, graphPath: string): KNode {
     if (isSwitch(node)) {
@@ -261,7 +263,8 @@ export class Compiler {
       const caught = node.catch ? { catch: { ...node.catch } } : {};
       return { kind: 'switch', in: lowerValues(node.in, roots), rules, else: node.else, ...caught };
     }
-    if (isMap(node) && node.run === undefined) return keepOf(node, roots);
+    const after = afterParts(node);
+    if (isMap(node) && node.run === undefined) return { ...keepOf(node, roots), ...after };
     const run = callOf(node);
     if (run === undefined) throw new Error(`${graphPath}: node '${node.id}' runs no operation`);
     const { handler, op } = this.handlerFor(run);
@@ -271,7 +274,7 @@ export class Compiler {
     const redact = redactOf(this.scope, op, node.in);
     const tagged = tagSite(this.sites, `${graphPath}#${node.id}`, node);
     const pure = pureOf(op);
-    if (isRun(node)) return { kind: 'call', handler, in: inputs, redact, ...pure, ...tagged };
+    if (isRun(node)) return { kind: 'call', handler, in: inputs, redact, ...pure, ...tagged, ...after };
     const over = lowerValue(node.over, roots);
     return {
       kind: 'map',
@@ -283,6 +286,7 @@ export class Compiler {
       ...pure,
       ...mapParts(node),
       ...tagged,
+      ...after,
     };
   }
 

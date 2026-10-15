@@ -1,9 +1,10 @@
 /**
- * Where a node sits in a graph's routing. A node runs when what it reads is ready, whatever a switch chose:
- * the switch decides who answers, not who runs. So a node sits behind a switch when a rule or `else` names
- * it, or when it reads something that does, and a node reached neither way runs on every branch. `routed`
- * answers whether a node sits behind any switch; `branchesOf` answers behind which branch of which; and
- * `readOnSomeBranchesOnly` puts the two together for G015, over the one walk G008 and G010 make.
+ * Where a node sits in a graph's routing. A node runs when what it waits for is ready, whatever a switch chose:
+ * the switch decides who answers, not who runs. A node waits for what it reads and for what it names under
+ * `after`. So a node sits behind a switch when a rule or `else` names it, or when it waits for something that
+ * does, and a node reached neither way runs on every branch. `routed` answers whether a node sits behind any
+ * switch; `branchesOf` answers behind which branch of which; and `readOnSomeBranchesOnly` puts the two together
+ * for G015, over the one walk G008 and G010 make.
  */
 import { isSwitch, type Node, type SwitchNode } from '@wilanis/core';
 
@@ -12,23 +13,26 @@ export function targetsOf(node: SwitchNode): string[] {
   return [...node.rules.map(rule => rule.to), node.else, ...Object.values(node.catch ?? {})];
 }
 
-/** Who routes whom and who reads whom: what every question about a graph's routing is asked over. */
+/** Who routes whom and who waits for whom: what every question about a graph's routing is asked over. */
 export interface Routing {
   /** node id -> the switch whose rule or else names it */
   routedBy: Map<string, string>;
-  /** node id -> the nodes it reads */
-  dependencies: Map<string, Set<string>>;
+  /** node id -> the nodes it waits for: what it reads and what it names under `after` */
+  waits: Map<string, Set<string>>;
 }
 
-/** Does a node sit behind a switch: routed itself, or reading something that is? Otherwise it runs on every branch. */
+/** Does a node sit behind a switch: routed itself, or waiting for something that is? Otherwise it runs on every branch. */
 export function routed(routing: Routing, id: string, seen = new Set<string>()): boolean {
   if (seen.has(id)) return false;
   seen.add(id);
   if (routing.routedBy.has(id)) return true;
-  return [...(routing.dependencies.get(id) ?? [])].some(dependency => routed(routing, dependency, seen));
+  return [...(routing.waits.get(id) ?? [])].some(dependency => routed(routing, dependency, seen));
 }
 
-/** Who reads whom: the dependency table the other way round, node id -> the nodes that read its answer. */
+/**
+ * Who reads whom: a table of reads or waits the other way round, node id -> the nodes that read its answer, or
+ * that wait for it where the table is the waits.
+ */
 export function readersOf(dependencies: Map<string, Set<string>>): Map<string, Set<string>> {
   const out = new Map<string, Set<string>>();
   for (const [reader, read] of dependencies) {
@@ -42,7 +46,7 @@ export function readersOf(dependencies: Map<string, Set<string>>): Map<string, S
 }
 
 /**
- * The branches a node sits behind, added to `out`: each switch that routes it or anything it reads, with the
+ * The branches a node sits behind, added to `out`: each switch that routes it or anything it waits for, with the
  * targets of that switch the node is reached through. Two nodes behind one rule share a branch; two behind
  * different rules of one switch do not, which is what G015 tells them apart by.
  */
@@ -61,14 +65,14 @@ export function branchesOf(
     out.set(router, targets);
     branchesOf(routing, router, out, seen);
   }
-  for (const dependency of routing.dependencies.get(id) ?? []) branchesOf(routing, dependency, out, seen);
+  for (const dependency of routing.waits.get(id) ?? []) branchesOf(routing, dependency, out, seen);
   return out;
 }
 
-/** Everything a node runs after: what it reads, the switch that routes it, and theirs in turn. */
+/** Everything a node runs after: what it waits for, the switch that routes it, and theirs in turn. */
 function upstreamOf(routing: Routing, id: string, out = new Set<string>()): Set<string> {
   const router = routing.routedBy.get(id);
-  const above = [...(routing.dependencies.get(id) ?? []), ...(router === undefined ? [] : [router])];
+  const above = [...(routing.waits.get(id) ?? []), ...(router === undefined ? [] : [router])];
   for (const one of above) {
     if (out.has(one)) continue;
     out.add(one);
@@ -85,6 +89,22 @@ function upstreamOf(routing: Routing, id: string, out = new Set<string>()): Set<
 export function firstReaders(routing: Routing, readers: string[]): string[] {
   const upstream = new Map(readers.map(reader => [reader, upstreamOf(routing, reader)]));
   return readers.filter(reader => !readers.some(other => other !== reader && upstream.get(reader)?.has(other)));
+}
+
+/**
+ * The one node an effect could name under `after` to run only where its first readers do: the target they all
+ * sit behind, where they sit behind exactly one switch through exactly one of its targets. Nothing where they
+ * sit behind several switches or several targets, since `after` waits for all it names and never for one of
+ * them; and nothing where that target itself waits for the effect, since the wait would then be a cycle.
+ */
+export function waitTarget(routing: Routing, effect: string, readers: string[]): string | undefined {
+  const branches = new Map<string, Set<string>>();
+  for (const reader of readers) branchesOf(routing, reader, branches);
+  if (branches.size !== 1) return undefined;
+  const [targets] = [...branches.values()];
+  if (targets.size !== 1) return undefined;
+  const [target] = [...targets];
+  return target === effect || upstreamOf(routing, target).has(effect) ? undefined : target;
 }
 
 /**

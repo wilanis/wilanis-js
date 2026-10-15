@@ -1,7 +1,7 @@
 /**
- * What is judged over a graph as a whole, once every node is: no cycle through data reads and routing (G007),
- * out.from names nodes that answer the out type and are alternatives of one another (G010), and everything
- * declared -- a field of in, a constant, a node -- is read by something (G008).
+ * What is judged over a graph as a whole, once every node is: no cycle through data reads, waits and routing
+ * (G007), out.from names nodes that answer the out type and are alternatives of one another (G010), and
+ * everything declared -- a field of in, a constant, a node -- is read by something (G008).
  */
 import { assignable, assignableTrimmed, type GraphDoc, isSwitch, show, type Type } from '@wilanis/core';
 import { outputCandidates } from '../documents.js';
@@ -19,23 +19,23 @@ export interface WholeGraph {
 }
 
 /**
- * The refusals over a graph once every node is judged: no cycle through reads and routing (G007), out.from
- * names nodes that answer the out type and are alternatives of one another (G010), and every field of in,
- * constant and node is read by something (G008).
+ * The refusals over a graph once every node is judged: no cycle through reads, waits and routing (G007),
+ * out.from names nodes that answer the out type and are alternatives of one another (G010), and every field of
+ * in, constant and node is read by something, or for a node waited for under another's `after` (G008).
  */
 export function checkWhole(graph: WholeGraph): void {
-  const dependencies = graph.reads.narrowing.dependencies;
-  // routing edges join the dependency table here, for good: a routed node runs only after its switch
-  for (const [target, router] of graph.routedBy) dependencies.get(target)?.add(router);
-  checkCycles(graph, dependencies);
-  checkOutput(graph, dependencies);
+  const waits = graph.reads.narrowing.waits;
+  // routing edges join the wait table here, for good: a routed node runs only after its switch
+  for (const [target, router] of graph.routedBy) waits.get(target)?.add(router);
+  checkCycles(graph, waits);
+  checkOutput(graph, waits);
   checkUnusedIn(graph);
   checkUnusedConstants(graph);
-  checkUnusedNodes(graph, dependencies);
+  checkUnusedNodes(graph, waits);
 }
 
 /** G007. */
-function checkCycles(graph: WholeGraph, dependencies: Map<string, Set<string>>): void {
+function checkCycles(graph: WholeGraph, waits: Map<string, Set<string>>): void {
   const state = new Map<string, 'visiting' | 'done'>();
   const visit = (id: string, stack: string[]): void => {
     const seen = state.get(id);
@@ -45,22 +45,22 @@ function checkCycles(graph: WholeGraph, dependencies: Map<string, Set<string>>):
         'G007',
         `cycle: ${[...stack.slice(stack.indexOf(id)), id].join(' → ')}`,
         `nodes/${id}`,
-        'break the cycle: a graph is a dataflow, so one of these edges must read something earlier',
+        'break the cycle: a graph is a dataflow, so one of these edges must read or wait for something earlier',
       );
       return;
     }
     state.set(id, 'visiting');
-    for (const dependency of dependencies.get(id) ?? []) visit(dependency, [...stack, id]);
+    for (const dependency of waits.get(id) ?? []) visit(dependency, [...stack, id]);
     state.set(id, 'done');
   };
   for (const id of graph.reads.table.nodes.keys()) visit(id, []);
 }
 
 /** G010: out.from names nodes that answer the out type; several candidates are alternatives behind switches. */
-function checkOutput(graph: WholeGraph, dependencies: Map<string, Set<string>>): void {
+function checkOutput(graph: WholeGraph, waits: Map<string, Set<string>>): void {
   const candidates = outputCandidates(graph.doc) ?? [];
   for (const id of candidates) checkCandidate(graph, id);
-  if (candidates.length > 1) checkAlternatives(graph, candidates, dependencies);
+  if (candidates.length > 1) checkAlternatives(graph, candidates, waits);
   if (graph.doc.out && candidates.length === 0)
     graph.refuse(
       'G010',
@@ -108,9 +108,9 @@ function outHint(id: string, answers: Type, out: Type): string {
 }
 
 /** Candidates are alternatives: one that no switch routes always settles, so later candidates are dead. */
-function checkAlternatives(graph: WholeGraph, candidates: string[], dependencies: Map<string, Set<string>>): void {
+function checkAlternatives(graph: WholeGraph, candidates: string[], waits: Map<string, Set<string>>): void {
   for (const id of candidates) {
-    if (!graph.reads.table.nodes.has(id) || routed({ routedBy: graph.routedBy, dependencies }, id)) continue;
+    if (!graph.reads.table.nodes.has(id) || routed({ routedBy: graph.routedBy, waits }, id)) continue;
     const message = `out.from candidate '${id}' is never routed -- it always settles, so later candidates are dead`;
     graph.refuse('G010', message, 'out/from', 'candidates are alternatives; each one sits behind a switch');
   }
@@ -140,18 +140,19 @@ function checkUnusedConstants(graph: WholeGraph): void {
 }
 
 /**
- * G008: every node's answer is read by another node or named in out.from. An effect nothing reads and no
- * switch routes is the one case the hint names the idiom for: a node runs when its inputs are ready, whatever
- * a switch chose, so that effect runs on every branch -- the author most often meant it to sit under one.
+ * G008: every node's answer is read by another node or named in out.from, or another node waits for it under
+ * `after`, which says it exists for its effect. An effect nothing reads and no switch routes is the one case
+ * the hint names the idiom for: a node runs when its inputs are ready, whatever a switch chose, so that effect
+ * runs on every branch -- the author most often meant it to sit under one.
  */
-function checkUnusedNodes(graph: WholeGraph, dependencies: Map<string, Set<string>>): void {
+function checkUnusedNodes(graph: WholeGraph, waits: Map<string, Set<string>>): void {
   for (const node of graph.reads.table.nodes.values()) {
-    if (isSwitch(node) || graph.reads.readNodes.has(node.id)) continue;
+    if (isSwitch(node) || graph.reads.used(node.id)) continue;
     const hit = graph.reads.table.ops.get(node.id);
     const effect = hit !== undefined && hit.op.pure !== true;
     const hint =
-      effect && !routed({ routedBy: graph.routedBy, dependencies }, node.id)
-        ? `nothing routes to '${node.id}', so it runs on every branch: make it the 'to' of a switch rule, or read its answer from every branch`
+      effect && !routed({ routedBy: graph.routedBy, waits }, node.id)
+        ? `nothing routes to '${node.id}', so it runs on every branch: make it the 'to' of a switch rule, or read its answer from every branch, or, where another node must not start before it, name it in that node's after`
         : 'wire its result into another node, or name it in out.from';
     graph.refuse('G008', `node '${node.id}' is read by nothing`, `nodes/${node.id}`, hint);
   }

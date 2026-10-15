@@ -6,11 +6,13 @@
  * type, which a call's report redacts.
  */
 import {
+  afterOf,
   expr,
   type Fields,
   hasVars,
   type Loaded,
   type MapNode,
+  type Node,
   type Operation,
   type Scope,
   type StoreDoc,
@@ -23,7 +25,7 @@ import {
   type Values,
   WHOLE_TEMPLATE,
 } from '@wilanis/core';
-import { type KMap, type KSource, type Redact, readPath } from '@wilanis/engine';
+import { type KCall, type KMap, type KSource, type Redact, readPath } from '@wilanis/engine';
 import { bindings, type CallSite, collectionOf } from './documents.js';
 import type { SiteLiteral } from './sites.js';
 
@@ -126,6 +128,12 @@ export function mapParts(node: MapNode): Pick<KMap, 'bind' | 'limit' | 'concurre
     // compiled as a switch's rule is, and labelled with the rule as its author wrote it
     ...(node.where === undefined ? {} : { where: { when: expr.compilePredicate(node.where), label: node.where } }),
   };
+}
+
+/** What a run or a map waits for without reading it, as the kernel reads it; nothing where it names nothing. */
+export function afterParts(node: Node): Pick<KCall, 'after'> {
+  const after = afterOf(node);
+  return after.length ? { after: [...after] } : {};
 }
 
 /**

@@ -133,6 +133,8 @@ export interface CatchSite extends NodeSite {
   scope: Scope;
   /** node id -> the nodes it reads */
   dependencies: Map<string, Set<string>>;
+  /** node id -> the nodes it waits for: what it reads and what it names under `after` */
+  waits: Map<string, Set<string>>;
   /** the nodes a guard the compiler lowers moves aside to `<id>:made`: made sites an invariant is unproved at */
   guarded: Set<string>;
 }
@@ -238,21 +240,43 @@ function whyNeverBreaks(site: CatchSite, one: Caught): string | undefined {
 }
 
 /**
- * G022 and G023: whatever else reads a caught node runs only where the switch routes, since a reader beside it
- * would wait on a node that broke; and nothing behind where the fault goes reads it, since it produced nothing.
+ * G022 and G023: whatever else reads a caught node, or waits for it under `after`, runs only where the switch
+ * routes, since a node beside it would wait on a node that broke; and nothing behind where the fault goes reads
+ * it or waits for it, since it produced nothing.
  */
 function checkReaders(site: CatchSite, one: Caught): void {
-  const routing = { routedBy: site.routedBy, dependencies: site.dependencies };
-  for (const [reader, reads] of site.dependencies) {
-    if (reader === one.by.id || !reads.has(one.node) || catchesToo(site, reader, one.node)) continue;
-    const branches = branchesOf(routing, reader).get(one.by.id);
-    if (!branches) {
-      const message = `reads '${one.node}', whose fault '${one.by.id}' catches, but does not run behind '${one.by.id}'`;
-      const hint =
-        'a reader of a node whose fault is caught runs only where the switch routes: move it behind the switch, or drop catch';
-      site.refuse('G022', message, `nodes/${reader}/in`, hint);
-    } else if (branches.has(one.to)) refuseReadOfBroken(site, one, reader);
+  const routing = { routedBy: site.routedBy, waits: site.waits };
+  for (const [reader, waits] of site.waits) {
+    if (reader === one.by.id || !waits.has(one.node) || catchesToo(site, reader, one.node)) continue;
+    judgeReader(site, one, reader, branchesOf(routing, reader).get(one.by.id));
   }
+}
+
+/** One node that reads or waits for a caught node, given the targets of the catching switch it runs behind. */
+function judgeReader(site: CatchSite, one: Caught, reader: string, branches: Set<string> | undefined): void {
+  const reads = site.dependencies.get(reader)?.has(one.node) === true;
+  if (!branches) refuseBeside(site, one, reader, reads);
+  else if (!branches.has(one.to)) return;
+  else if (reads) refuseReadOfBroken(site, one, reader);
+  else refuseWaitOnBroken(site, one, reader);
+}
+
+/** G022, at the reader's `in`, or at its `after` where it only waits for the caught node. */
+function refuseBeside(site: CatchSite, one: Caught, reader: string, reads: boolean): void {
+  const verb = reads ? 'reads' : 'waits for';
+  const message = `${verb} '${one.node}', whose fault '${one.by.id}' catches, but does not run behind '${one.by.id}'`;
+  const hint = reads
+    ? 'a reader of a node whose fault is caught runs only where the switch routes: move it behind the switch, or drop catch'
+    : `a node that waits for a node whose fault is caught runs only where the switch routes: wait for the node a rule of '${one.by.id}' routes to instead, or drop catch`;
+  site.refuse('G022', message, `nodes/${reader}/${reads ? 'in' : 'after'}`, hint);
+}
+
+/** G023, at the waiter's `after`: the node it waits for broke, so it would never start. */
+function refuseWaitOnBroken(site: CatchSite, one: Caught, reader: string): void {
+  const where =
+    reader === one.to ? 'whose fault routed here' : `whose fault routed to '${one.to}', which this node runs behind`;
+  const message = `waits for '${one.node}', ${where}: it produced nothing, so this node would never start`;
+  site.refuse('G023', message, `nodes/${reader}/after`, `drop '${one.node}' from after`);
 }
 
 /** Is the reader a second switch catching the same node? G021 has refused that already, once. */

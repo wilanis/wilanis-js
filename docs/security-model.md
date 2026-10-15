@@ -69,6 +69,8 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
 - A refusal's message never reads a field marked secret. [[G016](refusals/G016.md)] (RFC 0014)
 - An effect whose answer is read only behind a switch runs behind that switch, never beside it on every branch,
   unless it is the graph's answer (`out.from`). [[G015](refusals/G015.md)] (RFC 0035)
+- A node's `after` names another node of its graph, never a switch and never a node it already reads, so every wait a
+  graph writes holds back what it says. [[G029](refusals/G029.md), [G030](refusals/G030.md)] (RFC 0041)
 - The context a trigger kind hands is read as `context.*` in a trigger's `fire.in`, a policy's `decide.in` and a
   resolvers document only, and a resolver reads only a path the trigger's kind or the guard hands. [[G003](refusals/G003.md),
   [L002](refusals/L002.md), [P002](refusals/P002.md), [P003](refusals/P003.md), [T004](refusals/T004.md),

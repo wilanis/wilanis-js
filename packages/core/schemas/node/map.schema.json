@@ -70,6 +70,15 @@
     },
     "retry": {
       "$ref": "../common.schema.json#/$defs/retry"
+    },
+    "after": {
+      "description": "Nodes of this graph this node waits for without reading their answers: it starts only once each has answered, as if it read them, and its operation is not given them. A node behind a switch's branch makes this node run only on that branch; one that refuses or breaks means this node never starts. Names a node that is not this one, not a switch, and not one this node already reads (G029, G030).",
+      "type": "array",
+      "items": {
+        "$ref": "../common.schema.json#/$defs/ident"
+      },
+      "minItems": 1,
+      "uniqueItems": true
     }
   },
   "required": [
