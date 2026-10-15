@@ -21,7 +21,10 @@ import { docsDir } from './example-harness.js';
 const RESOLVES = { $T: 'collections[collection].of', $K: 'collections[collection].of{key}.type' };
 
 /** A plugin granting one port whose `get` says where its record and key types are written down. */
-function keeper(resolves: unknown = RESOLVES, storeField: Record<string, unknown> = { static: true }): PluginModule {
+function keeper(
+  resolves: unknown = RESOLVES,
+  storeField: Record<string, unknown> = { static: true, names: 'store' },
+): PluginModule {
   return {
     root: '@keeper',
     docs: docsDir({

@@ -53,7 +53,7 @@ function keeper(log: Log, opened: { count: number }): PluginModule {
             description: 'Write one row inside whatever transaction the run carries.',
             transactional: true,
             accepts: {
-              connection: { type: 'string', static: true },
+              connection: { type: 'string', static: true, names: 'connection' },
               row: { type: 'string' },
             },
             returns: 'string',
@@ -67,7 +67,7 @@ function keeper(log: Log, opened: { count: number }): PluginModule {
             description: 'Break on the connection, so a run inside a transaction ends without an answer.',
             transactional: true,
             accepts: {
-              connection: { type: 'string', static: true },
+              connection: { type: 'string', static: true, names: 'connection' },
               after: { type: 'string' },
             },
             returns: 'string',

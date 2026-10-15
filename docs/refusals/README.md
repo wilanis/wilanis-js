@@ -171,7 +171,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [C006](C006.md) | C | live | a reference whose field's type is not the type of the key it refers to |
 | [C007](C007.md) | C | live | a `unique` or `refs` entry naming the collection's key, which is unique and identifies already |
 | [C008](C008.md) | C | live | a constraint the store's engine cannot keep: any over a blob, a reference over a shape or list, a `unique` over a class its kind does not list, a `refs` over a kind that enforces none |
-| [C009](C009.md) | C | live | a transactional operation that accepts no static `connection` or `store` to resolve one from |
+| [C009](C009.md) | C | live | a transactional operation that does not mark exactly one field `names`, the one its transaction falls on |
 | [C010](C010.md) | C | live | a `renamed` entry that describes no rename: unknown field, old name still a field, or one name twice |
 | [C011](C011.md) | C | live | a `was` naming the collection itself or a name another collection on the connection holds now |
 | [C012](C012.md) | C | live | a `scoped` column not filled by exactly one required string-or-number read the store binds |
@@ -187,6 +187,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [C022](C022.md) | C | live | a `permits` entry that permits nothing the profile reaches |
 | [C023](C023.md) | C | live | a `permits` entry naming a domain port or its operation, a pure operation, a port with nothing effectful, or a connection the profile replaces |
 | [C024](C024.md) | C | live | a profile extending one the project does not declare, itself, or one that extends another |
+| [C025](C025.md) | C | live | a field marked `names` that is not a string or a list of strings, not static on a contract, or on a shape or a domain operation; or a native static `connection` or `store` field that does not say `names` |
 | [S001](S001.md) | S | live | a scenario naming a trigger the tree does not have |
 | [S002](S002.md) | S | live | a scenario, or a shared answer of an answers document, pinning a reason on a node whose status is not failed |
 | [S003](S003.md) | S | live | a `cancelAt` that is not a key of the scenario's `stubs` |
@@ -208,7 +209,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [X201](X201.md) | X | live | a store's collection keeps an edge shape, not a core one |
 | [X202](X202.md) | X | live | a collection's key is not a field of its shape, or is an optional one |
 | [X203](X203.md) | X | live | a store's connection is of a kind that reaches no storage engine, or that no loaded plugin grants |
-| [X204](X204.md) | X | live | a storage call names a store the tree does not hold, or a collection the store does not declare |
+| [X204](X204.md) | X | live | a storage call names a collection the store does not declare |
 | [X207](X207.md) | X | live | two stores on one connection declare the same collection name with different shapes |
 | [X208](X208.md) | X | live | a call's `where` or `order` names a field the collection's shape does not have |
 | [X209](X209.md) | X | live | a value a `where` tests with is one the field would not accept |
@@ -234,7 +235,7 @@ miscitations of X104 could not gain a meaning. X205 and X206 were never used.
 | [X251](X251.md) | X | live | a schedule that is not one: cron and everyMs both or neither, a bad cron, interval or zone, or a bad setting |
 | [X252](X252.md) | X | live | a scheduled trigger declares `in` with no `fire.in`, and nothing arrives on a tick |
 | [X253](X253.md) | X | live | `catchUp` is set while no scheduler run step names a lease |
-| [X254](X254.md) | X | live | the scheduler run step's lease names no connection, or one whose kind keeps no leases |
+| [X254](X254.md) | X | live | the scheduler run step's lease names a connection whose kind keeps no leases |
 | [X301](X301.md) | X | live | an @otel endpoint that is neither an http(s) URL nor a secret read, a level that is not summary or full, or a flushDeadlineMs longer than a Node timer can wait |
 | [X401](X401.md) | X | live | a queue setting a worker cannot act on: an outcome that is not ack, retry or dead, or attempts, backoff, deadline or concurrency out of range |
 | [X402](X402.md) | X | live | a `retry` outcome, or `onFault` left at retry, on a queue trigger whose connection's kind delivers at most once |

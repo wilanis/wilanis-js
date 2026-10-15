@@ -183,6 +183,10 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
 - A profile extends only a declared profile that extends nothing, and one that writes no `permits` is held to the
   list of the profile it extends, as strictly as to a list of its own. [[C024](refusals/C024.md),
   [C021](refusals/C021.md), [C022](refusals/C022.md)] (RFC 0043)
+- A call reaches every connection its contract's marked fields name, a store's through the store, so a profile's
+  reach and its `permits` see each one: only a native contract marks a field `names`, the field is static and a
+  string or a list of strings, a static field called `connection` or `store` says it, and every literal there names
+  a document of that kind the tree has. [[C025](refusals/C025.md), [R001](refusals/R001.md)] (RFC 0037)
 - A `retry` is written only over a call that reaches an effect and is idempotent where it is made, an atomic graph's
   transactional effects excepted, since a failed try rolls them back; its `when` is a boolean over what one try
   answers; a `timeoutMs` and a `backoffMs` are each a wait a Node timer can keep; and a domain graph writes no
@@ -194,7 +198,7 @@ npm package names, never paths. Adding any of these is an RFC that edits this pa
   [T009](refusals/T009.md)] (RFC 0011)
 - An atomic graph reaches, under every profile that runs it, only effects that take part in its transaction, on one
   connection, and at least one; it collects no failed element and nothing below it retries; and a transactional
-  operation takes its connection or store as a static input. [[L009](refusals/L009.md), [L010](refusals/L010.md),
+  operation takes its connection or store in the one field it marks `names`. [[L009](refusals/L009.md), [L010](refusals/L010.md),
   [L011](refusals/L011.md), [G014](refusals/G014.md), [G020](refusals/G020.md), [C009](refusals/C009.md)] (RFC 0004)
 
 ## Enforced by the runtime

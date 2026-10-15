@@ -160,7 +160,10 @@ function checkCatchUp(one: Scheduled, leased: boolean, refuse: Refuse): void {
   });
 }
 
-/** X254: the connection a run step's lease names is one whose kind declares it can keep one. */
+/**
+ * X254: the connection a run step's lease names is one whose kind declares it can keep one. A lease that names no
+ * connection is the compiler's R001, since the port marks `lease` `"names": "connection"`.
+ */
 function checkLease(scope: Scope, step: StartupStep, index: number, refuse: Refuse): void {
   const named = step.in?.lease;
   if (typeof named !== 'string') return; // B007 has held it to a string; nothing named is this process alone
@@ -168,10 +171,7 @@ function checkLease(scope: Scope, step: StartupStep, index: number, refuse: Refu
   const hint = 'name a connection whose kind declares leases; wilanis ls connection-kind';
   const say = (message: string) => refuse({ code: 'X254', file: '@project.json', message, at, hint });
   const connection = scope.get('connection', named);
-  if (!connection) {
-    say(`the run step's lease names '${named}', which is not a connection document`);
-    return;
-  }
+  if (!connection) return; // R001, where the step's inputs are judged
   const kindRef = (connection.doc as ConnectionDoc).kind;
   const kind = scope.get('connection-kind', kindRef);
   if (!kind) return; // R001 judges a connection whose kind is not one

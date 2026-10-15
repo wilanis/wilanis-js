@@ -17,7 +17,7 @@ type Refuse = PluginCheckContext['refuse'];
 
 /**
  * What a site's `scope` would be over, in the store's own words: the collection the call names, as the store
- * declares it, or nothing where the call names no collection this tree holds (X204 refuses that).
+ * declares it, or nothing where the call names no collection this tree holds (R001 or X204 refuses that).
  */
 function scopedAt(call: Call, scope: Scope): { name: string; collection: StoreCollection } | undefined {
   const named = call.given?.store;

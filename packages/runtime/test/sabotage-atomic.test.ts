@@ -237,7 +237,7 @@ describe('an operation that says it is transactional', () => {
       description: 'Write something, where the store says.',
       transactional: true,
       accepts: {
-        store: { type: 'string', static: true, description: 'the store written to' },
+        store: { type: 'string', static: true, names: 'store', description: 'the store written to' },
         what: { type: 'string', description: 'the thing written' },
       },
     };

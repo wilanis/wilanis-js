@@ -1,8 +1,9 @@
 /**
  * What every rule family shares: the scope, the refusal list, the project, the resolver table, and the small
  * judgements that recur -- typing a spec (R001), visibility (L005), the shapes a type may name (L001), an
- * operation reference (R001, L005), settings where only secrets may appear (C001), the profiles to judge
- * under -- a trigger under those that serve it --, and the reasons an operation can refuse with.
+ * operation reference (R001, L005), settings where only secrets may appear (C001), a literal that names a
+ * connection or a store (R001), the profiles to judge under -- a trigger under those that serve it --, and the
+ * reasons an operation can refuse with.
  */
 import {
   expr,
@@ -10,6 +11,7 @@ import {
   type Fix,
   isMap,
   type Loaded,
+  type Names,
   type Node,
   type Operation,
   type OpHit,
@@ -355,6 +357,27 @@ export class Judge {
       if (!(path[0] in secrets)) return `secret '${path[0]}' is not declared in project.json secrets`;
       return { type: STRING, optional: false };
     });
+  }
+
+  /**
+   * R001: every literal a field marked `names` gives names a document of that kind the tree has -- a connection,
+   * or a store. A read is P001's, and a field the contract does not mark is passed over. Graph nodes and binding
+   * delegations reach this through `checkInputs`, and a startup step through `checkStepInputs`.
+   */
+  checkNamedLiterals(file: string, accepted: Fields, site: { given: Values | undefined; at: string }): void {
+    for (const [name, { names }] of Object.entries(accepted)) {
+      if (!names) continue;
+      const value = site.given?.[name];
+      const at = `${site.at}/${name}`;
+      if (!Array.isArray(value)) this.checkNamed(file, names, value, at);
+      else for (const [index, one] of value.entries()) this.checkNamed(file, names, one, `${at}/${index}`);
+    }
+  }
+
+  /** R001 for one literal of a marked field: it names a document of the kind the field says. */
+  private checkNamed(file: string, names: Names, value: unknown, at: string): void {
+    if (typeof value !== 'string' || !this.scope.literal(value) || this.scope.get(names, value)) return;
+    this.refuser(file)('R001', `unknown ${names} '${value}'`, at, `wilanis ls ${names}`);
   }
 
   /** Type a settings block; C001 when it reads anything but a secret. */

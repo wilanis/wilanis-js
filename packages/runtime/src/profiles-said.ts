@@ -101,7 +101,7 @@ function groupsOf(sites: ReachedNative[]): ReachedGroup[] {
   const byOp = new Map<string, string[]>();
   for (const site of sites) {
     const connections = byOp.get(site.key) ?? [];
-    if (site.connection && !connections.includes(site.connection)) connections.push(site.connection);
+    for (const one of site.connections) if (!connections.includes(one)) connections.push(one);
     byOp.set(site.key, connections);
   }
   const groups = new Map<string, ReachedGroup>();

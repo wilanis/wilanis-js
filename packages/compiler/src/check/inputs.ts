@@ -5,8 +5,9 @@
  * Every other value is typed by the site's reader in the caller's context (G003), must be an input (G006),
  * present when required (G005), and assignable (G004). Where the operation refuses, its `message` is said to
  * the caller, and reads no field marked secret (G016). A field the contract marks `provided` is the compiler's:
- * it is never given (G026) and never missing (G005 passes it over). A static `connection` written as a literal names a
- * connection document the tree has (R001). A static field marked `within` is a path the bound type holds (G028, `within.ts`).
+ * it is never given (G026) and never missing (G005 passes it over). A literal in a field marked `names` names a
+ * document of that kind the tree has (R001, `Judge.checkNamedLiterals`). A static field marked `within` is a path the
+ * bound type holds (G028, `within.ts`).
  */
 import {
   assignable,
@@ -93,26 +94,6 @@ export function providedNames(accepted: Fields): string[] {
     .map(([name]) => name);
 }
 
-/** The static field a native call names its connection in (C009), the one `connectionOf` reads. */
-const CONNECTION = 'connection';
-
-/**
- * R001: a static `connection` written as a literal names a connection document the tree has. A read is P001's, and
- * an operation that accepts no static `connection` is passed over. Graph nodes and binding delegations reach this
- * through `checkInputs`; a startup step, whose inputs are judged apart, asks it directly.
- */
-export function checkConnectionNamed(
-  judge: Judge,
-  file: string,
-  accepted: Fields,
-  site: { given: Record<string, unknown> | undefined; at: string },
-): void {
-  const value = site.given?.[CONNECTION];
-  if (accepted[CONNECTION]?.static !== true || typeof value !== 'string' || !judge.scope.literal(value)) return;
-  if (judge.scope.get('connection', value)) return;
-  judge.refuser(file)('R001', `unknown connection '${value}'`, `${site.at}/${CONNECTION}`, 'wilanis ls connection');
-}
-
 const BRACES = /^\{\{(.*)\}\}$/s;
 const INDEX = /^[0-9]+$/;
 
@@ -151,7 +132,7 @@ class InputCheck {
   run(): Record<string, Type> {
     this.checkUnknown();
     this.checkTrim();
-    checkConnectionNamed(this.judge, this.site.file, this.accepts, this.site);
+    this.judge.checkNamedLiterals(this.site.file, this.accepts, this.site);
     // what binds comes first: the rest may be typed through the variables bound here
     for (const [name, field] of Object.entries(this.accepts))
       if (this.isTypeField(field)) this.checkTypeField(name, field);

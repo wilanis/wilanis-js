@@ -110,7 +110,7 @@ export function bindingCalls(scope: Scope): Call[] {
   return out;
 }
 
-/** The collection a call names, once X204 has settled that it names one; nothing where it does not. */
+/** The collection a call names, once R001 and X204 have settled that it names one; nothing where it does not. */
 export function collectionOf(call: Call, scope: Scope): { shape: Type; fields: Record<string, ObjField> } | undefined {
   const named = call.given?.store;
   const collection = call.given?.collection;

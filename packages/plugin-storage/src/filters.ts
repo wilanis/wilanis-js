@@ -133,7 +133,7 @@ function checkValues(call: Call, where: Where, site: Site): void {
 /** X208, X209, X210: what a call asks of the records, against the shape the collection declares. */
 export function checkFilter(call: Call, scope: Scope, refuse: Refuse): void {
   const collection = collectionOf(call, scope);
-  if (!collection) return; // X204, or R001 where the store is judged
+  if (!collection) return; // R001 for the store, or X204 for the collection
   const { shape, fields } = collection;
   checkOrder(call, fields, refuse);
   const site: Site = { scope, refuse, fields, resolve: readsOf(call.reads) };

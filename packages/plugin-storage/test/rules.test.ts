@@ -101,15 +101,15 @@ describe('what a store may sit on', () => {
 });
 
 describe('what a call may name', () => {
-  it('X204 a store this tree does not hold, pointing at the input that named it', () => {
-    const found = at(
-      graph(doc => {
-        doc.nodes[0].in.store = '@features/customers/data/nope.store.json';
-      }),
-      'X204',
-    );
-    expect(found).toHaveLength(1);
-    expect(found[0].at).toBe('nodes/asked/in/store');
+  it("a store this tree does not hold is the compiler's R001 at the input that named it, and no X204", () => {
+    const found = graph(doc => {
+      doc.nodes[0].in.store = '@features/customers/data/nope.store.json';
+    });
+    expect(at(found, 'X204')).toHaveLength(0);
+    const unknown = at(found, 'R001');
+    expect(unknown).toHaveLength(1);
+    expect(unknown[0].at).toBe('nodes/asked/in/store');
+    expect(unknown[0].message).toBe("unknown store '@features/customers/data/nope.store.json'");
   });
 
   it('X204 a collection the store does not declare, naming the ones it does', () => {
